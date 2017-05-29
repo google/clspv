@@ -16,6 +16,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
@@ -24,6 +25,10 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "ReplaceOpenCLBuiltin"
+
+static llvm::cl::opt<bool> f16bit_storage(
+    "f16bit_storage", llvm::cl::init(false),
+    llvm::cl::desc("Assume the target supports SPV_KHR_16bit_storage"));
 
 namespace {
 uint32_t clz(uint32_t v) {
@@ -1129,12 +1134,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
           // The pointer argument from vstore_half.
           auto Arg2 = CI->getOperand(2);
 
-          auto ShortTy = Type::getInt16Ty(M.getContext());
           auto IntTy = Type::getInt32Ty(M.getContext());
           auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              ShortTy, Arg2->getType()->getPointerAddressSpace());
           auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+          auto One = ConstantInt::get(IntTy, 1);
 
           // Our intrinsic to pack a float2 to an int.
           auto SPIRVIntrinsic = "spirv.pack.v2f16";
@@ -1142,24 +1145,100 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
           auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
           // Insert our value into a float2 so that we can pack it.
-          auto TempVec = InsertElementInst::Create(UndefValue::get(Float2Ty), Arg0, ConstantInt::get(IntTy, 0), "", CI);
+          auto TempVec =
+              InsertElementInst::Create(UndefValue::get(Float2Ty), Arg0,
+                                        ConstantInt::get(IntTy, 0), "", CI);
 
           // Pack the float2 -> half2 (in an int).
           auto X = CallInst::Create(NewF, TempVec, "", CI);
 
-          // Truncate our i32 to an i16.
-          auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
+          if (f16bit_storage) {
+            auto ShortTy = Type::getInt16Ty(M.getContext());
+            auto ShortPointerTy = PointerType::get(
+                ShortTy, Arg2->getType()->getPointerAddressSpace());
 
-          // Cast the half* pointer to short*.
-          auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+            // Truncate our i32 to an i16.
+            auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
 
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
+            // Cast the half* pointer to short*.
+            auto Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
 
-          // Store to the int* we casted to.
-          auto Store = new StoreInst(Trunc, Index, CI);
+            // Index into the correct address of the casted pointer.
+            auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
 
-          CI->replaceAllUsesWith(Store);
+            // Store to the int* we casted to.
+            auto Store = new StoreInst(Trunc, Index, CI);
+
+            CI->replaceAllUsesWith(Store);
+          } else {
+            // We can only write to 32-bit aligned words.
+            //
+            // Assuming base is aligned to 32-bits, replace the equivalent of
+            //   vstore_half(value, index, base)
+            // with:
+            //   uint32_t* target_ptr = (uint32_t*)(base) + index / 2;
+            //   uint32_t write_to_upper_half = index & 1u;
+            //   uint32_t shift = write_to_upper_half << 4;
+            //
+            //   // Pack the float value as a half number in bottom 16 bits
+            //   // of an i32.
+            //   uint32_t packed = spirv.pack.v2f16((float2)(value, undef));
+            //
+            //   uint32_t xor_value =   (*target_ptr & (0xffff << shift))
+            //                        ^ ((packed & 0xffff) << shift)
+            //   // We only need relaxed consistency, but OpenCL 1.2 only has
+            //   // sequentially consistent atomics.
+            //   // TODO(dneto): Use relaxed consistency.
+            //   atomic_xor(target_ptr, xor_value)
+            auto IntPointerTy = PointerType::get(
+                IntTy, Arg2->getType()->getPointerAddressSpace());
+
+            auto Four = ConstantInt::get(IntTy, 4);
+            auto FFFF = ConstantInt::get(IntTy, 0xffff);
+
+            auto IndexIsOdd = BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
+            // Compute index / 2
+            auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
+            auto BaseI32Ptr = CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
+            auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32, "base_i32_ptr", CI);
+            auto CurrentValue = new LoadInst(OutPtr, "current_value", CI);
+            auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+            auto MaskBitsToWrite = BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
+            auto MaskedCurrent = BinaryOperator::CreateAnd(MaskBitsToWrite, CurrentValue, "masked_current", CI);
+
+            auto XLowerBits = BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
+            auto NewBitsToWrite = BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
+            auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite, "value_to_xor", CI);
+
+            // Generate the call to atomi_xor.
+            SmallVector<Type *, 5> ParamTypes;
+            // The pointer type.
+            ParamTypes.push_back(IntPointerTy);
+            // The Types for memory scope, semantics, and value.
+            ParamTypes.push_back(IntTy);
+            ParamTypes.push_back(IntTy);
+            ParamTypes.push_back(IntTy);
+            auto NewFType = FunctionType::get(IntTy, ParamTypes, false);
+            auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
+
+            const auto ConstantScopeDevice =
+                ConstantInt::get(IntTy, spv::ScopeDevice);
+            // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
+            // (SPIR-V Workgroup).
+            const auto AddrSpaceSemanticsBits =
+                IntPointerTy->getPointerAddressSpace() == 1
+                    ? spv::MemorySemanticsUniformMemoryMask
+                    : spv::MemorySemanticsWorkgroupMemoryMask;
+
+            // We're using relaxed consistency here.
+            const auto ConstantMemorySemantics =
+                ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                            AddrSpaceSemanticsBits);
+
+            SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
+                                           ConstantMemorySemantics, ValueToXor};
+            CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
+          }
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
