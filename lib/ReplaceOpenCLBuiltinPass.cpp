@@ -970,9 +970,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Module &M) {
             auto IntPointerTy = PointerType::get(
                 IntTy, Arg1->getType()->getPointerAddressSpace());
 
-            // Cast the half* pointer to int*.
+            // Cast the base pointer to int*.
             // In a valid call (according to assumptions), this should get
-            // optimize away in the simplify GEP pass.
+            // optimized away in the simplify GEP pass.
             auto Cast = CastInst::CreatePointerCast(Arg1, IntPointerTy, "", CI);
 
             auto One = ConstantInt::get(IntTy, 1);

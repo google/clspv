@@ -28,6 +28,7 @@ struct SimplifyPointerBitcastPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 
+  bool runOnTrivialBitcast(Module &M) const;
   bool runOnBitcastFromBitcast(Module &M) const;
   bool runOnBitcastFromGEP(Module &M) const;
   bool runOnGEPFromGEP(Module &M) const;
@@ -52,9 +53,52 @@ bool SimplifyPointerBitcastPass::runOnModule(Module &M) {
   for (bool localChanged = true; localChanged; Changed |= localChanged) {
     localChanged = false;
 
+    localChanged |= runOnTrivialBitcast(M);
     localChanged |= runOnBitcastFromGEP(M);
     localChanged |= runOnBitcastFromBitcast(M);
     localChanged |= runOnGEPFromGEP(M);
+  }
+
+  return Changed;
+}
+
+bool SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
+  // Remove things like:
+  //  bitcast i32 addrspace(1)* %ptr to i32 addrspace(1)*
+
+  SmallVector<BitCastInst *, 16> WorkList;
+  for (Function &F : M) {
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        // If we have a bitcast instruction...
+        if (auto Bitcast = dyn_cast<BitCastInst>(&I)) {
+          // ... whose source type is the same as the destination type.
+          auto Source = Bitcast->getOperand(0);
+          if (Source->getType() == Bitcast->getType()) {
+            // ... record the bitcast as something we need to process.
+            WorkList.push_back(Bitcast);
+          }
+        }
+      }
+    }
+  }
+
+  const bool Changed = !WorkList.empty();
+
+  for (auto Bitcast : WorkList) {
+    auto Source = Bitcast->getOperand(0);
+    Bitcast->replaceAllUsesWith(Source);
+
+    // Remove the bitcast as it has no users now.
+    Bitcast->eraseFromParent();
+
+    // Check if the source value is an instruction and had no other users...
+    if (auto SourceInst = dyn_cast<Instruction>(Source)) {
+      if (0 == SourceInst->getNumUses()) {
+        // ... and remove it if we were its only user.
+        SourceInst->eraseFromParent();
+      }
+    }
   }
 
   return Changed;
@@ -165,12 +209,16 @@ bool SimplifyPointerBitcastPass::runOnBitcastFromBitcast(Module &M) const {
   for (auto Bitcast : WorkList) {
     auto OtherBitcast = cast<BitCastInst>(Bitcast->getOperand(0));
 
-    // Create a new bitcast from the other bitcasts argument to our type.
-    auto NewBitcast = CastInst::CreatePointerCast(
-        OtherBitcast->getOperand(0), Bitcast->getType(), "", Bitcast);
+    if (OtherBitcast->getType() == Bitcast->getType()) {
+      Bitcast->replaceAllUsesWith(OtherBitcast);
+    } else {
+      // Create a new bitcast from the other bitcasts argument to our type.
+      auto NewBitcast = CastInst::CreatePointerCast(
+          OtherBitcast->getOperand(0), Bitcast->getType(), "", Bitcast);
 
-    // And replace the original bitcast with our replacement bitcast.
-    Bitcast->replaceAllUsesWith(NewBitcast);
+      // And replace the original bitcast with our replacement bitcast.
+      Bitcast->replaceAllUsesWith(NewBitcast);
+    }
 
     // Remove the bitcast as it has no users now.
     Bitcast->eraseFromParent();
