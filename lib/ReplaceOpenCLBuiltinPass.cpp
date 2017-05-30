@@ -26,6 +26,12 @@ using namespace llvm;
 
 #define DEBUG_TYPE "ReplaceOpenCLBuiltin"
 
+// TODO(dneto): As per Neil's suggestion, might not need this if you can
+// trace the pointer back far enough to see that it's 32-bit aligned.
+// However, even in the vstore_half case, you'll probably get better
+// performance if you can rely on SPV_KHR_16bit_storage since in the
+// alternate case you're using a (relaxed) atomic, and therefore have
+// to write through to the cache.
 static llvm::cl::opt<bool> f16bit_storage(
     "f16bit_storage", llvm::cl::init(false),
     llvm::cl::desc("Assume the target supports SPV_KHR_16bit_storage"));
@@ -910,37 +916,85 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Module &M) {
           // The pointer argument from vload_half.
           auto Arg1 = CI->getOperand(1);
 
-          auto ShortTy = Type::getInt16Ty(M.getContext());
           auto IntTy = Type::getInt32Ty(M.getContext());
           auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              ShortTy, Arg1->getType()->getPointerAddressSpace());
           auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
-
-          // Cast the half* pointer to short*.
-          auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg0, "", CI);
-
-          // Load from the short* we casted to.
-          auto Load = new LoadInst(Index, "", CI);
-
-          // ZExt the short -> int.
-          auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
 
           // Our intrinsic to unpack a float2 from an int.
           auto SPIRVIntrinsic = "spirv.unpack.v2f16";
 
           auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          // Get our float2.
-          auto Call = CallInst::Create(NewF, ZExt, "", CI);
+          if (f16bit_storage) {
+            auto ShortTy = Type::getInt16Ty(M.getContext());
+            auto ShortPointerTy = PointerType::get(
+                ShortTy, Arg1->getType()->getPointerAddressSpace());
 
-          // Extract out the bottom element which is our float result.
-          auto Extract = ExtractElementInst::Create(Call, ConstantInt::get(IntTy, 0), "", CI);
+            // Cast the half* pointer to short*.
+            auto Cast =
+                CastInst::CreatePointerCast(Arg1, ShortPointerTy, "", CI);
 
-          CI->replaceAllUsesWith(Extract);
+            // Index into the correct address of the casted pointer.
+            auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg0, "", CI);
+
+            // Load from the short* we casted to.
+            auto Load = new LoadInst(Index, "", CI);
+
+            // ZExt the short -> int.
+            auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
+
+            // Get our float2.
+            auto Call = CallInst::Create(NewF, ZExt, "", CI);
+
+            // Extract out the bottom element which is our float result.
+            auto Extract = ExtractElementInst::Create(
+                Call, ConstantInt::get(IntTy, 0), "", CI);
+
+            CI->replaceAllUsesWith(Extract);
+          } else {
+            // Assume the pointer argument points to storage aligned to 32bits
+            // or more.
+            // TODO(dneto): Do more analysis to make sure this is true?
+            //
+            // Replace call vstore_half(i32 %index, half addrspace(1) %base)
+            // with:
+            //
+            //   %base_i32_ptr = bitcast half addrspace(1)* %base to i32
+            //   addrspace(1)* %index_is_odd32 = and i32 %index, 1 %index_i32 =
+            //   lshr i32 %index, 1 %in_ptr = getlementptr i32, i32
+            //   addrspace(1)* %base_i32_ptr, %index_i32 %value_i32 = load i32,
+            //   i32 addrspace(1)* %in_ptr %converted = call <2 x float>
+            //   @spirv.unpack.v2f16(i32 %value_i32) %value = extractelement <2
+            //   x float> %converted, %index_is_odd32
+
+            auto IntPointerTy = PointerType::get(
+                IntTy, Arg1->getType()->getPointerAddressSpace());
+
+            // Cast the half* pointer to int*.
+            // In a valid call (according to assumptions), this should get
+            // optimize away in the simplify GEP pass.
+            auto Cast = CastInst::CreatePointerCast(Arg1, IntPointerTy, "", CI);
+
+            auto One = ConstantInt::get(IntTy, 1);
+            auto IndexIsOdd = BinaryOperator::CreateAnd(Arg0, One, "", CI);
+            auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg0, One, "", CI);
+
+            // Index into the correct address of the casted pointer.
+            auto Ptr =
+                GetElementPtrInst::Create(IntTy, Cast, IndexIntoI32, "", CI);
+
+            // Load from the int* we casted to.
+            auto Load = new LoadInst(Ptr, "", CI);
+
+            // Get our float2.
+            auto Call = CallInst::Create(NewF, Load, "", CI);
+
+            // Extract out the float result, where the element number is
+            // determined by whether the original index was even or odd.
+            auto Extract = ExtractElementInst::Create(Call, IndexIsOdd, "", CI);
+
+            CI->replaceAllUsesWith(Extract);
+          }
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
