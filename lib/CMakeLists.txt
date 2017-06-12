@@ -1,0 +1,52 @@
+# Copyright 2017 The Clspv Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+add_library(clspv_core STATIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceLLVMIntrinsicsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceOpenCLBuiltinPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ReplacePointerBitcastPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SimplifyPointerBitcastPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SplatArgPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoBoolPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoByvalPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoGetElementPtrConstantExprPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoSRetPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoTranslateSamplerFoldPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoTruncatedSwitchConditionPass.cpp
+)
+
+# Enable C++11 for our executable
+target_compile_features(clspv_core PRIVATE cxx_range_for)
+
+target_include_directories(clspv_core PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
+
+target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
+
+target_include_directories(clspv_core PRIVATE ${CLSPV_INCLUDE_DIRS})
+
+target_link_libraries(clspv_core PRIVATE LLVMCore)
+
+add_dependencies(clspv_core clspv_c_strings clspv_glsl)
+
+if (MSVC)
+  set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
+    PROPERTIES COMPILE_FLAGS "/Wall /WX /wd4710 /wd4820 /wd4625 /wd4626 /wd5026 /wd5027 /wd4061 /wd4711 /wd4996"
+  )
+endif()

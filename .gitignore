@@ -1,0 +1,5 @@
+build
+*.swp
+cscope.*
+.DS_Store
+third_party/

@@ -1,0 +1,16 @@
+# People who have agreed to one of the CLAs and can contribute patches.
+# The AUTHORS file lists the copyright holders; this file
+# lists people.
+#
+# https://developers.google.com/open-source/cla/individual
+# https://developers.google.com/open-source/cla/corporate
+#
+# Names should be added to this file as:
+#     Name <email address>
+
+Neil Henning <neil@codeplay.com>
+JinGu <jingu@codeplay.com>
+Alistair Low <alistair@codeplay.com>
+
+David Neto <dneto@google.com>
+John Kessenich <johnkessenich@google.com>

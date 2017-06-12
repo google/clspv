@@ -1,0 +1,36 @@
+{
+  "commits" : [
+    {
+      "name" : "llvm",
+      "site" : "github",
+      "subrepo" : "llvm-mirror/llvm",
+      "branch" : "master",
+      "subdir" : "third_party/llvm",
+      "commit" : "3a204faa093c681a1e96c5e0622f50649b761ee0"
+    },
+    {
+      "name" : "clang",
+      "site" : "github",
+      "subrepo" : "llvm-mirror/clang",
+      "branch" : "master",
+      "subdir" : "third_party/clang",
+      "commit" : "6e3d1bf62c66b58287bccc61e6cbab9d0d6395a7"
+    },
+    {
+      "name" : "SPIRV-Headers",
+      "site" : "github",
+      "subrepo" : "KhronosGroup/SPIRV-Headers",
+      "branch" : "master",
+      "subdir" : "third_party/SPIRV-Headers",
+      "commit" : "63e1062a194750b354d48be8c16750d7a4d0dc4e"
+    },
+    {
+      "name" : "SPIRV-Tools",
+      "site" : "github",
+      "subrepo" : "KhronosGroup/SPIRV-Tools",
+      "branch" : "master",
+      "subdir" : "third_party/SPIRV-Tools",
+      "commit" : "7c8da66bc27cc5c4ccb6a0fa612f56c9417518ff"
+    }
+  ]
+}

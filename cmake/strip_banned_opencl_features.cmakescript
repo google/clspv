@@ -1,0 +1,54 @@
+# Copyright 2017 The Clspv Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+if(NOT DEFINED STRIP_BANNED_OPENCL_FEATURES_INPUT_FILE)
+  message(FATAL_ERROR
+    "Required cmake variable STRIP_BANNED_OPENCL_FEATURES_INPUT_FILE not set!"
+  )
+endif()
+
+if(NOT DEFINED STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE)
+  message(FATAL_ERROR
+    "Required cmake variable STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE not set!"
+  )
+endif()
+
+if(NOT EXISTS ${STRIP_BANNED_OPENCL_FEATURES_INPUT_FILE})
+  message(FATAL_ERROR "File '${STRIP_BANNED_OPENCL_FEATURES_INPUT_FILE}' does not exist!")
+endif()
+
+file(READ "${STRIP_BANNED_OPENCL_FEATURES_INPUT_FILE}" lines)
+
+string(REGEX REPLACE "\n[^;\n]*char8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*char16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*short8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*short16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*int8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*int16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*long8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*long16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*float8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*float16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*double8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*double16[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*half8[^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*half16[^;]*;" "" lines "${lines}")
+
+string(REGEX REPLACE "\n[^;\n]*_rt[pn][^;]*;" "" lines "${lines}")
+string(REGEX REPLACE "\n[^;\n]*_sat[^;]*;" "" lines "${lines}")
+
+# get_work_dim gets stripped out, lets fudge it back in
+string(REPLACE "#define __cnfn __attribute__((const))" "#define __cnfn __attribute__((const))\nunsigned int __ovld __cnfn get_work_dim(void);" lines "${lines}")
+
+file(WRITE "${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE}" "${lines}")
