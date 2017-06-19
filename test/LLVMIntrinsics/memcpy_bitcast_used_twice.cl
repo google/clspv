@@ -15,7 +15,6 @@
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[entry_id:[a-zA-Z0-9_]*]] "bitcast_used_twice"
 
-// TODO(dneto): Fill out this test
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1)))
 bitcast_used_twice(global float *A, int n, int k) {
@@ -26,6 +25,7 @@ bitcast_used_twice(global float *A, int n, int k) {
   }
   for (int i = 0; i < 20; i++) {
     // Second use of a bitcast for A[i]. Don't delete prematurely
+    // Just check that we don't crash the compiler, and we produce sensible output.
     dst[n+i] = A[i];
   }
   A[n] = dst[k] + src[k];
