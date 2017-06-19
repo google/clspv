@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
@@ -116,10 +117,41 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
 
 bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   bool Changed = false;
+  auto Layout = M.getDataLayout();
+
+  // Unpack source and destination types until we find a matching
+  // element type.  Count the number of levels we unpack for the
+  // source and destination types.  So far this only works for
+  // array types, but could be generalized to other regular types
+  // like vectors.
+  auto match_types = [&Layout](CallInst &CI, Type **DstElemTy, Type **SrcElemTy,
+                               unsigned *NumDstUnpackings,
+                               unsigned *NumSrcUnpackings) {
+    unsigned *numSrcUnpackings = 0;
+    unsigned *numDstUnpackings = 0;
+    while (*SrcElemTy != *DstElemTy) {
+      auto SrcElemSize = Layout.getTypeSizeInBits(*SrcElemTy);
+      auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy);
+      if (SrcElemSize >= DstElemSize) {
+        assert((*SrcElemTy)->isArrayTy());
+        *SrcElemTy = (*SrcElemTy)->getArrayElementType();
+        (*NumSrcUnpackings)++;
+      } else if (DstElemSize >= SrcElemSize) {
+        assert((*DstElemTy)->isArrayTy());
+        *DstElemTy = (*DstElemTy)->getArrayElementType();
+        (*NumDstUnpackings)++;
+      } else {
+        errs() << "Don't know how to unpack types for memcpy: " << CI
+               << "\ngot to: " << **DstElemTy << " vs " << **SrcElemTy << "\n";
+        assert(false && "Don't know how to unpack these types");
+      }
+    }
+  };
 
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memcpy")) {
-      SmallVector<CallInst *, 8> CallsToReplace;
+      SmallPtrSet<Instruction *, 8> BitCastsToForget;
+      SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
 
       for (auto U : F.users()) {
         if (auto CI = dyn_cast<CallInst>(U)) {
@@ -139,29 +171,32 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           auto SrcTy = Src->getType();
           assert(SrcTy->isPointerTy());
 
+          auto DstElemTy = DstTy->getPointerElementType();
+          auto SrcElemTy = SrcTy->getPointerElementType();
+          unsigned NumDstUnpackings = 0;
+          unsigned NumSrcUnpackings = 0;
+          match_types(*CI, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
+                      &NumSrcUnpackings);
+
           // Check that the pointee types match.
-          assert(DstTy->getPointerElementType() ==
-                 SrcTy->getPointerElementType());
+          assert(DstElemTy == SrcElemTy);
 
           // Check that the size is a constant integer.
           assert(isa<ConstantInt>(CI->getArgOperand(2)));
           auto Size =
               dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
 
-          auto TypeSize = M.getDataLayout().getTypeSizeInBits(
-                              DstTy->getPointerElementType()) /
-                          8;
+          auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
 
-          // Check that the size is equal to the alignment of the pointee type.
-          assert(Size == TypeSize);
+          // Check that the size is a multiple of the size of the pointee type.
+          assert(Size % DstElemSize == 0);
 
           // Check that the alignment is a constant integer.
           assert(isa<ConstantInt>(CI->getArgOperand(3)));
           auto Alignment =
               dyn_cast<ConstantInt>(CI->getArgOperand(3))->getZExtValue();
 
-          auto TypeAlignment = M.getDataLayout().getABITypeAlignment(
-              DstTy->getPointerElementType());
+          auto TypeAlignment = Layout.getABITypeAlignment(DstElemTy);
 
           // Check that the alignment is at least the alignment of the pointee
           // type.
@@ -174,43 +209,104 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           // Check that volatile is a constant.
           assert(isa<ConstantInt>(CI->getArgOperand(4)));
 
-          CallsToReplace.push_back(CI);
+          CallsToReplaceWithSpirvCopyMemory.push_back(CI);
         }
       }
 
-      for (auto CI : CallsToReplace) {
+      for (auto CI : CallsToReplaceWithSpirvCopyMemory) {
         auto Arg0 = dyn_cast<BitCastInst>(CI->getArgOperand(0));
         auto Arg1 = dyn_cast<BitCastInst>(CI->getArgOperand(1));
-
-        auto Dst = dyn_cast<BitCastInst>(Arg0)->getOperand(0);
-        auto Src = dyn_cast<BitCastInst>(Arg1)->getOperand(0);
-
-        auto DstTy = Dst->getType();
-        auto SrcTy = Src->getType();
-
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
         auto Arg4 = dyn_cast<ConstantInt>(CI->getArgOperand(4));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
+        auto Alignment = ConstantInt::get(I32Ty, Arg3->getZExtValue());
+        auto Volatile = ConstantInt::get(I32Ty, Arg4->getZExtValue());
 
-        auto NewFType = FunctionType::get(F.getReturnType(),
-                                          {DstTy, SrcTy, I32Ty, I32Ty}, false);
+        auto Dst = dyn_cast<BitCastInst>(Arg0)->getOperand(0);
+        auto Src = dyn_cast<BitCastInst>(Arg1)->getOperand(0);
+
+        auto DstElemTy = Dst->getType()->getPointerElementType();
+        auto SrcElemTy = Src->getType()->getPointerElementType();
+        unsigned NumDstUnpackings = 0;
+        unsigned NumSrcUnpackings = 0;
+        match_types(*CI, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
+                    &NumSrcUnpackings);
+
+        assert(NumDstUnpackings < 2 && "Need to generalize dst unpacking case");
+        assert(NumSrcUnpackings < 2 && "Need to generalize src unpacking case");
+        assert((NumDstUnpackings == 0 || NumSrcUnpackings == 0) &&
+               "Need to generalize unpackings in both dimensions");
 
         auto SPIRVIntrinsic = "spirv.copy_memory";
 
-        auto NewF =
-            Function::Create(NewFType, F.getLinkage(), SPIRVIntrinsic, &M);
+        auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
 
-        auto NewCI = CallInst::Create(
-            NewF, {Dst, Src, ConstantInt::get(I32Ty, Arg3->getZExtValue()),
-                   ConstantInt::get(I32Ty, Arg4->getZExtValue())},
-            "", CI);
+        auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
 
-        CI->replaceAllUsesWith(NewCI);
+        IRBuilder<> Builder(CI);
+
+        if (NumSrcUnpackings == 0 && NumDstUnpackings == 0) {
+          auto NewFType = FunctionType::get(
+              F.getReturnType(), {Dst->getType(), Src->getType(), I32Ty, I32Ty},
+              false);
+          auto NewF =
+              Function::Create(NewFType, F.getLinkage(), SPIRVIntrinsic, &M);
+          Builder.CreateCall(NewF, {Dst, Src, Alignment, Volatile}, "");
+        } else {
+          auto Zero = ConstantInt::get(I32Ty, 0);
+          SmallVector<Value *, 3> SrcIndices;
+          SmallVector<Value *, 3> DstIndices;
+          // Make unpacking indices.
+          for (unsigned unpacking = 0; unpacking < NumSrcUnpackings;
+               ++unpacking) {
+            SrcIndices.push_back(Zero);
+          }
+          for (unsigned unpacking = 0; unpacking < NumDstUnpackings;
+               ++unpacking) {
+            DstIndices.push_back(Zero);
+          }
+          // Add a placeholder for the final index.
+          SrcIndices.push_back(Zero);
+          DstIndices.push_back(Zero);
+
+          // Build the function and function type only once.
+          FunctionType* NewFType = nullptr;
+          Function* NewF = nullptr;
+
+          IRBuilder<> Builder(CI);
+          for (unsigned i = 0; i < Size / DstElemSize; ++i) {
+            auto Index = ConstantInt::get(I32Ty, i);
+            SrcIndices.back() = Index;
+            DstIndices.back() = Index;
+
+            auto SrcElemPtr = Builder.CreateGEP(Src, SrcIndices);
+            auto DstElemPtr = Builder.CreateGEP(Dst, DstIndices);
+            NewFType =
+                NewFType != nullptr
+                    ? NewFType
+                    : FunctionType::get(F.getReturnType(),
+                                        {DstElemPtr->getType(),
+                                         SrcElemPtr->getType(), I32Ty, I32Ty},
+                                        false);
+            NewF = NewF != nullptr ? NewF
+                                   : Function::Create(NewFType, F.getLinkage(),
+                                                      SPIRVIntrinsic, &M);
+            Builder.CreateCall(
+                NewF, {DstElemPtr, SrcElemPtr, Alignment, Volatile}, "");
+          }
+        }
+
+        // Erase the call.
         CI->eraseFromParent();
 
-        Arg0->eraseFromParent();
-        Arg1->eraseFromParent();
+        // Erase the bitcasts.  A particular bitcast might be used
+        // in more than one memcpy, so defer actual deleting until later.
+        BitCastsToForget.insert(Arg0);
+        BitCastsToForget.insert(Arg1);
+      }
+      for (auto* Inst : BitCastsToForget) {
+        Inst->eraseFromParent();
       }
     }
   }
