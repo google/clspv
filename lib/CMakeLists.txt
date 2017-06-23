@@ -13,6 +13,7 @@
 # limitations under the License.
 
 add_library(clspv_core STATIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp

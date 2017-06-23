@@ -206,6 +206,13 @@ static llvm::cl::opt<std::string>
     SamplerMap("samplermap", llvm::cl::desc("Literal sampler map"),
                llvm::cl::value_desc("filename"));
 
+static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
+    "cluster-pod-kernel-args", llvm::cl::init(false),
+    llvm::cl::desc("Collect plain-old-data kernel arguments into a struct in "
+                   "a single storage buffer, using a binding number after "
+                   "other arguments. Use this to reduce storage buffer "
+                   "descriptors."));
+
 int main(const int argc, const char *const argv[]) {
   // We need to change how one of the called passes works by spoofing
   // ParseCommandLineOptions with the specific option.
@@ -629,6 +636,9 @@ int main(const int argc, const char *const argv[]) {
 
   pm.add(clspv::createUndoByvalPass());
   pm.add(clspv::createUndoSRetPass());
+  if (cluster_non_pointer_kernel_args) {
+    pm.add(clspv::createClusterPodKernelArgumentsPass());
+  }
   pm.add(clspv::createReplaceOpenCLBuiltinPass());
 
   // We need to run mem2reg and inst combine early because our

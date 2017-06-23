@@ -212,4 +212,12 @@ llvm::ModulePass *createUndoTranslateSamplerFoldPass();
 /// If we could add a flag to our LLVM target to indiciate "please do not create
 /// malformed types" that would make this pass redundant.
 llvm::ModulePass *createUndoTruncatedSwitchConditionPass();
+
+/// Cluster plain-old-data kernel arguments into a single struct argument.
+/// @return An LLVM module pass.
+///
+/// The idea is to save on the number of StorageBuffer (SSBO) arguments, as that
+/// is a very limited resource.  Vulkan requires a minimum of 4 StorageBuffer
+/// arguments (maxPerStageDescriptorStorageBuffers), which is very easy to reach.
+llvm::ModulePass *createClusterPodKernelArgumentsPass();
 }

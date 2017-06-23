@@ -69,6 +69,10 @@ following way:
 - If the argument to the kernel is a plain-old-data type, the matching Vulkan
   descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`.
 
+Note: If `-cluster-pod-kernel-args` is used, then all plain-old-data kernel
+arguments are collected into a single structure to be passed in to the compute
+shader as a single storage buffer resource.
+
 ## OpenCL C Modifications
 
 Some OpenCL C language features that are not natively expressible in Vulkan's
@@ -96,7 +100,8 @@ To pass data into Vulkan SPIR-V shaders, `OpVariable`s are declared outside of
 the functions, and decorated with `DescriptorSet` and `Binding` decorations, to
 denote that the shaders can interact with their data.
 
-So, to map the OpenCL C language kernels to Vulkan SPIR-V compute shaders:
+The default way to map an OpenCL C language kernel to a Vulkan SPIR-V compute
+shader is as follows:
 
 - Each kernel is assigned a corresponding descriptor set, such that the first
   kernel has descriptor set _0_, and each subsequent kernel is an increment of
@@ -119,6 +124,46 @@ So, to map the OpenCL C language kernels to Vulkan SPIR-V compute shaders:
   `OpTypeImage` or `OpTypeSampler` type is created and decorated with the
   corresponding `DescriptorSet` and `Binding`, using the `UniformConstant`
   storage class.
+
+Descriptors can be scarce.  So the compiler also has an option
+`-cluster-pod-kernel-args` which can be used to reduce the number of descriptors.
+When the option is used:
+
+- All plain-old-data (POD) kernel arguments are collected into a single struct
+  and passed into the compute shader via a single storage buffer resource.
+- The binding numbers are assigned as previously, except:
+  - Binding numbers for non-POD arguments are assigned as if there were no
+    POD arguments.
+  - The binding number for the struct containing the POD arguments is one more
+    than the highest non-POD argument.
+
+
+#### Example descriptor set mapping
+
+For example:
+
+    // First kernel in the translation unit, and no sampler map is used.
+    void kernel foo(global int* a, float f, global float* b, uint c);
+
+In the default case, the bindings are:
+
+- `a` is mapped to a storage buffer with descriptor set 0, binding 0
+- `f` is mapped to a storage buffer with descriptor set 0, binding 1
+- `b` is mapped to a storage buffer with descriptor set 0, binding 2
+- `c` is mapped to a storage buffer with descriptor set 0, binding 3
+
+If `-cluster-pod-kernel-args` is used:
+
+- `a` is mapped to a storage buffer with descriptor set 0, binding 0
+- `b` is mapped to a storage buffer with descriptor set 0, binding 1
+- `f` and `c` are POD arguments, so they are mapped to the first and
+  second members of a struct, and that struct is mapped to a storage
+  buffer with descriptor set 0 and binding 2
+
+If `foo` were the second kernel in the translation unit, then its arguments
+would use descriptor set 1.
+
+TODO(dneto): Give an example using images.
 
 ### Work-Group Size
 

@@ -5,6 +5,13 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv %s -S -o %t3.spvasm -cluster-pod-kernel-args
+// RUN: FileCheck %s < %t3.spvasm -check-prefix=CLUSTER
+// RUN: clspv %s -o %t4.spv -cluster-pod-kernel-args
+// RUN: spirv-dis -o %t4.spvasm %t4.spv
+// RUN: FileCheck %s < %t4.spvasm -check-prefix=CLUSTER
+// RUN: spirv-val --target-env vulkan1.0 %t4.spv
+
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
@@ -88,3 +95,29 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 {
   *a = read_imagef(i, s, c);
 }
+
+// In a second round, check -cluster-pod-kernel-args
+// CLUSTER: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
+// CLUSTER: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CLUSTER: [[sampler:%[a-zA-Z0-9_]+]] = OpTypeSampler
+// CLUSTER: [[image:%[a-zA-Z0-9_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
+// CLUSTER: [[vec2:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 2
+// CLUSTER: [[st_vec2:%[a-zA-Z0-9_]+]] = OpTypeStruct [[vec2]]
+// CLUSTER: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CLUSTER: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CLUSTER: [[void_fn:%[a-zA-Z0-9_]+]] = OpTypeFunction [[void]]
+// CLUSTER: [[zero:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
+
+// CLUSTER: [[fooinner:%[a-zA-A0-9]+]] = OpFunction [[void]] None
+// CLUSTER: OpFunctionEnd
+
+// Match the wrapper kernel function.
+// CLUSTER: [[foo]] = OpFunction [[void]] None [[void_fn]]
+// CLUSTER-NEXT: OpLabel
+// CLUSTER-NEXT: [[sampler_val:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]]
+// CLUSTER-NEXT: [[image_val:%[a-zA-Z0-9_]+]] = OpLoad [[image]]
+// CLUSTER-NEXT: [[a_base:%[a-zA-Z0-9_]+]] = OpAccessChain %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} [[zero]] [[zero]]
+// CLUSTER-NEXT: [[podargs_base:%[a-zA-Z0-9_]+]] = OpAccessChain %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} [[zero]]
+// CLUSTER-NEXT: [[podargs:%[a-zA-Z0-9_]+]] = OpLoad [[st_vec2]] [[podargs_base]]
+// CLUSTER-NEXT: [[vec2_val:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[vec2]] [[podargs]] 0
+// CLUSTER-NEXT: = OpFunctionCall [[void]] [[fooinner]] [[sampler_val]] [[image_val]] [[vec2_val]] [[a_base]]
