@@ -51,10 +51,10 @@
 
 // CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] None %[[FOO_TYPE_ID]]
 // CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
+// CHECK: %[[PRIVATE_VAR_ID:[a-zA-Z0-9_]*]] = OpVariable %[[UINT_PRIVATE_POINTER_TYPE_ID]] Function
 // CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[B_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG1_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[C_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG2_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[PRIVATE_VAR_ID:[a-zA-Z0-9_]*]] = OpVariable %[[UINT_PRIVATE_POINTER_TYPE_ID]] Function
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]] %[[B_ACCESS_CHAIN_ID]]
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] Frexp %[[LOADB_ID]] %[[PRIVATE_VAR_ID]]
 // CHECK: OpStore %[[A_ACCESS_CHAIN_ID]] %[[OP_ID]]

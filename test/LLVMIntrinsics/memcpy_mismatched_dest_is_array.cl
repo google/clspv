@@ -53,13 +53,11 @@
 
 // CHECK: [[entry_id]] = OpFunction [[void]] None [[void_fn]]
 // CHECK: OpLabel
+// CHECK: [[dest:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_arr7_float]] Function
 // CHECK: [[n_ptr:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_int]] [[var_n]] [[n0]]
 // CHECK: [[n:%[a-zA-Z0-9_]+]] = OpLoad [[int]] [[n_ptr]]
 // CHECK: [[k_ptr:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_int]] [[var_k]] [[n0]]
 // CHECK: [[k:%[a-zA-Z0-9_]+]] = OpLoad [[int]] [[k_ptr]]
-
-// TODO(dneto): This variable declaration should appear earlier.
-// CHECK: [[dest:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_arr7_float]] Function
 
 // CHECK: [[A_0:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[n0]]
 // CHECK: [[dest_0:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[dest]] [[n0]]

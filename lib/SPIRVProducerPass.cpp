@@ -3082,12 +3082,21 @@ void SPIRVProducerPass::GenerateFuncBody(Function &F) {
         new SPIRVInstruction(2, spv::OpLabel, nextID++, Ops);
     SPIRVInstList.push_back(Inst);
 
+    // OpVariable instructions must come first.
+    for (Instruction &I : BB) {
+      if (isa<AllocaInst>(I)) {
+        GenerateInstruction(I);
+      }
+    }
+
     if (&BB == &F.getEntryBlock() && IsKernel) {
       GenerateInstForArg(F);
     }
 
     for (Instruction &I : BB) {
-      GenerateInstruction(I);
+      if (!isa<AllocaInst>(I)) {
+        GenerateInstruction(I);
+      }
     }
   }
 }
