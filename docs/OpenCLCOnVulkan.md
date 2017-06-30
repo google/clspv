@@ -125,6 +125,65 @@ shader is as follows:
   corresponding `DescriptorSet` and `Binding`, using the `UniformConstant`
   storage class.
 
+#### Descriptor map
+
+The compiler can tell you what descriptor set and bindings are used for kernel
+arguemnts.  Use option `-descriptormap` to name a file that should contain
+the mapping information.
+
+Example:
+
+    clspv foo.cl -descriptormap=foomap.csv
+
+The descriptor map is a text file with comma-separated values.
+
+Consider this example:
+
+    // First kernel in the translation unit, and no sampler map is used.
+    void kernel foo(global int* a, float f, global float* b, uint c) {...}
+
+It generates the following descriptor map:
+
+    kernel,foo,arg,a,descriptorSet,0,binding,0,offset,0
+    kernel,foo,arg,f,descriptorSet,0,binding,1,offset,0
+    kernel,foo,arg,b,descriptorSet,0,binding,2,offset,0
+    kernel,foo,arg,c,descriptorSet,0,binding,3,offset,0
+
+For kernel arguments, the fields are:
+- `kernel` to indicate a kernel argument
+- kernel name
+- `arg` to indicate a kernel argument
+- argument name
+- `descriptorSet`
+- the DescriptorSet value
+- `binding`
+- the Binding value
+- `offset`
+- The byte offset inside the storage buffer where you should write the argument value.
+  This will always be zero, unless you cluster plain-old-data kernel arguments. (See below.)
+
+If a sampler map is used, then samplers use descriptor set 0 and kernel descriptor
+set numbers start at 1.  For example, if the sampler map file is `mysamplermap`
+containing:
+
+    CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST,
+    CLK_NORMALIZED_COORDS_TRUE  | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR
+
+Then compiling with:
+
+    clspv foo.cl -samplermap=mysamplermap -descriptormap=mydescriptormap
+
+Then `mydescriptormap` will contain:
+
+    sampler,18,descriptorSet,0,binding,0
+    sampler,35,descriptorSet,0,binding,1
+    kernel,foo,arg,a,descriptorSet,1,binding,0,offset,0
+    kernel,foo,arg,f,descriptorSet,1,binding,1,offset,0
+    kernel,foo,arg,b,descriptorSet,1,binding,2,offset,0
+    kernel,foo,arg,c,descriptorSet,1,binding,3,offset,0
+
+#### Clustering plain-old-data kernel arguments to save descriptors
+
 Descriptors can be scarce.  So the compiler also has an option
 `-cluster-pod-kernel-args` which can be used to reduce the number of descriptors.
 When the option is used:
@@ -160,8 +219,33 @@ If `-cluster-pod-kernel-args` is used:
   second members of a struct, and that struct is mapped to a storage
   buffer with descriptor set 0 and binding 2
 
+That is, compiling as follows:
+
+    clspv foo.cl -cluster-pod-kernel-args -descriptormap=myclusteredmap
+
+will produce the following in `myclusteredmap`:
+
+    kernel,foo,arg,a,descriptorSet,0,binding,0,offset,0
+    kernel,foo,arg,b,descriptorSet,0,binding,1,offset,0
+    kernel,foo,arg,c,descriptorSet,0,binding,2,offset,4
+    kernel,foo,arg,f,descriptorSet,0,binding,2,offset,0
+
 If `foo` were the second kernel in the translation unit, then its arguments
 would use descriptor set 1.
+
+Compiling with the same sampler map from before:
+
+    clspv foo.cl -cluster-pod-kernel-args -descriptormap=myclusteredmap -samplermap=mysamplermap
+
+produces the following descriptor map:
+
+    sampler,18,descriptorSet,0,binding,0
+    sampler,35,descriptorSet,0,binding,1
+    kernel,foo,arg,a,descriptorSet,1,binding,0,offset,0
+    kernel,foo,arg,b,descriptorSet,1,binding,1,offset,0
+    kernel,foo,arg,c,descriptorSet,1,binding,2,offset,4
+    kernel,foo,arg,f,descriptorSet,1,binding,2,offset,0
+
 
 TODO(dneto): Give an example using images.
 

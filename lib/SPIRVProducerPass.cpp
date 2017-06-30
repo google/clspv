@@ -106,8 +106,10 @@ struct SPIRVProducerPass final : public ModulePass {
       GlobalConstFuncMapType;
 
   explicit SPIRVProducerPass(raw_pwrite_stream &out,
+                             raw_ostream &descriptor_map_out,
                              ArrayRef<unsigned> samplerMap, bool outputAsm)
-      : ModulePass(ID), samplerMap(samplerMap), out(out), outputAsm(outputAsm),
+      : ModulePass(ID), samplerMap(samplerMap), out(out),
+        descriptorMapOut(descriptor_map_out), outputAsm(outputAsm),
         patchBoundOffset(0), nextID(1), OpExtInstImportID(0),
         HasVariablePointers(false), SamplerTy(nullptr) {}
 
@@ -222,6 +224,7 @@ private:
   static char ID;
   ArrayRef<unsigned> samplerMap;
   raw_pwrite_stream &out;
+  raw_ostream &descriptorMapOut;
   const bool outputAsm;
   uint64_t patchBoundOffset;
   uint32_t nextID;
@@ -251,11 +254,12 @@ char SPIRVProducerPass::ID;
 
 namespace clspv {
 ModulePass *createSPIRVProducerPass(raw_pwrite_stream &out,
+                                    raw_ostream &descriptor_map_out,
                                     ArrayRef<unsigned> samplerMap,
                                     bool outputAsm) {
-  return new SPIRVProducerPass(out, samplerMap, outputAsm);
+  return new SPIRVProducerPass(out, descriptor_map_out, samplerMap, outputAsm);
 }
-}
+} // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
   // SPIR-V always begins with its header information
@@ -1974,6 +1978,9 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     SPIRVOperand *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
     Ops.push_back(DecoOp);
 
+    descriptorMapOut << "sampler," << SamplerLiteral << ",descriptorSet,0,binding,"
+                     << BindingIdx << "\n";
+
     std::vector<uint32_t> LiteralNum;
     LiteralNum.push_back(0);
     SPIRVOperand *DescSet =
@@ -2312,6 +2319,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   ValueMapType &ArgGVIDMap = getArgumentGVIDMap();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
   auto &GlobalConstArgSet = getGlobalConstArgSet();
+  const DataLayout& dataLayout(F.getParent()->getDataLayout());
 
   FunctionType *FTy = F.getFunctionType();
 
@@ -2348,6 +2356,42 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
       Value *NewGV = ArgGVMap[&Arg];
       VMap[&Arg] = VMap[NewGV];
       ArgGVIDMap[&Arg] = VMap[&Arg];
+
+      // Emit a descriptor map entry. Handle the case where we've clustered POD
+      // arguments.
+      {
+        auto *ArgTy = Arg.getType();
+        bool was_podargs = false;
+        if (auto *StructTy = dyn_cast<StructType>(ArgTy)) {
+          std::string TypeName = StructTy->getName();
+          if (StructTy->getName().endswith(".podargs")) {
+            // The uses are extractvalue instructions.
+            const StructLayout *structLayout =
+                dataLayout.getStructLayout(StructTy);
+            for (auto use_iter = Arg.use_begin(); use_iter != Arg.use_end();
+                 ++use_iter) {
+              const Value *user = use_iter->getUser();
+              if (auto *ExtractInst = dyn_cast<ExtractValueInst>(user)) {
+                // There is only one index.
+                unsigned member = ExtractInst->getIndices()[0];
+                unsigned offset = structLayout->getElementOffset(member);
+
+                descriptorMapOut << "kernel," << F.getName() << ",arg,"
+                                 << ExtractInst->getName() << ",descriptorSet,"
+                                 << DescriptorSetIdx << ",binding,"
+                                 << BindingIdx << ",offset," << offset << "\n";
+              }
+            }
+            was_podargs = true;
+          }
+        }
+        if (!was_podargs) {
+          descriptorMapOut << "kernel," << F.getName() << ",arg,"
+                           << Arg.getName() << ",descriptorSet,"
+                           << DescriptorSetIdx << ",binding," << BindingIdx
+                           << ",offset,0\n";
+        }
+      }
 
       // Ops[0] = Target ID
       // Ops[1] = Decoration (DescriptorSet)

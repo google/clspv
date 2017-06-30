@@ -13,9 +13,11 @@
 // limitations under the License.
 
 namespace llvm {
+// This is against Google C++ style guide.
 class FunctionPass;
 class ModulePass;
 class raw_pwrite_stream;
+class raw_ostream;
 template <typename T> class ArrayRef;
 }
 
@@ -94,7 +96,10 @@ llvm::ModulePass *createReplaceLLVMIntrinsicsPass();
 /// possible.
 llvm::ModulePass *createReplaceOpenCLBuiltinPass();
 
+/// Create a pass to emit SPIR-V for the module.
+/// @return An LLVM module pass.
 llvm::ModulePass *createSPIRVProducerPass(llvm::raw_pwrite_stream &out,
+                                          llvm::raw_ostream& descriptor_mappings,
                                           llvm::ArrayRef<unsigned> samplerMap,
                                           bool outputAsm);
 

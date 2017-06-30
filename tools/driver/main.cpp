@@ -23,6 +23,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/LinkAllPasses.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include <clspv/Passes.h>
@@ -193,6 +194,11 @@ static llvm::cl::opt<std::string>
     OutputFilename("o", llvm::cl::desc("Override output filename"),
                    llvm::cl::value_desc("filename"));
 
+static llvm::cl::opt<std::string>
+    DescriptorMapFilename("descriptormap",
+                          llvm::cl::desc("Output file for descriptor map"),
+                          llvm::cl::value_desc("filename"));
+
 static llvm::cl::opt<char>
     OptimizationLevel(llvm::cl::Prefix, "O", llvm::cl::init('2'),
                       llvm::cl::desc("Optimization level to use"),
@@ -275,6 +281,20 @@ int main(const int argc, const char *const argv[]) {
     llvm::errs() << "Unable to open output file '" << OutputFilename
                  << "': " << error.message() << '\n';
     return -1;
+  }
+
+  std::unique_ptr<llvm::raw_fd_ostream> descriptor_map_out_fd;
+  std::string descriptor_map;
+  llvm::raw_string_ostream descriptor_map_out(descriptor_map);
+  if (!DescriptorMapFilename.empty()) {
+    descriptor_map_out_fd.reset(
+        new llvm::raw_fd_ostream(DescriptorMapFilename, error,
+                                 llvm::sys::fs::F_RW | llvm::sys::fs::F_Text));
+    if (error) {
+      llvm::errs() << "Unable to open descriptor map file '"
+                   << DescriptorMapFilename << "': " << error.message() << '\n';
+      return -1;
+    }
   }
 
   llvm::SmallVector<unsigned, 8> SamplerMapEntries;
@@ -681,9 +701,16 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
-  pm.add(clspv::createSPIRVProducerPass(
-      bufferedOutStream, SamplerMapEntries, OutputAssembly.getValue()));
+  pm.add(clspv::createSPIRVProducerPass(bufferedOutStream, descriptor_map_out,
+                                        SamplerMapEntries,
+                                        OutputAssembly.getValue()));
   pm.run(*module);
+
+  if (descriptor_map_out_fd.get()) {
+    descriptor_map_out.flush();
+    *(descriptor_map_out_fd.get()) << descriptor_map;
+    descriptor_map_out_fd->close();
+  }
 
   return 0;
 }
