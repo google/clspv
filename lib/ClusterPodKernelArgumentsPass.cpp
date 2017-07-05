@@ -12,6 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Cluster POD kernel arguments.
+//
+// Collect plain-old-data kernel arguments and place them into a single
+// struct argument, at the end.  Other arguments are pointers, and retain
+// their relative order.
+//
+// We will create a kernel function as the new entry point, and change
+// the original kernel function into a regular SPIR function.  Key
+// kernel metadata is moved from the old function to the wrapper.
+// We also attach a "kernel_arg_map" metadata node to the function to
+// encode the mapping from old kernel argument to new kernel argument.
+
 #include <cassert>
 
 #include <llvm/IR/Constants.h>
@@ -19,11 +31,11 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
 
-//#include <llvm/Transforms/Utils/Cloning.h>
 
 using namespace llvm;
 
@@ -67,10 +79,21 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     }
   }
 
-  //WorkList.clear();
-
   for (Function* F : WorkList) {
     Changed = true;
+
+    // An ArgMapping describes how a kernel argument is remapped.
+    struct ArgMapping {
+      std::string name;
+      // 0-based argument index in the old kernel function.
+      unsigned old_index;
+      // 0-based argument index in the new kernel function.
+      unsigned new_index;
+      // Offset of the argument value within the new kernel argument.
+      // This is always zero for non-POD arguments.  For a POD argument,
+      // this is the byte offset within the POD arguments struct.
+      unsigned offset;
+    };
 
     // In OpenCL, kernel arguments are either pointers or POD. A composite with
     // an element or memeber that is a pointer is not allowed.  So we'll use POD
@@ -78,21 +101,44 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
     SmallVector<Type *, 8> PtrArgTys;
     SmallVector<Type *, 8> PodArgTys;
+    SmallVector<ArgMapping, 8> RemapInfo;
+    unsigned arg_index = 0;
     for (Argument &Arg : F->args()) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
+        RemapInfo.push_back({std::string(Arg.getName()), arg_index,
+                             unsigned(RemapInfo.size()), 0u});
       } else {
         PodArgTys.push_back(ArgTy);
       }
+      arg_index++;
     }
-
 
     // Put the pointer arguments first, and then POD arguments struct last.
     auto PodArgsStructTy =
         StructType::create(PodArgTys, F->getName().str() + ".podargs");
     SmallVector<Type *, 8> NewFuncParamTys(PtrArgTys);
     NewFuncParamTys.push_back(PodArgsStructTy);
+
+    // We've recorded the remapping for pointer arguments.  Now record the
+    // remapping for POD arguments.
+    {
+      const auto StructLayout =
+          M.getDataLayout().getStructLayout(PodArgsStructTy);
+      arg_index = 0;
+      int pod_index = 0;
+      const unsigned num_pointer_args = unsigned(RemapInfo.size());
+      for (Argument &Arg : F->args()) {
+        Type *ArgTy = Arg.getType();
+        if (!isa<PointerType>(ArgTy)) {
+          RemapInfo.push_back(
+              {std::string(Arg.getName()), arg_index, num_pointer_args,
+               unsigned(StructLayout->getElementOffset(pod_index++))});
+        }
+        arg_index++;
+      }
+    }
 
     FunctionType *NewFuncTy =
         FunctionType::get(F->getReturnType(), NewFuncParamTys, false);
@@ -120,6 +166,37 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       F->setMetadata(name, nullptr);
     }
 
+    IRBuilder<> Builder(BasicBlock::Create(Context, "entry", NewFunc));
+
+    // Set kernel argument mapping metadata.
+    {
+      // Attach a metadata node named "kernel_arg_map" to the new kernel
+      // function.  It is a tuple of nodes, each of which is a tuple for
+      // each argument, with members:
+      //  - Argument name
+      //  - Ordinal index in the original kernel function
+      //  - Ordinal index in the new kernel function
+      //  - Byte offset within the argument.  This is always 0 for pointer
+      //    arguments.  For POD arguments this is the offest within the POD
+      //    argument struct.
+      LLVMContext& Context = M.getContext();
+      SmallVector<Metadata*, 8> mappings;
+      for (auto &arg_mapping : RemapInfo) {
+        auto *name_md = MDString::get(Context, arg_mapping.name);
+        auto *old_index_md =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.old_index));
+        auto *new_index_md =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.new_index));
+        auto *offset =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
+        auto *arg_md =
+            MDNode::get(Context, {name_md, old_index_md, new_index_md, offset});
+        mappings.push_back(arg_md);
+      }
+
+      NewFunc->setMetadata("kernel_arg_map", MDNode::get(Context, mappings));
+    }
+
     // Insert the function after the original, to preserve ordering
     // in the module as much as possible.
     auto &FunctionList = M.getFunctionList();
@@ -133,7 +210,6 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
     // The body of the wrapper is essentially a call to the original function,
     // but we have to unwrap the non-pointer arguments from the struct.
-    IRBuilder<> Builder(BasicBlock::Create(Context, "entry", NewFunc));
 
     // Map the wrapper's arguments to the callee's arguments.
     SmallVector<Argument *, 8> CallerArgs;

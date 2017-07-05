@@ -144,16 +144,18 @@ Consider this example:
 
 It generates the following descriptor map:
 
-    kernel,foo,arg,a,descriptorSet,0,binding,0,offset,0
-    kernel,foo,arg,f,descriptorSet,0,binding,1,offset,0
-    kernel,foo,arg,b,descriptorSet,0,binding,2,offset,0
-    kernel,foo,arg,c,descriptorSet,0,binding,3,offset,0
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,2,offset,0
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0
 
 For kernel arguments, the fields are:
 - `kernel` to indicate a kernel argument
 - kernel name
 - `arg` to indicate a kernel argument
 - argument name
+- `argOrdinal` to indicate a kernel argument ordinal position field
+- the argument's 0-based position in the kernel's parameter list
 - `descriptorSet`
 - the DescriptorSet value
 - `binding`
@@ -177,10 +179,10 @@ Then `mydescriptormap` will contain:
 
     sampler,18,descriptorSet,0,binding,0
     sampler,35,descriptorSet,0,binding,1
-    kernel,foo,arg,a,descriptorSet,1,binding,0,offset,0
-    kernel,foo,arg,f,descriptorSet,1,binding,1,offset,0
-    kernel,foo,arg,b,descriptorSet,1,binding,2,offset,0
-    kernel,foo,arg,c,descriptorSet,1,binding,3,offset,0
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0
 
 #### Clustering plain-old-data kernel arguments to save descriptors
 
@@ -225,10 +227,10 @@ That is, compiling as follows:
 
 will produce the following in `myclusteredmap`:
 
-    kernel,foo,arg,a,descriptorSet,0,binding,0,offset,0
-    kernel,foo,arg,b,descriptorSet,0,binding,1,offset,0
-    kernel,foo,arg,c,descriptorSet,0,binding,2,offset,4
-    kernel,foo,arg,f,descriptorSet,0,binding,2,offset,0
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,1,offset,0
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,2,offset,0
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4
 
 If `foo` were the second kernel in the translation unit, then its arguments
 would use descriptor set 1.
@@ -241,11 +243,10 @@ produces the following descriptor map:
 
     sampler,18,descriptorSet,0,binding,0
     sampler,35,descriptorSet,0,binding,1
-    kernel,foo,arg,a,descriptorSet,1,binding,0,offset,0
-    kernel,foo,arg,b,descriptorSet,1,binding,1,offset,0
-    kernel,foo,arg,c,descriptorSet,1,binding,2,offset,4
-    kernel,foo,arg,f,descriptorSet,1,binding,2,offset,0
-
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4
 
 TODO(dneto): Give an example using images.
 
