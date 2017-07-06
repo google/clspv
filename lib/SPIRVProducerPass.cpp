@@ -4006,6 +4006,18 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
     Ops.push_back(ResTyIDOp);
 
+    // Pointer equality is invalid.
+    Type* ArgTy = CmpI->getOperand(0)->getType();
+    if (isa<PointerType>(ArgTy)) {
+      CmpI->print(errs());
+      std::string name = I.getParent()->getParent()->getName();
+      errs()
+          << "\nPointer equality test is not supported by SPIR-V for Vulkan, "
+          << "in function " << name << "\n";
+      llvm_unreachable("Pointer equality check is invalid");
+      break;
+    }
+
     uint32_t Op1ID = VMap[CmpI->getOperand(0)];
     SPIRVOperand *Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
     Ops.push_back(Op1IDOp);

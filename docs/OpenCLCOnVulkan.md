@@ -400,6 +400,8 @@ Integer-to-pointer casts **must not** be used.
 
 Pointers in the `local` address space **must not** be used as kernel arguments.
 
+Pointers **must not** be compared for equality or inequality.
+
 #### 8- and 16-Wide Vectors
 
 Vectors of 8 and 16 elements **must not** be used.
