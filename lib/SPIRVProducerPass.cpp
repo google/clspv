@@ -1353,7 +1353,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
 
         std::vector<uint32_t> LiteralNum;
         Type *EleTy = PTy->getElementType();
-        const unsigned ArrayStride = DL.getABITypeAlignment(EleTy);
+        const unsigned ArrayStride = DL.getTypeAllocSize(EleTy);
         LiteralNum.push_back(ArrayStride);
         SPIRVOperand *ArrayStrideOp =
             new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);

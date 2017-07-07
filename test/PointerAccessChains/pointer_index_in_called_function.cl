@@ -6,7 +6,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 
-// CHECK: OpDecorate [[rtarr_struct:%[a-zA-Z0-9_]+]] ArrayStride 4
+// CHECK: OpDecorate [[rtarr_struct:%[a-zA-Z0-9_]+]] ArrayStride 48
 // CHECK: OpDecorate [[rtarr_float:%[a-zA-Z0-9_]+]] ArrayStride 4
 // This is the one we really want:
 // CHECK: OpDecorate [[ptr_sb_float:%[a-zA-Z0-9_]+]] ArrayStride 4
