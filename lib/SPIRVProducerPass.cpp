@@ -167,6 +167,9 @@ struct SPIRVProducerPass final : public ModulePass {
   SmallPtrSet<Value *, 16> &getGlobalConstArgSet() {
     return GlobalConstArgumentSet;
   }
+  TypeList &getPointerTypesNeedingArrayStride() {
+    return PointerTypesNeedingArrayStride;
+  }
 
   void GenerateLLVMIRInfo(Module &M);
   bool FindExtInst(Module &M);
@@ -191,6 +194,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
+  void HandleDeferredDecorations(const DataLayout& DL);
   bool is4xi8vec(Type *Ty) const;
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
@@ -249,6 +253,11 @@ private:
   Type *SamplerTy;
   GlobalConstFuncMapType GlobalConstFuncTypeMap;
   SmallPtrSet<Value *, 16> GlobalConstArgumentSet;
+  // An ordered set of pointer types of Base arguments to OpPtrAccessChain,
+  // and which point into transparent memory (StorageBuffer storage class).
+  // These will require an ArrayStride decoration.
+  // See SPV_KHR_variable_pointers rev 13.
+  TypeList PointerTypesNeedingArrayStride;
 };
 
 char SPIRVProducerPass::ID;
@@ -343,6 +352,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   HandleDeferredInstruction();
+  HandleDeferredDecorations(DL);
 
   // Generate SPIRV module information.
   GenerateModuleInfo();
@@ -3407,14 +3417,14 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Indexes ID
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(GEP->getType());
+    PointerType* ResultType = cast<PointerType>(GEP->getType());
     if (GEP->getPointerAddressSpace() == AddressSpace::ModuleScopePrivate ||
         GlobalConstArgSet.count(GEP->getPointerOperand())) {
       // Use pointer type with private address space for global constant.
       Type *EleTy = I.getType()->getPointerElementType();
-      Type *NewPTy = PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
-      ResTyID = lookupType(NewPTy);
+      ResultType = PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
     }
+    const uint32_t ResTyID = lookupType(ResultType);
     SPIRVOperand *ResTyIDOp =
         new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
     Ops.push_back(ResTyIDOp);
@@ -3477,11 +3487,24 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         offset = 1;
       } else if (CstInt->getZExtValue() != 0 && !HasArgBasePointer) {
         Opcode = spv::OpPtrAccessChain;
-        setVariablePointers(true);
       }
     } else if (!HasArgBasePointer) {
       Opcode = spv::OpPtrAccessChain;
+    }
+
+    if (Opcode == spv::OpPtrAccessChain) {
       setVariablePointers(true);
+      // Do we need to generate ArrayStride?  Check against the GEP result type
+      // rather than the pointer type of the base because when indexing into
+      // an OpenCL program-scope constant, we'll swap out the LLVM base pointer
+      // for something else in the SPIR-V.
+      // E.g. see test/PointerAccessChain/pointer_index_is_constant_1.cl
+      if (GetStorageClass(ResultType->getAddressSpace()) ==
+          spv::StorageClassStorageBuffer) {
+        // Save the need to generate an ArrayStride decoration.  But defer
+        // generation until later, so we only make one decoration.
+        getPointerTypesNeedingArrayStride().insert(ResultType);
+      }
     }
 
     for (auto II = GEP->idx_begin() + offset; II != GEP->idx_end(); II++) {
@@ -5033,6 +5056,54 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVInstList.insert(InsertPoint, CallInst);
       }
     }
+  }
+}
+
+void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
+  // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
+  // instructions we generated earlier.
+  if (getPointerTypesNeedingArrayStride().empty())
+    return;
+
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  ValueMapType &VMap = getValueMap();
+
+  // Find an iterator pointing just past the last decoration.
+  bool seen_decorations = false;
+  auto DecoInsertPoint =
+      std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
+                   [&seen_decorations](SPIRVInstruction *Inst) -> bool {
+                     const bool is_decoration =
+                         Inst->getOpcode() == spv::OpDecorate ||
+                         Inst->getOpcode() == spv::OpMemberDecorate;
+                     if (is_decoration) {
+                       seen_decorations = true;
+                       return false;
+                     } else {
+                       return seen_decorations;
+                     }
+                   });
+
+  for (auto *type : getPointerTypesNeedingArrayStride()) {
+    auto *ptrType = cast<PointerType>(type);
+
+    // Ops[0] = Target ID
+    // Ops[1] = Decoration (ArrayStride)
+    // Ops[2] = Stride number (Literal Number)
+    SPIRVOperandList Ops;
+
+    Ops.push_back(
+        new SPIRVOperand(SPIRVOperandType::NUMBERID, lookupType(ptrType)));
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                   spv::DecorationArrayStride));
+    Type *elemTy = ptrType->getElementType();
+    // Same as DL.getIndexedOfffsetInType( elemTy, { 1 } );
+    const unsigned stride = DL.getTypeAllocSize(elemTy);
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, stride));
+
+    SPIRVInstruction *DecoInst =
+        new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
+    SPIRVInstList.insert(DecoInsertPoint, DecoInst);
   }
 }
 
