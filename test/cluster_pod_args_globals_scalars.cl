@@ -32,9 +32,10 @@
 // CHECK: OpDecorate [[B]] Binding 1
 // CHECK: OpDecorate [[podargs:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[podargs]] Binding 2
+// CHECK: OpDecorate [[sbptr_float:%[a-zA-Z0-9_]+]] ArrayStride 4
 
 // CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[sbptr_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[float]]
+// CHECK: [[sbptr_float]] = OpTypePointer StorageBuffer [[float]]
 // CHECK: [[rtarr_float]] = OpTypeRuntimeArray [[float]]
 // CHECK: [[st_rtarr_float]] = OpTypeStruct [[rtarr_float]]
 // CHECK: [[sbptr_st_rtarr_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[st_rtarr_float]]

@@ -23,6 +23,8 @@
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 
+// CHECK-NOT: OpDecorate %{{[a-zA-Z0-9_]+}} ArrayStride
+
 // CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 // CHECK: %[[UINT_GLOBAL_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[UINT_TYPE_ID]]
 // CHECK: %[[UINT_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[UINT_TYPE_ID]]
@@ -35,7 +37,7 @@
 // CHECK: %[[CONSTANT_4_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 4
 // CHECK: %[[B_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeArray %[[UINT_TYPE_ID]] %[[CONSTANT_4_ID]]
 // CHECK: %[[B_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[B_TYPE_ID]]
-// CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[UINT_TYPE_ID]]
+// CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]+]] = OpTypePointer Private %[[UINT_TYPE_ID]]
 
 // CHECK: %[[BAR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[UINT_TYPE_ID]] %[[UINT_PRIVATE_POINTER_TYPE_ID]]
 
@@ -63,6 +65,7 @@ constant uint b[4] = {42, 13, 0, 5};
 // CHECK: %[[BUILTIN_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_INPUT_POINTER_TYPE_ID]] %[[BUILTIN_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[LOCAL_X_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[BUILTIN_ACCESS_CHAIN_ID]]
 
+// TODO(dneto): OpPtrAccessChain on pointer to Private is not alloweed by SPV_KHR_variable_pointers
 // CHECK: %[[BAR_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpPtrAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[LOCAL_X_ID]]
 // CHECK: %[[BAR_RETURN_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[BAR_ACCESS_CHAIN_ID]]
 // CHECK: OpReturnValue %[[BAR_RETURN_ID]]
