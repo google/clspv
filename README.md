@@ -49,6 +49,11 @@ Emit SPIR-V assembly to standard output:
 
     clspv -S foo.cl -o -
 
+Emit the binary as a C initializer list, for easy embedding of a shader in
+in a C or C++ program source:
+
+    clspv -mfmt=c foo.cl -o -
+
 Predefine some preprocessor symbols:
 
     clspv -DWIDTH=32 -DHEIGHT=64 foo.cl -o foo.spv

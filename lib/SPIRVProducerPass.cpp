@@ -37,6 +37,8 @@
 #include <clspv/spirv_glsl.hpp>
 
 #include <list>
+#include <iomanip>
+#include <sstream>
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
@@ -109,11 +111,13 @@ struct SPIRVProducerPass final : public ModulePass {
 
   explicit SPIRVProducerPass(raw_pwrite_stream &out,
                              raw_ostream &descriptor_map_out,
-                             ArrayRef<unsigned> samplerMap, bool outputAsm)
+                             ArrayRef<unsigned> samplerMap, bool outputAsm,
+                             bool outputCInitList)
       : ModulePass(ID), samplerMap(samplerMap), out(out),
+        binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapOut(descriptor_map_out), outputAsm(outputAsm),
-        patchBoundOffset(0), nextID(1), OpExtInstImportID(0),
-        HasVariablePointers(false), SamplerTy(nullptr) {}
+        outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
+        OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -230,8 +234,22 @@ private:
   static char ID;
   ArrayRef<unsigned> samplerMap;
   raw_pwrite_stream &out;
+
+  // TODO(dneto): Wouldn't it be better to always just emit a binary, and then
+  // convert to other formats on demand?
+
+  // When emitting a C initialization list, the WriteSPIRVBinary method
+  // will actually write its words to this vector via binaryTempOut.
+  SmallVector<char, 100> binaryTempUnderlyingVector;
+  raw_svector_ostream binaryTempOut;
+
+  // Binary output writes to this stream, which might be |out| or
+  // |binaryTempOut|.  It's the latter when we really want to write a C
+  // initializer list.
+  raw_pwrite_stream* binaryOut;
   raw_ostream &descriptorMapOut;
   const bool outputAsm;
+  const bool outputCInitList; // If true, output look like {0x7023, ... , 5}
   uint64_t patchBoundOffset;
   uint32_t nextID;
 
@@ -267,12 +285,15 @@ namespace clspv {
 ModulePass *createSPIRVProducerPass(raw_pwrite_stream &out,
                                     raw_ostream &descriptor_map_out,
                                     ArrayRef<unsigned> samplerMap,
-                                    bool outputAsm) {
-  return new SPIRVProducerPass(out, descriptor_map_out, samplerMap, outputAsm);
+                                    bool outputAsm,
+                                    bool outputCInitList) {
+  return new SPIRVProducerPass(out, descriptor_map_out, samplerMap, outputAsm, outputCInitList);
 }
 } // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
+  binaryOut = outputCInitList ? &binaryTempOut : &out;
+
   // SPIR-V always begins with its header information
   outputHeader();
 
@@ -365,6 +386,34 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 
   // We need to patch the SPIR-V header to set bound correctly.
   patchHeader();
+
+  if (outputCInitList) {
+    bool first = true;
+    int word_index = 0;
+    std::ostringstream os;
+
+    os << std::hex;
+    auto emit_word = [&os, &word_index, &first](uint32_t word) {
+      if (!first)
+        os << ',';
+      if (word_index > 0)
+        os << ((word_index & 3) ? ' ' : '\n');
+      os << "0x" << word;
+      ++word_index;
+      first = false;
+    };
+
+    os << "{";
+    const StringRef str = binaryTempOut.str();
+    for (unsigned i = 0; i < str.size() / 4; i++) {
+      emit_word(uint32_t(str[4 * i]) | (uint32_t(str[4 * i + 1]) << 8) |
+                (uint32_t(str[4 * i + 2]) << 16) |
+                (uint32_t(str[4 * i + 3]) << 24));
+    }
+    os << "}\n";
+    out << os.str();
+  }
+
   return false;
 }
 
@@ -399,24 +448,24 @@ void SPIRVProducerPass::outputHeader() {
 
     out << "; Schema: 0\n";
   } else {
-    out.write(reinterpret_cast<const char *>(&spv::MagicNumber),
+    binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
               sizeof(spv::MagicNumber));
-    out.write(reinterpret_cast<const char *>(&spv::Version),
+    binaryOut->write(reinterpret_cast<const char *>(&spv::Version),
               sizeof(spv::Version));
 
     // use Codeplay's vendor ID
     const uint32_t vendor = 3 << 16;
-    out.write(reinterpret_cast<const char *>(&vendor), sizeof(vendor));
+    binaryOut->write(reinterpret_cast<const char *>(&vendor), sizeof(vendor));
 
     // we record where we need to come back to and patch in the bound value
-    patchBoundOffset = out.tell();
+    patchBoundOffset = binaryOut->tell();
 
     // output a bad bound for now
-    out.write(reinterpret_cast<const char *>(&nextID), sizeof(nextID));
+    binaryOut->write(reinterpret_cast<const char *>(&nextID), sizeof(nextID));
 
     // output the schema (reserved for use and must be 0)
     const uint32_t schema = 0;
-    out.write(reinterpret_cast<const char *>(&schema), sizeof(schema));
+    binaryOut->write(reinterpret_cast<const char *>(&schema), sizeof(schema));
   }
 }
 
@@ -428,8 +477,8 @@ void SPIRVProducerPass::patchHeader() {
     out.pwrite(asString.c_str(), asString.size(), patchBoundOffset);
   } else {
     // for a binary we just write the value of nextID over bound
-    out.pwrite(reinterpret_cast<char *>(&nextID), sizeof(nextID),
-               patchBoundOffset);
+    binaryOut->pwrite(reinterpret_cast<char *>(&nextID), sizeof(nextID),
+                      patchBoundOffset);
   }
 }
 
@@ -5763,7 +5812,7 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
 }
 
 void SPIRVProducerPass::WriteOneWord(uint32_t Word) {
-  out.write(reinterpret_cast<const char *>(&Word), sizeof(uint32_t));
+  binaryOut->write(reinterpret_cast<const char *>(&Word), sizeof(uint32_t));
 }
 
 void SPIRVProducerPass::WriteResultID(SPIRVInstruction *Inst) {

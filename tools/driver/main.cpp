@@ -208,6 +208,12 @@ static llvm::cl::opt<bool>
     OutputAssembly("S", llvm::cl::init(false),
                    llvm::cl::desc("This option controls output of assembly"));
 
+static llvm::cl::opt<std::string> OutputFormat(
+    "mfmt", llvm::cl::init(""),
+    llvm::cl::desc(
+        "Specify special output format. 'c' is as a C initializer list"),
+    llvm::cl::value_desc("format"));
+
 static llvm::cl::opt<std::string>
     SamplerMap("samplermap", llvm::cl::desc("Literal sampler map"),
                llvm::cl::value_desc("filename"));
@@ -269,6 +275,8 @@ int main(const int argc, const char *const argv[]) {
     // if we've to output assembly
     if (OutputAssembly) {
       OutputFilename = "a.spvasm";
+    } else if (OutputFormat=="c") {
+      OutputFilename = "a.spvinc";
     } else {
       OutputFilename = "a.spv";
     }
@@ -701,9 +709,9 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
-  pm.add(clspv::createSPIRVProducerPass(bufferedOutStream, descriptor_map_out,
-                                        SamplerMapEntries,
-                                        OutputAssembly.getValue()));
+  pm.add(clspv::createSPIRVProducerPass(
+      bufferedOutStream, descriptor_map_out, SamplerMapEntries,
+      OutputAssembly.getValue(), OutputFormat == "c"));
   pm.run(*module);
 
   if (descriptor_map_out_fd.get()) {
