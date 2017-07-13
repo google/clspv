@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <utility>
+
 namespace llvm {
 // This is against Google C++ style guide.
 class FunctionPass;
@@ -100,7 +103,8 @@ llvm::ModulePass *createReplaceOpenCLBuiltinPass();
 /// @return An LLVM module pass.
 llvm::ModulePass *createSPIRVProducerPass(
     llvm::raw_pwrite_stream &out, llvm::raw_ostream &descriptor_mappings,
-    llvm::ArrayRef<unsigned> samplerMap, bool outputAsm, bool outputCInitList);
+    llvm::ArrayRef<std::pair<unsigned, std::string>> samplerMap, bool outputAsm,
+    bool outputCInitList);
 
 /// Undo LLVM's bitcast instructions with pointer type.
 /// @return An LLVM module pass.

@@ -177,12 +177,13 @@ Then compiling with:
 
 Then `mydescriptormap` will contain:
 
-    sampler,18,descriptorSet,0,binding,0
-    sampler,35,descriptorSet,0,binding,1
+    sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
+    sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0
     kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0
     kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0
+
 
 #### Clustering plain-old-data kernel arguments to save descriptors
 
@@ -241,12 +242,13 @@ Compiling with the same sampler map from before:
 
 produces the following descriptor map:
 
-    sampler,18,descriptorSet,0,binding,0
-    sampler,35,descriptorSet,0,binding,1
+    sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
+    sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0
     kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0
     kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4
+
 
 TODO(dneto): Give an example using images.
 

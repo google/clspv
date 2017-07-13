@@ -39,6 +39,7 @@
 #include <list>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
@@ -109,10 +110,10 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
 
-  explicit SPIRVProducerPass(raw_pwrite_stream &out,
-                             raw_ostream &descriptor_map_out,
-                             ArrayRef<unsigned> samplerMap, bool outputAsm,
-                             bool outputCInitList)
+  explicit SPIRVProducerPass(
+      raw_pwrite_stream &out, raw_ostream &descriptor_map_out,
+      ArrayRef<std::pair<unsigned, std::string>> samplerMap, bool outputAsm,
+      bool outputCInitList)
       : ModulePass(ID), samplerMap(samplerMap), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapOut(descriptor_map_out), outputAsm(outputAsm),
@@ -164,7 +165,7 @@ struct SPIRVProducerPass final : public ModulePass {
   std::vector<uint32_t> &getBuiltinDimVec() { return BuiltinDimensionVec; };
   bool hasVariablePointers() { return true; /* We use StorageBuffer everywhere */ };
   void setVariablePointers(bool Val) { HasVariablePointers = Val; };
-  ArrayRef<unsigned> &getSamplerMap() { return samplerMap; }
+  ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() { return samplerMap; }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
     return GlobalConstFuncTypeMap;
   }
@@ -232,7 +233,7 @@ struct SPIRVProducerPass final : public ModulePass {
 
 private:
   static char ID;
-  ArrayRef<unsigned> samplerMap;
+  ArrayRef<std::pair<unsigned, std::string>> samplerMap;
   raw_pwrite_stream &out;
 
   // TODO(dneto): Wouldn't it be better to always just emit a binary, and then
@@ -282,12 +283,12 @@ char SPIRVProducerPass::ID;
 }
 
 namespace clspv {
-ModulePass *createSPIRVProducerPass(raw_pwrite_stream &out,
-                                    raw_ostream &descriptor_map_out,
-                                    ArrayRef<unsigned> samplerMap,
-                                    bool outputAsm,
-                                    bool outputCInitList) {
-  return new SPIRVProducerPass(out, descriptor_map_out, samplerMap, outputAsm, outputCInitList);
+ModulePass *
+createSPIRVProducerPass(raw_pwrite_stream &out, raw_ostream &descriptor_map_out,
+                        ArrayRef<std::pair<unsigned, std::string>> samplerMap,
+                        bool outputAsm, bool outputCInitList) {
+  return new SPIRVProducerPass(out, descriptor_map_out, samplerMap, outputAsm,
+                               outputCInitList);
 }
 } // namespace clspv
 
@@ -2015,7 +2016,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
         static_cast<uint16_t>(2 + Ops.size()), spv::OpVariable, nextID, Ops);
     SPIRVInstList.push_back(Inst);
 
-    SamplerLiteralToIDMap[SamplerLiteral] = nextID++;
+    SamplerLiteralToIDMap[SamplerLiteral.first] = nextID++;
 
     // Find Insert Point for OpDecorate.
     auto DecoInsertPoint =
@@ -2031,15 +2032,17 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     // Ops[2] = LiteralNumber according to Decoration
     Ops.clear();
 
-    SPIRVOperand *ArgIDOp = new SPIRVOperand(
-        SPIRVOperandType::NUMBERID, SamplerLiteralToIDMap[SamplerLiteral]);
+    SPIRVOperand *ArgIDOp =
+        new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                         SamplerLiteralToIDMap[SamplerLiteral.first]);
     Ops.push_back(ArgIDOp);
 
     spv::Decoration Deco = spv::DecorationDescriptorSet;
     SPIRVOperand *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
     Ops.push_back(DecoOp);
 
-    descriptorMapOut << "sampler," << SamplerLiteral << ",descriptorSet,0,binding,"
+    descriptorMapOut << "sampler," << SamplerLiteral.first << ",samplerExpr,\""
+                     << SamplerLiteral.second << "\",descriptorSet,0,binding,"
                      << BindingIdx << "\n";
 
     std::vector<uint32_t> LiteralNum;
