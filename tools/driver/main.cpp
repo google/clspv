@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Basic/TargetInfo.h>
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Frontend/CompilerInstance.h>
@@ -67,11 +68,37 @@ private:
     return true;
   }
 
+  // This will be used to check the inside of function bodies.
+  class DeclVisitor : public RecursiveASTVisitor<DeclVisitor> {
+  private:
+    ExtraValidationConsumer &consumer;
+
+  public:
+    explicit DeclVisitor(ExtraValidationConsumer &VC) : consumer(VC) {}
+
+    // Visits a declaration.  Emits a diagnostic and returns false if the
+    // declaration represents an unsupported vector value or vector type.
+    // Otherwise returns true.
+    bool VisitDecl(Decl *D) {
+      // Looking at the Decl class hierarchy, it seems ValueDecl and TypeDecl
+      // are the only two that might represent an unsupported vector type.
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        return consumer.IsSupportedType(VD->getType(), D->getSourceRange());
+      } else if (auto *TD = dyn_cast<TypeDecl>(D)) {
+        QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
+        return consumer.IsSupportedType(DefinedType, TD->getSourceRange());
+      }
+      return true;
+    }
+  };
+
+  DeclVisitor Visitor;
+
 public:
   explicit ExtraValidationConsumer(CompilerInstance &Instance,
                                    llvm::StringRef InFile)
       : Instance(Instance), InFile(InFile),
-        CustomDiagnosticsIDMap(CustomDiagnosticTotal) {
+        CustomDiagnosticsIDMap(CustomDiagnosticTotal), Visitor(*this) {
     auto &DE = Instance.getDiagnostics();
 
     CustomDiagnosticsIDMap[CustomDiagnosticVectorsMoreThan4Elements] =
@@ -96,6 +123,9 @@ public:
               return false;
             }
           }
+
+          // Check for unsupported vector types.
+          Visitor.TraverseDecl(FD);
         }
       }
     }
