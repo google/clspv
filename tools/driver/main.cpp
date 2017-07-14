@@ -54,7 +54,7 @@ private:
       return IsSupportedType(Ty->getPointeeType(), SR);
     }
 
-    if (auto *VT = llvm::dyn_cast<VectorType>(Ty)) {
+    if (auto *VT = llvm::dyn_cast<ExtVectorType>(QT.getCanonicalType())) {
       // We don't support vectors with more than 4 elements.
       if (4 < VT->getNumElements()) {
         Instance.getDiagnostics().Report(

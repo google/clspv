@@ -51,4 +51,27 @@ string(REGEX REPLACE "\n[^;\n]*_sat[^;]*;" "" lines "${lines}")
 # get_work_dim gets stripped out, lets fudge it back in
 string(REPLACE "#define __cnfn __attribute__((const))" "#define __cnfn __attribute__((const))\nunsigned int __ovld __cnfn get_work_dim(void);" lines "${lines}")
 
+# Declare the invalid vector types so we can issue better error messages
+set(BANNED_VECTOR_TYPES "")
+foreach(LEN "8" "16")
+  foreach(ELEM "char" "uchar" "short" "ushort" "int" "uint" "long" "ulong" "half" "float" "double")
+    list(APPEND BANNED_VECTOR_TYPES
+         "typedef ${ELEM} ${ELEM}${LEN} __attribute__((ext_vector_type(${LEN})))\;\n")
+  endforeach(ELEM)
+  list(APPEND BANNED_VECTOR_TYPES
+         "#ifdef cl_khr_fp16\n"
+         "typedef half half${LEN} __attribute__((ext_vector_type(${LEN})))\;\n"
+	 "#endif\n")
+  list(APPEND BANNED_VECTOR_TYPES
+         "#ifdef cl_khr_fp64\n"
+         "typedef double double${LEN} __attribute__((ext_vector_type(${LEN})))\;\n"
+	 "#endif\n")
+endforeach(LEN)
+string(CONCAT BANNED_VECTOR_TYPE_DECLS ${BANNED_VECTOR_TYPES})
+string(REGEX REPLACE
+  "typedef __UINTPTR_TYPE__ uintptr_t;"
+  "typedef __UINTPTR_TYPE__ uintptr_t;\n// Banned vector types\n${BANNED_VECTOR_TYPE_DECLS}"
+  lines
+  "${lines}")
+
 file(WRITE "${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE}" "${lines}")
