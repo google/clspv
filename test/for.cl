@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 31
+// CHECK: ; Bound: 33
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -46,11 +46,15 @@
 // CHECK: %[[LOAD_B_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[B_ACCESS_CHAIN_ID]]
 // CHECK: %[[CMP_0_ID:[a-zA-Z0-9_]*]] = OpIEqual %[[BOOL_TYPE_ID]] %[[LOAD_B_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[NOT_CMP_0_ID:[a-zA-Z0-9_]*]] = OpLogicalNot %[[BOOL_TYPE_ID]] %[[CMP_0_ID]]
-// CHECK: OpBranchConditional %[[NOT_CMP_0_ID]] %[[LOOP_BODY_ID:[a-zA-Z0-9_]*]] %[[END_LABEL_ID:[a-zA-Z0-9_]*]]
-// CHECK: %[[END_LABEL_ID]] = OpLabel
-// CHECK: OpReturn
-// CHECK: %[[LOOP_BODY_ID]] = OpLabel
-// CHECK: %[[PHI_ID:[a-zA-Z0-9_]*]] = OpPhi %[[UINT_TYPE_ID]] %[[INCREMENT_PHI_ID:[a-zA-Z0-9_]*]] %[[LOOP_BODY_ID]] %[[CONSTANT_0_ID]] %[[LABEL_ID]]
+
+// CHECK: OpSelectionMerge [[sel_merge_id:%[0-9]+]] None
+// CHECK: OpBranchConditional %[[NOT_CMP_0_ID]] [[loop_preheader:%[0-9]+]] [[sel_merge_id]]
+
+// CHECK: [[loop_preheader]] = OpLabel
+// CHECK: OpBranch [[loop_body_id:%[0-9]+]]
+
+// CHECK: [[loop_body_id]] = OpLabel
+// CHECK: %[[PHI_ID:[a-zA-Z0-9_]*]] = OpPhi %[[UINT_TYPE_ID]] %[[INCREMENT_PHI_ID:[a-zA-Z0-9_]*]] [[loop_body_id]] %[[CONSTANT_0_ID]] [[loop_preheader]]
 // CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[PHI_ID]]
 // CHECK: %[[LOAD_A_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[A_ACCESS_CHAIN_ID]]
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpIAdd %[[UINT_TYPE_ID]] %[[LOAD_A_ID]] %[[CONSTANT_1_ID]]
@@ -58,10 +62,17 @@
 // CHECK: %[[INCREMENT_PHI_ID]] = OpIAdd %[[UINT_TYPE_ID]] %[[PHI_ID]] %[[CONSTANT_1_ID]]
 // CHECK: %[[CMP_1_ID:[a-zA-Z0-9_]*]] = OpULessThan %[[BOOL_TYPE_ID]] %[[INCREMENT_PHI_ID]] %[[LOAD_B_ID]]
 // CHECK: %[[NOT_CMP_1_ID:[a-zA-Z0-9_]*]] = OpLogicalNot %[[BOOL_TYPE_ID]] %[[CMP_1_ID]]
-// CHECK: OpLoopMerge %[[MERGE_ID:[a-zA-Z0-9_]*]] %[[LOOP_BODY_ID]] None
-// CHECK: OpBranchConditional %[[NOT_CMP_1_ID]] %[[MERGE_ID]] %[[LOOP_BODY_ID]]
+// CHECK: OpLoopMerge %[[MERGE_ID:[a-zA-Z0-9_]*]] [[loop_body_id]] None
+// CHECK: OpBranchConditional %[[NOT_CMP_1_ID]] %[[MERGE_ID]] [[loop_body_id]]
+
 // CHECK: %[[MERGE_ID]] = OpLabel
-// CHECK: OpBranch %[[END_LABEL_ID]]
+// CHECK: OpBranch [[sel_merge_id]]
+
+// CHECK: [[sel_merge_id]] = OpLabel
+// CHECK: OpBranch [[END_LABEL_ID:%[0-9]+]]
+
+// CHECK: [[END_LABEL_ID]] = OpLabel
+// CHECK: OpReturn
 // CHECK: OpFunctionEnd
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, uint b)
