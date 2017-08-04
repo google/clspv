@@ -25,6 +25,9 @@ additional extensions:
 
 - _SPV\_KHR\_variable\_pointers_ - to enable the support of more expressive
   pointers that the OpenCL C language can make use of.
+- _SPV\_KHR\_storage\_buffer\_storage\_class_ - required by
+  _SPV\_KHR\_variable\_pointers_, to enable use of the StorageBuffer storage
+  class.
 
 The SPIR-V as produced from the OpenCL C language can make use of the following
 capabilities:
@@ -32,7 +35,7 @@ capabilities:
 - `Shader` as we are targeting the OpenCL C language at a Vulkan implementation.
 - If pointers are used such that the operations in the OpenCL C require the use
   of the _SPV\_KHR\_variable\_pointers_  extension:
-  - From the _SPV\_KHR\_variable\_pointers_ extension, `VariablePointer`.
+  - From the _SPV\_KHR\_variable\_pointers_ extension, `VariablePointers`.
 
 ## Vulkan Interaction
 
@@ -48,9 +51,11 @@ language must conform to the following the rules:
   - The `shaderStorageImageWriteWithoutFormat` field of
     `VkPhysicalDeviceFeatures` **must** be set to true.
 - If pointers are used such that the operations in the OpenCL C require the use
-  of the _SPV\_KHR\_variable\_pointers_  extension:
+  of the _VK\_KHR\_storage\_buffer\_storage\_class_ and
+  _VK\_KHR\_variable\_pointers_  extensions:
   - A call to `vkCreateDevice()` where the `ppEnabledExtensionNames` field of
-    `VkDeviceCreateInfo` contains the extension string
+    `VkDeviceCreateInfo` contains extension strings
+    _"VK\_KHR\_storage\_buffer\_storage\_class"_ and
     _"VK\_KHR\_variable\_pointers"_ **must** succeed.
 
 ### Descriptor Type Mappings
