@@ -1614,7 +1614,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
               new SPIRVOperand(SPIRVOperandType::NUMBERID, STyID);
           Ops.push_back(STyIDOp);
 
-          const spv::Decoration Deco = spv::DecorationBufferBlock;
+          // Use Block decorations with StorageBuffer storage class.
+          const spv::Decoration Deco = spv::DecorationBlock;
 
           SPIRVOperand *DecoOp =
               new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);

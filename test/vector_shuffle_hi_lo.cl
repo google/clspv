@@ -17,10 +17,10 @@
 // CHECK: OpEntryPoint GLCompute  %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1 
 // CHECK: OpMemberDecorate %[[ARG0_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG0_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[ARG0_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[FLOAT_2_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 8
 // CHECK: OpMemberDecorate %[[ARG12_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG12_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[ARG12_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[ARG_0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG_0_ID]] Binding 0
 // CHECK: OpDecorate %[[ARG_1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0

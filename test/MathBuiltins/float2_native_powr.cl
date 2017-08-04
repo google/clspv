@@ -19,7 +19,7 @@
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 // CHECK: OpDecorate %[[FLOAT_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 8
 // CHECK: OpMemberDecorate %[[FLOAT_ARG_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[FLOAT_ARG_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[FLOAT_ARG_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 // CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0

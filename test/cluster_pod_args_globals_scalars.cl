@@ -19,12 +19,12 @@
 
 // CHECK: OpDecorate [[rtarr_float:%[a-zA-Z0-9_]+]] ArrayStride 4
 // CHECK: OpMemberDecorate [[st_rtarr_float:%[a-zA-Z0-9_]+]] 0 Offset 0
-// CHECK: OpDecorate [[st_rtarr_float:%[a-zA-Z0-9_]+]] BufferBlock
+// CHECK: OpDecorate [[st_rtarr_float:%[a-zA-Z0-9_]+]] Block
 
 // CHECK: OpMemberDecorate [[podty:%[a-zA-Z0-9_]+]] 0 Offset 0
 // CHECK: OpMemberDecorate [[podty]] 1 Offset 4
 // CHECK: OpMemberDecorate [[st_podty:%[a-zA-Z0-9_]+]] 0 Offset 0
-// CHECK: OpDecorate [[st_podty]] BufferBlock
+// CHECK: OpDecorate [[st_podty]] Block
 
 // CHECK: OpDecorate [[A:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[A]] Binding 0

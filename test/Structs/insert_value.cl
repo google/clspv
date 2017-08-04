@@ -19,7 +19,7 @@
 
 // CHECK: OpDecorate %[[FLOAT_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 4
 // CHECK: OpMemberDecorate %[[ARG_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[ARG_STRUCT_TYPE_ID]] Block
 // CHECK: OpMemberDecorate %[[THING_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
 // CHECK: OpMemberDecorate %[[THING_TYPE_ID]] 1 Offset 4
 // CHECK: OpDecorate %[[ARG_ID:[a-zA-Z0-9_]*]] DescriptorSet 0

@@ -20,7 +20,7 @@
 // CHECK: OpExecutionMode %[[BAR_ID]] LocalSize 42 13 5
 // CHECK: OpDecorate %[[UINT_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 4
 // CHECK: OpMemberDecorate %[[UINT_ARG0_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[UINT_ARG0_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[UINT_ARG0_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[FOO_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[FOO_ARG0_ID]] Binding 0
 // CHECK: OpDecorate %[[BAR_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 1

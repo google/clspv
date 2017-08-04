@@ -17,7 +17,7 @@
 // CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 // CHECK: OpMemberDecorate %[[UINT_ARG0_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[UINT_ARG0_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[UINT_ARG0_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 // CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0

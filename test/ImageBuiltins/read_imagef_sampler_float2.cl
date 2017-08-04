@@ -25,12 +25,12 @@
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 
 // CHECK: OpMemberDecorate %[[ARG2_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG2_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[ARG2_STRUCT_TYPE_ID]] Block
 
 // CHECK: OpDecorate %[[ARG3_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 16
 
 // CHECK: OpMemberDecorate %[[ARG3_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG3_STRUCT_TYPE_ID]] BufferBlock
+// CHECK: OpDecorate %[[ARG3_STRUCT_TYPE_ID]] Block
 
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
