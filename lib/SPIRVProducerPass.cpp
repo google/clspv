@@ -2762,23 +2762,26 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     //
     // Ops[0] = Name (Literal String)
     //
-    Ops.clear();
+    for (auto extension : {"SPV_KHR_storage_buffer_storage_class",
+                           "SPV_KHR_variable_pointers"}) {
+      Ops.clear();
 
-    SPIRVOperand *Name = new SPIRVOperand(SPIRVOperandType::LITERAL_STRING,
-                                          "SPV_KHR_variable_pointers");
-    Ops.push_back(Name);
+      SPIRVOperand *Name =
+          new SPIRVOperand(SPIRVOperandType::LITERAL_STRING, extension);
+      Ops.push_back(Name);
 
-    size_t NameWordSize = (Name->getLiteralStr().size() + 1) / 4;
-    if ((Name->getLiteralStr().size() + 1) % 4) {
-      NameWordSize += 1;
+      size_t NameWordSize = (Name->getLiteralStr().size() + 1) / 4;
+      if ((Name->getLiteralStr().size() + 1) % 4) {
+        NameWordSize += 1;
+      }
+
+      assert((NameWordSize + 1) < UINT16_MAX);
+      uint16_t WordCount = static_cast<uint16_t>(1 + NameWordSize);
+
+      SPIRVInstruction *ExtensionInst =
+          new SPIRVInstruction(WordCount, spv::OpExtension, 0 /* No id */, Ops);
+      SPIRVInstList.insert(InsertPoint, ExtensionInst);
     }
-
-    assert((NameWordSize + 1) < UINT16_MAX);
-    uint16_t WordCount = static_cast<uint16_t>(1 + NameWordSize);
-
-    SPIRVInstruction *ExtensionInst =
-        new SPIRVInstruction(WordCount, spv::OpExtension, 0 /* No id */, Ops);
-    SPIRVInstList.insert(InsertPoint, ExtensionInst);
   }
 
   if (ExtInstImportID) {
