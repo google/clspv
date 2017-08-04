@@ -390,26 +390,23 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 
   if (outputCInitList) {
     bool first = true;
-    int word_index = 0;
     std::ostringstream os;
 
-    os << std::hex;
-    auto emit_word = [&os, &word_index, &first](uint32_t word) {
+    auto emit_word = [&os, &first](uint32_t word) {
       if (!first)
-        os << ',';
-      if (word_index > 0)
-        os << ((word_index & 3) ? ' ' : '\n');
-      os << "0x" << word;
-      ++word_index;
+        os << ",\n";
+      os << word;
       first = false;
     };
 
     os << "{";
-    const StringRef str = binaryTempOut.str();
-    for (unsigned i = 0; i < str.size() / 4; i++) {
-      emit_word(uint32_t(str[4 * i]) | (uint32_t(str[4 * i + 1]) << 8) |
-                (uint32_t(str[4 * i + 2]) << 16) |
-                (uint32_t(str[4 * i + 3]) << 24));
+    const std::string str(binaryTempOut.str());
+    for (unsigned i = 0; i < str.size(); i += 4) {
+      const uint32_t a = static_cast<unsigned char>(str[i]);
+      const uint32_t b = static_cast<unsigned char>(str[i + 1]);
+      const uint32_t c = static_cast<unsigned char>(str[i + 2]);
+      const uint32_t d = static_cast<unsigned char>(str[i + 3]);
+      emit_word(a | (b << 8) | (c << 16) | (d << 24));
     }
     os << "}\n";
     out << os.str();
