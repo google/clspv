@@ -1554,7 +1554,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
                                 Inst->getOpcode() != spv::OpExtInstImport;
                        });
 
-      uint32_t ByteOffset = 0;
+      const auto StructLayout = DL.getStructLayout(STy);
+
       for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
            MemberIdx++) {
         // Ops[0] = Structure Type ID
@@ -1578,6 +1579,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
         Ops.push_back(DecoOp);
 
         LiteralNum.clear();
+        const auto ByteOffset =
+            uint32_t(StructLayout->getElementOffset(MemberIdx));
         LiteralNum.push_back(ByteOffset);
         SPIRVOperand *ByteOffsetOp =
             new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
@@ -1586,10 +1589,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
         SPIRVInstruction *DecoInst =
             new SPIRVInstruction(5, spv::OpMemberDecorate, 0 /* No id */, Ops);
         SPIRVInstList.insert(DecoInsertPoint, DecoInst);
-
-        // Update ByteOffset.
-        Type *EleTy = STy->getElementType(MemberIdx);
-        ByteOffset += static_cast<uint32_t>(DL.getTypeSizeInBits(EleTy) / 8);
       }
 
       // Generate OpDecorate.
