@@ -256,6 +256,21 @@ produces the following descriptor map:
 
 TODO(dneto): Give an example using images.
 
+### Attributes
+
+The following attributes are ignored in the OpenCL C source, and thus have
+no functional impact on the produced SPIR-V:
+
+- `__attribute__((work_group_size_hint(X, Y, Z)))`
+- `__attribute__((packed))`
+- `__attribute__ ((endian(host)))`
+- `__attribute__ ((endian(device)))`
+- `__attribute__((vec_type_hint(<typen>)))`
+
+The `__attribute__((reqd_work_group_size(X, Y, Z)))` kernel attribute specifies
+the work-group size that **must** be used with that kernel.
+
+
 ### Work-Group Size
 
 The OpenCL C language allows the work-group size to be set just before executing
@@ -264,13 +279,15 @@ Vulkan requires that the work group size be specified no later than when the
 `VkPipeline` is created, which in OpenCL terms corresponds to when the
 `cl_kernel` is created.
 
-To allow for the maximum flexibility to developers who are used to being able to
-specify the work group size in the host API and not in the device-side kernel
-language, we use _specialization constants_ to allow for setting the work group
+To allow for the maximum flexibility to developers who are used to specifying
+the work-group size in the host API and not in the device-side kernel
+language, we can use _specialization constants_ to allow for setting the work-group
 size at `VkPipeline` creation time.
 
-The work-group size, as exposed in the Vulkan SPIR-V produced by compiling
-OpenCL C source files, is set such that:
+If the `reqd_work_group_size` attribute is used in the OpenCL C source, then that
+attribute will specify the work-group size that must be used.
+Otherwise, the Vulkan SPIR-V produced by the compiler will contain specialization
+constants as follows:
 
 - The _x_ dimension of the work-group size is stored in a specialization
   constant that is decorated with the `SpecId` of _0_, whose value defaults to 
@@ -282,20 +299,11 @@ OpenCL C source files, is set such that:
   constant that is decorated with the `SpecId` of _2_, whose value defaults to 
   _1_.
 
-### Attributes
-
-The `__attribute__((reqd_work_group_size(X, Y, Z)))` kernel attribute forces the
-SPIR-V generated for that kernel to ignore any attempt to specialize the
-work-group size via the specialization constants approach explained above.
-
-The following list of attributes are ignored, and thus have no functional
-impact on the produced SPIR-V:
-
-- `__attribute__((work_group_size_hint(X, Y, Z)))`
-- `__attribute__((packed))`
-- `__attribute__ ((endian(host)))`
-- `__attribute__ ((endian(device)))`
-- `__attribute__((vec_type_hint(<typen>)))`
+If a compilation unit contains multiple kernels, then either:
+- All kernels should have a `reqd_work_group_size` attribute, or
+- No kernels should have a `required_work_group_size` attribute.  In this case
+  work group sizes would be set via specialization constants for the
+  pipeline as described above.
 
 ### Types
 
