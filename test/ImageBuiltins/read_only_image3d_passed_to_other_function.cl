@@ -10,8 +10,9 @@
 // CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 39
 // CHECK: ; Schema: 0
-// CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
+// CHECK-DAG: OpCapability Shader
+// CHECK-DAG: OpCapability VariablePointers
+// CHECK-NOT: OpCapability StorageImageReadWithoutFormat
 // CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
