@@ -2710,18 +2710,8 @@ void SPIRVProducerPass::GenerateModuleInfo() {
                                                 spv::CapabilityFloat64)));
     } else if (auto *STy = dyn_cast<StructType>(Ty)) {
       if (STy->isOpaque()) {
-        if (STy->getName().equals("opencl.image2d_ro_t") ||
-            STy->getName().equals("opencl.image3d_ro_t")) {
-          // Generate OpCapability for read only image type.
-          SPIRVInstList.insert(
-              InsertPoint,
-              new SPIRVInstruction(
-                  2, spv::OpCapability, 0 /* No id */,
-                  new SPIRVOperand(
-                      SPIRVOperandType::NUMBERID,
-                      spv::CapabilityStorageImageReadWithoutFormat)));
-        } else if (STy->getName().equals("opencl.image2d_wo_t") ||
-                   STy->getName().equals("opencl.image3d_wo_t")) {
+        if (STy->getName().equals("opencl.image2d_wo_t") ||
+            STy->getName().equals("opencl.image3d_wo_t")) {
           // Generate OpCapability for write only image type.
           SPIRVInstList.insert(
               InsertPoint,
