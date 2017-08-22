@@ -1,0 +1,91 @@
+# macOS / Linux Build Configuration for Travis
+
+language: cpp
+
+os:
+  - linux
+  - osx
+
+# Use Ubuntu 14.04 LTS (Trusty) as the Linux testing environment.
+sudo: required
+dist: trusty
+
+env:
+  - CLSPV_BUILD_TYPE=Release
+  - CLSPV_BUILD_TYPE=Debug
+
+compiler:
+  - clang
+  - gcc
+
+matrix:
+  fast_finish: true # Show final status immediately if a test fails.
+  exclude:
+    # Skip GCC builds on macOS.
+    - os: osx
+      compiler: gcc
+  include:
+    # Additional GCC builds for code coverage.
+    - os: linux
+      compiler: gcc
+      env: CLSPV_CODE_COVERAGE=ON
+
+cache:
+  apt: true
+
+branches:
+  only:
+    - master
+
+addons:
+  apt:
+    packages:
+      - clang-3.6
+      - ninja-build
+      - lcov
+
+before_install:
+  # Install ninja on macOS.
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ninja; fi
+
+install:
+  - pip install --user nose
+  - pip install --user cpp-coveralls
+
+  - export PATH=$HOME/.local/bin:$PATH # Make sure we can find the above Python packages
+    # Make sure that clang-3.6 is selected.
+  - if [[ "$TRAVIS_OS_NAME" == "linux" && "$CC" == "clang" ]]; then
+      export CC=clang-3.6 CXX=clang++-3.6;
+    fi
+
+before_script:
+  - python utils/fetch_sources.py
+
+script:
+  - mkdir build && cd build
+  - cmake -DCMAKE_BUILD_TYPE=${CLSPV_BUILD_TYPE:-Debug}
+          -DENABLE_CODE_COVERAGE=${CLSPV_CODE_COVERAGE:-OFF}
+          -GNinja ..
+  - ninja check-spirv
+
+after_success:
+  # Collect coverage and push to coveralls.info.
+  # Ignore third party source code and tests.
+  - if [[ "$CC" == "gcc" && "$CLSPV_CODE_COVERAGE" == "ON" ]]; then
+      coveralls
+        --root ../
+        --build-root ./
+        --exclude-pattern '.+/third_party/'
+        --exclude-pattern '.+/.+_test\.cc'
+        --exclude-pattern '.+/CMakeFiles/'
+        --gcov /usr/bin/gcov
+        --gcov-options '\--long-file-names --preserve-paths'
+        --verbose;
+    fi
+
+notifications:
+  email:
+    recipients:
+      - neil@codeplay.com
+    on_success: change
+    on_failure: always
