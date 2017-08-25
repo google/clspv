@@ -101,7 +101,7 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<Type *, uint32_t> TypeMapType;
   typedef UniqueVector<Type *> TypeList;
   typedef DenseMap<Value *, uint32_t> ValueMapType;
-  typedef std::vector<Value *> ValueList;
+  typedef UniqueVector<Value *> ValueList;
   typedef std::vector<std::pair<Value *, uint32_t>> EntryPointVecType;
   typedef std::list<SPIRVInstruction *> SPIRVInstructionList;
   typedef std::vector<
@@ -342,7 +342,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 
     // If the variable is an input, entry points need to know about it.
     if (AddressSpace::Input == GV.getType()->getPointerAddressSpace()) {
-      getEntryPointInterfacesVec().push_back(&GV);
+      getEntryPointInterfacesVec().insert(&GV);
     }
   }
 
@@ -1158,8 +1158,8 @@ void SPIRVProducerPass::FindConstant(Value *V) {
   ValueMapType &VMap = getValueMap();
   ValueList &CstList = getConstantList();
 
-  // If V is already in VMap, ignore it.
-  if (VMap.find_as(V) != VMap.end()) {
+  // If V is already tracked, ignore it.
+  if (0 != CstList.idFor(V)) {
     return;
   }
 
@@ -1169,8 +1169,7 @@ void SPIRVProducerPass::FindConstant(Value *V) {
   Type *CstTy = Cst->getType();
   if (is4xi8vec(CstTy)) {
     if (!isa<GlobalValue>(V)) {
-      CstList.push_back(V);
-      VMap[V] = static_cast<uint32_t>(CstList.size());
+      CstList.insert(V);
     }
   }
 
@@ -1180,8 +1179,7 @@ void SPIRVProducerPass::FindConstant(Value *V) {
       FindConstant(*I);
     }
 
-    CstList.push_back(Cst);
-    VMap[V] = static_cast<uint32_t>(CstList.size());
+    CstList.insert(Cst);
     return;
   } else if (const ConstantDataSequential *CDS =
                  dyn_cast<ConstantDataSequential>(Cst)) {
@@ -1193,8 +1191,7 @@ void SPIRVProducerPass::FindConstant(Value *V) {
   }
 
   if (!isa<GlobalValue>(V)) {
-    CstList.push_back(V);
-    VMap[V] = static_cast<uint32_t>(CstList.size());
+    CstList.insert(V);
   }
 }
 
@@ -1837,15 +1834,15 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
   ValueList &CstList = getConstantList();
 
   for (uint32_t i = 0; i < CstList.size(); i++) {
-    Constant *Cst = cast<Constant>(CstList[i]);
+    // UniqueVector ids are 1-based.
+    Constant *Cst = cast<Constant>(CstList[i+1]);
 
     // OpTypeArray's constant was already generated.
-    //if (!AllocatedVMap.find_as(Cst) != AllocatedVMap.end())
-    if (AllocatedVMap[Cst]) {
+    if (AllocatedVMap.find_as(Cst) != AllocatedVMap.end()) {
       continue;
     }
 
-    // Update ValueMap with nextID for reference later.
+    // Set ValueMap with nextID for reference later.
     VMap[Cst] = nextID;
 
     //
