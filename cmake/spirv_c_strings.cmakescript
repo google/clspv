@@ -39,6 +39,7 @@ file(READ "${SPIRV_C_STRINGS_INPUT_FILE}" contents)
 # There are some SPIR-V entries that alias each other, need to remove them.
 string(REPLACE "CapabilityStorageUniformBufferBlock16 = 4433," "" contents "${contents}")
 string(REPLACE "CapabilityStorageUniform16 = 4434," "" contents "${contents}")
+string(REPLACE "CapabilityShaderViewportIndexLayerNV = 5254," "" contents "${contents}")
 
 function(helper contents prefix var keep_prefix is_mask)
   if(is_mask)
