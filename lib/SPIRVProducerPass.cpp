@@ -180,11 +180,18 @@ struct SPIRVProducerPass final : public ModulePass {
   bool FindExtInst(Module &M);
   void FindTypePerGlobalVar(GlobalVariable &GV);
   void FindTypePerFunc(Function &F);
+  // Inserts |Ty| and relevant sub-types into the |Types| member, indicating that
+  // |Ty| and its subtypes will need a corresponding SPIR-V type.
   void FindType(Type *Ty);
   void FindConstantPerGlobalVar(GlobalVariable &GV);
   void FindConstantPerFunc(Function &F);
   void FindConstant(Value *V);
   void GenerateExtInstImport();
+  // Generates instructions for SPIR-V types corresponding to the LLVM types
+  // saved in the |Types| member.  A type follows its subtypes.  IDs are
+  // allocated sequentially starting with the current value of nextID, and
+  // with a type following its subtypes.  Also updates nextID to just beyond
+  // the last generated ID.
   void GenerateSPIRVTypes(const DataLayout &DL);
   void GenerateSPIRVConstants();
   void GenerateModuleInfo();
@@ -254,10 +261,14 @@ private:
   uint64_t patchBoundOffset;
   uint32_t nextID;
 
+  // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   TypeMapType TypeMap;
+  // Maps an LLVM image type to its SPIR-V ID.
   TypeMapType ImageTypeMap;
+  // A unique-vector of LLVM types that map to a SPIR-V type.
   TypeList Types;
   ValueList Constants;
+  // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   ValueMapType ValueMap;
   ValueMapType AllocatedValueMap;
   SPIRVInstructionList SPIRVInsts;
@@ -1829,11 +1840,12 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
     Constant *Cst = cast<Constant>(CstList[i]);
 
     // OpTypeArray's constant was already generated.
+    //if (!AllocatedVMap.find_as(Cst) != AllocatedVMap.end())
     if (AllocatedVMap[Cst]) {
       continue;
     }
 
-    // Update TypeMap with nextID for reference later.
+    // Update ValueMap with nextID for reference later.
     VMap[Cst] = nextID;
 
     //
@@ -1944,7 +1956,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         if (VMap.count(CstInt)) {
           uint32_t CstID = VMap[CstInt];
           VMap[Cst] = CstID;
-          return;
+          continue;
         }
 
         LiteralNum.push_back(IntValue & 0xFFFFFFFF);
@@ -1956,8 +1968,10 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
             new SPIRVInstruction(4, spv::OpConstant, nextID++, Ops);
         SPIRVInstList.push_back(CstInst);
 
-        return;
+        continue;
       }
+
+      // This is a normal constant aggregate.
 
       // We use a constant composite in SPIR-V for our constant aggregate in
       // LLVM.
