@@ -1936,6 +1936,44 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 
     } else if (const ConstantDataSequential *CDS =
                    dyn_cast<ConstantDataSequential>(Cst)) {
+      // Let's convert <4 x i8> constant to int constant specially.
+      // This case occurs when all the values are specified as constant
+      // ints.
+      Type *CstTy = Cst->getType();
+      if (is4xi8vec(CstTy)) {
+        LLVMContext &Context = CstTy->getContext();
+
+        //
+        // Generate OpConstant with OpTypeInt 32 0.
+        //
+        uint64_t IntValue = 0;
+        for (int i = 0; i < 4; i++) {
+          const uint64_t Val = CDS->getElementAsInteger(i);
+          IntValue = (IntValue << 8) | (Val & 0xffu);
+        }
+
+        Type *i32 = Type::getInt32Ty(Context);
+        Constant *CstInt = ConstantInt::get(i32, IntValue);
+        // If this constant is already registered on VMap, use it.
+        if (VMap.count(CstInt)) {
+          uint32_t CstID = VMap[CstInt];
+          VMap[Cst] = CstID;
+          continue;
+        }
+
+        LiteralNum.push_back(IntValue);
+        SPIRVOperand *CstValue =
+            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
+        Ops.push_back(CstValue);
+
+        SPIRVInstruction *CstInst =
+            new SPIRVInstruction(4, spv::OpConstant, nextID++, Ops);
+        SPIRVInstList.push_back(CstInst);
+
+        continue;
+      }
+
+      // A normal constant-data-sequential case.
       for (unsigned k = 0; k < CDS->getNumElements(); k++) {
         Constant *EleCst = CDS->getElementAsConstant(k);
         uint32_t EleCstID = VMap[EleCst];
@@ -1948,6 +1986,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       WordCount = static_cast<uint16_t>(3 + CDS->getNumElements());
     } else if (const ConstantAggregate *CA = dyn_cast<ConstantAggregate>(Cst)) {
       // Let's convert <4 x i8> constant to int constant specially.
+      // This case occurs when at least one of the values is an undef.
       Type *CstTy = Cst->getType();
       if (is4xi8vec(CstTy)) {
         LLVMContext &Context = CstTy->getContext();
@@ -1960,14 +1999,15 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         for (User::const_op_iterator I = Cst->op_begin(), E = Cst->op_end();
              I != E; ++I) {
           uint64_t Val = 0;
-          if (ConstantInt *CI2 = dyn_cast<ConstantInt>(I)) {
-            Val = CI2->getZExtValue();
+          const Value* CV = *I;
+          if (auto* CI = dyn_cast<ConstantInt>(CV)) {
+            Val = CI->getZExtValue();
           }
-          IntValue = (IntValue << Idx) | Val;
+          IntValue = (IntValue << 8) | (Val & 0xffu);
         }
 
-        ConstantInt *CstInt =
-            ConstantInt::get(Type::getInt32Ty(Context), IntValue);
+        Type *i32 = Type::getInt32Ty(Context);
+        Constant *CstInt = ConstantInt::get(i32, IntValue);
         // If this constant is already registered on VMap, use it.
         if (VMap.count(CstInt)) {
           uint32_t CstID = VMap[CstInt];
@@ -1975,7 +2015,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
           continue;
         }
 
-        LiteralNum.push_back(IntValue & 0xFFFFFFFF);
+        LiteralNum.push_back(IntValue);
         SPIRVOperand *CstValue =
             new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
         Ops.push_back(CstValue);
@@ -1986,8 +2026,6 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 
         continue;
       }
-
-      // This is a normal constant aggregate.
 
       // We use a constant composite in SPIR-V for our constant aggregate in
       // LLVM.

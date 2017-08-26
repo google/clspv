@@ -3,6 +3,9 @@
 // of an early return in constant generation when we generate
 // the <4 x i8> constant.
 
+// Also test https://github.com/google/clspv/issues/36 for
+// generation of the <4 x i8> constant including an undef component.
+
 typedef struct {
   int a, b, c, d;
 } S;
@@ -26,5 +29,8 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 
 
 // CHECK: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
-// CHECK: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]] [[uint]]
+// CHECK: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
+// With undef mapping to 0 byte, (undef,1,2,3) maps to 66051.
+// CHECK: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
 // CHECK: [[undef_struct:%[_a-zA-Z0-9]+]] = OpUndef [[struct]]
+// CHECK: OpBitwiseAnd [[uint]] [[theconst]] {{%[_a-zA-Z0-9]+}}
