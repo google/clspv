@@ -1642,8 +1642,27 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
         SPIRVInstList.push_back(Inst);
       } else {
         // i8 is added to TypeMap as i32.
+        // No matter what LLVM type is requested first, always alias the
+        // second one's SPIR-V type to be the same as the one we generated
+        // first.
+        int aliasToWidth = 0;
         if (BitWidth == 8) {
+          aliasToWidth = 32;
           BitWidth = 32;
+        } else if (BitWidth == 32) {
+          aliasToWidth = 8;
+        }
+        if (aliasToWidth) {
+          Type* otherType = Type::getIntNTy(Ty->getContext(), aliasToWidth);
+          auto where = TypeMap.find(otherType);
+          if (where == TypeMap.end()) {
+            // Go ahead and make it, but also map the other type to it.
+            TypeMap[otherType] = nextID;
+          } else {
+            // Alias this SPIR-V type the existing type.
+            TypeMap[Ty] = where->second;
+            break;
+          }
         }
 
         SPIRVOperand *Ops[2] = {
