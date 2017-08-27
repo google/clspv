@@ -3946,7 +3946,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       uint32_t InvMaskID = nextID;
 
-      Inst = new SPIRVInstruction(4, spv::OpLogicalNot, nextID++, Ops);
+      Inst = new SPIRVInstruction(4, spv::OpNot, nextID++, Ops);
       SPIRVInstList.push_back(Inst);
 
       // Apply mask.
@@ -3997,6 +3997,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Op1ID = InsertValID;
       Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
       Ops.push_back(Op1IDOp);
+
+      VMap[&I] = nextID;
 
       Inst = new SPIRVInstruction(5, spv::OpBitwiseOr, nextID++, Ops);
       SPIRVInstList.push_back(Inst);
@@ -5795,6 +5797,7 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
     case spv::OpBitwiseOr:
     case spv::OpBitwiseXor:
     case spv::OpBitwiseAnd:
+    case spv::OpNot:
     case spv::OpShiftLeftLogical:
     case spv::OpShiftRightLogical:
     case spv::OpShiftRightArithmetic:
@@ -6020,6 +6023,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpBitwiseOr:
     case spv::OpBitwiseXor:
     case spv::OpBitwiseAnd:
+    case spv::OpNot:
     case spv::OpShiftLeftLogical:
     case spv::OpShiftRightLogical:
     case spv::OpShiftRightArithmetic:
