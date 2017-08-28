@@ -13,13 +13,13 @@ kernel void foo(global uchar4* A, int n) {
 
 
 // CHECK: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
-// CHECK: [[uint3mask:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 16908292
 // CHECK: [[uint255:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 255
+// CHECK: [[uint3mask:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 16908292
 // CHECK: [[uint16:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 16
 
 
 // CHECK: [[load:%[_a-zA-Z0-9]+]] = OpLoad [[uint]] {{%[_0-9a-zA-Z]+}}
-// CHECK: [[conv:%[_a-zA-Z0-9]+]] = OpUConvert [[uint]] [[load]]
+// CHECK: [[conv:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[load]] [[uint255]]
 // CHECK: [[shift:%[_a-zA-Z0-9]+]] = OpShiftLeftLogical [[uint]] [[uint255]] [[uint16]]
 // CHECK: [[not:%[_a-zA-Z0-9]+]] = OpNot [[uint]] [[shift]]
 // CHECK: [[and:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[uint3mask]] [[not]]

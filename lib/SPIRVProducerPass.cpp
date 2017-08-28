@@ -1143,6 +1143,15 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
         }
 
         continue;
+      } else if (isa<TruncInst>(I)) {
+        // For truncation to i8 we mask against 255.
+        Type *ToTy = I.getType();
+        if (8u == ToTy->getPrimitiveSizeInBits()) {
+          LLVMContext &Context = ToTy->getContext();
+          Constant *Cst255 = ConstantInt::get(Type::getInt32Ty(Context), 0xff);
+          FindConstant(Cst255);
+        }
+        // Fall through.
       }
 
       for (Use &Op : I.operands()) {
@@ -3369,7 +3378,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // Generate SPIRV instructions for cast operators.
       //
 
+
+      auto Ty = I.getType();
       auto OpTy = I.getOperand(0)->getType();
+      auto toI8 = Ty == Type::getInt8Ty(Context);
+      auto fromI32 = OpTy == Type::getInt32Ty(Context);
       // Handle zext, sext and uitofp with i1 type specially.
       if ((I.getOpcode() == Instruction::ZExt ||
            I.getOpcode() == Instruction::SExt ||
@@ -3426,6 +3439,35 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(6, spv::OpSelect, nextID++, Ops);
+        SPIRVInstList.push_back(Inst);
+      } else if (I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
+        // The SPIR-V target type is a 32-bit int.  Keep only the bottom
+        // 8 bits.
+        // Before:
+        //   %result = trunc i32 %a to i8
+        // After
+        //   %result = OpBitwiseAnd %uint %a %uint_255
+
+        SPIRVOperandList Ops;
+
+        uint32_t ResTyID = lookupType(OpTy);
+        SPIRVOperand *ResTyIDOp =
+            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
+        Ops.push_back(ResTyIDOp);
+
+        uint32_t Op0ID = VMap[I.getOperand(0)];
+        SPIRVOperand *Op0IDOp =
+            new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
+        Ops.push_back(Op0IDOp);
+
+        Type *UintTy = Type::getInt32Ty(Context);
+        uint32_t MaskID = VMap[ConstantInt::get(UintTy, 255)];
+        SPIRVOperand *MaskOp =
+            new SPIRVOperand(SPIRVOperandType::NUMBERID, MaskID);
+        Ops.push_back(MaskOp);
+
+        SPIRVInstruction *Inst =
+            new SPIRVInstruction(5, spv::OpBitwiseAnd, nextID++, Ops);
         SPIRVInstList.push_back(Inst);
       } else {
         // Ops[0] = Result Type ID
