@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 36
+// CHECK: ; Bound: 37
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -74,11 +74,12 @@
 // CHECK: %[[BX_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[FLOAT_TYPE_ID]] %[[B_LOAD_ID]] 0
 // CHECK: %[[BY_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[FLOAT_TYPE_ID]] %[[B_LOAD_ID]] 1
 // CHECK: %[[I_REM_ID:[a-zA-Z0-9_]*]] = OpBitwiseAnd %[[UINT_TYPE_ID]] %[[I_LOAD_ID]] %[[CONSTANT_1_ID]]
+// CHECK: %[[scaled_idx:[a-zA-Z0-9_]*]] = OpShiftLeftLogical %[[UINT_TYPE_ID]] %[[I_REM_ID]] %[[CONSTANT_1_ID]]
 
-// CHECK: %[[A0_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[I_DIV_ID]] %[[I_REM_ID]]
+// CHECK: %[[A0_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[I_DIV_ID]] %[[scaled_idx]]
 // CHECK: OpStore %[[A0_ACCESS_CHAIN_ID]] %[[BX_ID]]
 
-// CHECK: %[[I_ADD_ID:[a-zA-Z0-9_]*]] = OpIAdd %[[UINT_TYPE_ID]] %[[I_REM_ID]] %[[CONSTANT_1_ID]]
+// CHECK: %[[I_ADD_ID:[a-zA-Z0-9_]*]] = OpIAdd %[[UINT_TYPE_ID]] %[[scaled_idx]] %[[CONSTANT_1_ID]]
 // CHECK: %[[A1_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[I_DIV_ID]] %[[I_ADD_ID]]
 // CHECK: OpStore %[[A1_ACCESS_CHAIN_ID]] %[[BY_ID]]
 

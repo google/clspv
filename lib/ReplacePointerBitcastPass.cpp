@@ -27,6 +27,9 @@ struct ReplacePointerBitcastPass : public ModulePass {
   static char ID;
   ReplacePointerBitcastPass() : ModulePass(ID) {}
 
+  // Returns the number of chunks of source data required to exactly
+  // cover the destination data, if the source and destination types are
+  // different sizes.  Otherwise returns 0.
   unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth);
   Value *CalculateNewGEPIdx(unsigned SrcTyBitWidth, unsigned DstTyBitWidth,
                                GetElementPtrInst *GEP);
@@ -136,6 +139,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         SrcTy->isVectorTy() ? SrcTy->getSequentialElementType() : SrcTy;
     Type *DstEleTy =
         DstTy->isVectorTy() ? DstTy->getSequentialElementType() : DstTy;
+    // These are bit widths of the source and destination types, even
+    // if they are vector types.  E.g. bit width of float4 is 64.
     unsigned SrcTyBitWidth = SrcTy->getPrimitiveSizeInBits();
     unsigned DstTyBitWidth = DstTy->getPrimitiveSizeInBits();
     unsigned SrcEleTyBitWidth = SrcEleTy->getPrimitiveSizeInBits();
@@ -287,12 +292,17 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             // 3. dst_addr = gep (float2*) dst_addr, idx
             // 4. store (float2) val, (float2*) dst_addr
             //
-            // Transformed IR
+            // Transformed IR: Decompose the source vector into elements, then write
+            // them one at a time.
             // 1. val = load (float2*) src_addr
             // 2. val1 = (float)extract_element val, 0
             // 3. val2 = (float)extract_element val, 1
-            // 4. dst_addr1 = gep (float4*) dst, idx / 2
-            // 5. dst_addr2 = gep (float4*) dst, idx / 2 + 1
+            // // Source component k maps to destination component k * idxscale
+            // 3a. idxscale = sizeof(float4)/sizeof(float2)
+            // 3b. idxbase = idx / idxscale
+            // 3c. newarrayidx = idxbase * idxscale
+            // 4. dst_addr1 = gep (float4*) dst, newarrayidx
+            // 5. dst_addr2 = gep (float4*) dst, newarrayidx + 1
             // 6. store (float)val1, (float*) dst_addr1
             // 7. store (float)val2, (float*) dst_addr2
             //
@@ -313,6 +323,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             }
 
             SmallVector<Value *, 8> STValues;
+            // How many destination writes are required?
             unsigned DstNumElement = 1;
             if (!DstTy->isVectorTy() || SrcEleTyBitWidth == DstTyBitWidth) {
               // Handle scalar type.
@@ -331,14 +342,21 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Value *BaseAddr = BitCastSrc;
             Value *SubEleIdx = Builder.getInt32(0);
             if (IsGEPUser) {
+              // Compute SubNumElement = idxscale
               unsigned SubNumElement = SrcTy->getVectorNumElements();
               if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
+                // Same condition under which DstNumElements > 1
                 SubNumElement = SrcTy->getVectorNumElements() /
                                 DstTy->getVectorNumElements();
               }
 
+              // Compute SubEleIdx = idxbase * idxscale
               SubEleIdx = Builder.CreateAnd(
                   OrgGEPIdx, Builder.getInt32(SubNumElement - 1));
+              if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
+                SubEleIdx = Builder.CreateShl(
+                    SubEleIdx, Builder.getInt32(std::log2(SubNumElement)));
+              }
             }
 
             for (unsigned i = 0; i < DstNumElement; i++) {
