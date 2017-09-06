@@ -3866,6 +3866,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
       Ops.push_back(Op1IDOp);
 
+      // Reset mapping for this value to the result of the bitwise and.
+      VMap[&I] = nextID;
+
       Inst = new SPIRVInstruction(5, spv::OpBitwiseAnd, nextID++, Ops);
       SPIRVInstList.push_back(Inst);
       break;
