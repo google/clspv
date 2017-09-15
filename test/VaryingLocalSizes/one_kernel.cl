@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 29
+// CHECK: ; Bound: 32
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -48,14 +48,17 @@
 // CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 
 // CHECK: %[[ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: [[comp0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 0
+// CHECK: [[hack0:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[comp0:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack0]] 0
 // CHECK: OpStore %[[ACCESS_CHAIN0_ID]] [[comp0]]
 
-// CHECK: [[comp1:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 1
+// CHECK: [[hack1:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[comp1:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack1]]
 // CHECK: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_1_ID]]
 // CHECK: OpStore %[[ACCESS_CHAIN1_ID]] [[comp1]]
 
-// CHECK: [[comp2:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 2
+// CHECK: [[hack2:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[comp2:%[a-zA-Z0-9_]+]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack2]]
 // CHECK: %[[ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_2_ID]]
 // CHECK: OpStore %[[ACCESS_CHAIN2_ID]] [[comp2]]
 

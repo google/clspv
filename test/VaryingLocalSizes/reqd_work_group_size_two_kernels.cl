@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 39
+// CHECK: ; Bound: 45
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -50,14 +50,17 @@
 // CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 
 // CHECK: %[[ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: [[foo_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 0
+// CHECK: [[hack0:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[foo_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack0]] 0
 // CHECK: OpStore %[[ACCESS_CHAIN0_ID]] [[foo_comp0]]
 
-// CHECK: [[foo_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 1
+// CHECK: [[hack1:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[foo_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack1]] 1
 // CHECK: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_1_ID]]
 // CHECK: OpStore %[[ACCESS_CHAIN1_ID]] [[foo_comp1]]
 
-// CHECK: [[foo_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 2
+// CHECK: [[hack2:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[foo_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack2]] 2
 // CHECK: %[[ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_2_ID]]
 // CHECK: OpStore %[[ACCESS_CHAIN2_ID]] [[foo_comp2]]
 
@@ -79,14 +82,17 @@ void kernel __attribute__((reqd_work_group_size(42, 13, 5))) foo(global uint* a)
 // CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 
 // CHECK: %[[BAR_ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: [[bar_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 0
+// CHECK: [[hack3:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[bar_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack3]] 0
 // CHECK: OpStore %[[BAR_ACCESS_CHAIN0_ID]] [[bar_comp0]]
 
-// CHECK: [[bar_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 1
+// CHECK: [[hack4:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[bar_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack4]] 1
 // CHECK: %[[BAR_ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_1_ID]]
 // CHECK: OpStore %[[BAR_ACCESS_CHAIN1_ID]] [[bar_comp1]]
 
-// CHECK: [[bar_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 2
+// CHECK: [[hack5:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[bar_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] [[hack5]] 2
 // CHECK: %[[BAR_ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_2_ID]]
 // CHECK: OpStore %[[BAR_ACCESS_CHAIN2_ID]] [[bar_comp2]]
 

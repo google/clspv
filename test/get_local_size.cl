@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 34
+// CHECK: ; Bound: 35
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -66,7 +66,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 // CHECK: %[[LABEL2_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[COND_ID:[a-zA-Z0-9_]*]] = OpULessThan %[[BOOL_TYPE_ID]] %[[FUNC_PARAM_ID]] %[[CONSTANT_3_ID]]
 // CHECK: %[[SELECT1_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[COND_ID]] %[[FUNC_PARAM_ID]] %[[CONSTANT_0_ID]]
-// CHECK: [[result:%[a-zA-Z0-9_]*]] = OpVectorExtractDynamic %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] %[[SELECT1_ID]]
+// CHECK: %[[hack:[a-zA-Z0-9_]+]] = OpBitwiseAnd %[[UINT3_TYPE_ID]] %[[BUILTIN_ID]] %[[BUILTIN_ID]]
+// CHECK: [[result:%[a-zA-Z0-9_]*]] = OpVectorExtractDynamic %[[UINT_TYPE_ID]] %[[hack]] %[[SELECT1_ID]]
 // CHECK: %[[SELECT2_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[COND_ID]] [[result]] %[[CONSTANT_1_ID]]
 // CHECK: OpReturnValue %[[SELECT2_ID]]
 // CHECK: OpFunctionEnd

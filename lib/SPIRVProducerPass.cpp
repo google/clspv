@@ -4286,13 +4286,37 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Generate OpLoad.
     //
 
+    uint32_t ResTyID = lookupType(LD->getType());
     uint32_t PointerID = VMap[LD->getPointerOperand()];
 
     // This is a hack to work around what looks like a driver bug.
     // When we're loading from the special variable holding the WorkgroupSize
-    // builtin value, use the value's ID rather than generating a load.
+    // builtin value, use an OpBitWiseAnd of the value's ID rather than
+    // generating a load.
     if (PointerID == WorkgroupSizeVarID) {
-      VMap[&I] = WorkgroupSizeValueID;
+      // Generate a bitwise-and of the original value with itself.
+      // We should have been able to get away with just an OpCopyObject,
+      // but we need something more complex to get past certain driver bugs.
+      // This is ridiculous, but necessary.
+      // TODO(dneto): Revisit this once drivers fix their bugs.
+
+      SPIRVOperandList Ops;
+
+      SPIRVOperand *ResTyIDOp =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
+      Ops.push_back(ResTyIDOp);
+
+      SPIRVOperand *ValueIDOp0 =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, WorkgroupSizeValueID);
+      Ops.push_back(ValueIDOp0);
+
+      SPIRVOperand *ValueIDOp1 =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, WorkgroupSizeValueID);
+      Ops.push_back(ValueIDOp1);
+
+      SPIRVInstruction *Inst =
+          new SPIRVInstruction(5, spv::OpBitwiseAnd, nextID++, Ops);
+      SPIRVInstList.push_back(Inst);
       break;
     }
 
@@ -4303,9 +4327,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Optional Memory Access
     //
     // TODO: Do we need to implement Optional Memory Access???
+
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(LD->getType());
     SPIRVOperand *ResTyIDOp =
         new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
     Ops.push_back(ResTyIDOp);
@@ -5888,6 +5912,7 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
     case spv::OpCompositeExtract:
     case spv::OpVectorExtractDynamic:
     case spv::OpCompositeInsert:
+    case spv::OpCopyObject:
     case spv::OpVectorInsertDynamic:
     case spv::OpVectorShuffle:
     case spv::OpIEqual:
@@ -6114,6 +6139,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpCompositeExtract:
     case spv::OpVectorExtractDynamic:
     case spv::OpCompositeInsert:
+    case spv::OpCopyObject:
     case spv::OpVectorInsertDynamic:
     case spv::OpVectorShuffle:
     case spv::OpIEqual:
