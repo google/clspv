@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 46
+// CHECK: ; Bound: 39
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -34,7 +34,6 @@
 // CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 // CHECK: %[[UINT3_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[UINT_TYPE_ID]] 3
 // CHECK: %[[UINT3_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[UINT3_TYPE_ID]]
-// CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[UINT_TYPE_ID]]
 // CHECK: %[[CONSTANT_42_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 42
 // CHECK: %[[CONSTANT_13_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 13
 // CHECK: %[[CONSTANT_5_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 5
@@ -42,8 +41,8 @@
 // CHECK: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 // CHECK: %[[CONSTANT_2_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 2
 // CHECK: %[[CONSTANT_3_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 3
-// CHECK: %[[BUILTIN_FOR_FOO_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[UINT3_TYPE_ID]] %[[CONSTANT_42_ID]] %[[CONSTANT_13_ID]] %[[CONSTANT_5_ID]]
-// CHECK: %[[BUILTIN_VAR_FOR_FOO_ID:[a-zA-Z0-9_]*]] = OpVariable %[[UINT3_PRIVATE_POINTER_TYPE_ID]] Private %[[BUILTIN_FOR_FOO_ID]]
+// CHECK: %[[BUILTIN_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[UINT3_TYPE_ID]] %[[CONSTANT_42_ID]] %[[CONSTANT_13_ID]] %[[CONSTANT_5_ID]]
+// CHECK: %[[BUILTIN_VAR_FOR_FOO_ID:[a-zA-Z0-9_]*]] = OpVariable %[[UINT3_PRIVATE_POINTER_TYPE_ID]] Private %[[BUILTIN_ID]]
 // CHECK: %[[FOO_ARG0_ID]] = OpVariable %[[UINT_ARG0_POINTER_TYPE_ID]] StorageBuffer
 // CHECK: %[[BAR_ARG0_ID]] = OpVariable %[[UINT_ARG0_POINTER_TYPE_ID]] StorageBuffer
 
@@ -51,19 +50,16 @@
 // CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 
 // CHECK: %[[ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[LOAD_ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[LOAD0_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[LOAD_ACCESS_CHAIN0_ID]]
-// CHECK: OpStore %[[ACCESS_CHAIN0_ID]] %[[LOAD0_ID]]
+// CHECK: [[foo_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 0
+// CHECK: OpStore %[[ACCESS_CHAIN0_ID]] [[foo_comp0]]
 
-// CHECK: %[[LOAD_ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_1_ID]]
-// CHECK: %[[LOAD1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[LOAD_ACCESS_CHAIN1_ID]]
+// CHECK: [[foo_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 1
 // CHECK: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_1_ID]]
-// CHECK: OpStore %[[ACCESS_CHAIN1_ID]] %[[LOAD1_ID]]
+// CHECK: OpStore %[[ACCESS_CHAIN1_ID]] [[foo_comp1]]
 
-// CHECK: %[[LOAD_ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_2_ID]]
-// CHECK: %[[LOAD2_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[LOAD_ACCESS_CHAIN2_ID]]
+// CHECK: [[foo_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 2
 // CHECK: %[[ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_2_ID]]
-// CHECK: OpStore %[[ACCESS_CHAIN2_ID]] %[[LOAD2_ID]]
+// CHECK: OpStore %[[ACCESS_CHAIN2_ID]] [[foo_comp2]]
 
 // CHECK: %[[ACCESS_CHAIN3_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[FOO_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_3_ID]]
 // CHECK: OpStore %[[ACCESS_CHAIN3_ID]] %[[CONSTANT_1_ID]]
@@ -83,19 +79,16 @@ void kernel __attribute__((reqd_work_group_size(42, 13, 5))) foo(global uint* a)
 // CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 
 // CHECK: %[[BAR_ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[BAR_LOAD_ACCESS_CHAIN0_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[BAR_LOAD0_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[BAR_LOAD_ACCESS_CHAIN0_ID]]
-// CHECK: OpStore %[[BAR_ACCESS_CHAIN0_ID]] %[[BAR_LOAD0_ID]]
+// CHECK: [[bar_comp0:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 0
+// CHECK: OpStore %[[BAR_ACCESS_CHAIN0_ID]] [[bar_comp0]]
 
-// CHECK: %[[BAR_LOAD_ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_1_ID]]
-// CHECK: %[[BAR_LOAD1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[BAR_LOAD_ACCESS_CHAIN1_ID]]
+// CHECK: [[bar_comp1:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 1
 // CHECK: %[[BAR_ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_1_ID]]
-// CHECK: OpStore %[[BAR_ACCESS_CHAIN1_ID]] %[[BAR_LOAD1_ID]]
+// CHECK: OpStore %[[BAR_ACCESS_CHAIN1_ID]] [[bar_comp1]]
 
-// CHECK: %[[BAR_LOAD_ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_FOR_FOO_ID]] %[[CONSTANT_2_ID]]
-// CHECK: %[[BAR_LOAD2_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[BAR_LOAD_ACCESS_CHAIN2_ID]]
+// CHECK: [[bar_comp2:%[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] 2
 // CHECK: %[[BAR_ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_2_ID]]
-// CHECK: OpStore %[[BAR_ACCESS_CHAIN2_ID]] %[[BAR_LOAD2_ID]]
+// CHECK: OpStore %[[BAR_ACCESS_CHAIN2_ID]] [[bar_comp2]]
 
 // CHECK: %[[BAR_ACCESS_CHAIN3_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[BAR_ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_3_ID]]
 // CHECK: OpStore %[[BAR_ACCESS_CHAIN3_ID]] %[[CONSTANT_1_ID]]

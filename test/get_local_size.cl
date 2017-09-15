@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 36
+// CHECK: ; Bound: 34
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -38,7 +38,6 @@
 // CHECK: %[[BOOL_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeBool
 // CHECK: %[[UINT3_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[UINT_TYPE_ID]] 3
 // CHECK: %[[UINT3_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[UINT3_TYPE_ID]]
-// CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[UINT_TYPE_ID]]
 // CHECK: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 // CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 // CHECK: %[[CONSTANT_3_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 3
@@ -67,8 +66,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 // CHECK: %[[LABEL2_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[COND_ID:[a-zA-Z0-9_]*]] = OpULessThan %[[BOOL_TYPE_ID]] %[[FUNC_PARAM_ID]] %[[CONSTANT_3_ID]]
 // CHECK: %[[SELECT1_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[COND_ID]] %[[FUNC_PARAM_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[ACCESS_CHAIN3_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_PRIVATE_POINTER_TYPE_ID]] %[[BUILTIN_VAR_ID]] %[[SELECT1_ID]]
-// CHECK: %[[LOAD2_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[ACCESS_CHAIN3_ID]]
-// CHECK: %[[SELECT2_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[COND_ID]] %[[LOAD2_ID]] %[[CONSTANT_1_ID]]
+// CHECK: [[result:%[a-zA-Z0-9_]*]] = OpVectorExtractDynamic %[[UINT_TYPE_ID]] %[[BUILTIN_ID]] %[[SELECT1_ID]]
+// CHECK: %[[SELECT2_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[COND_ID]] [[result]] %[[CONSTANT_1_ID]]
 // CHECK: OpReturnValue %[[SELECT2_ID]]
 // CHECK: OpFunctionEnd

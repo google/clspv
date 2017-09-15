@@ -111,14 +111,22 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(Module &M, StringRef 
   Value *Select1 =
       Builder.CreateSelect(Cond, &*F->arg_begin(), Builder.getInt32(0));
 
-  Value *Indices[] = {Builder.getInt32(0), Select1};
-  Value *GEP = Builder.CreateGEP(GV, Indices);
-  Value *Load = Builder.CreateLoad(GEP);
+  Value* Result = nullptr;
+  if (GlobalVarName == "__spirv_WorkgroupSize") {
+    // Ugly hack to work around implementation bugs.
+    // Load the whole vector and extract the result
+    Value *LoadVec = Builder.CreateLoad(GV);
+    Result = Builder.CreateExtractElement(LoadVec, Select1);
+  } else {
+    Value *Indices[] = {Builder.getInt32(0), Select1};
+    Value *GEP = Builder.CreateGEP(GV, Indices);
+    Result = Builder.CreateLoad(GEP);
+  }
 
   // We also need to select on the result of the load, because if Cond is
   // false, we need to return the default value to the user.
   Value *Select2 =
-      Builder.CreateSelect(Cond, Load, Builder.getInt32(DefaultValue));
+      Builder.CreateSelect(Cond, Result, Builder.getInt32(DefaultValue));
   Builder.CreateRet(Select2);
 
   return true;

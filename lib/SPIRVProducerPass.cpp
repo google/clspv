@@ -118,7 +118,8 @@ struct SPIRVProducerPass final : public ModulePass {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapOut(descriptor_map_out), outputAsm(outputAsm),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
-        OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr) {}
+        OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
+        WorkgroupSizeValueID(0), WorkgroupSizeVarID(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -288,6 +289,17 @@ private:
   // These will require an ArrayStride decoration.
   // See SPV_KHR_variable_pointers rev 13.
   TypeList PointerTypesNeedingArrayStride;
+
+  // This is truly ugly, but works around what look like driver bugs.
+  // For get_local_size, an earlier part of the flow has created a module-scope
+  // variable in Private address space to hold the value for the workgroup
+  // size.  Its intializer is a uint3 value marked as builtin WorkgroupSize.
+  // When this is present, save the IDs of the initializer value and variable
+  // in these two variables.  We only ever do a vector load from it, and
+  // when we see one of those, substitute just the value of the intializer.
+  // This mimics what Glslang does, and that's what drivers are used to.
+  uint32_t WorkgroupSizeValueID;
+  uint32_t WorkgroupSizeVarID;
 };
 
 char SPIRVProducerPass::ID;
@@ -2432,6 +2444,9 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // its value, rather than the variable that we use to access the value.
     if (spv::BuiltInWorkgroupSize == BuiltinType) {
       ResultID = InitializerID;
+      // Save both the value and variable IDs for later.
+      WorkgroupSizeValueID = InitializerID;
+      WorkgroupSizeVarID = VMap[&GV];
     } else {
       ResultID = VMap[&GV];
     }
@@ -4271,6 +4286,18 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Generate OpLoad.
     //
 
+    uint32_t PointerID = VMap[LD->getPointerOperand()];
+
+    // This is a hack to work around what looks like a driver bug.
+    // When we're loading from the special variable holding the WorkgroupSize
+    // builtin value, use the value's ID rather than generating a load.
+    if (PointerID == WorkgroupSizeVarID) {
+      VMap[&I] = WorkgroupSizeValueID;
+      break;
+    }
+
+    // This is the normal path.  Generate a load.
+
     // Ops[0] = Result Type ID
     // Ops[1] = Pointer ID
     // Ops[2] ... Ops[n] = Optional Memory Access
@@ -4283,7 +4310,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
     Ops.push_back(ResTyIDOp);
 
-    uint32_t PointerID = VMap[LD->getPointerOperand()];
     SPIRVOperand *PointerIDOp =
         new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
     Ops.push_back(PointerIDOp);
