@@ -190,6 +190,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   // false, we need to return the default value (1) to the user.
   Value *Select2 = Builder.CreateSelect(Cond, Mul, Builder.getInt32(1));
   Builder.CreateRet(Select2);
+
+  return true;
 }
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
