@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 21
+// CHECK: ; Bound: 22
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -34,6 +34,7 @@
 // CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 // CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 // CHECK: %[[CONSTANT_31_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 31
+// CHECK: [[vec31:%[a-zA-Z0-9_]*]] = OpConstantComposite %[[UINT_VECTOR_TYPE_ID]] %[[CONSTANT_31_ID]] %[[CONSTANT_31_ID]] %[[CONSTANT_31_ID]] %[[CONSTANT_31_ID]]
 // CHECK: %[[ARG0_ID]] = OpVariable %[[UINT_ARG_POINTER_TYPE_ID]] StorageBuffer
 // CHECK: %[[ARG1_ID]] = OpVariable %[[UINT_ARG_POINTER_TYPE_ID]] StorageBuffer
 
@@ -43,7 +44,7 @@
 // CHECK: %[[B_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG1_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_VECTOR_TYPE_ID]] %[[B_ACCESS_CHAIN_ID]]
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_VECTOR_TYPE_ID]] %[[EXT_INST]] FindUMsb %[[LOADB_ID]]
-// CHECK: %[[SUB_ID:[a-zA-Z0-9_]*]] = OpISub %[[UINT_VECTOR_TYPE_ID]] %[[CONSTANT_31_ID]] %[[OP_ID]]
+// CHECK: %[[SUB_ID:[a-zA-Z0-9_]*]] = OpISub %[[UINT_VECTOR_TYPE_ID]] [[vec31]] %[[OP_ID]]
 // CHECK: OpStore %[[A_ACCESS_CHAIN_ID]] %[[SUB_ID]]
 // CHECK: OpReturn
 // CHECK: OpFunctionEnd

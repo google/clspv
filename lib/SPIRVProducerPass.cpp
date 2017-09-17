@@ -844,12 +844,18 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
           // Check whether this call is for extend instructions.
           glsl::ExtInst EInst = getExtInstEnum(Callee->getName());
           if (EInst) {
-            // clz needs OpExtInst and OpISub with constant 31. Add constant 31
-            // to constant list here.
+            // clz needs OpExtInst and OpISub with constant 31, or splat vector
+            // of 31.  Add it to the constant list here.
             if (EInst == glsl::ExtInstFindUMsb) {
               Type *IdxTy = Type::getInt32Ty(Context);
-              FindConstant(ConstantInt::get(IdxTy, 31));
+              auto Idx = ConstantInt::get(IdxTy, 31);
               FindType(IdxTy);
+              FindConstant(Idx);
+              if (auto* vectorTy = dyn_cast<VectorType>(I.getType())) {
+                // Register the splat vector with element 31.
+                FindConstant(ConstantVector::getSplat(vectorTy->getNumElements(), Idx));
+                FindType(vectorTy);
+              }
             }
 
             HasExtInst = true;
@@ -4813,7 +4819,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Check whether this call is for extend instructions.
     glsl::ExtInst EInst = getExtInstEnum(Callee->getName());
     if (EInst == glsl::ExtInstFindUMsb) {
-      // clz needs OpExtInst and OpISub with constant 31. Increase nextID.
+      // clz needs OpExtInst and OpISub with constant 31 or vector constant 31.
+      // Increase nextID.
       VMap[&I] = nextID;
       nextID++;
     }
@@ -5136,12 +5143,17 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           // Ops[2] = Operand 1
           Ops.clear();
 
+          Type *resultTy = Call->getType();
           Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                         lookupType(Call->getType())));
+                                         lookupType(resultTy)));
 
           Type *IdxTy = Type::getInt32Ty(Context);
-          Constant *Cst31 = ConstantInt::get(IdxTy, 31);
-          uint32_t Op0ID = VMap[Cst31];
+          Constant *minuend = ConstantInt::get(IdxTy, 31);
+          if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
+            minuend = ConstantVector::getSplat(vectorTy->getNumElements(),
+                                               minuend);
+          }
+          uint32_t Op0ID = VMap[minuend];
           SPIRVOperand *Op0IDOp =
               new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
           Ops.push_back(Op0IDOp);
