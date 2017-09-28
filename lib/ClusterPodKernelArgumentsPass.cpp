@@ -34,13 +34,21 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include "ArgKind.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "clusterpodkernelargs"
+
+// TODO(dneto): Remove this after experimentation.
+static llvm::cl::opt<bool> no_inline_pod_fn(
+    "no-inline-pod-inner-function", llvm::cl::init(false),
+    llvm::cl::desc("DEPRECATED. Avoid inlining the inner function created by "
+                   "clustering pod kernel args"));
 
 namespace {
 struct ClusterPodKernelArgumentsPass : public ModulePass {
@@ -80,6 +88,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       }
     }
   }
+
+  SmallVector<CallInst*, 8> CallList;
 
   for (Function* F : WorkList) {
     Changed = true;
@@ -245,8 +255,16 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
     auto Call = Builder.CreateCall(F, CalleeArgs);
     Call->setCallingConv(F->getCallingConv());
+    CallList.push_back(Call);
 
     Builder.CreateRetVoid();
+  }
+
+  if (!no_inline_pod_fn) {
+    for (CallInst *C : CallList) {
+      InlineFunctionInfo info;
+      Changed |= InlineFunction(C, info);
+    }
   }
 
   return Changed;

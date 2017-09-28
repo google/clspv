@@ -98,27 +98,70 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 }
 
 // In a second round, check -cluster-pod-kernel-args
-// CLUSTER: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
-// CLUSTER: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CLUSTER: [[sampler:%[a-zA-Z0-9_]+]] = OpTypeSampler
-// CLUSTER: [[image:%[a-zA-Z0-9_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
-// CLUSTER: [[vec2:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 2
-// CLUSTER: [[st_vec2:%[a-zA-Z0-9_]+]] = OpTypeStruct [[vec2]]
-// CLUSTER: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CLUSTER: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CLUSTER: [[void_fn:%[a-zA-Z0-9_]+]] = OpTypeFunction [[void]]
-// CLUSTER: [[zero:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
 
-// CLUSTER: [[fooinner:%[a-zA-A0-9]+]] = OpFunction [[void]] None
+// CLUSTER: ; SPIR-V
+// CLUSTER: ; Version: 1.0
+// CLUSTER: ; Generator: Codeplay; 0
+// CLUSTER: ; Bound: 36
+// CLUSTER: ; Schema: 0
+// CLUSTER: OpCapability Shader
+// CLUSTER: OpCapability VariablePointers
+// CLUSTER: OpExtension "SPV_KHR_storage_buffer_storage_class"
+// CLUSTER: OpExtension "SPV_KHR_variable_pointers"
+// CLUSTER: OpMemoryModel Logical GLSL450
+// CLUSTER: OpEntryPoint GLCompute [[_26:%[a-zA-Z0-9_]+]] "foo"
+// CLUSTER: OpExecutionMode [[_26]] LocalSize 1 1 1
+// CLUSTER: OpSource OpenCL_C 120
+// CLUSTER: OpDecorate [[__runtimearr_v4float:%[a-zA-Z0-9_]+]] ArrayStride 16
+// CLUSTER: OpMemberDecorate [[__struct_9:%[a-zA-Z0-9_]+]] 0 Offset 0
+// CLUSTER: OpDecorate [[__struct_9]] Block
+// CLUSTER: OpMemberDecorate [[__struct_12:%[a-zA-Z0-9_]+]] 0 Offset 0
+// CLUSTER: OpMemberDecorate [[__struct_13:%[a-zA-Z0-9_]+]] 0 Offset 0
+// CLUSTER: OpDecorate [[__struct_13]] Block
+// CLUSTER: OpDecorate [[_22:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// CLUSTER: OpDecorate [[_22]] Binding 0
+// CLUSTER: OpDecorate [[_23:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// CLUSTER: OpDecorate [[_23]] Binding 1
+// CLUSTER: OpDecorate [[_23]] NonWritable
+// CLUSTER: OpDecorate [[_24:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// CLUSTER: OpDecorate [[_24]] Binding 2
+// CLUSTER: OpDecorate [[_25:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// CLUSTER: OpDecorate [[_25]] Binding 3
+// CLUSTER: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CLUSTER: [[_2:%[a-zA-Z0-9_]+]] = OpTypeSampler
+// CLUSTER: [[__ptr_UniformConstant_2:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_2]]
+// CLUSTER: [[_4:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
+// CLUSTER: [[__ptr_UniformConstant_4:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_4]]
+// CLUSTER: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
+// CLUSTER: [[__ptr_StorageBuffer_v4float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v4float]]
+// CLUSTER: [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
+// CLUSTER: [[__struct_9]] = OpTypeStruct [[__runtimearr_v4float]]
+// CLUSTER: [[__ptr_StorageBuffer__struct_9:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
+// CLUSTER: [[_v2float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 2
+// CLUSTER: [[__struct_12]] = OpTypeStruct [[_v2float]]
+// CLUSTER: [[__struct_13]] = OpTypeStruct [[__struct_12]]
+// CLUSTER: [[__ptr_StorageBuffer__struct_13:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
+// CLUSTER: [[__ptr_StorageBuffer__struct_12:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
+// CLUSTER: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CLUSTER: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CLUSTER: [[_18:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CLUSTER: [[_19:%[a-zA-Z0-9_]+]] = OpTypeSampledImage [[_4]]
+// CLUSTER: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
+// CLUSTER: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CLUSTER: [[_22]] = OpVariable [[__ptr_UniformConstant_2]] UniformConstant
+// CLUSTER: [[_23]] = OpVariable [[__ptr_UniformConstant_4]] UniformConstant
+// CLUSTER: [[_24]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
+// CLUSTER: [[_25]] = OpVariable [[__ptr_StorageBuffer__struct_13]] StorageBuffer
+// CLUSTER: [[_26]] = OpFunction [[_void]] None [[_18]]
+// CLUSTER: [[_27:%[a-zA-Z0-9_]+]] = OpLabel
+// CLUSTER: [[_28:%[a-zA-Z0-9_]+]] = OpLoad [[_2]] [[_22]]
+// CLUSTER: [[_29:%[a-zA-Z0-9_]+]] = OpLoad [[_4]] [[_23]]
+// CLUSTER: [[_30:%[a-zA-Z0-9_]+]] = OpAccessChain [[__ptr_StorageBuffer_v4float]] [[_24]] [[_uint_0]] [[_uint_0]]
+// CLUSTER: [[_31:%[a-zA-Z0-9_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_12]] [[_25]] [[_uint_0]]
+// CLUSTER: [[_32:%[a-zA-Z0-9_]+]] = OpLoad [[__struct_12]] [[_31]]
+// CLUSTER: [[_33:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v2float]] [[_32]] 0
+// CLUSTER: [[_34:%[a-zA-Z0-9_]+]] = OpSampledImage [[_19]] [[_29]] [[_28]]
+// CLUSTER: [[_35:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_34]] [[_33]] Lod [[_float_0]]
+// CLUSTER: OpStore [[_30]] [[_35]]
+// CLUSTER: OpReturn
 // CLUSTER: OpFunctionEnd
-
-// Match the wrapper kernel function.
-// CLUSTER: [[foo]] = OpFunction [[void]] None [[void_fn]]
-// CLUSTER-NEXT: OpLabel
-// CLUSTER-NEXT: [[sampler_val:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]]
-// CLUSTER-NEXT: [[image_val:%[a-zA-Z0-9_]+]] = OpLoad [[image]]
-// CLUSTER-NEXT: [[a_base:%[a-zA-Z0-9_]+]] = OpAccessChain %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} [[zero]] [[zero]]
-// CLUSTER-NEXT: [[podargs_base:%[a-zA-Z0-9_]+]] = OpAccessChain %{{[a-zA-Z0-9_]+}} %{{[a-zA-Z0-9_]+}} [[zero]]
-// CLUSTER-NEXT: [[podargs:%[a-zA-Z0-9_]+]] = OpLoad [[st_vec2]] [[podargs_base]]
-// CLUSTER-NEXT: [[vec2_val:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[vec2]] [[podargs]] 0
-// CLUSTER-NEXT: = OpFunctionCall [[void]] [[fooinner]] [[sampler_val]] [[image_val]] [[vec2_val]] [[a_base]]
