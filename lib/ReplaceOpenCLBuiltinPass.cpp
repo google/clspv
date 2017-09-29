@@ -449,15 +449,15 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
 
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
-  const std::map<const char *, const char *> Map = {
-      {"_Z9mem_fencej", "__spirv_memory_barrier"},
-      {"_Z14read_mem_fencej", "__spirv_memory_barrier"},
-      {"_Z15write_mem_fencej", "__spirv_memory_barrier"}};
-
-  std::map<const char *, uint32_t> MemorySemanticsMap = {
-      {"_Z9mem_fencej", spv::MemorySemanticsSequentiallyConsistentMask},
-      {"_Z14read_mem_fencej", spv::MemorySemanticsAcquireMask},
-      {"_Z15write_mem_fencej", spv::MemorySemanticsReleaseMask}};
+  using Tuple = std::tuple<const char *, unsigned>;
+  const std::map<const char *, Tuple> Map = {
+      {"_Z9mem_fencej",
+       Tuple("__spirv_memory_barrier",
+        spv::MemorySemanticsSequentiallyConsistentMask)},
+      {"_Z14read_mem_fencej",
+       Tuple("__spirv_memory_barrier", spv::MemorySemanticsAcquireMask)},
+      {"_Z15write_mem_fencej",
+       Tuple("__spirv_memory_barrier", spv::MemorySemanticsReleaseMask)}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
@@ -474,7 +474,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
           }
           auto NewFType =
               FunctionType::get(FType->getReturnType(), Params, false);
-          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
+          auto NewF = M.getOrInsertFunction(std::get<0>(Pair.second), NewFType);
 
           auto Arg = CI->getOperand(0);
 
@@ -484,7 +484,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
           const auto GlobalMemFence =
               ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
           const auto ConstantMemorySemantics =
-              ConstantInt::get(Arg->getType(), MemorySemanticsMap[Pair.first]);
+              ConstantInt::get(Arg->getType(), std::get<1>(Pair.second));
           const auto ConstantScopeDevice =
               ConstantInt::get(Arg->getType(), spv::ScopeDevice);
 
@@ -1538,28 +1538,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
-      {"_Z10atomic_addPU3AS1Vii", "spirv.atomic_add"},
-      {"_Z10atomic_addPU3AS1Vjj", "spirv.atomic_add"},
-      {"_Z10atomic_subPU3AS1Vii", "spirv.atomic_sub"},
-      {"_Z10atomic_subPU3AS1Vjj", "spirv.atomic_sub"},
-      {"_Z11atomic_xchgPU3AS1Vii", "spirv.atomic_exchange"},
-      {"_Z11atomic_xchgPU3AS1Vjj", "spirv.atomic_exchange"},
       {"_Z10atomic_incPU3AS1Vi", "spirv.atomic_inc"},
       {"_Z10atomic_incPU3AS1Vj", "spirv.atomic_inc"},
       {"_Z10atomic_decPU3AS1Vi", "spirv.atomic_dec"},
       {"_Z10atomic_decPU3AS1Vj", "spirv.atomic_dec"},
       {"_Z14atomic_cmpxchgPU3AS1Viii", "spirv.atomic_compare_exchange"},
-      {"_Z14atomic_cmpxchgPU3AS1Vjjj", "spirv.atomic_compare_exchange"},
-      {"_Z10atomic_minPU3AS1Vii", "spirv.atomic_smin"},
-      {"_Z10atomic_minPU3AS1Vjj", "spirv.atomic_umin"},
-      {"_Z10atomic_maxPU3AS1Vii", "spirv.atomic_smax"},
-      {"_Z10atomic_maxPU3AS1Vjj", "spirv.atomic_umax"},
-      {"_Z10atomic_andPU3AS1Vii", "spirv.atomic_and"},
-      {"_Z10atomic_andPU3AS1Vjj", "spirv.atomic_and"},
-      {"_Z9atomic_orPU3AS1Vii", "spirv.atomic_or"},
-      {"_Z9atomic_orPU3AS1Vjj", "spirv.atomic_or"},
-      {"_Z10atomic_xorPU3AS1Vii", "spirv.atomic_xor"},
-      {"_Z10atomic_xorPU3AS1Vjj", "spirv.atomic_xor"}};
+      {"_Z14atomic_cmpxchgPU3AS1Vjjj", "spirv.atomic_compare_exchange"}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
@@ -1636,6 +1620,55 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
           auto NewCI = CallInst::Create(NewF, Params, "", CI);
 
           CI->replaceAllUsesWith(NewCI);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  const std::map<const char *, llvm::AtomicRMWInst::BinOp> Map2 = {
+      {"_Z10atomic_addPU3AS1Vii", llvm::AtomicRMWInst::Add},
+      {"_Z10atomic_addPU3AS1Vjj", llvm::AtomicRMWInst::Add},
+      {"_Z10atomic_subPU3AS1Vii", llvm::AtomicRMWInst::Sub},
+      {"_Z10atomic_subPU3AS1Vjj", llvm::AtomicRMWInst::Sub},
+      {"_Z11atomic_xchgPU3AS1Vii", llvm::AtomicRMWInst::Xchg},
+      {"_Z11atomic_xchgPU3AS1Vjj", llvm::AtomicRMWInst::Xchg},
+      {"_Z10atomic_minPU3AS1Vii", llvm::AtomicRMWInst::Min},
+      {"_Z10atomic_minPU3AS1Vjj", llvm::AtomicRMWInst::UMin},
+      {"_Z10atomic_maxPU3AS1Vii", llvm::AtomicRMWInst::Max},
+      {"_Z10atomic_maxPU3AS1Vjj", llvm::AtomicRMWInst::UMax},
+      {"_Z10atomic_andPU3AS1Vii", llvm::AtomicRMWInst::And},
+      {"_Z10atomic_andPU3AS1Vjj", llvm::AtomicRMWInst::And},
+      {"_Z9atomic_orPU3AS1Vii", llvm::AtomicRMWInst::Or},
+      {"_Z9atomic_orPU3AS1Vjj", llvm::AtomicRMWInst::Or},
+      {"_Z10atomic_xorPU3AS1Vii", llvm::AtomicRMWInst::Xor},
+      {"_Z10atomic_xorPU3AS1Vjj", llvm::AtomicRMWInst::Xor}};
+
+  for (auto Pair : Map2) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Pair.first)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          auto AtomicOp = new AtomicRMWInst(
+              Pair.second, CI->getArgOperand(0), CI->getArgOperand(1),
+              AtomicOrdering::SequentiallyConsistent, SyncScope::System, CI);
+
+          CI->replaceAllUsesWith(AtomicOp);
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
