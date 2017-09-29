@@ -750,6 +750,7 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
+  pm.add(clspv::createSplatSelectConditionPass());
   pm.add(clspv::createSPIRVProducerPass(
       bufferedOutStream, descriptor_map_out, SamplerMapEntries,
       OutputAssembly.getValue(), OutputFormat == "c"));

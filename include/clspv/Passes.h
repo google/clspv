@@ -228,4 +228,12 @@ llvm::ModulePass *createUndoTruncatedSwitchConditionPass();
 /// is a very limited resource.  Vulkan requires a minimum of 4 StorageBuffer
 /// arguments (maxPerStageDescriptorStorageBuffers), which is very easy to reach.
 llvm::ModulePass *createClusterPodKernelArgumentsPass();
+
+/// Splat select scalar condition with vector data operands.
+/// @return An LLVM module pass.
+///
+/// Converts a select with scalar bool argument but vector operands so that
+/// the bool condition is converted into a bool vector with as many elements
+/// as the operands.
+llvm::ModulePass *createSplatSelectConditionPass();
 }
