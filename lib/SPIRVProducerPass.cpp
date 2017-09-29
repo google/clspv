@@ -874,7 +874,8 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
               FindConstant(Idx);
               if (auto* vectorTy = dyn_cast<VectorType>(I.getType())) {
                 // Register the splat vector with element 31.
-                FindConstant(ConstantVector::getSplat(vectorTy->getNumElements(), Idx));
+                FindConstant(ConstantVector::getSplat(
+                    static_cast<unsigned>(vectorTy->getNumElements()), Idx));
                 FindType(vectorTy);
               }
             }
@@ -1179,6 +1180,15 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
           FindConstant(Cst255);
         }
         // Fall through.
+      } else if (isa<AtomicRMWInst>(I)) {
+        LLVMContext &Context = I.getContext();
+
+        FindConstant(
+            ConstantInt::get(Type::getInt32Ty(Context), spv::ScopeDevice));
+        FindConstant(ConstantInt::get(
+            Type::getInt32Ty(Context),
+            spv::MemorySemanticsUniformMemoryMask |
+                spv::MemorySemanticsSequentiallyConsistentMask));
       }
 
       for (Use &Op : I.operands()) {
@@ -1191,7 +1201,6 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
 }
 
 void SPIRVProducerPass::FindConstant(Value *V) {
-  ValueMapType &VMap = getValueMap();
   ValueList &CstList = getConstantList();
 
   // If V is already tracked, ignore it.
@@ -1444,8 +1453,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
 
         std::vector<uint32_t> LiteralNum;
         Type *EleTy = PTy->getElementType();
-        const unsigned ArrayStride = DL.getTypeAllocSize(EleTy);
-        LiteralNum.push_back(ArrayStride);
+        LiteralNum.push_back(static_cast<uint32_t>(DL.getTypeAllocSize(EleTy)));
         SPIRVOperand *ArrayStrideOp =
             new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
         Ops.push_back(ArrayStrideOp);
@@ -1681,7 +1689,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
         // No matter what LLVM type is requested first, always alias the
         // second one's SPIR-V type to be the same as the one we generated
         // first.
-        int aliasToWidth = 0;
+        unsigned aliasToWidth = 0;
         if (BitWidth == 8) {
           aliasToWidth = 32;
           BitWidth = 32;
@@ -1982,9 +1990,9 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         //
         // Generate OpConstant with OpTypeInt 32 0.
         //
-        uint64_t IntValue = 0;
-        for (int i = 0; i < 4; i++) {
-          const uint64_t Val = CDS->getElementAsInteger(i);
+        uint32_t IntValue = 0;
+        for (unsigned k = 0; k < 4; k++) {
+          const uint64_t Val = CDS->getElementAsInteger(k);
           IntValue = (IntValue << 8) | (Val & 0xffu);
         }
 
@@ -2030,14 +2038,13 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         //
         // Generate OpConstant with OpTypeInt 32 0.
         //
-        uint64_t IntValue = 0;
-        uint32_t Idx = 0;
+        uint32_t IntValue = 0;
         for (User::const_op_iterator I = Cst->op_begin(), E = Cst->op_end();
              I != E; ++I) {
           uint64_t Val = 0;
           const Value* CV = *I;
-          if (auto* CI = dyn_cast<ConstantInt>(CV)) {
-            Val = CI->getZExtValue();
+          if (auto *CI2 = dyn_cast<ConstantInt>(CV)) {
+            Val = CI2->getZExtValue();
           }
           IntValue = (IntValue << 8) | (Val & 0xffu);
         }
@@ -2487,7 +2494,6 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   ValueMapType &ArgGVIDMap = getArgumentGVIDMap();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
   auto &GlobalConstArgSet = getGlobalConstArgSet();
-  const DataLayout& dataLayout(F.getParent()->getDataLayout());
 
   FunctionType *FTy = F.getFunctionType();
 
@@ -4381,8 +4387,79 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     break;
   }
   case Instruction::AtomicRMW: {
-    I.print(errs());
-    llvm_unreachable("Unsupported instruction???");
+    AtomicRMWInst *AtomicRMW = dyn_cast<AtomicRMWInst>(&I);
+
+    spv::Op opcode;
+
+    switch (AtomicRMW->getOperation()) {
+    default:
+      I.print(errs());
+      llvm_unreachable("Unsupported instruction???");
+    case llvm::AtomicRMWInst::Add:
+      opcode = spv::OpAtomicIAdd;
+      break;
+    case llvm::AtomicRMWInst::Sub:
+      opcode = spv::OpAtomicISub;
+      break;
+    case llvm::AtomicRMWInst::Xchg:
+      opcode = spv::OpAtomicExchange;
+      break;
+    case llvm::AtomicRMWInst::Min:
+      opcode = spv::OpAtomicSMin;
+      break;
+    case llvm::AtomicRMWInst::Max:
+      opcode = spv::OpAtomicSMax;
+      break;
+    case llvm::AtomicRMWInst::UMin:
+      opcode = spv::OpAtomicUMin;
+      break;
+    case llvm::AtomicRMWInst::UMax:
+      opcode = spv::OpAtomicUMax;
+      break;
+    case llvm::AtomicRMWInst::And:
+      opcode = spv::OpAtomicAnd;
+      break;
+    case llvm::AtomicRMWInst::Or:
+      opcode = spv::OpAtomicOr;
+      break;
+    case llvm::AtomicRMWInst::Xor:
+      opcode = spv::OpAtomicXor;
+      break;
+    }
+
+    //
+    // Generate OpAtomic*.
+    //
+    SPIRVOperandList Ops;
+
+    uint32_t TyID = lookupType(I.getType());
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
+
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                   VMap[AtomicRMW->getPointerOperand()]));
+
+    auto IntTy = Type::getInt32Ty(I.getContext());
+
+    const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
+
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                   VMap[ConstantScopeDevice]));
+
+    const auto ConstantMemorySemantics = ConstantInt::get(
+        IntTy, spv::MemorySemanticsUniformMemoryMask |
+                   spv::MemorySemanticsSequentiallyConsistentMask);
+
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                   VMap[ConstantMemorySemantics]));
+
+    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                   VMap[AtomicRMW->getValOperand()]));
+
+    VMap[&I] = nextID;
+
+    SPIRVInstruction *Inst = new SPIRVInstruction(
+        static_cast<uint16_t>(2 + Ops.size()), opcode, nextID++, Ops);
+    SPIRVInstList.push_back(Inst);
     break;
   }
   case Instruction::Fence: {
@@ -5211,8 +5288,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           Type *IdxTy = Type::getInt32Ty(Context);
           Constant *minuend = ConstantInt::get(IdxTy, 31);
           if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
-            minuend = ConstantVector::getSplat(vectorTy->getNumElements(),
-                                               minuend);
+            minuend = ConstantVector::getSplat(
+                static_cast<unsigned>(vectorTy->getNumElements()), minuend);
           }
           uint32_t Op0ID = VMap[minuend];
           SPIRVOperand *Op0IDOp =
@@ -5296,7 +5373,6 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     return;
 
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
-  ValueMapType &VMap = getValueMap();
 
   // Find an iterator pointing just past the last decoration.
   bool seen_decorations = false;
@@ -5328,7 +5404,7 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
                                    spv::DecorationArrayStride));
     Type *elemTy = ptrType->getElementType();
     // Same as DL.getIndexedOfffsetInType( elemTy, { 1 } );
-    const unsigned stride = DL.getTypeAllocSize(elemTy);
+    const uint32_t stride = static_cast<uint32_t>(DL.getTypeAllocSize(elemTy));
     Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, stride));
 
     SPIRVInstruction *DecoInst =

@@ -22,8 +22,8 @@ endif()
 
 # Check if required third-party dependencies exist.
 macro(use_component path)
-  if(NOT IS_DIRECTORY ${path})
-	  message(FATAL_ERROR "Required component '${path}' does not exist! Please run 'python utils/fetch_sources.py' in the '${CMAKE_CURRENT_SOURCE_DIR}' folder.")
+if(NOT IS_DIRECTORY ${path})
+  message(FATAL_ERROR "Required component '${path}' does not exist! Please run 'python utils/fetch_sources.py' in the '${CMAKE_CURRENT_SOURCE_DIR}' folder.")
 endif()
 endmacro()
 

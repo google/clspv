@@ -18,7 +18,7 @@ set(SPIRV_C_STRINGS_NAMESPACE spv)
 set(SPIRV_C_STRINGS_CMAKE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/spirv_c_strings.cmakescript)
 
 add_custom_target(clspv_c_strings
-	DEPENDS ${SPIRV_C_STRINGS_OUTPUT_FILE})
+  DEPENDS ${SPIRV_C_STRINGS_OUTPUT_FILE})
 
 add_custom_command(
   OUTPUT ${SPIRV_C_STRINGS_OUTPUT_FILE}
