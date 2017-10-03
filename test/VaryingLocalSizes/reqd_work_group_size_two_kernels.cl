@@ -23,7 +23,7 @@
 // CHECK: OpDecorate %[[UINT_ARG0_STRUCT_TYPE_ID]] Block
 // CHECK: OpDecorate %[[FOO_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[FOO_ARG0_ID]] Binding 0
-// CHECK: OpDecorate %[[BAR_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 1
+// CHECK: OpDecorate %[[BAR_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[BAR_ARG0_ID]] Binding 0
 // CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 // CHECK: %[[UINT_GLOBAL_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[UINT_TYPE_ID]]

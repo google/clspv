@@ -107,7 +107,12 @@ denote that the shaders can interact with their data.
 The default way to map an OpenCL C language kernel to a Vulkan SPIR-V compute
 shader is as follows:
 
-- Each kernel is assigned a corresponding descriptor set, such that the first
+- If a sampler map file is specified, all literal samplers use descriptor set _0_.
+- By default, all kernels in the translation unit use the same descriptor set
+  number, either _0_ or _1_.  (They use 1 if a sampler map is specified.)
+  **This is new default behaviour**.
+  - Use option `-distinct-kernel-descriptor-sets` to get the old behaviour,
+  where each kernel is assigned its own descriptor set number, such that the first
   kernel has descriptor set _0_, and each subsequent kernel is an increment of
   _1_ from the previous.
 - Each argument within each kernel is assigned a binding in that kernel's
@@ -131,9 +136,9 @@ shader is as follows:
 
 #### Descriptor map
 
-The compiler can tell you what descriptor set and bindings are used for kernel
-arguemnts.  Use option `-descriptormap` to name a file that should contain
-the mapping information.
+The compiler can tell you what descriptor set and bindings are used for samplers
+in the sampler map and kernel arguments.
+Use option `-descriptormap` to name a file that should contain the mapping information.
 
 Example:
 
@@ -238,7 +243,10 @@ will produce the following in `myclusteredmap`:
     kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4
 
 If `foo` were the second kernel in the translation unit, then its arguments
-would use descriptor set 1.
+would also use descriptor set 0.
+If `foo` were the second kernel in the translation unit _and_ option
+`-distinct-kernel-descriptor-sets` is used, then its arguments would
+use descriptor set 1.
 
 Compiling with the same sampler map from before:
 

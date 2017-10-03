@@ -28,6 +28,7 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
@@ -50,6 +51,14 @@ using namespace clspv;
 using namespace mdconst;
 
 namespace {
+
+// By default, reuse the same descriptor set number for all arguments.
+// To turn that off, use -distinct-kernel-descriptor-sets
+llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
+    "distinct-kernel-descriptor-sets", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Each kernel uses its own descriptor set for its arguments"));
+
 enum SPIRVOperandType {
   NUMBERID,
   LITERAL_INTEGER,
@@ -2497,16 +2506,18 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
                      });
 
     uint32_t DescriptorSetIdx = (0 < getSamplerMap().size()) ? 1u : 0u;
-    for (Function &Func : *F.getParent()) {
-      if (Func.isDeclaration()) {
-        continue;
-      }
-
-      if (Func.getCallingConv() == CallingConv::SPIR_KERNEL) {
-        if (&Func == &F) {
-          break;
+    if (distinct_kernel_descriptor_sets) {
+      for (Function &Func : *F.getParent()) {
+        if (Func.isDeclaration()) {
+          continue;
         }
-        DescriptorSetIdx++;
+
+        if (Func.getCallingConv() == CallingConv::SPIR_KERNEL) {
+          if (&Func == &F) {
+            break;
+          }
+          DescriptorSetIdx++;
+        }
       }
     }
 
