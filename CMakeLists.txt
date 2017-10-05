@@ -27,6 +27,11 @@ if(NOT IS_DIRECTORY ${path})
 endif()
 endmacro()
 
+option(SKIP_CLSPV_TOOLS_INSTALL "Skip installation" ${SKIP_CLSPV_TOOLS_INSTALL})
+if(NOT ${SKIP_CLSPV_TOOLS_INSTALL})
+  set(ENABLE_CLSPV_TOOLS_INSTALL ON)
+endif()
+
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
@@ -88,3 +93,13 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
 # Bring in our test folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+
+
+if(ENABLE_CLSPV_TOOLS_INSTALL)
+  install(
+    FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/AddressSpace.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Passes.h
+    DESTINATION
+      ${CMAKE_INSTALL_INCLUDEDIR}/clspv/)
+endif(ENABLE_CLSPV_TOOLS_INSTALL)

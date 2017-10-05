@@ -28,3 +28,8 @@ target_link_libraries(clspv PRIVATE clspv_core clangCodeGen LLVMAnalysis LLVMSca
 add_dependencies(clspv clspv_baked_opencl_header)
 
 set_target_properties(clspv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
+
+if(ENABLE_CLSPV_TOOLS_INSTALL)
+  install(TARGETS clspv
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif(ENABLE_CLSPV_TOOLS_INSTALL)
