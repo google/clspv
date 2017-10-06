@@ -1,12 +1,17 @@
-Want to contribute?  Great!  First, read this page (including the small print at
-the end).  We're sorting out policies and direction, but at the very least all
+Want to contribute?  Great!  First, read this page.
+We're sorting out policies and direction, but at the very least all
 contributions will be reviewed before they can be accepted.
 
 ## Before you contribute
 
-Before we can use your code, you must sign the
-[Google Individual Contributor License Agreement](https://developers.google.com/open-source/cla/individual?csw=1)
-(CLA), which you can do online. The CLA is necessary mainly because you own the
+Before we can use your code, you must sign a contributor's license agreement
+(CLA), which you can do online.
+There are two choices, depending on who legally owns your contribution:
+
+* [Google Individual Contributor License Agreement](https://cla.developers.google.com/about/google-individual) - if you own the contribution.
+* [Google Software Grant and Corporate Contributor License Agreement ](https://cla.developers.google.com/about/google-corporate) - if a corporation owns the contribution.
+
+The CLA is necessary mainly because you own the
 copyright to your changes, even after your contribution becomes part of our
 codebase, so we need your permission to use and distribute your code. We also
 need to be sure of various other things -- for instance that you'll tell us if
@@ -18,8 +23,3 @@ Before you start working on a larger contribution, you should get in touch with
 us first through the issue tracker with your idea so that we can help out and
 possibly guide you. Coordinating up front makes it much easier to avoid
 frustration later on.
-
-## The small print
-
-Contributions made by corporations are covered by a different agreement than
-the one above, the Software Grant and Corporate Contributor License Agreement.
