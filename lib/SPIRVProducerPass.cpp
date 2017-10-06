@@ -37,7 +37,7 @@
 #include <clspv/spirv_c_strings.hpp>
 #include <clspv/spirv_glsl.hpp>
 
-#include "ArgType.h"
+#include "ArgKind.h"
 
 #include <list>
 #include <iomanip>
@@ -2544,12 +2544,12 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
             dyn_extract<ConstantInt>(arg_node->getOperand(2))->getZExtValue();
         const auto offset =
             dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
-        const auto argType =
+        const auto argKind =
             dyn_cast<MDString>(arg_node->getOperand(4))->getString();
         descriptorMapOut << "kernel," << F.getName() << ",arg," << name
                          << ",argOrdinal," << old_index << ",descriptorSet,"
                          << DescriptorSetIdx << ",binding," << new_index
-                         << ",offset," << offset << ",argType," << argType
+                         << ",offset," << offset << ",argKind," << argKind
                          << "\n";
       }
     }
@@ -2566,8 +2566,8 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
         descriptorMapOut << "kernel," << F.getName() << ",arg," << Arg.getName()
                          << ",argOrdinal," << BindingIdx << ",descriptorSet,"
                          << DescriptorSetIdx << ",binding," << BindingIdx
-                         << ",offset,0,argType,"
-                         << clspv::GetArgTypeForType(Arg.getType()) << "\n";
+                         << ",offset,0,argKind,"
+                         << clspv::GetArgKindForType(Arg.getType()) << "\n";
       }
 
       // Ops[0] = Target ID

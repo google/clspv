@@ -21,7 +21,7 @@ using namespace llvm;
 
 namespace clspv {
 
-const char *GetArgTypeForType(Type *type) {
+const char *GetArgKindForType(Type *type) {
   if (type->isPointerTy()) {
     auto pointeeTy = type->getPointerElementType();
     if (auto structTy = dyn_cast<StructType>(pointeeTy)) {

@@ -36,7 +36,7 @@
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include "ArgType.h"
+#include "ArgKind.h"
 
 using namespace llvm;
 
@@ -96,8 +96,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       // this is the byte offset within the POD arguments struct.
       unsigned offset;
       // Argument type.  Same range of values as the result of
-      // clspv::GetArgTypeForType.
-      const char* arg_type;
+      // clspv::GetArgKindForType.
+      const char* arg_kind;
     };
 
     // In OpenCL, kernel arguments are either pointers or POD. A composite with
@@ -114,7 +114,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
         PtrArgTys.push_back(ArgTy);
         RemapInfo.push_back({std::string(Arg.getName()), arg_index,
                              unsigned(RemapInfo.size()), 0u,
-                             clspv::GetArgTypeForType(ArgTy)});
+                             clspv::GetArgKindForType(ArgTy)});
       } else {
         PodArgTys.push_back(ArgTy);
       }
@@ -141,7 +141,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, num_pointer_args,
                unsigned(StructLayout->getElementOffset(pod_index++)),
-               clspv::GetArgTypeForType(ArgTy)});
+               clspv::GetArgKindForType(ArgTy)});
         }
         arg_index++;
       }
@@ -197,7 +197,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.new_index));
         auto *offset =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
-        auto *argtype_md = MDString::get(Context, arg_mapping.arg_type);
+        auto *argtype_md = MDString::get(Context, arg_mapping.arg_kind);
         auto *arg_md = MDNode::get(
             Context, {name_md, old_index_md, new_index_md, offset, argtype_md});
         mappings.push_back(arg_md);

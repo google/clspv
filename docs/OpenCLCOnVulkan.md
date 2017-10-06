@@ -153,10 +153,10 @@ Consider this example:
 
 It generates the following descriptor map:
 
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argType,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argType,pod
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argType,buffer
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argType,pod
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argKind,buffer
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod
 
 For kernel arguments, the fields are:
 - `kernel` to indicate a kernel argument
@@ -172,7 +172,7 @@ For kernel arguments, the fields are:
 - `offset`
 - The byte offset inside the storage buffer where you should write the argument value.
   This will always be zero, unless you cluster plain-old-data kernel arguments. (See below.)
-- `argType`
+- `argKind`
 - a string describing the kind of argument, one of:
   - `buffer` - OpenCL buffer
   - `pod` - Plain Old Data, e.g. a scalar, vector, or structure
@@ -195,10 +195,10 @@ Then `mydescriptormap` will contain:
 
     sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
     sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argType,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argType,pod
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0,argType,buffer
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argType,pod
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0,argKind,buffer
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argKind,pod
 
 
 #### Clustering plain-old-data kernel arguments to save descriptors
@@ -244,10 +244,10 @@ That is, compiling as follows:
 
 will produce the following in `myclusteredmap`:
 
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argType,buffer
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,1,offset,0,argType,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,2,offset,0,argType,pod
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4,argType,pod
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,1,offset,0,argKind,buffer
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,2,offset,0,argKind,pod
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4,argKind,pod
 
 If `foo` were the second kernel in the translation unit, then its arguments
 would also use descriptor set 0.
@@ -263,10 +263,10 @@ produces the following descriptor map:
 
     sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
     sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argType,buffer
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0,argType,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0,argType,pod
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4,argType,pod
+    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0,argKind,buffer
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0,argKind,pod
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4,argKind,pod
 
 
 TODO(dneto): Give an example using images.

@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CLSPV_LIB_ARGTYPE_H_
-#define CLSPV_LIB_ARGTYPE_H_
+#ifndef CLSPV_LIB_ARGKIND_H_
+#define CLSPV_LIB_ARGKIND_H_
 
 #include <llvm/IR/Type.h>
 
 namespace clspv {
 
 // Maps an LLVM type for a kernel argument to an argument
-// type suitable for a descriptor map.  The result is one of:
+// kind suitable for a descriptor map.  The result is one of:
 //   buffer
 //   pod
 //   ro_image
 //   wo_image
 //   sampler
-const char *GetArgTypeForType(llvm::Type *type);
+const char *GetArgKindForType(llvm::Type *type);
 
 } // namespace clspv
 
