@@ -36,6 +36,7 @@
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "ArgType.h"
 
 using namespace llvm;
 
@@ -48,6 +49,7 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
+
 } // namespace
 
 char ClusterPodKernelArgumentsPass::ID = 0;
@@ -93,6 +95,9 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       // This is always zero for non-POD arguments.  For a POD argument,
       // this is the byte offset within the POD arguments struct.
       unsigned offset;
+      // Argument type.  Same range of values as the result of
+      // clspv::GetArgTypeForType.
+      const char* arg_type;
     };
 
     // In OpenCL, kernel arguments are either pointers or POD. A composite with
@@ -108,7 +113,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
         RemapInfo.push_back({std::string(Arg.getName()), arg_index,
-                             unsigned(RemapInfo.size()), 0u});
+                             unsigned(RemapInfo.size()), 0u,
+                             clspv::GetArgTypeForType(ArgTy)});
       } else {
         PodArgTys.push_back(ArgTy);
       }
@@ -134,7 +140,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
         if (!isa<PointerType>(ArgTy)) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, num_pointer_args,
-               unsigned(StructLayout->getElementOffset(pod_index++))});
+               unsigned(StructLayout->getElementOffset(pod_index++)),
+               clspv::GetArgTypeForType(ArgTy)});
         }
         arg_index++;
       }
@@ -179,6 +186,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       //  - Byte offset within the argument.  This is always 0 for pointer
       //    arguments.  For POD arguments this is the offest within the POD
       //    argument struct.
+      //  - Argument type
       LLVMContext& Context = M.getContext();
       SmallVector<Metadata*, 8> mappings;
       for (auto &arg_mapping : RemapInfo) {
@@ -189,8 +197,9 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.new_index));
         auto *offset =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
-        auto *arg_md =
-            MDNode::get(Context, {name_md, old_index_md, new_index_md, offset});
+        auto *argtype_md = MDString::get(Context, arg_mapping.arg_type);
+        auto *arg_md = MDNode::get(
+            Context, {name_md, old_index_md, new_index_md, offset, argtype_md});
         mappings.push_back(arg_md);
       }
 
