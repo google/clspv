@@ -717,6 +717,12 @@ int main(const int argc, const char *const argv[]) {
   //   %2 = bitcast float* %1
   //   %3 = load float %2
   pm.add(llvm::createPromoteMemoryToRegisterPass());
+
+  // Hide loads from __constant address space away from instcombine.
+  // This prevents us from generating select between pointers-to-__constant.
+  // See https://github.com/google/clspv/issues/71
+  pm.add(clspv::createHideConstantLoadsPass());
+
   pm.add(llvm::createInstructionCombiningPass());
 
   pm.add(clspv::createInlineFuncWithPointerBitCastArgPass());
@@ -738,6 +744,10 @@ int main(const int argc, const char *const argv[]) {
 
   // Now we add any of the LLVM optimizations we wanted
   pmBuilder.populateModulePassManager(pm);
+
+  // Unhide loads from __constant address space.  Undoes the action of
+  // HideConstantLoadsPass.
+  pm.add(clspv::createUnhideConstantLoadsPass());
 
   pm.add(clspv::createFunctionInternalizerPass());
   pm.add(clspv::createReplaceLLVMIntrinsicsPass());

@@ -236,4 +236,18 @@ llvm::ModulePass *createClusterPodKernelArgumentsPass();
 /// the bool condition is converted into a bool vector with as many elements
 /// as the operands.
 llvm::ModulePass *createSplatSelectConditionPass();
+
+/// Hide loads from __constant address space.
+/// @return An LLVM module pass.
+///
+/// Wrap the result of a load from __constant address space.  This prevents
+/// the instcombine pass from generating selects over pointer-to-constant.
+/// See https://github.com/google/clspv/issues/71
+llvm::ModulePass *createHideConstantLoadsPass();
+
+/// Unhide loads from __constant address space.
+/// @return An LLVM module pass.
+///
+/// Unwrap the result of a load from __constant address space.
+llvm::ModulePass *createUnhideConstantLoadsPass();
 }
