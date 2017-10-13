@@ -5348,6 +5348,14 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops.push_back(ResTyIDOp);
 
         uint32_t CalleeID = VMap[Callee];
+        if (CalleeID == 0) {
+          errs() << "Can't translate function call.  Missing builtin? "
+                 << Callee->getName() << " in: " << *Call << "\n";
+          // TODO(dneto): Can we error out?  Enabling this llvm_unreachable
+          // causes an infinite loop.  Instead, go ahead and generate
+          // the bad function call.  A validator will catch the 0-Id.
+          // llvm_unreachable("Can't translate function call");
+        }
 
         SPIRVOperand *CalleeIDOp =
             new SPIRVOperand(SPIRVOperandType::NUMBERID, CalleeID);
