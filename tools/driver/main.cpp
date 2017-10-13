@@ -313,28 +313,8 @@ int main(const int argc, const char *const argv[]) {
     }
   }
 
-  std::error_code error;
-  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
-
-  if (error) {
-    llvm::errs() << "Unable to open output file '" << OutputFilename
-                 << "': " << error.message() << '\n';
-    return -1;
-  }
-
-  std::unique_ptr<llvm::raw_fd_ostream> descriptor_map_out_fd;
   std::string descriptor_map;
   llvm::raw_string_ostream descriptor_map_out(descriptor_map);
-  if (!DescriptorMapFilename.empty()) {
-    descriptor_map_out_fd.reset(
-        new llvm::raw_fd_ostream(DescriptorMapFilename, error,
-                                 llvm::sys::fs::F_RW | llvm::sys::fs::F_Text));
-    if (error) {
-      llvm::errs() << "Unable to open descriptor map file '"
-                   << DescriptorMapFilename << "': " << error.message() << '\n';
-      return -1;
-    }
-  }
 
   llvm::SmallVector<std::pair<unsigned,std::string>, 8> SamplerMapEntries;
 
@@ -510,7 +490,9 @@ int main(const int argc, const char *const argv[]) {
     }
   }
 
-  llvm::buffer_ostream bufferedOutStream(outStream);
+  // Create a memory buffer for temporarily writing the result.
+  SmallVector<char, 10000> binary;
+  llvm::raw_svector_ostream binaryStream(binary);
 
   clang::CompilerInstance instance;
 
@@ -762,15 +744,40 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
   pm.add(clspv::createSplatSelectConditionPass());
   pm.add(clspv::createSPIRVProducerPass(
-      bufferedOutStream, descriptor_map_out, SamplerMapEntries,
+      binaryStream, descriptor_map_out, SamplerMapEntries,
       OutputAssembly.getValue(), OutputFormat == "c"));
   pm.run(*module);
 
-  if (descriptor_map_out_fd.get()) {
+  // Write outputs
+
+  // Write the descriptor map, if requested.
+  std::error_code error;
+  if (!DescriptorMapFilename.empty()) {
     descriptor_map_out.flush();
-    *(descriptor_map_out_fd.get()) << descriptor_map;
-    descriptor_map_out_fd->close();
+
+    llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
+                                               llvm::sys::fs::F_RW |
+                                                   llvm::sys::fs::F_Text);
+    if (error) {
+      llvm::errs() << "Unable to open descriptor map file '"
+                   << DescriptorMapFilename << "': " << error.message() << '\n';
+      return -1;
+    }
+    descriptor_map_out_fd << descriptor_map;
+    descriptor_map_out_fd.close();
   }
+
+  // Write the resulting binary.
+  // Wait until now to try writing the file so that we only write it on
+  // successful compilation.
+  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
+
+  if (error) {
+    llvm::errs() << "Unable to open output file '" << OutputFilename
+                 << "': " << error.message() << '\n';
+    return -1;
+  }
+  outStream << binaryStream.str();
 
   return 0;
 }
