@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <math.h>
+#include <string>
+#include <tuple>
+
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/CommandLine.h>
@@ -90,6 +95,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceReadImageF(Module &M);
   bool replaceAtomics(Module &M);
   bool replaceCross(Module &M);
+  bool replaceFract(Module &M);
 };
 }
 
@@ -126,6 +132,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceReadImageF(M);
   Changed |= replaceAtomics(M);
   Changed |= replaceCross(M);
+  Changed |= replaceFract(M);
 
   return Changed;
 }
@@ -1745,6 +1752,168 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Module &M) {
 
     // And remove the function we don't need either too.
     F->eraseFromParent();
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
+  bool Changed = false;
+
+  // OpenCL's   float result = fract(float x, float* ptr)
+  //
+  // In the LLVM domain:
+  //
+  //    %floor_result = call spir_func float @floor(float %x)
+  //    store float %floor_result, float * %ptr
+  //    %fract_intermediate = call spir_func float @clspv.fract(float %x)
+  //    %result = call spir_func float
+  //        @fmin(float %fract_intermediate, float 0x1.fffffep-1f)
+  //
+  // Becomes in the SPIR-V domain, where translations of floor, fmin,
+  // and clspv.fract occur in the SPIR-V generator pass:
+  //
+  //    %glsl_ext = OpExtInstImport "GLSL.std.450"
+  //    %just_under_1 = OpConstant %float 0x1.fffffep-1f
+  //    ...
+  //    %floor_result = OpExtInst %float %glsl_ext Floor %x
+  //    OpStore %ptr %floor_result
+  //    %fract_intermediate = OpExtInst %float %glsl_ext Fract %x
+  //    %fract_result = OpExtInst %float
+  //       %glsl_ext Fmin %fract_intermediate %just_under_1
+
+
+  using std::string;
+
+  // Mapping from the fract builtin to the floor, fmin, and clspv.fract builtins
+  // we need.  The clspv.fract builtin is the same as GLSL.std.450 Fract.
+  using QuadType = std::tuple<const char *, const char *, const char *, const char *>;
+  auto make_quad = [](const char *a, const char *b, const char *c,
+                      const char *d) {
+    return std::tuple<const char *, const char *, const char *, const char *>(
+        a, b, c, d);
+  };
+  const std::vector<QuadType> Functions = {
+      make_quad("_Z5fractfPf", "_Z5floorff", "_Z4fminff", "clspv.fract.f"),
+      make_quad("_Z5fractDv2_fPS_", "_Z5floorDv2_f", "_Z4fminDv2_ff", "clspv.fract.v2f"),
+      make_quad("_Z5fractDv3_fPS_", "_Z5floorDv3_f", "_Z4fminDv3_ff", "clspv.fract.v3f"),
+      make_quad("_Z5fractDv4_fPS_", "_Z5floorDv4_f", "_Z4fminDv4_ff", "clspv.fract.v4f"),
+  };
+
+  for (auto& quad : Functions) {
+    const StringRef fract_name(std::get<0>(quad));
+
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(fract_name)) {
+      if (F->use_begin() == F->use_end())
+        continue;
+
+      // We have some uses.
+      Changed = true;
+
+      auto& Context = M.getContext();
+
+      const StringRef floor_name(std::get<1>(quad));
+      const StringRef fmin_name(std::get<2>(quad));
+      const StringRef clspv_fract_name(std::get<3>(quad));
+
+      // This is either float or a float vector.  All the float-like
+      // types are this type.
+      auto result_ty = F->getReturnType();
+
+      Function* fmin_fn = M.getFunction(fmin_name);
+      if (!fmin_fn) {
+        // Make the fmin function.
+        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty, result_ty}, false);
+        fmin_fn = cast<Function>(M.getOrInsertFunction(fmin_name, fn_ty));
+        fmin_fn->addFnAttr(Attribute::ReadOnly);
+        fmin_fn->addFnAttr(Attribute::ReadNone);
+        fmin_fn->setCallingConv(CallingConv::SPIR_FUNC);
+      }
+
+      Function* floor_fn = M.getFunction(floor_name);
+      if (!floor_fn) {
+        // Make the floor function.
+        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
+        floor_fn = cast<Function>(M.getOrInsertFunction(floor_name, fn_ty));
+        floor_fn->addFnAttr(Attribute::ReadOnly);
+        floor_fn->addFnAttr(Attribute::ReadNone);
+        floor_fn->setCallingConv(CallingConv::SPIR_FUNC);
+      }
+
+      Function* clspv_fract_fn = M.getFunction(clspv_fract_name);
+      if (!clspv_fract_fn) {
+        // Make the clspv_fract function.
+        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
+        clspv_fract_fn = cast<Function>(M.getOrInsertFunction(clspv_fract_name, fn_ty));
+        clspv_fract_fn->addFnAttr(Attribute::ReadOnly);
+        clspv_fract_fn->addFnAttr(Attribute::ReadNone);
+        clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
+      }
+
+      // Number of significant significand bits, whether represented or not.
+      unsigned num_significand_bits;
+      switch (result_ty->getScalarType()->getTypeID()) {
+        case Type::HalfTyID:
+          num_significand_bits = 11;
+          break;
+        case Type::FloatTyID:
+          num_significand_bits = 24;
+          break;
+        case Type::DoubleTyID:
+          num_significand_bits = 53;
+          break;
+        default:
+          assert(false && "Unhandled float type when processing fract builtin");
+          break;
+      }
+      // Beware that the disassembler displays this value as
+      //   OpConstant %float 1
+      // which is not quite right.
+      const double kJustUnderOneScalar =
+          ldexp(double((1 << num_significand_bits) - 1), -num_significand_bits);
+
+      Constant *just_under_one =
+          ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
+      if (result_ty->isVectorTy()) {
+        just_under_one = ConstantVector::getSplat(
+            result_ty->getVectorNumElements(), just_under_one);
+      }
+
+      IRBuilder<> Builder(Context);
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          Builder.SetInsertPoint(CI);
+          auto arg = CI->getArgOperand(0);
+          auto ptr = CI->getArgOperand(1);
+
+          // Compute floor result and store it.
+          auto floor = Builder.CreateCall(floor_fn, {arg});
+          Builder.CreateStore(floor, ptr);
+
+          auto fract_intermediate = Builder.CreateCall(clspv_fract_fn, arg);
+          auto fract_result = Builder.CreateCall(fmin_fn, {fract_intermediate, just_under_one});
+
+          CI->replaceAllUsesWith(fract_result);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
   }
 
   return Changed;

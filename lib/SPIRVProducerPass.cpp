@@ -5625,6 +5625,10 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .StartsWith("llvm.fmuladd.", glsl::ExtInst::ExtInstFma)
       .Case("spirv.unpack.v2f16", glsl::ExtInst::ExtInstUnpackHalf2x16)
       .Case("spirv.pack.v2f16", glsl::ExtInst::ExtInstPackHalf2x16)
+      .Case("clspv.fract.f", glsl::ExtInst::ExtInstFract)
+      .Case("clspv.fract.v2f", glsl::ExtInst::ExtInstFract)
+      .Case("clspv.fract.v3f", glsl::ExtInst::ExtInstFract)
+      .Case("clspv.fract.v4f", glsl::ExtInst::ExtInstFract)
       .Default(kGlslExtInstBad);
 }
 
