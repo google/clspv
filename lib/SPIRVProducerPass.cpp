@@ -5550,6 +5550,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .StartsWith("_Z4sign", glsl::ExtInst::ExtInstFSign)
       .StartsWith("_Z6length", glsl::ExtInst::ExtInstLength)
       .StartsWith("_Z8distance", glsl::ExtInst::ExtInstDistance)
+      .StartsWith("_Z4step", glsl::ExtInst::ExtInstStep)
       .Case("_Z5crossDv3_fS_", glsl::ExtInst::ExtInstCross)
       .StartsWith("_Z9normalize", glsl::ExtInst::ExtInstNormalize)
       .StartsWith("llvm.fmuladd.", glsl::ExtInst::ExtInstFma)
