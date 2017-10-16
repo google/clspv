@@ -32,11 +32,14 @@ while(<>) {
     if ($word =~ m/^%(.*)/) {
       my $name = $1;
       if (defined $id{$name}) {
-	# This is a first use
-	push @parts, "[[_$name]]"
+	# This is a use, not the first mention.
+	push @parts, "[[_$name]]";
       } else {
-	# This is a definition.  Write a match rule
-	push @parts, "[[_$name:%[a-zA-Z0-9_]+]]"
+	# This is first use of the pattern, and therefore a definition.
+	# Write a match rule.
+	push @parts, "[[_$name:%[a-zA-Z0-9_]+]]";
+	# Also remember that we made this defnition.
+	$id{$name} = 1;
       }
     } else {
       # Not an Id.  Emit it verbatim
