@@ -54,6 +54,11 @@ using namespace mdconst;
 
 namespace {
 
+// The value of 1/pi.  This value is from MSDN
+// https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
+const double kOneOverPi = 0.318309886183790671538;
+const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
+
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
 llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
@@ -222,7 +227,17 @@ struct SPIRVProducerPass final : public ModulePass {
   bool is4xi8vec(Type *Ty) const;
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
+  // Returns the GLSL extended instruction enum that the given function
+  // call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
   glsl::ExtInst getExtInstEnum(StringRef Name);
+  // Returns the GLSL extended instruction enum indirectly used by the given
+  // function.  That is, to implement the given function, we use an extended
+  // instruction plus one more instruction. If none, then returns the 0 value,
+  // i.e. GLSLstd4580Bad.
+  glsl::ExtInst getIndirectExtInstEnum(StringRef Name);
+  // Returns the single GLSL extended instruction used directly or
+  // indirectly by the given function call.
+  glsl::ExtInst getDirectOrIndirectExtInstEnum(StringRef Name);
   void PrintResID(SPIRVInstruction *Inst);
   void PrintOpcode(SPIRVInstruction *Inst);
   void PrintOperand(SPIRVOperand *Op);
@@ -865,24 +880,51 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           Function *Callee = Call->getCalledFunction();
           // Check whether this call is for extend instructions.
-          glsl::ExtInst EInst = getExtInstEnum(Callee->getName());
-          if (EInst) {
-            // clz needs OpExtInst and OpISub with constant 31, or splat vector
-            // of 31.  Add it to the constant list here.
-            if (EInst == glsl::ExtInstFindUMsb) {
-              Type *IdxTy = Type::getInt32Ty(Context);
-              auto Idx = ConstantInt::get(IdxTy, 31);
-              FindType(IdxTy);
-              FindConstant(Idx);
-              if (auto* vectorTy = dyn_cast<VectorType>(I.getType())) {
-                // Register the splat vector with element 31.
-                FindConstant(ConstantVector::getSplat(
-                    static_cast<unsigned>(vectorTy->getNumElements()), Idx));
-                FindType(vectorTy);
-              }
-            }
+          auto callee_name = Callee->getName();
+          const glsl::ExtInst EInst = getExtInstEnum(callee_name);
+          const glsl::ExtInst IndirectEInst =
+              getIndirectExtInstEnum(callee_name);
 
-            HasExtInst = true;
+          HasExtInst |=
+              (EInst != kGlslExtInstBad) || (IndirectEInst != kGlslExtInstBad);
+
+          if (IndirectEInst) {
+            // Register extra constants if needed.
+
+            // Registers a type and constant for computing the result of the
+            // given instruction.  If the result of the instruction is a vector,
+            // then make a splat vector constant with the same number of
+            // elements.
+            auto register_constant = [this, &I](Constant *constant) {
+              FindType(constant->getType());
+              FindConstant(constant);
+              if (auto *vectorTy = dyn_cast<VectorType>(I.getType())) {
+                // Register the splat vector of the value with the same
+                // width as the result of the instruction.
+                auto *vec_constant = ConstantVector::getSplat(
+                    static_cast<unsigned>(vectorTy->getNumElements()),
+                    constant);
+                FindConstant(vec_constant);
+                FindType(vec_constant->getType());
+              }
+            };
+            switch (IndirectEInst) {
+            case glsl::ExtInstFindUMsb:
+              // clz needs OpExtInst and OpISub with constant 31, or splat
+              // vector of 31.  Add it to the constant list here.
+              register_constant(
+                  ConstantInt::get(Type::getInt32Ty(Context), 31));
+              break;
+            case glsl::ExtInstAcos:
+            case glsl::ExtInstAsin:
+            case glsl::ExtInstAtan2:
+              // We need 1/pi for acospi, asinpi, atan2pi.
+              register_constant(
+                  ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
+              break;
+            default:
+              assert(false && "internally inconsistent");
+            }
           }
         }
       }
@@ -4984,10 +5026,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     DeferredInsts.push_back(
         std::make_tuple(&I, --SPIRVInstList.end(), nextID++));
 
-    // Check whether this call is for extend instructions.
-    glsl::ExtInst EInst = getExtInstEnum(Callee->getName());
-    if (EInst == glsl::ExtInstFindUMsb) {
-      // clz needs OpExtInst and OpISub with constant 31 or vector constant 31.
+    // Check whether the implementation of this call uses an extended
+    // instruction plus one more value-producing instruction.  If so, then
+    // reserve the id for the extra value-producing slot.
+    glsl::ExtInst EInst = getIndirectExtInstEnum(Callee->getName());
+    if (EInst != kGlslExtInstBad) {
+      // Reserve a spot for the extra value.
       // Increase nextID.
       VMap[&I] = nextID;
       nextID++;
@@ -5254,7 +5298,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
                                             std::get<2>(*DeferredInst), Ops));
     } else if (CallInst *Call = dyn_cast<CallInst>(Inst)) {
       Function *Callee = Call->getCalledFunction();
-      glsl::ExtInst EInst = getExtInstEnum(Callee->getName());
+      auto callee_name = Callee->getName();
+      glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(callee_name);
 
       if (EInst) {
         uint32_t &ExtInstImportID = getOpExtInstImportID();
@@ -5299,42 +5344,67 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             WordCount, spv::OpExtInst, std::get<2>(*DeferredInst), Ops);
         SPIRVInstList.insert(InsertPoint, ExtInst);
 
-        // clz needs OpExtInst and OpISub with constant 31.
-        if (EInst == glsl::ExtInstFindUMsb) {
+        const auto IndirectExtInst = getIndirectExtInstEnum(callee_name);
+        if (IndirectExtInst != kGlslExtInstBad) {
+          // Generate one more instruction that uses the result of the extended
+          // instruction.  Its result id is one more than the id of the
+          // extended instruction.
           LLVMContext &Context =
               Call->getParent()->getParent()->getParent()->getContext();
-          //
-          // Generate OpISub with constant 31.
-          //
-          // Ops[0] = Result Type ID
-          // Ops[1] = Operand 0
-          // Ops[2] = Operand 1
-          Ops.clear();
 
-          Type *resultTy = Call->getType();
-          Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                         lookupType(resultTy)));
+          auto generate_extra_inst = [this, &Context, &Call, &DeferredInst,
+                                      &VMap, &SPIRVInstList, &InsertPoint](
+                                         spv::Op opcode, Constant *constant) {
+            //
+            // Generate instruction like:
+            //   result = opcode constant <extinst-result>
+            //
+            // Ops[0] = Result Type ID
+            // Ops[1] = Operand 0 ;; the constant, suitably splatted
+            // Ops[2] = Operand 1 ;; the result of the extended instruction
+            SPIRVOperandList Ops;
 
-          Type *IdxTy = Type::getInt32Ty(Context);
-          Constant *minuend = ConstantInt::get(IdxTy, 31);
-          if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
-            minuend = ConstantVector::getSplat(
-                static_cast<unsigned>(vectorTy->getNumElements()), minuend);
+            Type *resultTy = Call->getType();
+            Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                           lookupType(resultTy)));
+
+            if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
+              constant = ConstantVector::getSplat(
+                  static_cast<unsigned>(vectorTy->getNumElements()), constant);
+            }
+            uint32_t Op0ID = VMap[constant];
+            SPIRVOperand *Op0IDOp =
+                new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
+            Ops.push_back(Op0IDOp);
+
+            SPIRVOperand *Op1IDOp = new SPIRVOperand(
+                SPIRVOperandType::NUMBERID, std::get<2>(*DeferredInst));
+            Ops.push_back(Op1IDOp);
+
+            SPIRVInstList.insert(
+                InsertPoint,
+                new SPIRVInstruction(5, opcode, std::get<2>(*DeferredInst) + 1,
+                                     Ops));
+          };
+
+          switch (IndirectExtInst) {
+          case glsl::ExtInstFindUMsb: // Implementing clz
+            generate_extra_inst(
+                spv::OpISub, ConstantInt::get(Type::getInt32Ty(Context), 31));
+            break;
+          case glsl::ExtInstAcos:  // Implementing acospi
+          case glsl::ExtInstAsin:  // Implementing asinpi
+          case glsl::ExtInstAtan2: // Implementing atan2pi
+            generate_extra_inst(
+                spv::OpFMul,
+                ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
+            break;
+
+          default:
+            assert(false && "internally inconsistent");
           }
-          uint32_t Op0ID = VMap[minuend];
-          SPIRVOperand *Op0IDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-          Ops.push_back(Op0IDOp);
-
-          SPIRVOperand *Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                                   std::get<2>(*DeferredInst));
-          Ops.push_back(Op1IDOp);
-
-          SPIRVInstList.insert(
-              InsertPoint,
-              new SPIRVInstruction(5, spv::OpISub,
-                                   std::get<2>(*DeferredInst) + 1, Ops));
         }
+
       } else if (Callee->getName().equals("_Z8popcounti") ||
                  Callee->getName().equals("_Z8popcountj") ||
                  Callee->getName().equals("_Z8popcountDv2_i") ||
@@ -5469,7 +5539,6 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z5clampDv2_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv3_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv4_fS_S_", glsl::ExtInst::ExtInstFClamp)
-      .StartsWith("_Z3clz", glsl::ExtInst::ExtInstFindUMsb)
       .Case("_Z3maxii", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv2_iS_", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv3_iS_", glsl::ExtInst::ExtInstSMax)
@@ -5556,7 +5625,35 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .StartsWith("llvm.fmuladd.", glsl::ExtInst::ExtInstFma)
       .Case("spirv.unpack.v2f16", glsl::ExtInst::ExtInstUnpackHalf2x16)
       .Case("spirv.pack.v2f16", glsl::ExtInst::ExtInstPackHalf2x16)
-      .Default(static_cast<glsl::ExtInst>(0));
+      .Default(kGlslExtInstBad);
+}
+
+glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(StringRef Name) {
+  // Check indirect cases.
+  return StringSwitch<glsl::ExtInst>(Name)
+      .StartsWith("_Z3clz", glsl::ExtInst::ExtInstFindUMsb)
+      // Use exact match on float arg because these need a multiply
+      // of a constant of the right floating point type.
+      .Case("_Z6acospif", glsl::ExtInst::ExtInstAcos)
+      .Case("_Z6acospiDv2_f", glsl::ExtInst::ExtInstAcos)
+      .Case("_Z6acospiDv3_f", glsl::ExtInst::ExtInstAcos)
+      .Case("_Z6acospiDv4_f", glsl::ExtInst::ExtInstAcos)
+      .Case("_Z6asinpif", glsl::ExtInst::ExtInstAsin)
+      .Case("_Z6asinpiDv2_f", glsl::ExtInst::ExtInstAsin)
+      .Case("_Z6asinpiDv3_f", glsl::ExtInst::ExtInstAsin)
+      .Case("_Z6asinpiDv4_f", glsl::ExtInst::ExtInstAsin)
+      .Case("_Z7atan2piff", glsl::ExtInst::ExtInstAtan2)
+      .Case("_Z7atan2piDv2_fS_", glsl::ExtInst::ExtInstAtan2)
+      .Case("_Z7atan2piDv3_fS_", glsl::ExtInst::ExtInstAtan2)
+      .Case("_Z7atan2piDv4_fS_", glsl::ExtInst::ExtInstAtan2)
+      .Default(kGlslExtInstBad);
+}
+
+glsl::ExtInst SPIRVProducerPass::getDirectOrIndirectExtInstEnum(StringRef Name) {
+  auto direct = getExtInstEnum(Name);
+  if (direct != kGlslExtInstBad)
+    return direct;
+  return getIndirectExtInstEnum(Name);
 }
 
 void SPIRVProducerPass::PrintResID(SPIRVInstruction *Inst) {
