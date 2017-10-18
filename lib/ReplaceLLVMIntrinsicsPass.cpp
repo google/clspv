@@ -58,6 +58,7 @@ bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
 
 bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
   bool Changed = false;
+  auto Layout = M.getDataLayout();
 
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memset")) {
@@ -86,6 +87,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
           NewArg = Bitcast->getOperand(0);
         }
 
+        auto NumBytes = cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
+
         auto Ty = NewArg->getType();
         auto PointeeTy = Ty->getPointerElementType();
 
@@ -100,9 +103,25 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
 
         auto Zero = Constant::getNullValue(PointeeTy);
 
-        auto NewCI = CallInst::Create(NewF, {NewArg, Zero}, "", CI);
+        const auto num_stores = NumBytes / Layout.getTypeAllocSize(PointeeTy);
+        assert((NumBytes == num_stores * Layout.getTypeAllocSize(PointeeTy)) &&
+               "Null memset can't be divided evenly across multiple stores.");
+        assert((num_stores & 0xFFFFFFFF) == num_stores);
 
-        CI->replaceAllUsesWith(NewCI);
+        // Generate the first store.
+        CallInst::Create(NewF, {NewArg, Zero}, "", CI);
+
+        // Generate subsequent stores, but only if needed.
+        if (num_stores) {
+          auto I32Ty = Type::getInt32Ty(M.getContext());
+          auto One = ConstantInt::get(I32Ty, 1);
+          auto Ptr = NewArg;
+          for (uint32_t i = 1; i < num_stores; i++) {
+            Ptr = GetElementPtrInst::Create(PointeeTy, Ptr, {One}, "", CI);
+            CallInst::Create(NewF, {Ptr, Zero}, "", CI);
+          }
+        }
+
         CI->eraseFromParent();
 
         if (auto Bitcast = dyn_cast<BitCastInst>(NewArg)) {
