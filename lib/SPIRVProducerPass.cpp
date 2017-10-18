@@ -66,6 +66,11 @@ llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
     llvm::cl::desc(
         "Each kernel uses its own descriptor set for its arguments"));
 
+llvm::cl::opt<bool> hack_undef(
+    "hack-undef", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Use OpConstantNull instead of OpUndef"));
+
 enum SPIRVOperandType {
   NUMBERID,
   LITERAL_INTEGER,
@@ -1971,7 +1976,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 
     if (isa<UndefValue>(Cst)) {
       // Ops[0] = Result Type ID
-      Opcode = spv::OpUndef;
+      Opcode = hack_undef ? spv::OpConstantNull : spv::OpUndef;
       WordCount = 3;
     } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(Cst)) {
       unsigned BitWidth = CI->getBitWidth();
