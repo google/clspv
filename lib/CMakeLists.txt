@@ -51,7 +51,7 @@ add_dependencies(clspv_core clspv_c_strings clspv_glsl)
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
-    PROPERTIES COMPILE_FLAGS "/Wall /WX /wd4710 /wd4820 /wd4625 /wd4626 /wd5026 /wd5027 /wd4061 /wd4711 /wd4996 /wd4530 /wd4577"
+    PROPERTIES COMPILE_FLAGS "/Wall /WX /wd4710 /wd4820 /wd4625 /wd4626 /wd5026 /wd5027 /wd4061 /wd4711 /wd4996 /wd4530 /wd4577 /wd4514 /wd4365 /wd4987 /wd4774 /wd4623 /wd4571"
   )
 endif()
 
