@@ -66,10 +66,16 @@ llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
     llvm::cl::desc(
         "Each kernel uses its own descriptor set for its arguments"));
 
+// Some drivers don't like to see constant composite values constructed
+// from scalar Undef values.  Replace numeric scalar and vector Undef with
+// corresponding OpConstantNull.  We need to keep Undef for image values,
+// for example.  In the LLVM domain, image values are passed as pointer to
+// struct.
+// See https://github.com/google/clspv/issues/95
 llvm::cl::opt<bool> hack_undef(
     "hack-undef", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Use OpConstantNull instead of OpUndef"));
+    llvm::cl::desc("Use OpConstantNull instead of OpUndef for floating point, "
+                   "integer, or vectors of them"));
 
 enum SPIRVOperandType {
   NUMBERID,
@@ -1976,7 +1982,13 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 
     if (isa<UndefValue>(Cst)) {
       // Ops[0] = Result Type ID
-      Opcode = hack_undef ? spv::OpConstantNull : spv::OpUndef;
+      Opcode = spv::OpUndef;
+      if (hack_undef) {
+        Type *type = Cst->getType();
+        if (type->isFPOrFPVectorTy() || type->isIntOrIntVectorTy()) {
+          Opcode = spv::OpConstantNull;
+        }
+      }
       WordCount = 3;
     } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(Cst)) {
       unsigned BitWidth = CI->getBitWidth();
