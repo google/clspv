@@ -9,8 +9,8 @@
 // CHECK: OpDecorate [[foo_pod:%[a-zA-Z0-9]+]] DescriptorSet 0
 // CHECK: OpDecorate [[foo_pod]] Binding 1
 
-// CHECK: OpDecorate [[B:%[a-zA-Z0-9]+]] DescriptorSet 0
-// CHECK: OpDecorate [[B]] Binding 0
+// B reuses the variable for A, and hence its bindings.
+
 // CHECK: OpDecorate [[bar_pod:%[a-zA-Z0-9]+]] DescriptorSet 0
 // CHECK: OpDecorate [[bar_pod]] Binding 1
 
