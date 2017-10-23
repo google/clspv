@@ -132,8 +132,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     }
 
     // Put the pointer arguments first, and then POD arguments struct last.
-    auto PodArgsStructTy =
-        StructType::create(PodArgTys, F->getName().str() + ".podargs");
+    // Use StructType::get so we reuse types where possible.
+    auto PodArgsStructTy = StructType::get(Context, PodArgTys);
     SmallVector<Type *, 8> NewFuncParamTys(PtrArgTys);
     NewFuncParamTys.push_back(PodArgsStructTy);
 
