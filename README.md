@@ -14,6 +14,21 @@ Clspv depends on external projects:
 * [SPIRV-Tools][SPIRV-Tools]
 * [SPIRV-Headers][SPIRV-Headers]
 
+Table of Contents (ToC)
+======================
+
+* [Legal](#legal)
+* [Status](#status)
+* [Examples](#examples)
+* [Build](#build)
+* [Tools](#tools)
+* [Getting sources for dependencies](#getting-sources-for-dependencies)
+* [Building](#building)
+* [Using Ninja to build, and other build options](#using-ninja-to-build-and-other-build-options)
+* [Test](#test)
+
+---
+
 ## Legal
 
 Clspv is licensed under the terms of the [Apache 2.0 license](LICENSE).
@@ -26,6 +41,8 @@ their own terms.
 
 Clspv is not an official Google product.
 
+---
+
 ## Status
 
 The compiler is an incomplete prototype, with many rough edges.
@@ -34,6 +51,8 @@ The input language is a subset of OpenCL C version 1.2.
 The [OpenCL C on Vulkan Specification](docs/OpenCLCOnVulkan.md)
 describes the specific subset, and also the mapping into Vulkan compute
 shaders.
+
+---
 
 ## Examples
 
@@ -65,6 +84,8 @@ Use OpenCL compiler options:
 Show help:
 
     clspv -help
+
+---
 
 ## Build
 
@@ -116,6 +137,8 @@ Other useful configuration options (the first `cmake` command):
 
 See the [CMake][CMake] [documentation][CMake-doc] for more generic options.
 
+---
+
 ## Test
 
 To run the test suite from within the build directory:
@@ -133,3 +156,7 @@ Or if you are using Ninja:
 [Ninja]: https://ninja-build.org
 [SPIRV-Headers]: https://github.com/KhronosGroup/SPIRV-Headers
 [SPIRV-Tools]: https://github.com/KhronosGroup/SPIRV-Tools
+
+---
+
+<img src="https://avatars2.githubusercontent.com/u/1342004?s=200&v=4" width="50"></img>
