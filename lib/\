@@ -339,10 +339,6 @@ private:
   // This mimics what Glslang does, and that's what drivers are used to.
   uint32_t WorkgroupSizeValueID;
   uint32_t WorkgroupSizeVarID;
-
-  // What module-scope variables already have had their binding information
-  // emitted?
-  DenseSet<Value*> GVarWithEmittedBindingInfo;
 };
 
 char SPIRVProducerPass::ID;
@@ -823,11 +819,9 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
       // Make a new variable if there was none for this type, or if we can
       // reuse one created for a different function but not yet reused for
       // the current function, *and* the binding is the same.
-      // Always make a new variable if we're forcing distinct descriptor sets.
       GlobalVariable *GV = nullptr;
       auto which_set = GVarsForType.find(GVTy);
-      if (IsSamplerType || IsImageType || which_set == GVarsForType.end() ||
-          distinct_kernel_descriptor_sets) {
+      if (IsSamplerType || IsImageType || which_set == GVarsForType.end()) {
         GV = make_gvar();
       } else {
         auto &set = which_set->second;
@@ -2695,12 +2689,6 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
                          << ",offset,0,argKind,"
                          << clspv::GetArgKindForType(Arg.getType()) << "\n";
       }
-
-      if (GVarWithEmittedBindingInfo.count(NewGV)) {
-        BindingIdx++;
-        continue;
-      }
-      GVarWithEmittedBindingInfo.insert(NewGV);
 
       // Ops[0] = Target ID
       // Ops[1] = Decoration (DescriptorSet)
