@@ -768,7 +768,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
       } else {
         // Wrap up argument type with struct type.
         // Reuse struct types where possible.
-        SmallVector<Type*,1> members{TmpArgTy};
+        SmallVector<Type*,1> members{ArgTy};
         StructType *STy = StructType::get(Context, members);
 
         GVTy = STy;
