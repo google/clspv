@@ -250,4 +250,12 @@ llvm::ModulePass *createHideConstantLoadsPass();
 ///
 /// Unwrap the result of a load from __constant address space.
 llvm::ModulePass *createUnhideConstantLoadsPass();
+
+/// Rewrite insertvalue instructions.
+/// @return An LLVM module pass.
+///
+/// Rewrite a chain of insertvalue instructions that cover all
+/// members of a vector of struct, so that it becomes a single
+/// new builtin corresponding to an OpCompositeConstruct.
+llvm::ModulePass *createRewriteInsertsPass();
 }

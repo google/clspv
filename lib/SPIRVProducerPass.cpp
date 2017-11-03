@@ -61,6 +61,8 @@ namespace {
 const double kOneOverPi = 0.318309886183790671538;
 const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
+const char* kCompositeConstructFunctionPrefix = "clspv.composite_construct.";
+
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
 llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
@@ -5516,6 +5518,27 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVInstList.insert(
             InsertPoint, new SPIRVInstruction(4, spv::OpBitCount,
                                               std::get<2>(*DeferredInst), Ops));
+
+      } else if (Callee->getName().startswith(kCompositeConstructFunctionPrefix)) {
+
+        // Generate an OpCompositeConstruct
+        SPIRVOperandList Ops;
+
+        // The result type.
+        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                       lookupType(Call->getType())));
+
+        for (Use &use : Call->arg_operands()) {
+          Value* val = use.get();
+          Ops.push_back(
+              new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[use.get()]));
+        }
+
+        SPIRVInstList.insert(
+            InsertPoint,
+            new SPIRVInstruction(2 + Ops.size(), spv::OpCompositeConstruct,
+                                 std::get<2>(*DeferredInst), Ops));
+
       } else {
         //
         // Generate OpFunctionCall.
@@ -6226,6 +6249,7 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
     case spv::OpShiftRightLogical:
     case spv::OpShiftRightArithmetic:
     case spv::OpBitCount:
+    case spv::OpCompositeConstruct:
     case spv::OpCompositeExtract:
     case spv::OpVectorExtractDynamic:
     case spv::OpCompositeInsert:
@@ -6453,6 +6477,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpShiftRightLogical:
     case spv::OpShiftRightArithmetic:
     case spv::OpBitCount:
+    case spv::OpCompositeConstruct:
     case spv::OpCompositeExtract:
     case spv::OpVectorExtractDynamic:
     case spv::OpCompositeInsert:
