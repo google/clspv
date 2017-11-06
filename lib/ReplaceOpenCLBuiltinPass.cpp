@@ -96,6 +96,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceAtomics(Module &M);
   bool replaceCross(Module &M);
   bool replaceFract(Module &M);
+  bool replaceVload(Module &M);
+  bool replaceVstore(Module &M);
 };
 }
 
@@ -133,6 +135,8 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceAtomics(M);
   Changed |= replaceCross(M);
   Changed |= replaceFract(M);
+  Changed |= replaceVload(M);
+  Changed |= replaceVstore(M);
 
   return Changed;
 }
@@ -897,6 +901,136 @@ bool ReplaceOpenCLBuiltinPass::replaceMadandMad24andMul24(Module &M) {
 
       // And remove the function we don't need either too.
       F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
+  bool Changed = false;
+
+  struct VectorStoreOps {
+    const char* name;
+    int n;
+    Type* (*get_scalar_type_function)(LLVMContext&);
+  } vector_store_ops[] = {
+    // TODO(derekjchow): Expand this list.
+    { "_Z7vstore4Dv4_fjPU3AS1f", 4, Type::getFloatTy }
+  };
+
+  for (int i = 0; i < sizeof(vector_store_ops) / sizeof(*vector_store_ops);
+       ++i) {
+    const auto& Op = vector_store_ops[i];
+    auto Name = Op.name;
+    auto N = Op.n;
+    auto TypeFn = Op.get_scalar_type_function;
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          // The value argument from vstoren.
+          auto Arg0 = CI->getOperand(0);
+
+          // The index argument from vstoren.
+          auto Arg1 = CI->getOperand(1);
+
+          // The pointer argument from vstoren.
+          auto Arg2 = CI->getOperand(2);
+
+          // Get types.
+          auto ScalarNTy = VectorType::get(TypeFn(M.getContext()), N);
+          auto ScalarNPointerTy = PointerType::get(
+              ScalarNTy, Arg2->getType()->getPointerAddressSpace());
+
+          // Cast to scalarn
+          auto Cast = CastInst::CreatePointerCast(
+              Arg2, ScalarNPointerTy, "", CI);
+          // Index to correct address
+          auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg1, "", CI);
+          // Store
+          auto Store = new StoreInst(Arg0, Index, CI);
+
+          CI->replaceAllUsesWith(Store);
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
+  bool Changed = false;
+
+  struct VectorLoadOps {
+    const char* name;
+    int n;
+    Type* (*get_scalar_type_function)(LLVMContext&);
+  } vector_load_ops[] = {
+    // TODO(derekjchow): Expand this list.
+    { "_Z6vload4jPU3AS1Kf", 4, Type::getFloatTy }
+  };
+
+  for (int i = 0; i < sizeof(vector_load_ops) / sizeof(*vector_load_ops); ++i) {
+    const auto& Op = vector_load_ops[i];
+    auto Name = Op.name;
+    auto N = Op.n;
+    auto TypeFn = Op.get_scalar_type_function;
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          // The index argument from vloadn.
+          auto Arg0 = CI->getOperand(0);
+
+          // The pointer argument from vloadn.
+          auto Arg1 = CI->getOperand(1);
+
+          // Get types.
+          auto ScalarNTy = VectorType::get(TypeFn(M.getContext()), N);
+          auto ScalarNPointerTy = PointerType::get(
+              ScalarNTy, Arg1->getType()->getPointerAddressSpace());
+
+          // Cast to scalarn
+          auto Cast = CastInst::CreatePointerCast(
+              Arg1, ScalarNPointerTy, "", CI);
+          // Index to correct address
+          auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg0, "", CI);
+          // Load
+          auto Load = new LoadInst(Index, "", CI);
+
+          CI->replaceAllUsesWith(Load);
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+
     }
   }
 
