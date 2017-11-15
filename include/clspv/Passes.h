@@ -255,7 +255,12 @@ llvm::ModulePass *createUnhideConstantLoadsPass();
 /// @return An LLVM module pass.
 ///
 /// Rewrite a chain of insertvalue instructions that cover all
-/// members of a vector of struct, so that it becomes a single
-/// new builtin corresponding to an OpCompositeConstruct.
+/// members of a struct, so that it becomes a single new builtin
+/// corresponding to an OpCompositeConstruct.  Only affects 
+/// insertvalue instructions with a single index operand.
+///
+/// Also, if -hack-inserts option is used, then also rewrite
+/// chains of insertvalue instructions that only cover some but
+/// not all of a struct.
 llvm::ModulePass *createRewriteInsertsPass();
 }
