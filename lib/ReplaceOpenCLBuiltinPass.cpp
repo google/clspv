@@ -919,9 +919,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
     { "_Z7vstore4Dv4_fjPU3AS1f", 4, Type::getFloatTy }
   };
 
-  for (int i = 0; i < sizeof(vector_store_ops) / sizeof(*vector_store_ops);
-       ++i) {
-    const auto& Op = vector_store_ops[i];
+  for (const auto& Op : vector_store_ops) {
     auto Name = Op.name;
     auto N = Op.n;
     auto TypeFn = Op.get_scalar_type_function;
@@ -985,8 +983,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
     { "_Z6vload4jPU3AS1Kf", 4, Type::getFloatTy }
   };
 
-  for (int i = 0; i < sizeof(vector_load_ops) / sizeof(*vector_load_ops); ++i) {
-    const auto& Op = vector_load_ops[i];
+  for (const auto& Op : vector_load_ops) {
     auto Name = Op.name;
     auto N = Op.n;
     auto TypeFn = Op.get_scalar_type_function;
