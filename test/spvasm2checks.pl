@@ -22,13 +22,18 @@ use Getopt::Long;
 # Only replace numeric IDs?
 my $numeric_only = 0;
 
-GetOptions("numeric" => \$numeric_only) or die ("Bad option");
+# Can we assume RE2 is the matcher?  It supports more readable expressions.
+my $assume_re2 = 0;
+
+GetOptions("numeric" => \$numeric_only,
+	   "re2"     => \$assume_re2,
+          ) or die ("Bad option");
 
 # Key is a defined id.
 my %id = ();
 
 my $replace_pat = $numeric_only ? '\d+' : '\S+';
-my $id_pat = '[0-9a-zA-Z_]+';
+my $id_pat = $assume_re2 ? '\w+' : '[0-9a-zA-Z_]+';
 
 while(<>) {
   chomp;
