@@ -17,9 +17,18 @@
 # Convert a SPIR-V assembly listing into a list of FileCheck check assertions.
 
 use strict;
+use Getopt::Long;
+
+# Only replace numeric IDs?
+my $numeric_only = 0;
+
+GetOptions("numeric" => \$numeric_only) or die ("Bad option");
 
 # Key is a defined id.
 my %id = ();
+
+my $replace_pat = $numeric_only ? '\d+' : '\S+';
+my $id_pat = '[0-9a-zA-Z_]+';
 
 while(<>) {
   chomp;
@@ -29,7 +38,7 @@ while(<>) {
   my @words = split(/\s+/, $line);
   my @parts = qw(// CHECK:);
   foreach my $word (@words) {
-    if ($word =~ m/^%(.*)/) {
+    if ($word =~ m/^%($replace_pat)/o) {
       my $name = $1;
       if (defined $id{$name}) {
 	# This is a use, not the first mention.
@@ -37,7 +46,7 @@ while(<>) {
       } else {
 	# This is first use of the pattern, and therefore a definition.
 	# Write a match rule.
-	push @parts, "[[_$name:%[a-zA-Z0-9_]+]]";
+	push @parts, "[[_$name:%$id_pat]]";
 	# Also remember that we made this defnition.
 	$id{$name} = 1;
       }
