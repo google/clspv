@@ -433,7 +433,7 @@ constants as follows:
 
 If a compilation unit contains multiple kernels, then either:
 - All kernels should have a `reqd_work_group_size` attribute, or
-- No kernels should have a `required_work_group_size` attribute.  In this case
+- No kernels should have a `reqd_work_group_size` attribute.  In this case
   work group sizes would be set via specialization constants for the
   pipeline as described above.
 
