@@ -81,6 +81,9 @@ llvm::cl::opt<bool> hack_undef(
     llvm::cl::desc("Use OpConstantNull instead of OpUndef for floating point, "
                    "integer, or vectors of them"));
 
+llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
+                             llvm::cl::desc("Show SPIR-V IDs for functions"));
+
 enum SPIRVOperandType {
   NUMBERID,
   LITERAL_INTEGER,
@@ -2864,6 +2867,9 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
   VMap[&F] = nextID;
 
+  if (show_ids) {
+    errs() << "Function " << F.getName() << " is " << nextID << "\n";
+  }
   // Generate SPIRV instruction for function.
   SPIRVInstruction *FuncInst =
       new SPIRVInstruction(5, spv::OpFunction, nextID++, FOps);
