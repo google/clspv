@@ -32,6 +32,15 @@ if(NOT ${SKIP_CLSPV_TOOLS_INSTALL})
   set(ENABLE_CLSPV_TOOLS_INSTALL ON)
 endif()
 
+
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+	# GCC 7.3 complains about LLVM code: RetryAfterSignal in lib/Support/Process.cpp
+	# Silence that warning for now.
+	# TODO(dneto): Upgrade to newer LLVM to avoid this issue.
+	add_compile_options("-Wno-noexcept-type")
+endif()
+
+
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
