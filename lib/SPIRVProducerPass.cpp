@@ -17,6 +17,7 @@
 #endif
 
 #include <cassert>
+#include <unordered_set>
 #include <clspv/Passes.h>
 
 #include <llvm/ADT/StringSwitch.h>
@@ -229,7 +230,7 @@ struct SPIRVProducerPass final : public ModulePass {
   // the last generated ID.
   void GenerateSPIRVTypes(const DataLayout &DL);
   void GenerateSPIRVConstants();
-  void GenerateModuleInfo();
+  void GenerateModuleInfo(Module &M);
   void GenerateGlobalVar(GlobalVariable &GV);
   void GenerateSamplers(Module &M);
   void GenerateFuncPrologue(Function &F);
@@ -448,7 +449,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   HandleDeferredDecorations(DL);
 
   // Generate SPIRV module information.
-  GenerateModuleInfo();
+  GenerateModuleInfo(module);
 
   if (outputAsm) {
     WriteSPIRVAssembly();
@@ -561,6 +562,15 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
 
   // Map for avoiding to generate struct type with same fields.
   DenseMap<Type *, Type *> ArgTyMap;
+
+  // These function calls need a <2 x i32> as an intermediate result but not
+  // the final result.
+  std::unordered_set<std::string> NeedsIVec2{
+      "_Z15get_image_width14ocl_image2d_ro",
+      "_Z15get_image_width14ocl_image2d_wo",
+      "_Z16get_image_height14ocl_image2d_ro",
+      "_Z16get_image_height14ocl_image2d_wo",
+  };
 
   // Collect global constant variables.
   SmallVector<GlobalVariable *, 8> GVList;
@@ -710,6 +720,10 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
             OpImageTypeMap[ImageTy] = 0;
 
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
+          }
+
+          if (NeedsIVec2.find(Callee->getName()) != NeedsIVec2.end()) {
+            FindType(VectorType::get(Type::getInt32Ty(Context), 2));
           }
         }
       }
@@ -2915,7 +2929,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   }
 }
 
-void SPIRVProducerPass::GenerateModuleInfo() {
+void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   ValueMapType &VMap = getValueMap();
@@ -2983,6 +2997,29 @@ void SPIRVProducerPass::GenerateModuleInfo() {
                       spv::CapabilityStorageImageWriteWithoutFormat)));
         }
       }
+    }
+  }
+
+  { // OpCapability ImageQuery
+    bool hasImageQuery = false;
+    for (const char *imageQuery : {
+             "_Z15get_image_width14ocl_image2d_ro",
+             "_Z15get_image_width14ocl_image2d_wo",
+             "_Z16get_image_height14ocl_image2d_ro",
+             "_Z16get_image_height14ocl_image2d_wo",
+         }) {
+      if (module.getFunction(imageQuery)) {
+        hasImageQuery = true;
+        break;
+      }
+    }
+    if (hasImageQuery) {
+
+      SPIRVInstruction *ImageQueryCapInst =
+          new SPIRVInstruction(2, spv::OpCapability, 0 /* No id */,
+                               new SPIRVOperand(SPIRVOperandType::NUMBERID,
+                                                spv::CapabilityImageQuery));
+      SPIRVInstList.insert(InsertPoint, ImageQueryCapInst);
     }
   }
 
@@ -5119,6 +5156,64 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
+    // get_image_width is mapped to OpImageQuerySize
+    if (Callee->getName().equals("_Z15get_image_width14ocl_image2d_ro") ||
+        Callee->getName().equals("_Z15get_image_width14ocl_image2d_wo") ||
+        Callee->getName().equals("_Z16get_image_height14ocl_image2d_ro") ||
+        Callee->getName().equals("_Z16get_image_height14ocl_image2d_wo")) {
+      //
+      // Generate OpImageQuerySize, then pull out the right component.
+      // Assume 2D image for now.
+      //
+      // Ops[0] = Image ID
+      //
+      // %sizes = OpImageQuerySizes %uint2 %im
+      // %result = OpCompositeExtract %uint %sizes 0-or-1
+      SPIRVOperandList Ops;
+
+      // Implement:
+      //     %sizes = OpImageQuerySizes %uint2 %im
+      uint32_t SizesTypeID =
+          TypeMap[VectorType::get(Type::getInt32Ty(Context), 2)];
+      SPIRVOperand *SizesTypeIDOp =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, SizesTypeID);
+      Ops.push_back(SizesTypeIDOp);
+
+      Value *Image = Call->getArgOperand(0);
+      uint32_t ImageID = VMap[Image];
+      SPIRVOperand *ImageIDOp =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, ImageID);
+      Ops.push_back(ImageIDOp);
+
+      uint32_t SizesID = nextID++;
+      SPIRVInstruction *QueryInst =
+          new SPIRVInstruction(4, spv::OpImageQuerySize, SizesID, Ops);
+      SPIRVInstList.push_back(QueryInst);
+
+      // Reset value map entry since we generated an intermediate instruction.
+      VMap[&I] = nextID;
+
+      // Implement:
+      //     %result = OpCompositeExtract %uint %sizes 0-or-1
+      Ops.clear();
+
+      SPIRVOperand *ResultTypeOp =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, TypeMap[I.getType()]);
+      Ops.push_back(ResultTypeOp);
+
+      SPIRVOperand *SizesOp =
+          new SPIRVOperand(SPIRVOperandType::NUMBERID, SizesID);
+      Ops.push_back(SizesOp);
+
+      uint32_t component = Callee->getName().contains("height") ? 1 : 0;
+      Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, component));
+
+      SPIRVInstruction *Inst =
+          new SPIRVInstruction(5, spv::OpCompositeExtract, nextID++, Ops);
+      SPIRVInstList.push_back(Inst);
+      break;
+    }
+
     // Call instrucion is deferred because it needs function's ID. Record
     // slot's location on SPIRVInstructionList.
     DeferredInsts.push_back(
@@ -6302,6 +6397,7 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
     case spv::OpIsNan:
     case spv::OpAny:
     case spv::OpAll:
+    case spv::OpImageQuerySize:
     case spv::OpAtomicIAdd:
     case spv::OpAtomicISub:
     case spv::OpAtomicExchange:
@@ -6397,6 +6493,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
 
     switch (Opcode) {
     default: {
+      errs() << "Unsupported SPIR-V instruction opcode " << int(Opcode) << "\n";
       llvm_unreachable("Unsupported SPIRV instruction");
       break;
     }
@@ -6533,6 +6630,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpFunctionCall:
     case spv::OpSampledImage:
     case spv::OpImageSampleExplicitLod:
+    case spv::OpImageQuerySize:
     case spv::OpSelect:
     case spv::OpPhi:
     case spv::OpLoad:
