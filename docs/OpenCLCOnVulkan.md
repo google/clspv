@@ -644,7 +644,8 @@ The `async_work_group_copy()`, `async_work_group_strided_copy()`,
 
 #### Miscellaneous Vector Functions
 
-The `shuffle()` and `shuffle2()` built-in functions **must not** be used.
+The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions **must not**
+be used.
 
 #### Printf
 
