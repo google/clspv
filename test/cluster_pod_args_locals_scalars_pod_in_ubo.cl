@@ -1,7 +1,7 @@
-// RUN: clspv %s -S -o %t.spvasm -cluster-pod-kernel-args -descriptormap=%t.map
+// RUN: clspv %s -S -o %t.spvasm -cluster-pod-kernel-args -pod-ubo -descriptormap=%t.map
 // RUN: FileCheck %s < %t.spvasm
 // RUN: FileCheck %s < %t.map -check-prefix=MAP
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -descriptormap=%t2.map
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -pod-ubo -descriptormap=%t2.map
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck %s < %t2.map -check-prefix=MAP
@@ -15,8 +15,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 
 // MAP: kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,B,argOrdinal,2,argKind,local,arrayElemSize,4,arrayNumElemSpecId,3
-// MAP-NEXT: kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
-// MAP-NEXT: kernel,foo,arg,n,argOrdinal,3,descriptorSet,0,binding,1,offset,4,argKind,pod,argSize,4
+// MAP-NEXT: kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod_ubo,argSize,4
+// MAP-NEXT: kernel,foo,arg,n,argOrdinal,3,descriptorSet,0,binding,1,offset,4,argKind,pod_ubo,argSize,4
 // MAP-NOT: kernel
 
 
@@ -36,10 +36,10 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: OpDecorate [[__runtimearr_float:%[0-9a-zA-Z_]+]] ArrayStride 4
 // CHECK: OpMemberDecorate [[__struct_9:%[0-9a-zA-Z_]+]] 0 Offset 0
 // CHECK: OpDecorate [[__struct_9]] Block
-// CHECK: OpMemberDecorate [[__struct_12:%[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK: OpMemberDecorate [[__struct_12]] 1 Offset 4
-// CHECK: OpMemberDecorate [[__struct_13:%[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK: OpDecorate [[__struct_13]] Block
+// CHECK: OpMemberDecorate [[__struct_10:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK: OpMemberDecorate [[__struct_10]] 1 Offset 4
+// CHECK: OpMemberDecorate [[__struct_11:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK: OpDecorate [[__struct_11]] Block
 // CHECK: OpDecorate [[_20:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_20]] Binding 0
 // CHECK: OpDecorate [[_21:%[0-9a-zA-Z_]+]] DescriptorSet 0
@@ -51,30 +51,30 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK-DAG: [[__struct_9]] = OpTypeStruct [[__runtimearr_float]]
 // CHECK-DAG: [[__ptr_StorageBuffer__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
 // CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK-DAG: [[__struct_12]] = OpTypeStruct [[_float]] [[_uint]]
-// CHECK-DAG: [[__struct_13]] = OpTypeStruct [[__struct_12]]
-// CHECK-DAG: [[__ptr_StorageBuffer__struct_13:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
-// CHECK-DAG: [[__ptr_StorageBuffer__struct_12:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
+// CHECK-DAG: [[__struct_10]] = OpTypeStruct [[_float]] [[_uint]]
+// CHECK-DAG: [[__struct_11]] = OpTypeStruct [[__struct_10]]
+// CHECK-DAG: [[__ptr_Uniform_struct_11:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_11]]
 // CHECK-DAG: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: [[_17:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[__ptr_Uniform_struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_10]]
 // CHECK-DAG: [[__ptr_Workgroup_float:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_float]]
 // CHECK: [[_2]] = OpSpecConstant [[_uint]] 1
 // CHECK-DAG: [[__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_2]]
 // CHECK-DAG: [[__ptr_Workgroup__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_float_2]]
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK: [[_20]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
-// CHECK: [[_21]] = OpVariable [[__ptr_StorageBuffer__struct_13]] StorageBuffer
-// CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
-// CHECK: [[_22]] = OpFunction [[_void]] None [[_17]]
-// CHECK: [[_23:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK: [[_24:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_12]] [[_21]] [[_uint_0]]
-// CHECK: [[_25:%[0-9a-zA-Z_]+]] = OpLoad [[__struct_12]] [[_24]]
-// CHECK: [[_26:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_25]] 0
-// CHECK: [[_27:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]] [[_25]] 1
-// CHECK: [[_28:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_27]]
-// CHECK: [[_29:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_28]]
-// CHECK: [[_30:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_26]] [[_29]]
-// CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_20]] [[_uint_0]] [[_27]]
-// CHECK: OpStore [[_31]] [[_30]]
-// CHECK: OpReturn
-// CHECK: OpFunctionEnd
+// CHECK: [[_19:%[0-9a-zA-Z]+]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
+// CHECK: [[_20:%[0-9a-zA-Z]+]] = OpVariable [[__ptr_Uniform_struct_11]] Uniform
+// CHECK: [[_1:%[0-9a-zA-Z]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
+// CHECK: [[_21:%[0-9a-zA-Z]+]] = OpFunction [[_void]] None [[_17]]
+// CHECK: [[_22:%[0-9a-zA-Z]+]] =	OpLabel
+// CHECK: [[_23:%[0-9a-zA-Z]+]] = OpAccessChain [[__ptr_Uniform_struct_10]] [[_20]] [[_uint_0]]
+// CHECK: [[_24:%[0-9a-zA-Z]+]] = OpLoad [[__struct_10]] [[_23]]
+// CHECK: [[_25:%[0-9a-zA-Z]+]] = OpCompositeExtract [[_float]] [[_24]] 0
+// CHECK: [[_26:%[0-9a-zA-Z]+]] = OpCompositeExtract [[_uint]] [[_24]] 1
+// CHECK: [[_27:%[0-9a-zA-Z]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_26]]
+// CHECK: [[_28:%[0-9a-zA-Z]+]] = OpLoad [[_float]] [[_27]]
+// CHECK: [[_29:%[0-9a-zA-Z]+]] = OpFAdd [[_float]] [[_25]] [[_28]]
+// CHECK: [[_30:%[0-9a-zA-Z]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_19]] [[_uint_0]] [[_26]]
+// CHECK: 	OpStore [[_30]] [[_29]]
+// CHECK: 	OpReturn
+// CHECK: 	OpFunctionEnd

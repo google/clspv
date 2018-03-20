@@ -16,9 +16,9 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 }
 
 //      MAP: kernel,foo,arg,A,argOrdinal,1,descriptorSet,0,binding,0,offset,0,argKind,buffer
-// MAP-NEXT: kernel,foo,arg,f,argOrdinal,2,descriptorSet,0,binding,1,offset,0,argKind,pod
+// MAP-NEXT: kernel,foo,arg,f,argOrdinal,2,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
 // MAP-NEXT: kernel,foo,arg,C,argOrdinal,4,descriptorSet,0,binding,2,offset,0,argKind,buffer
-// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,3,offset,0,argKind,pod
+// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,3,offset,0,argKind,pod,argSize,4
 // MAP-NEXT: kernel,foo,arg,L,argOrdinal,0,argKind,local,arrayElemSize,4,arrayNumElemSpecId,3
 // MAP-NEXT: kernel,foo,arg,LS,argOrdinal,3,argKind,local,arrayElemSize,8,arrayNumElemSpecId,4
 // MAP-NOT: kernel

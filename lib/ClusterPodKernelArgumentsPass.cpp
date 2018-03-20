@@ -104,6 +104,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       // This is always zero for non-POD arguments.  For a POD argument,
       // this is the byte offset within the POD arguments struct.
       unsigned offset;
+      // Size of the argument
+      unsigned arg_size;
       // Argument type.  Same range of values as the result of
       // clspv::GetArgKindNameForType.
       const char* arg_kind;
@@ -132,7 +134,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           assert(spec_id > 0);
         }
         RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
-                             0u, clspv::GetArgKindName(kind), spec_id});
+                             0u, 0u, clspv::GetArgKindName(kind), spec_id});
       } else {
         PodArgTys.push_back(ArgTy);
       }
@@ -148,17 +150,18 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // We've recorded the remapping for pointer arguments.  Now record the
     // remapping for POD arguments.
     {
-      const auto StructLayout =
-          M.getDataLayout().getStructLayout(PodArgsStructTy);
+      const DataLayout DL(&M);
+      const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
       arg_index = 0;
       int pod_index = 0;
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
         if (!isa<PointerType>(ArgTy)) {
+          unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
                unsigned(StructLayout->getElementOffset(pod_index++)),
-               clspv::GetArgKindNameForType(ArgTy), -1});
+               arg_size, clspv::GetArgKindNameForType(ArgTy), -1});
         }
         arg_index++;
       }
@@ -214,12 +217,14 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             Builder.getInt32(arg_mapping.new_index));
         auto *offset_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
+        auto *arg_size_md =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
         auto *argtype_md = MDString::get(Context, arg_mapping.arg_kind);
         auto *spec_id_md = ConstantAsMetadata::get(
             Builder.getInt32(arg_mapping.spec_id));
         auto *arg_md =
             MDNode::get(Context, {name_md, old_index_md, new_index_md,
-                                  offset_md, argtype_md, spec_id_md});
+                                  offset_md, arg_size_md, argtype_md, spec_id_md});
         mappings.push_back(arg_md);
       }
 

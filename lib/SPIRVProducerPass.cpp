@@ -2950,7 +2950,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
   if (arg_map) {
     for (const auto &arg : arg_map->operands()) {
       const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
-      assert(arg_node->getNumOperands() == 6);
+      assert(arg_node->getNumOperands() == 7);
       const auto name =
           dyn_cast<MDString>(arg_node->getOperand(0))->getString();
       const auto old_index =
@@ -2960,10 +2960,12 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
           dyn_extract<ConstantInt>(arg_node->getOperand(2))->getZExtValue();
       const auto offset =
           dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
+      const auto arg_size =
+          dyn_extract<ConstantInt>(arg_node->getOperand(4))->getZExtValue();
       const auto argKind = remap_arg_kind(
-          dyn_cast<MDString>(arg_node->getOperand(4))->getString());
+          dyn_cast<MDString>(arg_node->getOperand(5))->getString());
       const auto spec_id =
-          dyn_extract<ConstantInt>(arg_node->getOperand(5))->getSExtValue();
+          dyn_extract<ConstantInt>(arg_node->getOperand(6))->getSExtValue();
       if (spec_id > 0) {
         // This was a pointer-to-local argument.  It is not associated with a
         // resource variable.
@@ -2980,14 +2982,17 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
         descriptorMapOut << "kernel," << F.getName() << ",arg," << name
                          << ",argOrdinal," << old_index << ",descriptorSet,"
                          << info->descriptor_set << ",binding," << info->binding
-                         << ",offset," << offset << ",argKind," << argKind
-                         << "\n";
+                         << ",offset," << offset << ",argKind," << argKind;
+        if (argKind.startswith("pod")) {
+          descriptorMapOut << ",argSize," << arg_size;
+        }
+        descriptorMapOut << "\n";
       }
     }
   } else {
     // There is no argument map.
     // Take descriptor info from the resource variable calls.
-    // Take argument name from the arguments list.
+    // Take argument name and size from the arguments list.
 
     SmallVector<Argument *, 4> arguments;
     for (auto &arg : F.args()) {
@@ -2997,14 +3002,23 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
     unsigned arg_index = 0;
     for (auto *info : resource_var_at_index) {
       if (info) {
+        auto arg = arguments[arg_index];
+        unsigned arg_size;
+        if (info->arg_kind == clspv::ArgKind::Pod) {
+          arg_size = DL.getTypeStoreSize(arg->getType());
+        }
+
         descriptorMapOut << "kernel," << F.getName() << ",arg,"
-                         << arguments[arg_index]->getName() << ",argOrdinal,"
+                         << arg->getName() << ",argOrdinal,"
                          << arg_index << ",descriptorSet,"
                          << info->descriptor_set << ",binding," << info->binding
                          << ",offset," << 0 << ",argKind,"
                          << remap_arg_kind(
-                                clspv::GetArgKindName(info->arg_kind))
-                         << "\n";
+                                clspv::GetArgKindName(info->arg_kind));
+        if (info->arg_kind == clspv::ArgKind::Pod) {
+          descriptorMapOut << ",argSize," << arg_size;
+        }
+        descriptorMapOut << "\n";
       }
       arg_index++;
     }

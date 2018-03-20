@@ -162,9 +162,9 @@ Consider this example:
 It generates the following descriptor map:
 
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argKind,buffer
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod,argSize,4
 
 For kernel arguments of types pointer-to-global, pointer-to-constant, and
 plain-old-data types, the fields are:
@@ -189,6 +189,8 @@ plain-old-data types, the fields are:
   - `ro_image` - Read-only image
   - `wo_image` - Write-only image
   - `sampler` - Sampler
+- `argSize`
+- only present for plain-old-data kernel arguments.
 
 Consider this example, which uses pointer-to-local arguments:
 
@@ -239,9 +241,9 @@ Then `mydescriptormap` will contain:
     sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
     sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod,argSize,4
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0,argKind,buffer
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argKind,pod
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argKind,pod,argSize,4
 
 #### Sending in plain-old-data kernel arguments in uniform buffers
 
@@ -299,8 +301,8 @@ will produce the following in `myclusteredmap`:
 
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,1,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,2,offset,0,argKind,pod
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4,argKind,pod
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,2,offset,0,argKind,pod,argSize,4
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,2,offset,4,argKind,pod,argSize,4
 
 If `foo` were the second kernel in the translation unit, then its arguments
 would also use descriptor set 0.
@@ -318,8 +320,8 @@ produces the following descriptor map:
     sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0,argKind,pod
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4,argKind,pod
+    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0,argKind,pod,argSize,4
+    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4,argKind,pod,argSize,4
 
 
 TODO(dneto): Give an example using images.

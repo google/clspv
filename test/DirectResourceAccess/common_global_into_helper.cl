@@ -7,9 +7,9 @@
 
 
 //      MAP: kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
-// MAP-NEXT: kernel,foo,arg,n,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod
+// MAP-NEXT: kernel,foo,arg,n,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
 // MAP-NEXT: kernel,bar,arg,B,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
-// MAP-NEXT: kernel,bar,arg,m,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod
+// MAP-NEXT: kernel,bar,arg,m,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
 // MAP-NONE: kernel
 
 

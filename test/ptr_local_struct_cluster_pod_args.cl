@@ -19,8 +19,8 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // MAP-NEXT: kernel,foo,arg,A,argOrdinal,1,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,LS,argOrdinal,2,argKind,local,arrayElemSize,8,arrayNumElemSpecId,4
 // MAP-NEXT: kernel,foo,arg,C,argOrdinal,3,descriptorSet,0,binding,1,offset,0,argKind,buffer
-// MAP-NEXT: kernel,foo,arg,f,argOrdinal,4,descriptorSet,0,binding,2,offset,0,argKind,pod
-// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,2,offset,4,argKind,pod
+// MAP-NEXT: kernel,foo,arg,f,argOrdinal,4,descriptorSet,0,binding,2,offset,0,argKind,pod,argSize,4
+// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,2,offset,4,argKind,pod,argSize,4
 // MAP-NOT: kernel
 
 // CHECK:      ; SPIR-V
