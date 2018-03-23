@@ -71,7 +71,8 @@ following way:
 - If the argument to the kernel is a constant or global pointer type, the
   matching Vulkan descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`.
 - If the argument to the kernel is a plain-old-data type, the matching Vulkan
-  descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`.
+  descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER` by default.
+  If option `-pod-ubo` is used the `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
 
 Note: If `-cluster-pod-kernel-args` is used, then all plain-old-data kernel
 arguments are collected into a single structure to be passed in to the compute
@@ -175,7 +176,8 @@ For kernel arguments, the fields are:
 - `argKind`
 - a string describing the kind of argument, one of:
   - `buffer` - OpenCL buffer
-  - `pod` - Plain Old Data, e.g. a scalar, vector, or structure
+  - `pod` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a storage buffer.
+  - `pod_ubo` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a uniform buffer.
   - `ro_image` - Read-only image
   - `wo_image` - Write-only image
   - `sampler` - Sampler
@@ -200,6 +202,16 @@ Then `mydescriptormap` will contain:
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0,argKind,buffer
     kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argKind,pod
 
+#### Sending in plain-old-data kernel arguments in uniform buffers
+
+Normally plan-old-data arguments are passed into the kernel via a storage buffer.
+Use option `-pod-ubo` to pass these parameters in via a uniform buffer.  These can
+be faster to read in the shader.
+
+When option `-pod-ubo` is used, the descriptor map list the `argKind` of a plain-old-data
+argument as `pod_ubo` rather than the default of `pod`.
+
+TODO(dneto):  A push-constant might even be faster, but space is very limited.
 
 #### Clustering plain-old-data kernel arguments to save descriptors
 

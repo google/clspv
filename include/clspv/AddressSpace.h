@@ -20,7 +20,8 @@ enum Type {
   Constant,          // OpenCL constant memory.
   Local,             // OpenCL local memory.
   Input,             // Vulkan input memory.
-  UniformConstant,   // Vulkan uniform memory.
+  Uniform,           // Vulkan uniform memory.
+  UniformConstant,   // Vulkan uniform constant memory.
   ModuleScopePrivate // Vulkan private memory.
 };
 }

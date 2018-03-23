@@ -85,6 +85,10 @@ llvm::cl::opt<bool> hack_undef(
 llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
                              llvm::cl::desc("Show SPIR-V IDs for functions"));
 
+llvm::cl::opt<bool> option_pod_ubo(
+    "pod-ubo", llvm::cl::init(false),
+    llvm::cl::desc("POD kernel arguments are in uniform buffers"));
+
 enum SPIRVOperandType {
   NUMBERID,
   LITERAL_INTEGER,
@@ -181,7 +185,7 @@ struct SPIRVProducerPass final : public ModulePass {
 
     if (0 == TypeMap.count(Ty)) {
       Ty->print(errs());
-      llvm_unreachable("Unhandled type!");
+      llvm_unreachable("\nUnhandled type!");
     }
 
     return TypeMap[Ty];
@@ -318,6 +322,8 @@ private:
   ValueMapType ValueMap;
   ValueMapType AllocatedValueMap;
   SPIRVInstructionList SPIRVInsts;
+  // Maps a kernel argument value to a global value.  OpenCL kernel arguments
+  // have to map to resources: buffers, samplers, images, or sampled images.
   ValueToValueMapTy ArgumentGVMap;
   ValueMapType ArgumentGVIDMap;
   EntryPointVecType EntryPointVec;
@@ -755,22 +761,15 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
 
     for (const Argument &Arg : F.args()) {
       Type *ArgTy = Arg.getType();
-      Type *GVTy = nullptr;
 
-      // Check argument type whether it is pointer type or not. If it is
-      // pointer type, add its address space to new global variable for
-      // argument.
-      unsigned AddrSpace = AddressSpace::Global;
-      if (PointerType *ArgPTy = dyn_cast<PointerType>(ArgTy)) {
-        AddrSpace = ArgPTy->getAddressSpace();
-      }
+      // The pointee type of the module scope variable we will make.
+      Type *GVTy = nullptr;
 
       Type *TmpArgTy = ArgTy;
 
       // sampler_t and image types have pointer type of struct type with
-      // opaque
-      // type as field. Extract the struct type. It will be used by global
-      // variable for argument.
+      // opaque type as field. Extract the struct type. It will be used by
+      // global variable for argument.
       bool IsSamplerType = false;
       bool IsImageType = false;
       if (PointerType *TmpArgPTy = dyn_cast<PointerType>(TmpArgTy)) {
@@ -778,14 +777,12 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
                 dyn_cast<StructType>(TmpArgPTy->getElementType())) {
           if (STy->isOpaque()) {
             if (STy->getName().equals("opencl.sampler_t")) {
-              AddrSpace = AddressSpace::UniformConstant;
               IsSamplerType = true;
               TmpArgTy = STy;
             } else if (STy->getName().equals("opencl.image2d_ro_t") ||
                        STy->getName().equals("opencl.image2d_wo_t") ||
                        STy->getName().equals("opencl.image3d_ro_t") ||
                        STy->getName().equals("opencl.image3d_wo_t")) {
-              AddrSpace = AddressSpace::UniformConstant;
               IsImageType = true;
               TmpArgTy = STy;
             } else {
@@ -795,13 +792,23 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
         }
       }
 
+      // Determine the address space for the module-scope variable.
+      unsigned AddrSpace = AddressSpace::Global;
+      if (IsSamplerType || IsImageType) {
+        AddrSpace = AddressSpace::UniformConstant;
+      } else if (PointerType *ArgPTy = dyn_cast<PointerType>(ArgTy)) {
+        AddrSpace = ArgPTy->getAddressSpace();
+      } else if (option_pod_ubo) {
+        // Use a uniform buffer for POD arguments.
+        AddrSpace = AddressSpace::Uniform;
+      }
+
       // LLVM's pointer type is distinguished by address space but we need to
       // regard constant and global address space as same here. If pointer
       // type has constant address space, generate new pointer type
       // temporarily to check previous struct type for argument.
       if (PointerType *TmpArgPTy = dyn_cast<PointerType>(TmpArgTy)) {
-        AddrSpace = TmpArgPTy->getAddressSpace();
-        if (AddrSpace == AddressSpace::Constant) {
+        if (TmpArgPTy->getAddressSpace() == AddressSpace::Constant) {
           TmpArgTy = PointerType::get(TmpArgPTy->getElementType(),
                                       AddressSpace::Global);
         }
@@ -880,7 +887,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
       // Generate pointer type of argument type for OpAccessChain of argument.
       if (!Arg.use_empty()) {
         if (!isa<PointerType>(ArgTy)) {
-          FindType(PointerType::get(ArgTy, AddrSpace));
+          auto ty = PointerType::get(ArgTy, AddrSpace);
+          FindType(ty);
         }
         HasArgUser = true;
       }
@@ -1396,6 +1404,8 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
     return spv::StorageClassWorkgroup;
   case AddressSpace::UniformConstant:
     return spv::StorageClassUniformConstant;
+  case AddressSpace::Uniform: // For POD kernel args.
+    return spv::StorageClassUniform;
   case AddressSpace::ModuleScopePrivate:
     return spv::StorageClassPrivate;
   }
@@ -1480,6 +1490,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(const DataLayout &DL) {
         auto GlobalTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
         if (0 < TypeMap.count(GlobalTy)) {
           TypeMap[PTy] = TypeMap[GlobalTy];
+          UseExistingOpTypePointer = true;
           break;
         }
       } else if (AddressSpace::Global == AddrSpace) {
@@ -2674,6 +2685,10 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
       }
     }
 
+    auto remap_arg_kind = [](StringRef argKind) {
+      return option_pod_ubo && argKind.equals("pod") ? "pod_ubo" : argKind;
+    };
+
     const auto *ArgMap = F.getMetadata("kernel_arg_map");
     // Emit descriptor map entries, if there was explicit metadata
     // attached.
@@ -2694,8 +2709,8 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
         descriptorMapOut << "kernel," << F.getName() << ",arg," << name
                          << ",argOrdinal," << old_index << ",descriptorSet,"
                          << DescriptorSetIdx << ",binding," << new_index
-                         << ",offset," << offset << ",argKind," << argKind
-                         << "\n";
+                         << ",offset," << offset << ",argKind,"
+                         << remap_arg_kind(argKind) << "\n";
       }
     }
 
@@ -2712,7 +2727,9 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
                          << ",argOrdinal," << BindingIdx << ",descriptorSet,"
                          << DescriptorSetIdx << ",binding," << BindingIdx
                          << ",offset,0,argKind,"
-                         << clspv::GetArgKindForType(Arg.getType()) << "\n";
+                         << remap_arg_kind(
+                                clspv::GetArgKindForType(Arg.getType()))
+                         << "\n";
       }
 
       if (GVarWithEmittedBindingInfo.count(NewGV)) {
@@ -3401,7 +3418,8 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
 
       uint32_t ResTyID = lookupType(ArgTy);
       if (!isa<PointerType>(ArgTy)) {
-        ResTyID = lookupType(PointerType::get(ArgTy, AddressSpace::Global));
+        auto AS = option_pod_ubo ? AddressSpace::Uniform : AddressSpace::Global;
+        ResTyID = lookupType(PointerType::get(ArgTy, AS));
       }
       SPIRVOperand *ResTyIDOp =
           new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
