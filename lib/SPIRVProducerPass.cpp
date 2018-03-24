@@ -311,7 +311,10 @@ private:
   Type *SamplerTy;
 
   // If a function F has a pointer-to-__constant parameter, then this variable
-  // will map F's type to (F's type, index of the parameter).
+  // will map F's type to (G, index of the parameter), where in a first phase
+  // G is F's type.  During FindTypePerFunc, G will be changed to F's type
+  // but replacing the pointer-to-constant parameter with
+  // pointer-to-ModuleScopePrivate.
   // TODO(dneto): This doesn't seem general enough?  A function might have
   // more than one such parameter.
   GlobalConstFuncMapType GlobalConstFuncTypeMap;
@@ -1033,7 +1036,7 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
     auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
-    // Handle function with global constant parameters.
+    // Handle a regular function with global constant parameters.
     if (GlobalConstFuncTyMap.count(FTy)) {
       uint32_t GVCstArgIdx = GlobalConstFuncTypeMap[FTy].second;
       SmallVector<Type *, 4> NewFuncParamTys;
@@ -1387,7 +1390,7 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
     return spv::StorageClassWorkgroup;
   case AddressSpace::UniformConstant:
     return spv::StorageClassUniformConstant;
-  case AddressSpace::Uniform: // For POD kernel args.
+  case AddressSpace::Uniform:
     return spv::StorageClassUniform;
   case AddressSpace::ModuleScopePrivate:
     return spv::StorageClassPrivate;
@@ -2867,7 +2870,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
         FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
     FTyID = lookupType(NewFTy);
   } else {
-    // Handle function with global constant parameters.
+    // Handle regular function with global constant parameters.
     if (GlobalConstFuncTyMap.count(FTy)) {
       FTyID = lookupType(GlobalConstFuncTyMap[FTy].first);
     } else {
