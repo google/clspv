@@ -325,6 +325,7 @@ private:
   // in these two variables.  We only ever do a vector load from it, and
   // when we see one of those, substitute just the value of the intializer.
   // This mimics what Glslang does, and that's what drivers are used to.
+  // TODO(dneto): Remove this once drivers are fixed.
   uint32_t WorkgroupSizeValueID;
   uint32_t WorkgroupSizeVarID;
 
@@ -4492,6 +4493,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // When we're loading from the special variable holding the WorkgroupSize
     // builtin value, use an OpBitWiseAnd of the value's ID rather than
     // generating a load.
+    // TODO(dneto): Remove this awful hack once drivers are fixed.
     if (PointerID == WorkgroupSizeVarID) {
       // Generate a bitwise-and of the original value with itself.
       // We should have been able to get away with just an OpCopyObject,
