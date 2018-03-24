@@ -309,6 +309,11 @@ private:
   std::vector<uint32_t> BuiltinDimensionVec;
   bool HasVariablePointers;
   Type *SamplerTy;
+
+  // If a function F has a pointer-to-__constant parameter, then this variable
+  // will map F's type to (F's type, index of the parameter).
+  // TODO(dneto): This doesn't seem general enough?  A function might have
+  // more than one such parameter.
   GlobalConstFuncMapType GlobalConstFuncTypeMap;
   SmallPtrSet<Value *, 16> GlobalConstArgumentSet;
   // An ordered set of pointer types of Base arguments to OpPtrAccessChain,
@@ -587,34 +592,30 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
     const SmallVector<User *, 8> GVUsers(GV->user_begin(), GV->user_end());
     SmallVector<User*, 8> CandidateUsers;
 
+    auto record_called_function_type_as_user =
+        [&GlobalConstFuncTyMap](Value *gv, CallInst *call) {
+          // Find argument index.
+          unsigned index = 0;
+          for (unsigned i = 0; i < call->getNumArgOperands(); i++) {
+            if (gv == call->getOperand(i)) {
+              // TODO(dneto): Should we break here?
+              index = i;
+            }
+          }
+
+          // Record function type with global constant.
+          GlobalConstFuncTyMap[call->getFunctionType()] =
+              std::make_pair(call->getFunctionType(), index);
+        };
+
     for (User *GVU : GVUsers) {
       if (CallInst *Call = dyn_cast<CallInst>(GVU)) {
-        // Find argument index.
-        unsigned GVCstArgIdx = 0;
-        for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-          if (GV == Call->getOperand(i)) {
-            GVCstArgIdx = i;
-          }
-        }
-
-        // Record function with global constant.
-        GlobalConstFuncTyMap[Call->getFunctionType()] =
-            std::make_pair(Call->getFunctionType(), GVCstArgIdx);
+        record_called_function_type_as_user(GV, Call);
       } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(GVU)) {
         // Check GEP users.
         for (User *GEPU : GEP->users()) {
           if (CallInst *GEPCall = dyn_cast<CallInst>(GEPU)) {
-            // Find argument index.
-            unsigned GVCstArgIdx = 0;
-            for (unsigned i = 0; i < GEPCall->getNumArgOperands(); i++) {
-              if (GEP == GEPCall->getOperand(i)) {
-                GVCstArgIdx = i;
-              }
-            }
-
-            // Record function with global constant.
-            GlobalConstFuncTyMap[GEPCall->getFunctionType()] =
-                std::make_pair(GEPCall->getFunctionType(), GVCstArgIdx);
+            record_called_function_type_as_user(GEP, GEPCall);
           }
         }
       }
