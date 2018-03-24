@@ -20,6 +20,7 @@ add_library(clspv_core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceLLVMIntrinsicsPass.cpp

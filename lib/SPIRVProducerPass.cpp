@@ -18,6 +18,7 @@
 
 #include <cassert>
 #include <unordered_set>
+#include <clspv/Option.h>
 #include <clspv/Passes.h>
 
 #include <llvm/ADT/StringSwitch.h>
@@ -63,31 +64,6 @@ const double kOneOverPi = 0.318309886183790671538;
 const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
 const char* kCompositeConstructFunctionPrefix = "clspv.composite_construct.";
-
-// By default, reuse the same descriptor set number for all arguments.
-// To turn that off, use -distinct-kernel-descriptor-sets
-llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
-    "distinct-kernel-descriptor-sets", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Each kernel uses its own descriptor set for its arguments"));
-
-// Some drivers don't like to see constant composite values constructed
-// from scalar Undef values.  Replace numeric scalar and vector Undef with
-// corresponding OpConstantNull.  We need to keep Undef for image values,
-// for example.  In the LLVM domain, image values are passed as pointer to
-// struct.
-// See https://github.com/google/clspv/issues/95
-llvm::cl::opt<bool> hack_undef(
-    "hack-undef", llvm::cl::init(false),
-    llvm::cl::desc("Use OpConstantNull instead of OpUndef for floating point, "
-                   "integer, or vectors of them"));
-
-llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
-                             llvm::cl::desc("Show SPIR-V IDs for functions"));
-
-llvm::cl::opt<bool> option_pod_ubo(
-    "pod-ubo", llvm::cl::init(false),
-    llvm::cl::desc("POD kernel arguments are in uniform buffers"));
 
 enum SPIRVOperandType {
   NUMBERID,
@@ -798,7 +774,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
         AddrSpace = AddressSpace::UniformConstant;
       } else if (PointerType *ArgPTy = dyn_cast<PointerType>(ArgTy)) {
         AddrSpace = ArgPTy->getAddressSpace();
-      } else if (option_pod_ubo) {
+      } else if (clspv::Option::PodArgsInUniformBuffer()) {
         // Use a uniform buffer for POD arguments.
         AddrSpace = AddressSpace::Uniform;
       }
@@ -853,7 +829,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
       GlobalVariable *GV = nullptr;
       auto which_set = GVarsForType.find(GVTy);
       if (IsSamplerType || IsImageType || which_set == GVarsForType.end() ||
-          distinct_kernel_descriptor_sets) {
+          clspv::Option::DistinctKernelDescriptorSets()) {
         GV = make_gvar();
       } else {
         auto &set = which_set->second;
@@ -2047,6 +2023,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
   ValueMapType &VMap = getValueMap();
   ValueMapType &AllocatedVMap = getAllocatedValueMap();
   ValueList &CstList = getConstantList();
+  const bool hack_undef = clspv::Option::HackUndef();
 
   for (uint32_t i = 0; i < CstList.size(); i++) {
     // UniqueVector ids are 1-based.
@@ -2670,7 +2647,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
                      });
 
     uint32_t DescriptorSetIdx = (0 < getSamplerMap().size()) ? 1u : 0u;
-    if (distinct_kernel_descriptor_sets) {
+    if (clspv::Option::DistinctKernelDescriptorSets()) {
       for (Function &Func : *F.getParent()) {
         if (Func.isDeclaration()) {
           continue;
@@ -2686,7 +2663,9 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
     }
 
     auto remap_arg_kind = [](StringRef argKind) {
-      return option_pod_ubo && argKind.equals("pod") ? "pod_ubo" : argKind;
+      return clspv::Option::PodArgsInUniformBuffer() && argKind.equals("pod")
+                 ? "pod_ubo"
+                 : argKind;
     };
 
     const auto *ArgMap = F.getMetadata("kernel_arg_map");
@@ -2898,7 +2877,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
   VMap[&F] = nextID;
 
-  if (show_ids) {
+  if (clspv::Option::ShowIDs()) {
     errs() << "Function " << F.getName() << " is " << nextID << "\n";
   }
   // Generate SPIRV instruction for function.
@@ -3418,7 +3397,9 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
 
       uint32_t ResTyID = lookupType(ArgTy);
       if (!isa<PointerType>(ArgTy)) {
-        auto AS = option_pod_ubo ? AddressSpace::Uniform : AddressSpace::Global;
+        auto AS = clspv::Option::PodArgsInUniformBuffer()
+                      ? AddressSpace::Uniform
+                      : AddressSpace::Global;
         ResTyID = lookupType(PointerType::get(ArgTy, AS));
       }
       SPIRVOperand *ResTyIDOp =

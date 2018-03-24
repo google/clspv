@@ -28,17 +28,12 @@
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "clspv/Option.h"
+
 using namespace llvm;
 using std::string;
 
 #define DEBUG_TYPE "rewriteinserts"
-
-static llvm::cl::opt<bool> hack_inserts(
-    "hack-inserts", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Avoid all single-index OpCompositInsert instructions "
-        "into struct types by using complete composite construction and "
-        "extractions"));
 
 namespace {
 
@@ -193,7 +188,7 @@ llvm::ModulePass *createRewriteInsertsPass() {
 bool RewriteInsertsPass::runOnModule(Module &M) {
   bool Changed = ReplaceCompleteInsertionChains(M);
 
-  if (hack_inserts) {
+  if (clspv::Option::HackInserts()) {
     Changed |= ReplacePartialInsertions(M);
   }
 

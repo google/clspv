@@ -27,19 +27,11 @@
 
 #include <spirv/1.0/spirv.hpp>
 
+#include "clspv/Option.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "ReplaceOpenCLBuiltin"
-
-// TODO(dneto): As per Neil's suggestion, might not need this if you can
-// trace the pointer back far enough to see that it's 32-bit aligned.
-// However, even in the vstore_half case, you'll probably get better
-// performance if you can rely on SPV_KHR_16bit_storage since in the
-// alternate case you're using a (relaxed) atomic, and therefore have
-// to write through to the cache.
-static llvm::cl::opt<bool> f16bit_storage(
-    "f16bit_storage", llvm::cl::init(false),
-    llvm::cl::desc("Assume the target supports SPV_KHR_16bit_storage"));
 
 namespace {
 uint32_t clz(uint32_t v) {
@@ -1063,7 +1055,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Module &M) {
 
           auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          if (f16bit_storage) {
+          if (clspv::Option::F16BitStorage()) {
             auto ShortTy = Type::getInt16Ty(M.getContext());
             auto ShortPointerTy = PointerType::get(
                 ShortTy, Arg1->getType()->getPointerAddressSpace());
@@ -1344,7 +1336,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
           // Pack the float2 -> half2 (in an int).
           auto X = CallInst::Create(NewF, TempVec, "", CI);
 
-          if (f16bit_storage) {
+          if (clspv::Option::F16BitStorage()) {
             auto ShortTy = Type::getInt16Ty(M.getContext());
             auto ShortPointerTy = PointerType::get(
                 ShortTy, Arg2->getType()->getPointerAddressSpace());

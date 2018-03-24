@@ -44,12 +44,6 @@ using namespace llvm;
 
 #define DEBUG_TYPE "clusterpodkernelargs"
 
-// TODO(dneto): Remove this after experimentation.
-static llvm::cl::opt<bool> no_inline_pod_fn(
-    "no-inline-pod-inner-function", llvm::cl::init(false),
-    llvm::cl::desc("DEPRECATED. Avoid inlining the inner function created by "
-                   "clustering pod kernel args"));
-
 namespace {
 struct ClusterPodKernelArgumentsPass : public ModulePass {
   static char ID;
@@ -260,11 +254,10 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     Builder.CreateRetVoid();
   }
 
-  if (!no_inline_pod_fn) {
-    for (CallInst *C : CallList) {
-      InlineFunctionInfo info;
-      Changed |= InlineFunction(C, info);
-    }
+  // Inline the inner function.  It's cleaner to do this.
+  for (CallInst *C : CallList) {
+    InlineFunctionInfo info;
+    Changed |= InlineFunction(C, info);
   }
 
   return Changed;
