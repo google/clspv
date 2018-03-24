@@ -221,6 +221,14 @@ llvm::ModulePass *createUndoTranslateSamplerFoldPass();
 /// malformed types" that would make this pass redundant.
 llvm::ModulePass *createUndoTruncatedSwitchConditionPass();
 
+/// Cluster module-scope __constant variables.
+/// @return An LLVM module pass.
+///
+/// Replace all live module-scope __constant variables by a single such variable
+/// of struct type.  Assumes none of the constants contain pointers.  Eliminates
+/// any dead module-scope __constant variables.
+llvm::ModulePass *createClusterModuleScopeConstantVars();
+
 /// Cluster plain-old-data kernel arguments into a single struct argument.
 /// @return An LLVM module pass.
 ///

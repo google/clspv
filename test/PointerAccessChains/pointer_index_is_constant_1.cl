@@ -27,6 +27,7 @@
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 // CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG1_ID]] Binding 1
+// CHECK-NEXT: OpDecorate %[[CONSTANT_ARRAY_TYPE_ID:[a-zA-Z0-9_]+]] ArrayStride 4
 // CHECK-NEXT: OpDecorate %[[FLOAT_POINTER_TYPE_ID:[a-zA-Z0-9_]+]] ArrayStride 4
 // CHECK: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK: %[[FLOAT_POINTER_TYPE_ID]] = OpTypePointer StorageBuffer %[[FLOAT_TYPE_ID]]
@@ -35,7 +36,7 @@
 // CHECK: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG0_STRUCT_TYPE_ID]]
 // CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 // CHECK: %[[CONSTANT_128_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 128
-// CHECK: %[[CONSTANT_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeArray %[[FLOAT_TYPE_ID]] %[[CONSTANT_128_ID]]
+// CHECK: %[[CONSTANT_ARRAY_TYPE_ID]] = OpTypeArray %[[FLOAT_TYPE_ID]] %[[CONSTANT_128_ID]]
 // CHECK: %[[THING_TYPE_ID]] = OpTypeStruct %[[CONSTANT_ARRAY_TYPE_ID]]
 // CHECK: %[[THING_GLOBAL_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[THING_TYPE_ID]]
 // CHECK: %[[ARG1_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[THING_TYPE_ID]]

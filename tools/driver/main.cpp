@@ -27,8 +27,9 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
-#include <clspv/Passes.h>
-#include <clspv/opencl_builtins_header.h>
+#include "clspv/Option.h"
+#include "clspv/Passes.h"
+#include "clspv/opencl_builtins_header.h"
 
 #include <numeric>
 #include <string>
@@ -742,6 +743,11 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
+
+  if (clspv::Option::ModuleConstantsInStorageBuffer()) {
+    pm.add(clspv::createClusterModuleScopeConstantVars());
+  }
+
   pm.add(clspv::createSplatSelectConditionPass());
   pm.add(clspv::createRewriteInsertsPass());
   pm.add(clspv::createSPIRVProducerPass(

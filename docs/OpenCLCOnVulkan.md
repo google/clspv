@@ -283,6 +283,70 @@ produces the following descriptor map:
 
 TODO(dneto): Give an example using images.
 
+#### Module scope constants
+
+By default, each module-scope variable in `__constant` address space is mapped to
+a SPIR-V variable in Private address space, with an intializer.  This works only
+for simple scenarios, where:
+
+- The variable is small, so it's reasonable to fit in a single invocations private registers, and
+- The variable is only read, and in particular its address is not taken.
+
+In more general cases, use compiler option `-module-constants-in-storage-buffer`. In this case:
+
+- All module-scope constants are collected into a single SPIR-V storage buffer variable in its
+  own descriptor set.
+- The intialization data are written to the descriptor map, and the host program must fill the
+  buffer with that data before the kernel executes.
+
+The descriptor map will contain a line starting with
+
+Consider this example kernel `a.cl`:
+    
+    typedef struct {
+      char c;
+      uint a;
+      float f;
+    } Foo;
+    __constant Foo ppp[3] = {{'a', 0x1234abcd, 1.0}, {'b', 0xffffffff, 1.5}, {0}};
+
+    kernel void foo(global uint* A, uint i) { *A = ppp[i].a; }
+
+Compiling as follows:
+
+    clspv a.cl -descriptormap=map -module-constants-in-storage-buffer
+
+Produces the following in file `map`:
+
+    constant,descriptorSet,0,binding,0,bytes,61000000cdab34120000803f62000000ffffffff0000c03f000000000000000000000000
+    kernel,foo,arg,A,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,i,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod
+
+The initialization data are in the line starting with `constant`, and its fields are:
+
+- `constant` to indicate constant initialization data
+- `descriptorSet`
+- the DescriptorSet value
+- `binding`
+- the Binding value
+- `kind`
+- `buffer` to indicate the use of a storage buffer
+- `hexbytes` to indicate the next field is the data, as a sequence of bytes in hexadecimal
+- a sequence of bytes expressed in hexadecimal notation, presented in order from lowest
+  address to highest address.
+
+Take a closer look at the hexadecimal bytes in the example. They are:
+
+- `61`: ASCII character 'a'
+- `000000`: zero padding to satisfy alignment for the float value
+- `cdab3412`: the value 0x1234abcd` in little-endian format
+- `0000803f`: the float value 1.0
+- `62`: ASCII character 'b'
+- `000000`: zero padding to satisfy alignment for the float value
+- `ffffffff`: the value 0xffffffff`
+- `0000c03f`: the float value 1.5
+- `000000000000000000000000`: 12 zero bytes representing the zero-initialized third Foo value.
+
 ### Attributes
 
 The following attributes are ignored in the OpenCL C source, and thus have

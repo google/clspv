@@ -56,6 +56,13 @@ llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
 
+llvm::cl::opt<bool> module_constants_in_storage_buffer(
+    "module-constants-in-storage-buffer", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Module-scope __constants are collected into a single storage buffer.  "
+        "The binding and initialization data are reported in the descriptor "
+        "map."));
+
 llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
                              llvm::cl::desc("Show SPIR-V IDs for functions"));
 
@@ -68,6 +75,7 @@ bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
 bool HackInserts() { return hack_inserts; }
 bool HackUndef() { return hack_undef; }
+bool ModuleConstantsInStorageBuffer() { return module_constants_in_storage_buffer; }
 bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
 

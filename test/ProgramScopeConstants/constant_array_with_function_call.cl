@@ -23,6 +23,7 @@
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 
+// CHECK: OpDecorate %[[B_TYPE_ID:[a-zA-Z0-9_]+]] ArrayStride 4
 // CHECK-NOT: OpDecorate %{{[a-zA-Z0-9_]+}} ArrayStride
 
 // CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
@@ -35,7 +36,7 @@
 // CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 
 // CHECK: %[[CONSTANT_4_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 4
-// CHECK: %[[B_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeArray %[[UINT_TYPE_ID]] %[[CONSTANT_4_ID]]
+// CHECK: %[[B_TYPE_ID]] = OpTypeArray %[[UINT_TYPE_ID]] %[[CONSTANT_4_ID]]
 // CHECK: %[[B_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Private %[[B_TYPE_ID]]
 // CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]+]] = OpTypePointer Private %[[UINT_TYPE_ID]]
 

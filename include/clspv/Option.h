@@ -31,6 +31,11 @@ bool HackInserts();
 // TODO(dneto): Remove this eventually when drivers are fixed.
 bool HackUndef();
 
+// Returns true if module-scope constants are to be collected into a single
+// storage buffer.  The binding for that buffer, and its intialization data
+// are given in the descriptor map file.
+bool ModuleConstantsInStorageBuffer();
+
 // Returns true if POD kernel arguments should be passed in via uniform buffers.
 bool PodArgsInUniformBuffer();
 
