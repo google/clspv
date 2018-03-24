@@ -557,21 +557,26 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M) {
 
   // Collect global constant variables.
   SmallVector<GlobalVariable *, 8> GVList;
+  SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : M.globals()) {
     if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
-      GVList.push_back(&GV);
+      if (GV.use_empty()) {
+        DeadGVList.push_back(&GV);
+      } else {
+        GVList.push_back(&GV);
+      }
     }
   }
+
+  // Remove dead global variables.
+  for (auto GV : DeadGVList) {
+    GV->eraseFromParent();
+  }
+  DeadGVList.clear();
 
   // Change global constant variable's address space to ModuleScopePrivate.
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
   for (auto GV : GVList) {
-    // If there is no user of gv, delete gv.
-    if (GV->use_empty()) {
-      GV->eraseFromParent();
-      continue;
-    }
-
     // Create new gv with ModuleScopePrivate address space.
     Type *NewGVTy = GV->getType()->getPointerElementType();
     GlobalVariable *NewGV = new GlobalVariable(
