@@ -299,8 +299,6 @@ In more general cases, use compiler option `-module-constants-in-storage-buffer`
 - The intialization data are written to the descriptor map, and the host program must fill the
   buffer with that data before the kernel executes.
 
-The descriptor map will contain a line starting with
-
 Consider this example kernel `a.cl`:
     
     typedef struct {
@@ -338,12 +336,14 @@ The initialization data are in the line starting with `constant`, and its fields
 Take a closer look at the hexadecimal bytes in the example. They are:
 
 - `61`: ASCII character 'a'
-- `000000`: zero padding to satisfy alignment for the float value
-- `cdab3412`: the value 0x1234abcd` in little-endian format
+- `000000`: zero padding to satisfy alignment for the 32-bit integer value that
+  follows
+- `cdab3412`: the integer value `0x1234abcd` in little-endian format
 - `0000803f`: the float value 1.0
 - `62`: ASCII character 'b'
-- `000000`: zero padding to satisfy alignment for the float value
-- `ffffffff`: the value 0xffffffff`
+- `000000`: zero padding to satisfy alignment for the 32-bit integer value that
+  follows
+- `ffffffff`: the integer value `0xffffffff`
 - `0000c03f`: the float value 1.5
 - `000000000000000000000000`: 12 zero bytes representing the zero-initialized third Foo value.
 
