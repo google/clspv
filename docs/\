@@ -111,7 +111,7 @@ shader is as follows:
 - If a sampler map file is specified, all literal samplers use descriptor set _0_.
 - By default, all kernels in the translation unit use the same descriptor set
   number, either _0_, _1_, or _2_.  (The particular value depends on whether
-  a sampler map is used, and how `__constant` variables are mapped.)
+  a sampler map and how `__constant` variables are mapped.)
   **This is new default behaviour**.
   - Use option `-distinct-kernel-descriptor-sets` to get the old behaviour,
   where each kernel is assigned its own descriptor set number, such that the first
@@ -217,11 +217,6 @@ For kernel arguments of type pointer-to-local, the fields are:
   `SpecId` decoration on the integer constant that specficies the array size.
   (This number is always at least 3 so that specialization IDs 0, 1, and 2 can
   be use for the workgroup size dimensions along `x`, `y`, and `z`.)
-
-Notes: Each pointer-to-local argument is assigned its own array type and
-specialization constant to size the array.  Unless you override the
-array size specialization constant at pipeline creation time, the array will
-only have one element.
 
 If a sampler map is used, then samplers use descriptor set 0 and kernel descriptor
 set numbers start at 1.  For example, if the sampler map file is `mysamplermap`

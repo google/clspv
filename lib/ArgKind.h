@@ -15,18 +15,42 @@
 #ifndef CLSPV_LIB_ARGKIND_H_
 #define CLSPV_LIB_ARGKIND_H_
 
-#include <llvm/IR/Type.h>
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace clspv {
 
 // Maps an LLVM type for a kernel argument to an argument
 // kind suitable for a descriptor map.  The result is one of:
-//   buffer
-//   pod
-//   ro_image
-//   wo_image
-//   sampler
+//   buffer   - storage buffer
+//   local    - array in Workgroup storage, number of elements given by
+//              a specialization constant
+//   pod      - plain-old-data
+//   ro_image - read-only image
+//   wo_image - write-only image
+//   sampler  - sampler
 const char *GetArgKindForType(llvm::Type *type);
+
+// Returns true if the given type is a pointer-to-local type.
+bool IsLocalPtr(llvm::Type* type);
+
+using ArgIdMapType = llvm::DenseMap<const llvm::Argument*, int>;
+
+// Returns a mapping from pointer-to-local Argument to a specialization constant
+// ID for that argument's array size.  The lowest value allocated is 3.
+//
+// The mapping is as follows:
+// - The first index used is 3.
+// - There are no gaps in the list of used indices.
+// - Arguments from earlier kernel bodies have lower indices than arguments from
+//   later kernel bodies.
+// - Lower-numbered arguments have lower indices than higher-numbered arguments
+//   in the same function.
+// Note that this mapping is stable as long as the order of kernel bodies is
+// retained, and the number and order of pointer-to-local arguments is retained.
+ArgIdMapType AllocateArgSpecIds(llvm::Module &M);
 
 } // namespace clspv
 
