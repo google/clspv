@@ -17,6 +17,8 @@
 #endif
 
 #include <cassert>
+#include <cstring>
+
 #include <unordered_set>
 #include <clspv/Option.h>
 #include <clspv/Passes.h>
@@ -46,6 +48,7 @@
 #include <iomanip>
 #include <set>
 #include <sstream>
+#include <string>
 #include <tuple>
 #include <utility>
 
@@ -122,8 +125,17 @@ SPIRVOperandList &operator<<(SPIRVOperandList &list, SPIRVOperand *elem) {
 SPIRVOperand* MkNum(uint32_t num) {
   return new SPIRVOperand(LITERAL_INTEGER, num);
 }
+SPIRVOperand* MkInteger(ArrayRef<uint32_t> num_vec) {
+  return new SPIRVOperand(LITERAL_INTEGER, num_vec);
+}
+SPIRVOperand* MkFloat(ArrayRef<uint32_t> num_vec) {
+  return new SPIRVOperand(LITERAL_FLOAT, num_vec);
+}
 SPIRVOperand* MkId(uint32_t id) {
   return new SPIRVOperand(NUMBERID, id);
+}
+SPIRVOperand* MkString(StringRef str) {
+  return new SPIRVOperand(LITERAL_STRING, str);
 }
 
 struct SPIRVInstruction {
@@ -165,10 +177,9 @@ struct SPIRVProducerPass final : public ModulePass {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapOut(descriptor_map_out), outputAsm(outputAsm),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
-        nextSpecID(3),
         OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        NextDescriptorSetIndex(0) {}
+        NextDescriptorSetIndex(0), constant_i32_zero_id_(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -259,6 +270,9 @@ struct SPIRVProducerPass final : public ModulePass {
   void HandleDeferredInstruction();
   void HandleDeferredDecorations(const DataLayout& DL);
   bool is4xi8vec(Type *Ty) const;
+  // Return the SPIR-V Id for 32-bit constant zero.  The constant must already
+  // have been created.
+  uint32_t GetI32Zero();
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
   // Returns the GLSL extended instruction enum that the given function
@@ -321,9 +335,6 @@ private:
   const bool outputCInitList; // If true, output look like {0x7023, ... , 5}
   uint64_t patchBoundOffset;
   uint32_t nextID;
-  // The next specialization constant ID to be used.  Spec ID values 0, 1, 2
-  // are reserved for the workgroup size elements.
-  uint32_t nextSpecID;
 
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   TypeMapType TypeMap;
@@ -408,6 +419,10 @@ private:
   // A mapping from pointer-to-local argument to a specialization constant ID
   // for that argument's array size.  This is generated from AllocatArgSpecIds.
   ArgIdMapType ArgSpecIdMap;
+
+  // The ID of 32-bit integer zero constant.  This is only valid after
+  // GenerateSPIRVConstants has run.
+  uint32_t constant_i32_zero_id_;
 };
 
 char SPIRVProducerPass::ID;
@@ -426,6 +441,8 @@ createSPIRVProducerPass(raw_pwrite_stream &out, raw_ostream &descriptor_map_out,
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
   binaryOut = outputCInitList ? &binaryTempOut : &out;
+
+  constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
 
   ArgSpecIdMap = AllocateArgSpecIds(module);
 
@@ -1534,15 +1551,11 @@ void SPIRVProducerPass::GenerateExtInstImport() {
   // Ops[0] ... Ops[n] = Name (Literal String)
   SPIRVOperandList Ops;
 
-  SPIRVOperand *Name =
-      new SPIRVOperand(SPIRVOperandType::LITERAL_STRING, "GLSL.std.450");
-  Ops.push_back(Name);
+  const char* name = "GLSL.std.450";
+  Ops << MkString(name);
 
-  size_t NameWordSize = (Name->getLiteralStr().size() + 1) / 4;
+  const size_t NameWordSize = (std::strlen(name) + 4)/4;
   assert(NameWordSize < (UINT16_MAX - 2));
-  if ((Name->getLiteralStr().size() + 1) % 4) {
-    NameWordSize += 1;
-  }
 
   uint16_t WordCount = static_cast<uint16_t>(2 + NameWordSize);
   ExtInstImportID = nextID;
@@ -1640,16 +1653,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
         // Ops[1] = Element Type ID
         SPIRVOperandList Ops;
 
-        spv::StorageClass StorageClass = GetStorageClass(AddrSpace);
-
-        SPIRVOperand *StorageClassOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, StorageClass);
-        Ops.push_back(StorageClassOp);
-
-        uint32_t EleTyID = lookupType(PTy->getElementType());
-        SPIRVOperand *EleTyOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, EleTyID);
-        Ops.push_back(EleTyOp);
+        Ops << MkNum(GetStorageClass(AddrSpace))
+            << MkId(lookupType(PTy->getElementType()));
 
         spv::Op Opcode = spv::OpTypePointer;
         uint16_t WordCount = 4;
@@ -1668,10 +1673,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
         // Ops[0] = Element Type ID
         SPIRVOperandList Ops;
 
-        uint32_t EleTyID = lookupType(PTy->getElementType());
-        SPIRVOperand *EleTyOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, EleTyID);
-        Ops.push_back(EleTyOp);
+        Type *EleTy = PTy->getElementType();
+        Ops << MkId(lookupType(EleTy));
 
         spv::Op Opcode = spv::OpTypeRuntimeArray;
         uint16_t WordCount = 3;
@@ -1698,20 +1701,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
         // Ops[2] = Stride Number(Literal Number)
         Ops.clear();
 
-        SPIRVOperand *PTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, OpTypeRuntimeArrayID);
-        Ops.push_back(PTyIDOp);
-
-        SPIRVOperand *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                                spv::DecorationArrayStride);
-        Ops.push_back(DecoOp);
-
-        std::vector<uint32_t> LiteralNum;
-        Type *EleTy = PTy->getElementType();
-        LiteralNum.push_back(static_cast<uint32_t>(DL.getTypeAllocSize(EleTy)));
-        SPIRVOperand *ArrayStrideOp =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(ArrayStrideOp);
+        Ops << MkId(OpTypeRuntimeArrayID) << MkNum(spv::DecorationArrayStride)
+            << MkNum(static_cast<uint32_t>(DL.getTypeAllocSize(EleTy)));
 
         SPIRVInstruction *DecoInst =
             new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
@@ -1756,39 +1747,23 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
 
           // TODO: Changed Sampled Type according to situations.
           uint32_t SampledTyID = lookupType(Type::getFloatTy(Context));
-          SPIRVOperand *SampledTyIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, SampledTyID);
-          Ops.push_back(SampledTyIDOp);
+          Ops << MkId(SampledTyID);
 
           spv::Dim DimID = spv::Dim2D;
           if (STy->getName().equals("opencl.image3d_ro_t") ||
               STy->getName().equals("opencl.image3d_wo_t")) {
             DimID = spv::Dim3D;
           }
-          SPIRVOperand *DimIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, DimID);
-          Ops.push_back(DimIDOp);
+          Ops << MkNum(DimID);
 
           // TODO: Set up Depth.
-          std::vector<uint32_t> LiteralNum;
-          LiteralNum.push_back(0);
-          SPIRVOperand *DepthOp =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(DepthOp);
+          Ops << MkNum(0);
 
           // TODO: Set up Arrayed.
-          LiteralNum.clear();
-          LiteralNum.push_back(0);
-          SPIRVOperand *ArrayedOp =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(ArrayedOp);
+          Ops << MkNum(0);
 
           // TODO: Set up MS.
-          LiteralNum.clear();
-          LiteralNum.push_back(0);
-          SPIRVOperand *MSOp =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(MSOp);
+          Ops << MkNum(0);
 
           // TODO: Set up Sampled.
           //
@@ -1802,16 +1777,10 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
               STy->getName().equals("opencl.image3d_wo_t")) {
             Sampled = 2;
           }
-          LiteralNum.clear();
-          LiteralNum.push_back(Sampled);
-          SPIRVOperand *SampledOp =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(SampledOp);
+          Ops << MkNum(Sampled);
 
           // TODO: Set up Image Format.
-          SPIRVOperand *ImageFormatOp = new SPIRVOperand(
-              SPIRVOperandType::NUMBERID, spv::ImageFormatUnknown);
-          Ops.push_back(ImageFormatOp);
+          Ops << MkNum(spv::ImageFormatUnknown);
 
           SPIRVInstruction *Inst =
               new SPIRVInstruction(9, spv::OpTypeImage, nextID++, Ops);
@@ -1841,9 +1810,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
           }
         }
 
-        SPIRVOperand *EleTyOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, EleTyID);
-        Ops.push_back(EleTyOp);
+        Ops << MkId(EleTyID);
       }
 
       uint16_t WordCount = static_cast<uint16_t>(2 + Ops.size());
@@ -1872,27 +1839,11 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
         // Ops[3] = Byte Offset (Literal Number)
         Ops.clear();
 
-        SPIRVOperand *STyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, STyID);
-        Ops.push_back(STyIDOp);
+        Ops << MkId(STyID) << MkNum(MemberIdx) << MkNum(spv::DecorationOffset);
 
-        std::vector<uint32_t> LiteralNum;
-        LiteralNum.push_back(MemberIdx);
-        SPIRVOperand *MemberIdxOp =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(MemberIdxOp);
-
-        SPIRVOperand *DecoOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::DecorationOffset);
-        Ops.push_back(DecoOp);
-
-        LiteralNum.clear();
         const auto ByteOffset =
             uint32_t(StructLayout->getElementOffset(MemberIdx));
-        LiteralNum.push_back(ByteOffset);
-        SPIRVOperand *ByteOffsetOp =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(ByteOffsetOp);
+        Ops << MkNum(ByteOffset);
 
         SPIRVInstruction *DecoInst =
             new SPIRVInstruction(5, spv::OpMemberDecorate, 0 /* No id */, Ops);
@@ -1914,16 +1865,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
           // Ops[1] = Decoration (Block or BufferBlock)
           Ops.clear();
 
-          SPIRVOperand *STyIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, STyID);
-          Ops.push_back(STyIDOp);
-
           // Use Block decorations with StorageBuffer storage class.
-          const spv::Decoration Deco = spv::DecorationBlock;
-
-          SPIRVOperand *DecoOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-          Ops.push_back(DecoOp);
+          Ops << MkId(STyID) << MkNum(spv::DecorationBlock);
 
           SPIRVInstruction *DecoInst =
               new SPIRVInstruction(3, spv::OpDecorate, 0 /* No id */, Ops);
@@ -1965,9 +1908,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
           }
         }
 
-        SPIRVOperand *Ops[2] = {
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, BitWidth),
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, 0u)};
+        SPIRVOperandList Ops;
+        Ops << MkNum(BitWidth) << MkNum(0 /* not signed */);
 
         SPIRVInstList.push_back(
             new SPIRVInstruction(4, spv::OpTypeInt, nextID++, Ops));
@@ -2000,17 +1942,11 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
 
       Type *LengthTy = Type::getInt32Ty(Context);
       uint32_t ResTyID = lookupType(LengthTy);
-      SPIRVOperand *ResTyOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyOp);
+      Ops << MkId(ResTyID);
 
       uint64_t Length = ArrTy->getArrayNumElements();
       assert(Length < UINT32_MAX);
-      std::vector<uint32_t> LiteralNum;
-      LiteralNum.push_back(static_cast<uint32_t>(Length));
-      SPIRVOperand *ValOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(ValOp);
+      Ops << MkNum(static_cast<uint32_t>(Length));
 
       // Add constant for length to constant list.
       Constant *CstLength = ConstantInt::get(LengthTy, Length);
@@ -2033,13 +1969,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
       Ops.clear();
 
       uint32_t EleTyID = lookupType(ArrTy->getElementType());
-      SPIRVOperand *EleTyOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, EleTyID);
-      Ops.push_back(EleTyOp);
-
-      SPIRVOperand *LengthOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, LengthID);
-      Ops.push_back(LengthOp);
+      Ops << MkId(EleTyID) << MkId(LengthID);
 
       // Update TypeMap with nextID.
       TypeMap[Ty] = nextID;
@@ -2064,11 +1994,9 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
 
       // Ops[0] = Component Type ID
       // Ops[1] = Component Count (Literal Number)
-      SPIRVOperand *Ops[2] = {
-          new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                           lookupType(Ty->getVectorElementType())),
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER,
-                           Ty->getVectorNumElements())};
+      SPIRVOperandList Ops;
+      Ops << MkId(lookupType(Ty->getVectorElementType()))
+          << MkNum(Ty->getVectorNumElements());
 
       SPIRVInstruction* inst = new SPIRVInstruction(4, spv::OpTypeVector, nextID++, Ops);
       SPIRVInstList.push_back(inst);
@@ -2194,10 +2122,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
     // Ops[1] .. Ops[n] = Values LiteralNumber
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(Cst->getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
+    Ops << MkId(lookupType(Cst->getType()));
 
     std::vector<uint32_t> LiteralNum;
     uint16_t WordCount = 0;
@@ -2237,9 +2162,11 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         Opcode = spv::OpConstant;
         WordCount = static_cast<uint16_t>(3 + LiteralNum.size());
 
-        SPIRVOperand *CstValue =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(CstValue);
+        Ops << MkInteger(LiteralNum);
+
+        if (BitWidth == 32 && V == 0) {
+          constant_i32_zero_id_ = nextID;
+        }
       }
     } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(Cst)) {
       uint64_t FPVal = CFP->getValueAPF().bitcastToAPInt().getZExtValue();
@@ -2254,9 +2181,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       Opcode = spv::OpConstant;
       WordCount = static_cast<uint16_t>(3 + LiteralNum.size());
 
-      SPIRVOperand *CstValue =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_FLOAT, LiteralNum);
-      Ops.push_back(CstValue);
+      Ops << MkFloat(LiteralNum);
     } else if (isa<ConstantDataSequential>(Cst) &&
                cast<ConstantDataSequential>(Cst)->isString()) {
       Cst->print(errs());
@@ -2289,10 +2214,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
           continue;
         }
 
-        LiteralNum.push_back(IntValue);
-        SPIRVOperand *CstValue =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(CstValue);
+        Ops << MkNum(IntValue);
 
         SPIRVInstruction *CstInst =
             new SPIRVInstruction(4, spv::OpConstant, nextID++, Ops);
@@ -2305,9 +2227,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       for (unsigned k = 0; k < CDS->getNumElements(); k++) {
         Constant *EleCst = CDS->getElementAsConstant(k);
         uint32_t EleCstID = VMap[EleCst];
-        SPIRVOperand *EleCstIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, EleCstID);
-        Ops.push_back(EleCstIDOp);
+        Ops << MkId(EleCstID);
       }
 
       Opcode = spv::OpConstantComposite;
@@ -2342,10 +2262,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
           continue;
         }
 
-        LiteralNum.push_back(IntValue);
-        SPIRVOperand *CstValue =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(CstValue);
+        Ops << MkNum(IntValue);
 
         SPIRVInstruction *CstInst =
             new SPIRVInstruction(4, spv::OpConstant, nextID++, Ops);
@@ -2365,8 +2282,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         uint32_t ElementConstantID = VMap[CA->getAggregateElement(k)];
 
         // And add an operand to the composite we are constructing
-        Ops.push_back(
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ElementConstantID));
+        Ops << MkId(ElementConstantID);
       }
     } else if (Cst->isNullValue()) {
       Opcode = spv::OpConstantNull;
@@ -2398,11 +2314,8 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     // GIDOps[1] : Storage Class
     SPIRVOperandList Ops;
 
-    Ops.push_back(
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, lookupType(SamplerTy)));
-
-    spv::StorageClass StorageClass = spv::StorageClassUniformConstant;
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, StorageClass));
+    Ops << MkId(lookupType(SamplerTy))
+        << MkNum(spv::StorageClassUniformConstant);
 
     SPIRVInstruction *Inst = new SPIRVInstruction(
         static_cast<uint16_t>(2 + Ops.size()), spv::OpVariable, nextID, Ops);
@@ -2424,24 +2337,14 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     // Ops[2] = LiteralNumber according to Decoration
     Ops.clear();
 
-    SPIRVOperand *ArgIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                         SamplerLiteralToIDMap[SamplerLiteral.first]);
-    Ops.push_back(ArgIDOp);
-
-    spv::Decoration Deco = spv::DecorationDescriptorSet;
-    SPIRVOperand *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-    Ops.push_back(DecoOp);
+    uint32_t ArgID = SamplerLiteralToIDMap[SamplerLiteral.first];
+    Ops << MkId(ArgID) << MkNum(spv::DecorationDescriptorSet)
+        << MkNum(NextDescriptorSetIndex);
 
     descriptorMapOut << "sampler," << SamplerLiteral.first << ",samplerExpr,\""
-                     << SamplerLiteral.second << "\",descriptorSet,0,binding,"
-                     << BindingIdx << "\n";
-
-    std::vector<uint32_t> LiteralNum;
-    LiteralNum.push_back(NextDescriptorSetIndex);
-    SPIRVOperand *DescSet =
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-    Ops.push_back(DescSet);
+                     << SamplerLiteral.second << "\",descriptorSet,"
+                     << NextDescriptorSetIndex << ",binding," << BindingIdx
+                     << "\n";
 
     SPIRVInstruction *DescDecoInst =
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
@@ -2451,18 +2354,8 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     // Ops[1] = Decoration (Binding)
     // Ops[2] = LiteralNumber according to Decoration
     Ops.clear();
-
-    Ops.push_back(ArgIDOp);
-
-    Deco = spv::DecorationBinding;
-    DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-    Ops.push_back(DecoOp);
-
-    LiteralNum.clear();
-    LiteralNum.push_back(BindingIdx++);
-    SPIRVOperand *Binding =
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-    Ops.push_back(Binding);
+    Ops << MkId(ArgID) << MkNum(spv::DecorationBinding) << MkNum(BindingIdx);
+    BindingIdx++;
 
     SPIRVInstruction *BindDecoInst =
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
@@ -2575,13 +2468,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
         InitializerID = nextID;
 
-        Ops.push_back(
-            new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                             lookupType(Ty->getPointerElementType())));
-
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, XDimCstID));
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, YDimCstID));
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, ZDimCstID));
+        Ops << MkId(lookupType(Ty->getPointerElementType())) << MkId(XDimCstID)
+            << MkId(YDimCstID) << MkId(ZDimCstID);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(6, spv::OpConstantComposite, nextID++, Ops);
@@ -2617,65 +2505,35 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       uint32_t YDimCstID = 0;
       uint32_t ZDimCstID = 0;
 
-      // X Dimension
       SPIRVOperandList Ops;
+      uint32_t result_type_id =
+          lookupType(Ty->getPointerElementType()->getSequentialElementType());
 
-      Ops.push_back(new SPIRVOperand(
-          SPIRVOperandType::NUMBERID,
-          lookupType(Ty->getPointerElementType()->getSequentialElementType())));
-
-      std::vector<uint32_t> LiteralNum;
-      LiteralNum.push_back(1);
-      SPIRVOperand *XDim =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(XDim);
-
-      XDimCstID = nextID;
-      BuiltinDimVec.push_back(XDimCstID);
-
-      SPIRVInstruction *XDimCstInst =
-          new SPIRVInstruction(4, spv::OpSpecConstant, nextID++, Ops);
-      SPIRVInstList.push_back(XDimCstInst);
+      // X Dimension
+      Ops << MkId(result_type_id) << MkNum(1);
+      XDimCstID = nextID++;
+      SPIRVInstList.push_back(
+          new SPIRVInstruction(4, spv::OpSpecConstant, XDimCstID, Ops));
 
       // Y Dimension
       Ops.clear();
-
-      Ops.push_back(new SPIRVOperand(
-          SPIRVOperandType::NUMBERID,
-          lookupType(Ty->getPointerElementType()->getSequentialElementType())));
-
-      LiteralNum.clear();
-      LiteralNum.push_back(1);
-      SPIRVOperand *YDim =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(YDim);
-
-      YDimCstID = nextID;
-      BuiltinDimVec.push_back(YDimCstID);
-
-      SPIRVInstruction *YDimCstInst =
-          new SPIRVInstruction(4, spv::OpSpecConstant, nextID++, Ops);
-      SPIRVInstList.push_back(YDimCstInst);
+      Ops << MkId(result_type_id) << MkNum(1);
+      YDimCstID = nextID++;
+      SPIRVInstList.push_back(
+          new SPIRVInstruction(4, spv::OpSpecConstant, YDimCstID, Ops));
 
       // Z Dimension
       Ops.clear();
+      Ops << MkId(result_type_id) << MkNum(1);
+      ZDimCstID = nextID++;
+      SPIRVInstList.push_back(
+          new SPIRVInstruction(4, spv::OpSpecConstant, ZDimCstID, Ops));
 
-      Ops.push_back(new SPIRVOperand(
-          SPIRVOperandType::NUMBERID,
-          lookupType(Ty->getPointerElementType()->getSequentialElementType())));
 
-      LiteralNum.clear();
-      LiteralNum.push_back(1);
-      SPIRVOperand *ZDim =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(ZDim);
-
-      ZDimCstID = nextID;
+      BuiltinDimVec.push_back(XDimCstID);
+      BuiltinDimVec.push_back(YDimCstID);
       BuiltinDimVec.push_back(ZDimCstID);
 
-      SPIRVInstruction *ZDimCstInst =
-          new SPIRVInstruction(4, spv::OpSpecConstant, nextID++, Ops);
-      SPIRVInstList.push_back(ZDimCstInst);
 
       //
       // Generate OpSpecConstantComposite.
@@ -2687,13 +2545,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       InitializerID = nextID;
 
       Ops.clear();
-
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                     lookupType(Ty->getPointerElementType())));
-
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, XDimCstID));
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, YDimCstID));
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, ZDimCstID));
+      Ops << MkId(lookupType(Ty->getPointerElementType())) << MkId(XDimCstID)
+          << MkId(YDimCstID) << MkId(ZDimCstID);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(6, spv::OpSpecConstantComposite, nextID++, Ops);
@@ -2763,17 +2616,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     }
 
     SPIRVOperandList DOps;
-    SPIRVOperand *ResultIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResultID);
-    DOps.push_back(ResultIDOp);
-
-    spv::Decoration Deco = spv::DecorationBuiltIn;
-    SPIRVOperand *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-    DOps.push_back(DecoOp);
-
-    SPIRVOperand *Builtin =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, BuiltinType);
-    DOps.push_back(Builtin);
+    DOps << MkId(ResultID) << MkNum(spv::DecorationBuiltIn)
+         << MkNum(BuiltinType);
 
     SPIRVInstruction *DescDecoInst =
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, DOps);
@@ -2800,25 +2644,17 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
                               Inst->getOpcode() != spv::OpExtInstImport;
                      });
 
-    // OpDecorate %var Binding <descriptor_set>
+    // OpDecorate %var Binding <binding>
     SPIRVOperandList DOps;
-    DOps.push_back(
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, var_id));
-    DOps.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER,
-                                    spv::DecorationBinding));
-    DOps.push_back(
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, 0u));
-    DecoInsertPoint = SPIRVInstList.insert(DecoInsertPoint, 
+    DOps << MkId(var_id) << MkNum(spv::DecorationBinding) << MkNum(0);
+    DecoInsertPoint = SPIRVInstList.insert(
+        DecoInsertPoint,
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, DOps));
 
     // OpDecorate %var DescriptorSet <descriptor_set>
     DOps.clear();
-    DOps.push_back(
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, var_id));
-    DOps.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER,
-                                    spv::DecorationDescriptorSet));
-    DOps.push_back(
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, descriptor_set));
+    DOps << MkId(var_id) << MkNum(spv::DecorationDescriptorSet)
+         << MkNum(descriptor_set);
     SPIRVInstList.insert(DecoInsertPoint,
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, DOps));
   }
@@ -2960,25 +2796,16 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
           SPIRVOperandList Ops;
           SPIRVOperand *ArgIDOp = nullptr;
+          uint32_t ArgID = 0;
 
           if (uses_binding) {
             // Ops[0] = Target ID
             // Ops[1] = Decoration (DescriptorSet)
             // Ops[2] = LiteralNumber according to Decoration
 
-            ArgIDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[&Arg]);
-            Ops.push_back(ArgIDOp);
-
-            spv::Decoration Deco = spv::DecorationDescriptorSet;
-            SPIRVOperand *DecoOp =
-                new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-            Ops.push_back(DecoOp);
-
-            std::vector<uint32_t> LiteralNum;
-            LiteralNum.push_back(DescriptorSetIdx);
-            SPIRVOperand *DescSet =
-                new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-            Ops.push_back(DescSet);
+            ArgID = VMap[&Arg];
+            Ops << MkId(ArgID) << MkNum(spv::DecorationDescriptorSet)
+                << MkNum(DescriptorSetIdx);
 
             SPIRVInstruction *DescDecoInst =
                 new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
@@ -2988,18 +2815,8 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
             // Ops[1] = Decoration (Binding)
             // Ops[2] = LiteralNumber according to Decoration
             Ops.clear();
-
-            Ops.push_back(ArgIDOp);
-
-            Deco = spv::DecorationBinding;
-            DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-            Ops.push_back(DecoOp);
-
-            LiteralNum.clear();
-            LiteralNum.push_back(BindingIdx);
-            SPIRVOperand *Binding =
-                new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-            Ops.push_back(Binding);
+            Ops << MkId(ArgID) << MkNum(spv::DecorationBinding)
+                << MkNum(BindingIdx);
 
             SPIRVInstruction *BindDecoInst =
                 new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
@@ -3029,16 +2846,12 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
             // Ops[1] = Decoration (NonReadable or NonWritable)
             Ops.clear();
 
-            auto *ArgIDOp =
-                new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[&Arg]);
-            Ops.push_back(ArgIDOp);
+            Ops << MkId(VMap[&Arg]);
 
-            auto Deco = spv::DecorationNonReadable;
-            if (HasReadOnlyImageType) {
-              Deco = spv::DecorationNonWritable;
-            }
-            auto *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-            Ops.push_back(DecoOp);
+            // In OpenCL 1.2 an image is either read-only or write-only, but
+            // never both.
+            Ops << MkNum(HasReadOnlyImageType ? spv::DecorationNonWritable
+                                              : spv::DecorationNonReadable);
 
             auto *DescDecoInst =
                 new SPIRVInstruction(3, spv::OpDecorate, 0 /* No id */, Ops);
@@ -3051,13 +2864,8 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
             // Ops[0] = Target ID
             // Ops[1] = Decoration (NonWriteable)
             Ops.clear();
-
-            assert(ArgIDOp);
-            Ops.push_back(ArgIDOp);
-
-            auto Deco = spv::DecorationNonWritable;
-            auto *DecoOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Deco);
-            Ops.push_back(DecoOp);
+            assert(ArgID > 0);
+            Ops << MkId(ArgID) << MkNum(spv::DecorationNonWritable);
 
             auto *BindDecoInst =
                 new SPIRVInstruction(3, spv::OpDecorate, 0 /* No id */, Ops);
@@ -3080,9 +2888,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   SPIRVOperandList FOps;
 
   // Find SPIRV instruction for return type.
-  uint32_t RetTyID = lookupType(FTy->getReturnType());
-  SPIRVOperand *RetTyOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, RetTyID);
-  FOps.push_back(RetTyOp);
+  FOps << MkId(lookupType(FTy->getReturnType()));
 
   // Check function attributes for SPIRV Function Control.
   uint32_t FuncControl = spv::FunctionControlMaskNone;
@@ -3101,9 +2907,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
     FuncControl |= spv::FunctionControlConstMask;
   }
 
-  SPIRVOperand *FunctionControlOp =
-      new SPIRVOperand(SPIRVOperandType::NUMBERID, FuncControl);
-  FOps.push_back(FunctionControlOp);
+  FOps << MkNum(FuncControl);
 
   uint32_t FTyID;
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
@@ -3120,8 +2924,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
     }
   }
 
-  SPIRVOperand *FTyOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, FTyID);
-  FOps.push_back(FTyOp);
+  FOps << MkId(FTyID);
 
   if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
     EntryPoints.push_back(std::make_pair(&F, nextID));
@@ -3163,9 +2966,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
           }
         }
       }
-      SPIRVOperand *ParamTyOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ParamTyID);
-      ParamOps.push_back(ParamTyOp);
+      ParamOps << MkId(ParamTyID);
 
       // Generate SPIRV instruction for parameter.
       SPIRVInstruction *ParamInst =
@@ -3282,9 +3083,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
     // Ops[0] = Capability
     //
     Ops.clear();
-
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   spv::CapabilityVariablePointers));
+    Ops << MkNum(spv::CapabilityVariablePointers);
 
     SPIRVInstList.insert(InsertPoint, new SPIRVInstruction(2, spv::OpCapability,
                                                            0 /* No id */, Ops));
@@ -3298,16 +3097,11 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
                            "SPV_KHR_variable_pointers"}) {
       Ops.clear();
 
-      SPIRVOperand *Name =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_STRING, extension);
-      Ops.push_back(Name);
+      Ops << MkString(extension);
 
-      size_t NameWordSize = (Name->getLiteralStr().size() + 1) / 4;
-      if ((Name->getLiteralStr().size() + 1) % 4) {
-        NameWordSize += 1;
-      }
-
+      const size_t NameWordSize = (std::strlen(extension) + 4)/4;
       assert((NameWordSize + 1) < UINT16_MAX);
+
       uint16_t WordCount = static_cast<uint16_t>(1 + NameWordSize);
 
       SPIRVInstruction *ExtensionInst =
@@ -3328,13 +3122,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
   // Ops[0] = Addressing Model
   // Ops[1] = Memory Model
   Ops.clear();
-  SPIRVOperand *AddrModel =
-      new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::AddressingModelLogical);
-  Ops.push_back(AddrModel);
-
-  SPIRVOperand *MemModel =
-      new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::MemoryModelGLSL450);
-  Ops.push_back(MemModel);
+  Ops << MkNum(spv::AddressingModelLogical) << MkNum(spv::MemoryModelGLSL450);
 
   SPIRVInstruction *MemModelInst =
       new SPIRVInstruction(3, spv::OpMemoryModel, 0 /* No id */, Ops);
@@ -3351,30 +3139,17 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
     //
     // TODO: Do we need to consider Interface ID for forward references???
     Ops.clear();
-    SPIRVOperand *ExecModel = new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                               spv::ExecutionModelGLCompute);
-    Ops.push_back(ExecModel);
+    const StringRef& name = EntryPoint.first->getName();
+    Ops << MkNum(spv::ExecutionModelGLCompute) << MkId(EntryPoint.second)
+        << MkString(name);
 
-    SPIRVOperand *EntryPointID =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, EntryPoint.second);
-    Ops.push_back(EntryPointID);
-
-    SPIRVOperand *Name = new SPIRVOperand(SPIRVOperandType::LITERAL_STRING,
-                                          EntryPoint.first->getName());
-    Ops.push_back(Name);
-
-    size_t NameWordSize = (Name->getLiteralStr().size() + 1) / 4;
-    if ((Name->getLiteralStr().size() + 1) % 4) {
-      NameWordSize += 1;
-    }
+    const size_t NameWordSize = (name.size() + 4) / 4;
 
     assert((3 + NameWordSize) < UINT16_MAX);
     uint16_t WordCount = static_cast<uint16_t>(3 + NameWordSize);
 
     for (Value *Interface : EntryPointInterfaces) {
-      SPIRVOperand *GIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[Interface]);
-      Ops.push_back(GIDOp);
+      Ops << MkId(VMap[Interface]);
       WordCount++;
     }
 
@@ -3400,13 +3175,8 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
       // Ops[1] = Execution Mode
       // Ops[2] ... Ops[n] = Optional literals according to Execution Mode
       Ops.clear();
-      SPIRVOperand *EntryPointID =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, EntryPoint.second);
-      Ops.push_back(EntryPointID);
-
-      SPIRVOperand *ExecMode = new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                                spv::ExecutionModeLocalSize);
-      Ops.push_back(ExecMode);
+      Ops << MkId(EntryPoint.second)
+          << MkNum(spv::ExecutionModeLocalSize);
 
       uint32_t XDim = static_cast<uint32_t>(
           mdconst::extract<ConstantInt>(MD->getOperand(0))->getZExtValue());
@@ -3415,23 +3185,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
       uint32_t ZDim = static_cast<uint32_t>(
           mdconst::extract<ConstantInt>(MD->getOperand(2))->getZExtValue());
 
-      std::vector<uint32_t> LiteralNum;
-      LiteralNum.push_back(XDim);
-      SPIRVOperand *XDimOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(XDimOp);
-
-      LiteralNum.clear();
-      LiteralNum.push_back(YDim);
-      SPIRVOperand *YDimOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(YDimOp);
-
-      LiteralNum.clear();
-      LiteralNum.push_back(ZDim);
-      SPIRVOperand *ZDimOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(ZDimOp);
+      Ops << MkNum(XDim) << MkNum(YDim) << MkNum(ZDim);
 
       SPIRVInstruction *ExecModeInst =
           new SPIRVInstruction(static_cast<uint16_t>(1 + Ops.size()),
@@ -3447,15 +3201,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
   // Ops[1] = Version (LiteralNum)
   //
   Ops.clear();
-  SPIRVOperand *SourceLanguage =
-      new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::SourceLanguageOpenCL_C);
-  Ops.push_back(SourceLanguage);
-
-  std::vector<uint32_t> LiteralNum;
-  LiteralNum.push_back(120);
-  SPIRVOperand *Version =
-      new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-  Ops.push_back(Version);
+  Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(120);
 
   SPIRVInstruction *OpenSourceInst =
       new SPIRVInstruction(3, spv::OpSource, 0 /* No id */, Ops);
@@ -3467,68 +3213,25 @@ void SPIRVProducerPass::GenerateModuleInfo(Module& module) {
     //
     // Ops[0] = Target ID
     // Ops[1] = Decoration (SpecId)
-    // Ops[2] = Specialization Cosntant ID (Literal Number)
+    // Ops[2] = Specialization Constant ID (Literal Number)
 
     // X Dimension
     Ops.clear();
-
-    SPIRVOperand *TargetID =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, BuiltinDimVec[0]);
-    Ops.push_back(TargetID);
-
-    SPIRVOperand *DecoOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::DecorationSpecId);
-    Ops.push_back(DecoOp);
-
-    LiteralNum.clear();
-    LiteralNum.push_back(0);
-    SPIRVOperand *XDim =
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-    Ops.push_back(XDim);
-
-    SPIRVInstruction *XDimDecoInst =
-        new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
-    SPIRVInstList.insert(InsertPoint, XDimDecoInst);
+    Ops << MkId(BuiltinDimVec[0]) << MkNum(spv::DecorationSpecId) << MkNum(0);
+    SPIRVInstList.insert(InsertPoint, new SPIRVInstruction(4, spv::OpDecorate,
+                                                           0 /* No id */, Ops));
 
     // Y Dimension
     Ops.clear();
-
-    TargetID = new SPIRVOperand(SPIRVOperandType::NUMBERID, BuiltinDimVec[1]);
-    Ops.push_back(TargetID);
-
-    DecoOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::DecorationSpecId);
-    Ops.push_back(DecoOp);
-
-    LiteralNum.clear();
-    LiteralNum.push_back(1);
-    SPIRVOperand *YDim =
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-    Ops.push_back(YDim);
-
-    SPIRVInstruction *YDimDecoInst =
-        new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
-    SPIRVInstList.insert(InsertPoint, YDimDecoInst);
+    Ops << MkId(BuiltinDimVec[1]) << MkNum(spv::DecorationSpecId) << MkNum(1);
+    SPIRVInstList.insert(InsertPoint, new SPIRVInstruction(4, spv::OpDecorate,
+                                                           0 /* No id */, Ops));
 
     // Z Dimension
     Ops.clear();
-
-    TargetID = new SPIRVOperand(SPIRVOperandType::NUMBERID, BuiltinDimVec[2]);
-    Ops.push_back(TargetID);
-
-    DecoOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, spv::DecorationSpecId);
-    Ops.push_back(DecoOp);
-
-    LiteralNum.clear();
-    LiteralNum.push_back(2);
-    SPIRVOperand *ZDim =
-        new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-    Ops.push_back(ZDim);
-
-    SPIRVInstruction *ZDimDecoInst =
-        new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
-    SPIRVInstList.insert(InsertPoint, ZDimDecoInst);
+    Ops << MkId(BuiltinDimVec[2]) << MkNum(spv::DecorationSpecId) << MkNum(2);
+    SPIRVInstList.insert(InsertPoint, new SPIRVInstruction(4, spv::OpDecorate,
+                                                           0 /* No id */, Ops));
   }
 }
 
@@ -3590,15 +3293,10 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
             // Use type with address space modified.
             ArgTy = ArgGVMap[&Arg]->getType()->getPointerElementType();
 
-            uint32_t ResTyID = lookupType(ArgTy);
-            SPIRVOperand *ResTyIDOp =
-                new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-            Ops.push_back(ResTyIDOp);
+            Ops << MkId(lookupType(ArgTy));
 
             uint32_t PointerID = VMap[&Arg];
-            SPIRVOperand *PointerIDOp =
-                new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
-            Ops.push_back(PointerIDOp);
+            Ops << MkId(PointerID);
 
             VMap[&Arg] = nextID;
             SPIRVInstruction *Inst =
@@ -3622,21 +3320,11 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
         if (!isa<PointerType>(ArgTy)) {
           ResTyID = lookupType(PointerType::get(ArgTy, AddressSpace::Global));
         }
-        SPIRVOperand *ResTyOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyOp);
+        Ops << MkId(ResTyID);
 
         uint32_t BaseID = VMap[&Arg];
-        SPIRVOperand *BaseOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, BaseID);
-        Ops.push_back(BaseOp);
-
-        Type *IdxTy = Type::getInt32Ty(Context);
-        uint32_t IndexID = VMap[ConstantInt::get(IdxTy, 0)];
-        SPIRVOperand *IndexIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-        Ops.push_back(IndexIDOp);
-        Ops.push_back(IndexIDOp);
+        Ops << MkId(BaseID) << MkId(GetI32Zero())
+            << MkId(GetI32Zero());
 
         // Generate SPIRV instruction for argument.
         VMap[&Arg] = nextID;
@@ -3667,20 +3355,10 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
                       : AddressSpace::Global;
         ResTyID = lookupType(PointerType::get(ArgTy, AS));
       }
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
+      Ops << MkId(ResTyID);
 
       uint32_t BaseID = VMap[&Arg];
-      SPIRVOperand *BaseOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, BaseID);
-      Ops.push_back(BaseOp);
-
-      Type *IdxTy = Type::getInt32Ty(Context);
-      uint32_t IndexID = VMap[ConstantInt::get(IdxTy, 0)];
-      SPIRVOperand *IndexIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-      Ops.push_back(IndexIDOp);
+      Ops << MkId(BaseID) << MkId(GetI32Zero());
 
       // Generate SPIRV instruction for argument.
       uint32_t PointerID = nextID;
@@ -3699,14 +3377,7 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
       //
       // TODO: Do we need to implement Optional Memory Access???
       Ops.clear();
-
-      ResTyID = lookupType(ArgTy);
-      ResTyIDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
-
-      SPIRVOperand *PointerIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
-      Ops.push_back(PointerIDOp);
+      Ops << MkId(lookupType(ArgTy)) << MkId(PointerID);
 
       VMap[&Arg] = nextID;
       SPIRVInstruction *Inst =
@@ -3885,16 +3556,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Ops[3] = False Constant ID
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(I.getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
+        Ops << MkId(lookupType(I.getType()));
 
-        // TODO: zext's first operand should be compare instructions???
         uint32_t CondID = VMap[I.getOperand(0)];
-        SPIRVOperand *CondIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, CondID);
-        Ops.push_back(CondIDOp);
+        Ops << MkId(CondID);
 
         uint32_t TrueID = 0;
         if (I.getOpcode() == Instruction::ZExt) {
@@ -3906,9 +3571,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         } else {
           TrueID = VMap[ConstantFP::get(Context, APFloat(1.0f))];
         }
-        SPIRVOperand *TrueIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, TrueID);
-        Ops.push_back(TrueIDOp);
+        Ops << MkId(TrueID);
 
         uint32_t FalseID = 0;
         if (I.getOpcode() == Instruction::ZExt) {
@@ -3918,9 +3581,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         } else {
           FalseID = VMap[ConstantFP::get(Context, APFloat(0.0f))];
         }
-        SPIRVOperand *FalseIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, FalseID);
-        Ops.push_back(FalseIDOp);
+        Ops << MkId(FalseID);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(6, spv::OpSelect, nextID++, Ops);
@@ -3935,21 +3596,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(OpTy);
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
-
-        uint32_t Op0ID = VMap[I.getOperand(0)];
-        SPIRVOperand *Op0IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-        Ops.push_back(Op0IDOp);
+        Ops << MkId(lookupType(OpTy)) << MkId(VMap[I.getOperand(0)]);
 
         Type *UintTy = Type::getInt32Ty(Context);
         uint32_t MaskID = VMap[ConstantInt::get(UintTy, 255)];
-        SPIRVOperand *MaskOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, MaskID);
-        Ops.push_back(MaskOp);
+        Ops << MkId(MaskID);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(5, spv::OpBitwiseAnd, nextID++, Ops);
@@ -3959,15 +3610,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Ops[1] = Source Value ID
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(I.getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
-
-        uint32_t SrcID = VMap[I.getOperand(0)];
-        SPIRVOperand *SrcIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, SrcID);
-        Ops.push_back(SrcIDOp);
+        Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)]);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(4, GetSPIRVCastOpcode(I), nextID++, Ops);
@@ -3989,19 +3632,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Ops[1] = Operand
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(I.getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
+        Ops << MkId(lookupType(I.getType()));
 
         Value *CondV = I.getOperand(0);
         if (isa<Constant>(I.getOperand(0))) {
           CondV = I.getOperand(1);
         }
-        uint32_t CondID = VMap[CondV];
-        SPIRVOperand *CondIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, CondID);
-        Ops.push_back(CondIDOp);
+        Ops << MkId(VMap[CondV]);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(4, spv::OpLogicalNot, nextID++, Ops);
@@ -4012,20 +3649,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Ops[2] = Operand 1
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(I.getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
-
-        uint32_t Op0ID = VMap[I.getOperand(0)];
-        SPIRVOperand *Op0IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-        Ops.push_back(Op0IDOp);
-
-        uint32_t Op1ID = VMap[I.getOperand(1)];
-        SPIRVOperand *Op1IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-        Ops.push_back(Op1IDOp);
+        Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)])
+            << MkId(VMap[I.getOperand(1)]);
 
         SPIRVInstruction *Inst =
             new SPIRVInstruction(5, GetSPIRVBinaryOpcode(I), nextID++, Ops);
@@ -4061,10 +3686,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Type *EleTy = I.getType()->getPointerElementType();
       ResultType = PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
     }
-    const uint32_t ResTyID = lookupType(ResultType);
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
+
+    Ops << MkId(lookupType(ResultType));
 
     // Check whether GEP's pointer operand is pointer argument.
     bool HasArgBasePointer = false;
@@ -4087,9 +3710,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       BaseID = VMap[GEP->getPointerOperand()];
     }
 
-    SPIRVOperand *BaseIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, BaseID);
-    Ops.push_back(BaseIDOp);
+    Ops << MkId(BaseID);
 
     uint16_t WordCount = 4;
 
@@ -4097,10 +3718,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // If GEP's pointer operand is argument, add one more index for struct
       // type to wrap up argument type.
       Type *IdxTy = Type::getInt32Ty(Context);
-      uint32_t IndexID = VMap[ConstantInt::get(IdxTy, 0)];
-      SPIRVOperand *IndexIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-      Ops.push_back(IndexIDOp);
+      Ops << MkId(VMap[ConstantInt::get(IdxTy, 0)]);
 
       WordCount++;
     }
@@ -4145,11 +3763,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     for (auto II = GEP->idx_begin() + offset; II != GEP->idx_end(); II++) {
-      uint32_t IndexID = VMap[*II];
-      SPIRVOperand *IndexIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-      Ops.push_back(IndexIDOp);
-
+      Ops << MkId(VMap[*II]);
       WordCount++;
     }
 
@@ -4165,18 +3779,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Indexes (Literal Number)
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(I.getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
+    Ops << MkId(lookupType(I.getType()));
 
     uint32_t CompositeID = VMap[EVI->getAggregateOperand()];
-    SPIRVOperand *CompositeIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, CompositeID);
-    Ops.push_back(CompositeIDOp);
+    Ops << MkId(CompositeID);
 
     for (auto &Index : EVI->indices()) {
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, Index));
+      Ops << MkNum(Index);
     }
 
     uint16_t WordCount = static_cast<uint16_t>(2 + Ops.size());
@@ -4194,16 +3803,16 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     SPIRVOperandList Ops;
 
     uint32_t ResTyID = lookupType(I.getType());
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID));
+    Ops << MkId(ResTyID);
 
     uint32_t ObjectID = VMap[IVI->getInsertedValueOperand()];
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, ObjectID));
+    Ops << MkId(ObjectID);
 
     uint32_t CompositeID = VMap[IVI->getAggregateOperand()];
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, CompositeID));
+    Ops << MkId(CompositeID);
 
     for (auto &Index : IVI->indices()) {
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, Index));
+      Ops << MkNum(Index);
     }
 
     uint16_t WordCount = static_cast<uint16_t>(2 + Ops.size());
@@ -4233,25 +3842,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       }
     }
 
-    uint32_t ResTyID = lookupType(Ty);
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
-    uint32_t CondID = VMap[I.getOperand(0)];
-    SPIRVOperand *CondIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, CondID);
-    Ops.push_back(CondIDOp);
-
-    uint32_t TrueID = VMap[I.getOperand(1)];
-    SPIRVOperand *TrueIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, TrueID);
-    Ops.push_back(TrueIDOp);
-
-    uint32_t FalseID = VMap[I.getOperand(2)];
-    SPIRVOperand *FalseIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, FalseID);
-    Ops.push_back(FalseIDOp);
+    Ops << MkId(lookupType(Ty)) << MkId(VMap[I.getOperand(0)])
+        << MkId(VMap[I.getOperand(1)]) << MkId(VMap[I.getOperand(2)]);
 
     SPIRVInstruction *Inst =
         new SPIRVInstruction(6, spv::OpSelect, nextID++, Ops);
@@ -4276,15 +3868,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t ResTyID = lookupType(CompositeTy);
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
+      Ops << MkId(lookupType(CompositeTy));
 
       uint32_t Op0ID = VMap[I.getOperand(0)];
-      SPIRVOperand *Op0IDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
+      Ops << MkId(Op0ID);
 
       uint32_t Op1ID = 0;
       if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1))) {
@@ -4297,21 +3884,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Handle variable index.
         SPIRVOperandList TmpOps;
 
-        uint32_t TmpResTyID = lookupType(Type::getInt32Ty(Context));
-        SPIRVOperand *TmpResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, TmpResTyID);
-        TmpOps.push_back(TmpResTyIDOp);
-
-        uint32_t IdxID = VMap[I.getOperand(1)];
-        SPIRVOperand *TmpOp0IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, IdxID);
-        TmpOps.push_back(TmpOp0IDOp);
+        TmpOps << MkId(lookupType(Type::getInt32Ty(Context)))
+               << MkId(VMap[I.getOperand(1)]);
 
         ConstantInt *Cst8 = ConstantInt::get(Type::getInt32Ty(Context), 8);
-        uint32_t Cst8ID = VMap[Cst8];
-        SPIRVOperand *TmpOp1IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, Cst8ID);
-        TmpOps.push_back(TmpOp1IDOp);
+        TmpOps << MkId(VMap[Cst8]);
 
         Op1ID = nextID;
 
@@ -4319,9 +3896,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             new SPIRVInstruction(5, spv::OpIMul, nextID++, TmpOps);
         SPIRVInstList.push_back(TmpInst);
       }
-      SPIRVOperand *Op1IDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      Ops << MkId(Op1ID);
 
       uint32_t ShiftID = nextID;
 
@@ -4338,18 +3913,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      ResTyID = lookupType(CompositeTy);
-      ResTyIDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
-
-      Op0ID = ShiftID;
-      Op0IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
+      Ops << MkId(lookupType(CompositeTy)) << MkId(ShiftID);
 
       Constant *CstFF = ConstantInt::get(Type::getInt32Ty(Context), 0xFF);
-      Op1ID = VMap[CstFF];
-      Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      Ops << MkId(VMap[CstFF]);
 
       // Reset mapping for this value to the result of the bitwise and.
       VMap[&I] = nextID;
@@ -4364,29 +3931,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Indexes (Literal Number)
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(I.getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
-    uint32_t CompositeID = VMap[I.getOperand(0)];
-    SPIRVOperand *CompositeIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, CompositeID);
-    Ops.push_back(CompositeIDOp);
+    Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)]);
 
     spv::Op Opcode = spv::OpCompositeExtract;
     if (const ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1))) {
-      std::vector<uint32_t> LiteralNum;
-      assert(CI->getZExtValue() < UINT32_MAX);
-      LiteralNum.push_back(static_cast<uint32_t>(CI->getZExtValue()));
-      SPIRVOperand *Indexes =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(Indexes);
+      Ops << MkNum(static_cast<uint32_t>(CI->getZExtValue()));
     } else {
-      uint32_t IndexID = VMap[I.getOperand(1)];
-      SPIRVOperand *IndexIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-      Ops.push_back(IndexIDOp);
+      Ops << MkId(VMap[I.getOperand(1)]);
       Opcode = spv::OpVectorExtractDynamic;
     }
 
@@ -4414,21 +3965,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Handle variable index.
         SPIRVOperandList TmpOps;
 
-        uint32_t TmpResTyID = lookupType(Type::getInt32Ty(Context));
-        SPIRVOperand *TmpResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, TmpResTyID);
-        TmpOps.push_back(TmpResTyIDOp);
-
-        uint32_t IdxID = VMap[I.getOperand(2)];
-        SPIRVOperand *TmpOp0IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, IdxID);
-        TmpOps.push_back(TmpOp0IDOp);
+        TmpOps << MkId(lookupType(Type::getInt32Ty(Context)))
+               << MkId(VMap[I.getOperand(2)]);
 
         ConstantInt *Cst8 = ConstantInt::get(Type::getInt32Ty(Context), 8);
-        uint32_t Cst8ID = VMap[Cst8];
-        SPIRVOperand *TmpOp1IDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, Cst8ID);
-        TmpOps.push_back(TmpOp1IDOp);
+        TmpOps << MkId(VMap[Cst8]);
 
         ShiftAmountID = nextID;
 
@@ -4444,20 +3985,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // ShiftLeft mask according to index of insertelement.
       SPIRVOperandList Ops;
 
-      uint32_t ResTyID = lookupType(CompositeTy);
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t Op0ID = CstFFID;
-      SPIRVOperand *Op0IDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
-
-      uint32_t Op1ID = ShiftAmountID;
-      SPIRVOperand *Op1IDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      const uint32_t ResTyID = lookupType(CompositeTy);
+      Ops << MkId(ResTyID) << MkId(CstFFID) << MkId(ShiftAmountID);
 
       uint32_t MaskID = nextID;
 
@@ -4467,12 +3996,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // Inverse mask.
       Ops.clear();
-
-      Ops.push_back(ResTyIDOp);
-
-      Op0ID = MaskID;
-      Op0IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
+      Ops << MkId(ResTyID) << MkId(MaskID);
 
       uint32_t InvMaskID = nextID;
 
@@ -4481,16 +4005,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // Apply mask.
       Ops.clear();
-
-      Ops.push_back(ResTyIDOp);
-
-      Op0ID = VMap[I.getOperand(0)];
-      Op0IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
-
-      Op1ID = InvMaskID;
-      Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      Ops << MkId(ResTyID) << MkId(VMap[I.getOperand(0)]) << MkId(InvMaskID);
 
       uint32_t OrgValID = nextID;
 
@@ -4499,16 +4014,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // Create correct value according to index of insertelement.
       Ops.clear();
-
-      Ops.push_back(ResTyIDOp);
-
-      Op0ID = VMap[I.getOperand(1)];
-      Op0IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
-
-      Op1ID = ShiftAmountID;
-      Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      Ops << MkId(ResTyID) << MkId(VMap[I.getOperand(1)]) << MkId(ShiftAmountID);
 
       uint32_t InsertValID = nextID;
 
@@ -4517,16 +4023,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // Insert value to original value.
       Ops.clear();
-
-      Ops.push_back(ResTyIDOp);
-
-      Op0ID = OrgValID;
-      Op0IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-      Ops.push_back(Op0IDOp);
-
-      Op1ID = InsertValID;
-      Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-      Ops.push_back(Op1IDOp);
+      Ops << MkId(ResTyID) << MkId(OrgValID) << MkId(InsertValID);
 
       VMap[&I] = nextID;
 
@@ -4542,34 +4039,16 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[3] ... Ops[n] = Indexes (Literal Number)
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(I.getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
-    uint32_t ObjectID = VMap[I.getOperand(1)];
-    SPIRVOperand *ObjectIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ObjectID);
-    Ops.push_back(ObjectIDOp);
-
-    uint32_t CompositeID = VMap[I.getOperand(0)];
-    SPIRVOperand *CompositeIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, CompositeID);
-    Ops.push_back(CompositeIDOp);
+    Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(1)])
+        << MkId(VMap[I.getOperand(0)]);
 
     spv::Op Opcode = spv::OpCompositeInsert;
     if (const ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2))) {
-      std::vector<uint32_t> LiteralNum;
-      assert(CI->getZExtValue() < UINT32_MAX);
-      LiteralNum.push_back(static_cast<uint32_t>(CI->getZExtValue()));
-      SPIRVOperand *Indexes =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(Indexes);
+      const auto value = CI->getZExtValue();
+      assert(value <= UINT32_MAX);
+      Ops << MkNum(static_cast<uint32_t>(value));
     } else {
-      uint32_t IndexID = VMap[I.getOperand(1)];
-      SPIRVOperand *IndexIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, IndexID);
-      Ops.push_back(IndexIDOp);
+      Ops << MkId(VMap[I.getOperand(1)]);
       Opcode = spv::OpVectorInsertDynamic;
     }
 
@@ -4586,20 +4065,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[3] ... Ops[n] = Components (Literal Number)
     SPIRVOperandList Ops;
 
-    uint32_t ResTyID = lookupType(I.getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
-    uint32_t Vec1ID = VMap[I.getOperand(0)];
-    SPIRVOperand *Vec1IDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, Vec1ID);
-    Ops.push_back(Vec1IDOp);
-
-    uint32_t Vec2ID = VMap[I.getOperand(1)];
-    SPIRVOperand *Vec2IDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, Vec2ID);
-    Ops.push_back(Vec2IDOp);
+    Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)])
+        << MkId(VMap[I.getOperand(1)]);
 
     uint64_t NumElements = 0;
     if (Constant *Cst = dyn_cast<Constant>(I.getOperand(2))) {
@@ -4607,22 +4074,15 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       if (Cst->isNullValue()) {
         for (unsigned i = 0; i < NumElements; i++) {
-          std::vector<uint32_t> LiteralNum;
-          LiteralNum.push_back(0);
-          SPIRVOperand *Component =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(Component);
+          Ops << MkNum(0);
         }
       } else if (const ConstantDataSequential *CDS =
                      dyn_cast<ConstantDataSequential>(Cst)) {
         for (unsigned i = 0; i < CDS->getNumElements(); i++) {
           std::vector<uint32_t> LiteralNum;
-          assert(CDS->getElementAsInteger(i) < UINT32_MAX);
-          LiteralNum.push_back(
-              static_cast<uint32_t>(CDS->getElementAsInteger(i)));
-          SPIRVOperand *Component =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(Component);
+          const auto value = CDS->getElementAsInteger(i);
+          assert(value <= UINT32_MAX);
+          Ops << MkNum(static_cast<uint32_t>(value));
         }
       } else if (const ConstantVector *CV = dyn_cast<ConstantVector>(Cst)) {
         for (unsigned i = 0; i < CV->getNumOperands(); i++) {
@@ -4639,11 +4099,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             llvm_unreachable("Unsupported element in ConstantVector!");
           }
 
-          std::vector<uint32_t> LiteralNum;
-          LiteralNum.push_back(literal);
-          SPIRVOperand *Component =
-              new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-          Ops.push_back(Component);
+          Ops << MkNum(literal);
         }
       } else {
         Cst->print(errs());
@@ -4661,16 +4117,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   case Instruction::FCmp: {
     CmpInst *CmpI = cast<CmpInst>(&I);
 
-    // Ops[0] = Result Type ID
-    // Ops[1] = Operand 1 ID
-    // Ops[2] = Operand 2 ID
-    SPIRVOperandList Ops;
-
-    uint32_t ResTyID = lookupType(CmpI->getType());
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
     // Pointer equality is invalid.
     Type* ArgTy = CmpI->getOperand(0)->getType();
     if (isa<PointerType>(ArgTy)) {
@@ -4683,13 +4129,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    uint32_t Op1ID = VMap[CmpI->getOperand(0)];
-    SPIRVOperand *Op1IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op1ID);
-    Ops.push_back(Op1IDOp);
+    // Ops[0] = Result Type ID
+    // Ops[1] = Operand 1 ID
+    // Ops[2] = Operand 2 ID
+    SPIRVOperandList Ops;
 
-    uint32_t Op2ID = VMap[CmpI->getOperand(1)];
-    SPIRVOperand *Op2IDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, Op2ID);
-    Ops.push_back(Op2IDOp);
+    Ops << MkId(lookupType(CmpI->getType())) << MkId(VMap[CmpI->getOperand(0)])
+        << MkId(VMap[CmpI->getOperand(1)]);
 
     spv::Op Opcode = GetSPIRVCmpOpcode(CmpI);
     SPIRVInstruction *Inst = new SPIRVInstruction(5, Opcode, nextID++, Ops);
@@ -4728,16 +4174,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[1] : Storage Class
     SPIRVOperandList Ops;
 
-    Type *ResTy = I.getType();
-    uint32_t ResTyID = lookupType(ResTy);
-    SPIRVOperand *ResTyOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyOp);
-
-    spv::StorageClass StorageClass = spv::StorageClassFunction;
-    SPIRVOperand *StorageClassOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, StorageClass);
-    Ops.push_back(StorageClassOp);
+    Ops << MkId(lookupType(I.getType())) << MkNum(spv::StorageClassFunction);
 
     SPIRVInstruction *Inst =
         new SPIRVInstruction(4, spv::OpVariable, nextID++, Ops);
@@ -4766,18 +4203,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // TODO(dneto): Revisit this once drivers fix their bugs.
 
       SPIRVOperandList Ops;
-
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
-
-      SPIRVOperand *ValueIDOp0 =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, WorkgroupSizeValueID);
-      Ops.push_back(ValueIDOp0);
-
-      SPIRVOperand *ValueIDOp1 =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, WorkgroupSizeValueID);
-      Ops.push_back(ValueIDOp1);
+      Ops << MkId(ResTyID) << MkId(WorkgroupSizeValueID)
+          << MkId(WorkgroupSizeValueID);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(5, spv::OpBitwiseAnd, nextID++, Ops);
@@ -4794,14 +4221,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // TODO: Do we need to implement Optional Memory Access???
 
     SPIRVOperandList Ops;
-
-    SPIRVOperand *ResTyIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-    Ops.push_back(ResTyIDOp);
-
-    SPIRVOperand *PointerIDOp =
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
-    Ops.push_back(PointerIDOp);
+    Ops << MkId(ResTyID) << MkId(PointerID);
 
     SPIRVInstruction *Inst =
         new SPIRVInstruction(4, spv::OpLoad, nextID++, Ops);
@@ -4819,10 +4239,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Optional Memory Access (later???)
     //
     // TODO: Do we need to implement Optional Memory Access???
-    SPIRVOperand *Ops[2] = {new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                             VMap[ST->getPointerOperand()]),
-                            new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                             VMap[ST->getValueOperand()])};
+    SPIRVOperandList Ops;
+    Ops << MkId(VMap[ST->getPointerOperand()])
+        << MkId(VMap[ST->getValueOperand()]);
 
     SPIRVInstruction *Inst =
         new SPIRVInstruction(3, spv::OpStore, 0 /* No id */, Ops);
@@ -4880,28 +4299,19 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     //
     SPIRVOperandList Ops;
 
-    uint32_t TyID = lookupType(I.getType());
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
-
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   VMap[AtomicRMW->getPointerOperand()]));
+    Ops << MkId(lookupType(I.getType()))
+        << MkId(VMap[AtomicRMW->getPointerOperand()]);
 
     auto IntTy = Type::getInt32Ty(I.getContext());
-
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
-
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   VMap[ConstantScopeDevice]));
+    Ops << MkId(VMap[ConstantScopeDevice]);
 
     const auto ConstantMemorySemantics = ConstantInt::get(
         IntTy, spv::MemorySemanticsUniformMemoryMask |
                    spv::MemorySemanticsSequentiallyConsistentMask);
+    Ops << MkId(VMap[ConstantMemorySemantics]);
 
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   VMap[ConstantMemorySemantics]));
-
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   VMap[AtomicRMW->getValOperand()]));
+    Ops << MkId(VMap[AtomicRMW->getValOperand()]);
 
     VMap[&I] = nextID;
 
@@ -4928,15 +4338,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       SPIRVOperandList Ops;
 
-      uint32_t ResTyID = lookupType(SamplerTy->getPointerElementType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t PointerID = VMap[Call];
-      SPIRVOperand *PointerIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
-      Ops.push_back(PointerIDOp);
+      Ops << MkId(lookupType(SamplerTy->getPointerElementType()))
+          << MkId(VMap[Call]);
 
       VMap[Call] = nextID;
       SPIRVInstruction *Inst =
@@ -4969,12 +4372,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
+      Ops << MkId(lookupType(I.getType()));
 
       for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                       VMap[Call->getArgOperand(i)]));
+        Ops << MkId(VMap[Call->getArgOperand(i)]);
       }
 
       VMap[&I] = nextID;
@@ -4993,12 +4394,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         //
         SPIRVOperandList Ops;
 
-        uint32_t TyID = lookupType(I.getType());
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
+        Ops << MkId(lookupType(I.getType()));
 
         for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-          Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                         VMap[Call->getArgOperand(i)]));
+          Ops << MkId(VMap[Call->getArgOperand(i)]);
         }
 
         VMap[&I] = nextID;
@@ -5012,12 +4411,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         //
         SPIRVOperandList Ops;
 
-        uint32_t TyID = lookupType(I.getType());
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
+        Ops << MkId(lookupType(I.getType()));
 
         for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-          Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                         VMap[Call->getArgOperand(i)]));
+          Ops << MkId(VMap[Call->getArgOperand(i)]);
         }
 
         VMap[&I] = nextID;
@@ -5037,12 +4434,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID));
+      Ops << MkId(lookupType(I.getType()));
 
       for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                       VMap[Call->getArgOperand(i)]));
+        Ops << MkId(VMap[Call->getArgOperand(i)]);
       }
 
       VMap[&I] = nextID;
@@ -5065,14 +4460,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       SPIRVOperandList Ops;
 
       uint32_t PointerID = VMap[Call->getArgOperand(0)];
-      SPIRVOperand *PointerIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, PointerID);
-      Ops.push_back(PointerIDOp);
-
       uint32_t ObjectID = VMap[Call->getArgOperand(1)];
-      SPIRVOperand *ObjectIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ObjectID);
-      Ops.push_back(ObjectIDOp);
+      Ops << MkId(PointerID) << MkId(ObjectID);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(3, spv::OpStore, 0 /* No id */, Ops);
@@ -5103,14 +4492,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       auto Alignment =
           dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
 
-      SPIRVOperand *Ops[4] = {
-          new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                           VMap[Call->getArgOperand(0)]),
-          new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                           VMap[Call->getArgOperand(1)]),
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, MemoryAccess),
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER,
-                           static_cast<uint32_t>(Alignment))};
+      SPIRVOperandList Ops;
+      Ops << MkId(VMap[Call->getArgOperand(0)])
+          << MkId(VMap[Call->getArgOperand(1)]) << MkNum(MemoryAccess)
+          << MkNum(static_cast<uint32_t>(Alignment));
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(5, spv::OpCopyMemory, 0 /* No id */, Ops);
@@ -5143,10 +4528,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Value *MemoryScope = Call->getArgOperand(1);
       Value *MemorySemantics = Call->getArgOperand(2);
 
-      SPIRVOperand *Ops[3] = {
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[ExecutionScope]),
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[MemoryScope]),
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[MemorySemantics])};
+      SPIRVOperandList Ops;
+      Ops << MkId(VMap[ExecutionScope]) << MkId(VMap[MemoryScope])
+          << MkId(VMap[MemorySemantics]);
 
       SPIRVInstList.push_back(
           new SPIRVInstruction(4, spv::OpControlBarrier, 0 /* No id */, Ops));
@@ -5163,16 +4547,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      Value *MemoryScope = Call->getArgOperand(0);
-      Value *MemorySemantics = Call->getArgOperand(1);
+      uint32_t MemoryScopeID = VMap[Call->getArgOperand(0)];
+      uint32_t MemorySemanticsID = VMap[Call->getArgOperand(1)];
 
-      uint32_t MemoryScopeID = VMap[MemoryScope];
-      Ops.push_back(
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, MemoryScopeID));
-
-      uint32_t MemorySemanticsID = VMap[MemorySemantics];
-      Ops.push_back(
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, MemorySemanticsID));
+      Ops << MkId(MemoryScopeID) << MkId(MemorySemanticsID);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(3, spv::OpMemoryBarrier, 0 /* No id */, Ops);
@@ -5193,13 +4571,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t XID = VMap[Call->getArgOperand(0)];
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, XID));
+      Ops << MkId(lookupType(I.getType()))
+          << MkId(VMap[Call->getArgOperand(0)]);
 
       VMap[&I] = nextID;
 
@@ -5222,13 +4595,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t XID = VMap[Call->getArgOperand(0)];
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, XID));
+      Ops << MkId(lookupType(I.getType()))
+          << MkId(VMap[Call->getArgOperand(0)]);
 
       VMap[&I] = nextID;
 
@@ -5250,13 +4618,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t VectorID = VMap[Call->getArgOperand(0)];
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, VectorID));
+      Ops << MkId(lookupType(I.getType()))
+          << MkId(VMap[Call->getArgOperand(0)]);
 
       VMap[&I] = nextID;
 
@@ -5278,13 +4641,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       SPIRVOperandList Ops;
 
-      uint32_t TyID = lookupType(I.getType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TyID);
-      Ops.push_back(ResTyIDOp);
-
-      uint32_t VectorID = VMap[Call->getArgOperand(0)];
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID, VectorID));
+      Ops << MkId(lookupType(I.getType()))
+          << MkId(VMap[Call->getArgOperand(0)]);
 
       VMap[&I] = nextID;
 
@@ -5316,19 +4674,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       TypeMapType &OpImageTypeMap = getImageTypeMap();
       Type *ImageTy = Image->getType()->getPointerElementType();
       uint32_t ImageTyID = OpImageTypeMap[ImageTy];
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ImageTyID);
-      Ops.push_back(ResTyIDOp);
-
       uint32_t ImageID = VMap[Image];
-      SPIRVOperand *ImageIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ImageID);
-      Ops.push_back(ImageIDOp);
-
       uint32_t SamplerID = VMap[Sampler];
-      SPIRVOperand *SamplerIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, SamplerID);
-      Ops.push_back(SamplerIDOp);
+
+      Ops << MkId(ImageTyID) << MkId(ImageID) << MkId(SamplerID);
 
       uint32_t SampledImageID = nextID;
 
@@ -5347,30 +4696,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      uint32_t RetTyID = lookupType(Call->getType());
-      ResTyIDOp = new SPIRVOperand(SPIRVOperandType::NUMBERID, RetTyID);
-      Ops.push_back(ResTyIDOp);
-
-      SPIRVOperand *SampledImageIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, SampledImageID);
-      Ops.push_back(SampledImageIDOp);
-
-      uint32_t CoordinateID = VMap[Coordinate];
-      SPIRVOperand *CoordinateIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, CoordinateID);
-      Ops.push_back(CoordinateIDOp);
-
-      std::vector<uint32_t> LiteralNum;
-      LiteralNum.push_back(spv::ImageOperandsLodMask);
-      SPIRVOperand *ImageOperandTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-      Ops.push_back(ImageOperandTyIDOp);
+      Ops << MkId(lookupType(Call->getType())) << MkId(SampledImageID)
+          << MkId(VMap[Coordinate]) << MkNum(spv::ImageOperandsLodMask);
 
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
-      uint32_t OperandID = VMap[CstFP0];
-      SPIRVOperand *OperandIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, OperandID);
-      Ops.push_back(OperandIDOp);
+      Ops << MkId(VMap[CstFP0]);
 
       VMap[&I] = nextID;
 
@@ -5401,19 +4731,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Value *Texel = Call->getArgOperand(2);
 
       uint32_t ImageID = VMap[Image];
-      SPIRVOperand *ImageIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ImageID);
-      Ops.push_back(ImageIDOp);
-
       uint32_t CoordinateID = VMap[Coordinate];
-      SPIRVOperand *CoordinateIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, CoordinateID);
-      Ops.push_back(CoordinateIDOp);
-
       uint32_t TexelID = VMap[Texel];
-      SPIRVOperand *TexelIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TexelID);
-      Ops.push_back(TexelIDOp);
+      Ops << MkId(ImageID) << MkId(CoordinateID) << MkId(TexelID);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(4, spv::OpImageWrite, 0 /* No id */, Ops);
@@ -5440,15 +4760,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //     %sizes = OpImageQuerySizes %uint2 %im
       uint32_t SizesTypeID =
           TypeMap[VectorType::get(Type::getInt32Ty(Context), 2)];
-      SPIRVOperand *SizesTypeIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, SizesTypeID);
-      Ops.push_back(SizesTypeIDOp);
-
       Value *Image = Call->getArgOperand(0);
       uint32_t ImageID = VMap[Image];
-      SPIRVOperand *ImageIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ImageID);
-      Ops.push_back(ImageIDOp);
+      Ops << MkId(SizesTypeID) << MkId(ImageID);
 
       uint32_t SizesID = nextID++;
       SPIRVInstruction *QueryInst =
@@ -5461,17 +4775,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // Implement:
       //     %result = OpCompositeExtract %uint %sizes 0-or-1
       Ops.clear();
-
-      SPIRVOperand *ResultTypeOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, TypeMap[I.getType()]);
-      Ops.push_back(ResultTypeOp);
-
-      SPIRVOperand *SizesOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, SizesID);
-      Ops.push_back(SizesOp);
+      Ops << MkId(TypeMap[I.getType()]) << MkId(SizesID);
 
       uint32_t component = Callee->getName().contains("height") ? 1 : 0;
-      Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, component));
+      Ops << MkNum(component);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(5, spv::OpCompositeExtract, nextID++, Ops);
@@ -5515,10 +4822,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // Ops[0] = Return Value ID
       SPIRVOperandList Ops;
-      uint32_t RetValID = VMap[I.getOperand(0)];
-      SPIRVOperand *RetValIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, RetValID);
-      Ops.push_back(RetValIDOp);
+
+      Ops << MkId(VMap[I.getOperand(0)]);
 
       SPIRVInstruction *Inst =
           new SPIRVInstruction(2, spv::OpReturnValue, 0 /* No id */, Ops);
@@ -5554,6 +4859,14 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
   }
 
   return false;
+}
+
+uint32_t SPIRVProducerPass::GetI32Zero() {
+  if (0 == constant_i32_zero_id_) {
+    llvm_unreachable("Requesting a 32-bit integer constant but it is not "
+                     "defined in the SPIR-V module");
+  }
+  return constant_i32_zero_id_;
 }
 
 void SPIRVProducerPass::HandleDeferredInstruction() {
@@ -5629,18 +4942,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // StructurizeCFG pass already manipulated CFG. Just use false block of
         // branch instruction as merge block.
         uint32_t MergeBBID = VMap[MergeBB];
-        SPIRVOperand *MergeBBIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, MergeBBID);
-        Ops.push_back(MergeBBIDOp);
-
         uint32_t ContinueBBID = VMap[ContinueBB];
-        SPIRVOperand *ContinueBBIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ContinueBBID);
-        Ops.push_back(ContinueBBIDOp);
-
-        SPIRVOperand *SelectionControlOp = new SPIRVOperand(
-            SPIRVOperandType::NUMBERID, spv::SelectionControlMaskNone);
-        Ops.push_back(SelectionControlOp);
+        Ops << MkId(MergeBBID) << MkId(ContinueBBID)
+            << MkNum(spv::SelectionControlMaskNone);
 
         SPIRVInstruction *MergeInst =
             new SPIRVInstruction(4, spv::OpLoopMerge, 0 /* No id */, Ops);
@@ -5665,13 +4969,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           // StructurizeCFG pass already manipulated CFG. Just use false block
           // of branch instruction as merge block.
           uint32_t MergeBBID = VMap[Br->getSuccessor(1)];
-          SPIRVOperand *MergeBBIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, MergeBBID);
-          Ops.push_back(MergeBBIDOp);
-
-          SPIRVOperand *SelectionControlOp = new SPIRVOperand(
-              SPIRVOperandType::NUMBERID, spv::SelectionControlMaskNone);
-          Ops.push_back(SelectionControlOp);
+          Ops << MkId(MergeBBID) << MkNum(spv::SelectionControlMaskNone);
 
           SPIRVInstruction *MergeInst = new SPIRVInstruction(
               3, spv::OpSelectionMerge, 0 /* No id */, Ops);
@@ -5690,19 +4988,10 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVOperandList Ops;
 
         uint32_t CondID = VMap[Br->getCondition()];
-        SPIRVOperand *CondIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, CondID);
-        Ops.push_back(CondIDOp);
-
         uint32_t TrueBBID = VMap[Br->getSuccessor(0)];
-        SPIRVOperand *TrueBBIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, TrueBBID);
-        Ops.push_back(TrueBBIDOp);
-
         uint32_t FalseBBID = VMap[Br->getSuccessor(1)];
-        SPIRVOperand *FalseBBIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, FalseBBID);
-        Ops.push_back(FalseBBIDOp);
+
+        Ops << MkId(CondID) << MkId(TrueBBID) << MkId(FalseBBID);
 
         SPIRVInstruction *BrInst = new SPIRVInstruction(
             4, spv::OpBranchConditional, 0 /* No id */, Ops);
@@ -5715,9 +5004,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVOperandList Ops;
 
         uint32_t TargetID = VMap[Br->getSuccessor(0)];
-        SPIRVOperand *TargetIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, TargetID);
-        Ops.push_back(TargetIDOp);
+        Ops << MkId(TargetID);
 
         SPIRVInstList.insert(
             InsertPoint,
@@ -5731,23 +5018,13 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
       // Ops[1] ... Ops[n] = (Variable ID, Parent ID) pairs
       SPIRVOperandList Ops;
 
-      uint32_t ResTyID = lookupType(PHI->getType());
-      SPIRVOperand *ResTyIDOp =
-          new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-      Ops.push_back(ResTyIDOp);
+      Ops << MkId(lookupType(PHI->getType()));
 
       uint16_t WordCount = 3;
       for (unsigned i = 0; i < PHI->getNumIncomingValues(); i++) {
         uint32_t VarID = VMap[PHI->getIncomingValue(i)];
-        SPIRVOperand *VarIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, VarID);
-        Ops.push_back(VarIDOp);
-
         uint32_t ParentID = VMap[PHI->getIncomingBlock(i)];
-        SPIRVOperand *ParentIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ParentID);
-        Ops.push_back(ParentIDOp);
-
+        Ops << MkId(VarID) << MkId(ParentID);
         WordCount += 2;
       }
 
@@ -5772,29 +5049,13 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(Call->getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
-
-        SPIRVOperand *SetIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ExtInstImportID);
-        Ops.push_back(SetIDOp);
-
-        std::vector<uint32_t> LiteralNum;
-        LiteralNum.push_back(EInst);
-        SPIRVOperand *InstructionOp =
-            new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, LiteralNum);
-        Ops.push_back(InstructionOp);
+        Ops << MkId(lookupType(Call->getType())) << MkId(ExtInstImportID) << MkNum(EInst);
 
         uint16_t WordCount = 5;
 
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
         for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
-          uint32_t ArgID = VMap[Call->getOperand(i)];
-          SPIRVOperand *ArgIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, ArgID);
-          Ops.push_back(ArgIDOp);
+          Ops << MkId(VMap[Call->getOperand(i)]);
           WordCount++;
         }
 
@@ -5823,21 +5084,13 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             SPIRVOperandList Ops;
 
             Type *resultTy = Call->getType();
-            Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                           lookupType(resultTy)));
+            Ops << MkId(lookupType(resultTy));
 
             if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
               constant = ConstantVector::getSplat(
                   static_cast<unsigned>(vectorTy->getNumElements()), constant);
             }
-            uint32_t Op0ID = VMap[constant];
-            SPIRVOperand *Op0IDOp =
-                new SPIRVOperand(SPIRVOperandType::NUMBERID, Op0ID);
-            Ops.push_back(Op0IDOp);
-
-            SPIRVOperand *Op1IDOp = new SPIRVOperand(
-                SPIRVOperandType::NUMBERID, std::get<2>(*DeferredInst));
-            Ops.push_back(Op1IDOp);
+            Ops << MkId(VMap[constant]) << MkId(std::get<2>(*DeferredInst));
 
             SPIRVInstList.insert(
                 InsertPoint,
@@ -5876,10 +5129,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         //
         // Ops[0] = Result Type ID
         // Ops[1] = Base ID
-        SPIRVOperand *Ops[2]{new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                              lookupType(Call->getType())),
-                             new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                              VMap[Call->getOperand(0)])};
+        SPIRVOperandList Ops;
+        Ops << MkId(lookupType(Call->getType()))
+            << MkId(VMap[Call->getOperand(0)]);
 
         SPIRVInstList.insert(
             InsertPoint, new SPIRVInstruction(4, spv::OpBitCount,
@@ -5891,13 +5143,11 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVOperandList Ops;
 
         // The result type.
-        Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                       lookupType(Call->getType())));
+        Ops << MkId(lookupType(Call->getType()));
 
         for (Use &use : Call->arg_operands()) {
-          Value* val = use.get();
-          Ops.push_back(
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, VMap[use.get()]));
+          Value *val = use.get();
+          Ops << MkId(VMap[use.get()]);
         }
 
         SPIRVInstList.insert(
@@ -5915,10 +5165,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // Ops[2] ... Ops[n] = Argument 0, ... , Argument n
         SPIRVOperandList Ops;
 
-        uint32_t ResTyID = lookupType(Call->getType());
-        SPIRVOperand *ResTyIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, ResTyID);
-        Ops.push_back(ResTyIDOp);
+        Ops << MkId( lookupType(Call->getType()));
 
         uint32_t CalleeID = VMap[Callee];
         if (CalleeID == 0) {
@@ -5930,18 +5177,13 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           // llvm_unreachable("Can't translate function call");
         }
 
-        SPIRVOperand *CalleeIDOp =
-            new SPIRVOperand(SPIRVOperandType::NUMBERID, CalleeID);
-        Ops.push_back(CalleeIDOp);
+        Ops << MkId(CalleeID);
 
         uint16_t WordCount = 4;
 
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
         for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
-          uint32_t ArgID = VMap[Call->getOperand(i)];
-          SPIRVOperand *ArgIDOp =
-              new SPIRVOperand(SPIRVOperandType::NUMBERID, ArgID);
-          Ops.push_back(ArgIDOp);
+          Ops << MkId(VMap[Call->getOperand(i)]);
           WordCount++;
         }
 
@@ -5996,13 +5238,11 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     // Ops[2] = Stride number (Literal Number)
     SPIRVOperandList Ops;
 
-    Ops.push_back(
-        new SPIRVOperand(SPIRVOperandType::NUMBERID, lookupType(type)));
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::NUMBERID,
-                                   spv::DecorationArrayStride));
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
     const uint32_t stride = static_cast<uint32_t>(DL.getTypeAllocSize(elemTy));
-    Ops.push_back(new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, stride));
+
+    Ops << MkId(lookupType(type)) << MkNum(spv::DecorationArrayStride)
+        << MkNum(stride);
 
     SPIRVInstruction *DecoInst =
         new SPIRVInstruction(4, spv::OpDecorate, 0 /* No id */, Ops);
