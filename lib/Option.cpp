@@ -34,6 +34,14 @@ llvm::cl::opt<bool> f16bit_storage(
     "f16bit_storage", llvm::cl::init(false),
     llvm::cl::desc("Assume the target supports SPV_KHR_16bit_storage"));
 
+llvm::cl::opt<bool> hack_initializers(
+    "hack-initializers", llvm::cl::init(false),
+    llvm::cl::desc(
+        "At the start of each kernel, explicitly write the initializer "
+        "value for a compiler-generated variable containing the workgroup "
+        "size. Required by some drivers to make the get_global_size builtin "
+        "function work when used with non-constant dimension index."));
+
 llvm::cl::opt<bool> hack_inserts(
     "hack-inserts", llvm::cl::init(false),
     llvm::cl::desc(
@@ -73,6 +81,7 @@ namespace Option {
 
 bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
+bool HackInitializers() { return hack_initializers; }
 bool HackInserts() { return hack_inserts; }
 bool HackUndef() { return hack_undef; }
 bool ModuleConstantsInStorageBuffer() { return module_constants_in_storage_buffer; }

@@ -1,6 +1,6 @@
-// RUN: clspv %s -S -o %t.spvasm
+// RUN: clspv %s -S -o %t.spvasm -hack-initializers
 // RUN: FileCheck %s < %t.spvasm
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %s -o %t.spv -hack-initializers
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -54,6 +54,8 @@
 
 // CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] None %[[FOO_TYPE_ID]]
 // CHECK-NEXT: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
+// This is new, caused by -hack-initializers
+// CHECK-NEXT: OpStore %[[WORKGROUP_SIZE_VAR_ID]] %[[WORKGROUP_SIZE_ID]]
 // CHECK-NEXT: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG1_ID]] %[[CONSTANT_0_ID]]
 // CHECK-NEXT: %[[LOAD1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[ACCESS_CHAIN1_ID]]
 // CHECK-NEXT: %[[RESULT_ID:[a-zA-Z0-9_]*]] = OpFunctionCall %[[UINT_TYPE_ID]] %[[GET_GLOBAL_SIZE_ID:[a-zA-Z0-9_]*]] %[[LOAD1_ID]]

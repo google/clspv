@@ -302,6 +302,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateFuncPrologue(Function &F);
   void GenerateFuncBody(Function &F);
   void GenerateInstForArg(Function &F);
+  void GenerateEntryPointInitialStores();
   spv::Op GetSPIRVCmpOpcode(CmpInst *CmpI);
   spv::Op GetSPIRVCastOpcode(Instruction &I);
   spv::Op GetSPIRVBinaryOpcode(Instruction &I);
@@ -3334,14 +3335,29 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
   }
 }
 
+void SPIRVProducerPass::GenerateEntryPointInitialStores() {
+  // Work around a driver bug.  Initializers on Private variables might not
+  // work. So the start of the kernel should store the initializer value to the
+  // variables.  Yes, *every* entry point pays this cost if *any* entry point
+  // uses this builtin.  At this point I judge this to be an acceptable tradeoff
+  // of complexity vs. runtime, for a broken driver.
+  // TODO(dneto): Remove this at some point once fixed drivers are widely available.
+  if (WorkgroupSizeVarID) {
+    assert(WorkgroupSizeValueID);
+
+    SPIRVOperandList Ops;
+    Ops << MkId(WorkgroupSizeVarID) << MkId(WorkgroupSizeValueID);
+
+    auto *Inst = new SPIRVInstruction(spv::OpStore, Ops);
+    getSPIRVInstList().push_back(Inst);
+  }
+}
+
 void SPIRVProducerPass::GenerateFuncBody(Function &F) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
 
-  bool IsKernel = false;
-  if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    IsKernel = true;
-  }
+  const bool IsKernel = F.getCallingConv() == CallingConv::SPIR_KERNEL;
 
   for (BasicBlock &BB : F) {
     // Register BasicBlock to ValueMap.
@@ -3362,6 +3378,9 @@ void SPIRVProducerPass::GenerateFuncBody(Function &F) {
     }
 
     if (&BB == &F.getEntryBlock() && IsKernel) {
+      if (clspv::Option::HackInitializers()) {
+        GenerateEntryPointInitialStores();
+      }
       GenerateInstForArg(F);
     }
 
