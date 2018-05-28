@@ -67,6 +67,14 @@ llvm::ModulePass *createFunctionInternalizerPass();
 /// call instructions which have pointer bitcast as argument.
 llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass();
 
+/// Inline call instructions having pointer-to-function parameters.
+/// @return An LLVM module pass.
+///
+/// Rewrite any helper function that has a pointer-to-function argument.
+/// This avoids important cases of doing OpPtrAccessChain for a pointer
+/// in Function storage class, which is not allowed by VariablePointers.
+llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass();
+
 /// Create a simple OpenCL inliner.
 /// @return An LLVM module pass.
 ///
@@ -264,7 +272,7 @@ llvm::ModulePass *createUnhideConstantLoadsPass();
 ///
 /// Rewrite a chain of insertvalue instructions that cover all
 /// members of a struct, so that it becomes a single new builtin
-/// corresponding to an OpCompositeConstruct.  Only affects 
+/// corresponding to an OpCompositeConstruct.  Only affects
 /// insertvalue instructions with a single index operand.
 ///
 /// Also, if -hack-inserts option is used, then also rewrite
