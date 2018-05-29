@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
@@ -101,6 +102,8 @@ Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(
 bool ReplacePointerBitcastPass::runOnModule(Module &M) {
   bool Changed = false;
 
+  const DataLayout& DL = M.getDataLayout();
+
   SmallVector<Instruction *, 16> VectorWorkList;
   SmallVector<Instruction *, 16> ScalarWorkList;
   for (Function &F : M) {
@@ -141,10 +144,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         DstTy->isVectorTy() ? DstTy->getSequentialElementType() : DstTy;
     // These are bit widths of the source and destination types, even
     // if they are vector types.  E.g. bit width of float4 is 64.
-    unsigned SrcTyBitWidth = SrcTy->getPrimitiveSizeInBits();
-    unsigned DstTyBitWidth = DstTy->getPrimitiveSizeInBits();
-    unsigned SrcEleTyBitWidth = SrcEleTy->getPrimitiveSizeInBits();
-    unsigned DstEleTyBitWidth = DstEleTy->getPrimitiveSizeInBits();
+    unsigned SrcTyBitWidth = DL.getTypeStoreSizeInBits(SrcTy);
+    unsigned DstTyBitWidth = DL.getTypeStoreSizeInBits(DstTy);
+    unsigned SrcEleTyBitWidth = DL.getTypeStoreSizeInBits(SrcEleTy);
+    unsigned DstEleTyBitWidth = DL.getTypeStoreSizeInBits(DstEleTy);
     unsigned NumIter = CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
 
     // Investigate pointer bitcast's users.
@@ -715,11 +718,86 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
   }
 
   for (Instruction *Inst : ScalarWorkList) {
+    // Some tests have a stray bitcast from pointer-to-array to
+    // pointer to i8*, but the bitcast has no uses.  Exit early
+    // but be sure to delete it later.
+    //
+    // Example:
+    //   %1 = bitcast [25 x float]* %dst to i8*
+
+    // errs () << " Scalar bitcast is " << *Inst << "\n";
+
+    if (!Inst->hasNUsesOrMore(1)) {
+      ToBeDeleted.push_back(Inst);
+      continue;
+    }
+
     Value *Src = Inst->getOperand(0);
-    Type *SrcTy = Src->getType()->getPointerElementType();
-    Type *DstTy = Inst->getType()->getPointerElementType();
-    unsigned SrcTyBitWidth = SrcTy->getPrimitiveSizeInBits();
-    unsigned DstTyBitWidth = DstTy->getPrimitiveSizeInBits();
+    Type *SrcTy; // Original type
+    Type *DstTy; // Type that SrcTy is cast to.
+    unsigned SrcTyBitWidth;
+    unsigned DstTyBitWidth;
+
+    SrcTy = Src->getType()->getPointerElementType();
+    DstTy = Inst->getType()->getPointerElementType();
+    int iter_count = 0;
+    while (++iter_count) {
+      SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
+      DstTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(DstTy));
+#if 0
+      errs() << "  Try Src " << *Src << "\n";
+      errs() << "  SrcTy elem " << *SrcTy << " bit width " << SrcTyBitWidth
+             << "\n";
+      errs() << "  DstTy elem " << *DstTy << " bit width " << DstTyBitWidth
+             << "\n";
+#endif
+
+      // The normal case that we can handle is source type is smaller than
+      // the dest type.
+      if (SrcTyBitWidth <= DstTyBitWidth)
+        break;
+
+      // The Source type is bigger than the destination type.
+      // Walk into the source type to break it down.
+      if (SrcTy->isArrayTy()) {
+        // If it's an array, consider only the first element.
+        Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+        Instruction* NewSrc = GetElementPtrInst::CreateInBounds(Src, {Zero, Zero});
+        // errs() << "NewSrc is " << *NewSrc << "\n";
+        if (auto *SrcInst = dyn_cast<Instruction>(Src)) {
+          // errs() << " instruction case\n";
+          NewSrc->insertAfter(SrcInst);
+        } else {
+          // Could be a parameter.
+          auto where = Inst->getParent()
+                           ->getParent()
+                           ->getEntryBlock()
+                           .getFirstInsertionPt();
+          Instruction& whereInst = *where;
+          // errs() << "insert " << *NewSrc << " before " << whereInst << "\n";
+          NewSrc->insertBefore(&whereInst);
+        }
+        Src = NewSrc;
+        SrcTy = Src->getType()->getPointerElementType();
+      } else {
+        errs() << "Replace pointer bitcasts: unhandled case: non-array "
+                  "non-vector source type "
+               << *SrcTy << " is wider than dest type " << *DstTy << "\n";
+        llvm_unreachable("ReplacePointerBitcastPass: non-array non-vector "
+                         "source type is wider than dest type");
+      }
+      if (iter_count > 1000) {
+        llvm_unreachable("ReplacePointerBitcastPass: Too many iterations!");
+      }
+    };
+#if 0
+    errs() << " Src is " << *Src << "\n";
+    errs() << " Dst is " << *Inst << "\n";
+    errs() << "  SrcTy elem " << *SrcTy << " bit width " << SrcTyBitWidth
+           << "\n";
+    errs() << "  DstTy elem " << *DstTy << " bit width " << DstTyBitWidth
+           << "\n";
+#endif
 
     for (User *BitCastUser : Inst->users()) {
       Value *NewAddrIdx = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
@@ -753,6 +831,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
         // Handle store instruction with gep.
         if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
+          //errs() << " store is " << *ST << "\n";
           if (SrcTyBitWidth == DstTyBitWidth) {
             auto STVal = Builder.CreateBitCast(ST->getValueOperand(), SrcTy);
             Value *DstAddr = Builder.CreateGEP(Src, NewAddrIdx);

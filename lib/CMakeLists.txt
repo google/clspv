@@ -39,6 +39,7 @@ add_library(clspv_core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoSRetPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoTranslateSamplerFoldPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoTruncatedSwitchConditionPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
 # Enable C++11 for our executable

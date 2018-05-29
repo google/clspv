@@ -74,7 +74,7 @@ kernel void foo(global S* data, float f) {
 // CHECK: [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
 // CHECK: [[_float_2:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 2
 // CHECK: [[_float_1:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 1
-// CHECK: [[_21:%[0-9a-zA-Z_]+]] = OpUndef [[_float]]
+// CHECK: [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK: [[_22]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_23]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_24]] = OpSpecConstant [[_uint]] 1
@@ -87,7 +87,7 @@ kernel void foo(global S* data, float f) {
 // CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK: [[_32:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_30]] [[_float_2]]
 // CHECK: [[_33:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_30]] [[_float_1]]
-// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[__struct_2]] [[_30]] [[_33]] [[_32]] [[_21]]
+// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[__struct_2]] [[_30]] [[_33]] [[_32]] [[_float_0]]
 // CHECK: OpReturnValue [[_34]]
 // CHECK: OpFunctionEnd
 // CHECK: [[_35]] = OpFunction [[_void]] None [[_11]]

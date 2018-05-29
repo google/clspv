@@ -680,6 +680,7 @@ int main(const int argc, const char *const argv[]) {
     break;
   }
 
+  pm.add(clspv::createZeroInitializeAllocasPass());
   pm.add(clspv::createDefineOpenCLWorkItemBuiltinsPass());
 
   if (0 < pmBuilder.OptLevel) {

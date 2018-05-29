@@ -67,13 +67,25 @@ llvm::ModulePass *createFunctionInternalizerPass();
 /// call instructions which have pointer bitcast as argument.
 llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass();
 
-/// Inline call instructions having pointer-to-function parameters.
+/// Inline call instructions to functions having pointer-to-private args.
 /// @return An LLVM module pass.
 ///
-/// Rewrite any helper function that has a pointer-to-function argument.
-/// This avoids important cases of doing OpPtrAccessChain for a pointer
-/// in Function storage class, which is not allowed by VariablePointers.
+/// Try to avoid OpPtrAccessChain to Function storage class by inlining
+/// function calls that lead to getelementptr on private storage, but which
+/// the compiler will not normally optimize away.
 llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass();
+
+/// Zero-initialize allocas.
+/// @return An LLVM module pass.
+///
+/// Store a zero value to any alloca.  This helps us avoid ConstantExpr
+/// in the output.  The SPIR-V producer does not know how to emit code
+/// for ConstantExpr.  This is a bit of a hack.
+llvm::ModulePass *createZeroInitializeAllocasPass();
+
+/// Rewrite constant expressions as instructions.
+/// @return An LLVM module pass.
+llvm::ModulePass *createRewriteConstantExpressionsPass();
 
 /// Create a simple OpenCL inliner.
 /// @return An LLVM module pass.

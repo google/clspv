@@ -5,116 +5,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Schema: 0
-// CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
-// CHECK: OpMemoryModel Logical GLSL450
-// CHECK: OpEntryPoint GLCompute [[entry_id:%[a-zA-Z0-9_]*]] "src_is_array"
-// CHECK: OpExecutionMode [[entry_id]] LocalSize 1 1 1
-
-// CHECK: OpDecorate
-
-// Types:
-
-// CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[ptr_sb_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[float]]
-// CHECK: [[rtarr_float:%[a-zA-Z0-9_]+]] = OpTypeRuntimeArray [[float]]
-// CHECK: [[st_rtarr_float:%[a-zA-Z0-9_]+]] = OpTypeStruct [[rtarr_float]]
-// CHECK: [[ptr_sb_st_rtarr_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[st_rtarr_float]]
-
-// CHECK: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[st_int:%[a-zA-Z0-9_]+]] = OpTypeStruct [[int]]
-// CHECK: [[ptr_sb_st_int:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[st_int]]
-// CHECK: [[ptr_sb_int:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[int]]
-
-// CHECK: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CHECK: [[void_fn:%[a-zA-Z0-9_]+]] = OpTypeFunction [[void]]
-// CHECK: [[n7:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 7
-// CHECK: [[arr7_float:%[a-zA-Z0-9_]+]] = OpTypeArray [[float]] [[n7]]
-// CHECK: [[ptr_arr7_float:%[a-zA-Z0-9_]+]] = OpTypePointer Function [[arr7_float]]
-// CHECK: [[ptr_float:%[a-zA-Z0-9_]+]] = OpTypePointer Function [[float]]
-
-
-// CHECK: [[n0:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 0
-// CHECK: [[f0:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 0
-// CHECK: [[n1:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 1
-// CHECK: [[f1:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 1
-// CHECK: [[n2:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 2
-// CHECK: [[f2:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 2
-// CHECK: [[n3:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 3
-// CHECK: [[f3:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 3
-// CHECK: [[n4:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 4
-// CHECK: [[f4:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 4
-// CHECK: [[n5:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 5
-// CHECK: [[f5:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 5
-// CHECK: [[n6:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 6
-// CHECK: [[f6:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 6
-
-// CHECK: [[var_A:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_sb_st_rtarr_float]] StorageBuffer
-// CHECK: [[var_n:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_sb_st_int]] StorageBuffer
-// CHECK: [[var_k:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_sb_st_int]] StorageBuffer
-
-
-// CHECK: [[entry_id]] = OpFunction [[void]] None [[void_fn]]
-// CHECK: OpLabel
-// CHECK: [[src:%[a-zA-Z0-9_]+]] = OpVariable [[ptr_arr7_float]] Function
-// CHECK: [[n_ptr:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_int]] [[var_n]] [[n0]]
-// CHECK: [[n:%[a-zA-Z0-9_]+]] = OpLoad [[int]] [[n_ptr]]
-
-
-// CHECK: [[src_0:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n0]]
-// CHECK: OpStore [[src_0]] [[f0]]
-// CHECK: [[src_1:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n1]]
-// CHECK: OpStore [[src_1]] [[f1]]
-// CHECK: [[src_2:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n2]]
-// CHECK: OpStore [[src_2]] [[f2]]
-// CHECK: [[src_3:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n3]]
-// CHECK: OpStore [[src_3]] [[f3]]
-// CHECK: [[src_4:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n4]]
-// CHECK: OpStore [[src_4]] [[f4]]
-// CHECK: [[src_5:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n5]]
-// CHECK: OpStore [[src_5]] [[f5]]
-// CHECK: [[src_6:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n6]]
-// CHECK: OpStore [[src_6]] [[f6]]
-
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n0]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n0]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n1]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n1]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n2]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n2]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n3]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n3]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n4]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n4]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n5]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n5]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-// CHECK: [[src_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_float]] [[src]] [[n6]]
-// CHECK: [[index:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[n]] [[n6]]
-// CHECK: [[A_elemp:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_sb_float]] [[var_A]] [[n0]] [[index]]
-// CHECK: OpCopyMemory [[A_elemp]] [[src_elemp]] Aligned 4
-
-// CHECK-NOT: Op
-
-// CHECK: OpReturn
-// CHECK: OpFunctionEnd
-
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1)))
 src_is_array(global float *A, int n, int k) {
@@ -126,3 +16,110 @@ src_is_array(global float *A, int n, int k) {
     A[n+i] = src[i]; // Reading whole array.
   }
 }
+// CHECK: ; SPIR-V
+// CHECK: ; Version: 1.0
+// CHECK: ; Generator: Codeplay; 0
+// CHECK: ; Bound: 67
+// CHECK: ; Schema: 0
+// CHECK: OpCapability Shader
+// CHECK: OpCapability VariablePointers
+// CHECK: OpExtension "SPV_KHR_storage_buffer_storage_class"
+// CHECK: OpExtension "SPV_KHR_variable_pointers"
+// CHECK: OpMemoryModel Logical GLSL450
+// CHECK: OpEntryPoint GLCompute [[_33:%[0-9a-zA-Z_]+]] "src_is_array"
+// CHECK: OpExecutionMode [[_33]] LocalSize 1 1 1
+// CHECK: OpSource OpenCL_C 120
+// CHECK: OpDecorate [[__runtimearr_float:%[0-9a-zA-Z_]+]] ArrayStride 4
+// CHECK: OpMemberDecorate [[__struct_4:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK: OpDecorate [[__struct_4]] Block
+// CHECK: OpMemberDecorate [[__struct_7:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK: OpDecorate [[__struct_7]] Block
+// CHECK: OpDecorate [[_30:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK: OpDecorate [[_30]] Binding 0
+// CHECK: OpDecorate [[_31:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK: OpDecorate [[_31]] Binding 1
+// CHECK: OpDecorate [[_32:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK: OpDecorate [[_32]] Binding 2
+// CHECK: OpDecorate [[__arr_float_uint_7:%[0-9a-zA-Z_]+]] ArrayStride 4
+// CHECK: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK: [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
+// CHECK: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
+// CHECK: [[__struct_4]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK: [[__ptr_StorageBuffer__struct_4:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
+// CHECK: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK: [[__struct_7]] = OpTypeStruct [[_uint]]
+// CHECK: [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK: [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK: [[_11:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK: [[_uint_7:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 7
+// CHECK: [[__arr_float_uint_7]] = OpTypeArray [[_float]] [[_uint_7]]
+// CHECK: [[__ptr_Function__arr_float_uint_7:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[__arr_float_uint_7]]
+// CHECK: [[__ptr_Function_float:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[_float]]
+// CHECK: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
+// CHECK: [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
+// CHECK: [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
+// CHECK: [[_uint_4:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 4
+// CHECK: [[_uint_5:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 5
+// CHECK: [[_uint_6:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 6
+// CHECK: [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
+// CHECK: [[_float_1:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 1
+// CHECK: [[_float_2:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 2
+// CHECK: [[_float_3:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 3
+// CHECK: [[_float_4:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 4
+// CHECK: [[_float_5:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 5
+// CHECK: [[_float_6:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 6
+// CHECK: [[_30]] = OpVariable [[__ptr_StorageBuffer__struct_4]] StorageBuffer
+// CHECK: [[_31]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
+// CHECK: [[_32]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
+// CHECK: [[_33]] = OpFunction [[_void]] None [[_11]]
+// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpLabel
+// CHECK: [[_35:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Function__arr_float_uint_7]] Function
+// CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_31]] [[_uint_0]]
+// CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_36]]
+// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_0]]
+// CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_1]]
+// CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_2]]
+// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_3]]
+// CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_4]]
+// CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_5]]
+// CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_6]]
+// CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_38]]
+// CHECK: OpStore [[_45]] [[_float_0]]
+// CHECK: OpStore [[_39]] [[_float_1]]
+// CHECK: OpStore [[_40]] [[_float_2]]
+// CHECK: OpStore [[_41]] [[_float_3]]
+// CHECK: OpStore [[_42]] [[_float_4]]
+// CHECK: OpStore [[_43]] [[_float_5]]
+// CHECK: OpStore [[_44]] [[_float_6]]
+// CHECK: [[_46:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_0]]
+// CHECK: [[_47:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_0]]
+// CHECK: [[_48:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_47]]
+// CHECK: OpCopyMemory [[_48]] [[_46]] Aligned 4
+// CHECK: [[_49:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_1]]
+// CHECK: [[_50:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_1]]
+// CHECK: [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_50]]
+// CHECK: OpCopyMemory [[_51]] [[_49]] Aligned 4
+// CHECK: [[_52:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_2]]
+// CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_2]]
+// CHECK: [[_54:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_53]]
+// CHECK: OpCopyMemory [[_54]] [[_52]] Aligned 4
+// CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_3]]
+// CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_3]]
+// CHECK: [[_57:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_56]]
+// CHECK: OpCopyMemory [[_57]] [[_55]] Aligned 4
+// CHECK: [[_58:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_4]]
+// CHECK: [[_59:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_4]]
+// CHECK: [[_60:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_59]]
+// CHECK: OpCopyMemory [[_60]] [[_58]] Aligned 4
+// CHECK: [[_61:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_5]]
+// CHECK: [[_62:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_5]]
+// CHECK: [[_63:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_62]]
+// CHECK: OpCopyMemory [[_63]] [[_61]] Aligned 4
+// CHECK: [[_64:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_6]]
+// CHECK: [[_65:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_37]] [[_uint_6]]
+// CHECK: [[_66:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_30]] [[_uint_0]] [[_65]]
+// CHECK: OpCopyMemory [[_66]] [[_64]] Aligned 4
+// CHECK: OpReturn
+// CHECK: OpFunctionEnd

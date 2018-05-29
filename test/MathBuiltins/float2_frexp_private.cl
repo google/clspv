@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 30
+// CHECK: ; Bound: 31
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -45,6 +45,7 @@
 // CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 // CHECK: %[[UINT_PRIVATE_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer Function %[[UINT_VECTOR_TYPE_ID]]
 // CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
+// CHECK: %[[null_uint2:[a-zA-Z0-9_]*]] = OpConstantNull %[[UINT_VECTOR_TYPE_ID]]
 // CHECK: %[[ARG0_ID]] = OpVariable %[[FLOAT_ARG_POINTER_TYPE_ID]] StorageBuffer
 // CHECK: %[[ARG1_ID]] = OpVariable %[[FLOAT_ARG_POINTER_TYPE_ID]] StorageBuffer
 // CHECK: %[[ARG2_ID]] = OpVariable %[[UINT_ARG_POINTER_TYPE_ID]] StorageBuffer
@@ -55,6 +56,7 @@
 // CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[B_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG1_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
 // CHECK: %[[C_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG2_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
+// CHECK: OpStore %[[PRIVATE_VAR_ID]] %[[null_uint2]]
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]] %[[B_ACCESS_CHAIN_ID]]
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] Frexp %[[LOADB_ID]] %[[PRIVATE_VAR_ID]]
 // CHECK: OpStore %[[A_ACCESS_CHAIN_ID]] %[[OP_ID]]
