@@ -4269,6 +4269,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     if (Callee->getName().equals("__translate_sampler_initializer")) {
       // Check that the sampler map was definitely used though.
       if (0 == getSamplerMap().size()) {
+        errs() << "error: kernel uses a literal sampler but option -samplermap "
+                  "has not been specified\n";
         llvm_unreachable("Sampler literal in source without sampler map!");
       }
 
