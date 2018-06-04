@@ -44,6 +44,7 @@ private:
 
   enum CustomDiagnosticType {
     CustomDiagnosticVectorsMoreThan4Elements = 0,
+    CustomDiagnosticVoidPointer = 1,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -53,10 +54,19 @@ private:
 
     // First check if we have a pointer type.
     if (Ty->isPointerType()) {
+      const Type *pointeeTy = Ty->getPointeeType().getTypePtr();
+      if (pointeeTy && pointeeTy->isVoidType()) {
+        // We don't support void pointers.
+        Instance.getDiagnostics().Report(
+            SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer]);
+        return false;
+      }
+      // Otherwise check recursively.
       return IsSupportedType(Ty->getPointeeType(), SR);
     }
 
-    if (auto *VT = llvm::dyn_cast<ExtVectorType>(QT.getCanonicalType())) {
+    const auto &canonicalType = QT.getCanonicalType();
+    if (auto *VT = llvm::dyn_cast<ExtVectorType>(canonicalType)) {
       // We don't support vectors with more than 4 elements.
       if (4 < VT->getNumElements()) {
         Instance.getDiagnostics().Report(
@@ -106,6 +116,10 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Error,
             "vectors with more than 4 elements are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "pointer-to-void is not supported");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
