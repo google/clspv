@@ -81,6 +81,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVloadHalf(Module &M);
   bool replaceVloadHalf2(Module &M);
   bool replaceVloadHalf4(Module &M);
+  bool replaceClspvVloadaHalf2(Module &M);
+  bool replaceClspvVloadaHalf4(Module &M);
   bool replaceVstoreHalf(Module &M);
   bool replaceVstoreHalf2(Module &M);
   bool replaceVstoreHalf4(Module &M);
@@ -120,6 +122,8 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceVloadHalf(M);
   Changed |= replaceVloadHalf2(M);
   Changed |= replaceVloadHalf4(M);
+  Changed |= replaceClspvVloadaHalf2(M);
+  Changed |= replaceClspvVloadaHalf4(M);
   Changed |= replaceVstoreHalf(M);
   Changed |= replaceVstoreHalf2(M);
   Changed |= replaceVstoreHalf4(M);
@@ -1280,6 +1284,153 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Module &M) {
       }
 
       Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Module &M) {
+  bool Changed = false;
+
+  // Replace __clspv_vloada_half2(uint Index, global uint* Ptr) with:
+  //
+  //    %u = load i32 %ptr
+  //    %fxy = call <2 x float> Unpack2xHalf(u)
+  //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
+  const std::vector<const char *> Map = {
+      "_Z20__clspv_vloada_half2jPU3AS1Kj", // global
+      "_Z20__clspv_vloada_half2jPU3AS3Kj", // local
+      "_Z20__clspv_vloada_half2jPKj",      // private
+  };
+
+  for (auto Name : Map) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto* CI = dyn_cast<CallInst>(U.getUser())) {
+          auto Index = CI->getOperand(0);
+          auto Ptr = CI->getOperand(1);
+
+          auto IntTy = Type::getInt32Ty(M.getContext());
+          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+          auto IndexedPtr =
+              GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
+          auto Load = new LoadInst(IndexedPtr, "", CI);
+
+          // Our intrinsic to unpack a float2 from an int.
+          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+
+          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+          // Get our final float2.
+          auto Result = CallInst::Create(NewF, Load, "", CI);
+
+          CI->replaceAllUsesWith(Result);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = true;
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Module &M) {
+  bool Changed = false;
+
+  // Replace __clspv_vloada_half4(uint Index, global uint2* Ptr) with:
+  //
+  //    %u2 = load <2 x i32> %ptr
+  //    %u2xy = extractelement %u2, 0
+  //    %u2zw = extractelement %u2, 1
+  //    %fxy = call <2 x float> Unpack2xHalf(uint)
+  //    %fzw = call <2 x float> Unpack2xHalf(uint)
+  //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
+  const std::vector<const char *> Map = {
+      "_Z20__clspv_vloada_half4jPU3AS1KDv2_j", // global
+      "_Z20__clspv_vloada_half4jPU3AS3KDv2_j", // local
+      "_Z20__clspv_vloada_half4jPKDv2_j",      // private
+  };
+
+  for (auto Name : Map) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          auto Index = CI->getOperand(0);
+          auto Ptr = CI->getOperand(1);
+
+          auto IntTy = Type::getInt32Ty(M.getContext());
+          auto Int2Ty = VectorType::get(IntTy, 2);
+          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+          auto IndexedPtr =
+              GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
+          auto Load = new LoadInst(IndexedPtr, "", CI);
+
+          // Extract each element from the loaded int2.
+          auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0),
+                                              "", CI);
+          auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1),
+                                              "", CI);
+
+          // Our intrinsic to unpack a float2 from an int.
+          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+
+          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+          // Get the lower (x & y) components of our final float4.
+          auto Lo = CallInst::Create(NewF, X, "", CI);
+
+          // Get the higher (z & w) components of our final float4.
+          auto Hi = CallInst::Create(NewF, Y, "", CI);
+
+          Constant *ShuffleMask[4] = {
+              ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+              ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
+
+          // Combine our two float2's into one float4.
+          auto Combine = new ShuffleVectorInst(
+              Lo, Hi, ConstantVector::get(ShuffleMask), "", CI);
+
+          CI->replaceAllUsesWith(Combine);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = true;
 
       // And cleanup the calls we don't use anymore.
       for (auto V : ToRemoves) {

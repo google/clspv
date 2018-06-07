@@ -74,4 +74,16 @@ string(REGEX REPLACE
   lines
   "${lines}")
 
+# Write it all out to the file.
 file(WRITE "${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE}" "${lines}")
+
+# Declare some extra builtins
+set(clspv_builtins "")
+set(o "__attribute__((overloadable))")
+list(APPEND clspv_builtins "\nfloat4 ${o} __clspv_vloada_half4(size_t, const global uint2*)")
+list(APPEND clspv_builtins "\nfloat4 ${o} __clspv_vloada_half4(size_t, const local uint2*)")
+list(APPEND clspv_builtins "\nfloat4 ${o} __clspv_vloada_half4(size_t, const private uint2*)")
+list(APPEND clspv_builtins "\nfloat2 ${o} __clspv_vloada_half2(size_t, const global uint*)")
+list(APPEND clspv_builtins "\nfloat2 ${o} __clspv_vloada_half2(size_t, const local uint*)")
+list(APPEND clspv_builtins "\nfloat2 ${o} __clspv_vloada_half2(size_t, const private uint*)")
+file(APPEND "${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE}" "${clspv_builtins};")
