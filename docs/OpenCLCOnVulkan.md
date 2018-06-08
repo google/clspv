@@ -422,13 +422,13 @@ Otherwise, the Vulkan SPIR-V produced by the compiler will contain specializatio
 constants as follows:
 
 - The _x_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _0_, whose value defaults to 
+  constant that is decorated with the `SpecId` of _0_, whose value defaults to
   _1_.
 - The _y_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _1_, whose value defaults to 
+  constant that is decorated with the `SpecId` of _1_, whose value defaults to
   _1_.
 - The _z_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _2_, whose value defaults to 
+  constant that is decorated with the `SpecId` of _2_, whose value defaults to
   _1_.
 
 If a compilation unit contains multiple kernels, then either:
@@ -612,9 +612,24 @@ The `vload<size>()`, `vstore<size>()`, `vstore_half_rtp()`, `vstore_half_rtn()`,
 
 The `vload_half()`, `vload_half<size>()`, `vstore_half()`, `vstore_half_rte()`,
 `vstore_half_rtz()`, `vstore_half<size>()`, `vstore_half<size>_rte()`,
-`vstore_half<size>_rtz()`, `vloada_half<size>()`, `vstorea_half<size>()`,
-`vstorea_half<size>_rte()`, and `vstorea_half<size>_rtz()` built-in functions
+`vstore_half<size>_rtz()`, and `vloada_half<size>()`
+built-in functions
 are only allowed to use the `global` and `constant` address spaces.
+
+**Note**: When 16-bit storage support is not assumed, both `vload_half` and
+`vstore_half` assume the pointers are aligned to 4 bytes, not 2 bytes.
+See [issue 6](https://github.com/google/clspv/issues/6).
+
+Builtin functions
+`vstorea_half2()`,
+`vstorea_half4()`,
+`vstorea_half2_rtz()`,
+`vstorea_half4_rtz()`,
+`vstorea_half2_rte()`,
+ and
+`vstorea_half4_rte()` built-in functions
+have implementations for global, local, and private
+address spaces.
 
 The `vstore_half_rte()`, `vstore_half_rtz()`, `vstore_half<size>_rte()`,
 `vstore_half<size>_rtz()`, `vstorea_half<size>_rte()`, and

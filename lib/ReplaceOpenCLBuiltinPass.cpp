@@ -1598,9 +1598,20 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Module &M) {
   bool Changed = false;
 
-  const std::vector<const char *> Map = {"_Z12vstore_half2Dv2_fjPU3AS1Dh",
-                                         "_Z16vstore_half2_rteDv2_fjPU3AS1Dh",
-                                         "_Z16vstore_half2_rtzDv2_fjPU3AS1Dh"};
+  const std::vector<const char *> Map = {
+      "_Z12vstore_half2Dv2_fjPU3AS1Dh",
+      "_Z13vstorea_half2Dv2_fjPU3AS1Dh", // vstorea global
+      "_Z13vstorea_half2Dv2_fjPU3AS3Dh", // vstorea local
+      "_Z13vstorea_half2Dv2_fjPDh",      // vstorea private
+      "_Z16vstore_half2_rteDv2_fjPU3AS1Dh",
+      "_Z17vstorea_half2_rteDv2_fjPU3AS1Dh", // vstorea global
+      "_Z17vstorea_half2_rteDv2_fjPU3AS3Dh", // vstorea local
+      "_Z17vstorea_half2_rteDv2_fjPDh",      // vstorea private
+      "_Z16vstore_half2_rtzDv2_fjPU3AS1Dh",
+      "_Z17vstorea_half2_rtzDv2_fjPU3AS1Dh", // vstorea global
+      "_Z17vstorea_half2_rtzDv2_fjPU3AS3Dh", // vstorea local
+      "_Z17vstorea_half2_rtzDv2_fjPDh",      // vstorea private
+  };
 
   for (auto Name : Map) {
     // If we find a function with the matching name.
@@ -1667,9 +1678,20 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
   bool Changed = false;
 
-  const std::vector<const char *> Map = {"_Z12vstore_half4Dv4_fjPU3AS1Dh",
-                                         "_Z16vstore_half4_rteDv4_fjPU3AS1Dh",
-                                         "_Z16vstore_half4_rtzDv4_fjPU3AS1Dh"};
+  const std::vector<const char *> Map = {
+      "_Z12vstore_half4Dv4_fjPU3AS1Dh",
+      "_Z13vstorea_half4Dv4_fjPU3AS1Dh", // global
+      "_Z13vstorea_half4Dv4_fjPU3AS3Dh", // local
+      "_Z13vstorea_half4Dv4_fjPDh",      // private
+      "_Z16vstore_half4_rteDv4_fjPU3AS1Dh",
+      "_Z17vstorea_half4_rteDv4_fjPU3AS1Dh", // global
+      "_Z17vstorea_half4_rteDv4_fjPU3AS3Dh", // local
+      "_Z17vstorea_half4_rteDv4_fjPDh",      // private
+      "_Z16vstore_half4_rtzDv4_fjPU3AS1Dh",
+      "_Z17vstorea_half4_rtzDv4_fjPU3AS1Dh", // global
+      "_Z17vstorea_half4_rtzDv4_fjPU3AS3Dh", // local
+      "_Z17vstorea_half4_rtzDv4_fjPDh",      // private
+  };
 
   for (auto Name : Map) {
     // If we find a function with the matching name.
