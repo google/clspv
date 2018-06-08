@@ -637,24 +637,6 @@ The `vstore_half_rte()`, `vstore_half_rtz()`, `vstore_half<size>_rte()`,
 result correctly if the destination address was not declared as a `half*` on the
 kernel entry point.
 
-Clspv has its own replacements for vector loads of aligned half data:
-
-- The `vloada_half4` builtin function is unavailable.  Instead, use builtin function
-  `__clspv_vloada_half4` that takes a pointer-to-`uint2` instead of pointer-to-`half`:
-
-  `__clspv_vloada_half4(uint n, const global uint2* ptr)` Loads the `uint2` value
-  at `ptr[n]` and reinterprets it as a `half4` value.
-
-  There are variations for global, local, and private storage.
-
-- The `vloada_half2` builtin function is unavailable.  Instead, use builtin function
-  `__clspv_vloada_half2` that takes a pointer-to-`uint` instead of pointer-to-`half`:
-
-  `__clspv_vloada_half2(uint n, const global uint* ptr)` Loads the `uint` value
-  at `ptr[n]` and reinterprets it as a `half2` value.
-
-  There are variations for global, local, and private storage.
-
 #### Async Copy and Prefetch Functions
 
 The `async_work_group_copy()`, `async_work_group_strided_copy()`,

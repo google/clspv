@@ -1153,8 +1153,12 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Module &M) {
   bool Changed = false;
 
-  const std::vector<const char *> Map = {"_Z11vload_half2jPU3AS1KDh",
-                                         "_Z11vload_half2jPU3AS2KDh"};
+  const std::vector<const char *> Map = {
+      "_Z11vload_half2jPU3AS1KDh",
+      "_Z12vloada_half2jPU3AS1KDh", // vloada_half2 global
+      "_Z11vload_half2jPU3AS2KDh",
+      "_Z12vloada_half2jPU3AS2KDh", // vloada_half2 constant
+  };
 
   for (auto Name : Map) {
     // If we find a function with the matching name.
@@ -1218,8 +1222,12 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Module &M) {
   bool Changed = false;
 
-  const std::vector<const char *> Map = {"_Z11vload_half4jPU3AS1KDh",
-                                         "_Z11vload_half4jPU3AS2KDh"};
+  const std::vector<const char *> Map = {
+      "_Z11vload_half4jPU3AS1KDh",
+      "_Z12vloada_half4jPU3AS1KDh",
+      "_Z11vload_half4jPU3AS2KDh",
+      "_Z12vloada_half4jPU3AS2KDh",
+  };
 
   for (auto Name : Map) {
     // If we find a function with the matching name.
