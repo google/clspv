@@ -624,16 +624,16 @@ kernel entry point.
 
 Clspv has its own replacements for vector loads of aligned half data:
 
-- `__clspv_vloada_half4` is similar to `vloada_half4` but takes a pointer-to-`uint2`
-  instead of pointer-to-`half`:
+- The `vloada_half4` builtin function is unavailable.  Instead, use builtin function
+  `__clspv_vloada_half4` that takes a pointer-to-`uint2` instead of pointer-to-`half`:
 
   `__clspv_vloada_half4(uint n, const global uint2* ptr)` Loads the `uint2` value
   at `ptr[n]` and reinterprets it as a `half4` value.
 
   There are variations for global, local, and private storage.
 
-- `__clspv_vloada_half2` is similar to `vloada_half2` but takes a pointer-to-`uint`
-  instead of pointer-to-`half`:
+- The `vloada_half2` builtin function is unavailable.  Instead, use builtin function
+  `__clspv_vloada_half2` that takes a pointer-to-`uint` instead of pointer-to-`half`:
 
   `__clspv_vloada_half2(uint n, const global uint* ptr)` Loads the `uint` value
   at `ptr[n]` and reinterprets it as a `half2` value.
