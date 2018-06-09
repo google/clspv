@@ -3978,22 +3978,28 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // Ops[0] = Result Type ID
-    // Ops[1] = Object ID
-    // Ops[2] = Composite ID
-    // Ops[3] ... Ops[n] = Indexes (Literal Number)
     SPIRVOperandList Ops;
 
-    Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(1)])
-        << MkId(VMap[I.getOperand(0)]);
+    // Ops[0] = Result Type ID
+    Ops << MkId(lookupType(I.getType()));
 
     spv::Op Opcode = spv::OpCompositeInsert;
     if (const ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2))) {
       const auto value = CI->getZExtValue();
       assert(value <= UINT32_MAX);
-      Ops << MkNum(static_cast<uint32_t>(value));
+      // Ops[1] = Object ID
+      // Ops[2] = Composite ID
+      // Ops[3] ... Ops[n] = Indexes (Literal Number)
+      Ops << MkId(VMap[I.getOperand(1)])
+          << MkId(VMap[I.getOperand(0)])
+          << MkNum(static_cast<uint32_t>(value));
     } else {
-      Ops << MkId(VMap[I.getOperand(1)]);
+      // Ops[1] = Composite ID
+      // Ops[2] = Object ID
+      // Ops[3] ... Ops[n] = Indexes (Literal Number)
+      Ops << MkId(VMap[I.getOperand(0)])
+          << MkId(VMap[I.getOperand(1)])
+          << MkId(VMap[I.getOperand(2)]);
       Opcode = spv::OpVectorInsertDynamic;
     }
 
