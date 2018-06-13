@@ -51,7 +51,7 @@ void kernel foo(global float3* A, float3 y, float3 x)
 // CHECK: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
 // CHECK: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
 // CHECK: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
-// CHECK: [[_float_0_31831:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0.31831
+// CHECK: [[_float_0_31831:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0.3183
 // CHECK: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v3float]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]]
 // CHECK: [[_18]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_19]] = OpSpecConstant [[_uint]] 1
