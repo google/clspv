@@ -35,19 +35,19 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: OpDecorate [[_15]] Binding 1
 // CHECK: OpDecorate [[_16:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_16]] Binding 2
-// CHECK: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[__ptr_StorageBuffer_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
-// CHECK: [[__struct_4]] = OpTypeStruct [[__runtimearr_float]]
-// CHECK: [[__ptr_StorageBuffer__struct_4:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
-// CHECK: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[__struct_7]] = OpTypeStruct [[_float]] [[_uint]]
-// CHECK: [[__struct_8]] = OpTypeStruct [[__struct_7]]
-// CHECK: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
-// CHECK: [[__ptr_StorageBuffer__struct_7:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CHECK: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CHECK: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[__ptr_StorageBuffer_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_float]]
+// CHECK-DAG: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
+// CHECK-DAG: [[__struct_4]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_4:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
+// CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[__struct_7]] = OpTypeStruct [[_float]] [[_uint]]
+// CHECK-DAG: [[__struct_8]] = OpTypeStruct [[__struct_7]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_7:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK-DAG: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CHECK-DAG: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_14]] = OpVariable [[__ptr_StorageBuffer__struct_4]] StorageBuffer
 // CHECK: [[_15]] = OpVariable [[__ptr_StorageBuffer__struct_4]] StorageBuffer
 // CHECK: [[_16]] = OpVariable [[__ptr_StorageBuffer__struct_8]] StorageBuffer

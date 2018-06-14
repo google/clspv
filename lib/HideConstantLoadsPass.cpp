@@ -107,7 +107,6 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
       fn = cast<Function>(fn_constant);
       fn->addFnAttr(Attribute::ReadOnly);
-      fn->addFnAttr(Attribute::ReadNone);
     }
 
     // Wrap the load

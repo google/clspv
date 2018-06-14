@@ -13,8 +13,8 @@ kernel void bar(global float* B, float f, float g) {
   *B = f - g;
 }
 
-// CHECK: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[__runtimearr_float:%[a-zA-Z0-9_]+]] = OpTypeRuntimeArray [[_float]]
+// CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[__runtimearr_float:%[a-zA-Z0-9_]+]] = OpTypeRuntimeArray [[_float]]
 // CHECK-DAG: [[__struct_4:%[a-zA-Z0-9_]+]] = OpTypeStruct [[__runtimearr_float]]
 // CHECK-DAG: [[__struct_6:%[a-zA-Z0-9_]+]] = OpTypeStruct [[_float]] [[_float]]
 // CHECK-DAG: [[__struct_7:%[a-zA-Z0-9_]+]] = OpTypeStruct [[__struct_6]]

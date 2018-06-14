@@ -24,13 +24,13 @@
 // CHECK: OpDecorate [[podargs:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[podargs]] Binding 1
 
-// CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[float4:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]]
-// CHECK: [[podty]] = OpTypeStruct [[uint]] [[float4]]
-// CHECK: [[st_podty]] = OpTypeStruct [[podty]]
-// CHECK: [[sbptr_st_podty:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[st_podty]]
-// CHECK: [[sbptr_podty:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[podty]]
+// CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[float4:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]]
+// CHECK-DAG: [[podty]] = OpTypeStruct [[uint]] [[float4]]
+// CHECK-DAG: [[st_podty]] = OpTypeStruct [[podty]]
+// CHECK-DAG: [[sbptr_st_podty:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[st_podty]]
+// CHECK-DAG: [[sbptr_podty:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[podty]]
 
 // CHECK: [[podargs]] = OpVariable [[sbptr_st_podty]] StorageBuffer
 

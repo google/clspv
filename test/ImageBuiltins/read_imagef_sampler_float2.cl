@@ -12,90 +12,76 @@
 // RUN: FileCheck %s < %t4.spvasm -check-prefix=CLUSTER
 // RUN: spirv-val --target-env vulkan1.0 %t4.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 34
-// CHECK: ; Schema: 0
-// CHECK-DAG: OpCapability Shader
-// CHECK-DAG: OpCapability VariablePointers
-// CHECK-NOT: OpCapability StorageImageReadWithoutFormat
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
-// CHECK: OpMemoryModel Logical GLSL450
-// CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
-// CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
-
-// CHECK: OpMemberDecorate %[[ARG2_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG2_STRUCT_TYPE_ID]] Block
-
-// CHECK: OpDecorate %[[ARG3_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 16
-
-// CHECK: OpMemberDecorate %[[ARG3_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG3_STRUCT_TYPE_ID]] Block
-
-// CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG0_ID]] Binding 0
-
-// CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG1_ID]] Binding 1
-// CHECK: OpDecorate %[[ARG1_ID]] NonWritable
-
-// CHECK: OpDecorate %[[ARG2_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG2_ID]] Binding 2
-
-// CHECK: OpDecorate %[[ARG3_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG3_ID]] Binding 3
-
-// CHECK: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
-// CHECK: %[[SAMPLER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeSampler
-// CHECK: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[SAMPLER_TYPE_ID]]
-
-// CHECK: %[[READ_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[FLOAT_TYPE_ID]] 2D 0 0 0 1 Unknown
-// CHECK: %[[ARG1_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[READ_ONLY_IMAGE_TYPE_ID]]
-
-// CHECK: %[[FLOAT2_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
-// CHECK: %[[ARG2_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT2_TYPE_ID]]
-// CHECK: %[[ARG2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG2_STRUCT_TYPE_ID]]
-
-// CHECK: %[[FLOAT2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT2_TYPE_ID]]
-
-// CHECK: %[[FLOAT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
-// CHECK: %[[FLOAT4_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT4_TYPE_ID]]
-
-// CHECK: %[[ARG3_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[FLOAT4_TYPE_ID]]
-// CHECK: %[[ARG3_STRUCT_TYPE_ID]] = OpTypeStruct %[[ARG3_DYNAMIC_ARRAY_TYPE_ID]]
-// CHECK: %[[ARG3_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG3_STRUCT_TYPE_ID]]
-
-// CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
-// CHECK: %[[SAMPLED_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeSampledImage %[[READ_ONLY_IMAGE_TYPE_ID]]
-
-// CHECK: %[[FP_CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0
-// CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
-
-// CHECK: %[[ARG0_ID]] = OpVariable %[[ARG0_POINTER_TYPE_ID]] UniformConstant
-// CHECK: %[[ARG1_ID]] = OpVariable %[[ARG1_POINTER_TYPE_ID]] UniformConstant
-// CHECK: %[[ARG2_ID]] = OpVariable %[[ARG2_POINTER_TYPE_ID]] StorageBuffer
-// CHECK: %[[ARG3_ID]] = OpVariable %[[ARG3_POINTER_TYPE_ID]] StorageBuffer
-
-// CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] None %[[FOO_TYPE_ID]]
-// CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
-// CHECK: %[[S_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[SAMPLER_TYPE_ID]] %[[ARG0_ID]]
-// CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[READ_ONLY_IMAGE_TYPE_ID]] %[[ARG1_ID]]
-// CHECK: %[[C_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT2_POINTER_TYPE_ID]] %[[ARG2_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[C_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT2_TYPE_ID]] %[[C_ACCESS_CHAIN_ID]]
-// CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT4_POINTER_TYPE_ID]] %[[ARG3_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[SAMPLED_IMAGE_ID:[a-zA-Z0-9_]*]] = OpSampledImage %[[SAMPLED_IMAGE_TYPE_ID]] %[[I_LOAD_ID]] %[[S_LOAD_ID]]
-// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpImageSampleExplicitLod %[[FLOAT4_TYPE_ID]] %[[SAMPLED_IMAGE_ID]] %[[C_LOAD_ID]] Lod %[[FP_CONSTANT_0_ID]]
-// CHECK: OpStore %[[A_ACCESS_CHAIN_ID]] %[[OP_ID]]
-// CHECK: OpReturn
-// CHECK: OpFunctionEnd
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read_only image2d_t i, float2 c, global float4* a)
 {
   *a = read_imagef(i, s, c);
 }
+
+
+// CHECK:  ; SPIR-V
+// CHECK:  ; Version: 1.0
+// CHECK:  ; Generator: Codeplay; 0
+// CHECK:  ; Bound: 34
+// CHECK:  ; Schema: 0
+// CHECK:  OpCapability Shader
+// CHECK:  OpCapability VariablePointers
+// CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
+// CHECK:  OpExtension "SPV_KHR_variable_pointers"
+// CHECK:  OpMemoryModel Logical GLSL450
+// CHECK:  OpEntryPoint GLCompute [[_25:%[0-9a-zA-Z_]+]] "foo"
+// CHECK:  OpExecutionMode [[_25]] LocalSize 1 1 1
+// CHECK:  OpSource OpenCL_C 120
+// CHECK:  OpMemberDecorate [[__struct_7:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_7]] Block
+// CHECK:  OpDecorate [[__runtimearr_v4float:%[0-9a-zA-Z_]+]] ArrayStride 16
+// CHECK:  OpMemberDecorate [[__struct_11:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_11]] Block
+// CHECK:  OpDecorate [[_21:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_21]] Binding 0
+// CHECK:  OpDecorate [[_22:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_22]] Binding 1
+// CHECK:  OpDecorate [[_22]] NonWritable
+// CHECK:  OpDecorate [[_23:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_23]] Binding 2
+// CHECK:  OpDecorate [[_24:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_24]] Binding 3
+// CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG:  [[_2:%[0-9a-zA-Z_]+]] = OpTypeSampler
+// CHECK-DAG:  [[__ptr_UniformConstant_2:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_2]]
+// CHECK-DAG:  [[_4:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
+// CHECK-DAG:  [[__ptr_UniformConstant_4:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_4]]
+// CHECK-DAG:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
+// CHECK-DAG:  [[__struct_7]] = OpTypeStruct [[_v2float]]
+// CHECK-DAG:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK-DAG:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
+// CHECK-DAG:  [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
+// CHECK-DAG:  [[__struct_11]] = OpTypeStruct [[__runtimearr_v4float]]
+// CHECK-DAG:  [[__ptr_StorageBuffer__struct_11:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_11]]
+// CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK-DAG:  [[_15:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG:  [[__ptr_StorageBuffer_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_v2float]]
+// CHECK-DAG:  [[__ptr_StorageBuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_v4float]]
+// CHECK-DAG:  [[_18:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[_4]]
+// CHECK-DAG:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
+// CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK:  [[_21]] = OpVariable [[__ptr_UniformConstant_2]] UniformConstant
+// CHECK:  [[_22]] = OpVariable [[__ptr_UniformConstant_4]] UniformConstant
+// CHECK:  [[_23]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
+// CHECK:  [[_24]] = OpVariable [[__ptr_StorageBuffer__struct_11]] StorageBuffer
+// CHECK:  [[_25]] = OpFunction [[_void]] None [[_15]]
+// CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLabel
+// CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]] [[_21]]
+// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_4]] [[_22]]
+// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v2float]] [[_23]] [[_uint_0]]
+// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]] [[_29]]
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v4float]] [[_24]] [[_uint_0]] [[_uint_0]]
+// CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpSampledImage [[_18]] [[_28]] [[_27]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_32]] [[_30]] Lod [[_float_0]]
+// CHECK:  OpStore [[_31]] [[_33]]
+// CHECK:  OpReturn
+// CHECK:  OpFunctionEnd
 
 // In a second round, check -cluster-pod-kernel-args
 
@@ -127,27 +113,27 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CLUSTER: OpDecorate [[_24]] Binding 2
 // CLUSTER: OpDecorate [[_25:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CLUSTER: OpDecorate [[_25]] Binding 3
-// CLUSTER: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CLUSTER: [[_2:%[a-zA-Z0-9_]+]] = OpTypeSampler
-// CLUSTER: [[__ptr_UniformConstant_2:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_2]]
-// CLUSTER: [[_4:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
-// CLUSTER: [[__ptr_UniformConstant_4:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_4]]
-// CLUSTER: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
-// CLUSTER: [[__ptr_StorageBuffer_v4float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v4float]]
-// CLUSTER: [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
-// CLUSTER: [[__struct_9]] = OpTypeStruct [[__runtimearr_v4float]]
-// CLUSTER: [[__ptr_StorageBuffer__struct_9:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
-// CLUSTER: [[_v2float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 2
-// CLUSTER: [[__struct_12]] = OpTypeStruct [[_v2float]]
-// CLUSTER: [[__struct_13]] = OpTypeStruct [[__struct_12]]
-// CLUSTER: [[__ptr_StorageBuffer__struct_13:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
-// CLUSTER: [[__ptr_StorageBuffer__struct_12:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
-// CLUSTER: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CLUSTER: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CLUSTER: [[_18:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
-// CLUSTER: [[_19:%[a-zA-Z0-9_]+]] = OpTypeSampledImage [[_4]]
-// CLUSTER: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
-// CLUSTER: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CLUSTER-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CLUSTER-DAG: [[_2:%[a-zA-Z0-9_]+]] = OpTypeSampler
+// CLUSTER-DAG: [[__ptr_UniformConstant_2:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_2]]
+// CLUSTER-DAG: [[_4:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
+// CLUSTER-DAG: [[__ptr_UniformConstant_4:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[_4]]
+// CLUSTER-DAG: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
+// CLUSTER-DAG: [[__ptr_StorageBuffer_v4float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v4float]]
+// CLUSTER-DAG: [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
+// CLUSTER-DAG: [[__struct_9]] = OpTypeStruct [[__runtimearr_v4float]]
+// CLUSTER-DAG: [[__ptr_StorageBuffer__struct_9:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
+// CLUSTER-DAG: [[_v2float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 2
+// CLUSTER-DAG: [[__struct_12]] = OpTypeStruct [[_v2float]]
+// CLUSTER-DAG: [[__struct_13]] = OpTypeStruct [[__struct_12]]
+// CLUSTER-DAG: [[__ptr_StorageBuffer__struct_13:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
+// CLUSTER-DAG: [[__ptr_StorageBuffer__struct_12:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
+// CLUSTER-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CLUSTER-DAG: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CLUSTER-DAG: [[_18:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CLUSTER-DAG: [[_19:%[a-zA-Z0-9_]+]] = OpTypeSampledImage [[_4]]
+// CLUSTER-DAG: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
+// CLUSTER-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
 // CLUSTER: [[_22]] = OpVariable [[__ptr_UniformConstant_2]] UniformConstant
 // CLUSTER: [[_23]] = OpVariable [[__ptr_UniformConstant_4]] UniformConstant
 // CLUSTER: [[_24]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer

@@ -17,6 +17,15 @@
 #include <llvm/Support/CommandLine.h>
 
 namespace {
+
+// Should the compiler try to use direct buffer accesses within helper
+// functions instead of passing pointers via function arguments?
+llvm::cl::opt<bool> direct_buffer_access(
+    "direct-buffer-access", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Helper functions access buffers directly instead of by pointers "
+        "in function arguments"));
+
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
 llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
@@ -41,6 +50,13 @@ llvm::cl::opt<bool> hack_initializers(
         "value for a compiler-generated variable containing the workgroup "
         "size. Required by some drivers to make the get_global_size builtin "
         "function work when used with non-constant dimension index."));
+
+llvm::cl::opt<bool> hack_dis(
+    "hack-dis", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Force use of a distinct image or sampler variable for each "
+        "image or sampler kernel argument.  This prevents sharing "
+        "of resource variables."));
 
 llvm::cl::opt<bool> hack_inserts(
     "hack-inserts", llvm::cl::init(false),
@@ -79,8 +95,10 @@ llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
 namespace clspv {
 namespace Option {
 
+bool DirectBufferAccess() { return direct_buffer_access; }
 bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
+bool HackDistinctImageSampler() { return hack_dis; }
 bool HackInitializers() { return hack_initializers; }
 bool HackInserts() { return hack_inserts; }
 bool HackUndef() { return hack_undef; }

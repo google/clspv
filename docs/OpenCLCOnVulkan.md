@@ -341,7 +341,7 @@ In more general cases, use compiler option `-module-constants-in-storage-buffer`
   buffer with that data before the kernel executes.
 
 Consider this example kernel `a.cl`:
-    
+
     typedef struct {
       char c;
       uint a;
@@ -357,9 +357,9 @@ Compiling as follows:
 
 Produces the following in file `map`:
 
-    constant,descriptorSet,0,binding,0,hexbytes,61000000cdab34120000803f62000000ffffffff0000c03f000000000000000000000000
-    kernel,foo,arg,A,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
-    kernel,foo,arg,i,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod
+    constant,descriptorSet,1,binding,0,hexbytes,61000000cdab34120000803f62000000ffffffff0000c03f000000000000000000000000
+    kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
+    kernel,foo,arg,i,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod
 
 The initialization data are in the line starting with `constant`, and its fields are:
 

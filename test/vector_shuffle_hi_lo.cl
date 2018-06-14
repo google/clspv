@@ -27,20 +27,20 @@
 // CHECK: OpDecorate %[[ARG_1_ID]] Binding 1
 // CHECK: OpDecorate %[[ARG_2_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG_2_ID]] Binding 2
-// CHECK: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
-// CHECK: %[[FLOAT_4_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
-// CHECK: %[[ARG0_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT_4_VECTOR_TYPE_ID]]
-// CHECK: %[[ARG0_STRUCT_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG0_STRUCT_TYPE_ID]]
-// CHECK: %[[FLOAT_4_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT_4_VECTOR_TYPE_ID]]
-// CHECK: %[[FLOAT_2_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
-// CHECK: %[[FLOAT_2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT_2_VECTOR_TYPE_ID]]
-// CHECK: %[[FLOAT_2_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[FLOAT_2_VECTOR_TYPE_ID]]
-// CHECK: %[[ARG12_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT_2_DYNAMIC_ARRAY_TYPE_ID]]
-// CHECK: %[[ARG12_STRUCT_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG12_STRUCT_TYPE_ID]]
-// CHECK: %[[INT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]] 
-// CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[INT_TYPE_ID]] 0
+// CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
+// CHECK-DAG: %[[FLOAT_4_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
+// CHECK-DAG: %[[ARG0_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT_4_VECTOR_TYPE_ID]]
+// CHECK-DAG: %[[ARG0_STRUCT_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG0_STRUCT_TYPE_ID]]
+// CHECK-DAG: %[[FLOAT_4_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT_4_VECTOR_TYPE_ID]]
+// CHECK-DAG: %[[FLOAT_2_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
+// CHECK-DAG: %[[FLOAT_2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT_2_VECTOR_TYPE_ID]]
+// CHECK-DAG: %[[FLOAT_2_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[FLOAT_2_VECTOR_TYPE_ID]]
+// CHECK-DAG: %[[ARG12_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT_2_DYNAMIC_ARRAY_TYPE_ID]]
+// CHECK-DAG: %[[ARG12_STRUCT_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG12_STRUCT_TYPE_ID]]
+// CHECK-DAG: %[[INT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
+// CHECK-DAG: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
+// CHECK-DAG: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]] 
+// CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[INT_TYPE_ID]] 0
 // CHECK: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_4_VECTOR_TYPE_ID]]
 // CHECK: %[[ARG_0_ID]] = OpVariable %[[ARG0_STRUCT_POINTER_TYPE_ID]] StorageBuffer
 // CHECK: %[[ARG_1_ID]] = OpVariable %[[ARG12_STRUCT_POINTER_TYPE_ID]] StorageBuffer

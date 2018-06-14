@@ -18,8 +18,8 @@
 // CHECK: OpEntryPoint GLCompute %[[BAR_ID:[a-zA-Z0-9_]*]] "bar"
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 4 2 1
 // CHECK: OpExecutionMode %[[BAR_ID]] LocalSize 5 3 2
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[FUNC_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
+// CHECK-DAG: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
+// CHECK-DAG: %[[FUNC_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 
 // CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] Const %[[FUNC_TYPE_ID]]
 // CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel

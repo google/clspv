@@ -18,8 +18,8 @@
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 // CHECK-NOT: OpMemberDecorate
 // CHECK-NOT: OpTypeStruct
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
+// CHECK-DAG: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
+// CHECK-DAG: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 // CHECK-NOT: OpUndef
 
 struct test {

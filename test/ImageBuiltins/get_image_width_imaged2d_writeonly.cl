@@ -33,18 +33,18 @@ foo(global int* out, write_only image2d_t im)
 // CHECK: OpDecorate [[_14:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_14]] Binding 1
 // CHECK: OpDecorate [[_14]] NonReadable
-// CHECK: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
-// CHECK: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK: [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
-// CHECK: [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
-// CHECK: [[__struct_6]] = OpTypeStruct [[__runtimearr_uint]]
-// CHECK: [[__ptr_StorageBuffer__struct_6:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
-// CHECK: [[_8:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 2D 0 0 0 2 Unknown
-// CHECK: [[__ptr_UniformConstant_8:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_8]]
-// CHECK: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
-// CHECK: [[_11:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
+// CHECK-DAG: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK-DAG: [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
+// CHECK-DAG: [[__struct_6]] = OpTypeStruct [[__runtimearr_uint]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_6:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
+// CHECK-DAG: [[_8:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 2D 0 0 0 2 Unknown
+// CHECK-DAG: [[__ptr_UniformConstant_8:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_8]]
+// CHECK-DAG: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK-DAG: [[_11:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_13]] = OpVariable [[__ptr_StorageBuffer__struct_6]] StorageBuffer
 // CHECK: [[_14]] = OpVariable [[__ptr_UniformConstant_8]] UniformConstant
 // CHECK: [[_15]] = OpFunction [[_void]] None [[_11]]

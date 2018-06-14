@@ -22,6 +22,21 @@
 
 namespace clspv {
 
+enum class ArgKind : int {
+  Buffer,
+  Local,
+  Pod,
+  ReadOnlyImage,
+  WriteOnlyImage,
+  Sampler,
+};
+
+// Maps an LLVM type for a kernel argument to an argument kind.
+ArgKind GetArgKindForType(llvm::Type *type);
+
+// Converts an ArgKind to its string name.
+const char* GetArgKindName(ArgKind);
+
 // Maps an LLVM type for a kernel argument to an argument
 // kind suitable for a descriptor map.  The result is one of:
 //   buffer   - storage buffer
@@ -31,10 +46,20 @@ namespace clspv {
 //   ro_image - read-only image
 //   wo_image - write-only image
 //   sampler  - sampler
-const char *GetArgKindForType(llvm::Type *type);
+inline const char *GetArgKindNameForType(llvm::Type *type) {
+  return GetArgKindName(GetArgKindForType(type));
+}
 
 // Returns true if the given type is a pointer-to-local type.
 bool IsLocalPtr(llvm::Type* type);
+
+// Returns true if the given type is a sampler type.  If it is, then the
+// struct type is sent back through the ptr argument.
+bool IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
+
+// Returns true if the given type is a image type.  If it is, then the
+// struct type is sent back through the ptr argument.
+bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 
 using ArgIdMapType = llvm::DenseMap<const llvm::Argument*, int>;
 
