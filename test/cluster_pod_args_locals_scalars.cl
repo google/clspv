@@ -45,23 +45,23 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: OpDecorate [[_21:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_21]] Binding 1
 // CHECK: OpDecorate [[_2:%[0-9a-zA-Z_]+]] SpecId 3
-// CHECK: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK: [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
-// CHECK: [[__struct_9]] = OpTypeStruct [[__runtimearr_float]]
-// CHECK: [[__ptr_StorageBuffer__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
-// CHECK: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[__struct_12]] = OpTypeStruct [[_float]] [[_uint]]
-// CHECK: [[__struct_13]] = OpTypeStruct [[__struct_12]]
-// CHECK: [[__ptr_StorageBuffer__struct_13:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
-// CHECK: [[__ptr_StorageBuffer__struct_12:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
-// CHECK: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
-// CHECK: [[_17:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[__ptr_Workgroup_float:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_float]]
+// CHECK-DAG: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
+// CHECK-DAG: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
+// CHECK-DAG: [[__struct_9]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
+// CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[__struct_12]] = OpTypeStruct [[_float]] [[_uint]]
+// CHECK-DAG: [[__struct_13]] = OpTypeStruct [[__struct_12]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_13:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_13]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_12:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
+// CHECK-DAG: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK-DAG: [[_17:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[__ptr_Workgroup_float:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_float]]
 // CHECK: [[_2]] = OpSpecConstant [[_uint]] 1
-// CHECK: [[__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_2]]
-// CHECK: [[__ptr_Workgroup__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_float_2]]
-// CHECK: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_2]]
+// CHECK-DAG: [[__ptr_Workgroup__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_float_2]]
+// CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_20]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
 // CHECK: [[_21]] = OpVariable [[__ptr_StorageBuffer__struct_13]] StorageBuffer
 // CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup

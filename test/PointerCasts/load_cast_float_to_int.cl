@@ -5,74 +5,76 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 27
-// CHECK: ; Schema: 0
-// CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
-// CHECK: OpMemoryModel Logical GLSL450
-// CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
-// CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
-// CHECK: OpDecorate %[[FLOAT_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 4
-// CHECK: OpMemberDecorate %[[ARG0_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG0_STRUCT_TYPE_ID]] Block
 
-// CHECK: OpDecorate %[[UINT_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 4
-// CHECK: OpMemberDecorate %[[ARG1_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG1_STRUCT_TYPE_ID]] Block
 
-// CHECK: OpMemberDecorate %[[ARG2_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG2_STRUCT_TYPE_ID]] Block
 
-// CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG0_ID]] Binding 0
-// CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG1_ID]] Binding 1
-// CHECK: OpDecorate %[[ARG2_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG2_ID]] Binding 2
 
-// CHECK: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
-// CHECK: %[[FLOAT_GLOBAL_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT_TYPE_ID]]
-// CHECK: %[[FLOAT_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[FLOAT_TYPE_ID]]
-// CHECK: %[[ARG0_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT_DYNAMIC_ARRAY_TYPE_ID]]
-// CHECK: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG0_STRUCT_TYPE_ID]]
 
-// CHECK: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
-// CHECK: %[[UINT_GLOBAL_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[UINT_TYPE_ID]]
-// CHECK: %[[UINT_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[UINT_TYPE_ID]]
-// CHECK: %[[ARG1_STRUCT_TYPE_ID]] = OpTypeStruct %[[UINT_DYNAMIC_ARRAY_TYPE_ID]]
-// CHECK: %[[ARG1_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG1_STRUCT_TYPE_ID]]
 
-// CHECK: %[[ARG2_STRUCT_TYPE_ID]] = OpTypeStruct %[[UINT_TYPE_ID]]
-// CHECK: %[[ARG2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG2_STRUCT_TYPE_ID]]
 
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
-// CHECK: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 
-// CHECK: %[[ARG0_ID]] = OpVariable %[[ARG0_POINTER_TYPE_ID]] StorageBuffer
-// CHECK: %[[ARG1_ID]] = OpVariable %[[ARG1_POINTER_TYPE_ID]] StorageBuffer
-// CHECK: %[[ARG2_ID]] = OpVariable %[[ARG2_POINTER_TYPE_ID]] StorageBuffer
 
-// CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] None %[[FOO_TYPE_ID]]
-// CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 
-// CHECK: %[[B_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG1_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[I_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[UINT_GLOBAL_POINTER_TYPE_ID]] %[[ARG2_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[I_ACCESS_CHAIN_ID]]
 
-// CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT_GLOBAL_POINTER_TYPE_ID]] %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[I_LOAD_ID]]
-// CHECK: %[[A_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]] %[[A_ACCESS_CHAIN_ID]]
-// CHECK: %[[BITCAST_ID:[a-zA-Z0-9_]*]] = OpBitcast %[[UINT_TYPE_ID]] %[[A_LOAD_ID]]
-// CHECK: OpStore %[[B_ACCESS_CHAIN_ID]] %[[BITCAST_ID]]
 
-// CHECK: OpReturn
-// CHECK: OpFunctionEnd
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, global int* b, int i)
 {
   *b = ((global int*)a)[i];
 }
+// CHECK:  ; SPIR-V
+// CHECK:  ; Version: 1.0
+// CHECK:  ; Generator: Codeplay; 0
+// CHECK:  ; Bound: 27
+// CHECK:  ; Schema: 0
+// CHECK:  OpCapability Shader
+// CHECK:  OpCapability VariablePointers
+// CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
+// CHECK:  OpExtension "SPV_KHR_variable_pointers"
+// CHECK:  OpMemoryModel Logical GLSL450
+// CHECK:  OpEntryPoint GLCompute [[_19:%[0-9a-zA-Z_]+]] "foo"
+// CHECK:  OpExecutionMode [[_19]] LocalSize 1 1 1
+// CHECK:  OpSource OpenCL_C 120
+// CHECK:  OpDecorate [[__runtimearr_float:%[0-9a-zA-Z_]+]] ArrayStride 4
+// CHECK:  OpMemberDecorate [[__struct_3:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_3]] Block
+// CHECK:  OpDecorate [[__runtimearr_uint:%[0-9a-zA-Z_]+]] ArrayStride 4
+// CHECK:  OpMemberDecorate [[__struct_7:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_7]] Block
+// CHECK:  OpMemberDecorate [[__struct_9:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_9]] Block
+// CHECK:  OpDecorate [[_16:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_16]] Binding 0
+// CHECK:  OpDecorate [[_17:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_17]] Binding 1
+// CHECK:  OpDecorate [[_18:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_18]] Binding 2
+// CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK:  [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
+// CHECK:  [[__struct_3]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
+// CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK:  [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
+// CHECK:  [[__struct_7]] = OpTypeStruct [[__runtimearr_uint]]
+// CHECK:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK:  [[__struct_9]] = OpTypeStruct [[_uint]]
+// CHECK:  [[__ptr_StorageBuffer__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
+// CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK:  [[_12:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
+// CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK:  [[_16]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
+// CHECK:  [[_17]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
+// CHECK:  [[_18]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
+// CHECK:  [[_19]] = OpFunction [[_void]] None [[_12]]
+// CHECK:  [[_20:%[0-9a-zA-Z_]+]] = OpLabel
+// CHECK:  [[_21:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_17]] [[_uint_0]] [[_uint_0]]
+// CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_18]] [[_uint_0]]
+// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_22]]
+// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_16]] [[_uint_0]] [[_23]]
+// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_24]]
+// CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpBitcast [[_uint]] [[_25]]
+// CHECK:  OpStore [[_21]] [[_26]]
+// CHECK:  OpReturn
+// CHECK:  OpFunctionEnd

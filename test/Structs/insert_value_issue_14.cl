@@ -29,11 +29,11 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 
-// CHECK: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
-// CHECK: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
+// CHECK-DAG: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
 
 // With undef mapping to 0 byte, (undef,1,2,3) maps to 66051.
-// CHECK: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
+// CHECK-DAG: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
 
 // no longer checked: [[undef_struct:%[_a-zA-Z0-9]+]] = OpUndef [[struct]]
 

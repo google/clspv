@@ -22,6 +22,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/LinkAllPasses.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/raw_ostream.h>
@@ -758,14 +759,19 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSplatArgPass());
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
-  // Replacing pointer bitcasts can leave some trivial GEPs
-  // that are easy to remove.
-  pm.add(clspv::createSimplifyPointerBitcastPass());
+
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
 
   if (clspv::Option::ModuleConstantsInStorageBuffer()) {
     pm.add(clspv::createClusterModuleScopeConstantVars());
   }
+
+  pm.add(clspv::createAllocateDescriptorsPass(SamplerMapEntries));
+  pm.add(llvm::createVerifierPass());
+  // Replacing pointer bitcasts can leave some trivial GEPs
+  // that are easy to remove.  Also replace GEPs of GEPS
+  // left by replacing indirect buffer accesses.
+  pm.add(clspv::createSimplifyPointerBitcastPass());
 
   pm.add(clspv::createSplatSelectConditionPass());
   pm.add(clspv::createRewriteInsertsPass());

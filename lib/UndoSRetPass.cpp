@@ -41,6 +41,7 @@ llvm::ModulePass *createUndoSRetPass() { return new UndoSRetPass(); }
 
 bool UndoSRetPass::runOnModule(Module &M) {
   bool Changed = false;
+  LLVMContext& Context = M.getContext();
 
   SmallVector<Function *, 8> WorkList;
   for (Function &F : M) {
@@ -127,7 +128,7 @@ bool UndoSRetPass::runOnModule(Module &M) {
         // ret %retv;
         for (auto Ret : RetInsts) {
           LoadInst *LD = new LoadInst(VMap[RetVal], "", Ret);
-          ReturnInst *NewRet = ReturnInst::Create(F->getContext(), LD, Ret);
+          ReturnInst *NewRet = ReturnInst::Create(Context, LD, Ret);
           Ret->replaceAllUsesWith(NewRet);
           Ret->eraseFromParent();
         }
@@ -144,8 +145,23 @@ bool UndoSRetPass::runOnModule(Module &M) {
 
             NewCall->takeName(Call);
             NewCall->setCallingConv(Call->getCallingConv());
-            NewCall->setAttributes(Call->getAttributes());
             NewCall->setDebugLoc(Call->getDebugLoc());
+
+            // Copy attributes over, but skip the attributes for the first
+            // parameter since it is removed.  In particular, the old
+            // first parameter has a StructRet attribute that should disappear.
+            auto attrs(Call->getAttributes());
+            AttributeList new_attrs(
+                AttributeList::get(Context, AttributeList::FunctionIndex,
+                                   AttrBuilder(attrs.getFnAttributes())));
+            new_attrs =
+                new_attrs.addAttributes(Context, AttributeList::ReturnIndex,
+                                        AttrBuilder(attrs.getRetAttributes()));
+            for (unsigned i = 1; i < Call->getNumArgOperands(); i++) {
+              new_attrs = new_attrs.addParamAttributes(
+                  Context, i - 1, AttrBuilder(attrs.getParamAttributes(i)));
+            }
+            NewCall->setAttributes(new_attrs);
 
             // Store the value we returned from our function call into the
             // the orignal destination.

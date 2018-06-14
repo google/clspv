@@ -37,22 +37,22 @@ void kernel foo(global float4* A, float4 y, float4 x)
 // CHECK: OpDecorate [[_24]] Binding 1
 // CHECK: OpDecorate [[_25:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_25]] Binding 2
-// CHECK: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
-// CHECK: [[__ptr_StorageBuffer_v4float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v4float]]
-// CHECK: [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
-// CHECK: [[__struct_6]] = OpTypeStruct [[__runtimearr_v4float]]
-// CHECK: [[__ptr_StorageBuffer__struct_6:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
-// CHECK: [[__struct_8]] = OpTypeStruct [[_v4float]]
-// CHECK: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
-// CHECK: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CHECK: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
-// CHECK: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
-// CHECK: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
-// CHECK: [[_float_0_31831:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0.3183
-// CHECK: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v4float]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]]
+// CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
+// CHECK-DAG: [[__ptr_StorageBuffer_v4float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v4float]]
+// CHECK-DAG: [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
+// CHECK-DAG: [[__struct_6]] = OpTypeStruct [[__runtimearr_v4float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_6:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
+// CHECK-DAG: [[__struct_8]] = OpTypeStruct [[_v4float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
+// CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CHECK-DAG: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
+// CHECK-DAG: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
+// CHECK-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[_float_0_31831:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0.3183
+// CHECK-DAG: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v4float]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]]
 // CHECK: [[_18]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_19]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_20]] = OpSpecConstant [[_uint]] 1

@@ -38,21 +38,21 @@ __kernel void myTest(__global float* jasper)
 // CHECK: OpDecorate [[_gl_WorkGroupSize:%[a-zA-Z0-9_]+]] BuiltIn WorkgroupSize
 // CHECK: OpDecorate [[_21:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_21]] Binding 0
-// CHECK: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[__ptr_StorageBuffer_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
-// CHECK: [[__struct_4]] = OpTypeStruct [[__runtimearr_float]]
-// CHECK: [[__ptr_StorageBuffer__struct_4:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
-// CHECK: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CHECK: [[_8:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
-// CHECK: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
-// CHECK: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
-// CHECK: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
-// CHECK: [[_uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 1
-// CHECK: [[_uint_2:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 2
-// CHECK: [[_uint_3:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 3
+// CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[__ptr_StorageBuffer_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_float]]
+// CHECK-DAG: [[__runtimearr_float]] = OpTypeRuntimeArray [[_float]]
+// CHECK-DAG: [[__struct_4]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_4:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
+// CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CHECK-DAG: [[_8:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
+// CHECK-DAG: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
+// CHECK-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
+// CHECK-DAG: [[_uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 1
+// CHECK-DAG: [[_uint_2:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 2
+// CHECK-DAG: [[_uint_3:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 3
 // CHECK: [[_16]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_17]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_18]] = OpSpecConstant [[_uint]] 1
