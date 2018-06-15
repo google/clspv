@@ -758,6 +758,9 @@ int main(const int argc, const char *const argv[]) {
   pm.add(clspv::createSplatArgPass());
   pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createReplacePointerBitcastPass());
+  // Replacing pointer bitcasts can leave some trivial GEPs
+  // that are easy to remove.
+  pm.add(clspv::createSimplifyPointerBitcastPass());
   pm.add(clspv::createUndoTranslateSamplerFoldPass());
 
   if (clspv::Option::ModuleConstantsInStorageBuffer()) {

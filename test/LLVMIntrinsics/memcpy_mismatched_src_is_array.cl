@@ -19,7 +19,7 @@ src_is_array(global float *A, int n, int k) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 67
+// CHECK: ; Bound: 66
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -78,15 +78,15 @@ src_is_array(global float *A, int n, int k) {
 // CHECK: [[_35:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Function__arr_float_uint_7]] Function
 // CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_31]] [[_uint_0]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_36]]
-// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_0]]
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_1]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_2]]
 // CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_3]]
 // CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_4]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_5]]
 // CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_6]]
-// CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_38]]
-// CHECK: OpStore [[_45]] [[_float_0]]
+// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_35]] [[_uint_0]]
+// HECK: [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_float]] [[_38]]
+// CHECK: OpStore [[_38]] [[_float_0]]
 // CHECK: OpStore [[_39]] [[_float_1]]
 // CHECK: OpStore [[_40]] [[_float_2]]
 // CHECK: OpStore [[_41]] [[_float_3]]
