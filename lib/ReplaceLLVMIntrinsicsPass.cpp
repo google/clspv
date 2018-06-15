@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/Utils/Cloning.h>
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
-#include <spirv/1.0/spirv.hpp>
+#include "spirv/1.0/spirv.hpp"
 
 using namespace llvm;
 
@@ -34,6 +34,7 @@ struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
   bool runOnModule(Module &M) override;
   bool replaceMemset(Module &M);
   bool replaceMemcpy(Module &M);
+  bool removeLifetimeDeclarations(Module &M);
 };
 }
 
@@ -50,6 +51,9 @@ ModulePass *createReplaceLLVMIntrinsicsPass() {
 bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
   bool Changed = false;
 
+  // Remove lifetime annotations first.  They coulud be using memset
+  // and memcpy calls.
+  Changed |= removeLifetimeDeclarations(M);
   Changed |= replaceMemset(M);
   Changed |= replaceMemcpy(M);
 
@@ -328,6 +332,32 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         Inst->eraseFromParent();
       }
     }
+  }
+
+  return Changed;
+}
+
+bool ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
+  // SPIR-V OpLifetimeStart and OpLifetimeEnd require Kernel capability.
+  // Vulkan doesn't support that, so remove all lifteime bounds declarations.
+
+  bool Changed = false;
+
+  SmallVector<Function *, 2> WorkList;
+  for (auto &F : M) {
+    if (F.getName().startswith("llvm.lifetime.")) {
+      WorkList.push_back(&F);
+    }
+  }
+
+  for (auto *F : WorkList) {
+    Changed = true;
+    for (auto U : F->users()) {
+      if (auto *CI = dyn_cast<CallInst>(U)) {
+        CI->eraseFromParent();
+      }
+    }
+    F->eraseFromParent();
   }
 
   return Changed;
