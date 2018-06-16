@@ -18,6 +18,7 @@ add_library(clspv_core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp

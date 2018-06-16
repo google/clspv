@@ -43,6 +43,7 @@
 
 #include "ArgKind.h"
 #include "ConstantEmitter.h"
+#include "DescriptorCounter.h"
 
 #include <list>
 #include <iomanip>
@@ -219,7 +220,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        NextDescriptorSetIndex(0), constant_i32_zero_id_(0) {}
+        constant_i32_zero_id_(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -453,9 +454,6 @@ private:
   };
   // A mapping from a pointer-to-local argument value to a LocalArgInfo value.
   DenseMap<const Argument*, LocalArgInfo> LocalArgMap;
-
-  // The next descriptor set index to use.
-  uint32_t NextDescriptorSetIndex;
 
   // A mapping from pointer-to-local argument to a specialization constant ID
   // for that argument's array size.  This is generated from AllocatArgSpecIds.
@@ -2334,11 +2332,11 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
 
     uint32_t ArgID = SamplerLiteralToIDMap[SamplerLiteral.first];
     Ops << MkId(ArgID) << MkNum(spv::DecorationDescriptorSet)
-        << MkNum(NextDescriptorSetIndex);
+        << MkNum(clspv::GetCurrentDescriptorIndex(&M));
 
     descriptorMapOut << "sampler," << SamplerLiteral.first << ",samplerExpr,\""
                      << SamplerLiteral.second << "\",descriptorSet,"
-                     << NextDescriptorSetIndex << ",binding," << BindingIdx
+                     << clspv::GetCurrentDescriptorIndex(&M) << ",binding," << BindingIdx
                      << "\n";
 
     auto *DescDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
@@ -2356,7 +2354,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   }
   if (BindingIdx > 0) {
     // We generated something.
-    ++NextDescriptorSetIndex;
+    clspv::TakeDescriptorIndex(&M);
   }
 
   const char *TranslateSamplerFunctionName = "__translate_sampler_initializer";
@@ -2394,6 +2392,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
 }
 
 void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
+  Module& M = *GV.getParent();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
@@ -2616,7 +2615,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   } else if (module_scope_constant_external_init) {
     // This module scope constant is initialized from a storage buffer with data
     // provided by the host at binding 0 of the next descriptor set.
-    const uint32_t descriptor_set = NextDescriptorSetIndex++;
+    const uint32_t descriptor_set = TakeDescriptorIndex(&M);
 
     // Emit the intiialier to the descriptor map file.
     // Use "kind,buffer" to indicate storage buffer. We might want to expand
@@ -2668,7 +2667,8 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
 }
 
 void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
-  const DataLayout &DL = F.getParent()->getDataLayout();
+  Module& M = *F.getParent();
+  const DataLayout &DL = M.getDataLayout();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
@@ -2693,9 +2693,9 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
                               Inst->getOpcode() != spv::OpExtInstImport;
                      });
 
-    const uint32_t DescriptorSetIdx = NextDescriptorSetIndex;
+    const uint32_t DescriptorSetIdx = clspv::GetCurrentDescriptorIndex(&M);
     if (clspv::Option::DistinctKernelDescriptorSets()) {
-      ++NextDescriptorSetIndex;
+      clspv::TakeDescriptorIndex(&M);
     }
 
     auto remap_arg_kind = [](StringRef argKind) {
