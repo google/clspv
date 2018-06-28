@@ -98,10 +98,10 @@ struct SPIRVOperand {
       return 1;
     case LITERAL_INTEGER:
     case LITERAL_FLOAT:
-      return LiteralNum.size();
+      return uint32_t(LiteralNum.size());
     case LITERAL_STRING:
       // Account for the terminating null character.
-      return (LiteralStr.size() + 4) / 4;
+      return uint32_t((LiteralStr.size() + 4) / 4);
     }
     llvm_unreachable("Unhandled case in SPIRVOperand::GetNumWords()");
   }
@@ -164,7 +164,7 @@ struct SPIRVInstruction {
       : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0),
         Operands(Ops.begin(), Ops.end()) {
     for (auto *operand : Ops) {
-      WordCount += operand->GetNumWords();
+      WordCount += uint16_t(operand->GetNumWords());
     }
   }
   // Create an instruction with an opcode and a no-zero result ID, and
@@ -181,13 +181,13 @@ struct SPIRVInstruction {
     }
   }
 
-  uint16_t getWordCount() const { return WordCount; }
+  uint32_t getWordCount() const { return WordCount; }
   uint16_t getOpcode() const { return Opcode; }
   uint32_t getResultID() const { return ResultID; }
   ArrayRef<SPIRVOperand *> getOperands() const { return Operands; }
 
 private:
-  uint16_t WordCount;
+  uint32_t WordCount; // Check the 16-bit bound at code generation time.
   uint16_t Opcode;
   uint32_t ResultID;
   SmallVector<SPIRVOperand *, 4> Operands;
@@ -724,7 +724,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
       if (GVList.size() > 0) {
         assert(GVList.size() == 1);
         const auto *GV = GVList[0];
-        const size_t constants_byte_size =
+        const auto constants_byte_size =
             (DL.getTypeSizeInBits(GV->getInitializer()->getType())) / 8;
         const size_t kConstantMaxSize = 65536;
         if (constants_byte_size > kConstantMaxSize) {
@@ -1731,8 +1731,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
       break;
     }
     case Type::StructTyID: {
-      LLVMContext &Context = Ty->getContext();
-
       StructType *STy = cast<StructType>(Ty);
 
       // Handle sampler type.
@@ -1941,7 +1939,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
       break;
     }
     case Type::ArrayTyID: {
-      LLVMContext &Context = Ty->getContext();
       ArrayType *ArrTy = cast<ArrayType>(Ty);
       //
       // Generate OpConstant and OpTypeArray.
@@ -1993,7 +1990,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
     }
     case Type::VectorTyID: {
       // <4 x i8> is changed to i32.
-      LLVMContext &Context = Ty->getContext();
       if (Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
         if (Ty->getVectorNumElements() == 4) {
           TypeMap[Ty] = lookupType(Ty->getVectorElementType());
@@ -2732,12 +2728,13 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
           num_ptr_local++;
           FunctionType *fTy =
               cast<FunctionType>(F.getType()->getPointerElementType());
-          descriptorMapOut
-              << "kernel," << F.getName() << ",arg," << name << ",argOrdinal,"
-              << old_index << ",argKind," << argKind << ",arrayElemSize,"
-              << DL.getTypeAllocSize(
-                     fTy->getParamType(new_index)->getPointerElementType())
-              << ",arrayNumElemSpecId," << spec_id << "\n";
+          descriptorMapOut << "kernel," << F.getName() << ",arg," << name
+                           << ",argOrdinal," << old_index << ",argKind,"
+                           << argKind << ",arrayElemSize,"
+                           << DL.getTypeAllocSize(
+                                  fTy->getParamType(unsigned(new_index))
+                                      ->getPointerElementType())
+                           << ",arrayNumElemSpecId," << spec_id << "\n";
         } else {
           descriptorMapOut << "kernel," << F.getName() << ",arg," << name
                            << ",argOrdinal," << old_index << ",descriptorSet,"
@@ -2785,7 +2782,6 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
           GVarWithEmittedBindingInfo.insert(NewGV);
 
           SPIRVOperandList Ops;
-          SPIRVOperand *ArgIDOp = nullptr;
           uint32_t ArgID = 0;
 
           if (uses_binding) {
@@ -5053,7 +5049,6 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops << MkId(lookupType(Call->getType()));
 
         for (Use &use : Call->arg_operands()) {
-          Value *val = use.get();
           Ops << MkId(VMap[use.get()]);
         }
 
@@ -5865,6 +5860,11 @@ void SPIRVProducerPass::WriteWordCountAndOpcode(SPIRVInstruction *Inst) {
   // High 16 bit : Word Count
   // Low 16 bit  : Opcode
   uint32_t Word = Inst->getOpcode();
+  const uint32_t count = Inst->getWordCount();
+  if (count > 65535) {
+    errs() << "Word count limit of 65535 exceeded: " << count << "\n";
+    llvm_unreachable("Word count too high");
+  }
   Word |= Inst->getWordCount() << 16;
   WriteOneWord(Word);
 }
