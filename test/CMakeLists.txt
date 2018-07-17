@@ -19,6 +19,6 @@ add_custom_target(check-spirv
     --path ${LLVM_BINARY_DIR}/bin
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path ${CLSPV_BINARY_DIR}/bin
-  DEPENDS clspv spirv-as spirv-dis spirv-val FileCheck not
+  DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt FileCheck not
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
