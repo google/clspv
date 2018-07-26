@@ -36,20 +36,20 @@ kernel void foo(global float3 *A, float3 edge, float3 x) {
 // CHECK: OpDecorate [[_22]] Binding 1
 // CHECK: OpDecorate [[_23:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_23]] Binding 2
-// CHECK: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[_v3float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 3
-// CHECK: [[__ptr_StorageBuffer_v3float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v3float]]
-// CHECK: [[__runtimearr_v3float]] = OpTypeRuntimeArray [[_v3float]]
-// CHECK: [[__struct_6]] = OpTypeStruct [[__runtimearr_v3float]]
-// CHECK: [[__ptr_StorageBuffer__struct_6:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
-// CHECK: [[__struct_8]] = OpTypeStruct [[_v3float]]
-// CHECK: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
-// CHECK: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
-// CHECK: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
-// CHECK: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
-// CHECK: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
-// CHECK: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[_v3float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 3
+// CHECK-DAG: [[__ptr_StorageBuffer_v3float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[_v3float]]
+// CHECK-DAG: [[__runtimearr_v3float]] = OpTypeRuntimeArray [[_v3float]]
+// CHECK-DAG: [[__struct_6]] = OpTypeStruct [[__runtimearr_v3float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_6:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
+// CHECK-DAG: [[__struct_8]] = OpTypeStruct [[_v3float]]
+// CHECK-DAG: [[__ptr_StorageBuffer__struct_8:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
+// CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
+// CHECK-DAG: [[_12:%[a-zA-Z0-9_]+]] = OpTypeFunction [[_void]]
+// CHECK-DAG: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
+// CHECK-DAG: [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_v3uint]]
+// CHECK-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_16]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_17]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_18]] = OpSpecConstant [[_uint]] 1

@@ -291,4 +291,15 @@ llvm::ModulePass *createUnhideConstantLoadsPass();
 /// chains of insertvalue instructions that only cover some but
 /// not all of a struct.
 llvm::ModulePass *createRewriteInsertsPass();
+
+/// Allocate descriptors.
+/// @return An LLVM module pass.
+///
+/// Replaces compile time samplers (from the sampler map), and kernel
+/// arguments to descriptors.  Encoding is via compiler builtins
+/// starting with "clspv.resource.*".  Uses of those kernel arguments
+/// and samplers are replaced by calls the special functions yielding
+/// the appropriately typed pointers.
+llvm::ModulePass *createAllocateDescriptorsPass(
+    llvm::ArrayRef<std::pair<unsigned, std::string>> samplerMap);
 }

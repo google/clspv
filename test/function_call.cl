@@ -18,8 +18,8 @@
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
-// CHECK: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK: %[[NOP_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
+// CHECK-DAG: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
+// CHECK-DAG: %[[NOP_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
 
 // CHECK: %[[BAR_ID:[a-zA-Z0-9_]*]] = OpFunction %[[VOID_TYPE_ID]] None %[[NOP_TYPE_ID]]
 void bar()

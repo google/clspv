@@ -105,7 +105,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       // this is the byte offset within the POD arguments struct.
       unsigned offset;
       // Argument type.  Same range of values as the result of
-      // clspv::GetArgKindForType.
+      // clspv::GetArgKindNameForType.
       const char* arg_kind;
       // If non-negative, this argument is a pointer-to-local, and the value
       // here is the specialization constant id for the array size.
@@ -125,14 +125,14 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
-        auto kind = clspv::GetArgKindForType(ArgTy);
+        const auto kind = clspv::GetArgKindForType(ArgTy);
         int spec_id = -1;
-        if (0 == std::strcmp("local", kind)) {
+        if (kind == clspv::ArgKind::Local) {
           spec_id = arg_spec_id_map[&Arg];
           assert(spec_id > 0);
         }
-        RemapInfo.push_back({std::string(Arg.getName()), arg_index,
-                             new_index++, 0u, kind, spec_id});
+        RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
+                             0u, clspv::GetArgKindName(kind), spec_id});
       } else {
         PodArgTys.push_back(ArgTy);
       }
@@ -158,7 +158,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
                unsigned(StructLayout->getElementOffset(pod_index++)),
-               clspv::GetArgKindForType(ArgTy), -1});
+               clspv::GetArgKindNameForType(ArgTy), -1});
         }
         arg_index++;
       }

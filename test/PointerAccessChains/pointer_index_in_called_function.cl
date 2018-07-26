@@ -12,15 +12,15 @@
 // This is the one we really want:
 // CHECK: OpDecorate [[ptr_sb_float:%[a-zA-Z0-9_]+]] ArrayStride 4
 
-// CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct
-// CHECK: [[ptr_sb_struct:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[struct]]
-// CHECK: [[ptr_sb_float]] = OpTypePointer StorageBuffer [[float]]
-// CHECK: [[rtarr_float]] = OpTypeRuntimeArray [[float]]
+// CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct
+// CHECK-DAG: [[ptr_sb_struct:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[struct]]
+// CHECK-DAG: [[ptr_sb_float]] = OpTypePointer StorageBuffer [[float]]
+// CHECK-DAG: [[rtarr_float]] = OpTypeRuntimeArray [[float]]
 
-// CHECK: [[uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
-// CHECK: [[uint_7:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 7
+// CHECK-DAG: [[uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
+// CHECK-DAG: [[uint_7:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 7
 
 typedef struct {
   float x[12];

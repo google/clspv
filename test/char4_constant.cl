@@ -14,7 +14,7 @@ kernel void dup(global uchar4 *B) {
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 
-// CHECK: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
-// CHECK: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 25166596
+// CHECK-DAG: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 25166596
 // CHECK-DAG: OpStore {{%[_a-zA-Z0-9]+}} [[theconst]]
 // CHECK-NOT: OpStore

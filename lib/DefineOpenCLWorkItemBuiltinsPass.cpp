@@ -77,8 +77,8 @@ GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(
     Module &M, StringRef GlobalVarName, Type *Ty,
     AddressSpace::Type AddrSpace) {
   auto GV = new GlobalVariable(
-      M, Ty, false, GlobalValue::CommonLinkage, nullptr, GlobalVarName, nullptr,
-      GlobalValue::ThreadLocalMode::NotThreadLocal, AddrSpace);
+      M, Ty, false, GlobalValue::ExternalLinkage, nullptr, GlobalVarName,
+      nullptr, GlobalValue::ThreadLocalMode::NotThreadLocal, AddrSpace);
 
   GV->setInitializer(Constant::getNullValue(Ty));
 

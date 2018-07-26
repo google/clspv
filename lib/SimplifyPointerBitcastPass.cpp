@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
@@ -260,18 +261,35 @@ bool SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     SmallVector<Value *, 8> Idxs;
 
     Value *SrcLastIdxOp = OtherGEP->getOperand(OtherGEP->getNumOperands() - 1);
+
     Value *GEPIdxOp = GEP->getOperand(1);
-    Value *MergedIdx = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
+    Value *MergedIdx = GEPIdxOp;
+
+    // Add the indices together, if the last one from before is not zero.
+    bool last_idx_is_zero = false;
+    if (auto *constant = dyn_cast<ConstantInt>(SrcLastIdxOp)) {
+      last_idx_is_zero = constant->isZero();
+    }
+    if (!last_idx_is_zero) {
+      MergedIdx = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
+    }
 
     Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
     Idxs.push_back(MergedIdx);
     Idxs.append(GEP->op_begin() + 2, GEP->op_end());
 
     Value *NewGEP = nullptr;
+    // Create the new GEP.  If we used the Builder it will do some folding
+    // that we don't want.  In particular, if the first GEP is to an LLVM
+    // constant then the combined GEP will become a ConstantExpr and it
+    // will hide the pointer from subsequent passes.  So bypass the Builder
+    // and create the GEP instruction directly.
     if (GEP->isInBounds() && OtherGEP->isInBounds()) {
-      NewGEP = Builder.CreateInBoundsGEP(OtherGEP->getPointerOperand(), Idxs);
+      NewGEP = GetElementPtrInst::CreateInBounds(
+          nullptr, OtherGEP->getPointerOperand(), Idxs, "", GEP);
     } else {
-      NewGEP = Builder.CreateGEP(OtherGEP->getPointerOperand(), Idxs);
+      NewGEP = GetElementPtrInst::Create(nullptr, OtherGEP->getPointerOperand(),
+                                         Idxs, "", GEP);
     }
 
     // And replace the original GEP with our replacement GEP.

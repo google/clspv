@@ -2130,7 +2130,6 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
         // Make the fmin function.
         FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty, result_ty}, false);
         fmin_fn = cast<Function>(M.getOrInsertFunction(fmin_name, fn_ty));
-        fmin_fn->addFnAttr(Attribute::ReadOnly);
         fmin_fn->addFnAttr(Attribute::ReadNone);
         fmin_fn->setCallingConv(CallingConv::SPIR_FUNC);
       }
@@ -2140,7 +2139,6 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
         // Make the floor function.
         FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
         floor_fn = cast<Function>(M.getOrInsertFunction(floor_name, fn_ty));
-        floor_fn->addFnAttr(Attribute::ReadOnly);
         floor_fn->addFnAttr(Attribute::ReadNone);
         floor_fn->setCallingConv(CallingConv::SPIR_FUNC);
       }
@@ -2150,7 +2148,6 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
         // Make the clspv_fract function.
         FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
         clspv_fract_fn = cast<Function>(M.getOrInsertFunction(clspv_fract_name, fn_ty));
-        clspv_fract_fn->addFnAttr(Attribute::ReadOnly);
         clspv_fract_fn->addFnAttr(Attribute::ReadNone);
         clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
       }

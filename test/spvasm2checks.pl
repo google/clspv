@@ -40,9 +40,13 @@ while(<>) {
   my $line = $_;
   $line =~ s/^\s+//;
   $line =~ s/\s+$//;
+  my $is_type_or_constant = 0;
   my @words = split(/\s+/, $line);
-  my @parts = qw(// CHECK:);
+  my @parts = ();
   foreach my $word (@words) {
+    if ($word =~ m/^(OpType|OpConstant)/) {
+      $is_type_or_constant = 1;
+    }
     if ($word =~ m/^%($replace_pat)/o) {
       my $name = $1;
       if (defined $id{$name}) {
@@ -60,5 +64,6 @@ while(<>) {
       push @parts, $word;
     }
   }
-  print join(' ', @parts), "\n";
+  my $first = ($is_type_or_constant ? '// CHECK-DAG: ' : '// CHECK: ');
+  print join(' ', $first, @parts), "\n";
 }
