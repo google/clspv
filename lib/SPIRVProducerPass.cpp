@@ -2893,34 +2893,7 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
 void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
                                                   Function &F) {
   // Gather the list of resources that are used by this function's arguments.
-  DenseSet<unsigned> arg_index_set;
-  // TODO(dneto): resource_var_at_index should have same contents as
-  // FunctionToResourceVars[&F].  So remove this redundant calculation.
-  DenseMap<unsigned, ResourceVarInfo *> resource_var_at_index;
-  // We'll scan uses of the var_fn for each resource var info struct.  This
-  // will overcount in the case where the same resource is shared across
-  // kernels.  So we have to filter two ways:  ensuring the call site really
-  // is in the target function F, and also to ensure the set and binding
-  // for the resource-var-info struct match the set and binding as specified
-  // in the call.
-  for (auto *info : ModuleOrderedResourceVars) {
-    for (auto &U : info->var_fn->uses()) {
-      if (auto *call = dyn_cast<CallInst>(U.getUser())) {
-        if (&F == call->getParent()->getParent()) {
-          auto set = unsigned(
-              dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          auto binding = unsigned(
-              dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          auto arg_index = unsigned(
-              dyn_cast<ConstantInt>(call->getOperand(3))->getZExtValue());
-          if (set == info->descriptor_set && binding == info->binding) {
-            arg_index_set.insert(arg_index);
-            resource_var_at_index[arg_index] = info;
-          }
-        }
-      }
-    }
-  }
+  auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
 
   auto remap_arg_kind = [](StringRef argKind) {
     return clspv::Option::PodArgsInUniformBuffer() && argKind.equals("pod")
@@ -2982,24 +2955,22 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
       arguments.push_back(&arg);
     }
 
-    SmallVector<unsigned, 4> ordered_arg_index(arg_index_set.begin(),
-                                               arg_index_set.end());
-    std::sort(ordered_arg_index.begin(), ordered_arg_index.end(),
-              std::less<unsigned>());
-
-    for (auto arg_index : ordered_arg_index) {
-      auto *info = resource_var_at_index[arg_index];
-      assert(info);
-      descriptorMapOut << "kernel," << F.getName() << ",arg,"
-                       << arguments[arg_index]->getName() << ",argOrdinal,"
-                       << arg_index << ",descriptorSet," << info->descriptor_set
-                       << ",binding," << info->binding << ",offset," << 0
-                       << ",argKind,"
-                       << remap_arg_kind(clspv::GetArgKindName(info->arg_kind))
-                       << "\n";
+    unsigned arg_index = 0;
+    for (auto *info : resource_var_at_index) {
+      if (info) {
+        descriptorMapOut << "kernel," << F.getName() << ",arg,"
+                         << arguments[arg_index]->getName() << ",argOrdinal,"
+                         << arg_index << ",descriptorSet,"
+                         << info->descriptor_set << ",binding," << info->binding
+                         << ",offset," << 0 << ",argKind,"
+                         << remap_arg_kind(
+                                clspv::GetArgKindName(info->arg_kind))
+                         << "\n";
+      }
+      arg_index++;
     }
     // Generate mappings for pointer-to-local arguments.
-    for (unsigned arg_index = 0; arg_index < arguments.size(); ++arg_index) {
+    for (arg_index = 0; arg_index < arguments.size(); ++arg_index) {
       Argument *arg = arguments[arg_index];
       auto where = LocalArgMap.find(arg);
       if (where != LocalArgMap.end()) {
