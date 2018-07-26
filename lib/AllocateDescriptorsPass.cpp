@@ -462,6 +462,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     int arg_index = 0;
     for (Argument &Arg : f_ptr->args()) {
       if (discriminants[arg_index].index >= 0) {
+        Changed = true;
         // This argument needs to be rewritten.
 
         const auto set = set_and_binding_list[arg_index].first;
