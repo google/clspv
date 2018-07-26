@@ -273,6 +273,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
   const bool always_distinct_sets =
       clspv::Option::DistinctKernelDescriptorSets();
+  // The default is that all kernels use the same descriptor set.
+  const bool always_single_kernel_descriptor = true;
 
   // First classify all kernel arguments by arg discriminant which
   // is the pair (type, arg index).  Each discriminant remembers which
@@ -398,10 +400,13 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
-          if (functions_used_by_discriminant[info.index].size() ==
-              kernels_with_bodies.size()) {
-            // This kernel argument discriminant is consistent across all
-            // kernels. Reuse the descriptor.
+          if (always_single_kernel_descriptor ||
+              functions_used_by_discriminant[info.index].size() ==
+                  kernels_with_bodies.size()) {
+            // Reuse the descriptor because one of the following is true:
+            // - This kernel argument discriminant is consistent across all
+            //   kernels.
+            // - Convention is to use a single descriptor for all kernels.
             if (all_kernels_descriptor_set == kUnallocated) {
               all_kernels_descriptor_set = clspv::TakeDescriptorIndex(&M);
             }
