@@ -768,6 +768,7 @@ int main(const int argc, const char *const argv[]) {
 
   pm.add(clspv::createAllocateDescriptorsPass(SamplerMapEntries));
   pm.add(llvm::createVerifierPass());
+  pm.add(clspv::createDirectResourceAccessPass());
   // Replacing pointer bitcasts can leave some trivial GEPs
   // that are easy to remove.  Also replace GEPs of GEPS
   // left by replacing indirect buffer accesses.

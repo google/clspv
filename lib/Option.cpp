@@ -18,20 +18,23 @@
 
 namespace {
 
-// Should the compiler try to use direct buffer accesses within helper
+// Should the compiler try to use direct resource accesses within helper
 // functions instead of passing pointers via function arguments?
-llvm::cl::opt<bool> direct_buffer_access(
-    "direct-buffer-access", llvm::cl::init(false),
+llvm::cl::opt<bool> no_direct_resource_access(
+    "no-dra", llvm::cl::init(false),
     llvm::cl::desc(
-        "Helper functions access buffers directly instead of by pointers "
-        "in function arguments"));
+        "No Direct Resource Access: Avoid rewriting helper functions "
+        "to access resources directly instead of by pointers "
+        "in function arguments.  Affects kernel arguments of type "
+        "pointer-to-global, pointer-to-constant, image, and sampler."));
 
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
 llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
     "distinct-kernel-descriptor-sets", llvm::cl::init(false),
     llvm::cl::desc(
-        "Each kernel uses its own descriptor set for its arguments"));
+        "Each kernel uses its own descriptor set for its arguments. "
+        "Turns off direct-resource-access optimizations."));
 
 // TODO(dneto): As per Neil Henning suggestion, might not need this if
 // you can trace the pointer back far enough to see that it's 32-bit
@@ -95,7 +98,9 @@ llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
 namespace clspv {
 namespace Option {
 
-bool DirectBufferAccess() { return direct_buffer_access; }
+bool DirectResourceAccess() {
+  return !(no_direct_resource_access || distinct_kernel_descriptor_sets);
+}
 bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
 bool HackDistinctImageSampler() { return hack_dis; }

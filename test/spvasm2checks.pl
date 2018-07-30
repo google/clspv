@@ -64,6 +64,7 @@ while(<>) {
       push @parts, $word;
     }
   }
+  $is_type_or_constant = 0;
   my $first = ($is_type_or_constant ? '// CHECK-DAG: ' : '// CHECK: ');
   print join(' ', $first, @parts), "\n";
 }

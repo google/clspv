@@ -22,7 +22,7 @@ class ModulePass;
 class raw_pwrite_stream;
 class raw_ostream;
 template <typename T> class ArrayRef;
-}
+} // namespace llvm
 
 namespace clspv {
 /// Define the work-item builtins that OpenCL has.
@@ -254,7 +254,8 @@ llvm::ModulePass *createClusterModuleScopeConstantVars();
 ///
 /// The idea is to save on the number of StorageBuffer (SSBO) arguments, as that
 /// is a very limited resource.  Vulkan requires a minimum of 4 StorageBuffer
-/// arguments (maxPerStageDescriptorStorageBuffers), which is very easy to reach.
+/// arguments (maxPerStageDescriptorStorageBuffers), which is very easy to
+/// reach.
 llvm::ModulePass *createClusterPodKernelArgumentsPass();
 
 /// Splat select scalar condition with vector data operands.
@@ -302,4 +303,15 @@ llvm::ModulePass *createRewriteInsertsPass();
 /// the appropriately typed pointers.
 llvm::ModulePass *createAllocateDescriptorsPass(
     llvm::ArrayRef<std::pair<unsigned, std::string>> samplerMap);
-}
+
+/// Direct Resource Access
+/// @return An LLVM module pass.
+///
+/// For kernel arguments that map to resource variabls (descriptors),
+/// try to avoid passing them by pointer down into helper functions.
+/// Find and exploit commonality among callees of each helper function.
+/// Assumes descriptors have been allocated and mapped to function
+/// calls of the form @clspv.resource.var.*.
+llvm::ModulePass *createDirectResourceAccessPass();
+
+} // namespace clspv

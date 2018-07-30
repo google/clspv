@@ -5,97 +5,100 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 41
-// CHECK: ; Schema: 0
-// CHECK-DAG: OpCapability Shader
-// CHECK-DAG: OpCapability VariablePointers
-// CHECK-NOT: OpCapability StorageImageReadWithoutFormat
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
-// CHECK: OpMemoryModel Logical GLSL450
-// CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
-// CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 
-// CHECK: OpMemberDecorate %[[ARG2_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG2_STRUCT_TYPE_ID]] Block
 
-// CHECK: OpDecorate %[[ARG3_DYNAMIC_ARRAY_TYPE_ID:[a-zA-Z0-9_]*]] ArrayStride 16
 
-// CHECK: OpMemberDecorate %[[ARG3_STRUCT_TYPE_ID:[a-zA-Z0-9_]*]] 0 Offset 0
-// CHECK: OpDecorate %[[ARG3_STRUCT_TYPE_ID]] Block
 
-// CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 
-// CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG1_ID]] Binding 1
-// CHECK: OpDecorate %[[ARG1_ID]] NonWritable
 
-// CHECK: OpDecorate %[[ARG2_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG2_ID]] Binding 2
 
-// CHECK: OpDecorate %[[ARG3_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
-// CHECK: OpDecorate %[[ARG3_ID]] Binding 3
 
-// CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
-// CHECK-DAG: %[[SAMPLER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeSampler
-// CHECK-DAG: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[SAMPLER_TYPE_ID]]
-// CHECK-DAG: %[[READ_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[FLOAT_TYPE_ID]] 2D 0 0 0 1 Unknown
-// CHECK-DAG: %[[ARG1_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[READ_ONLY_IMAGE_TYPE_ID]]
-// CHECK-DAG: %[[FLOAT2_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
-// CHECK-DAG: %[[ARG2_STRUCT_TYPE_ID]] = OpTypeStruct %[[FLOAT2_TYPE_ID]]
-// CHECK-DAG: %[[ARG2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG2_STRUCT_TYPE_ID]]
-// CHECK-DAG: %[[FLOAT2_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT2_TYPE_ID]]
-// CHECK-DAG: %[[FLOAT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
-// CHECK-DAG: %[[FLOAT4_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[FLOAT4_TYPE_ID]]
-// CHECK-DAG: %[[ARG3_DYNAMIC_ARRAY_TYPE_ID]] = OpTypeRuntimeArray %[[FLOAT4_TYPE_ID]]
-// CHECK-DAG: %[[ARG3_STRUCT_TYPE_ID]] = OpTypeStruct %[[ARG3_DYNAMIC_ARRAY_TYPE_ID]]
-// CHECK-DAG: %[[ARG3_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer StorageBuffer %[[ARG3_STRUCT_TYPE_ID]]
-// CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
-// CHECK-DAG: %[[VOID_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVoid
-// CHECK-DAG: %[[FOO_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[VOID_TYPE_ID]]
-// CHECK-DAG: %[[BAR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFunction %[[FLOAT4_TYPE_ID]] %[[SAMPLER_TYPE_ID]] %[[READ_ONLY_IMAGE_TYPE_ID]] %[[FLOAT2_TYPE_ID]]
 
-// CHECK-DAG: %[[SAMPLED_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeSampledImage %[[READ_ONLY_IMAGE_TYPE_ID]]
 
-// CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
-// CHECK-DAG: %[[FP_CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0
 
-// CHECK: %[[ARG0_ID]] = OpVariable %[[ARG0_POINTER_TYPE_ID]] UniformConstant
-// CHECK: %[[ARG1_ID]] = OpVariable %[[ARG1_POINTER_TYPE_ID]] UniformConstant
-// CHECK: %[[ARG2_ID]] = OpVariable %[[ARG2_POINTER_TYPE_ID]] StorageBuffer
-// CHECK: %[[ARG3_ID]] = OpVariable %[[ARG3_POINTER_TYPE_ID]] StorageBuffer
 
-// CHECK: %[[BAR_ID:[a-zA-Z0-9_]*]] = OpFunction %[[FLOAT4_TYPE_ID]] Pure %[[BAR_TYPE_ID]]
-// CHECK: %[[S_ID:[a-zA-Z0-9_]*]] = OpFunctionParameter %[[SAMPLER_TYPE_ID]]
-// CHECK: %[[I_ID:[a-zA-Z0-9_]*]] = OpFunctionParameter %[[READ_ONLY_IMAGE_TYPE_ID]]
-// CHECK: %[[C_ID:[a-zA-Z0-9_]*]] = OpFunctionParameter %[[FLOAT2_TYPE_ID]]
-// CHECK: %[[BAR_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
-// CHECK: %[[SAMPLED_IMAGE_ID:[a-zA-Z0-9_]*]] = OpSampledImage %[[SAMPLED_IMAGE_TYPE_ID]] %[[I_ID]] %[[S_ID]]
-// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpImageSampleExplicitLod %[[FLOAT4_TYPE_ID]] %[[SAMPLED_IMAGE_ID]] %[[C_ID]] Lod %[[FP_CONSTANT_0_ID]]
-// CHECK: OpReturnValue %[[OP_ID]]
-// CHECK: OpFunctionEnd
 
 float4 bar(sampler_t s, read_only image2d_t i, float2 c)
 {
   return read_imagef(i, s, c);
 }
 
-// CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] None %[[FOO_TYPE_ID]]
-// CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
-// CHECK: %[[S_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[SAMPLER_TYPE_ID]] %[[ARG0_ID]]
-// CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[READ_ONLY_IMAGE_TYPE_ID]] %[[ARG1_ID]]
-// CHECK: %[[C_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT2_POINTER_TYPE_ID]] %[[ARG2_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[C_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT2_TYPE_ID]] %[[C_ACCESS_CHAIN_ID]]
-// CHECK: %[[A_ACCESS_CHAIN_ID:[a-zA-Z0-9_]*]] = OpAccessChain %[[FLOAT4_POINTER_TYPE_ID]] %[[ARG3_ID]] %[[CONSTANT_0_ID]] %[[CONSTANT_0_ID]]
-// CHECK: %[[CALL_ID:[a-zA-Z0-9_]*]] = OpFunctionCall %[[FLOAT4_TYPE_ID]] %[[BAR_ID]] %[[S_LOAD_ID]] %[[I_LOAD_ID]] %[[C_LOAD_ID]]
-// CHECK: OpStore %[[A_ACCESS_CHAIN_ID]] %[[CALL_ID]]
-// CHECK: OpReturn
-// CHECK: OpFunctionEnd
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read_only image2d_t i, float2 c, global float4* a)
 {
   *a = bar(s, i, c);
 }
+// CHECK:  ; SPIR-V
+// CHECK:  ; Version: 1.0
+// CHECK:  ; Generator: Codeplay; 0
+// CHECK:  ; Bound: 43
+// CHECK:  ; Schema: 0
+// CHECK:  OpCapability Shader
+// CHECK:  OpCapability VariablePointers
+// CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
+// CHECK:  OpExtension "SPV_KHR_variable_pointers"
+// CHECK:  OpMemoryModel Logical GLSL450
+// CHECK:  OpEntryPoint GLCompute [[_35:%[0-9a-zA-Z_]+]] "foo"
+// CHECK:  OpExecutionMode [[_35]] LocalSize 1 1 1
+// CHECK:  OpSource OpenCL_C 120
+// CHECK:  OpMemberDecorate [[__struct_7:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_7]] Block
+// CHECK:  OpDecorate [[__runtimearr_v4float:%[0-9a-zA-Z_]+]] ArrayStride 16
+// CHECK:  OpMemberDecorate [[__struct_11:%[0-9a-zA-Z_]+]] 0 Offset 0
+// CHECK:  OpDecorate [[__struct_11]] Block
+// CHECK:  OpDecorate [[_22:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_22]] Binding 0
+// CHECK:  OpDecorate [[_23:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_23]] Binding 1
+// CHECK:  OpDecorate [[_23]] NonWritable
+// CHECK:  OpDecorate [[_24:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_24]] Binding 2
+// CHECK:  OpDecorate [[_25:%[0-9a-zA-Z_]+]] DescriptorSet 0
+// CHECK:  OpDecorate [[_25]] Binding 3
+// CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK:  [[_2:%[0-9a-zA-Z_]+]] = OpTypeSampler
+// CHECK:  [[__ptr_UniformConstant_2:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_2]]
+// CHECK:  [[_4:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
+// CHECK:  [[__ptr_UniformConstant_4:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[_4]]
+// CHECK:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
+// CHECK:  [[__struct_7]] = OpTypeStruct [[_v2float]]
+// CHECK:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
+// CHECK:  [[__runtimearr_v4float]] = OpTypeRuntimeArray [[_v4float]]
+// CHECK:  [[__struct_11]] = OpTypeStruct [[__runtimearr_v4float]]
+// CHECK:  [[__ptr_StorageBuffer__struct_11:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_11]]
+// CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK:  [[_14:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
+// CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK:  [[__ptr_StorageBuffer_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_v2float]]
+// CHECK:  [[__ptr_StorageBuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_v4float]]
+// CHECK:  [[_18:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_v4float]] [[_2]] [[_4]] [[_v2float]]
+// CHECK:  [[_19:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[_4]]
+// CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
+// CHECK:  [[_22]] = OpVariable [[__ptr_UniformConstant_2]] UniformConstant
+// CHECK:  [[_23]] = OpVariable [[__ptr_UniformConstant_4]] UniformConstant
+// CHECK:  [[_24]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
+// CHECK:  [[_25]] = OpVariable [[__ptr_StorageBuffer__struct_11]] StorageBuffer
+// CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpFunction [[_v4float]] Pure [[_18]]
+// CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_2]]
+// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_4]]
+// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v2float]]
+// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLabel
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpLoad [[_4]] [[_23]]
+// CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpLoad [[_2]] [[_22]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpSampledImage [[_19]] [[_31]] [[_32]]
+// CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_33]] [[_29]] Lod [[_float_0]]
+// CHECK:  OpReturnValue [[_34]]
+// CHECK:  OpFunctionEnd
+// CHECK:  [[_35]] = OpFunction [[_void]] None [[_14]]
+// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpLabel
+// CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpLoad [[_2]] [[_22]]
+// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpLoad [[_4]] [[_23]]
+// CHECK:  [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v2float]] [[_24]] [[_uint_0]]
+// CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]] [[_39]]
+// CHECK:  [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v4float]] [[_25]] [[_uint_0]] [[_uint_0]]
+// CHECK:  [[_42:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_26]] [[_37]] [[_38]] [[_40]]
+// CHECK:  OpStore [[_41]] [[_42]]
+// CHECK:  OpReturn
+// CHECK:  OpFunctionEnd

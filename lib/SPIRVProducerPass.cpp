@@ -2919,6 +2919,9 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
 
 void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
                                                   Function &F) {
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    return;
+  }
   // Gather the list of resources that are used by this function's arguments.
   auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
 

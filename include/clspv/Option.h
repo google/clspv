@@ -21,9 +21,9 @@ bool F16BitStorage();
 // Returns true if each kernel must use its own descriptor set for all arguments.
 bool DistinctKernelDescriptorSets();
 
-// Returns true if the compiler should try to use direct buffer accesses
+// Returns true if the compiler should try to use direct resource accesses
 // within helper functions instead of passing pointers via function arguments.
-bool DirectBufferAccess();
+bool DirectResourceAccess();
 
 // Returns true if we should avoid sharing resource variables for images
 // and samplers.  Use this to avoid one difference between the old and new
