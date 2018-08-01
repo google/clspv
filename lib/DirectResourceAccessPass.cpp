@@ -250,13 +250,18 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
 
       // Unpack GEPs with zeros, if we can.  Rewrite |value| as we go along.
       unsigned num_gep_zeroes = 0;
+      bool first_gep = true;
       for (auto *gep = dyn_cast<GetElementPtrInst>(value); gep;
            gep = dyn_cast<GetElementPtrInst>(value)) {
         if (!gep->hasAllZeroIndices()) {
           return false;
         }
-        num_gep_zeroes += gep->getNumIndices();
+        // If not the first GEP, then ignore the "element" index (which I call
+        // "slide") since that will be combined with the last index of the
+        // previous GEP.
+        num_gep_zeroes += gep->getNumIndices() + (first_gep ? 0 : -1);
         value = gep->getPointerOperand();
+        first_gep = false;
       }
       if (auto *call = dyn_cast<CallInst>(value)) {
         // If the call is a call to a @clspv.resource.var.* function, then try
@@ -289,7 +294,8 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       outs() << "DRA:  Rewrite " << fn->getName() << " arg " << arg_index << " "
              << arg.getName() << ": " << common.var_fn->getName() << " ("
              << common.set << "," << common.binding
-             << ") zeroes: " << common.num_gep_zeroes << "\n";
+             << ") zeroes: " << common.num_gep_zeroes << " sample-call "
+             << *(common.sample_call) << "\n";
     }
   }
 
