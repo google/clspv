@@ -44,6 +44,12 @@ bool HackInitializers();
 // TODO(dneto): Remove this eventually when drivers are fixed.
 bool HackInserts();
 
+// Returns true if we should rewrite signed integer compares into other
+// equivalent code that does not use signed integer comparisons.
+// Works around a driver bug.
+// TODO(dneto): Remove this eventually when drivers are fixed.
+bool HackSignedCompareFixup();
+
 // Returns true if numeric scalar and vector Undef values should be replaced
 // with OpConstantNull.  Works around a driver bug.
 // TODO(dneto): Remove this eventually when drivers are fixed.

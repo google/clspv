@@ -314,4 +314,12 @@ llvm::ModulePass *createAllocateDescriptorsPass(
 /// calls of the form @clspv.resource.var.*.
 llvm::ModulePass *createDirectResourceAccessPass();
 
+/// Signed compare fixup
+/// @return An LLVM module pass.
+///
+/// If -hack-scf is used, then rewrite signed integer comparisons
+/// into other equivalent code that does not use signed integer
+/// comparisons.  Works around a driver bug.
+llvm::ModulePass *createSignedCompareFixupPass();
+
 } // namespace clspv

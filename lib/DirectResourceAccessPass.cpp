@@ -194,6 +194,9 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
     case clspv::ArgKind::Sampler:
       Changed |= RewriteAccessesForArg(fn, arg_index, arg);
       break;
+    default:
+      // Should not happen
+      break;
     }
     arg_index++;
   }

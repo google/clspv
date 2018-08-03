@@ -68,6 +68,11 @@ llvm::cl::opt<bool> hack_inserts(
         "into struct types by using complete composite construction and "
         "extractions"));
 
+llvm::cl::opt<bool> hack_signed_compare_fixup(
+    "hack-scf", llvm::cl::init(false),
+    llvm::cl::desc("Rewrite signed integer comparisons to use other kinds of "
+                   "instructions"));
+
 // Some drivers don't like to see constant composite values constructed
 // from scalar Undef values.  Replace numeric scalar and vector Undef with
 // corresponding OpConstantNull.  We need to keep Undef for image values,
@@ -106,6 +111,7 @@ bool F16BitStorage() { return f16bit_storage; }
 bool HackDistinctImageSampler() { return hack_dis; }
 bool HackInitializers() { return hack_initializers; }
 bool HackInserts() { return hack_inserts; }
+bool HackSignedCompareFixup() { return hack_signed_compare_fixup; }
 bool HackUndef() { return hack_undef; }
 bool ModuleConstantsInStorageBuffer() { return module_constants_in_storage_buffer; }
 bool PodArgsInUniformBuffer() { return pod_ubo; }
