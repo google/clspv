@@ -79,7 +79,7 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Input_uint]] [[_gl_LocalInvocationID]] [[_uint_0]]
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_27]]
-// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Private_uint]] [[_25]] [[_28]]
+// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Private_uint]] [[_22]] [[_28]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_29]]
 // CHECK:  OpReturnValue [[_30]]
 // CHECK:  OpFunctionEnd

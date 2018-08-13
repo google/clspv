@@ -31,6 +31,7 @@
 #include "clspv/Passes.h"
 
 #include "ArgKind.h"
+#include "Constants.h"
 #include "DescriptorCounter.h"
 
 using namespace llvm;
@@ -66,6 +67,8 @@ private:
   // Allocate descriptor for kernel arguments with uses.  Returns true if we
   // changed the module.
   bool AllocateKernelArgDescriptors(Module &M);
+
+  bool AllocateLocalKernelArgSpecIds(Module &M);
 
   // Allocates the next descriptor set and resets the tracked binding number to
   // 0.
@@ -146,6 +149,7 @@ bool AllocateDescriptorsPass::runOnModule(Module &M) {
   // Samplers from the sampler map always grab descriptor set 0.
   Changed |= AllocateLiteralSamplerDescriptors(M);
   Changed |= AllocateKernelArgDescriptors(M);
+  Changed |= AllocateLocalKernelArgSpecIds(M);
 
   return Changed;
 }
@@ -622,7 +626,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         assert(resource_type);
 
-        auto fn_name = std::string("clspv.resource.var.") +
+        auto fn_name = std::string(clspv::ResourceAccessorFunction()) +
                        std::to_string(discriminants_list[arg_index].index);
         Function *var_fn = M.getFunction(fn_name);
 
@@ -699,5 +703,122 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       arg_index++;
     }
   }
+  return Changed;
+}
+
+bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
+  bool Changed = false;
+  if (ShowDescriptors) {
+    outs() << "Allocate local kernel arg spec ids\n";
+  }
+
+  int next_id = clspv::FirstLocalSpecId();
+  // Maps argument type to assigned SpecIds.
+  DenseMap<Type*, SmallVector<int, 4>> spec_id_types;
+  // Tracks SpecIds assigned in the current function.
+  DenseSet<int> function_spec_ids;
+  // Tracks newly allocated spec ids.
+  std::vector<std::pair<Type*, int>> function_allocations;
+
+  // Allocates a SpecId for |type|.
+  auto GetSpecId = [&next_id, &spec_id_types, &function_spec_ids, &function_allocations](Type *type) {
+    const bool always_distinct_sets =
+        clspv::Option::DistinctKernelDescriptorSets();
+
+    // Attempt to reuse a SpecId. If the SpecId is associated with the same type
+    // in another kernel and not yet assigned to this kernel it can be reused.
+    auto where = spec_id_types.find(type);
+    if (where != spec_id_types.end()) {
+      for (auto id : where->second) {
+        if (!function_spec_ids.count(id)) {
+          return id;
+        }
+      }
+    }
+
+    // Need to allocate a new SpecId.
+    function_allocations.push_back(std::make_pair(type, next_id));
+    function_spec_ids.insert(next_id);
+    return next_id++;
+  };
+
+  IRBuilder<> Builder(M.getContext());
+  for (Function &F : M) {
+    // Only scan arguments of kernel functions that have bodies.
+    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+      continue;
+    }
+
+    // Prepare to insert arg remapping instructions at the start of the
+    // function.
+    Builder.SetInsertPoint(F.getEntryBlock().getFirstNonPHI());
+
+    function_allocations.clear();
+    function_spec_ids.clear();
+    int arg_index = 0;
+    for (Argument &Arg : F.args()) {
+      Type *argTy = Arg.getType();
+      const auto arg_kind = clspv::GetArgKindForType(argTy);
+      if (arg_kind == clspv::ArgKind::Local && !Arg.use_empty()) {
+        // Assign a SpecId to this argument.
+        int spec_id = GetSpecId(Arg.getType());
+
+        if (ShowDescriptors) {
+          outs() << "DBA: " << F.getName() << " arg " << arg_index << " " << Arg
+                 << " allocated SpecId " << spec_id << "\n";
+        }
+
+        // The type returned by the accessor function is [ Elem x 0 ]
+        // addrspace(3)*. The zero-sized array is used to match the correct
+        // indexing required by gep's, but the zero size will eventually be
+        // codegen'd as an OpSpecConstant.
+        auto fn_name = std::string(clspv::WorkgroupAccessorFunction()) +
+                       std::to_string(spec_id);
+        Function *var_fn = M.getFunction(fn_name);
+        auto *zero = Builder.getInt32(0);
+        auto *array_ty = ArrayType::get(argTy->getPointerElementType(), 0);
+        auto *ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
+        if (!var_fn) {
+          // Generate the function.
+          Type *i32 = Builder.getInt32Ty();
+          FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
+          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fn_ty));
+        }
+
+        // Generate an accessor call.
+        auto *spec_id_arg = Builder.getInt32(spec_id);
+        auto *call = Builder.CreateCall(var_fn, {spec_id_arg});
+
+        // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
+        // addrspace(3)*, generate two zero indices for the gep.
+        auto *replacement = Builder.CreateGEP(call, {zero, zero});
+        Arg.replaceAllUsesWith(replacement);
+
+        // We record the assignment of the spec id for this particular argument
+        // in module-level metadata. This allows us to reconstruct the
+        // connection during SPIR-V generation. We cannot use the argument as an
+        // operand to the function because DirectResourceAccess will generate
+        // these calls in different function scopes potentially.
+        auto *arg_const = Builder.getInt32(arg_index);
+        NamedMDNode *nmd =
+            M.getOrInsertNamedMetadata(clspv::LocalSpecIdMetadataName());
+        Metadata *ops[3];
+        ops[0] = ValueAsMetadata::get(&F);
+        ops[1] = ConstantAsMetadata::get(arg_const);
+        ops[2] = ConstantAsMetadata::get(spec_id_arg);
+        MDTuple *tuple = MDTuple::get(M.getContext(), ops);
+        nmd->addOperand(tuple);
+        Changed = true;
+      }
+
+      ++arg_index;
+    }
+
+    // Move newly allocated SpecIds for this function into the overall mapping.
+    for (auto &pair : function_allocations) {
+      spec_id_types[pair.first].push_back(pair.second);
+    }
+  }
+
   return Changed;
 }

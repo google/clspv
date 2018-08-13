@@ -72,7 +72,7 @@ kernel void foo(global float2* A, local uint* B, uint n) {
 // CHECK: [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v2float]] [[_29]] [[_uint_0]] [[_uint_0]]
 // CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_30]] [[_uint_0]]
 // CHECK: [[_35:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_34]]
-// CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_uint]] [[_5]] [[_35]]
+// CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_1]] [[_35]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_36]]
 // CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] [[_6]] UnpackHalf2x16 [[_37]]
 // CHECK: OpStore [[_33]] [[_38]]

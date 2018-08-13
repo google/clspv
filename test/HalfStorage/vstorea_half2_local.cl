@@ -15,7 +15,7 @@ kernel void foo(local uint* A, float2 val, uint n) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 45
+// CHECK: ; Bound: 44
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -68,21 +68,20 @@ kernel void foo(local uint* A, float2 val, uint n) {
 // CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_uint_2]] Workgroup
 // CHECK: [[_31]] = OpFunction [[_void]] None [[_17]]
 // CHECK: [[_32:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK: [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_1]] [[_uint_0]]
 // CHECK: [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v2float]] [[_29]] [[_uint_0]]
 // CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]] [[_33]]
 // CHECK: [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_30]] [[_uint_0]]
 // CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_35]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_6]] PackHalf2x16 [[_34]]
-// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_uint]] [[_5]] [[_36]]
+// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_1]] [[_36]]
 // CHECK: OpStore [[_38]] [[_37]]
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_36]] [[_uint_1]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_6]] PackHalf2x16 [[_34]]
-// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_uint]] [[_5]] [[_39]]
+// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_1]] [[_39]]
 // CHECK: OpStore [[_41]] [[_40]]
 // CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_36]] [[_uint_2]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_6]] PackHalf2x16 [[_34]]
-// CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_uint]] [[_5]] [[_42]]
+// CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_1]] [[_42]]
 // CHECK: OpStore [[_44]] [[_43]]
 // CHECK: OpReturn
 // CHECK: OpFunctionEnd

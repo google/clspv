@@ -23,7 +23,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 32
+// CHECK: ; Bound: 31
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -67,12 +67,11 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
 // CHECK: [[_22]] = OpFunction [[_void]] None [[_17]]
 // CHECK: [[_23:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK: [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_uint_0]]
 // CHECK: [[_24:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_12]] [[_21]] [[_uint_0]]
 // CHECK: [[_25:%[0-9a-zA-Z_]+]] = OpLoad [[__struct_12]] [[_24]]
 // CHECK: [[_26:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_25]] 0
 // CHECK: [[_27:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]] [[_25]] 1
-// CHECK: [[_28:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_float]] [[_5]] [[_27]]
+// CHECK: [[_28:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_27]]
 // CHECK: [[_29:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_28]]
 // CHECK: [[_30:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_26]] [[_29]]
 // CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_20]] [[_uint_0]] [[_27]]
