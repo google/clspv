@@ -31,6 +31,7 @@
 #include "clspv/Passes.h"
 
 #include "ArgKind.h"
+#include "Constants.h"
 #include "DescriptorCounter.h"
 
 using namespace llvm;
@@ -145,18 +146,10 @@ ModulePass *createAllocateDescriptorsPass(SamplerMapType sampler_map) {
 bool AllocateDescriptorsPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  if (ShowDescriptors) {
-    outs() << "\nBEFORE\n" << M << "\n";
-  }
-
   // Samplers from the sampler map always grab descriptor set 0.
   Changed |= AllocateLiteralSamplerDescriptors(M);
   Changed |= AllocateKernelArgDescriptors(M);
   Changed |= AllocateLocalKernelArgSpecIds(M);
-
-  if (ShowDescriptors) {
-    outs() << "\nAFTER\n" << M << "\n";
-  }
 
   return Changed;
 }
@@ -633,7 +626,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         assert(resource_type);
 
-        auto fn_name = std::string("clspv.resource.var.") +
+        auto fn_name = std::string(clspv::ResourceAccessorFunction()) +
                        std::to_string(discriminants_list[arg_index].index);
         Function *var_fn = M.getFunction(fn_name);
 
@@ -741,30 +734,40 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         int spec_id = next_id++;
 
         if (ShowDescriptors) {
-          outs() << F.getName() << " arg " << arg_index << " " << Arg << " allocated SpecId " << spec_id << "\n";
+          outs() << "DBA: " << F.getName() << " arg " << arg_index << " " << Arg
+                 << " allocated SpecId " << spec_id << "\n";
         }
 
-        // Generate an array type for this local variable:
-        // [ 0 x Elem ]
-        //auto *arr_type = ArrayType::get(argTy->getPointerElementType(), 0);
-        auto *ptr_ty = PointerType::get(argTy->getPointerElementType(), argTy->getPointerAddressSpace());
-        auto fn_name = std::string("clspv.local.var.") + std::to_string(spec_id);
+        // The resource function will return the same type as the argument.
+        // Eventually, the function will be codegen'd as an AccessChain.
+        auto fn_name = std::string(clspv::WorkgroupAccessorFunction()) +
+                       std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
+          FunctionType *fn_ty = FunctionType::get(argTy, i32, false);
           var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fn_ty));
         }
 
         auto *spec_id_arg = Builder.getInt32(spec_id);
         auto *call = Builder.CreateCall(var_fn, {spec_id_arg});
-        auto *zero = Builder.getInt32(0);
-        //auto *replacement = Builder.CreateGEP(call, {zero, zero});
-        //Arg.replaceAllUsesWith(replacement);
         Arg.replaceAllUsesWith(call);
-        MDNode *md = MDNode::get(M.getContext(), ConstantAsMetadata::get(zero));
-        Arg.setMetadata("spec_id", md);
+
+        // We record the assignment of the spec id for this particular argument
+        // in module-level metadata. This allows us to reconstruct the
+        // connection during SPIR-V generation. We cannot use the argument as an
+        // operand to the function because DirectResourceAccess will generate
+        // these calls in different function scopes potentially.
+        auto *arg_const = Builder.getInt32(arg_index);
+        NamedMDNode *nmd =
+            M.getOrInsertNamedMetadata(clspv::LocalSpecIdMetadataName());
+        Metadata *ops[3];
+        ops[0] = ValueAsMetadata::get(&F);
+        ops[1] = ConstantAsMetadata::get(arg_const);
+        ops[2] = ConstantAsMetadata::get(spec_id_arg);
+        MDTuple *tuple = MDTuple::get(M.getContext(), ops);
+        nmd->addOperand(tuple);
         Changed = true;
       }
 

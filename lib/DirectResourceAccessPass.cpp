@@ -34,6 +34,7 @@
 #include "clspv/Passes.h"
 
 #include "ArgKind.h"
+#include "Constants.h"
 
 using namespace llvm;
 
@@ -279,7 +280,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
         // If the call is a call to a @clspv.resource.var.* function, then try
         // to merge it, assuming the given number of GEP zero-indices so far.
         if (call->getCalledFunction()->getName().startswith(
-                "clspv.resource.var.")) {
+                clspv::ResourceAccessorFunction())) {
           const auto set = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
           const auto binding = uint32_t(
