@@ -67,6 +67,8 @@ private:
   // changed the module.
   bool AllocateKernelArgDescriptors(Module &M);
 
+  bool AllocateLocalKernelArgSpecIds(Module &M);
+
   // Allocates the next descriptor set and resets the tracked binding number to
   // 0.
   unsigned StartNewDescriptorSet(Module &M) {
@@ -143,9 +145,18 @@ ModulePass *createAllocateDescriptorsPass(SamplerMapType sampler_map) {
 bool AllocateDescriptorsPass::runOnModule(Module &M) {
   bool Changed = false;
 
+  if (ShowDescriptors) {
+    outs() << "\nBEFORE\n" << M << "\n";
+  }
+
   // Samplers from the sampler map always grab descriptor set 0.
   Changed |= AllocateLiteralSamplerDescriptors(M);
   Changed |= AllocateKernelArgDescriptors(M);
+  Changed |= AllocateLocalKernelArgSpecIds(M);
+
+  if (ShowDescriptors) {
+    outs() << "\nAFTER\n" << M << "\n";
+  }
 
   return Changed;
 }
@@ -699,5 +710,67 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       arg_index++;
     }
   }
+  return Changed;
+}
+
+bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
+  bool Changed = false;
+  if (ShowDescriptors) {
+    outs() << "Allocate local kernel arg spec ids\n";
+  }
+
+  // 0, 1 and 2 are reserved for workgroup size.
+  int next_id = 3;
+  IRBuilder<> Builder(M.getContext());
+  for (Function &F : M) {
+    // Only scan arguments of kernel functions that have bodies.
+    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+      continue;
+    }
+
+    // Prepare to insert arg remapping instructions at the start of the
+    // function.
+    Builder.SetInsertPoint(F.getEntryBlock().getFirstNonPHI());
+
+    int arg_index = 0;
+    for (Argument &Arg : F.args()) {
+      Type *argTy = Arg.getType();
+      const auto arg_kind = clspv::GetArgKindForType(argTy);
+      if (arg_kind == clspv::ArgKind::Local && !Arg.use_empty()) {
+        // Claim this spec id.
+        int spec_id = next_id++;
+
+        if (ShowDescriptors) {
+          outs() << F.getName() << " arg " << arg_index << " " << Arg << " allocated SpecId " << spec_id << "\n";
+        }
+
+        // Generate an array type for this local variable:
+        // [ 0 x Elem ]
+        //auto *arr_type = ArrayType::get(argTy->getPointerElementType(), 0);
+        auto *ptr_ty = PointerType::get(argTy->getPointerElementType(), argTy->getPointerAddressSpace());
+        auto fn_name = std::string("clspv.local.var.") + std::to_string(spec_id);
+        Function *var_fn = M.getFunction(fn_name);
+        if (!var_fn) {
+          // Generate the function.
+          Type *i32 = Builder.getInt32Ty();
+          FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
+          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fn_ty));
+        }
+
+        auto *spec_id_arg = Builder.getInt32(spec_id);
+        auto *call = Builder.CreateCall(var_fn, {spec_id_arg});
+        auto *zero = Builder.getInt32(0);
+        //auto *replacement = Builder.CreateGEP(call, {zero, zero});
+        //Arg.replaceAllUsesWith(replacement);
+        Arg.replaceAllUsesWith(call);
+        MDNode *md = MDNode::get(M.getContext(), ConstantAsMetadata::get(zero));
+        Arg.setMetadata("spec_id", md);
+        Changed = true;
+      }
+
+      ++arg_index;
+    }
+  }
+
   return Changed;
 }

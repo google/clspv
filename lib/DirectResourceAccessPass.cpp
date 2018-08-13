@@ -87,8 +87,10 @@ bool DirectResourceAccessPass::runOnModule(Module &M) {
   bool Changed = false;
 
   if (clspv::Option::DirectResourceAccess()) {
+    if (ShowDRA) outs() << "\n" << M << "\n";
     auto ordered_functions = CallGraphOrderedFunctions(M);
     for (auto *fn : ordered_functions) {
+      if (ShowDRA) outs() << "\n" << *fn << "\n";
       Changed |= RewriteResourceAccesses(fn);
     }
   }
@@ -192,6 +194,7 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
     case clspv::ArgKind::ReadOnlyImage:
     case clspv::ArgKind::WriteOnlyImage:
     case clspv::ArgKind::Sampler:
+    case clspv::ArgKind::Local:
       Changed |= RewriteAccessesForArg(fn, arg_index, arg);
       break;
     default:
@@ -209,6 +212,10 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   bool Changed = false;
   if (fn->use_empty()) {
     return false;
+  }
+
+  if (ShowDRA) {
+    outs() << "Considering " << fn->getName() << " arg " << arg_index << " " << arg.getName() << "\n";
   }
 
   // We can convert a parameter to a direct resource access if it is
@@ -245,6 +252,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   };
 
   for (auto &use : fn->uses()) {
+    if (ShowDRA) outs() << " use: " << *use.getUser() << "\n";
     if (auto *caller = dyn_cast<CallInst>(use.getUser())) {
       Value *value = caller->getArgOperand(arg_index);
       // We care about two cases:
@@ -257,6 +265,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       for (auto *gep = dyn_cast<GetElementPtrInst>(value); gep;
            gep = dyn_cast<GetElementPtrInst>(value)) {
         if (!gep->hasAllZeroIndices()) {
+          if (ShowDRA) outs() << " Non zero GEP:" << *gep << "\n";
           return false;
         }
         // If not the first GEP, then ignore the "element" index (which I call
@@ -277,17 +286,21 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
               dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
           if (!merge_param_info({call->getCalledFunction(), set, binding,
                                  num_gep_zeroes, call})) {
+            if (ShowDRA) outs() << " Unable to merge param info\n";
             return false;
           }
         } else {
+          if (ShowDRA) outs() << " Unhandled call:" << *value << "\n";
           // A call but not to a resource access builtin function.
           return false;
         }
       } else {
+        if (ShowDRA) outs() << " Unhandled inst:" << *value << "\n";
         // Not a call.
         return false;
       }
     } else {
+      if (ShowDRA) outs() << " Unhandled use:" << use << "\n";
       // There isn't enough commonality.  Bail out without changing anything.
       return false;
     }

@@ -229,7 +229,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        constant_i32_zero_id_(0) {}
+        constant_i32_zero_id_(0), max_workgroup_spec_id_(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -298,6 +298,7 @@ struct SPIRVProducerPass final : public ModulePass {
   // Populate ResourceVarInfoList, FunctionToResourceVarsMap, and
   // ModuleOrderedResourceVars.
   void FindResourceVars(Module &M, const DataLayout &DL);
+  void FindWorkgroupVars(Module &M);
   bool FindExtInst(Module &M);
   void FindTypePerGlobalVar(GlobalVariable &GV);
   void FindTypePerFunc(Function &F);
@@ -493,8 +494,8 @@ private:
   DenseMap<CallInst *, uint32_t> ResourceVarDeferredLoadCalls;
 
   // An ordered list of the kernel arguments of type pointer-to-local.
-  using LocalArgList = SmallVector<const Argument*, 8>;
-  LocalArgList LocalArgs;
+  //using LocalArgList = SmallVector<const Argument*, 8>;
+  //LocalArgList LocalArgs;
   // Information about a pointer-to-local argument.
   struct LocalArgInfo {
     // The SPIR-V ID of the array variable.
@@ -513,7 +514,9 @@ private:
     int spec_id;
   };
   // A mapping from a pointer-to-local argument value to a LocalArgInfo value.
-  DenseMap<const Argument*, LocalArgInfo> LocalArgMap;
+  //DenseMap<const Argument*, LocalArgInfo> LocalArgMap;
+  using LocalArgList = SmallVector<LocalArgInfo, 8>;
+  LocalArgList LocalArgs;
 
   // A mapping from pointer-to-local argument to a specialization constant ID
   // for that argument's array size.  This is generated from AllocatArgSpecIds.
@@ -522,6 +525,8 @@ private:
   // The ID of 32-bit integer zero constant.  This is only valid after
   // GenerateSPIRVConstants has run.
   uint32_t constant_i32_zero_id_;
+
+  uint32_t max_workgroup_spec_id_;
 };
 
 char SPIRVProducerPass::ID;
@@ -753,6 +758,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 
   FindTypesForSamplerMap(M);
   FindTypesForResourceVars(M);
+  FindWorkgroupVars(M);
 
   // TODO(dneto): Delete the next 3 vars.
 
@@ -856,37 +862,37 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
     // Allocated IDs for pointer-to-local arguments.  We'll create module
     // scope variables for them later.  All other arguments have no uses
     // since they were converted to calls to clspv.resource.var.* functions.
-    bool HasArgUser = false;
-    for (const Argument &Arg : F.args()) {
-      if (Arg.use_empty())
-        continue;
-      HasArgUser = true;
+    //bool HasArgUser = false;
+    //for (const Argument &Arg : F.args()) {
+    //  if (Arg.use_empty())
+    //    continue;
+    //  HasArgUser = true;
 
-      Type *ArgTy = Arg.getType();
-      // Only pointer-to-local arguments reach here.
-      if (!IsLocalPtr(ArgTy)) {
-        errs() << "Ooops.  Expected only pointer-to-local arguments to have uses. Got " << Arg << "\n";
-        llvm_unreachable("Expected only pointer-to-local arguments to have uses");
-      }
+    //  Type *ArgTy = Arg.getType();
+    //  // Only pointer-to-local arguments reach here.
+    //  if (!IsLocalPtr(ArgTy)) {
+    //    errs() << "Ooops.  Expected only pointer-to-local arguments to have uses. Got " << Arg << "\n";
+    //    llvm_unreachable("Expected only pointer-to-local arguments to have uses");
+    //  }
 
-      auto spec_id = ArgSpecIdMap[&Arg];
-      assert(spec_id > 0);
-      LocalArgMap[&Arg] =
-          LocalArgInfo{nextID,     ArgTy->getPointerElementType(),
-                       nextID + 1, nextID + 2,
-                       nextID + 3, nextID + 4,
-                       spec_id};
-      LocalArgs.push_back(&Arg);
-      nextID += 5;
+    //  auto spec_id = ArgSpecIdMap[&Arg];
+    //  assert(spec_id > 0);
+    //  LocalArgMap[&Arg] =
+    //      LocalArgInfo{nextID,     ArgTy->getPointerElementType(),
+    //                   nextID + 1, nextID + 2,
+    //                   nextID + 3, nextID + 4,
+    //                   spec_id};
+    //  LocalArgs.push_back(&Arg);
+    //  nextID += 5;
 
-    }
+    //}
 
-    if (HasArgUser) {
-      // Generate constant 0 for OpAccessChain of argument.
-      Type *IdxTy = Type::getInt32Ty(Context);
-      FindConstant(ConstantInt::get(IdxTy, 0));
-      FindType(IdxTy);
-    }
+    //if (HasArgUser) {
+    //  // Generate constant 0 for OpAccessChain of argument.
+    //  Type *IdxTy = Type::getInt32Ty(Context);
+    //  FindConstant(ConstantInt::get(IdxTy, 0));
+    //  FindType(IdxTy);
+    //}
 
     // Collect types' information from function.
     FindTypePerFunc(F);
@@ -1290,6 +1296,12 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
         continue;
       }
 
+      if (Call && Call->getCalledFunction()->getName().startswith("clspv.local.var.")) {
+        // This is a fake call representing access to a workgroup variable.
+        // We handle that elsewhere.
+        continue;
+      }
+
       // Work through the operands of the instruction.
       for (unsigned i = 0; i < I.getNumOperands(); i++) {
         Value *const Op = I.getOperand(i);
@@ -1434,6 +1446,36 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
   }
 }
 
+void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
+  SmallSet<uint32_t, 8> seen;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto call = dyn_cast<CallInst>(&I)) {
+          auto name = call->getCalledFunction()->getName();
+          if (name == "clspv.local.var.") {
+            int spec_id = cast<ConstantInt>(call->getOperand(0))->getSExtValue();
+            if (seen.insert(spec_id).second) continue;
+
+            LocalArgInfo info{nextID,     call->getType()->getPointerElementType(),
+                              nextID + 1, nextID + 2,
+                              nextID + 3, nextID + 4,
+                              spec_id};
+            LocalArgs.push_back(info);
+            nextID += 5;
+
+            if (!call->use_empty()) {
+              Type* IdxTy = Type::getInt32Ty(M.getContext());
+              FindConstant(ConstantInt::get(IdxTy, 0));
+              FindType(IdxTy);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 void SPIRVProducerPass::FindType(Type *Ty) {
   TypeList &TyList = getTypeList();
 
@@ -1501,6 +1543,9 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
           continue;
         }
         if (name.startswith("clspv.resource.var.")) {
+          continue;
+        }
+        if (name.startswith("clspv.local.var.")) {
           continue;
         }
       }
@@ -2195,9 +2240,9 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
   }
 
   // Generate types for pointer-to-local arguments.
-  for (auto* arg : LocalArgs) {
-
-    LocalArgInfo& arg_info = LocalArgMap[arg];
+  //for (auto* arg : LocalArgs) {
+  //  LocalArgInfo& arg_info = LocalArgMap[arg];
+  for (const auto &arg_info : LocalArgs) {
 
     // Generate the spec constant.
     SPIRVOperandList Ops;
@@ -2902,8 +2947,9 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
 void SPIRVProducerPass::GenerateWorkgroupVars() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
-  for (auto* arg : LocalArgs) {
-    const auto& info = LocalArgMap[arg];
+  //for (auto* arg : LocalArgs) {
+  //  const auto& info = LocalArgMap[arg];
+  for (const auto& info : LocalArgs) {
 
     // Generate OpVariable.
     //
@@ -3365,30 +3411,39 @@ void SPIRVProducerPass::GenerateInstForArg(Function &F) {
   //
   // All that remains is to generate the access chain instruction to get the
   // first element of each pointer-to-local argument.
-  for (Argument &Arg : F.args()) {
-    if (Arg.use_empty()) {
-      continue;
-    }
+  for (const auto &info : LocalArgs) {
+    VMap[&Arg] = info.first_elem_ptr_id;
 
-    Type *ArgTy = Arg.getType();
-    if (IsLocalPtr(ArgTy)) {
-      // Generate OpAccessChain to point to the first element of the array.
-      const LocalArgInfo &info = LocalArgMap[&Arg];
-      VMap[&Arg] = info.first_elem_ptr_id;
-
-      SPIRVOperandList Ops;
-      uint32_t zeroId = VMap[ConstantInt::get(Type::getInt32Ty(Context), 0)];
-      Ops << MkId(lookupType(ArgTy)) << MkId(info.variable_id) << MkId(zeroId);
-      SPIRVInstList.push_back(new SPIRVInstruction(
-          spv::OpAccessChain, info.first_elem_ptr_id, Ops));
-
-      continue;
-    }
-
-    errs() << "Old algorithm for resource vars for kernel args should be dead "
-              "code.\n";
-    assert(false && "Expected this to be dead code");
+    SPIRVOperandList Ops;
+    uint32_t zeroId = VMap[ConstantInt::get(Type::getInt32Ty(Context), 0)];
+    Ops << MkId(lookupType(ArgTy)) << MkId(info.variable_id) << MkId(zeroId);
+    SPIRVInstList.push_back(
+        new SPIRVInstruction(spv::OpAccessChain, info.first_elem_ptr_id, Ops));
   }
+  //for (Argument &Arg : F.args()) {
+  //  if (Arg.use_empty()) {
+  //    continue;
+  //  }
+
+  //  Type *ArgTy = Arg.getType();
+  //  if (IsLocalPtr(ArgTy)) {
+  //    // Generate OpAccessChain to point to the first element of the array.
+  //    const LocalArgInfo &info = LocalArgMap[&Arg];
+  //    VMap[&Arg] = info.first_elem_ptr_id;
+
+  //    SPIRVOperandList Ops;
+  //    uint32_t zeroId = VMap[ConstantInt::get(Type::getInt32Ty(Context), 0)];
+  //    Ops << MkId(lookupType(ArgTy)) << MkId(info.variable_id) << MkId(zeroId);
+  //    SPIRVInstList.push_back(new SPIRVInstruction(
+  //        spv::OpAccessChain, info.first_elem_ptr_id, Ops));
+
+  //    continue;
+  //  }
+
+  //  errs() << "Old algorithm for resource vars for kernel args should be dead "
+  //            "code.\n";
+  //  assert(false && "Expected this to be dead code");
+  //}
 }
 
 void SPIRVProducerPass::GenerateEntryPointInitialStores() {
@@ -4319,6 +4374,18 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // No code is generated for the call.
       }
       break;
+    } else if (Callee->getName().startswith("clspv.local.var.")) {
+      SPIRVOperandList Ops;
+      const auto access_id = nextID++;
+
+      Value *zero = ConstantInt::get(IntegerType::getInt32Ty(Call->getContext()), 0);
+      Ops << MkId(lookupType(Call->getType()))
+          << MkId(VMap[zero]);
+
+      auto *Inst = new SPIRVInstruction(spv::OpAccessChain, access_id, Ops);
+      SPIRVInstList.push_back(Inst);
+      VMap[Call] = access_id;
+      break;
     }
 
     // Sampler initializers become a load of the corresponding sampler.
@@ -5115,6 +5182,11 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // We have already mapped the call's result value to an ID.
         // Don't generate any code now.
 
+      } else if (callee_name.startswith("clspv.local.var.")) {
+
+        // We have already mapped the call's result value to an ID.
+        // Don't generate any code now.
+
       } else {
         //
         // Generate OpFunctionCall.
@@ -5206,8 +5278,9 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
   }
 
   // Emit SpecId decorations targeting the array size value.
-  for (const Argument *arg : LocalArgs) {
-    const LocalArgInfo &arg_info = LocalArgMap[arg];
+  //for (const Argument *arg : LocalArgs) {
+  //  const LocalArgInfo &arg_info = LocalArgMap[arg];
+  for (const auto &arg_info : LocalArgs) {
     SPIRVOperandList Ops;
     Ops << MkId(arg_info.array_size_id) << MkNum(spv::DecorationSpecId)
         << MkNum(arg_info.spec_id);
