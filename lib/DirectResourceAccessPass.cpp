@@ -290,6 +290,15 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
             if (ShowDRA) outs() << " Unable to merge param info\n";
             return false;
           }
+        } else if (call->getCalledFunction()->getName().startswith(
+                      clspv::WorkgroupAccessorFunction())) {
+          const uint32_t spec_id = uint32_t(
+              dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+          if (!merge_param_info({call->getCalledFunction(), spec_id, 0,
+                                 num_gep_zeroes, call})) {
+            if (ShowDRA) outs() << " Unable to merge param info\n";
+            return false;
+          }
         } else {
           if (ShowDRA) outs() << " Unhandled call:" << *value << "\n";
           // A call but not to a resource access builtin function.
