@@ -738,21 +738,29 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
                  << " allocated SpecId " << spec_id << "\n";
         }
 
-        // The resource function will return the same type as the argument.
-        // Eventually, the function will be codegen'd as an AccessChain.
+        // The type returned by the accessor function is [ Elem x 0 ]
+        // addrspace(3)*.
         auto fn_name = std::string(clspv::WorkgroupAccessorFunction()) +
                        std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
+        auto *zero = Builder.getInt32(0);
+        auto *array_ty = ArrayType::get(argTy->getPointerElementType(), 0);
+        auto *ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fn_ty = FunctionType::get(argTy, i32, false);
+          FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
           var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fn_ty));
         }
 
+        // Generate an accessor call.
         auto *spec_id_arg = Builder.getInt32(spec_id);
         auto *call = Builder.CreateCall(var_fn, {spec_id_arg});
-        Arg.replaceAllUsesWith(call);
+
+        // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
+        // addrspace(3)*, generate two zero indices for the gep.
+        auto *replacement = Builder.CreateGEP(call, {zero, zero});
+        Arg.replaceAllUsesWith(replacement);
 
         // We record the assignment of the spec id for this particular argument
         // in module-level metadata. This allows us to reconstruct the
