@@ -1414,6 +1414,7 @@ void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
   // module-level metadata. Translate that information into local argument
   // information.
   NamedMDNode *nmd = M.getNamedMetadata(clspv::LocalSpecIdMetadataName());
+  if (!nmd) return;
   for (auto operand : nmd->operands()) {
     MDTuple *tuple = cast<MDTuple>(operand);
     ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
