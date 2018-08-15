@@ -4288,18 +4288,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       }
       break;
     } else if (Callee->getName().startswith(clspv::WorkgroupAccessorFunction())) {
-      // Codegen an OpCopyObject to access the workgroup variable.
-      SPIRVOperandList Ops;
-      const auto access_id = nextID++;
+      // Don't codegen an instruction here, but instead map this call directly
+      // to the workgroup variable id.
       int spec_id = cast<ConstantInt>(Call->getOperand(0))->getSExtValue();
       const Argument *arg = LocalArgIds[spec_id];
       const auto &info = LocalArgMap[arg];
-
-      Ops << MkId(info.ptr_array_type_id)
-          << MkId(info.variable_id);
-      auto *Inst = new SPIRVInstruction(spv::OpCopyObject, access_id, Ops);
-      SPIRVInstList.push_back(Inst);
-      VMap[Call] = access_id;
+      VMap[Call] = info.variable_id;
       break;
     }
 
