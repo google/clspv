@@ -160,7 +160,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
       GetElementPtrInst *GEP = nullptr;
       Value *OrgGEPIdx = nullptr;
-      if (GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
+      if ((GEP = dyn_cast<GetElementPtrInst>(BitCastUser))) {
         OrgGEPIdx = GEP->getOperand(1);
 
         // Build new src/dst address index.
@@ -806,7 +806,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
       GetElementPtrInst *GEP = nullptr;
       Value *OrgGEPIdx = nullptr;
-      if (GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
+      if ((GEP = dyn_cast<GetElementPtrInst>(BitCastUser))) {
         IRBuilder<> Builder(GEP);
 
         // Build new src/dst address.
