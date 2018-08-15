@@ -739,7 +739,9 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         }
 
         // The type returned by the accessor function is [ Elem x 0 ]
-        // addrspace(3)*.
+        // addrspace(3)*. The zero-sized array is used to match the correct
+        // indexing required by gep's, but the zero size will eventually be
+        // codegen'd as an OpSpecConstant.
         auto fn_name = std::string(clspv::WorkgroupAccessorFunction()) +
                        std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);

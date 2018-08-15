@@ -516,10 +516,6 @@ private:
   // A mapping from a pointer-to-local argument value to a LocalArgInfo value.
   DenseMap<const Argument*, LocalArgInfo> LocalArgMap;
 
-  // A mapping from pointer-to-local argument to a specialization constant ID
-  // for that argument's array size.  This is generated from AllocatArgSpecIds.
-  ArgIdMapType ArgSpecIdMap;
-
   // The ID of 32-bit integer zero constant.  This is only valid after
   // GenerateSPIRVConstants has run.
   uint32_t constant_i32_zero_id_;
@@ -545,8 +541,6 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
-
-  ArgSpecIdMap = AllocateArgSpecIds(module);
 
   // SPIR-V always begins with its header information
   outputHeader();
@@ -578,8 +572,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   // Find types related to pointer-to-local arguments.
-  for (auto& arg_spec_id_pair : ArgSpecIdMap) {
-    const Argument* arg = arg_spec_id_pair.first;
+  for (auto arg : LocalArgs) {
     FindType(arg->getType());
     FindType(arg->getType()->getPointerElementType());
   }
@@ -738,9 +731,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   // is artificial one because we need Vulkan SPIR-V output. This function is
   // executed ahead of FindType and FindConstant.
   LLVMContext &Context = M.getContext();
-
-  // Map for avoiding to generate struct type with same fields.
-  DenseMap<Type *, Type *> ArgTyMap;
 
   FindGlobalConstVars(M, DL);
 
@@ -1259,7 +1249,8 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
         continue;
       }
 
-      if (Call && Call->getCalledFunction()->getName().startswith(clspv::WorkgroupAccessorFunction())) {
+      if (Call && Call->getCalledFunction()->getName().startswith(
+                      clspv::WorkgroupAccessorFunction())) {
         // This is a fake call representing access to a workgroup variable.
         // We handle that elsewhere.
         continue;
@@ -1278,6 +1269,14 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           // Avoid to check call instruction's type.
           break;
+        }
+        if (CallInst *OpCall = dyn_cast<CallInst>(Op)) {
+          if (OpCall && OpCall->getCalledFunction()->getName().startswith(
+                            clspv::WorkgroupAccessorFunction())) {
+            // This is a fake call representing access to a workgroup variable.
+            // We handle that elsewhere.
+            continue;
+          }
         }
         if (!isa<MetadataAsValue>(&Op)) {
           FindType(Op->getType());
