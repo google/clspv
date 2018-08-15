@@ -230,7 +230,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        constant_i32_zero_id_(0), max_workgroup_spec_id_(0) {}
+        constant_i32_zero_id_(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -519,8 +519,6 @@ private:
   // The ID of 32-bit integer zero constant.  This is only valid after
   // GenerateSPIRVConstants has run.
   uint32_t constant_i32_zero_id_;
-
-  uint32_t max_workgroup_spec_id_;
 };
 
 char SPIRVProducerPass::ID;
