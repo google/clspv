@@ -48,14 +48,13 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK:  OpDecorate [[_19:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK:  OpDecorate [[_19]] Binding 0
 // CHECK:  OpDecorate [[__arr_uint_uint_4:%[0-9a-zA-Z_]+]] ArrayStride 4
-// CHECK:  OpDecorate [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] ArrayStride 4
 // CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK:  [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
 // CHECK:  [[__struct_3]] = OpTypeStruct [[__runtimearr_uint]]
 // CHECK:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
 // CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK:  [[_6:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK:  [[__ptr_StorageBuffer_uint]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // CHECK:  [[_uint_4:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 4
 // CHECK:  [[__arr_uint_uint_4]] = OpTypeArray [[_uint]] [[_uint_4]]
 // CHECK:  [[__struct_10]] = OpTypeStruct [[__arr_uint_uint_4]]
@@ -73,7 +72,7 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Input_uint]] [[_gl_LocalInvocationID]] [[_uint_0]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_23]]
-// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_StorageBuffer_uint]] [[_21]] [[_24]]
+// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_18]] [[_uint_0]] [[_24]]
 // CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_25]]
 // CHECK:  OpReturnValue [[_26]]
 // CHECK:  OpFunctionEnd

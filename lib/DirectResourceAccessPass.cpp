@@ -217,8 +217,9 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   // either a direct call to a clspv.resource.var.* or if it a GEP of
   // such a thing (where the GEP can only have zero indices).
   struct ParamInfo {
-    // The resource-access builtin function.  (@clspv.resource.var.*)
-    Function *var_fn;
+    // The base value. It is either a global variable or a resource-access
+    // builtin function. (@clspv.resource.var.* or @clspv.local.var.*)
+    Value *base;
     // The descriptor set.
     uint32_t set;
     // The binding.
@@ -241,7 +242,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       seen_one = true;
       return true;
     }
-    return pi.var_fn == common.var_fn && pi.set == common.set &&
+    return pi.base == common.base && pi.set == common.set &&
            pi.binding == common.binding &&
            pi.num_gep_zeroes == common.num_gep_zeroes;
   };
@@ -291,6 +292,9 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
           // A call but not to a resource access builtin function.
           return false;
         }
+      } else if (isa<GlobalValue>(value)) {
+        if (!merge_param_info({value, 0, 0, num_gep_zeroes, nullptr}))
+          return false;
       } else {
         // Not a call.
         return false;
@@ -303,7 +307,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   if (ShowDRA) {
     if (seen_one) {
       outs() << "DRA:  Rewrite " << fn->getName() << " arg " << arg_index << " "
-             << arg.getName() << ": " << common.var_fn->getName() << " ("
+             << arg.getName() << ": " << common.base->getName() << " ("
              << common.set << "," << common.binding
              << ") zeroes: " << common.num_gep_zeroes << " sample-call "
              << *(common.sample_call) << "\n";
@@ -317,19 +321,25 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   auto *zero = Builder.getInt32(0);
   Builder.SetInsertPoint(fn->getEntryBlock().getFirstNonPHI());
 
-  // Create the call.
-  SmallVector<Value *, 8> args(common.sample_call->arg_begin(),
-                               common.sample_call->arg_end());
-  Value *replacement = Builder.CreateCall(common.var_fn, args);
-  if (ShowDRA) {
-    outs() << "DRA:    Replace: call " << *replacement << "\n";
+  Value *replacement = common.base;
+  if (Function* function = dyn_cast<Function>(replacement)) {
+    // Create the call.
+    SmallVector<Value *, 8> args(common.sample_call->arg_begin(),
+                                 common.sample_call->arg_end());
+    replacement = Builder.CreateCall(function, args);
+    if (ShowDRA) {
+      outs() << "DRA:    Replace: call " << *replacement << "\n";
+    }
   }
   if (common.num_gep_zeroes) {
     SmallVector<Value *, 3> zeroes;
     for (unsigned i = 0; i < common.num_gep_zeroes; i++) {
       zeroes.push_back(zero);
     }
-    replacement = Builder.CreateGEP(replacement, zeroes);
+    // Builder.CreateGEP is not used to avoid creating a GEPConstantExpr in the
+    // case of global variables.
+    replacement = GetElementPtrInst::Create(nullptr, replacement, zeroes);
+    Builder.Insert(cast<Instruction>(replacement));
     if (ShowDRA) {
       outs() << "DRA:    Replace: gep  " << *replacement << "\n";
     }
