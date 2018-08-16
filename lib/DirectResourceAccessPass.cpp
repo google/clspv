@@ -175,6 +175,12 @@ DirectResourceAccessPass::CallGraphOrderedFunctions(Module &M) {
   // If reverse_edges is not empty then there was a cycle.  But we don't care
   // about that erroneous case.
 
+  if (ShowDRA) {
+    outs() << "DRA: Ordered functions:\n";
+    for (Function *fun : result) {
+      outs() << "DRA:   " << fun->getName() << "\n";
+    }
+  }
   return result;
 }
 
