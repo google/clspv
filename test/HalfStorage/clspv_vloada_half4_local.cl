@@ -13,7 +13,7 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 66
+// CHECK: ; Bound: 65
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -71,12 +71,11 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_v4float_2]] Workgroup
 // CHECK: [[_35]] = OpFunction [[_void]] None [[_18]]
 // CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK: [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v4float]] [[_1]] [[_uint_0]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v4float]] [[_33]] [[_uint_0]] [[_uint_0]]
 // CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_34]] [[_uint_0]]
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_38]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpShiftRightLogical [[_uint]] [[_39]] [[_uint_1]]
-// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_v4float]] [[_5]] [[_40]]
+// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v4float]] [[_1]] [[_40]]
 // CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]] [[_41]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpBitwiseAnd [[_uint]] [[_39]] [[_uint_1]]
 // CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpShiftLeftLogical [[_uint]] [[_43]] [[_uint_1]]
@@ -92,7 +91,7 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK: [[_54:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] [[_6]] UnpackHalf2x16 [[_52]]
 // CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpVectorShuffle [[_v4float]] [[_53]] [[_54]] 0 1 2 3
 // CHECK: OpStore [[_37]] [[_55]]
-// CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v4float]] [[_5]]
+// CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v4float]] [[_1]] [[_uint_0]]
 // CHECK: [[_57:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]] [[_56]]
 // CHECK: [[_58:%[0-9a-zA-Z_]+]] = OpVectorShuffle [[_v2float]] [[_57]] [[_27]] 0 1
 // CHECK: [[_59:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[_58]]

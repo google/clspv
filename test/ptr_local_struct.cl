@@ -26,7 +26,7 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
 // CHECK:  ; Generator: Codeplay; 0
-// CHECK:  ; Bound: 55
+// CHECK:  ; Bound: 54
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
 // CHECK:  OpCapability VariablePointers
@@ -66,13 +66,13 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 // CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK:  [[_19:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
 // CHECK:  [[__ptr_Workgroup_float:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_float]]
-// CHECK:  [[__struct_22]] = OpTypeStruct [[_uint]] [[_uint]]
-// CHECK:  [[__ptr_Workgroup__struct_22:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__struct_22]]
+// CHECK:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
 // CHECK:  [[__ptr_Workgroup_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_uint]]
 // CHECK:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
 // CHECK:  [[__ptr_Private_v3uint:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[_v3uint]]
+// CHECK:  [[__struct_22]] = OpTypeStruct [[_uint]] [[_uint]]
+// CHECK:  [[__ptr_Workgroup__struct_22:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__struct_22]]
 // CHECK:  [[_2]] = OpSpecConstant [[_uint]] 1
 // CHECK:  [[__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_2]]
 // CHECK:  [[__ptr_Workgroup__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_float_2]]
@@ -95,7 +95,6 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 // CHECK:  [[_38]] = OpFunction [[_void]] None [[_19]]
 // CHECK:  [[_39:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK:  [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_uint_0]]
-// CHECK:  [[_10:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup__struct_22]] [[_6]] [[_uint_0]]
 // CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_34]] [[_uint_0]] [[_uint_0]]
 // CHECK:  [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_35]] [[_uint_0]]
 // CHECK:  [[_42:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_41]]
@@ -107,7 +106,7 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 // CHECK:  [[_48:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_46]] [[_47]]
 // CHECK:  [[_49:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_48]] [[_42]]
 // CHECK:  [[_50:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_49]] [[_45]]
-// CHECK:  [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_10]] [[_uint_1]]
+// CHECK:  [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_uint_0]] [[_uint_1]]
 // CHECK:  [[_52:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_51]]
 // CHECK:  [[_53:%[0-9a-zA-Z_]+]] = OpConvertSToF [[_float]] [[_52]]
 // CHECK:  [[_54:%[0-9a-zA-Z_]+]] = OpFAdd [[_float]] [[_50]] [[_53]]

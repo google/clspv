@@ -50,8 +50,8 @@ kernel void bar(global int *A, int n, local int *B) { apple(B, A, n); }
 // CHECK:  [[__ptr_StorageBuffer__struct_15:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_15]]
 // CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK:  [[_18:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // CHECK:  [[__ptr_Workgroup_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_uint]]
+// CHECK:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // CHECK:  [[_21:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]] [[__ptr_StorageBuffer_uint]] [[_uint]] [[__ptr_Workgroup_uint]]
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]] [[__ptr_Workgroup_uint]] [[__ptr_StorageBuffer_uint]] [[_uint]]
 // CHECK:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3

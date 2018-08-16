@@ -14,7 +14,7 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 64
+// CHECK: ; Bound: 63
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -72,7 +72,6 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_v2uint_2]] Workgroup
 // CHECK: [[_36]] = OpFunction [[_void]] None [[_17]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK: [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v2uint]] [[_1]] [[_uint_0]]
 // CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_v4float]] [[_34]] [[_uint_0]]
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]] [[_38]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_35]] [[_uint_0]]
@@ -84,7 +83,7 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: [[_46:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_44]] [[_25]] 0
 // CHECK: [[_47:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_45]] [[_46]] 1
 // CHECK: [[_48:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_1]] [[_41]]
-// CHECK: [[_49:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_v2uint]] [[_5]] [[_48]]
+// CHECK: [[_49:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v2uint]] [[_1]] [[_48]]
 // CHECK: OpStore [[_49]] [[_47]]
 // CHECK: [[_50:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_41]] [[_uint_1]]
 // CHECK: [[_51:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_6]] PackHalf2x16 [[_42]]
@@ -92,7 +91,7 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_51]] [[_25]] 0
 // CHECK: [[_54:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_52]] [[_53]] 1
 // CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_2]] [[_50]]
-// CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_v2uint]] [[_5]] [[_55]]
+// CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v2uint]] [[_1]] [[_55]]
 // CHECK: OpStore [[_56]] [[_54]]
 // CHECK: [[_57:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_41]] [[_uint_2]]
 // CHECK: [[_58:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_6]] PackHalf2x16 [[_42]]
@@ -100,7 +99,7 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: [[_60:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_58]] [[_25]] 0
 // CHECK: [[_61:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_59]] [[_60]] 1
 // CHECK: [[_62:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_3]] [[_57]]
-// CHECK: [[_63:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_Workgroup_v2uint]] [[_5]] [[_62]]
+// CHECK: [[_63:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_v2uint]] [[_1]] [[_62]]
 // CHECK: OpStore [[_63]] [[_61]]
 // CHECK: OpReturn
 // CHECK: OpFunctionEnd
