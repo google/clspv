@@ -26,6 +26,10 @@ inline std::string WorkgroupAccessorFunction() { return "clspv.local.var."; }
 // Base name for resource variable accessor function.
 inline std::string ResourceAccessorFunction() { return "clspv.resource.var."; }
 
+// The first useable SpecId for pointer-to-local arguments.
+// 0, 1 and 2 are reserved for workgroup size.
+inline int FirstLocalSpecId() { return 3; }
+
 } // namespace clspv
 
 #endif

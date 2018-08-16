@@ -712,8 +712,36 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     outs() << "Allocate local kernel arg spec ids\n";
   }
 
-  // 0, 1 and 2 are reserved for workgroup size.
-  int next_id = 3;
+  int next_id = clspv::FirstLocalSpecId();
+  // Maps argument type to assigned SpecIds.
+  DenseMap<Type*, SmallVector<int, 4>> spec_id_types;
+  // Tracks SpecIds assigned in the current function.
+  DenseSet<int> function_spec_ids;
+  // Tracks newly allocated spec ids.
+  std::vector<std::pair<Type*, int>> function_allocations;
+
+  // Allocates a SpecId for |type|.
+  auto GetSpecId = [&next_id, &spec_id_types, &function_spec_ids, &function_allocations](Type *type) {
+    const bool always_distinct_sets =
+        clspv::Option::DistinctKernelDescriptorSets();
+
+    // Attempt to reuse a SpecId. If the SpecId is associated with the same type
+    // in another kernel and not yet assigned to this kernel it can be reused.
+    auto where = spec_id_types.find(type);
+    if (where != spec_id_types.end()) {
+      for (auto id : where->second) {
+        if (!function_spec_ids.count(id)) {
+          return id;
+        }
+      }
+    }
+
+    // Need to allocate a new SpecId.
+    function_allocations.push_back(std::make_pair(type, next_id));
+    function_spec_ids.insert(next_id);
+    return next_id++;
+  };
+
   IRBuilder<> Builder(M.getContext());
   for (Function &F : M) {
     // Only scan arguments of kernel functions that have bodies.
@@ -725,13 +753,15 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     // function.
     Builder.SetInsertPoint(F.getEntryBlock().getFirstNonPHI());
 
+    function_allocations.clear();
+    function_spec_ids.clear();
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
       Type *argTy = Arg.getType();
       const auto arg_kind = clspv::GetArgKindForType(argTy);
       if (arg_kind == clspv::ArgKind::Local && !Arg.use_empty()) {
-        // Claim this spec id.
-        int spec_id = next_id++;
+        // Assign a SpecId to this argument.
+        int spec_id = GetSpecId(Arg.getType());
 
         if (ShowDescriptors) {
           outs() << "DBA: " << F.getName() << " arg " << arg_index << " " << Arg
@@ -782,6 +812,11 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
       }
 
       ++arg_index;
+    }
+
+    // Move newly allocated SpecIds for this function into the overall mapping.
+    for (auto &pair : function_allocations) {
+      spec_id_types[pair.first].push_back(pair.second);
     }
   }
 

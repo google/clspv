@@ -88,10 +88,8 @@ bool DirectResourceAccessPass::runOnModule(Module &M) {
   bool Changed = false;
 
   if (clspv::Option::DirectResourceAccess()) {
-    if (ShowDRA) outs() << "\n" << M << "\n";
     auto ordered_functions = CallGraphOrderedFunctions(M);
     for (auto *fn : ordered_functions) {
-      if (ShowDRA) outs() << "\n" << *fn << "\n";
       Changed |= RewriteResourceAccesses(fn);
     }
   }
@@ -177,12 +175,6 @@ DirectResourceAccessPass::CallGraphOrderedFunctions(Module &M) {
   // If reverse_edges is not empty then there was a cycle.  But we don't care
   // about that erroneous case.
 
-  if (ShowDRA) {
-    outs() << "DRA: Ordered functions:\n";
-    for (Function *fun : result) {
-      outs() << "DRA:   " << fun->getName() << "\n";
-    }
-  }
   return result;
 }
 
@@ -213,10 +205,6 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   bool Changed = false;
   if (fn->use_empty()) {
     return false;
-  }
-
-  if (ShowDRA) {
-    outs() << "Considering " << fn->getName() << " arg " << arg_index << " " << arg.getName() << "\n";
   }
 
   // We can convert a parameter to a direct resource access if it is
@@ -253,7 +241,6 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   };
 
   for (auto &use : fn->uses()) {
-    if (ShowDRA) outs() << " use: " << *use.getUser() << "\n";
     if (auto *caller = dyn_cast<CallInst>(use.getUser())) {
       Value *value = caller->getArgOperand(arg_index);
       // We care about two cases:
@@ -266,7 +253,6 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       for (auto *gep = dyn_cast<GetElementPtrInst>(value); gep;
            gep = dyn_cast<GetElementPtrInst>(value)) {
         if (!gep->hasAllZeroIndices()) {
-          if (ShowDRA) outs() << " Non zero GEP:" << *gep << "\n";
           return false;
         }
         // If not the first GEP, then ignore the "element" index (which I call
@@ -286,31 +272,24 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
           const auto binding = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
           if (!merge_param_info({call->getCalledFunction(), set, binding,
-                                 num_gep_zeroes, call})) {
-            if (ShowDRA) outs() << " Unable to merge param info\n";
+                                 num_gep_zeroes, call}))
             return false;
-          }
         } else if (call->getCalledFunction()->getName().startswith(
                       clspv::WorkgroupAccessorFunction())) {
           const uint32_t spec_id = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
           if (!merge_param_info({call->getCalledFunction(), spec_id, 0,
-                                 num_gep_zeroes, call})) {
-            if (ShowDRA) outs() << " Unable to merge param info\n";
+                                 num_gep_zeroes, call}))
             return false;
-          }
         } else {
-          if (ShowDRA) outs() << " Unhandled call:" << *value << "\n";
           // A call but not to a resource access builtin function.
           return false;
         }
       } else {
-        if (ShowDRA) outs() << " Unhandled inst:" << *value << "\n";
         // Not a call.
         return false;
       }
     } else {
-      if (ShowDRA) outs() << " Unhandled use:" << use << "\n";
       // There isn't enough commonality.  Bail out without changing anything.
       return false;
     }
