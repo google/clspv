@@ -322,6 +322,13 @@ llvm::ModulePass *createDirectResourceAccessPass();
 /// comparisons.  Works around a driver bug.
 llvm::ModulePass *createSignedCompareFixupPass();
 
+/// Share Global Variables
+/// @return An LLVM module pass.
+///
+/// Attempts to de-duplicate global Workgroup scope variables between kernels.
+/// Global variables of the same type can be merged if they are used by an
+/// exclusive set of kernels. This pass should run before direct resource access
+/// to enable more opportunities for that pass.
 llvm::ModulePass *createShareGlobalVariablesPass();
 
 } // namespace clspv
