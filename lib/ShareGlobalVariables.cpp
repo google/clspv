@@ -42,9 +42,24 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
+  // Maps functions to entry points that can call them including themselves.
+  void MapEntryPoints(Module &M);
+
+  // Traces the callable functions from |function| and maps them to
+  // |entry_point|.
   void TraceFunction(Function *function, Function *entry_point);
+
+  // Attempts to share global variables. Returns true if any variables are
+  // shared.  Shares variables of the same type that are used by
+  // non-intersecting sets of kernels.
+  bool ShareGlobals(Module &M);
+
+  // Collects the entry points that can reach |value| into |user_entry_points|.
   void CollectUserEntryPoints(Value *value,
                               UniqueVector<Function *> *user_entry_points);
+
+  // Returns true if there is an intersection between the |user_functions| and
+  // |other_entry_points|.
   bool HasSharedEntryPoints(const DenseSet<Function *> &user_functions,
                             const UniqueVector<Function *> &other_entry_points);
 
@@ -69,55 +84,23 @@ bool ShareGlobalVariablesPass::runOnModule(Module &M) {
   bool Changed = false;
 
   if (clspv::Option::ShareGlobalVariables()) {
-    for (auto &func : M) {
-      if (func.isDeclaration() ||
-          func.getCallingConv() != CallingConv::SPIR_KERNEL)
-        continue;
-
-      TraceFunction(&func, &func);
-    }
-
-    for (auto global = M.global_begin(); global != M.global_end(); ++global) {
-      if (global->getType()->getPointerAddressSpace() !=
-          clspv::AddressSpace::Local)
-        continue;
-
-      if (global->user_empty())
-        continue;
-
-      UniqueVector<Function *> entry_points;
-      CollectUserEntryPoints(&*global, &entry_points);
-      DenseSet<Function *> user_functions;
-      for (auto entry_point : entry_points) {
-        user_functions.insert(entry_point);
-      }
-
-      auto next = global;
-      ++next;
-      for (; next != M.global_end(); ++next) {
-        if (global->getType() != next->getType())
-          continue;
-
-        UniqueVector<Function *> other_entry_points;
-        CollectUserEntryPoints(&*next, &other_entry_points);
-
-        if (!HasSharedEntryPoints(user_functions, other_entry_points)) {
-          if (ShowSGV) {
-            outs() << "SGV: Combining globals\n"
-                   << "  " << *global << "\n"
-                   << "  " << *next << "\n";
-          }
-          next->replaceAllUsesWith(&*global);
-          for (auto fn : other_entry_points) {
-            user_functions.insert(fn);
-          }
-          Changed = true;
-        }
-      }
-    }
+    MapEntryPoints(M);
+    Changed = ShareGlobals(M);
   }
 
   return Changed;
+}
+
+void ShareGlobalVariablesPass::MapEntryPoints(Module &M) {
+  // TODO: this could be more efficient if it memoized results for non-kernel
+  // functions.
+  for (auto &func : M) {
+    if (func.isDeclaration() ||
+        func.getCallingConv() != CallingConv::SPIR_KERNEL)
+      continue;
+
+    TraceFunction(&func, &func);
+  }
 }
 
 void ShareGlobalVariablesPass::TraceFunction(Function *function,
@@ -133,6 +116,60 @@ void ShareGlobalVariablesPass::TraceFunction(Function *function,
       }
     }
   }
+}
+
+bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
+  // Greedily attempts to share global variables.
+  // TODO: this should be analysis driven to aid direct resource access more
+  // directly.
+  bool Changed = false;
+  DenseMap<Value *, UniqueVector<Function *>> global_entry_points;
+  for (auto &G : M.globals()) {
+    auto &entry_points = global_entry_points[&G];
+    CollectUserEntryPoints(&G, &entry_points);
+  }
+
+  for (auto global = M.global_begin(); global != M.global_end(); ++global) {
+    if (global->getType()->getPointerAddressSpace() !=
+        clspv::AddressSpace::Local)
+      continue;
+
+    if (global->user_empty())
+      continue;
+
+    auto &entry_points = global_entry_points[&*global];
+    DenseSet<Function *> user_functions;
+    for (auto entry_point : entry_points) {
+      user_functions.insert(entry_point);
+    }
+
+    auto next = global;
+    ++next;
+    for (; next != M.global_end(); ++next) {
+      if (global->getType() != next->getType())
+        continue;
+      if (next->user_empty())
+        continue;
+
+      auto &other_entry_points = global_entry_points[&*next];
+      if (!HasSharedEntryPoints(user_functions, other_entry_points)) {
+        if (ShowSGV) {
+          outs() << "SGV: Combining globals\n"
+                 << "  " << *global << "\n"
+                 << "  " << *next << "\n";
+        }
+        next->replaceAllUsesWith(&*global);
+        // Don't need to update |entry_points| because we won't revisit this
+        // global variable after the outer loop iteration.
+        for (auto fn : other_entry_points) {
+          user_functions.insert(fn);
+        }
+        Changed = true;
+      }
+    }
+  }
+
+  return Changed;
 }
 
 void ShareGlobalVariablesPass::CollectUserEntryPoints(
