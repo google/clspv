@@ -766,7 +766,7 @@ int main(const int argc, const char *const argv[]) {
     pm.add(clspv::createClusterModuleScopeConstantVars());
   }
 
-  pm.add(clspv::createShareGlobalVariablesPass());
+  pm.add(clspv::createShareModuleScopeVariablesPass());
   pm.add(clspv::createAllocateDescriptorsPass(SamplerMapEntries));
   pm.add(llvm::createVerifierPass());
   pm.add(clspv::createDirectResourceAccessPass());

@@ -31,15 +31,15 @@ using namespace llvm;
 
 namespace {
 
-cl::opt<bool> ShowSGV("show-sgv", cl::init(false), cl::Hidden,
-                      cl::desc("Show share global variables details"));
+cl::opt<bool> ShowSMSV("show-smsv", cl::init(false), cl::Hidden,
+                       cl::desc("Show share module scope variables details"));
 
-class ShareGlobalVariablesPass final : public ModulePass {
+class ShareModuleScopeVariablesPass final : public ModulePass {
 public:
-  typedef DenseMap<Function *, SmallVector<Function *, 4>> EntryPointMap;
+  typedef DenseMap<Function *, UniqueVector<Function *>> EntryPointMap;
 
   static char ID;
-  ShareGlobalVariablesPass() : ModulePass(ID) {}
+  ShareModuleScopeVariablesPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override;
 
 private:
@@ -50,10 +50,10 @@ private:
   // |entry_point|.
   void TraceFunction(Function *function, Function *entry_point);
 
-  // Attempts to share global variables. Returns true if any variables are
+  // Attempts to share module scope variables. Returns true if any variables are
   // shared.  Shares variables of the same type that are used by
   // non-intersecting sets of kernels.
-  bool ShareGlobals(Module &M);
+  bool ShareModuleScopeVariables(Module &M);
 
   // Collects the entry points that can reach |value| into |user_entry_points|.
   void CollectUserEntryPoints(Value *value,
@@ -67,32 +67,32 @@ private:
   EntryPointMap function_to_entry_points_;
 };
 
-char ShareGlobalVariablesPass::ID = 0;
-static RegisterPass<ShareGlobalVariablesPass> X("ShareGlobalVariablesPass",
-                                                "Share global variables");
+char ShareModuleScopeVariablesPass::ID = 0;
+static RegisterPass<ShareModuleScopeVariablesPass>
+    X("ShareModuleScopeVariablesPass", "Share module scope variables");
 
 } // namespace
 
 namespace clspv {
-ModulePass *createShareGlobalVariablesPass() {
-  return new ShareGlobalVariablesPass();
+ModulePass *createShareModuleScopeVariablesPass() {
+  return new ShareModuleScopeVariablesPass();
 }
 } // namespace clspv
 
 namespace {
 
-bool ShareGlobalVariablesPass::runOnModule(Module &M) {
+bool ShareModuleScopeVariablesPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  if (clspv::Option::ShareGlobalVariables()) {
+  if (clspv::Option::ShareModuleScopeVariables()) {
     MapEntryPoints(M);
-    Changed = ShareGlobals(M);
+    Changed = ShareModuleScopeVariables(M);
   }
 
   return Changed;
 }
 
-void ShareGlobalVariablesPass::MapEntryPoints(Module &M) {
+void ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
   // TODO: this could be more efficient if it memoized results for non-kernel
   // functions.
   for (auto &func : M) {
@@ -104,9 +104,9 @@ void ShareGlobalVariablesPass::MapEntryPoints(Module &M) {
   }
 }
 
-void ShareGlobalVariablesPass::TraceFunction(Function *function,
+void ShareModuleScopeVariablesPass::TraceFunction(Function *function,
                                              Function *entry_point) {
-  function_to_entry_points_[function].push_back(entry_point);
+  function_to_entry_points_[function].insert(entry_point);
 
   for (auto &BB : *function) {
     for (auto &I : BB) {
@@ -119,7 +119,7 @@ void ShareGlobalVariablesPass::TraceFunction(Function *function,
   }
 }
 
-bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
+bool ShareModuleScopeVariablesPass::ShareModuleScopeVariables(Module &M) {
   // Greedily attempts to share global variables.
   // TODO: this should be analysis driven to aid direct resource access more
   // directly.
@@ -157,8 +157,8 @@ bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
 
       auto &other_entry_points = global_entry_points[&*next];
       if (!HasSharedEntryPoints(user_functions, other_entry_points)) {
-        if (ShowSGV) {
-          outs() << "SGV: Combining globals\n"
+        if (ShowSMSV) {
+          outs() << "SMSV: Combining module scope variables\n"
                  << "  " << *global << "\n"
                  << "  " << *next << "\n";
         }
@@ -182,7 +182,7 @@ bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
   return Changed;
 }
 
-void ShareGlobalVariablesPass::CollectUserEntryPoints(
+void ShareModuleScopeVariablesPass::CollectUserEntryPoints(
     Value *value, UniqueVector<Function *> *user_entry_points) {
   if (auto I = dyn_cast<Instruction>(value)) {
     Function *function = I->getParent()->getParent();
@@ -191,6 +191,9 @@ void ShareGlobalVariablesPass::CollectUserEntryPoints(
       user_entry_points->insert(fn);
     }
 
+    // We're looking for the first use inside a function to identify the entry
+    // points. Mutations beyond that point do not prevent sharing so we do not
+    // consider them.
     return;
   }
 
@@ -199,7 +202,7 @@ void ShareGlobalVariablesPass::CollectUserEntryPoints(
   }
 }
 
-bool ShareGlobalVariablesPass::HasSharedEntryPoints(
+bool ShareModuleScopeVariablesPass::HasSharedEntryPoints(
     const DenseSet<Function *> &user_functions,
     const UniqueVector<Function *> &other_entry_points) {
   for (auto fn : other_entry_points) {

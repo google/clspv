@@ -26,7 +26,7 @@ bool DistinctKernelDescriptorSets();
 // within helper functions instead of passing pointers via function arguments.
 bool DirectResourceAccess();
 
-bool ShareGlobalVariables();
+bool ShareModuleScopeVariables();
 
 // Returns true if we should avoid sharing resource variables for images
 // and samplers.  Use this to avoid one difference between the old and new

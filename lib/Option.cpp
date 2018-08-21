@@ -28,10 +28,10 @@ llvm::cl::opt<bool> no_direct_resource_access(
         "in function arguments.  Affects kernel arguments of type "
         "pointer-to-global, pointer-to-constant, image, and sampler."));
 
-llvm::cl::opt<bool> no_share_global_variables(
-    "no-sgv", llvm::cl::init(false),
-    llvm::cl::desc(
-        "No Share Global Variables: Avoid de-duplicating global variables."));
+llvm::cl::opt<bool> no_share_module_scope_variables(
+    "no-smsv", llvm::cl::init(false),
+    llvm::cl::desc("No Share Module Scope Variables: Avoid de-duplicating "
+                   "module scope variables."));
 
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
@@ -109,7 +109,7 @@ namespace Option {
 bool DirectResourceAccess() {
   return !(no_direct_resource_access || distinct_kernel_descriptor_sets);
 }
-bool ShareGlobalVariables() { return !no_share_global_variables; }
+bool ShareModuleScopeVariables() { return !no_share_module_scope_variables; }
 bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
 bool HackDistinctImageSampler() { return hack_dis; }
