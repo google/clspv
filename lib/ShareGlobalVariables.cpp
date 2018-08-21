@@ -22,6 +22,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "ArgKind.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
@@ -125,13 +126,16 @@ bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
   bool Changed = false;
   DenseMap<Value *, UniqueVector<Function *>> global_entry_points;
   for (auto &G : M.globals()) {
+    if (!clspv::IsLocalPtr(G.getType()))
+      continue;
+
     auto &entry_points = global_entry_points[&G];
     CollectUserEntryPoints(&G, &entry_points);
   }
 
+  SmallVector<GlobalVariable *, 8> dead_globals;
   for (auto global = M.global_begin(); global != M.global_end(); ++global) {
-    if (global->getType()->getPointerAddressSpace() !=
-        clspv::AddressSpace::Local)
+    if (!clspv::IsLocalPtr(global->getType()))
       continue;
 
     if (global->user_empty())
@@ -164,9 +168,15 @@ bool ShareGlobalVariablesPass::ShareGlobals(Module &M) {
         for (auto fn : other_entry_points) {
           user_functions.insert(fn);
         }
+        dead_globals.push_back(&*next);
         Changed = true;
       }
     }
+  }
+
+  // Remove the unused variables that were merged.
+  for (auto GV : dead_globals) {
+    GV->eraseFromParent();
   }
 
   return Changed;

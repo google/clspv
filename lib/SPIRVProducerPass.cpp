@@ -1175,7 +1175,7 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
 
 void SPIRVProducerPass::FindTypePerGlobalVar(GlobalVariable &GV) {
   // Investigate global variable's type.
-  if (!GV.user_empty()) FindType(GV.getType());
+  FindType(GV.getType());
 }
 
 void SPIRVProducerPass::FindTypePerFunc(Function &F) {
@@ -2651,8 +2651,6 @@ void SPIRVProducerPass::GenerateResourceVars(Module &M) {
 }
 
 void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
-  if (GV.user_empty()) return;
-
   Module& M = *GV.getParent();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
