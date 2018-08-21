@@ -322,4 +322,6 @@ llvm::ModulePass *createDirectResourceAccessPass();
 /// comparisons.  Works around a driver bug.
 llvm::ModulePass *createSignedCompareFixupPass();
 
+llvm::ModulePass *createShareGlobalVariablesPass();
+
 } // namespace clspv

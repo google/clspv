@@ -28,13 +28,17 @@ llvm::cl::opt<bool> no_direct_resource_access(
         "in function arguments.  Affects kernel arguments of type "
         "pointer-to-global, pointer-to-constant, image, and sampler."));
 
+llvm::cl::opt<bool> no_share_global_variables(
+    "no-sgv", llvm::cl::init(false),
+    llvm::cl::desc(
+        "No Share Global Variables: Avoid de-duplicating global variables."));
+
 // By default, reuse the same descriptor set number for all arguments.
 // To turn that off, use -distinct-kernel-descriptor-sets
 llvm::cl::opt<bool> distinct_kernel_descriptor_sets(
     "distinct-kernel-descriptor-sets", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Each kernel uses its own descriptor set for its arguments. "
-        "Turns off direct-resource-access optimizations."));
+    llvm::cl::desc("Each kernel uses its own descriptor set for its arguments. "
+                   "Turns off direct-resource-access optimizations."));
 
 // TODO(dneto): As per Neil Henning suggestion, might not need this if
 // you can trace the pointer back far enough to see that it's 32-bit
@@ -56,10 +60,9 @@ llvm::cl::opt<bool> hack_initializers(
 
 llvm::cl::opt<bool> hack_dis(
     "hack-dis", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Force use of a distinct image or sampler variable for each "
-        "image or sampler kernel argument.  This prevents sharing "
-        "of resource variables."));
+    llvm::cl::desc("Force use of a distinct image or sampler variable for each "
+                   "image or sampler kernel argument.  This prevents sharing "
+                   "of resource variables."));
 
 llvm::cl::opt<bool> hack_inserts(
     "hack-inserts", llvm::cl::init(false),
@@ -106,6 +109,7 @@ namespace Option {
 bool DirectResourceAccess() {
   return !(no_direct_resource_access || distinct_kernel_descriptor_sets);
 }
+bool ShareGlobalVariables() { return !no_share_global_variables; }
 bool DistinctKernelDescriptorSets() { return distinct_kernel_descriptor_sets; }
 bool F16BitStorage() { return f16bit_storage; }
 bool HackDistinctImageSampler() { return hack_dis; }
@@ -113,7 +117,9 @@ bool HackInitializers() { return hack_initializers; }
 bool HackInserts() { return hack_inserts; }
 bool HackSignedCompareFixup() { return hack_signed_compare_fixup; }
 bool HackUndef() { return hack_undef; }
-bool ModuleConstantsInStorageBuffer() { return module_constants_in_storage_buffer; }
+bool ModuleConstantsInStorageBuffer() {
+  return module_constants_in_storage_buffer;
+}
 bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
 

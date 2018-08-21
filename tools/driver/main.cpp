@@ -117,10 +117,8 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Error,
             "vectors with more than 4 elements are not supported");
-    CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] =
-        DE.getCustomDiagID(
-            DiagnosticsEngine::Error,
-            "pointer-to-void is not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
+        DiagnosticsEngine::Error, "pointer-to-void is not supported");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -167,7 +165,7 @@ struct ExtraValidationASTAction final : public PluginASTAction {
     return PluginASTAction::AddBeforeMainAction;
   }
 };
-}
+} // namespace
 
 static FrontendPluginRegistry::Add<ExtraValidationASTAction>
     X("extra-validation",
@@ -224,8 +222,9 @@ static llvm::cl::opt<bool> cl_fast_relaxed_math(
                    "-cl-unsafe-math-optimizations."));
 
 static llvm::cl::list<std::string>
-    Includes("I", llvm::cl::desc("Add a directory to the list of directories "
-                                 "to be searched for header files."),
+    Includes("I",
+             llvm::cl::desc("Add a directory to the list of directories "
+                            "to be searched for header files."),
              llvm::cl::ZeroOrMore, llvm::cl::value_desc("include path"));
 
 static llvm::cl::list<std::string>
@@ -276,9 +275,9 @@ int main(const int argc, const char *const argv[]) {
   // We need to change how one of the called passes works by spoofing
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
-  const char * llvmArgv[llvmArgc] = {
-    argv[0],
-    "-simplifycfg-sink-common=false",
+  const char *llvmArgv[llvmArgc] = {
+      argv[0],
+      "-simplifycfg-sink-common=false",
   };
 
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
@@ -322,7 +321,7 @@ int main(const int argc, const char *const argv[]) {
     // if we've to output assembly
     if (OutputAssembly) {
       OutputFilename = "a.spvasm";
-    } else if (OutputFormat=="c") {
+    } else if (OutputFormat == "c") {
       OutputFilename = "a.spvinc";
     } else {
       OutputFilename = "a.spv";
@@ -332,7 +331,7 @@ int main(const int argc, const char *const argv[]) {
   std::string descriptor_map;
   llvm::raw_string_ostream descriptor_map_out(descriptor_map);
 
-  llvm::SmallVector<std::pair<unsigned,std::string>, 8> SamplerMapEntries;
+  llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
 
   if (!SamplerMap.empty()) {
     auto errorOrSamplerMapFile =
@@ -589,7 +588,8 @@ int main(const int argc, const char *const argv[]) {
   instance.getCodeGenOpts().PreserveVec3Type = true;
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
-  clang::FrontendInputFile kernelFile(overiddenInputFilename, clang::InputKind::OpenCL);
+  clang::FrontendInputFile kernelFile(overiddenInputFilename,
+                                      clang::InputKind::OpenCL);
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
   instance.getPreprocessorOpts().addRemappedFile(
       overiddenInputFilename, errorOrInputFile.get().release());
@@ -766,6 +766,7 @@ int main(const int argc, const char *const argv[]) {
     pm.add(clspv::createClusterModuleScopeConstantVars());
   }
 
+  pm.add(clspv::createShareGlobalVariablesPass());
   pm.add(clspv::createAllocateDescriptorsPass(SamplerMapEntries));
   pm.add(llvm::createVerifierPass());
   pm.add(clspv::createDirectResourceAccessPass());
