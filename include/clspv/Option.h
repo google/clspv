@@ -18,12 +18,15 @@ namespace Option {
 // Returns true if code generation can use SPV_KHR_16bit_storage.
 bool F16BitStorage();
 
-// Returns true if each kernel must use its own descriptor set for all arguments.
+// Returns true if each kernel must use its own descriptor set for all
+// arguments.
 bool DistinctKernelDescriptorSets();
 
 // Returns true if the compiler should try to use direct resource accesses
 // within helper functions instead of passing pointers via function arguments.
 bool DirectResourceAccess();
+
+bool ShareModuleScopeVariables();
 
 // Returns true if we should avoid sharing resource variables for images
 // and samplers.  Use this to avoid one difference between the old and new

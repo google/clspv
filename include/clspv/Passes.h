@@ -322,4 +322,13 @@ llvm::ModulePass *createDirectResourceAccessPass();
 /// comparisons.  Works around a driver bug.
 llvm::ModulePass *createSignedCompareFixupPass();
 
+/// Share Module Scope Variables
+/// @return An LLVM module pass.
+///
+/// Attempts to de-duplicate module scope Workgroup scope variables between kernels.
+/// Module scope variables of the same type can be merged if they are used by an
+/// exclusive set of kernels. This pass should run before direct resource access
+/// to enable more opportunities for that pass.
+llvm::ModulePass *createShareModuleScopeVariablesPass();
+
 } // namespace clspv

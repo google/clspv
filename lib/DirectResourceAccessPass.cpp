@@ -309,8 +309,9 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       outs() << "DRA:  Rewrite " << fn->getName() << " arg " << arg_index << " "
              << arg.getName() << ": " << common.base->getName() << " ("
              << common.set << "," << common.binding
-             << ") zeroes: " << common.num_gep_zeroes << " sample-call "
-             << *(common.sample_call) << "\n";
+             << ") zeroes: " << common.num_gep_zeroes << " sample-call ";
+      if (common.sample_call) outs() << *common.sample_call << "\n";
+      else outs() << "nullptr\n";
     }
   }
 
