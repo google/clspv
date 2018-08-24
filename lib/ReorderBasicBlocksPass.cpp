@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/IR/Dominators.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/raw_ostream.h>
+#include "llvm/IR/Dominators.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 

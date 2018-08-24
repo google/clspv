@@ -14,16 +14,16 @@
 
 #include <string>
 
-#include <llvm/ADT/DenseMap.h>
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/raw_ostream.h>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/Attributes.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
 
-#include <clspv/AddressSpace.h>
+#include "clspv/AddressSpace.h"
 
 using namespace llvm;
 using std::string;

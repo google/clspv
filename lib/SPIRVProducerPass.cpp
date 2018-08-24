@@ -18,28 +18,35 @@
 
 #include <cassert>
 #include <cstring>
-
-#include <unordered_set>
+#include <iomanip>
+#include <list>
 #include <memory>
+#include <set>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <unordered_set>
+#include <utility>
 
-#include <clspv/Option.h>
-#include <clspv/Passes.h>
 
-#include <llvm/ADT/StringSwitch.h>
-#include <llvm/ADT/UniqueVector.h>
-#include <llvm/Analysis/LoopInfo.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/Dominators.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Metadata.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/CommandLine.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/Utils/Cloning.h>
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/UniqueVector.h"
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Dominators.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Metadata.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include "spirv/1.0/spirv.hpp"
+
 #include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
+#include "clspv/Passes.h"
 #include "clspv/spirv_c_strings.hpp"
 #include "clspv/spirv_glsl.hpp"
 
@@ -47,14 +54,6 @@
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
-
-#include <list>
-#include <iomanip>
-#include <set>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <utility>
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

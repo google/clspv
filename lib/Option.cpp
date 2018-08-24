@@ -14,7 +14,7 @@
 
 // This translation unit defines all Clspv command line option variables.
 
-#include <llvm/Support/CommandLine.h>
+#include "llvm/Support/CommandLine.h"
 
 namespace {
 

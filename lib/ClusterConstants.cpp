@@ -17,17 +17,17 @@
 
 #include <cassert>
 
-#include <llvm/ADT/UniqueVector.h>
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/GlobalVariable.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/raw_ostream.h>
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/UniqueVector.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"

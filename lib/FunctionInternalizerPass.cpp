@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
 
 using namespace llvm;
 
