@@ -1,4 +1,4 @@
-// Copyright 2017 The Clspv Authors. All rights reserved.
+// Copyright 2018 The Clspv Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +14,12 @@
 
 #include <vector>
 
-#include <llvm/IR/CallingConv.h>
-#include <llvm/Pass.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/Utils/Cloning.h>
+#include "llvm/IR/CallingConv.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
+#include "ArgKind.h"
 #include "clspv/Option.h"
 
 using namespace llvm;
@@ -56,6 +57,20 @@ bool InlineFuncWithSingleCallSitePass::runOnModule(Module &M) {
     local_changed = InlineFunctions(M);
   }
 
+  // Clean up dead functions. This done here to avoid ordering requirements on
+  // inlining.
+  std::vector<Function *> to_delete;
+  for (auto &F : M) {
+    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
+      continue;
+
+    if (F.user_empty())
+      to_delete.push_back(&F);
+  }
+  for (auto func : to_delete) {
+    func->eraseFromParent();
+  }
+
   return Changed;
 }
 
@@ -66,9 +81,17 @@ bool InlineFuncWithSingleCallSitePass::InlineFunctions(Module &M) {
     if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
       continue;
 
+    bool has_local_ptr_arg = false;
+    for (auto &Arg : F.args()) {
+      if (clspv::IsLocalPtr(Arg.getType()))
+        has_local_ptr_arg = true;
+    }
+
+    // Only inline if the function has a local address space parameter.
+    if (!has_local_ptr_arg) continue;
+
     if (F.getNumUses() == 1) {
-      CallInst *call = dyn_cast<CallInst>(*F.user_begin());
-      if (call)
+      if (auto *call = dyn_cast<CallInst>(*F.user_begin()))
         to_inline.push_back(call);
     }
   }
