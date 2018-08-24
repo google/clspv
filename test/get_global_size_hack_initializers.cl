@@ -1,6 +1,6 @@
-// RUN: clspv %s -S -o %t.spvasm -hack-initializers
+// RUN: clspv %s -S -o %t.spvasm -hack-initializers -no-inline-single
 // RUN: FileCheck %s < %t.spvasm
-// RUN: clspv %s -o %t.spv -hack-initializers
+// RUN: clspv %s -o %t.spv -hack-initializers -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

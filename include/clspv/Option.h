@@ -70,5 +70,8 @@ bool PodArgsInUniformBuffer();
 // code generation.
 bool ShowIDs();
 
+// Returns true if functions with single call sites should be inlined.
+bool InlineSingleCallSite();
+
 } // namespace Option
 } // namespace clspv

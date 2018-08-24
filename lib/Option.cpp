@@ -18,6 +18,10 @@
 
 namespace {
 
+llvm::cl::opt<bool> no_inline_single_call_site(
+    "no-inline-single", llvm::cl::init(false),
+    llvm::cl::desc("Disable inlining functions with single call sites."));
+
 // Should the compiler try to use direct resource accesses within helper
 // functions instead of passing pointers via function arguments?
 llvm::cl::opt<bool> no_direct_resource_access(
@@ -106,6 +110,7 @@ llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
 namespace clspv {
 namespace Option {
 
+bool InlineSingleCallSite() { return !no_inline_single_call_site; }
 bool DirectResourceAccess() {
   return !(no_direct_resource_access || distinct_kernel_descriptor_sets);
 }
