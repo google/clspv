@@ -1,6 +1,6 @@
-// RUN: clspv %s -S -o %t.spvasm -hack-inserts
+// RUN: clspv %s -S -o %t.spvasm -hack-inserts -no-inline-single
 // RUN: FileCheck %s < %t.spvasm
-// RUN: clspv %s -o %t.spv -hack-inserts
+// RUN: clspv %s -o %t.spv -hack-inserts -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

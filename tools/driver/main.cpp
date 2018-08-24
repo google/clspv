@@ -276,8 +276,7 @@ int main(const int argc, const char *const argv[]) {
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
   const char *llvmArgv[llvmArgc] = {
-      argv[0],
-      "-simplifycfg-sink-common=false",
+      argv[0], "-simplifycfg-sink-common=false",
   };
 
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
@@ -726,6 +725,7 @@ int main(const int argc, const char *const argv[]) {
 
   pm.add(clspv::createInlineFuncWithPointerBitCastArgPass());
   pm.add(clspv::createInlineFuncWithPointerToFunctionArgPass());
+  pm.add(clspv::createInlineFuncWithSingleCallSitePass());
 
   if (0 == pmBuilder.OptLevel) {
     // Mem2Reg pass should be run early because O0 level optimization leaves

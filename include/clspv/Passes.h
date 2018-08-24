@@ -75,6 +75,12 @@ llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass();
 /// the compiler will not normally optimize away.
 llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass();
 
+/// Inline call instructions to functions having a single call site.
+/// @return An LLVM module pass.
+///
+/// Inline functions that have a single call site.
+llvm::ModulePass *createInlineFuncWithSingleCallSitePass();
+
 /// Zero-initialize allocas.
 /// @return An LLVM module pass.
 ///
@@ -325,10 +331,10 @@ llvm::ModulePass *createSignedCompareFixupPass();
 /// Share Module Scope Variables
 /// @return An LLVM module pass.
 ///
-/// Attempts to de-duplicate module scope Workgroup scope variables between kernels.
-/// Module scope variables of the same type can be merged if they are used by an
-/// exclusive set of kernels. This pass should run before direct resource access
-/// to enable more opportunities for that pass.
+/// Attempts to de-duplicate module scope Workgroup scope variables between
+/// kernels. Module scope variables of the same type can be merged if they are
+/// used by an exclusive set of kernels. This pass should run before direct
+/// resource access to enable more opportunities for that pass.
 llvm::ModulePass *createShareModuleScopeVariablesPass();
 
 } // namespace clspv
