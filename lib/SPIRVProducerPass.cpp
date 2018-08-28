@@ -6129,7 +6129,6 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
 }
 
 bool SPIRVProducerPass::IsTypeNullable(const Type* type) const {
-  outs() << "IsTypeNullable: " << *type << "\n";
   switch (type->getTypeID()) {
     case Type::HalfTyID:
     case Type::FloatTyID:
