@@ -8,6 +8,7 @@
 struct a {
   int x;
   int y;
+  float arr[5];
 };
 
 kernel void foo(global struct a* struct_out, int n) {
@@ -19,7 +20,9 @@ kernel void foo(global struct a* struct_out, int n) {
 }
 
 // CHECK: [[uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[uint]] [[uint]]
+// CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[float]]
+// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[uint]] [[uint]] [[array]]
 // CHECK-NOT: OpUndef
 // CHECK: OpConstantNull [[struct]]
 // CHECK-NOT: OpUndef
