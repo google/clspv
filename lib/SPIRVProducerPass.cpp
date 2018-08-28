@@ -383,6 +383,9 @@ struct SPIRVProducerPass final : public ModulePass {
   void WriteOperand(SPIRVOperand *Op);
   void WriteSPIRVBinary();
 
+  // Returns true if |type| is compatible with OpConstantNull.
+  bool IsTypeNullable(const Type* type) const;
+
 private:
   static char ID;
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
@@ -2265,11 +2268,8 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
     if (isa<UndefValue>(Cst)) {
       // Ops[0] = Result Type ID
       Opcode = spv::OpUndef;
-      if (hack_undef) {
-        Type *type = Cst->getType();
-        if (type->isFPOrFPVectorTy() || type->isIntOrIntVectorTy()) {
-          Opcode = spv::OpConstantNull;
-        }
+      if (hack_undef && IsTypeNullable(Cst->getType())) {
+        Opcode = spv::OpConstantNull;
       }
     } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(Cst)) {
       unsigned BitWidth = CI->getBitWidth();
@@ -6125,5 +6125,42 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
       break;
     }
     }
+  }
+}
+
+bool SPIRVProducerPass::IsTypeNullable(const Type* type) const {
+  switch (type->getTypeID()) {
+    case Type::HalfTyID:
+    case Type::FloatTyID:
+    case Type::DoubleTyID:
+    case Type::IntegerTyID:
+    case Type::VectorTyID:
+      return true;
+    case Type::PointerTyID: {
+      const PointerType *pointer_type = cast<PointerType>(type);
+      if (pointer_type->getPointerAddressSpace() !=
+          AddressSpace::UniformConstant) {
+        auto pointee_type = pointer_type->getPointerElementType();
+        if (pointee_type->isStructTy() &&
+            cast<StructType>(pointee_type)->isOpaque()) {
+          // Images and samplers are not nullable.
+          return false;
+        }
+      }
+      return true;
+    }
+    case Type::ArrayTyID:
+      return IsTypeNullable(cast<CompositeType>(type)->getTypeAtIndex(0u));
+    case Type::StructTyID: {
+      const StructType* struct_type = cast<StructType>(type);
+      // Images and samplers are not nullable.
+      if (struct_type->isOpaque()) return false;
+      for (const auto element : struct_type->elements()) {
+        if (!IsTypeNullable(element)) return false;
+      }
+      return true;
+    }
+    default:
+      return false;
   }
 }
