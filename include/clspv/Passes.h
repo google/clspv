@@ -337,4 +337,10 @@ llvm::ModulePass *createSignedCompareFixupPass();
 /// resource access to enable more opportunities for that pass.
 llvm::ModulePass *createShareModuleScopeVariablesPass();
 
+/// Exhaustively inline entry points
+/// @return An LLVM module pass.
+///
+/// Exhaustively inlines all kernels in the module.
+llvm::ModulePass *createInlineEntryPointsPass();
+
 } // namespace clspv

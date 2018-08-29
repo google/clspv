@@ -73,5 +73,8 @@ bool ShowIDs();
 // Returns true if functions with single call sites should be inlined.
 bool InlineSingleCallSite();
 
+// Returns true if entry points should be fully inlined.
+bool InlineEntryPoints();
+
 } // namespace Option
 } // namespace clspv

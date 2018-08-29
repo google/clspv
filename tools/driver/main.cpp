@@ -723,9 +723,13 @@ int main(const int argc, const char *const argv[]) {
 
   pm.add(llvm::createInstructionCombiningPass());
 
-  pm.add(clspv::createInlineFuncWithPointerBitCastArgPass());
-  pm.add(clspv::createInlineFuncWithPointerToFunctionArgPass());
-  pm.add(clspv::createInlineFuncWithSingleCallSitePass());
+  if (clspv::Option::InlineEntryPoints()) {
+    pm.add(clspv::createInlineEntryPointsPass());
+  } else {
+    pm.add(clspv::createInlineFuncWithPointerBitCastArgPass());
+    pm.add(clspv::createInlineFuncWithPointerToFunctionArgPass());
+    pm.add(clspv::createInlineFuncWithSingleCallSitePass());
+  }
 
   if (0 == pmBuilder.OptLevel) {
     // Mem2Reg pass should be run early because O0 level optimization leaves
