@@ -18,6 +18,10 @@
 
 namespace {
 
+llvm::cl::opt<bool>
+    inline_entry_points("inline-entry-points", llvm::cl::init(false),
+                        llvm::cl::desc("Exhaustively inline entry points."));
+
 llvm::cl::opt<bool> no_inline_single_call_site(
     "no-inline-single", llvm::cl::init(false),
     llvm::cl::desc("Disable inlining functions with single call sites."));
@@ -110,6 +114,7 @@ llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
 namespace clspv {
 namespace Option {
 
+bool InlineEntryPoints() { return inline_entry_points; }
 bool InlineSingleCallSite() { return !no_inline_single_call_site; }
 bool DirectResourceAccess() {
   return !(no_direct_resource_access || distinct_kernel_descriptor_sets);
