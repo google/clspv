@@ -53,20 +53,6 @@ bool InlineEntryPointsPass::runOnModule(Module &M) {
     local_changed = InlineFunctions(M);
   }
 
-  // Clean up dead functions. This done here to avoid ordering requirements on
-  // inlining.
-  std::vector<Function *> to_delete;
-  for (auto &F : M) {
-    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
-      continue;
-
-    if (F.user_empty())
-      to_delete.push_back(&F);
-  }
-  for (auto func : to_delete) {
-    func->eraseFromParent();
-  }
-
   return Changed;
 }
 
