@@ -105,8 +105,8 @@ class RewriteInsertsPass : public ModulePass {
    // not into arrays.
    InsertionVector *CompleteInsertionChain(InsertValueInst *iv) {
      if (iv->getNumIndices() == 1) {
-       if (auto *structTy = dyn_cast<StructType>(iv->getType())) {
-         auto numElems = structTy->getNumElements();
+       auto numElems = GetNumElements(iv->getType());
+       if (numElems != 0) {
          // Only handle single-index insertions.
          unsigned index = iv->getIndices()[0];
          if (index + 1u != numElems) {
@@ -153,19 +153,35 @@ class RewriteInsertsPass : public ModulePass {
    }
 
    // Get or create the composite construct function definition.
-   Function *GetConstructFunction(Module &M, StructType *constructed_type) {
+   Function *GetConstructFunction(Module &M, CompositeType *constructed_type,
+                                  unsigned num_elements) {
      // Get or create the composite construct function definition.
      const string &fn_name = WrapFunctionNameForType(constructed_type);
      Function *fn = M.getFunction(fn_name);
      if (!fn) {
        // Make the function.
+       SmallVector<Type*, 16> elements;
+       for (unsigned i = 0; i != num_elements; ++i)
+         elements.push_back(constructed_type->getTypeAtIndex(i));
        FunctionType *fnTy = FunctionType::get(
-           constructed_type, constructed_type->elements(), false);
+           constructed_type, elements, false);
        auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
        fn = cast<Function>(fn_constant);
        fn->addFnAttr(Attribute::ReadOnly);
      }
      return fn;
+   }
+
+   // Returns the number of elements in the struct or array.
+   unsigned GetNumElements(Type *type) {
+     // CompositeType doesn't implement getNumElements(), but its inheritors
+     // do.
+     if (auto *struct_ty = dyn_cast<StructType>(type)) {
+       return struct_ty->getNumElements();
+     } else if (auto *array_ty = dyn_cast<ArrayType>(type)) {
+       return array_ty->getNumElements();
+     }
+     return 0;
    }
 
    // Maps a loaded type to the name of the wrap function for that type.
@@ -226,8 +242,9 @@ bool RewriteInsertsPass::ReplaceCompleteInsertionChains(Module &M) {
       types.push_back(value->getType());
     }
 
-    StructType *resultTy = cast<StructType>(insertions->back()->getType());
-    Function *fn = GetConstructFunction(M, resultTy);
+    CompositeType *resultTy = cast<CompositeType>(insertions->back()->getType());
+    unsigned numElems = GetNumElements(resultTy);
+    Function *fn = GetConstructFunction(M, resultTy, numElems);
 
     // Replace the chain.
     auto call = CallInst::Create(fn, values);
@@ -338,7 +355,8 @@ bool RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
 
       // Create the call.  It's dominated by any extractions we've just
       // created.
-      Function *construct_fn = GetConstructFunction(M, resultTy);
+      Function *construct_fn =
+          GetConstructFunction(M, resultTy, resultTy->getNumElements());
       auto *call = CallInst::Create(construct_fn, members, "", insertion);
 
       // Disconnect this insertion.  We'll remove it later.
