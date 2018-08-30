@@ -342,5 +342,11 @@ llvm::ModulePass *createShareModuleScopeVariablesPass();
 ///
 /// Exhaustively inlines all kernels in the module.
 llvm::ModulePass *createInlineEntryPointsPass();
+/// Scalarize composite instructions.
+/// @return An LLVM module pass
+///
+/// Scalarizes instructions that return composite types. Works around driver
+/// bugs. See HackPhis().
+llvm::ModulePass *createScalarizePass();
 
 } // namespace clspv

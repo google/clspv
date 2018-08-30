@@ -95,6 +95,11 @@ llvm::cl::opt<bool> hack_undef(
     llvm::cl::desc("Use OpConstantNull instead of OpUndef for floating point, "
                    "integer, or vectors of them"));
 
+llvm::cl::opt<bool> hack_phis(
+    "hack-phis", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Scalarize phi instructions of struct type before code generation"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -127,6 +132,7 @@ bool HackInitializers() { return hack_initializers; }
 bool HackInserts() { return hack_inserts; }
 bool HackSignedCompareFixup() { return hack_signed_compare_fixup; }
 bool HackUndef() { return hack_undef; }
+bool HackPhis() { return hack_phis; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }

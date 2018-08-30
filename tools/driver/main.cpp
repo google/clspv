@@ -781,6 +781,8 @@ int main(const int argc, const char *const argv[]) {
 
   pm.add(clspv::createSplatSelectConditionPass());
   pm.add(clspv::createSignedCompareFixupPass());
+  // This pass generates insertions that need to be rewritten.
+  pm.add(clspv::createScalarizePass());
   pm.add(clspv::createRewriteInsertsPass());
   pm.add(clspv::createSPIRVProducerPass(
       binaryStream, descriptor_map_out, SamplerMapEntries,
