@@ -70,12 +70,6 @@ bool UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
   for (User *U : CE->users()) {
     if (Instruction *I = dyn_cast<Instruction>(U)) {
       WorkList.push_back(I);
-    } else if (isa<Constant>(U)) {
-      llvm_unreachable("User of a constant expression was a constant!");
-      return false;
-    } else {
-      llvm_unreachable("Unknown user type of a constant expression!");
-      return false;
     }
   }
 
@@ -106,7 +100,7 @@ bool UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
     }
   }
 
-  CE->destroyConstant();
+  if (CE->user_empty()) CE->destroyConstant();
 
   return true;
 }
