@@ -16,7 +16,7 @@ kernel void foo(global uint2* A, float4 val, uint n) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 72
+// CHECK: ; Bound: 68
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -70,7 +70,6 @@ kernel void foo(global uint2* A, float4 val, uint n) {
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_26:%[0-9a-zA-Z_]+]] = OpUndef [[_v4float]]
 // CHECK-DAG: [[_27:%[0-9a-zA-Z_]+]] = OpConstantNull [[__arr_v2uint_uint_64]]
-// CHECK: [[_28:%[0-9a-zA-Z_]+]] = OpUndef [[_v2uint]]
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK-DAG: [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
 // CHECK-DAG: [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
@@ -96,27 +95,24 @@ kernel void foo(global uint2* A, float4 val, uint n) {
 // CHECK: OpStore [[_42]] [[_27]]
 // CHECK: [[_51:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_49]]
 // CHECK: [[_52:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_50]]
-// CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_51]] [[_28]] 0
-// CHECK: [[_54:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_52]] [[_53]] 1
+// CHECK: [[construct1:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2uint]] [[_51]] [[_52]]
 // CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_1]] [[_47]]
 // CHECK: [[_56:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_v2uint]] [[_42]] [[_55]]
-// CHECK: OpStore [[_56]] [[_54]]
+// CHECK: OpStore [[_56]] [[construct1]]
 // CHECK: [[_57:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_47]] [[_uint_1]]
 // CHECK: [[_58:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_49]]
 // CHECK: [[_59:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_50]]
-// CHECK: [[_60:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_58]] [[_28]] 0
-// CHECK: [[_61:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_59]] [[_60]] 1
+// CHECK: [[construct2:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2uint]] [[_58]] [[_59]]
 // CHECK: [[_62:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_2]] [[_57]]
 // CHECK: [[_63:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_v2uint]] [[_42]] [[_62]]
-// CHECK: OpStore [[_63]] [[_61]]
+// CHECK: OpStore [[_63]] [[construct2]]
 // CHECK: [[_64:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_47]] [[_uint_2]]
 // CHECK: [[_65:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_49]]
 // CHECK: [[_66:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] [[_1]] PackHalf2x16 [[_50]]
-// CHECK: [[_67:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_65]] [[_28]] 0
-// CHECK: [[_68:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2uint]] [[_66]] [[_67]] 1
+// CHECK: [[construct3:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2uint]] [[_65]] [[_66]]
 // CHECK: [[_69:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_uint_3]] [[_64]]
 // CHECK: [[_70:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_v2uint]] [[_42]] [[_69]]
-// CHECK: OpStore [[_70]] [[_68]]
+// CHECK: OpStore [[_70]] [[construct3]]
 // CHECK: [[_71:%[0-9a-zA-Z_]+]] = OpLoad [[_v2uint]] [[_48]]
 // CHECK: OpStore [[_43]] [[_71]]
 // CHECK: OpReturn

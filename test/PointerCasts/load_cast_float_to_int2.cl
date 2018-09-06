@@ -27,7 +27,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
 // CHECK:  ; Generator: Codeplay; 0
-// CHECK:  ; Bound: 38
+// CHECK:  ; Bound: 36
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
 // CHECK:  OpCapability VariablePointers
@@ -70,7 +70,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 // CHECK:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK:  [[_20:%[0-9a-zA-Z_]+]] = OpUndef [[_v2float]]
 // CHECK:  [[_21]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CHECK:  [[_22]] = OpVariable [[__ptr_StorageBuffer__struct_8]] StorageBuffer
 // CHECK:  [[_23]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
@@ -85,9 +84,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_29]] [[_uint_1]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_21]] [[_uint_0]] [[_32]]
 // CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_33]]
-// CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_31]] [[_20]] 0
-// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_34]] [[_35]] 1
-// CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[_36]]
+// CHECK:  [[construct:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]] [[_31]] [[_34]]
+// CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[construct]]
 // CHECK:  OpStore [[_26]] [[_37]]
 // CHECK:  OpReturn
 // CHECK:  OpFunctionEnd

@@ -27,7 +27,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* a,
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
 // CHECK:  ; Generator: Codeplay; 0
-// CHECK:  ; Bound: 39
+// CHECK:  ; Bound: 37
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
 // CHECK:  OpCapability VariablePointers
@@ -70,7 +70,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* a,
 // CHECK:  [[__ptr_StorageBuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_v4float]]
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK:  [[_20:%[0-9a-zA-Z_]+]] = OpUndef [[_v2float]]
 // CHECK:  [[_21]] = OpVariable [[__ptr_StorageBuffer__struct_4]] StorageBuffer
 // CHECK:  [[_22]] = OpVariable [[__ptr_StorageBuffer__struct_8]] StorageBuffer
 // CHECK:  [[_23]] = OpVariable [[__ptr_StorageBuffer__struct_11]] StorageBuffer
@@ -85,10 +84,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* a,
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpBitwiseAnd [[_uint]] [[_28]] [[_uint_1]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpShiftLeftLogical [[_uint]] [[_32]] [[_uint_1]]
 // CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpVectorExtractDynamic [[_float]] [[_31]] [[_33]]
-// CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_34]] [[_20]] 0
 // CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_33]] [[_uint_1]]
 // CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpVectorExtractDynamic [[_float]] [[_31]] [[_36]]
-// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_37]] [[_35]] 1
-// CHECK:  OpStore [[_26]] [[_38]]
+// CHECK:  [[construct:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]] [[_34]] [[_37]]
+// CHECK:  OpStore [[_26]] [[construct]]
 // CHECK:  OpReturn
 // CHECK:  OpFunctionEnd
