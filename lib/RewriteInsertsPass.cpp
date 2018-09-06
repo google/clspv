@@ -371,7 +371,6 @@ bool RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
     // Record the list of tails for the next round.
     InsertionVector NextRoundWorkList;
 
-    //for (InsertValueInst *insertion : WorkList) {
     for (Instruction *inst : WorkList) {
       InsertValueInst *insertion = cast<InsertValueInst>(inst);
       // Rewrite |insertion|.
