@@ -28,7 +28,6 @@ kernel void foo(global uchar4* IN, global float4* OUT) {
 // CHECK-DAG: [[uint_8:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 8
 // CHECK-DAG: [[uint_16:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 16
 // CHECK-DAG: [[uint_24:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 24
-// CHECK-DAG: [[undef_float4:%[_a-zA-Z0-9]+]] = OpUndef [[float4]]
 
 
 // There is only one load
@@ -38,22 +37,20 @@ kernel void foo(global uchar4* IN, global float4* OUT) {
 // CHECK: [[c0:%[_a-zA-Z0-9]+]] = OpShiftRightLogical [[uint]] [[load]] [[uint_0]]
 // CHECK: [[and0:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[c0]] [[uint_255]]
 // CHECK: [[f0:%[_a-zA-Z0-9]+]] = OpConvertUToF [[float]] [[and0]]
-// CHECK: [[v0:%[_a-zA-Z0-9]+]] = OpCompositeInsert [[float4]] [[f0]] [[undef_float4]] 0
 
 // CHECK: [[c1:%[_a-zA-Z0-9]+]] = OpShiftRightLogical [[uint]] [[load]] [[uint_8]]
 // CHECK: [[and1:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[c1]] [[uint_255]]
 // CHECK: [[f1:%[_a-zA-Z0-9]+]] = OpConvertUToF [[float]] [[and1]]
-// CHECK: [[v1:%[_a-zA-Z0-9]+]] = OpCompositeInsert [[float4]] [[f1]] [[v0]] 1
 
 // CHECK: [[c2:%[_a-zA-Z0-9]+]] = OpShiftRightLogical [[uint]] [[load]] [[uint_16]]
 // CHECK: [[and2:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[c2]] [[uint_255]]
 // CHECK: [[f2:%[_a-zA-Z0-9]+]] = OpConvertUToF [[float]] [[and2]]
-// CHECK: [[v2:%[_a-zA-Z0-9]+]] = OpCompositeInsert [[float4]] [[f2]] [[v1]] 2
 
 // CHECK: [[c3:%[_a-zA-Z0-9]+]] = OpShiftRightLogical [[uint]] [[load]] [[uint_24]]
 // CHECK: [[and3:%[_a-zA-Z0-9]+]] = OpBitwiseAnd [[uint]] [[c3]] [[uint_255]]
 // CHECK: [[f3:%[_a-zA-Z0-9]+]] = OpConvertUToF [[float]] [[and3]]
-// CHECK: [[v3:%[_a-zA-Z0-9]+]] = OpCompositeInsert [[float4]] [[f3]] [[v2]] 3
 
-// CHECK: OpStore {{%[_0-9a-zA-Z]+}} [[v3]]
+// CHECK: [[construct:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[float4]] [[f0]] [[f1]] [[f2]] [[f3]]
+
+// CHECK: OpStore {{%[_0-9a-zA-Z]+}} [[construct]]
 // CHECK-NOT: OpStore

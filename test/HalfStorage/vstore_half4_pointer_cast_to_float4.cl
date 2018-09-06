@@ -8,7 +8,7 @@
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 35
+// CHECK: ; Bound: 33
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -39,7 +39,6 @@
 
 // CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 // CHECK: %[[FLOAT4_UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT4_TYPE_ID]]
-// CHECK: %[[UINT2_UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[UINT2_TYPE_ID]]
 // CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 
 // CHECK: %[[ARG0_ID]] = OpVariable %[[ARG_POINTER_TYPE_ID]] StorageBuffer
@@ -57,8 +56,7 @@
 // CHECK: %[[X_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] %[[EXT_INST]] PackHalf2x16 %[[LO_ID]]
 // CHECK: %[[Y_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] %[[EXT_INST]] PackHalf2x16 %[[HI_ID]]
 
-// CHECK: %[[TEMP_INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[UINT2_TYPE_ID]] %[[X_ID]] %[[UINT2_UNDEF_ID]] 0
-// CHECK: %[[INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[UINT2_TYPE_ID]] %[[Y_ID]] %[[TEMP_INSERT_ID]] 1
+// CHECK: %[[INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeConstruct %[[UINT2_TYPE_ID]] %[[X_ID]] %[[Y_ID]]
 
 // CHECK: %[[INSERT_BITCAST_ID:[a-zA-Z0-9_]*]] = OpBitcast %[[FLOAT2_TYPE_ID]] %[[INSERT_ID]]
 

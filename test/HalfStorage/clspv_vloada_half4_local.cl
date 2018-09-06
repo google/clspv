@@ -13,7 +13,7 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
 // CHECK: ; Generator: Codeplay; 0
-// CHECK: ; Bound: 65
+// CHECK: ; Bound: 63
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability VariablePointers
@@ -59,7 +59,6 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK-DAG: [[__ptr_Workgroup__arr_v4float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_v4float_2]]
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK: [[_26:%[0-9a-zA-Z_]+]] = OpUndef [[_v2float]]
 // CHECK: [[_27:%[0-9a-zA-Z_]+]] = OpUndef [[_v4float]]
 // CHECK: [[_28]] = OpSpecConstant [[_uint]] 1
 // CHECK: [[_29]] = OpSpecConstant [[_uint]] 1
@@ -80,11 +79,10 @@ kernel void foo(global float4* A, local float4* B, uint n) {
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpBitwiseAnd [[_uint]] [[_39]] [[_uint_1]]
 // CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpShiftLeftLogical [[_uint]] [[_43]] [[_uint_1]]
 // CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpVectorExtractDynamic [[_float]] [[_42]] [[_44]]
-// CHECK: [[_46:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_45]] [[_26]] 0
 // CHECK: [[_47:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_44]] [[_uint_1]]
 // CHECK: [[_48:%[0-9a-zA-Z_]+]] = OpVectorExtractDynamic [[_float]] [[_42]] [[_47]]
-// CHECK: [[_49:%[0-9a-zA-Z_]+]] = OpCompositeInsert [[_v2float]] [[_48]] [[_46]] 1
-// CHECK: [[_50:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[_49]]
+// CHECK: [[construct:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]] [[_45]] [[_48]]
+// CHECK: [[_50:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[construct]]
 // CHECK: [[_51:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]] [[_50]] 0
 // CHECK: [[_52:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]] [[_50]] 1
 // CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] [[_6]] UnpackHalf2x16 [[_51]]

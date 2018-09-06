@@ -47,7 +47,7 @@ class RewriteInsertsPass : public ModulePass {
   bool runOnModule(Module &M) override;
 
  private:
-   using InsertionVector = SmallVector<InsertValueInst *, 4>;
+   using InsertionVector = SmallVector<Instruction *, 4>;
 
    // Replaces chains of insertions that cover the entire value.
    // Such a change always reduces the number of instructions, so
@@ -98,11 +98,23 @@ class RewriteInsertsPass : public ModulePass {
      return frontier;
    }
 
+   // Returns the number of elements in the struct or array.
+   unsigned GetNumElements(Type *type) {
+     // CompositeType doesn't implement getNumElements(), but its inheritors
+     // do.
+     if (auto *struct_ty = dyn_cast<StructType>(type)) {
+       return struct_ty->getNumElements();
+     } else if (auto *seq_ty = dyn_cast<SequentialType>(type)) {
+       return seq_ty->getNumElements();
+     }
+     return 0;
+   }
+
+
    // If this is the tail of a chain of InsertValueInst instructions
    // that covers the entire composite, then return a small vector
    // containing the insertion instructions, in member order.
-   // Otherwise returns nullptr.  Only handle insertions into structs,
-   // not into arrays.
+   // Otherwise returns nullptr. 
    InsertionVector *CompleteInsertionChain(InsertValueInst *iv) {
      if (iv->getNumIndices() == 1) {
        auto numElems = GetNumElements(iv->getType());
@@ -137,6 +149,56 @@ class RewriteInsertsPass : public ModulePass {
      return nullptr;
    }
 
+   // If this is the tail of a chain of InsertElementInst instructions
+   // that covers the entire vector, then return a small vector
+   // containing the insertion instructions, in member order.
+   // Otherwise returns nullptr.  Only handle insertions into vectors.
+   InsertionVector *CompleteInsertionChain(InsertElementInst *ie) {
+     // Don't handle i8 vectors. Only <4 x i8> is supported and it is
+     // translated as i32.  Only handle single-index insertions.
+     if (auto vec_ty = dyn_cast<VectorType>(ie->getType())) {
+       if (vec_ty->getVectorElementType() == Type::getInt8Ty(ie->getContext())) {
+         return nullptr;
+       }
+     }
+
+     // Only handle single-index insertions.
+     if (ie->getNumOperands() == 3) {
+       auto numElems = GetNumElements(ie->getType());
+       if (numElems != 0) {
+         if (auto *const_value = dyn_cast<ConstantInt>(ie->getOperand(2))) {
+           uint64_t index = const_value->getZExtValue();
+           if (index + 1u != numElems) {
+             // Not the last in the chain.
+             return nullptr;
+           }
+           InsertionVector candidates(numElems, nullptr);
+           Value *value = ie;
+           uint64_t i = index;
+           while (auto *insert = dyn_cast<InsertElementInst>(value)) {
+             if (insert->getNumOperands() != 3) break;
+             if (auto *index_const = dyn_cast<ConstantInt>(insert->getOperand(2))) {
+               if (i != index_const->getZExtValue()) break;
+
+               candidates[i] = insert;
+               if (i == 0) {
+                 // We're done!
+                 return new InsertionVector(candidates);
+               }
+
+               value = insert->getOperand(0);
+               --i;
+             } else {
+               break;
+             }
+           }
+         } else {
+           return nullptr;
+         }
+       }
+     }
+     return nullptr;
+   }
 
    // Return the name for the wrap function for the given type.
    string &WrapFunctionNameForType(Type *type) {
@@ -153,14 +215,14 @@ class RewriteInsertsPass : public ModulePass {
    }
 
    // Get or create the composite construct function definition.
-   Function *GetConstructFunction(Module &M, CompositeType *constructed_type,
-                                  unsigned num_elements) {
+   Function *GetConstructFunction(Module &M, CompositeType *constructed_type) {
      // Get or create the composite construct function definition.
      const string &fn_name = WrapFunctionNameForType(constructed_type);
      Function *fn = M.getFunction(fn_name);
      if (!fn) {
        // Make the function.
        SmallVector<Type*, 16> elements;
+       unsigned num_elements = GetNumElements(constructed_type);
        for (unsigned i = 0; i != num_elements; ++i)
          elements.push_back(constructed_type->getTypeAtIndex(i));
        FunctionType *fnTy = FunctionType::get(
@@ -170,18 +232,6 @@ class RewriteInsertsPass : public ModulePass {
        fn->addFnAttr(Attribute::ReadOnly);
      }
      return fn;
-   }
-
-   // Returns the number of elements in the struct or array.
-   unsigned GetNumElements(Type *type) {
-     // CompositeType doesn't implement getNumElements(), but its inheritors
-     // do.
-     if (auto *struct_ty = dyn_cast<StructType>(type)) {
-       return struct_ty->getNumElements();
-     } else if (auto *array_ty = dyn_cast<ArrayType>(type)) {
-       return array_ty->getNumElements();
-     }
-     return 0;
    }
 
    // Maps a loaded type to the name of the wrap function for that type.
@@ -221,6 +271,10 @@ bool RewriteInsertsPass::ReplaceCompleteInsertionChains(Module &M) {
           if (InsertionVector *insertions = CompleteInsertionChain(iv)) {
             WorkList.push_back(insertions);
           }
+        } else if (InsertElementInst *ie = dyn_cast<InsertElementInst>(&I)) {
+          if (InsertionVector *insertions = CompleteInsertionChain(ie)) {
+            WorkList.push_back(insertions);
+          }
         }
       }
     }
@@ -235,16 +289,18 @@ bool RewriteInsertsPass::ReplaceCompleteInsertionChains(Module &M) {
 
     // Gather the member values and types.
     SmallVector<Value*, 4> values;
-    SmallVector<Type*, 4> types;
-    for (InsertValueInst* insert : *insertions) {
-      Value* value = insert->getInsertedValueOperand();
-      values.push_back(value);
-      types.push_back(value->getType());
+    for (Instruction* inst : *insertions) {
+      if (auto *insert_value = dyn_cast<InsertValueInst>(inst)) {
+        values.push_back(insert_value->getInsertedValueOperand());
+      } else if (auto *insert_element = dyn_cast<InsertElementInst>(inst)) {
+        values.push_back(insert_element->getOperand(1));
+      } else {
+        llvm_unreachable("Unhandled insertion instruction");
+      }
     }
 
     CompositeType *resultTy = cast<CompositeType>(insertions->back()->getType());
-    unsigned numElems = GetNumElements(resultTy);
-    Function *fn = GetConstructFunction(M, resultTy, numElems);
+    Function *fn = GetConstructFunction(M, resultTy);
 
     // Replace the chain.
     auto call = CallInst::Create(fn, values);
@@ -255,7 +311,7 @@ bool RewriteInsertsPass::ReplaceCompleteInsertionChains(Module &M) {
     // the head, since the tail uses the previous insertion, etc.
     for (auto iter = insertions->rbegin(), end = insertions->rend();
          iter != end; ++iter) {
-      InsertValueInst *insertion = *iter;
+      Instruction *insertion = *iter;
       if (!insertion->hasNUsesOrMore(1)) {
         insertion->eraseFromParent();
       }
@@ -323,7 +379,8 @@ bool RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
     // Record the list of tails for the next round.
     InsertionVector NextRoundWorkList;
 
-    for (InsertValueInst *insertion : WorkList) {
+    for (Instruction *inst : WorkList) {
+      InsertValueInst *insertion = cast<InsertValueInst>(inst);
       // Rewrite |insertion|.
 
       StructType *resultTy = cast<StructType>(insertion->getType());
@@ -355,8 +412,7 @@ bool RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
 
       // Create the call.  It's dominated by any extractions we've just
       // created.
-      Function *construct_fn =
-          GetConstructFunction(M, resultTy, resultTy->getNumElements());
+      Function *construct_fn = GetConstructFunction(M, resultTy);
       auto *call = CallInst::Create(construct_fn, members, "", insertion);
 
       // Disconnect this insertion.  We'll remove it later.
@@ -366,7 +422,7 @@ bool RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
       // we can.  Stop at the first element that has a remaining use.
       for (auto* chainElem : chain) {
         if (chainElem->hasNUsesOrMore(1)) {
-          unsigned &use_count = num_uses[insertions.idFor(chainElem)];
+          unsigned &use_count = num_uses[insertions.idFor(cast<InsertValueInst>(chainElem))];
           assert(use_count > 0);
           --use_count;
           if (use_count == 0) {
