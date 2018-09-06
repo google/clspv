@@ -154,6 +154,14 @@ class RewriteInsertsPass : public ModulePass {
    // containing the insertion instructions, in member order.
    // Otherwise returns nullptr.  Only handle insertions into vectors.
    InsertionVector *CompleteInsertionChain(InsertElementInst *ie) {
+     // Don't handle i8 vectors. Only <4 x i8> is supported and it is
+     // translated as i32.  Only handle single-index insertions.
+     if (auto vec_ty = dyn_cast<VectorType>(ie->getType())) {
+       if (vec_ty->getVectorElementType() == Type::getInt8Ty(ie->getContext())) {
+         return nullptr;
+       }
+     }
+
      // Only handle single-index insertions.
      if (ie->getNumOperands() == 3) {
        auto numElems = GetNumElements(ie->getType());
