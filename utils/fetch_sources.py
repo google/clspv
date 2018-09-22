@@ -26,9 +26,13 @@ import os.path
 import subprocess
 import sys
 
+# Figure out where we are and contruct a path to the root folder
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+TOP_DIR = os.path.abspath(os.path.join(THIS_DIR, '..'))
+
 # The file that tells us where to get dependency sources, and
 # what git commit to use.
-DEPS_FILE = 'deps.json'
+DEPS_FILE = os.path.join(TOP_DIR, 'deps.json')
 
 # The name of a git remote used for getting sources for a single
 # dependency.
@@ -74,7 +78,7 @@ class GoodCommit(object):
         self.site = json['site']
         self.subrepo = json['subrepo']
         self.branch = json['branch']
-        self.subdir = json['subdir'] if ('subdir' in json) else '.'
+        self.subdir = os.path.join(TOP_DIR, json['subdir']) if ('subdir' in json) else TOP_DIR
         self.commit = json['commit']
 
     def GetUrl(self, style='https'):
