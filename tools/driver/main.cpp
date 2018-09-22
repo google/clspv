@@ -222,7 +222,7 @@ static llvm::cl::opt<bool> cl_fast_relaxed_math(
                    "-cl-unsafe-math-optimizations."));
 
 static llvm::cl::list<std::string>
-    Includes("I",
+    Includes(llvm::cl::Prefix, "I",
              llvm::cl::desc("Add a directory to the list of directories "
                             "to be searched for header files."),
              llvm::cl::ZeroOrMore, llvm::cl::value_desc("include path"));
