@@ -43,8 +43,26 @@ endif()
 
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
 use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
-use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
-use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Tools)
+
+if (NOT DEFINED SPIRV_HEADERS_SOURCE_DIR)
+  set(SPIRV_HEADERS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
+  use_component(${SPIRV_HEADERS_SOURCE_DIR})
+endif()
+
+if (NOT DEFINED SPIRV_TOOLS_SOURCE_DIR)
+
+  set(SPIRV_TOOLS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Tools)
+
+  use_component(${SPIRV_TOOLS_SOURCE_DIR})
+
+  # First tell SPIR-V Tools where to find SPIR-V Headers
+  set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
+
+  # Bring in the SPIR-V Tools repository which we'll use for testing
+  add_subdirectory(${SPIRV_TOOLS_SOURCE_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -58,7 +76,6 @@ set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang
 # Then pull in LLVM for building.
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm EXCLUDE_FROM_ALL)
 
-set(SPIRV_HEADERS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
 set(SPIRV_HEADERS_INCLUDE_DIRS
   ${SPIRV_HEADERS_SOURCE_DIR}/include/
 )
@@ -74,16 +91,6 @@ set(CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
 set(CLANG_INCLUDE_DIRS
   ${CLANG_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm/tools/clang/include
-)
-
-# First tell SPIR-V Tools where to find SPIR-V Headers
-set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
-
-# Bring in the SPIR-V Tools repository which we'll use for testing
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Tools EXCLUDE_FROM_ALL)
-
-set(SPIRV_TOOLS_BINARY_DIR
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/SPIRV-Tools/tools
 )
 
 if(NOT WIN32)

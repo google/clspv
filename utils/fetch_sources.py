@@ -121,15 +121,22 @@ def GetGoodCommits():
 
 
 def main():
+
+    commits = GetGoodCommits()
+
+    all_deps = [c.name for c in commits]
+
     parser = argparse.ArgumentParser(description='Get sources for '
                                      ' dependencies at a specified commit')
     parser.add_argument('--dir', dest='dir', default='.',
                         help='Set target directory for dependencies source '
                         'root. Default is the current directory.')
 
-    args = parser.parse_args()
+    parser.add_argument('--deps', choices=all_deps, nargs='+', default=all_deps,
+                        help='A list of dependencies to fetch sources for. '
+                             'All is the default.')
 
-    commits = GetGoodCommits()
+    args = parser.parse_args()
 
     distutils.dir_util.mkpath(args.dir)
     print('Change directory to {d}'.format(d=args.dir))
@@ -138,6 +145,8 @@ def main():
     # Create the subdirectories in sorted order so that parent git repositories
     # are created first.
     for c in sorted(commits, key=lambda x: x.subdir):
+        if c.name not in args.deps:
+            continue
         print('Get {n}\n'.format(n=c.name))
         c.Checkout()
     sys.exit(0)
