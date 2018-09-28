@@ -5298,6 +5298,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .StartsWith("_Z8distance", glsl::ExtInst::ExtInstDistance)
       .StartsWith("_Z13fast_distance", glsl::ExtInst::ExtInstDistance)
       .StartsWith("_Z4step", glsl::ExtInst::ExtInstStep)
+      .StartsWith("_Z10smoothstep", glsl::ExtInst::ExtInstSmoothStep)
       .Case("_Z5crossDv3_fS_", glsl::ExtInst::ExtInstCross)
       .StartsWith("_Z9normalize", glsl::ExtInst::ExtInstNormalize)
       .StartsWith("_Z14fast_normalize", glsl::ExtInst::ExtInstNormalize)
