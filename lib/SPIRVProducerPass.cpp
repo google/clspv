@@ -1158,6 +1158,7 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
               break;
             case glsl::ExtInstAcos:
             case glsl::ExtInstAsin:
+            case glsl::ExtInstAtan:
             case glsl::ExtInstAtan2:
               // We need 1/pi for acospi, asinpi, atan2pi.
               register_constant(
@@ -5037,6 +5038,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             break;
           case glsl::ExtInstAcos:  // Implementing acospi
           case glsl::ExtInstAsin:  // Implementing asinpi
+          case glsl::ExtInstAtan:  // Implementing atanpi
           case glsl::ExtInstAtan2: // Implementing atan2pi
             generate_extra_inst(
                 spv::OpFMul,
@@ -5325,6 +5327,10 @@ glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(StringRef Name) {
       .Case("_Z6asinpiDv2_f", glsl::ExtInst::ExtInstAsin)
       .Case("_Z6asinpiDv3_f", glsl::ExtInst::ExtInstAsin)
       .Case("_Z6asinpiDv4_f", glsl::ExtInst::ExtInstAsin)
+      .Case("_Z6atanpif", glsl::ExtInst::ExtInstAtan)
+      .Case("_Z6atanpiDv2_f", glsl::ExtInst::ExtInstAtan)
+      .Case("_Z6atanpiDv3_f", glsl::ExtInst::ExtInstAtan)
+      .Case("_Z6atanpiDv4_f", glsl::ExtInst::ExtInstAtan)
       .Case("_Z7atan2piff", glsl::ExtInst::ExtInstAtan2)
       .Case("_Z7atan2piDv2_fS_", glsl::ExtInst::ExtInstAtan2)
       .Case("_Z7atan2piDv3_fS_", glsl::ExtInst::ExtInstAtan2)
