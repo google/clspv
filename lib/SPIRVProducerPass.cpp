@@ -793,9 +793,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 
           auto OpTy = I.getOperand(0)->getType();
 
-          if (OpTy->isIntegerTy(1) ||
-              (OpTy->isVectorTy() &&
-               OpTy->getVectorElementType()->isIntegerTy(1))) {
+          if (OpTy->isIntOrIntVectorTy(1)) {
             if (I.getOpcode() == Instruction::ZExt) {
               APInt One(32, 1);
               FindConstant(Constant::getNullValue(I.getType()));
@@ -866,9 +864,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 
           auto OpTy = I.getOperand(0)->getType();
 
-          if (OpTy->isIntegerTy(1) ||
-              (OpTy->isVectorTy() &&
-               OpTy->getVectorElementType()->isIntegerTy(1))) {
+          if (OpTy->isIntOrIntVectorTy(1)) {
             if (I.getOpcode() == Instruction::ZExt) {
               APInt One(32, 1);
               FindConstant(Constant::getNullValue(I.getType()));
@@ -3480,7 +3476,7 @@ spv::Op SPIRVProducerPass::GetSPIRVCastOpcode(Instruction &I) {
 }
 
 spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
-  if (I.getType()->isIntegerTy(1)) {
+  if (I.getType()->isIntOrIntVectorTy(1)) {
     switch (I.getOpcode()) {
     default:
       break;
@@ -3545,9 +3541,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       if ((I.getOpcode() == Instruction::ZExt ||
            I.getOpcode() == Instruction::SExt ||
            I.getOpcode() == Instruction::UIToFP) &&
-          (OpTy->isIntegerTy(1) ||
-           (OpTy->isVectorTy() &&
-            OpTy->getVectorElementType()->isIntegerTy(1)))) {
+           OpTy->isIntOrIntVectorTy(1)) {
         //
         // Generate OpSelect.
         //
@@ -3623,7 +3617,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // Handle xor with i1 type specially.
       if (I.getOpcode() == Instruction::Xor &&
           I.getType() == Type::getInt1Ty(Context) &&
-          (isa<Constant>(I.getOperand(0)) || isa<Constant>(I.getOperand(1)))) {
+          ((isa<ConstantInt>(I.getOperand(0)) &&
+            !cast<ConstantInt>(I.getOperand(0))->isZero()) ||
+           (isa<ConstantInt>(I.getOperand(1)) &&
+            !cast<ConstantInt>(I.getOperand(1))->isZero()))) {
         //
         // Generate OpLogicalNot.
         //
