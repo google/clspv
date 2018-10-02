@@ -349,4 +349,12 @@ llvm::ModulePass *createInlineEntryPointsPass();
 /// bugs. See HackPhis().
 llvm::ModulePass *createScalarizePass();
 
+/// Transform types for UBOs to conform to Vulkan 14.5.4 rules.
+/// @return An LLVM module pass
+///
+/// Performs type mutation on the module so that types destined for UBOs satisfy
+/// requirements in SPIR-V. It is assumed that the types are correct except for
+/// LLVM inserted padding added to represent the types as laid out in OpenCL C.
+llvm::ModulePass *createUBOTypeTransformPass();
+
 } // namespace clspv

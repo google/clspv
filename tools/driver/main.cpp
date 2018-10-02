@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <clang/AST/RecordLayout.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Basic/TargetInfo.h>
 #include <clang/CodeGen/CodeGenAction.h>
@@ -25,6 +26,7 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/LinkAllPasses.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/MathExtras.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
@@ -46,6 +48,16 @@ private:
   enum CustomDiagnosticType {
     CustomDiagnosticVectorsMoreThan4Elements = 0,
     CustomDiagnosticVoidPointer = 1,
+    CustomDiagnosticUBOUnalignedScalar = 2,
+    CustomDiagnosticUBOUnalignedVec2 = 3,
+    CustomDiagnosticUBOUnalignedVec4 = 4,
+    CustomDiagnosticUBOUnalignedArray = 5,
+    CustomDiagnosticUBOUnalignedStruct = 6,
+    CustomDiagnosticUBOSmallStraddle = 7,
+    CustomDiagnosticUBOLargeStraddle = 8,
+    CustomDiagnosticUBOUnalignedStructMember = 9,
+    CustomDiagnosticUBORestrictedSize = 10,
+    CustomDiagnosticUBORestrictedStruct = 11,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -75,6 +87,189 @@ private:
             CustomDiagnosticsIDMap[CustomDiagnosticVectorsMoreThan4Elements]);
         return false;
       }
+    }
+
+    return true;
+  }
+
+  // Returns the alignment of |QT| to satisfy standard Uniform buffer layout
+  // rules.
+  uint64_t GetAlignment(const QualType QT, const ASTContext &context) const {
+    const auto canonical = QT.getCanonicalType();
+    uint64_t alignment = context.getTypeAlignInChars(canonical).getQuantity();
+    if (canonical->isRecordType() || canonical->isArrayType()) {
+      return llvm::alignTo(alignment, 16);
+    }
+    return alignment;
+  }
+
+  // Returns true if |QT| is a valid layout for a Uniform buffer. Refer to
+  // 14.5.4 in the Vulkan specification.
+  bool IsSupportedUniformLayout(QualType QT, uint64_t offset,
+                                ASTContext &context, SourceRange SR) {
+    const auto canonical = QT.getCanonicalType();
+    if (canonical->isScalarType()) {
+      if (!IsSupportedUniformScalarLayout(canonical, offset, context, SR))
+        return false;
+    } else if (canonical->isExtVectorType()) {
+      if (!IsSupportedUniformVectorLayout(canonical, offset, context, SR))
+        return false;
+    } else if (canonical->isArrayType()) {
+      if (!IsSupportedUniformArrayLayout(canonical, offset, context, SR))
+        return false;
+    } else if (canonical->isRecordType()) {
+      if (!IsSupportedUniformRecordLayout(canonical, offset, context, SR))
+        return false;
+    }
+
+    // TODO(alan-baker): Find a way to avoid this restriction.
+    // Don't allow padding. This prevents structs like:
+    // struct {
+    //   int x[2];
+    //   int y __attribute((aligned(16)));
+    // };
+    //
+    // This would map in LLVM to { [2 x i32], [8 x i8], i32, [12 xi8] }.
+    // There is no easy way to manipulate the padding after the array to
+    // satisfy the standard Uniform buffer layout rules in this case. The usual
+    // trick is replacing the i8 arrays with an i32 element, but the i32 would
+    // still be laid out too close to the array.
+    const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
+    const auto type_align = GetAlignment(canonical, context);
+    if (type_size % type_align != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedSize]);
+      return false;
+    }
+
+    return true;
+  }
+
+  bool IsSupportedUniformScalarLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // A scalar type of size N has a base alignment on N.
+    const unsigned type_size = context.getTypeSizeInChars(QT).getQuantity();
+    if (offset % type_size != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedScalar]);
+      return false;
+    }
+
+    return true;
+  }
+
+  bool IsSupportedUniformVectorLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // 2-component vectors have a base alignment of 2 * (size of element).
+    // 3- and 4-component vectors hae a base alignment of 4 * (size of
+    // element).
+    const auto *VT = llvm::cast<VectorType>(QT);
+    const auto ele_size =
+        context.getTypeSizeInChars(VT->getElementType()).getQuantity();
+    if (VT->getNumElements() == 2) {
+      if (offset % (ele_size * 2) != 0) {
+        Instance.getDiagnostics().Report(
+            SR.getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec2]);
+        return false;
+      }
+    } else if (offset % (ele_size * 4) != 0) {
+      // Other vector sizes cause errors elsewhere.
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec4]);
+      return false;
+    }
+
+    // Straddling rules:
+    // * If total vector size is less than 16 bytes, the offset must place the
+    // entire vector within the same 16 bytes.
+    // * If total vector size is greater than 16 bytes, the offset must be a
+    // multiple of 16.
+    const auto size = context.getTypeSizeInChars(QT).getQuantity();
+    if (size <= 16 && (offset / 16 != (offset + size - 1) / 16)) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle]);
+      return false;
+    } else if (size > 16 && (offset % 16 != 0)) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOLargeStraddle]);
+      return false;
+    }
+
+    return IsSupportedUniformLayout(VT->getElementType(), offset, context, SR);
+  }
+
+  bool IsSupportedUniformArrayLayout(QualType QT, uint64_t offset,
+                                     ASTContext &context, SourceRange SR) {
+    // An array has a base alignment of is element type, rounded up to a
+    // multiple of 16.
+    const auto *AT = llvm::cast<ArrayType>(QT);
+    const auto type_align =
+        llvm::alignTo(GetAlignment(AT->getElementType(), context), 16);
+    if (offset % type_align != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedArray]);
+      return false;
+    }
+
+    return IsSupportedUniformLayout(AT->getElementType(), offset, context, SR);
+  }
+
+  bool IsSupportedUniformRecordLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // A structure has a base alignment of its largest member, rounded up to a
+    // multiple of 16.
+    const auto *RT = llvm::cast<RecordType>(QT);
+    const auto type_alignment = GetAlignment(QT, context);
+    if (offset % type_alignment != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct]);
+      return false;
+    }
+
+    const auto &layout = context.getASTRecordLayout(RT->getDecl());
+    const FieldDecl *prev = nullptr;
+    for (auto field_decl : RT->getDecl()->fields()) {
+      const auto field_type = field_decl->getType();
+      const auto field_alignment = GetAlignment(field_type, context);
+      const unsigned field_no = field_decl->getFieldIndex();
+      const uint64_t field_offset =
+          layout.getFieldOffset(field_no) / context.getCharWidth();
+
+      // Rules must be checked recursively.
+      if (!IsSupportedUniformLayout(field_type, field_offset, context, SR)) {
+        return false;
+      }
+
+      if (prev) {
+        const auto prev_canonical = prev->getType().getCanonicalType();
+        const uint64_t prev_offset =
+            layout.getFieldOffset(field_no - 1) / context.getCharWidth();
+        const auto prev_size = context.getTypeSizeInChars(prev_canonical).getQuantity();
+        const auto prev_alignment = GetAlignment(prev_canonical, context);
+        const auto next_available = prev_offset + llvm::alignTo(prev_size, prev_alignment);
+        if (prev_canonical->isArrayType() || prev_canonical->isRecordType()) {
+          // The next element after an array or struct must be placed on or
+          // after the next multiple of the alignment of that array or
+          // struct.
+          // Both arrays and structs must be aligned to a multiple of 16 bytes.
+          if (llvm::alignTo(next_available, 16) > field_offset) {
+            Instance.getDiagnostics().Report(
+                SR.getBegin(), CustomDiagnosticsIDMap
+                                   [CustomDiagnosticUBOUnalignedStructMember]);
+            return false;
+          }
+        }
+      }
+
+      prev = field_decl;
     }
 
     return true;
@@ -119,6 +314,48 @@ public:
             "vectors with more than 4 elements are not supported");
     CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
         DiagnosticsEngine::Error, "pointer-to-void is not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedScalar] = DE.getCustomDiagID(
+        DiagnosticsEngine::Error, "in an UBO, scalar elements must be aligned to their size");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec2] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, two-component vectors must be aligned "
+                           "to 2 times their element size");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec4] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, three- and four-component vectors must "
+                           "be aligned to 4 times their element size");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedArray] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, arrays must be aligned to their element "
+                           "alignment, rounded up to a multiple of 16 bytes");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, structs must be aligned to their "
+                           "largest element alignment, rounded up to a multiple of "
+                           "16 bytes");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, vectors with a total size less than or "
+                           "equal to 16 bytes must be placed entirely within a "
+                           "16 byte aligned region");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOLargeStraddle] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, vectors with a total size greater than "
+                           "16 bytes must aligned to 16 bytes");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStructMember] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "in an UBO, a structure member must not be placed "
+                           "between the end of a structure or array and the "
+                           "next multiple of the base alignment of that "
+                           "structure or array");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedSize] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "clspv restriction: UBO element size must be a "
+                           "multiple of that element's alignment");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "clspv restriction: UBO structures may not have implicit padding");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -132,9 +369,31 @@ public:
             return false;
           }
 
+          bool is_opencl_kernel = false;
+          if (FD->hasAttrs()) {
+            for (auto* attr : FD->attrs()) {
+              if (attr->getKind() == attr::Kind::OpenCLKernel) {
+                is_opencl_kernel = true;
+              }
+            }
+          }
+
           for (auto *P : FD->parameters()) {
+            auto type = P->getType();
             if (!IsSupportedType(P->getOriginalType(), P->getSourceRange())) {
               return false;
+            }
+
+            if (is_opencl_kernel &&
+                clspv::Option::ConstantArgsInUniformBuffer() &&
+                type->isPointerType() &&
+                type->getPointeeType().getAddressSpace() ==
+                    LangAS::opencl_constant) {
+              if (!IsSupportedUniformLayout(
+                      type->getPointeeType(), 0,
+                      FD->getASTContext(), P->getSourceRange())) {
+                return false;
+              }
             }
           }
 
@@ -270,6 +529,9 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
                    "a single storage buffer, using a binding number after "
                    "other arguments. Use this to reduce storage buffer "
                    "descriptors."));
+
+static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
+                                  llvm::cl::desc("Verify diagnostic outputs"));
 
 int main(const int argc, const char *const argv[]) {
   // We need to change how one of the called passes works by spoofing
@@ -510,6 +772,10 @@ int main(const int argc, const char *const argv[]) {
 
   clang::CompilerInstance instance;
 
+  if (verify) {
+    instance.getDiagnosticOpts().VerifyDiagnostics = true;
+  }
+
   clang::LangStandard::Kind standard = clang::LangStandard::lang_opencl12;
 
   // We are targeting OpenCL 1.2 only
@@ -661,6 +927,13 @@ int main(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "clspv restriction: -constant-arg-ubo requires "
+                    "-inline-entry-points\n";
+    return -1;
+  }
+
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(Registry);
   llvm::initializeScalarOpts(Registry);
@@ -784,6 +1057,9 @@ int main(const int argc, const char *const argv[]) {
   // This pass generates insertions that need to be rewritten.
   pm.add(clspv::createScalarizePass());
   pm.add(clspv::createRewriteInsertsPass());
+  // This pass mucks with types to point where you shouldn't rely on DataLayout
+  // anymore so leave this right before SPIR-V generation.
+  pm.add(clspv::createUBOTypeTransformPass());
   pm.add(clspv::createSPIRVProducerPass(
       binaryStream, descriptor_map_out, SamplerMapEntries,
       OutputAssembly.getValue(), OutputFormat == "c"));

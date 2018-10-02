@@ -114,6 +114,10 @@ llvm::cl::opt<bool> module_constants_in_storage_buffer(
 llvm::cl::opt<bool> show_ids("show-ids", llvm::cl::init(false),
                              llvm::cl::desc("Show SPIR-V IDs for functions"));
 
+llvm::cl::opt<bool> constant_args_in_uniform_buffer(
+    "constant-args-ubo", llvm::cl::init(false),
+    llvm::cl::desc("Put pointer-to-constant kernel args in UBOs."));
+
 } // namespace
 
 namespace clspv {
@@ -138,6 +142,9 @@ bool ModuleConstantsInStorageBuffer() {
 }
 bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
+bool ConstantArgsInUniformBuffer() {
+  return constant_args_in_uniform_buffer;
+}
 
 } // namespace Option
 } // namespace clspv
