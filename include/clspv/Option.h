@@ -79,5 +79,8 @@ bool InlineSingleCallSite();
 // Returns true if entry points should be fully inlined.
 bool InlineEntryPoints();
 
+// Returns true if pointer-to-constant kernel args should be generated as UBOs.
+bool ConstantArgsInUniformBuffer();
+
 } // namespace Option
 } // namespace clspv

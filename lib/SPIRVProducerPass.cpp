@@ -342,7 +342,7 @@ struct SPIRVProducerPass final : public ModulePass {
   // have been created.
   uint32_t GetI32Zero();
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
-  spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
+  spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind, const Type* type) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
   // Returns the GLSL extended instruction enum that the given function
   // call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
@@ -1710,8 +1710,11 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
   case AddressSpace::Private:
     return spv::StorageClassFunction;
   case AddressSpace::Global:
-  case AddressSpace::Constant:
     return spv::StorageClassStorageBuffer;
+  case AddressSpace::Constant:
+    return clspv::Option::ConstantArgsInUniformBuffer()
+               ? spv::StorageClassUniform
+               : spv::StorageClassStorageBuffer;
   case AddressSpace::Input:
     return spv::StorageClassInput;
   case AddressSpace::Local:
@@ -1726,10 +1729,15 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
 }
 
 spv::StorageClass
-SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
+SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind, const Type* type) const {
   switch (arg_kind) {
   case clspv::ArgKind::Buffer:
-    return spv::StorageClassStorageBuffer;
+    if (clspv::Option::ConstantArgsInUniformBuffer() &&
+        type->getPointerAddressSpace() == AddressSpace::Constant) {
+      return spv::StorageClassUniform;
+    } else {
+      return spv::StorageClassStorageBuffer;
+    }
   case clspv::ArgKind::Pod:
     return clspv::Option::PodArgsInUniformBuffer()
                ? spv::StorageClassUniform
@@ -1798,27 +1806,30 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
       // are conflated.
       bool UseExistingOpTypePointer = false;
       if (AddressSpace::Constant == AddrSpace) {
-        AddrSpace = AddressSpace::Global;
-
-        // Check to see if we already created this type (for instance, if we had
-        // a constant <type>* and a global <type>*, the type would be created by
-        // one of these types, and shared by both).
-        auto GlobalTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(GlobalTy)) {
-          TypeMap[PTy] = TypeMap[GlobalTy];
-          UseExistingOpTypePointer = true;
-          break;
+        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+          AddrSpace = AddressSpace::Global;
+          // Check to see if we already created this type (for instance, if we had
+          // a constant <type>* and a global <type>*, the type would be created by
+          // one of these types, and shared by both).
+          auto GlobalTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
+          if (0 < TypeMap.count(GlobalTy)) {
+            TypeMap[PTy] = TypeMap[GlobalTy];
+            UseExistingOpTypePointer = true;
+            break;
+          }
         }
       } else if (AddressSpace::Global == AddrSpace) {
-        AddrSpace = AddressSpace::Constant;
+        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+          AddrSpace = AddressSpace::Constant;
 
-        // Check to see if we already created this type (for instance, if we had
-        // a constant <type>* and a global <type>*, the type would be created by
-        // one of these types, and shared by both).
-        auto ConstantTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(ConstantTy)) {
-          TypeMap[PTy] = TypeMap[ConstantTy];
-          UseExistingOpTypePointer = true;
+          // Check to see if we already created this type (for instance, if we had
+          // a constant <type>* and a global <type>*, the type would be created by
+          // one of these types, and shared by both).
+          auto ConstantTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
+          if (0 < TypeMap.count(ConstantTy)) {
+            TypeMap[PTy] = TypeMap[ConstantTy];
+            UseExistingOpTypePointer = true;
+          }
         }
       }
 
@@ -2559,7 +2570,7 @@ void SPIRVProducerPass::GenerateResourceVars(Module &M) {
     info->var_id = nextID++;
 
     const auto type_id = lookupType(type);
-    const auto sc = GetStorageClassForArgKind(info->arg_kind);
+    const auto sc = GetStorageClassForArgKind(info->arg_kind, type);
     SPIRVOperandList Ops;
     Ops << MkId(type_id) << MkNum(sc);
 
