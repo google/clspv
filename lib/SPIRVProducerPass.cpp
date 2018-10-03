@@ -5279,6 +5279,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .StartsWith("_Z9half_log2", glsl::ExtInst::ExtInstLog2)
       .StartsWith("_Z11native_log2", glsl::ExtInst::ExtInstLog2)
       .StartsWith("_Z4fabs", glsl::ExtInst::ExtInstFAbs)
+      .StartsWith("_Z3fma", glsl::ExtInst::ExtInstFma)
       .StartsWith("_Z5floor", glsl::ExtInst::ExtInstFloor)
       .StartsWith("_Z5ldexp", glsl::ExtInst::ExtInstLdexp)
       .StartsWith("_Z3pow", glsl::ExtInst::ExtInstPow)
