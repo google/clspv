@@ -80,6 +80,14 @@ private:
     return true;
   }
 
+  // Returns true if |QT| is a valid layout for a Uniform buffer. Refer to
+  // 14.5.4 in the Vulkan specification.
+  bool IsSupportedUniformLayout(QualType QT, SourceRange SR) {
+    (void)QT;
+    (void)SR;
+    return true;
+  }
+
   // This will be used to check the inside of function bodies.
   class DeclVisitor : public RecursiveASTVisitor<DeclVisitor> {
   private:
@@ -132,9 +140,29 @@ public:
             return false;
           }
 
+          bool is_opencl_kernel = false;
+          if (FD->hasAttrs()) {
+            for (auto* attr : FD->attrs()) {
+              if (attr->getKind() == attr::Kind::OpenCLKernel) {
+                is_opencl_kernel = true;
+              }
+            }
+          }
+
           for (auto *P : FD->parameters()) {
+            auto type = P->getType();
             if (!IsSupportedType(P->getOriginalType(), P->getSourceRange())) {
               return false;
+            }
+
+            if (is_opencl_kernel &&
+                clspv::Option::ConstantArgsInUniformBuffer() &&
+                type->isPointerType() &&
+                type->getPointeeType().getAddressSpace() ==
+                    LangAS::opencl_constant) {
+              if (!IsSupportedUniformLayout(type->getPointeeType(), P->getSourceRange())) {
+                return false;
+              }
             }
           }
 
