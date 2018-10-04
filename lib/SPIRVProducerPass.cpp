@@ -1017,10 +1017,7 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
   }
 }
 
-void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &DL) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
-  ValueMapType &VMap = getValueMap();
-
+void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
   ResourceVarInfoList.clear();
   FunctionToResourceVarsMap.clear();
   ModuleOrderedResourceVars.reset();
@@ -1274,7 +1271,7 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
       }
 
       for (Use &Op : I.operands()) {
-        if (CallInst *Call = dyn_cast<CallInst>(&I)) {
+        if (isa<CallInst>(&I)) {
           // Avoid to check call instruction's type.
           break;
         }
@@ -1428,12 +1425,12 @@ void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
     ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
     Function *func = cast<Function>(fn_md->getValue());
     ConstantAsMetadata *arg_index_md = cast<ConstantAsMetadata>(tuple->getOperand(1));
-    int arg_index = cast<ConstantInt>(arg_index_md->getValue())->getSExtValue();
+    int arg_index = static_cast<int>(cast<ConstantInt>(arg_index_md->getValue())->getSExtValue());
     Argument* arg = &*(func->arg_begin() + arg_index);
 
     ConstantAsMetadata *spec_id_md =
         cast<ConstantAsMetadata>(tuple->getOperand(2));
-    int spec_id = cast<ConstantInt>(spec_id_md->getValue())->getSExtValue();
+    int spec_id = static_cast<int>(cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
 
     max_local_spec_id_ = std::max(max_local_spec_id_, spec_id + 1);
     LocalArgSpecIds[arg] = spec_id;
@@ -1758,6 +1755,8 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   case clspv::ArgKind::WriteOnlyImage:
   case clspv::ArgKind::Sampler:
     return spv::StorageClassUniformConstant;
+  default:
+    llvm_unreachable("Unsupported storage class for argument kind");
   }
 }
 
@@ -2455,7 +2454,6 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 
 void SPIRVProducerPass::GenerateSamplers(Module &M) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
-  ValueMapType &VMap = getValueMap();
 
   auto& sampler_map = getSamplerMap();
   SamplerMapIndexToIDMap.clear();
@@ -2569,7 +2567,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   }
 }
 
-void SPIRVProducerPass::GenerateResourceVars(Module &M) {
+void SPIRVProducerPass::GenerateResourceVars(Module &) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
 
@@ -3075,8 +3073,6 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
 }
 
 void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
-  Module& M = *F.getParent();
-  const DataLayout &DL = M.getDataLayout();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
@@ -4343,7 +4339,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     } else if (Callee->getName().startswith(clspv::WorkgroupAccessorFunction())) {
       // Don't codegen an instruction here, but instead map this call directly
       // to the workgroup variable id.
-      int spec_id = cast<ConstantInt>(Call->getOperand(0))->getSExtValue();
+      int spec_id = static_cast<int>(cast<ConstantInt>(Call->getOperand(0))->getSExtValue());
       const auto &info = LocalSpecIdInfoMap[spec_id];
       VMap[Call] = info.variable_id;
       break;
@@ -4361,7 +4357,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       const auto load_id = nextID++;
 
       Ops << MkId(lookupType(SamplerTy->getPointerElementType()))
-          << MkId(SamplerMapIndexToIDMap[index_into_sampler_map]);
+          << MkId(SamplerMapIndexToIDMap[static_cast<unsigned>(index_into_sampler_map)]);
 
       auto *Inst = new SPIRVInstruction(spv::OpLoad, load_id, Ops);
       SPIRVInstList.push_back(Inst);
