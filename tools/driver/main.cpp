@@ -56,6 +56,8 @@ private:
     CustomDiagnosticUBOSmallStraddle = 7,
     CustomDiagnosticUBOLargeStraddle = 8,
     CustomDiagnosticUBOUnalignedStructMember = 9,
+    CustomDiagnosticUBORestrictedSize = 10,
+    CustomDiagnosticUBORestrictedStruct = 11,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -94,108 +96,189 @@ private:
   // 14.5.4 in the Vulkan specification.
   bool IsSupportedUniformLayout(QualType QT, uint64_t offset,
                                 ASTContext &context, SourceRange SR) {
-    auto canonical = QT.getCanonicalType();
+    const auto canonical = QT.getCanonicalType();
+    const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
+    auto type_align = context.getTypeAlignInChars(canonical).getQuantity();
     if (canonical->isScalarType()) {
-      // A scalar type of size N has a base alignment on N.
-      unsigned type_size = context.getTypeSizeInChars(canonical).getQuantity();
-      if (offset % type_size != 0) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedScalar]);
+      if (!IsSupportedUniformScalarLayout(canonical, offset, context, SR))
         return false;
-      }
-    } else if (const auto *VT = llvm::dyn_cast<ExtVectorType>(canonical)) {
-      // 2-component vectors have a base alignment of 2 * (size of element)
-      // 3- and 4-component vectors hae a base alignment of 4 * (size of
-      // element)
-      auto ele_size = context.getTypeSizeInChars(VT->getElementType()).getQuantity();
-      if (VT->getNumElements() == 2 && offset % (ele_size * 2) != 0) {
+    } else if (canonical->isVectorType()) {
+      if (!IsSupportedUniformVectorLayout(canonical, offset, context, SR))
+        return false;
+    } else if (canonical->isArrayType()) {
+      type_align = llvm::alignTo(type_align, 16);
+      if (!IsSupportedUniformArrayLayout(canonical, offset, context, SR))
+        return false;
+    } else if (canonical->isRecordType()) {
+      type_align = llvm::alignTo(type_align, 16);
+      if (!IsSupportedUniformRecordLayout(canonical, offset, context, SR))
+        return false;
+    }
+
+    // TODO(alan-baker): Find a way to avoid this restriction.
+    // Don't allow padding.
+    if (type_size % type_align != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedSize]);
+      return false;
+    }
+
+    return true;
+  }
+
+  bool IsSupportedUniformScalarLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // A scalar type of size N has a base alignment on N.
+    const unsigned type_size = context.getTypeSizeInChars(QT).getQuantity();
+    if (offset % type_size != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedScalar]);
+      return false;
+    }
+
+    return true;
+  }
+
+  bool IsSupportedUniformVectorLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // 2-component vectors have a base alignment of 2 * (size of element).
+    // 3- and 4-component vectors hae a base alignment of 4 * (size of
+    // element).
+    const auto *VT = llvm::cast<VectorType>(QT);
+    const auto ele_size =
+        context.getTypeSizeInChars(VT->getElementType()).getQuantity();
+    if (VT->getNumElements() == 2) {
+      if (offset % (ele_size * 2) != 0) {
         Instance.getDiagnostics().Report(
             SR.getBegin(),
             CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec2]);
         return false;
-      } else if (offset % (ele_size * 4) != 0) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec4]);
-        return false;
       }
+    } else if (offset % (ele_size * 4) != 0) {
+      // Other vector sizes cause errors elsewhere.
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec4]);
+      return false;
+    }
 
-      // Straddling rules:
-      // * If total vector size is less than 16 bytes, the offset must place the
-      // entire vector within the same 16 bytes.
-      // * If total vector size is greater than 16 bytes, the offset must be a
-      // multiple of 16.
-      auto size = context.getTypeSizeInChars(canonical).getQuantity();
-      if (size <= 16 && (offset % 16 != (offset + size) % 16)) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle]);
-        return false;
-      } else if (size > 16 && (offset % 16 != 0)) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOLargeStraddle]);
-        return false;
-      }
-    } else if (const auto *AT = llvm::dyn_cast<ArrayType>(canonical)) {
-      // An array has a base alignment of is element type, rounded up to a
-      // multiple of 16.
-      auto ele_align = context.getTypeAlignInChars(AT->getElementType()).getQuantity();
-      if (offset % llvm::alignTo(ele_align, 16) != 0) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedArray]);
-        return false;
-      }
-    } else if (const auto *RT = llvm::dyn_cast<RecordType>(canonical)) {
-      // A structure has a base alignment of its largest member, rounded up to a
-      // multiple of 16.
-      auto alignment = context.getTypeAlignInChars(canonical).getQuantity();
-      if (offset % llvm::alignTo(alignment, 16) != 0) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct]);
-        return false;
-      }
+    // Straddling rules:
+    // * If total vector size is less than 16 bytes, the offset must place the
+    // entire vector within the same 16 bytes.
+    // * If total vector size is greater than 16 bytes, the offset must be a
+    // multiple of 16.
+    const auto size = context.getTypeSizeInChars(QT).getQuantity();
+    if (size <= 16 && (offset / 16 != (offset + size - 1) / 16)) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle]);
+      return false;
+    } else if (size > 16 && (offset % 16 != 0)) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOLargeStraddle]);
+      return false;
+    }
 
-      const auto &layout = context.getASTRecordLayout(RT->getDecl());
-      unsigned field_no = 0;
-      const FieldDecl* prev = nullptr;
-      for (auto field_decl : RT->getDecl()->fields()) {
-        uint64_t field_offset =
-            offset + layout.getFieldOffset(field_no) / context.getCharWidth();
-        if (prev) {
-          auto prev_canonical = prev->getType().getCanonicalType();
-          if (prev_canonical->isArrayType() ||
-              prev_canonical->isRecordType()) {
-            // The next element after an array or struct must be placed on or
-            // after the next multiple of the alignment of that array or
-            // struct.
-            uint64_t prev_offset =
-                offset +
-                layout.getFieldOffset(field_no - 1) / context.getCharWidth();
-            auto alignment = context.getTypeAlignInChars(prev_canonical).getQuantity();
-            auto size = context.getTypeSizeInChars(prev_canonical).getQuantity();
-            // Both arrays and structs must be aligned to a multiple of 16 bytes.
-            if (llvm::alignTo(llvm::alignTo(prev_offset + size, alignment), 16) > field_offset) {
-              Instance.getDiagnostics().Report(
-                  SR.getBegin(),
-                  CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStructMember]);
-              return false;
-            }
+    return IsSupportedUniformLayout(VT->getElementType(), offset, context, SR);
+  }
+
+  bool IsSupportedUniformArrayLayout(QualType QT, uint64_t offset,
+                                     ASTContext &context, SourceRange SR) {
+    // An array has a base alignment of is element type, rounded up to a
+    // multiple of 16.
+    const auto *AT = llvm::cast<ArrayType>(QT);
+    const auto ele_align =
+        context.getTypeAlignInChars(AT->getElementType()).getQuantity();
+    const auto type_align = llvm::alignTo(ele_align, 16);
+    if (offset % type_align != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedArray]);
+      return false;
+    }
+
+    return IsSupportedUniformLayout(AT->getElementType(), offset, context, SR);
+  }
+
+  bool IsSupportedUniformRecordLayout(QualType QT, uint64_t offset,
+                                      ASTContext &context, SourceRange SR) {
+    // A structure has a base alignment of its largest member, rounded up to a
+    // multiple of 16.
+    const auto *RT = llvm::cast<RecordType>(QT);
+    const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
+    auto alignment = context.getTypeAlignInChars(QT).getQuantity();
+    alignment = llvm::alignTo(alignment, 16);
+    if (offset % alignment != 0) {
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct]);
+      return false;
+    }
+
+    const auto &layout = context.getASTRecordLayout(RT->getDecl());
+    unsigned field_no = 0;
+    const FieldDecl *prev = nullptr;
+    for (auto field_decl : RT->getDecl()->fields()) {
+      const uint64_t field_offset =
+          offset + layout.getFieldOffset(field_no) / context.getCharWidth();
+      if (prev) {
+        const auto prev_canonical = prev->getType().getCanonicalType();
+        const uint64_t prev_offset =
+            offset +
+            layout.getFieldOffset(field_no - 1) / context.getCharWidth();
+        const auto prev_size =
+            context.getTypeSizeInChars(prev_canonical).getQuantity();
+        if (prev_canonical->isArrayType() || prev_canonical->isRecordType()) {
+          // The next element after an array or struct must be placed on or
+          // after the next multiple of the alignment of that array or
+          // struct.
+          const auto prev_alignment =
+              context.getTypeAlignInChars(prev_canonical).getQuantity();
+          // Both arrays and structs must be aligned to a multiple of 16 bytes.
+          if (llvm::alignTo(
+                  llvm::alignTo(prev_offset + prev_size, prev_alignment), 16) >
+              field_offset) {
+            Instance.getDiagnostics().Report(
+                SR.getBegin(), CustomDiagnosticsIDMap
+                                   [CustomDiagnosticUBOUnalignedStructMember]);
+            return false;
           }
         }
 
-        // Rules must be checked recursively.
-        if (!IsSupportedUniformLayout(field_decl->getType(), field_offset,
-                                      context, SR)) {
+        // TODO(alan-baker): Remove this restriction
+        // No padding between members.
+        if (prev_offset + prev_size != field_offset) {
+          Instance.getDiagnostics().Report(
+              SR.getBegin(),
+              CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
           return false;
         }
-
-        prev = field_decl;
-        ++field_no;
       }
+
+      // TODO(alan-baker): Remove this restriction
+      // No padding allowed at the end of the struct.
+      if (field_no == layout.getFieldCount() - 1) {
+        const auto size =
+            context.getTypeSizeInChars(field_decl->getType()).getQuantity();
+        if (field_offset + size != offset + type_size) {
+          Instance.getDiagnostics().Report(
+              SR.getBegin(),
+              CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
+          return false;
+        }
+      }
+
+      // Rules must be checked recursively.
+      if (!IsSupportedUniformLayout(field_decl->getType(), field_offset,
+                                    context, SR)) {
+        return false;
+      }
+
+      prev = field_decl;
+      ++field_no;
     }
 
     return true;
@@ -274,6 +357,14 @@ public:
                            "between the end of a structure or array and the "
                            "next multiple of the base alignment of that "
                            "structure or array");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedSize] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "clspv restriction: UBO element size must be a "
+                           "multiple of that element's alignment");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "clspv restriction: UBO structures may not have implicit padding");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
