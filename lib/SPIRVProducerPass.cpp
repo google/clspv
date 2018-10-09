@@ -342,7 +342,7 @@ struct SPIRVProducerPass final : public ModulePass {
   // have been created.
   uint32_t GetI32Zero();
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
-  spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind, const Type* type) const;
+  spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
   // Returns the GLSL extended instruction enum that the given function
   // call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
@@ -540,6 +540,7 @@ createSPIRVProducerPass(raw_pwrite_stream &out, raw_ostream &descriptor_map_out,
 } // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
+  //llvm::errs() << module << "\n";
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
@@ -1344,6 +1345,7 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
 
     switch (info->arg_kind) {
     case clspv::ArgKind::Buffer:
+    case clspv::ArgKind::BufferUBO:
       if (auto *sty = dyn_cast<StructType>(type->getPointerElementType())) {
         StructTypesNeedingBlock.insert(sty);
       } else {
@@ -1729,15 +1731,12 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
 }
 
 spv::StorageClass
-SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind, const Type* type) const {
+SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   switch (arg_kind) {
   case clspv::ArgKind::Buffer:
-    if (clspv::Option::ConstantArgsInUniformBuffer() &&
-        type->getPointerAddressSpace() == AddressSpace::Constant) {
-      return spv::StorageClassUniform;
-    } else {
-      return spv::StorageClassStorageBuffer;
-    }
+    return spv::StorageClassStorageBuffer;
+  case clspv::ArgKind::BufferUBO:
+    return spv::StorageClassUniform;
   case clspv::ArgKind::Pod:
     return clspv::Option::PodArgsInUniformBuffer()
                ? spv::StorageClassUniform
@@ -2570,7 +2569,7 @@ void SPIRVProducerPass::GenerateResourceVars(Module &M) {
     info->var_id = nextID++;
 
     const auto type_id = lookupType(type);
-    const auto sc = GetStorageClassForArgKind(info->arg_kind, type);
+    const auto sc = GetStorageClassForArgKind(info->arg_kind);
     SPIRVOperandList Ops;
     Ops << MkId(type_id) << MkNum(sc);
 
@@ -2587,6 +2586,7 @@ void SPIRVProducerPass::GenerateResourceVars(Module &M) {
         if (set == info->descriptor_set && binding == info->binding) {
           switch (info->arg_kind) {
           case clspv::ArgKind::Buffer:
+          case clspv::ArgKind::BufferUBO:
           case clspv::ArgKind::Pod:
             // The call maps to the variable directly.
             VMap[call] = info->var_id;
@@ -2634,6 +2634,7 @@ void SPIRVProducerPass::GenerateResourceVars(Module &M) {
     // Generate NonWritable and NonReadable
     switch (info->arg_kind) {
     case clspv::ArgKind::Buffer:
+    case clspv::ArgKind::BufferUBO:
       if (info->var_fn->getReturnType()->getPointerAddressSpace() ==
           clspv::AddressSpace::Constant) {
         Ops.clear();

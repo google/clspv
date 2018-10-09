@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
 
 
 using namespace llvm;
@@ -46,8 +47,10 @@ ArgKind GetArgKindForType(Type *type) {
     // Pointer to constant and pointer to global are both in
     // storage buffers.
     case clspv::AddressSpace::Global:
-    case clspv::AddressSpace::Constant:
       return ArgKind::Buffer;
+    case clspv::AddressSpace::Constant:
+      return Option::ConstantArgsInUniformBuffer() ? ArgKind::BufferUBO
+                                                   : ArgKind::Buffer;
     case clspv::AddressSpace::Local:
       return ArgKind::Local;
     default:
@@ -65,6 +68,8 @@ const char *GetArgKindName(ArgKind kind) {
   switch (kind) {
   case ArgKind::Buffer:
     return "buffer";
+  case ArgKind::BufferUBO:
+    return "buffer_ubo";
   case ArgKind::Local:
     return "local";
   case ArgKind::Pod:

@@ -578,7 +578,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         // 3) Generate no SPIR-V code for the call itself.
 
         switch (arg_kind) {
-        case clspv::ArgKind::Buffer: {
+        case clspv::ArgKind::Buffer:
+        case clspv::ArgKind::BufferUBO: {
           // If original argument is:
           //   Elem addrspace(1)*
           // Then make a zero-length array to mimic a StorageBuffer struct
@@ -661,6 +662,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         Value *zero = Builder.getInt32(0);
         switch (arg_kind) {
         case clspv::ArgKind::Buffer:
+        case clspv::ArgKind::BufferUBO:
           // Return a GEP to the first element
           // in the runtime array we'll make.
           replacement = Builder.CreateGEP(call, {zero, zero, zero});

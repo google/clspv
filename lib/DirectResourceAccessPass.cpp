@@ -190,6 +190,7 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   for (Argument &arg : fn->args()) {
     switch (clspv::GetArgKindForType(arg.getType())) {
     case clspv::ArgKind::Buffer:
+    case clspv::ArgKind::BufferUBO:
     case clspv::ArgKind::ReadOnlyImage:
     case clspv::ArgKind::WriteOnlyImage:
     case clspv::ArgKind::Sampler:

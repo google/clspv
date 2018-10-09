@@ -186,6 +186,7 @@ plain-old-data types, the fields are:
 - `argKind`
 - a string describing the kind of argument, one of:
   - `buffer` - OpenCL buffer
+  - `buffer_ubo` - OpenCL constant buffer. Sent in a uniform buffer.
   - `pod` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a storage buffer.
   - `pod_ubo` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a uniform buffer.
   - `ro_image` - Read-only image

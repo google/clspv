@@ -7,8 +7,16 @@
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-__kernel void foo(__global int* data, __constant int* c) {
-  *data = *c;
+typedef struct inner {
+  float4 x;
+} inner;
+
+typedef struct outer {
+  inner x;
+} outer;
+
+__kernel void foo(__global outer* data, __constant outer* c) {
+  data->x.x = c->x.x;
 }
 
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
@@ -17,12 +25,16 @@ __kernel void foo(__global int* data, __constant int* c) {
 // CHECK-DAG: OpDecorate [[var:%[0-9a-zA-Z_]+]] NonWritable
 // CHECK-DAG: OpDecorate [[var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[var]] Binding 1
-// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[int]]
+// CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK: [[float4:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 4
+// CHECK: [[inner:%[0-9a-zA-Z_]+]] = OpTypeStruct [[float4]]
+// CHECK: [[outer:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner]]
+// CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[outer]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
-// CHECK: [[ptr_int:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
+// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK: [[ptr_float4:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[float4]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[var]] = OpVariable [[ptr]] Uniform
-// CHECK: [[gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_int]] [[var]] [[zero]] [[zero]]
-// CHECK: OpLoad [[int]] [[gep]]
+// CHECK: [[gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_float4]] [[var]] [[zero]] [[zero]] [[zero]]
+// CHECK: OpLoad [[float4]] [[gep]]

@@ -24,6 +24,7 @@ namespace clspv {
 
 enum class ArgKind : int {
   Buffer,
+  BufferUBO,
   Local,
   Pod,
   ReadOnlyImage,
@@ -39,13 +40,14 @@ const char* GetArgKindName(ArgKind);
 
 // Maps an LLVM type for a kernel argument to an argument
 // kind suitable for a descriptor map.  The result is one of:
-//   buffer   - storage buffer
-//   local    - array in Workgroup storage, number of elements given by
-//              a specialization constant
-//   pod      - plain-old-data
-//   ro_image - read-only image
-//   wo_image - write-only image
-//   sampler  - sampler
+//   buffer     - storage buffer
+//   buffer_ubo - uniform buffer
+//   local      - array in Workgroup storage, number of elements given by
+//                a specialization constant
+//   pod        - plain-old-data
+//   ro_image   - read-only image
+//   wo_image   - write-only image
+//   sampler    - sampler
 inline const char *GetArgKindNameForType(llvm::Type *type) {
   return GetArgKindName(GetArgKindForType(type));
 }
