@@ -540,7 +540,6 @@ createSPIRVProducerPass(raw_pwrite_stream &out, raw_ostream &descriptor_map_out,
 } // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
-  //llvm::errs() << module << "\n";
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
