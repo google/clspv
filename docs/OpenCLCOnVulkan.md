@@ -70,6 +70,8 @@ following way:
   descriptor set type is `VK_DESCRIPTOR_TYPE_SAMPLER`.
 - If the argument to the kernel is a constant or global pointer type, the
   matching Vulkan descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`.
+  If option -constant-args-ubo' is used and the kernel has constant pointer
+  types, set `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
 - If the argument to the kernel is a plain-old-data type, the matching Vulkan
   descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER` by default.
   If option `-pod-ubo` is used the `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.

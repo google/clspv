@@ -340,7 +340,7 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "in an UBO, structs must be aligned to their "
-                           "largest element alignemnt, rounded up to a multiple of "
+                           "largest element alignment, rounded up to a multiple of "
                            "16 bytes");
     CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
@@ -538,6 +538,9 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
                    "a single storage buffer, using a binding number after "
                    "other arguments. Use this to reduce storage buffer "
                    "descriptors."));
+
+static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
+                                  llvm::cl::desc("Verify diagnostic outputs"));
 
 int main(const int argc, const char *const argv[]) {
   // We need to change how one of the called passes works by spoofing
@@ -778,6 +781,10 @@ int main(const int argc, const char *const argv[]) {
 
   clang::CompilerInstance instance;
 
+  if (verify) {
+    instance.getDiagnosticOpts().VerifyDiagnostics = true;
+  }
+
   clang::LangStandard::Kind standard = clang::LangStandard::lang_opencl12;
 
   // We are targeting OpenCL 1.2 only
@@ -926,6 +933,13 @@ int main(const int argc, const char *const argv[]) {
   auto num_errors = consumer->getNumErrors();
   if (num_errors > 0) {
     llvm::errs() << log << "\n";
+    return -1;
+  }
+
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "clspv restriction: -constant-arg-ubo requires "
+                    "-inline-entry-points\n";
     return -1;
   }
 
