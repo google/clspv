@@ -92,31 +92,40 @@ private:
     return true;
   }
 
+  // Returns the alignment of |QT| to satisfy standard Uniform buffer layout
+  // rules.
+  uint64_t GetAlignment(const QualType QT, const ASTContext &context) const {
+    const auto canonical = QT.getCanonicalType();
+    uint64_t alignment = context.getTypeAlignInChars(canonical).getQuantity();
+    if (canonical->isRecordType() || canonical->isArrayType()) {
+      return llvm::alignTo(alignment, 16);
+    }
+    return alignment;
+  }
+
   // Returns true if |QT| is a valid layout for a Uniform buffer. Refer to
   // 14.5.4 in the Vulkan specification.
   bool IsSupportedUniformLayout(QualType QT, uint64_t offset,
                                 ASTContext &context, SourceRange SR) {
     const auto canonical = QT.getCanonicalType();
-    const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
-    auto type_align = context.getTypeAlignInChars(canonical).getQuantity();
     if (canonical->isScalarType()) {
       if (!IsSupportedUniformScalarLayout(canonical, offset, context, SR))
         return false;
-    } else if (canonical->isVectorType()) {
+    } else if (canonical->isExtVectorType()) {
       if (!IsSupportedUniformVectorLayout(canonical, offset, context, SR))
         return false;
     } else if (canonical->isArrayType()) {
-      type_align = llvm::alignTo(type_align, 16);
       if (!IsSupportedUniformArrayLayout(canonical, offset, context, SR))
         return false;
     } else if (canonical->isRecordType()) {
-      type_align = llvm::alignTo(type_align, 16);
       if (!IsSupportedUniformRecordLayout(canonical, offset, context, SR))
         return false;
     }
 
     // TODO(alan-baker): Find a way to avoid this restriction.
     // Don't allow padding.
+    const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
+    const auto type_align = GetAlignment(canonical, context);
     if (type_size % type_align != 0) {
       Instance.getDiagnostics().Report(
           SR.getBegin(),
@@ -190,9 +199,8 @@ private:
     // An array has a base alignment of is element type, rounded up to a
     // multiple of 16.
     const auto *AT = llvm::cast<ArrayType>(QT);
-    const auto ele_align =
-        context.getTypeAlignInChars(AT->getElementType()).getQuantity();
-    const auto type_align = llvm::alignTo(ele_align, 16);
+    const auto type_align =
+        llvm::alignTo(GetAlignment(AT->getElementType(), context), 16);
     if (offset % type_align != 0) {
       Instance.getDiagnostics().Report(
           SR.getBegin(),
@@ -208,10 +216,8 @@ private:
     // A structure has a base alignment of its largest member, rounded up to a
     // multiple of 16.
     const auto *RT = llvm::cast<RecordType>(QT);
-    const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
-    auto alignment = context.getTypeAlignInChars(QT).getQuantity();
-    alignment = llvm::alignTo(alignment, 16);
-    if (offset % alignment != 0) {
+    const auto type_alignment = GetAlignment(QT, context);
+    if (offset % type_alignment != 0) {
       Instance.getDiagnostics().Report(
           SR.getBegin(),
           CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct]);
@@ -219,28 +225,32 @@ private:
     }
 
     const auto &layout = context.getASTRecordLayout(RT->getDecl());
-    unsigned field_no = 0;
     const FieldDecl *prev = nullptr;
     for (auto field_decl : RT->getDecl()->fields()) {
+      const auto field_type = field_decl->getType();
+      const auto field_alignment = GetAlignment(field_type, context);
+      const unsigned field_no = field_decl->getFieldIndex();
       const uint64_t field_offset =
-          offset + layout.getFieldOffset(field_no) / context.getCharWidth();
+          layout.getFieldOffset(field_no) / context.getCharWidth();
+
+      // Rules must be checked recursively.
+      if (!IsSupportedUniformLayout(field_type, field_offset, context, SR)) {
+        return false;
+      }
+
       if (prev) {
         const auto prev_canonical = prev->getType().getCanonicalType();
         const uint64_t prev_offset =
-            offset +
             layout.getFieldOffset(field_no - 1) / context.getCharWidth();
-        const auto prev_size =
-            context.getTypeSizeInChars(prev_canonical).getQuantity();
+        const auto prev_size = context.getTypeSizeInChars(prev_canonical).getQuantity();
+        const auto prev_alignment = GetAlignment(prev_canonical, context);
+        const auto next_available = prev_offset + llvm::alignTo(prev_size, prev_alignment);
         if (prev_canonical->isArrayType() || prev_canonical->isRecordType()) {
           // The next element after an array or struct must be placed on or
           // after the next multiple of the alignment of that array or
           // struct.
-          const auto prev_alignment =
-              context.getTypeAlignInChars(prev_canonical).getQuantity();
           // Both arrays and structs must be aligned to a multiple of 16 bytes.
-          if (llvm::alignTo(
-                  llvm::alignTo(prev_offset + prev_size, prev_alignment), 16) >
-              field_offset) {
+          if (llvm::alignTo(next_available, 16) > field_offset) {
             Instance.getDiagnostics().Report(
                 SR.getBegin(), CustomDiagnosticsIDMap
                                    [CustomDiagnosticUBOUnalignedStructMember]);
@@ -249,8 +259,10 @@ private:
         }
 
         // TODO(alan-baker): Remove this restriction
-        // No padding between members.
-        if (prev_offset + prev_size != field_offset) {
+        // Padding would need to be inserted if this field is not laid out at
+        // the next available suitable alignment.
+        const auto nearest_offset = llvm::alignTo(next_available, field_alignment);
+        if (nearest_offset != field_offset) {
           Instance.getDiagnostics().Report(
               SR.getBegin(),
               CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
@@ -261,9 +273,12 @@ private:
       // TODO(alan-baker): Remove this restriction
       // No padding allowed at the end of the struct.
       if (field_no == layout.getFieldCount() - 1) {
-        const auto size =
-            context.getTypeSizeInChars(field_decl->getType()).getQuantity();
-        if (field_offset + size != offset + type_size) {
+        const auto field_size =
+            context.getTypeSizeInChars(field_type).getQuantity();
+        const auto used_field_size = llvm::alignTo(field_size, field_alignment);
+        const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
+        const auto used_type_size = llvm::alignTo(type_size, type_alignment);
+        if (field_offset + used_field_size != offset + used_type_size) {
           Instance.getDiagnostics().Report(
               SR.getBegin(),
               CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
@@ -271,14 +286,7 @@ private:
         }
       }
 
-      // Rules must be checked recursively.
-      if (!IsSupportedUniformLayout(field_decl->getType(), field_offset,
-                                    context, SR)) {
-        return false;
-      }
-
       prev = field_decl;
-      ++field_no;
     }
 
     return true;
