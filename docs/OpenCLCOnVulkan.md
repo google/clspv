@@ -495,9 +495,6 @@ variant of SPIR-V are restricted.
 
 OpenCL C language kernels **must not** be called from other kernels.
 
-Pointer types in the `local` address space **must not** be used as kernel
-arguments.
-
 Pointers of type `half` **must not** be used as kernel arguments.
 
 ### Types
