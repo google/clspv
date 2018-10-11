@@ -261,30 +261,30 @@ private:
         // TODO(alan-baker): Remove this restriction
         // Padding would need to be inserted if this field is not laid out at
         // the next available suitable alignment.
-        const auto nearest_offset = llvm::alignTo(next_available, field_alignment);
-        if (nearest_offset != field_offset) {
-          Instance.getDiagnostics().Report(
-              SR.getBegin(),
-              CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
-          return false;
-        }
+        //const auto nearest_offset = llvm::alignTo(next_available, field_alignment);
+        //if (nearest_offset != field_offset) {
+        //  Instance.getDiagnostics().Report(
+        //      SR.getBegin(),
+        //      CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
+        //  return false;
+        //}
       }
 
       // TODO(alan-baker): Remove this restriction
       // No padding allowed at the end of the struct.
-      if (field_no == layout.getFieldCount() - 1) {
-        const auto field_size =
-            context.getTypeSizeInChars(field_type).getQuantity();
-        const auto used_field_size = llvm::alignTo(field_size, field_alignment);
-        const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
-        const auto used_type_size = llvm::alignTo(type_size, type_alignment);
-        if (field_offset + used_field_size != offset + used_type_size) {
-          Instance.getDiagnostics().Report(
-              SR.getBegin(),
-              CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
-          return false;
-        }
-      }
+      //if (field_no == layout.getFieldCount() - 1) {
+      //  const auto field_size =
+      //      context.getTypeSizeInChars(field_type).getQuantity();
+      //  const auto used_field_size = llvm::alignTo(field_size, field_alignment);
+      //  const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
+      //  const auto used_type_size = llvm::alignTo(type_size, type_alignment);
+      //  if (field_offset + used_field_size != offset + used_type_size) {
+      //    Instance.getDiagnostics().Report(
+      //        SR.getBegin(),
+      //        CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
+      //    return false;
+      //  }
+      //}
 
       prev = field_decl;
     }
@@ -1074,6 +1074,7 @@ int main(const int argc, const char *const argv[]) {
   // This pass generates insertions that need to be rewritten.
   pm.add(clspv::createScalarizePass());
   pm.add(clspv::createRewriteInsertsPass());
+  pm.add(clspv::createUBOTypeTransformPass());
   pm.add(clspv::createSPIRVProducerPass(
       binaryStream, descriptor_map_out, SamplerMapEntries,
       OutputAssembly.getValue(), OutputFormat == "c"));

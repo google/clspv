@@ -316,7 +316,7 @@ struct SPIRVProducerPass final : public ModulePass {
   // allocated sequentially starting with the current value of nextID, and
   // with a type following its subtypes.  Also updates nextID to just beyond
   // the last generated ID.
-  void GenerateSPIRVTypes(LLVMContext& context, const DataLayout &DL);
+  void GenerateSPIRVTypes(LLVMContext& context, Module &module);
   void GenerateSPIRVConstants();
   void GenerateModuleInfo(Module &M);
   void GenerateGlobalVar(GlobalVariable &GV);
@@ -579,7 +579,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   // Generate SPIRV instructions for types.
-  GenerateSPIRVTypes(module.getContext(), DL);
+  GenerateSPIRVTypes(module.getContext(), module);
 
   // Generate SPIRV constants.
   GenerateSPIRVConstants();
@@ -1772,10 +1772,11 @@ void SPIRVProducerPass::GenerateExtInstImport() {
                                                MkString("GLSL.std.450")));
 }
 
-void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayout &DL) {
+void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, Module &module) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   ValueMapType &VMap = getValueMap();
   ValueMapType &AllocatedVMap = getAllocatedValueMap();
+  const auto &DL = module.getDataLayout();
 
   // Map for OpTypeRuntimeArray. If argument has pointer type, 2 spirv type
   // instructions are generated. They are OpTypePointer and OpTypeRuntimeArray.
@@ -1952,6 +1953,22 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
                        });
 
       const auto StructLayout = DL.getStructLayout(STy);
+      // Search for the correct offsets if this type was remapped.
+      SmallVector<uint64_t, 8> offsets;
+      if (auto *offset_md = module.getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
+        for (const auto *operand : offset_md->operands()) {
+          const auto *pair = cast<MDTuple>(operand);
+          if (cast<ConstantAsMetadata>(pair->getOperand(0))->getValue()->getType() == STy) {
+            const auto *values = cast<MDTuple>(pair->getOperand(1));
+            for (const Metadata *offset_md : values->operands()) {
+              const auto *constant_md = cast<ConstantAsMetadata>(offset_md);
+              uint64_t offset = cast<ConstantInt>(constant_md->getValue())->getZExtValue();
+              offsets.push_back(offset);
+            }
+            break;
+          }
+        }
+      }
 
       // #error TODO(dneto): Only do this if in TypesNeedingLayout.
       for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
@@ -1964,8 +1981,12 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, const DataLayou
 
         Ops << MkId(STyID) << MkNum(MemberIdx) << MkNum(spv::DecorationOffset);
 
-        const auto ByteOffset =
-            uint32_t(StructLayout->getElementOffset(MemberIdx));
+        auto ByteOffset = StructLayout->getElementOffset(MemberIdx);
+        if (!offsets.empty()) {
+          ByteOffset = offsets[MemberIdx];
+        }
+        //const auto ByteOffset =
+        //    uint32_t(StructLayout->getElementOffset(MemberIdx));
         Ops << MkNum(ByteOffset);
 
         auto *DecoInst = new SPIRVInstruction(spv::OpMemberDecorate, Ops);

@@ -349,4 +349,6 @@ llvm::ModulePass *createInlineEntryPointsPass();
 /// bugs. See HackPhis().
 llvm::ModulePass *createScalarizePass();
 
+llvm::ModulePass *createUBOTypeTransformPass();
+
 } // namespace clspv
