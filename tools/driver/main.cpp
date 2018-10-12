@@ -123,7 +123,17 @@ private:
     }
 
     // TODO(alan-baker): Find a way to avoid this restriction.
-    // Don't allow padding.
+    // Don't allow padding. This prevents structs like:
+    // struct {
+    //   int x[2];
+    //   int y __attribute((aligned(16)));
+    // };
+    //
+    // This would map in LLVM to { [2 x i32], [8 x i8], i32, [12 xi8] }.
+    // There is no easy way to manipulate the padding after the array to
+    // satisfy the standard Uniform buffer layout rules in this case. The usual
+    // trick is replacing the i8 arrays with an i32 element, but the i32 would
+    // still be laid out too close to the array.
     const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
     const auto type_align = GetAlignment(canonical, context);
     if (type_size % type_align != 0) {
@@ -257,34 +267,7 @@ private:
             return false;
           }
         }
-
-        // TODO(alan-baker): Remove this restriction
-        // Padding would need to be inserted if this field is not laid out at
-        // the next available suitable alignment.
-        //const auto nearest_offset = llvm::alignTo(next_available, field_alignment);
-        //if (nearest_offset != field_offset) {
-        //  Instance.getDiagnostics().Report(
-        //      SR.getBegin(),
-        //      CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
-        //  return false;
-        //}
       }
-
-      // TODO(alan-baker): Remove this restriction
-      // No padding allowed at the end of the struct.
-      //if (field_no == layout.getFieldCount() - 1) {
-      //  const auto field_size =
-      //      context.getTypeSizeInChars(field_type).getQuantity();
-      //  const auto used_field_size = llvm::alignTo(field_size, field_alignment);
-      //  const auto type_size = context.getTypeSizeInChars(QT).getQuantity();
-      //  const auto used_type_size = llvm::alignTo(type_size, type_alignment);
-      //  if (field_offset + used_field_size != offset + used_type_size) {
-      //    Instance.getDiagnostics().Report(
-      //        SR.getBegin(),
-      //        CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedStruct]);
-      //    return false;
-      //  }
-      //}
 
       prev = field_decl;
     }
@@ -1074,6 +1057,8 @@ int main(const int argc, const char *const argv[]) {
   // This pass generates insertions that need to be rewritten.
   pm.add(clspv::createScalarizePass());
   pm.add(clspv::createRewriteInsertsPass());
+  // This pass mucks with types to point where you shouldn't rely on DataLayout
+  // anymore so leave this right before SPIR-V generation.
   pm.add(clspv::createUBOTypeTransformPass());
   pm.add(clspv::createSPIRVProducerPass(
       binaryStream, descriptor_map_out, SamplerMapEntries,

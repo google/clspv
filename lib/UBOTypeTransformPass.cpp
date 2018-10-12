@@ -33,38 +33,66 @@ using namespace llvm;
 namespace {
 
 class UBOTypeTransformPass final : public ModulePass {
- public:
+public:
   static char ID;
   UBOTypeTransformPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override;
- private:
-  Type *MapType(Type* type, Module &M);
+
+private:
+  // Returns the remapped version of |type| that satisfies UBO requirements.
+  Type *MapType(Type *type, Module &M);
+
+  // Returns the remapped version of |type| that satisfies UBO requirements.
   StructType *MapStructType(StructType *struct_ty, Module &M);
+
+  // Performs type mutation on |M|. Returns true if |M| was modified.
   bool RemapTypes(Module &M);
+
+  // Performs type mutation for functions that require it. Returns true if the
+  // module is modified.
+  //
+  // If a function requires type mutation it will be replaced by a new
+  // function. The function's basic blocks are moved into the new function and
+  // all metadata is copied.
+  bool RemapFunctions(SmallVectorImpl<Function *> *functions_to_modify,
+                      Module &M);
+
+  // Performs type mutation on |user|. Recursively fixes operands of |user|.
+  // Returns true if the module is modified.
   bool RemapUser(User *user, Module &M);
+
+  // Mutates the type of |value|. Returns true if the module is modified.
   bool RemapValue(Value *value, Module &M);
 
-  DenseMap<Type*,Type*> remapped_types_;
-  DenseSet<Type*> deferred_types_;
-  DenseSet<Type*> processing_types_;
+  // Performs final modifications on functions that were replaced. Fixes names
+  // and use-def chains.
+  void FixupFunctions(const ArrayRef<Function *> &functions_to_modify,
+                      Module &M);
+
+  // Maps a type to its UBO type.
+  DenseMap<Type *, Type *> remapped_types_;
+
+  // Prevents infinite recusion.
+  DenseSet<Type *> deferred_types_;
+
+  // Maps a function to it's replacement.
+  DenseMap<Function *, Function *> function_replacements_;
 };
 
 char UBOTypeTransformPass::ID = 0;
-static RegisterPass<UBOTypeTransformPass>
-  X("UBOTypeTransformPass", "Transform UBO types");
+static RegisterPass<UBOTypeTransformPass> X("UBOTypeTransformPass",
+                                            "Transform UBO types");
 
-}
+} // namespace
 
 namespace clspv {
-ModulePass *createUBOTypeTransformPass() {
-  return new UBOTypeTransformPass();
-}
+ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }
 } // namespace clspv
 
 namespace {
 
 bool UBOTypeTransformPass::runOnModule(Module &M) {
-  //llvm::errs() << M << "\n";
+  llvm::errs() << "BEFORE\n" << M << "\nBEFORE\n";
 
   if (!clspv::Option::ConstantArgsInUniformBuffer())
     return false;
@@ -75,10 +103,12 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
       continue;
 
     for (auto &Arg : F.args()) {
-      if (clspv::GetArgKindForType(Arg.getType()) == clspv::ArgKind::BufferUBO) {
-        // Pre-populate the type mapping for types that must change.
-        Type *remapped = MapType(Arg.getType(), M);
-        llvm::errs() << "Remapping " << *Arg.getType()->getPointerElementType() << " to:\n " << *remapped->getPointerElementType() << "\n";
+      if (clspv::GetArgKindForType(Arg.getType()) ==
+          clspv::ArgKind::BufferUBO) {
+        // Pre-populate the type mapping for types that must change. This
+        // necessary to prevent caching what would appear to be a no-op too
+        // early.
+        MapType(Arg.getType(), M);
       }
     }
   }
@@ -87,42 +117,52 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
     changed |= RemapTypes(M);
   }
 
-  llvm::errs() << M << "\n";
-  llvm_unreachable("intentional");
+  llvm::errs() << "\n\nAFTER\n" << M << "\nAFTER\n";
   return changed;
 }
 
 Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
+  // Check the cache to see if we've fixed this type.
   auto iter = remapped_types_.find(type);
   if (iter != remapped_types_.end()) {
     return iter->second;
   }
 
   // Fix circular references.
-  if (!processing_types_.insert(type).second) {
-    deferred_types_.insert(type);
+  if (!deferred_types_.insert(type).second) {
     return type;
   }
 
+  // Rebuild the types. Most types do not need handled here.
   Type *remapped = type;
   switch (type->getTypeID()) {
-    case Type::PointerTyID: {
-      PointerType *pointer = cast<PointerType>(type);
-      Type *pointee = MapType(pointer->getElementType(), M);
-      remapped = PointerType::get(pointee, pointer->getAddressSpace());
-      break;
+  case Type::PointerTyID: {
+    PointerType *pointer = cast<PointerType>(type);
+    Type *pointee = MapType(pointer->getElementType(), M);
+    remapped = PointerType::get(pointee, pointer->getAddressSpace());
+    break;
+  }
+  case Type::StructTyID:
+    remapped = MapStructType(cast<StructType>(type), M);
+    break;
+  case Type::ArrayTyID: {
+    ArrayType *array = cast<ArrayType>(type);
+    Type *element = MapType(array->getElementType(), M);
+    remapped = ArrayType::get(element, array->getNumElements());
+    break;
+  }
+  case Type::FunctionTyID: {
+    FunctionType *function = cast<FunctionType>(type);
+    SmallVector<Type *, 8> arg_types;
+    for (auto *param : function->params()) {
+      arg_types.push_back(MapType(param, M));
     }
-    case Type::StructTyID:
-      remapped = MapStructType(cast<StructType>(type), M);
-      break;
-    case Type::ArrayTyID: {
-      ArrayType *array = cast<ArrayType>(type);
-      Type *element = MapType(array->getElementType(), M);
-      remapped = ArrayType::get(element, array->getNumElements());
-      break;
-    }
-    default:
-      break;
+    remapped = FunctionType::get(MapType(function->getReturnType(), M),
+                                 arg_types, function->isVarArg());
+    break;
+  }
+  default:
+    break;
   }
 
   deferred_types_.erase(type);
@@ -130,7 +170,8 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
   return remapped_types_.insert(std::make_pair(type, remapped)).first->second;
 }
 
-StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty, Module &M) {
+StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
+                                                Module &M) {
   bool changed = false;
   SmallVector<Type *, 8> elements;
   SmallVector<uint64_t, 8> offsets;
@@ -142,20 +183,20 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty, Module &M
     if (array && array->getElementType()->isIntegerTy(8) && offset % 16 != 0) {
       // This is a padding element.
       elements.push_back(Type::getInt32Ty(M.getContext()));
-      changed = true;
     } else {
       elements.push_back(MapType(element, M));
     }
     offsets.push_back(offset);
+    changed |= (element != elements.back());
   }
 
   if (changed) {
     StructType *replacement = StructType::create(elements);
 
-    // Record the correct offsets.
+    // Record the correct offsets for use when generating the SPIR-V binary.
     NamedMDNode *offsets_md =
         M.getOrInsertNamedMetadata(clspv::RemappedTypeOffsetMetadataName());
-    SmallVector<Metadata*, 8> offset_values;
+    SmallVector<Metadata *, 8> offset_values;
     for (auto offset : offsets) {
       offset_values.push_back(ConstantAsMetadata::get(
           ConstantInt::get(Type::getInt32Ty(M.getContext()), offset)));
@@ -176,9 +217,12 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty, Module &M
 bool UBOTypeTransformPass::RemapTypes(Module &M) {
   bool changed = false;
 
-  // Fix globals.
+  // TODO(alan-baker): Fix globals.
   // Functions are problematic. Need to recreate them.
+  SmallVector<Function *, 16> functions_to_modify;
+  changed |= RemapFunctions(&functions_to_modify, M);
 
+  // Perform the type mutation within each function as necessary.
   for (auto &F : M) {
     for (auto &Arg : F.args()) {
       changed |= RemapValue(&Arg, M);
@@ -186,7 +230,57 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
 
     for (auto &BB : F) {
       for (auto &I : BB) {
+        if (auto *call = dyn_cast<CallInst>(&I)) {
+          Function *replacement =
+              function_replacements_[call->getCalledFunction()];
+          call->setCalledFunction(replacement->getFunctionType(), replacement);
+        }
         changed |= RemapUser(&I, M);
+      }
+    }
+  }
+
+  FixupFunctions(functions_to_modify, M);
+
+  return changed;
+}
+
+bool UBOTypeTransformPass::RemapFunctions(
+    SmallVectorImpl<Function *> *functions_to_modify, Module &M) {
+  bool changed = false;
+  for (auto &F : M) {
+    auto *remapped = MapType(F.getFunctionType(), M);
+    if (F.getType() != remapped) {
+      changed = true;
+      functions_to_modify->push_back(&F);
+    }
+  }
+
+  for (auto func : *functions_to_modify) {
+    // Remove the function from the module, but keep it around for the time
+    // being.
+    func->removeFromParent();
+    auto *replacement_type =
+        cast<FunctionType>(MapType(func->getFunctionType(), M));
+
+    // Insert the replacement function. Copy the calling convention, attributes
+    // and metadata of the source function.
+    Constant *inserted = M.getOrInsertFunction(
+        func->getName(), replacement_type, func->getAttributes());
+    Function *replacement = cast<Function>(inserted);
+    function_replacements_[func] = replacement;
+    replacement->setCallingConv(func->getCallingConv());
+    replacement->copyMetadata(func, 0);
+
+    // Move the basic blocks into the replacement function.
+    if (!func->isDeclaration()) {
+      std::vector<BasicBlock *> blocks;
+      for (auto &BB : *func) {
+        blocks.push_back(&BB);
+      }
+      for (auto *BB : blocks) {
+        BB->removeFromParent();
+        BB->insertInto(replacement);
       }
     }
   }
@@ -203,6 +297,7 @@ bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
       changed |= RemapValue(use.get(), M);
     else if (!isa<Instruction>(operand_user) &&
              !isa<GlobalValue>(operand_user) && !isa<Argument>(operand_user))
+      // Keep mutating to handle constant expressions.
       changed |= RemapUser(operand_user, M);
   }
 
@@ -218,5 +313,25 @@ bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
   return true;
 }
 
+void UBOTypeTransformPass::FixupFunctions(
+    const ArrayRef<Function *> &functions_to_modify, Module &M) {
+  // If functions were replaced, we have some final fixup to do:
+  // * Rename arguments to maintain descriptor mapping
+  // * Replace argument and function uses with their replacements.
+  //
+  // Note: type mutations occur to satisfy RAUW requirements.
+  for (auto *func : functions_to_modify) {
+    Function *replacement = function_replacements_[func];
+    for (auto arg_iter = func->arg_begin(),
+              replace_iter = replacement->arg_begin();
+         arg_iter != func->arg_end(); ++arg_iter, ++replace_iter) {
+      replace_iter->takeName(&*arg_iter);
+      arg_iter->mutateType(replace_iter->getType());
+      arg_iter->replaceAllUsesWith(replace_iter);
+    }
+    func->mutateType(replacement->getType());
+    func->replaceAllUsesWith(replacement);
+    delete func;
+  }
 }
-
+} // namespace
