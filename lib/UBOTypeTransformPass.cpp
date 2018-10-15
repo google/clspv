@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This pass performs type mutation to create types that satisfy the standard
+// Uniform buffer layout rules of Vulkan section 14.5.4.
+//
+// Assumes the following passes have run:
+// UndoGetElementPtrConstantExprPass
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/CallingConv.h"
@@ -256,9 +262,19 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         if (auto *call = dyn_cast<CallInst>(&I)) {
-          Function *replacement =
-              function_replacements_[call->getCalledFunction()];
-          call->setCalledFunction(replacement->getFunctionType(), replacement);
+          // Update the called function if we rewrote it.
+          auto iter = function_replacements_.find(call->getCalledFunction());
+          if (iter != function_replacements_.end()) {
+            call->setCalledFunction(iter->second->getFunctionType(),
+                                    iter->second);
+          }
+        } else if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+          // Fix the extra type in the GEP
+          Type *source_ty = gep->getSourceElementType();
+          Type *remapped = MapType(source_ty, M);
+          if (remapped != source_ty) {
+            gep->setSourceElementType(remapped);
+          }
         }
         changed |= RemapUser(&I, M);
       }
@@ -367,6 +383,7 @@ bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
         auto iter = remapped_globals_.find(constant);
         if (iter != remapped_globals_.end()) {
           use.set(iter->second);
+          changed = true;
         }
       }
     }
