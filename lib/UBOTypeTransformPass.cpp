@@ -57,6 +57,12 @@ private:
   bool RemapFunctions(SmallVectorImpl<Function *> *functions_to_modify,
                       Module &M);
 
+  // Rebuilds global variables if their types require transformation. Returns
+  // true if the module is modified.
+  bool
+  RemapGlobalVariables(SmallVectorImpl<GlobalVariable *> *variables_to_modify,
+                       Module &M);
+
   // Performs type mutation on |user|. Recursively fixes operands of |user|.
   // Returns true if the module is modified.
   bool RemapUser(User *user, Module &M);
@@ -64,10 +70,22 @@ private:
   // Mutates the type of |value|. Returns true if the module is modified.
   bool RemapValue(Value *value, Module &M);
 
+  // Maps and rebuilds |constant| to match its mapped type. Returns true if the
+  // module if modified.
+  bool RemapConstant(Constant *constant, Module &M);
+
+  // Rebuild |constant| as a constant with |remapped_ty| type. Returns the
+  // rebuilt constant.
+  Constant *RebuildConstant(Constant *constant, Type *remapped_ty, Module &M);
+
   // Performs final modifications on functions that were replaced. Fixes names
   // and use-def chains.
   void FixupFunctions(const ArrayRef<Function *> &functions_to_modify,
                       Module &M);
+
+  // Replaces and deletes modified global variables.
+  void
+  FixupGlobalVariables(const ArrayRef<GlobalVariable *> &variables_to_modify);
 
   // Maps a type to its UBO type.
   DenseMap<Type *, Type *> remapped_types_;
@@ -75,8 +93,11 @@ private:
   // Prevents infinite recusion.
   DenseSet<Type *> deferred_types_;
 
-  // Maps a function to it's replacement.
+  // Maps a function to its replacement.
   DenseMap<Function *, Function *> function_replacements_;
+
+  // Maps a global value to its replacement.
+  DenseMap<Constant *, Constant *> remapped_globals_;
 };
 
 char UBOTypeTransformPass::ID = 0;
@@ -191,7 +212,8 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
   }
 
   if (changed) {
-    StructType *replacement = StructType::create(elements);
+    StructType *replacement =
+        StructType::create(elements, "", struct_ty->isPacked());
 
     // Record the correct offsets for use when generating the SPIR-V binary.
     NamedMDNode *offsets_md =
@@ -217,10 +239,13 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
 bool UBOTypeTransformPass::RemapTypes(Module &M) {
   bool changed = false;
 
-  // TODO(alan-baker): Fix globals.
-  // Functions are problematic. Need to recreate them.
+  // Functions with transformed types require rebuilding.
   SmallVector<Function *, 16> functions_to_modify;
   changed |= RemapFunctions(&functions_to_modify, M);
+
+  // GLobal variables with transformed types require rebuilding.
+  SmallVector<GlobalVariable *, 16> variables_to_modify;
+  changed |= RemapGlobalVariables(&variables_to_modify, M);
 
   // Perform the type mutation within each function as necessary.
   for (auto &F : M) {
@@ -241,6 +266,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
   }
 
   FixupFunctions(functions_to_modify, M);
+  FixupGlobalVariables(variables_to_modify);
 
   return changed;
 }
@@ -288,17 +314,62 @@ bool UBOTypeTransformPass::RemapFunctions(
   return changed;
 }
 
+bool UBOTypeTransformPass::RemapGlobalVariables(
+    SmallVectorImpl<GlobalVariable *> *variables_to_modify, Module &M) {
+  bool changed = false;
+  for (auto &GV : M.globals()) {
+    if (auto *ptr_ty = dyn_cast<PointerType>(GV.getType())) {
+      auto *remapped = MapType(ptr_ty->getElementType(), M);
+      if (ptr_ty->getElementType() != remapped) {
+        changed = true;
+        variables_to_modify->push_back(&GV);
+      }
+    }
+  }
+  for (auto *GV : *variables_to_modify) {
+    GV->removeFromParent();
+    auto *replacement_type = MapType(GV->getType()->getPointerElementType(), M);
+
+    Constant *initializer = nullptr;
+    if (auto old_init = GV->getInitializer()) {
+      initializer = RebuildConstant(old_init, replacement_type, M);
+    }
+    // Recreate the global variable.
+    GlobalVariable *replacement = new GlobalVariable(
+        M, replacement_type, GV->isConstant(), GV->getLinkage(), initializer,
+        GV->getName(), /*InsertBefore=*/nullptr, GV->getThreadLocalMode(),
+        GV->getType()->getPointerAddressSpace());
+    remapped_globals_[GV] = replacement;
+    replacement->copyMetadata(GV, 0);
+  }
+
+  return changed;
+}
+
 bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
+  if (isa<ConstantData>(user) || isa<ConstantAggregate>(user)) {
+    return RemapConstant(cast<Constant>(user), M);
+  }
+
   bool changed = RemapValue(user, M);
 
   for (Use &use : user->operands()) {
     User *operand_user = use.getUser();
-    if (!operand_user)
+    if (!operand_user) {
       changed |= RemapValue(use.get(), M);
-    else if (!isa<Instruction>(operand_user) &&
-             !isa<GlobalValue>(operand_user) && !isa<Argument>(operand_user))
+    } else if (!isa<Instruction>(operand_user) &&
+               !isa<GlobalValue>(operand_user) &&
+               !isa<Argument>(operand_user)) {
       // Keep mutating to handle constant expressions.
       changed |= RemapUser(operand_user, M);
+      // If this was a constant that got rebuilt, update the operand.
+      if (auto *constant = dyn_cast<Constant>(operand_user)) {
+        auto iter = remapped_globals_.find(constant);
+        if (iter != remapped_globals_.end()) {
+          use.set(iter->second);
+        }
+      }
+    }
   }
 
   return changed;
@@ -311,6 +382,71 @@ bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
 
   value->mutateType(remapped);
   return true;
+}
+
+bool UBOTypeTransformPass::RemapConstant(Constant *constant, Module &M) {
+  // Rebuild the constant.
+  Type *remapped = MapType(constant->getType(), M);
+  if (remapped == constant->getType())
+    return false;
+
+  RebuildConstant(constant, remapped, M);
+  return true;
+}
+
+Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
+                                                Type *remapped_ty, Module &M) {
+  if (constant->getType() == remapped_ty)
+    return constant;
+
+  // Check whether this constant has been rebuilt already.
+  auto iter = remapped_globals_.find(constant);
+  if (iter != remapped_globals_.end())
+    return iter->second;
+
+  if (constant->isZeroValue()) {
+    Constant *null_constant = Constant::getNullValue(remapped_ty);
+    remapped_globals_[constant] = null_constant;
+    return null_constant;
+  } else if (isa<UndefValue>(constant)) {
+    // This case should catch the padding transformations since the padding
+    // can't be initialized.
+    Constant *undef_constant = UndefValue::get(remapped_ty);
+    remapped_globals_[constant] = undef_constant;
+    return undef_constant;
+  } else if (auto *agg_constant = dyn_cast<ConstantAggregate>(constant)) {
+    auto *struct_ty = dyn_cast<StructType>(constant->getType());
+    auto *seq_ty = dyn_cast<SequentialType>(constant->getType());
+    // CompositeType doesn't implement getNumElements().
+    unsigned num_elements =
+        struct_ty ? struct_ty->getNumElements() : seq_ty->getNumElements();
+    auto *remapped_comp_ty = cast<CompositeType>(remapped_ty);
+    SmallVector<Constant *, 8> rebuilt_constants;
+    for (unsigned i = 0; i != num_elements; ++i) {
+      Constant *element_constant = agg_constant->getAggregateElement(i);
+      Type *remapped_ele_ty = remapped_comp_ty->getTypeAtIndex(i);
+      if (remapped_ele_ty != element_constant->getType()) {
+        rebuilt_constants.push_back(
+            RebuildConstant(element_constant, remapped_ele_ty, M));
+      } else {
+        rebuilt_constants.push_back(element_constant);
+      }
+    }
+
+    Constant *rebuilt = nullptr;
+    if (auto remapped_struct_ty = dyn_cast<StructType>(remapped_ty)) {
+      rebuilt = ConstantStruct::get(remapped_struct_ty, rebuilt_constants);
+    } else if (auto remapped_array_ty = dyn_cast<ArrayType>(remapped_ty)) {
+      rebuilt = ConstantArray::get(remapped_array_ty, rebuilt_constants);
+    } else {
+      rebuilt = ConstantVector::get(rebuilt_constants);
+    }
+    return rebuilt;
+  } else {
+    llvm_unreachable("rewriting scalar constant?");
+  }
+
+  return constant;
 }
 
 void UBOTypeTransformPass::FixupFunctions(
@@ -332,6 +468,17 @@ void UBOTypeTransformPass::FixupFunctions(
     func->mutateType(replacement->getType());
     func->replaceAllUsesWith(replacement);
     delete func;
+  }
+}
+
+void UBOTypeTransformPass::FixupGlobalVariables(
+    const ArrayRef<GlobalVariable *> &variables_to_modify) {
+  for (auto *var : variables_to_modify) {
+    // Mutate type to satisfy RAUW requirements.
+    auto *remapped_var = remapped_globals_[var];
+    var->mutateType(remapped_var->getType());
+    var->replaceAllUsesWith(remapped_var);
+    delete var;
   }
 }
 } // namespace
