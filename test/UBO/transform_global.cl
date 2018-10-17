@@ -22,6 +22,7 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // MAP-NEXT: kernel,foo,arg,c_arg,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,buffer_ubo
 // MAP-NEXT: kernel,foo,arg,n,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argKind,pod
 
+// CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 16
 // CHECK-DAG: OpMemberDecorate [[data_type:%[0-9a-zA-Z_]+]] 0 Offset 0
 // CHECK-DAG: OpMemberDecorate [[data_type]] 1 Offset 4
 // CHECK-DAG: OpDecorate [[data:%[0-9a-zA-Z_]+]] Binding 0
@@ -33,7 +34,7 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: OpDecorate [[n]] DescriptorSet 0
 //     CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 //     CHECK: [[data_type]] = OpTypeStruct [[int]] [[int]]
-//     CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[data_type]]
+//     CHECK: [[runtime]] = OpTypeRuntimeArray [[data_type]]
 //     CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 //     CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
 //     CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]

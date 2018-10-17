@@ -385,6 +385,15 @@ struct SPIRVProducerPass final : public ModulePass {
   // Returns true if |type| is compatible with OpConstantNull.
   bool IsTypeNullable(const Type* type) const;
 
+  // Populate UBO remapped type maps.
+  void PopulateUBOTypeMaps(Module &module);
+
+  // Wrapped methods of DataLayout accessors. If |type| was remapped for UBOs,
+  // uses the internal map, otherwise it falls back on the data layout.
+  uint64_t GetTypeSizeInBits(Type *type, const DataLayout &DL);
+  uint64_t GetTypeStoreSize(Type *type, const DataLayout &DL);
+  uint64_t GetTypeAllocSize(Type *type, const DataLayout &DL);
+
 private:
   static char ID;
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
@@ -519,6 +528,10 @@ private:
   DenseMap<const Argument*, int> LocalArgSpecIds;
   // A mapping from SpecId to its LocalArgInfo.
   DenseMap<int, LocalArgInfo> LocalSpecIdInfoMap;
+  // A mapping from a remapped type to its real offsets.
+  DenseMap<Type*, std::vector<uint32_t>> RemappedUBOTypeOffsets;
+  // A mapping from a remapped type to its real sizes.
+  DenseMap<Type*, std::tuple<uint64_t, uint64_t, uint64_t>> RemappedUBOTypeSizes;
 
   // The ID of 32-bit integer zero constant.  This is only valid after
   // GenerateSPIRVConstants has run.
@@ -543,6 +556,8 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
+
+  PopulateUBOTypeMaps(module);
 
   // SPIR-V always begins with its header information
   outputHeader();
@@ -942,7 +957,7 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
       assert(GVList.size() == 1);
       const auto *GV = GVList[0];
       const auto constants_byte_size =
-          (DL.getTypeSizeInBits(GV->getInitializer()->getType())) / 8;
+          (GetTypeSizeInBits(GV->getInitializer()->getType(), DL)) / 8;
       const size_t kConstantMaxSize = 65536;
       if (constants_byte_size > kConstantMaxSize) {
         outs() << "Max __constant capacity of " << kConstantMaxSize
@@ -1954,20 +1969,10 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, Module &module)
 
       const auto StructLayout = DL.getStructLayout(STy);
       // Search for the correct offsets if this type was remapped.
-      SmallVector<uint64_t, 8> offsets;
-      if (auto *offset_md = module.getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
-        for (const auto *operand : offset_md->operands()) {
-          const auto *pair = cast<MDTuple>(operand);
-          if (cast<ConstantAsMetadata>(pair->getOperand(0))->getValue()->getType() == STy) {
-            const auto *values = cast<MDTuple>(pair->getOperand(1));
-            for (const Metadata *offset_md : values->operands()) {
-              const auto *constant_md = cast<ConstantAsMetadata>(offset_md);
-              uint64_t offset = cast<ConstantInt>(constant_md->getValue())->getZExtValue();
-              offsets.push_back(offset);
-            }
-            break;
-          }
-        }
+      std::vector<uint32_t> *offsets = nullptr;
+      auto iter = RemappedUBOTypeOffsets.find(STy);
+      if (iter != RemappedUBOTypeOffsets.end()) {
+        offsets = &iter->second;
       }
 
       // #error TODO(dneto): Only do this if in TypesNeedingLayout.
@@ -1982,8 +1987,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, Module &module)
         Ops << MkId(STyID) << MkNum(MemberIdx) << MkNum(spv::DecorationOffset);
 
         auto ByteOffset = StructLayout->getElementOffset(MemberIdx);
-        if (!offsets.empty()) {
-          ByteOffset = offsets[MemberIdx];
+        if (offsets) {
+          ByteOffset = (*offsets)[MemberIdx];
         }
         //const auto ByteOffset =
         //    uint32_t(StructLayout->getElementOffset(MemberIdx));
@@ -2097,7 +2102,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, Module &module)
 
             Ops << MkId(OpTypeRuntimeArrayID)
                 << MkNum(spv::DecorationArrayStride)
-                << MkNum(static_cast<uint32_t>(DL.getTypeAllocSize(EleTy)));
+                << MkNum(static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL)));
 
             auto *DecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
             SPIRVInstList.insert(DecoInsertPoint, DecoInst);
@@ -3001,9 +3006,9 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
         descriptorMapOut << "kernel," << F.getName() << ",arg," << name
                          << ",argOrdinal," << old_index << ",argKind,"
                          << argKind << ",arrayElemSize,"
-                         << DL.getTypeAllocSize(
+                         << GetTypeAllocSize(
                                 func_ty->getParamType(unsigned(new_index))
-                                    ->getPointerElementType())
+                                    ->getPointerElementType(), DL)
                          << ",arrayNumElemSpecId," << spec_id << "\n";
       } else {
         auto *info = resource_var_at_index[new_index];
@@ -3050,7 +3055,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
                          << ",argKind,"
                          << "local"
                          << ",arrayElemSize,"
-                         << DL.getTypeAllocSize(local_arg_info.elem_type)
+                         << GetTypeAllocSize(local_arg_info.elem_type, DL)
                          << ",arrayNumElemSpecId," << local_arg_info.spec_id
                          << "\n";
       }
@@ -5208,7 +5213,7 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     SPIRVOperandList Ops;
 
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
-    const uint32_t stride = static_cast<uint32_t>(DL.getTypeAllocSize(elemTy));
+    const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
 
     Ops << MkId(lookupType(type)) << MkNum(spv::DecorationArrayStride)
         << MkNum(stride);
@@ -6197,4 +6202,81 @@ bool SPIRVProducerPass::IsTypeNullable(const Type* type) const {
     default:
       return false;
   }
+}
+
+void SPIRVProducerPass::PopulateUBOTypeMaps(Module &module) {
+  if (auto *offsets_md =
+          module.getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
+    // Metdata is stored as key-value pair operands. The first element of each
+    // operand is the type and the second is a vector of offsets.
+    for (const auto *operand : offsets_md->operands()) {
+      const auto *pair = cast<MDTuple>(operand);
+      auto *type =
+          cast<ConstantAsMetadata>(pair->getOperand(0))->getValue()->getType();
+      const auto *offset_vector = cast<MDTuple>(pair->getOperand(1));
+      std::vector<uint32_t> offsets;
+      for (const Metadata *offset_md : offset_vector->operands()) {
+        const auto *constant_md = cast<ConstantAsMetadata>(offset_md);
+        offsets.push_back(
+            cast<ConstantInt>(constant_md->getValue())->getZExtValue());
+      }
+      RemappedUBOTypeOffsets.insert(std::make_pair(type, offsets));
+    }
+  }
+
+  if (auto *sizes_md =
+          module.getNamedMetadata(clspv::RemappedTypeSizesMetadataName())) {
+    // Metadata is stored as key-value pair operands. The first element of each
+    // operand is the type and the second is a triple of sizes: type size in
+    // bits, store size and alloc size.
+    for (const auto *operand : sizes_md->operands()) {
+      const auto *pair = cast<MDTuple>(operand);
+      auto *type =
+          cast<ConstantAsMetadata>(pair->getOperand(0))->getValue()->getType();
+      const auto *size_triple = cast<MDTuple>(pair->getOperand(1));
+      uint64_t type_size_in_bits =
+          cast<ConstantInt>(
+              cast<ConstantAsMetadata>(size_triple->getOperand(0))->getValue())
+              ->getZExtValue();
+      uint64_t type_store_size =
+          cast<ConstantInt>(
+              cast<ConstantAsMetadata>(size_triple->getOperand(1))->getValue())
+              ->getZExtValue();
+      uint64_t type_alloc_size =
+          cast<ConstantInt>(
+              cast<ConstantAsMetadata>(size_triple->getOperand(2))->getValue())
+              ->getZExtValue();
+      RemappedUBOTypeSizes.insert(std::make_pair(
+          type, std::make_tuple(type_size_in_bits, type_store_size,
+                                type_alloc_size)));
+    }
+  }
+}
+
+uint64_t SPIRVProducerPass::GetTypeSizeInBits(Type *type,
+                                              const DataLayout &DL) {
+  auto iter = RemappedUBOTypeSizes.find(type);
+  if (iter != RemappedUBOTypeSizes.end()) {
+    return std::get<0>(iter->second);
+  }
+
+  return DL.getTypeSizeInBits(type);
+}
+
+uint64_t SPIRVProducerPass::GetTypeStoreSize(Type *type, const DataLayout &DL) {
+  auto iter = RemappedUBOTypeSizes.find(type);
+  if (iter != RemappedUBOTypeSizes.end()) {
+    return std::get<1>(iter->second);
+  }
+
+  return DL.getTypeStoreSize(type);
+}
+
+uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
+  auto iter = RemappedUBOTypeSizes.find(type);
+  if (iter != RemappedUBOTypeSizes.end()) {
+    return std::get<2>(iter->second);
+  }
+
+  return DL.getTypeAllocSize(type);
 }

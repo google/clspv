@@ -119,10 +119,10 @@ ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }
 namespace {
 
 bool UBOTypeTransformPass::runOnModule(Module &M) {
-  llvm::errs() << "BEFORE\n" << M << "\nBEFORE\n";
-
   if (!clspv::Option::ConstantArgsInUniformBuffer())
     return false;
+
+  //llvm::errs() << "BEFORE\n" << M << "\nBEFORE\n";
 
   bool changed = false;
   for (auto &F : M) {
@@ -144,7 +144,7 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
     changed |= RemapTypes(M);
   }
 
-  llvm::errs() << "\n\nAFTER\n" << M << "\nAFTER\n";
+  //llvm::errs() << "\n\nAFTER\n" << M << "\nAFTER\n";
   return changed;
 }
 
@@ -194,7 +194,29 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
 
   deferred_types_.erase(type);
 
-  return remapped_types_.insert(std::make_pair(type, remapped)).first->second;
+  auto result = remapped_types_.insert(std::make_pair(type, remapped));
+  if (remapped != type && result.second && !remapped->isFunctionTy()) {
+    // Record the type sizes from data layout to generate correct SPIRV-V
+    // information later.
+    const auto &DL = M.getDataLayout();
+    NamedMDNode *type_sizes_md =
+        M.getOrInsertNamedMetadata(clspv::RemappedTypeSizesMetadataName());
+    auto *i64 = Type::getInt32Ty(M.getContext());
+    Metadata *size_values[3];
+    size_values[0] = ConstantAsMetadata::get(
+        ConstantInt::get(i64, DL.getTypeSizeInBits(type)));
+    size_values[1] = ConstantAsMetadata::get(
+        ConstantInt::get(i64, DL.getTypeStoreSize(type)));
+    size_values[2] = ConstantAsMetadata::get(
+        ConstantInt::get(i64, DL.getTypeAllocSize(type)));
+    MDTuple *values_md = MDTuple::get(M.getContext(), size_values);
+    MDTuple *entry = MDTuple::get(
+        M.getContext(),
+        {ConstantAsMetadata::get(Constant::getNullValue(remapped)), values_md});
+    type_sizes_md->addOperand(entry);
+  }
+
+  return remapped;
 }
 
 StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,

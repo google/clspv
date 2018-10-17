@@ -26,7 +26,11 @@ inline std::string WorkgroupAccessorFunction() { return "clspv.local.var."; }
 // Base name for resource variable accessor function.
 inline std::string ResourceAccessorFunction() { return "clspv.resource.var."; }
 
+// Name for module level metadata storing UBO remapped type offsets.
 inline std::string RemappedTypeOffsetMetadataName() { return "clspv.remapped.offsets"; }
+
+// Name for module level metadata storing UBO remapped type sizes.
+inline std::string RemappedTypeSizesMetadataName() { return "clspv.remapped.type.sizes"; }
 
 // The first useable SpecId for pointer-to-local arguments.
 // 0, 1 and 2 are reserved for workgroup size.

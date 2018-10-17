@@ -22,6 +22,7 @@ __kernel void foo(__global outer* data, __constant outer* c) {
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,c,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,buffer_ubo
 
+// CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 16
 // CHECK-DAG: OpDecorate [[var:%[0-9a-zA-Z_]+]] NonWritable
 // CHECK-DAG: OpDecorate [[var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[var]] Binding 1
@@ -29,7 +30,7 @@ __kernel void foo(__global outer* data, __constant outer* c) {
 // CHECK: [[float4:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 4
 // CHECK: [[inner:%[0-9a-zA-Z_]+]] = OpTypeStruct [[float4]]
 // CHECK: [[outer:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner]]
-// CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[outer]]
+// CHECK: [[runtime]] = OpTypeRuntimeArray [[outer]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
