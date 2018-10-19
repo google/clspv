@@ -3745,11 +3745,15 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // an OpenCL program-scope constant, we'll swap out the LLVM base pointer
       // for something else in the SPIR-V.
       // E.g. see test/PointerAccessChain/pointer_index_is_constant_1.cl
-      if (GetStorageClass(ResultType->getAddressSpace()) ==
-          spv::StorageClassStorageBuffer) {
+      switch (GetStorageClass(ResultType->getAddressSpace())) {
+      case spv::StorageClassStorageBuffer:
+      case spv::StorageClassUniform:
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
         getTypesNeedingArrayStride().insert(ResultType);
+        break;
+      default:
+        break;
       }
     }
 
