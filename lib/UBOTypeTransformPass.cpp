@@ -122,8 +122,6 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
   if (!clspv::Option::ConstantArgsInUniformBuffer())
     return false;
 
-  //llvm::errs() << "BEFORE\n" << M << "\nBEFORE\n";
-
   bool changed = false;
   for (auto &F : M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
@@ -144,7 +142,6 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
     changed |= RemapTypes(M);
   }
 
-  //llvm::errs() << "\n\nAFTER\n" << M << "\nAFTER\n";
   return changed;
 }
 
