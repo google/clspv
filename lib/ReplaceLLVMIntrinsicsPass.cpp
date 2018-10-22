@@ -147,27 +147,49 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   // source and destination types.  So far this only works for
   // array types, but could be generalized to other regular types
   // like vectors.
-  auto match_types = [&Layout](CallInst &CI, Type **DstElemTy, Type **SrcElemTy,
-                               unsigned *NumDstUnpackings,
+  auto match_types = [&Layout](CallInst &CI, uint64_t Size, Type **DstElemTy,
+                               Type **SrcElemTy, unsigned *NumDstUnpackings,
                                unsigned *NumSrcUnpackings) {
+    auto descend_type = [](Type *InType) {
+      Type *OutType = InType;
+      if (OutType->isStructTy()) {
+        OutType = OutType->getStructElementType(0);
+      } else if (OutType->isArrayTy()) {
+        OutType = OutType->getArrayElementType();
+      } else if (OutType->isVectorTy()) {
+        OutType = OutType->getVectorElementType();
+      } else {
+        assert(false && "Don't know how to descend into type");
+      }
+
+      return OutType;
+    };
+
     unsigned *numSrcUnpackings = 0;
     unsigned *numDstUnpackings = 0;
     while (*SrcElemTy != *DstElemTy) {
       auto SrcElemSize = Layout.getTypeSizeInBits(*SrcElemTy);
       auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy);
       if (SrcElemSize >= DstElemSize) {
-        assert((*SrcElemTy)->isArrayTy());
-        *SrcElemTy = (*SrcElemTy)->getArrayElementType();
+        *SrcElemTy = descend_type(*SrcElemTy);
         (*NumSrcUnpackings)++;
       } else if (DstElemSize >= SrcElemSize) {
-        assert((*DstElemTy)->isArrayTy());
-        *DstElemTy = (*DstElemTy)->getArrayElementType();
+        *DstElemTy = descend_type(*DstElemTy);
         (*NumDstUnpackings)++;
       } else {
         errs() << "Don't know how to unpack types for memcpy: " << CI
                << "\ngot to: " << **DstElemTy << " vs " << **SrcElemTy << "\n";
         assert(false && "Don't know how to unpack these types");
       }
+    }
+
+    auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy) / 8;
+    while (Size < DstElemSize) {
+      *DstElemTy = descend_type(*DstElemTy);
+      *SrcElemTy = descend_type(*SrcElemTy);
+      (*NumDstUnpackings)++;
+      (*NumSrcUnpackings)++;
+      DstElemSize = Layout.getTypeSizeInBits(*DstElemTy) / 8;
     }
   };
 
@@ -194,20 +216,20 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           auto SrcTy = Src->getType();
           assert(SrcTy->isPointerTy());
 
-          auto DstElemTy = DstTy->getPointerElementType();
-          auto SrcElemTy = SrcTy->getPointerElementType();
-          unsigned NumDstUnpackings = 0;
-          unsigned NumSrcUnpackings = 0;
-          match_types(*CI, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
-                      &NumSrcUnpackings);
-
-          // Check that the pointee types match.
-          assert(DstElemTy == SrcElemTy);
-
           // Check that the size is a constant integer.
           assert(isa<ConstantInt>(CI->getArgOperand(2)));
           auto Size =
               dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
+
+          auto DstElemTy = DstTy->getPointerElementType();
+          auto SrcElemTy = SrcTy->getPointerElementType();
+          unsigned NumDstUnpackings = 0;
+          unsigned NumSrcUnpackings = 0;
+          match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
+                      &NumSrcUnpackings);
+
+          // Check that the pointee types match.
+          assert(DstElemTy == SrcElemTy);
 
           auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
 
@@ -253,17 +275,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto SrcElemTy = Src->getType()->getPointerElementType();
         unsigned NumDstUnpackings = 0;
         unsigned NumSrcUnpackings = 0;
-        match_types(*CI, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
-                    &NumSrcUnpackings);
-
-        assert(NumDstUnpackings < 2 && "Need to generalize dst unpacking case");
-        assert(NumSrcUnpackings < 2 && "Need to generalize src unpacking case");
-        assert((NumDstUnpackings == 0 || NumSrcUnpackings == 0) &&
-               "Need to generalize unpackings in both dimensions");
-
-        auto SPIRVIntrinsic = "spirv.copy_memory";
-
         auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
+        match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
+                    &NumSrcUnpackings);
+        auto SPIRVIntrinsic = "spirv.copy_memory";
 
         auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
 
