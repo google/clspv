@@ -18,7 +18,7 @@ add_custom_target(check-spirv
   COMMAND ${LLVM_SOURCE_DIR}/utils/lit/lit.py --verbose ${CMAKE_CURRENT_BINARY_DIR}
     --path ${LLVM_BINARY_DIR}/bin
     --path ${SPIRV_TOOLS_BINARY_DIR}/
-    --path ${CLSPV_BINARY_DIR}/bin
+    --path "$<TARGET_FILE_DIR:clspv>"
   DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt FileCheck not
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
