@@ -1957,6 +1957,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
+      {"_Z8atom_incPU3AS1Vi", "spirv.atomic_inc"},
+      {"_Z8atom_incPU3AS1Vj", "spirv.atomic_inc"},
+      {"_Z8atom_decPU3AS1Vi", "spirv.atomic_dec"},
+      {"_Z8atom_decPU3AS1Vj", "spirv.atomic_dec"},
+      {"_Z12atom_cmpxchgPU3AS1Viii", "spirv.atomic_compare_exchange"},
+      {"_Z12atom_cmpxchgPU3AS1Vjjj", "spirv.atomic_compare_exchange"},
       {"_Z10atomic_incPU3AS1Vi", "spirv.atomic_inc"},
       {"_Z10atomic_incPU3AS1Vj", "spirv.atomic_inc"},
       {"_Z10atomic_decPU3AS1Vi", "spirv.atomic_dec"},
@@ -2058,6 +2064,22 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
   }
 
   const std::map<const char *, llvm::AtomicRMWInst::BinOp> Map2 = {
+      {"_Z8atom_addPU3AS1Vii", llvm::AtomicRMWInst::Add},
+      {"_Z8atom_addPU3AS1Vjj", llvm::AtomicRMWInst::Add},
+      {"_Z8atom_subPU3AS1Vii", llvm::AtomicRMWInst::Sub},
+      {"_Z8atom_subPU3AS1Vjj", llvm::AtomicRMWInst::Sub},
+      {"_Z9atom_xchgPU3AS1Vii", llvm::AtomicRMWInst::Xchg},
+      {"_Z9atom_xchgPU3AS1Vjj", llvm::AtomicRMWInst::Xchg},
+      {"_Z8atom_minPU3AS1Vii", llvm::AtomicRMWInst::Min},
+      {"_Z8atom_minPU3AS1Vjj", llvm::AtomicRMWInst::UMin},
+      {"_Z8atom_maxPU3AS1Vii", llvm::AtomicRMWInst::Max},
+      {"_Z8atom_maxPU3AS1Vjj", llvm::AtomicRMWInst::UMax},
+      {"_Z8atom_andPU3AS1Vii", llvm::AtomicRMWInst::And},
+      {"_Z8atom_andPU3AS1Vjj", llvm::AtomicRMWInst::And},
+      {"_Z7atom_orPU3AS1Vii", llvm::AtomicRMWInst::Or},
+      {"_Z7atom_orPU3AS1Vjj", llvm::AtomicRMWInst::Or},
+      {"_Z8atom_xorPU3AS1Vii", llvm::AtomicRMWInst::Xor},
+      {"_Z8atom_xorPU3AS1Vjj", llvm::AtomicRMWInst::Xor},
       {"_Z10atomic_addPU3AS1Vii", llvm::AtomicRMWInst::Add},
       {"_Z10atomic_addPU3AS1Vjj", llvm::AtomicRMWInst::Add},
       {"_Z10atomic_subPU3AS1Vii", llvm::AtomicRMWInst::Sub},
