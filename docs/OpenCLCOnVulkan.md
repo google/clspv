@@ -603,7 +603,7 @@ The `abs_diff()`, `add_sat()`, `hadd()`, `mad_hi()`, `mad_sat()`, `mul_hi()`,
 #### Relational Functions
 
 The `islessgreater()`, `isfinite()`, `isnormal()`, `isordered()`,
-`isunordered()`, `bitselect()`, and `select()` built-in functions **must not**
+`isunordered()`, and `bitselect()` built-in functions **must not**
 be used.
 
 #### Vector Data Load and Store Functions
