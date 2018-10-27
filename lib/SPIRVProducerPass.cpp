@@ -4612,9 +4612,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // all is converted to OpAll
-    if (Callee->getName().equals("__spirv_allDv2_i") ||
-        Callee->getName().equals("__spirv_allDv3_i") ||
-        Callee->getName().equals("__spirv_allDv4_i")) {
+    if (Callee->getName().startswith("__spirv_allDv")) {
       //
       // Generate OpAll.
       //
@@ -4634,9 +4632,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // any is converted to OpAny
-    if (Callee->getName().equals("__spirv_anyDv2_i") ||
-        Callee->getName().equals("__spirv_anyDv3_i") ||
-        Callee->getName().equals("__spirv_anyDv4_i")) {
+    if (Callee->getName().startswith("__spirv_anyDv")) {
       //
       // Generate OpAny.
       //
