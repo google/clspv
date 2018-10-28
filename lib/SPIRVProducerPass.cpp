@@ -5421,8 +5421,16 @@ void SPIRVProducerPass::PrintOperand(SPIRVOperand *Op) {
   }
   case SPIRVOperandType::LITERAL_INTEGER: {
     // TODO: Handle LiteralNum carefully.
-    for (auto Word : Op->getLiteralNum()) {
-      out << Word;
+    auto Words = Op->getLiteralNum();
+    auto NumWords = Words.size();
+
+    if (NumWords == 1) {
+      out << Words[0];
+    } else if (NumWords == 2) {
+      uint64_t Val = (static_cast<uint64_t>(Words[1]) << 32) | Words[0];
+      out << Val;
+    } else {
+      llvm_unreachable("Handle printing arbitrary precision integer literals.");
     }
     break;
   }
