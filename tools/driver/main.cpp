@@ -807,6 +807,9 @@ int main(const int argc, const char *const argv[]) {
   instance.getLangOpts().FiniteMathOnly =
       cl_finite_math_only || cl_fast_relaxed_math;
   instance.getLangOpts().FastRelaxedMath = cl_fast_relaxed_math;
+
+  // Preprocessor options
+  instance.getPreprocessorOpts().addMacroDef("__IMAGE_SUPPORT__");
   if (cl_fast_relaxed_math) {
     instance.getPreprocessorOpts().addMacroDef("__FAST_RELAXED_MATH__");
   }
@@ -815,6 +818,7 @@ int main(const int argc, const char *const argv[]) {
     instance.getPreprocessorOpts().addMacroDef(define);
   }
 
+  // Header search options
   for (auto include : Includes) {
     instance.getHeaderSearchOpts().AddPath(include, clang::frontend::After,
                                            false, false);
