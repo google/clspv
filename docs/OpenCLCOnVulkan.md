@@ -574,10 +574,6 @@ built-ins are not necessarily honoured.
 The `atomic_xchg()` built-in function that takes a floating-point argument
 **must not** be used.
 
-#### Common Functions
-
-The `step()`, and `smoothstep()` built-in functions **must not** be used.
-
 #### Conversions
 
 The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,
