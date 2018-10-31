@@ -78,6 +78,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceIsInfAndIsNan(Module &M);
   bool replaceAllAndAny(Module &M);
   bool replaceSelect(Module &M);
+  bool replaceBitSelect(Module &M);
   bool replaceStepSmoothStep(Module &M);
   bool replaceSignbit(Module &M);
   bool replaceMadandMad24andMul24(Module &M);
@@ -121,6 +122,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceIsInfAndIsNan(M);
   Changed |= replaceAllAndAny(M);
   Changed |= replaceSelect(M);
+  Changed |= replaceBitSelect(M);
   Changed |= replaceStepSmoothStep(M);
   Changed |= replaceSignbit(M);
   Changed |= replaceMadandMad24andMul24(M);
@@ -868,6 +870,133 @@ bool ReplaceOpenCLBuiltinPass::replaceSelect(Module &M) {
           Value *V = SelectInst::Create(Cmp, TrueValue, FalseValue, "", CI);
 
           // Replace call with the selection
+          CI->replaceAllUsesWith(V);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Module &M) {
+  bool Changed = false;
+
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+    // Skip symbols whose name doesn't match
+    if (!SymVal.getKey().startswith("_Z9bitselect")) {
+      continue;
+    }
+    // Is there a function going by that name?
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          if (CI->getNumOperands() != 4) {
+            continue;
+          }
+
+          // Get arguments
+          auto FalseValue = CI->getOperand(0);
+          auto TrueValue = CI->getOperand(1);
+          auto PredicateValue = CI->getOperand(2);
+
+          // Don't touch overloads that aren't in OpenCL C
+          auto FalseType = FalseValue->getType();
+          auto TrueType = TrueValue->getType();
+          auto PredicateType = PredicateValue->getType();
+
+          if ((FalseType != TrueType) || (PredicateType != TrueType)) {
+            continue;
+          }
+
+          if (TrueType->isVectorTy()) {
+            if (!TrueType->getScalarType()->isFloatingPointTy() &&
+                !TrueType->getScalarType()->isIntegerTy()) {
+                continue;
+            }
+            if ((TrueType->getVectorNumElements() != 2) &&
+                (TrueType->getVectorNumElements() != 3) &&
+                (TrueType->getVectorNumElements() != 4) &&
+                (TrueType->getVectorNumElements() != 8) &&
+                (TrueType->getVectorNumElements() != 16)) {
+              continue;
+            }
+          }
+
+          // Remember the type of the operands
+          auto OpType = TrueType;
+
+          // The actual bit selection will always be done on an integer type,
+          // declare it here
+          Type *BitType;
+
+          // If the operands are float, then bitcast them to int
+          if (OpType->getScalarType()->isFloatingPointTy()) {
+
+            // First create the new type
+            auto ScalarSize = OpType->getScalarType()->getPrimitiveSizeInBits();
+            BitType = Type::getIntNTy(M.getContext(), ScalarSize);
+            if (OpType->isVectorTy()) {
+              BitType = VectorType::get(BitType, OpType->getVectorNumElements());
+            }
+
+            // Then bitcast all operands
+            PredicateValue = CastInst::CreateZExtOrBitCast(PredicateValue,
+                                                           BitType, "", CI);
+            FalseValue = CastInst::CreateZExtOrBitCast(FalseValue,
+                                                       BitType, "", CI);
+            TrueValue = CastInst::CreateZExtOrBitCast(TrueValue, BitType, "", CI);
+
+          } else {
+            // The operands have an integer type, use it directly
+            BitType = OpType;
+          }
+
+          // All the operands are now always integers
+          // implement as (c & b) | (~c & a)
+
+          // Create our negated predicate value
+          auto AllOnes = Constant::getAllOnesValue(BitType);
+          auto NotPredicateValue = BinaryOperator::Create(Instruction::Xor,
+                                                          PredicateValue,
+                                                          AllOnes, "", CI);
+
+          // Then put everything together
+          auto BitsFalse = BinaryOperator::Create(Instruction::And,
+                                                  NotPredicateValue,
+                                                  FalseValue, "", CI);
+          auto BitsTrue = BinaryOperator::Create(Instruction::And,
+                                                 PredicateValue,
+                                                 TrueValue, "", CI);
+
+          Value *V = BinaryOperator::Create(Instruction::Or, BitsFalse,
+                                            BitsTrue, "", CI);
+
+          // If we were dealing with a floating point type, we must bitcast
+          // the result back to that
+          if (OpType->getScalarType()->isFloatingPointTy()) {
+            V = CastInst::CreateZExtOrBitCast(V, OpType, "", CI);
+          }
+
+          // Replace call with our new code
           CI->replaceAllUsesWith(V);
 
           // Lastly, remember to remove the user.
