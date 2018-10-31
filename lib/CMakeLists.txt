@@ -17,10 +17,12 @@ add_library(clspv_core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineEntryPointsPass.cpp
@@ -58,9 +60,11 @@ target_include_directories(clspv_core PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
 
 target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
 
+target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
+
 target_include_directories(clspv_core PRIVATE ${CLSPV_INCLUDE_DIRS})
 
-target_link_libraries(clspv_core PRIVATE LLVMCore)
+target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
 
 add_dependencies(clspv_core clspv_c_strings clspv_glsl)
 
