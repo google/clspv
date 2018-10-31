@@ -250,7 +250,7 @@ Then `mydescriptormap` will contain:
 
 #### Sending in plain-old-data kernel arguments in uniform buffers
 
-Normally plan-old-data arguments are passed into the kernel via a storage buffer.
+Normally plain-old-data arguments are passed into the kernel via a storage buffer.
 Use option `-pod-ubo` to pass these parameters in via a uniform buffer.  These can
 be faster to read in the shader.
 
@@ -258,6 +258,16 @@ When option `-pod-ubo` is used, the descriptor map list the `argKind` of a plain
 argument as `pod_ubo` rather than the default of `pod`.
 
 TODO(dneto):  A push-constant might even be faster, but space is very limited.
+
+#### Sending in pointer-to-constant kernel arguments in uniform buffers
+
+Normally pointer-to-constant kernel arguments are passed into the kernel via a storage
+buffer. Use option `-constant-args-ubo` to pass these parameters in via a uniform buffer.
+Uniform buffers can be faster to read in the shader.
+
+The compiler will generate an error if the layout of the buffer does not satisfy
+the Standard Uniform Buffer Layout rules of the Vulkan specification (see section
+[15.5.4](https://www.khronos.org/registry/vulkan/specs/1.1/html/vkspec.html#interfaces-resources)).
 
 #### Clustering plain-old-data kernel arguments to save descriptors
 
