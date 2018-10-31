@@ -713,14 +713,33 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
+      // all
+      {"_Z3alls", ""},
+      {"_Z3allDv2_s", "__spirv_allDv2_s"},
+      {"_Z3allDv3_s", "__spirv_allDv3_s"},
+      {"_Z3allDv4_s", "__spirv_allDv4_s"},
       {"_Z3alli", ""},
       {"_Z3allDv2_i", "__spirv_allDv2_i"},
       {"_Z3allDv3_i", "__spirv_allDv3_i"},
       {"_Z3allDv4_i", "__spirv_allDv4_i"},
+      {"_Z3alll", ""},
+      {"_Z3allDv2_l", "__spirv_allDv2_l"},
+      {"_Z3allDv3_l", "__spirv_allDv3_l"},
+      {"_Z3allDv4_l", "__spirv_allDv4_l"},
+
+      // any
+      {"_Z3anys", ""},
+      {"_Z3anyDv2_s", "__spirv_anyDv2_s"},
+      {"_Z3anyDv3_s", "__spirv_anyDv3_s"},
+      {"_Z3anyDv4_s", "__spirv_anyDv4_s"},
       {"_Z3anyi", ""},
       {"_Z3anyDv2_i", "__spirv_anyDv2_i"},
       {"_Z3anyDv3_i", "__spirv_anyDv3_i"},
       {"_Z3anyDv4_i", "__spirv_anyDv4_i"},
+      {"_Z3anyl", ""},
+      {"_Z3anyDv2_l", "__spirv_anyDv2_l"},
+      {"_Z3anyDv3_l", "__spirv_anyDv3_l"},
+      {"_Z3anyDv4_l", "__spirv_anyDv4_l"},
   };
 
   for (auto Pair : Map) {
@@ -738,19 +757,14 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
 
           Value *V;
 
-          // If we have a function to call, call it!
-          if (0 < strlen(SPIRVIntrinsic)) {
+          // If the argument is a 32-bit int, just use a shift
+          if (Arg->getType() == Type::getInt32Ty(M.getContext())) {
+            V = BinaryOperator::Create(Instruction::LShr, Arg,
+                                       ConstantInt::get(Arg->getType(), 31), "",
+                                       CI);
+          } else {
             // The value for zero to compare against.
             const auto ZeroValue = Constant::getNullValue(Arg->getType());
-
-            const auto Cmp = CmpInst::Create(
-                Instruction::ICmp, CmpInst::ICMP_SLT, Arg, ZeroValue, "", CI);
-            const auto NewFType = FunctionType::get(
-                Type::getInt1Ty(M.getContext()), Cmp->getType(), false);
-
-            const auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-            const auto NewCI = CallInst::Create(NewF, Cmp, "", CI);
 
             // The value to return for true.
             const auto TrueValue = ConstantInt::get(CI->getType(), 1);
@@ -758,11 +772,28 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
             // The value to return for false.
             const auto FalseValue = Constant::getNullValue(CI->getType());
 
-            V = SelectInst::Create(NewCI, TrueValue, FalseValue, "", CI);
-          } else {
-            V = BinaryOperator::Create(Instruction::LShr, Arg,
-                                       ConstantInt::get(CI->getType(), 31), "",
-                                       CI);
+            const auto Cmp = CmpInst::Create(
+                Instruction::ICmp, CmpInst::ICMP_SLT, Arg, ZeroValue, "", CI);
+
+            Value* SelectSource;
+
+            // If we have a function to call, call it!
+            if (0 < strlen(SPIRVIntrinsic)) {
+
+              const auto NewFType = FunctionType::get(
+                  Type::getInt1Ty(M.getContext()), Cmp->getType(), false);
+
+              const auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+              const auto NewCI = CallInst::Create(NewF, Cmp, "", CI);
+
+              SelectSource = NewCI;
+
+            } else {
+              SelectSource = Cmp;
+            }
+
+            V = SelectInst::Create(SelectSource, TrueValue, FalseValue, "", CI);
           }
 
           CI->replaceAllUsesWith(V);
