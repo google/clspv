@@ -23,8 +23,11 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/LinkAllPasses.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -151,7 +154,8 @@ static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
 
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
-int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>> *SamplerMapEntries) {
+int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
+                        *SamplerMapEntries) {
   if (!SamplerMap.empty()) {
     auto errorOrSamplerMapFile =
         llvm::MemoryBuffer::getFile(SamplerMap.getValue());
@@ -310,6 +314,8 @@ int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>> *Sam
               return left + std::string(left.empty() ? "" : "|") + right;
             });
 
+        // SamplerMapEntries->push_back(std::make_pair(
+        //    NormalizedCoord | AddressingMode | FilterMode, samplerExpr));
         SamplerMapEntries->emplace_back(
             NormalizedCoord | AddressingMode | FilterMode, samplerExpr);
 
@@ -331,16 +337,26 @@ int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>> *Sam
 int SetCompilerInstanceOptions(CompilerInstance &instance,
                                const llvm::StringRef &overiddenInputFilename,
                                const clang::FrontendInputFile &kernelFile,
+                               const std::string &program,
                                llvm::raw_string_ostream *diagnosticsStream) {
-  auto errorOrInputFile =
-      llvm::MemoryBuffer::getFileOrSTDIN(InputFilename.getValue());
+  std::unique_ptr<llvm::MemoryBuffer> memory_buffer(nullptr);
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> errorOrInputFile(nullptr);
+  if (program.empty()) {
+    auto errorOrInputFile =
+        llvm::MemoryBuffer::getFileOrSTDIN(InputFilename.getValue());
 
-  // If there was an error in getting the input file.
-  if (!errorOrInputFile) {
-    llvm::errs() << "Error: " << errorOrInputFile.getError().message() << " '"
-                 << InputFilename.getValue() << "'\n";
-    return -1;
+    // If there was an error in getting the input file.
+    if (!errorOrInputFile) {
+      llvm::errs() << "Error: " << errorOrInputFile.getError().message() << " '"
+                   << InputFilename.getValue() << "'\n";
+      return -1;
+    }
+    memory_buffer.reset(errorOrInputFile.get().release());
+  } else {
+    memory_buffer = llvm::MemoryBuffer::getMemBuffer(program.c_str(),
+                                                     overiddenInputFilename);
   }
+
   if (verify) {
     instance.getDiagnosticOpts().VerifyDiagnostics = true;
   }
@@ -425,8 +441,10 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
-  instance.getPreprocessorOpts().addRemappedFile(
-      overiddenInputFilename, errorOrInputFile.get().release());
+  // instance.getPreprocessorOpts().addRemappedFile(
+  //    overiddenInputFilename, errorOrInputFile.get().release());
+  instance.getPreprocessorOpts().addRemappedFile(overiddenInputFilename,
+                                                 memory_buffer.release());
 
   struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
     OpenCLBuiltinMemoryBuffer(const void *data, uint64_t data_length) {
@@ -476,7 +494,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   return 0;
 }
 
-// Populates |pm| with necessary passes to optimize and legalize the IR. 
+// Populates |pm| with necessary passes to optimize and legalize the IR.
 void PopulatePassManager(llvm::legacy::PassManager *pm,
                          llvm::raw_svector_ostream *binaryStream,
                          llvm::raw_string_ostream *descriptor_map_out,
@@ -613,7 +631,8 @@ int Compile(const int argc, const char *const argv[]) {
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
   const char *llvmArgv[llvmArgc] = {
-      argv[0], "-simplifycfg-sink-common=false",
+      argv[0],
+      "-simplifycfg-sink-common=false",
   };
 
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
@@ -652,8 +671,150 @@ int Compile(const int argc, const char *const argv[]) {
                                       clang::InputKind::OpenCL);
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
-  if (auto error = SetCompilerInstanceOptions(instance, overiddenInputFilename,
-                                              kernelFile, &diagnosticsStream))
+  if (auto error = SetCompilerInstanceOptions(
+          instance, overiddenInputFilename, kernelFile, "", &diagnosticsStream))
+    return error;
+
+  // Parse.
+  llvm::LLVMContext context;
+  clang::EmitLLVMOnlyAction action(&context);
+
+  // Prepare the action for processing kernelFile
+  const bool success = action.BeginSourceFile(instance, kernelFile);
+  if (!success) {
+    return -1;
+  }
+
+  action.Execute();
+  action.EndSourceFile();
+
+  clang::DiagnosticConsumer *const consumer =
+      instance.getDiagnostics().getClient();
+  consumer->finish();
+
+  auto num_errors = consumer->getNumErrors();
+  if (num_errors > 0) {
+    llvm::errs() << log << "\n";
+    return -1;
+  }
+
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "clspv restriction: -constant-arg-ubo requires "
+                    "-inline-entry-points\n";
+    return -1;
+  }
+
+  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
+  llvm::initializeCore(Registry);
+  llvm::initializeScalarOpts(Registry);
+
+  std::unique_ptr<llvm::Module> module(action.takeModule());
+
+  // Optimize.
+  // Create a memory buffer for temporarily writing the result.
+  SmallVector<char, 10000> binary;
+  llvm::raw_svector_ostream binaryStream(binary);
+  std::string descriptor_map;
+  llvm::raw_string_ostream descriptor_map_out(descriptor_map);
+  llvm::legacy::PassManager pm;
+  PopulatePassManager(&pm, &binaryStream, &descriptor_map_out,
+                      &SamplerMapEntries);
+  pm.run(*module);
+
+  // Write outputs
+
+  // Write the descriptor map, if requested.
+  std::error_code error;
+  if (!DescriptorMapFilename.empty()) {
+    descriptor_map_out.flush();
+
+    llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
+                                               llvm::sys::fs::F_RW |
+                                                   llvm::sys::fs::F_Text);
+    if (error) {
+      llvm::errs() << "Unable to open descriptor map file '"
+                   << DescriptorMapFilename << "': " << error.message() << '\n';
+      return -1;
+    }
+    descriptor_map_out_fd << descriptor_map;
+    descriptor_map_out_fd.close();
+  }
+
+  // Write the resulting binary.
+  // Wait until now to try writing the file so that we only write it on
+  // successful compilation.
+  if (OutputFilename.empty()) {
+    // if we've to output assembly
+    if (OutputAssembly) {
+      OutputFilename = "a.spvasm";
+    } else if (OutputFormat == "c") {
+      OutputFilename = "a.spvinc";
+    } else {
+      OutputFilename = "a.spv";
+    }
+  }
+  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
+
+  if (error) {
+    llvm::errs() << "Unable to open output file '" << OutputFilename
+                 << "': " << error.message() << '\n';
+    return -1;
+  }
+  outStream << binaryStream.str();
+
+  return 0;
+}
+
+int CompileFromSourceString(const std::string &program,
+                            const std::string &options) {
+  // We need to change how one of the called passes works by spoofing
+  // ParseCommandLineOptions with the specific option.
+  const int llvmArgc = 2;
+  const char *llvmArgv[llvmArgc] = {
+      "clspv",
+      "-simplifycfg-sink-common=false",
+  };
+
+  llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
+
+  llvm::SmallVector<const char *, 20> argv;
+  llvm::BumpPtrAllocator A;
+  llvm::StringSaver Saver(A);
+  argv.push_back(Saver.save("clspv").data());
+  llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
+  int argc = static_cast<int>(argv.size());
+  llvm::cl::ParseCommandLineOptions(argc, &argv[0]);
+
+  switch (OptimizationLevel) {
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case 's':
+  case 'z':
+    break;
+  default:
+    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
+                 << " specified!\n";
+    return -1;
+  }
+
+  llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
+  if (auto error = ParseSamplerMap(&SamplerMapEntries))
+    return error;
+
+  InputFilename = "source.cl";
+  llvm::StringRef overiddenInputFilename = InputFilename.getValue();
+
+  clang::CompilerInstance instance;
+  clang::FrontendInputFile kernelFile(overiddenInputFilename,
+                                      clang::InputKind::OpenCL);
+  std::string log;
+  llvm::raw_string_ostream diagnosticsStream(log);
+  if (auto error =
+          SetCompilerInstanceOptions(instance, overiddenInputFilename,
+                                     kernelFile, program, &diagnosticsStream))
     return error;
 
   // Parse.
