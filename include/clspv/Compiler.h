@@ -16,5 +16,8 @@ namespace clspv {
 // DEPRECATED: This function will be replaced by an expanded API.
 int Compile(const int argc, const char *const argv[]);
 
-int CompileFromSourceString(const std::string &program, const std::string &options);
+int CompileFromSourceString(const std::string &program,
+                            const std::string &sampler_map,
+                            const std::string &options,
+                            std::vector<uint32_t> *output_binary);
 } // namespace clspv

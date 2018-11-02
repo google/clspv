@@ -154,9 +154,20 @@ static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
 
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
-int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
+int ParseSamplerMap(const std::string &sampler_map,
+                    llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
                         *SamplerMapEntries) {
-  if (!SamplerMap.empty()) {
+  std::unique_ptr<llvm::MemoryBuffer> samplerMapBuffer(nullptr);
+  if (!sampler_map.empty()) {
+    // Parse the sampler map from the provided string.
+    samplerMapBuffer = llvm::MemoryBuffer::getMemBuffer(sampler_map);
+
+    if (!SamplerMap.empty()) {
+      llvm::outs() << "Warning: -samplermap is ignored when the sampler map is "
+                      "provided through a string.\n";
+    }
+  } else if (!SamplerMap.empty()) {
+    // Parse the sampler map from the option provided file.
     auto errorOrSamplerMapFile =
         llvm::MemoryBuffer::getFile(SamplerMap.getValue());
 
@@ -167,166 +178,169 @@ int ParseSamplerMap(llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
       return -1;
     }
 
-    auto samplerMapBuffer = std::move(errorOrSamplerMapFile.get());
-
+    samplerMapBuffer = std::move(errorOrSamplerMapFile.get());
     if (0 == samplerMapBuffer->getBufferSize()) {
       llvm::errs() << "Error: Sampler map was an empty file!\n";
       return -1;
     }
+  }
 
-    llvm::SmallVector<llvm::StringRef, 3> samplerStrings;
+  // No sampler map to parse.
+  if (!samplerMapBuffer || 0 == samplerMapBuffer->getBufferSize())
+    return 0;
 
-    // We need to keep track of the beginning of the current entry.
-    const char *b = samplerMapBuffer->getBufferStart();
-    for (const char *i = b, *e = samplerMapBuffer->getBufferEnd();; i++) {
-      // If we have a separator between declarations.
-      if ((*i == '|') || (*i == ',') || (i == e)) {
-        if (i == b) {
-          llvm::errs() << "Error: Sampler map contained an empty entry!\n";
-          return -1;
-        }
+  llvm::SmallVector<llvm::StringRef, 3> samplerStrings;
 
-        samplerStrings.push_back(llvm::StringRef(b, i - b).trim());
-
-        // And set b the next character after i.
-        b = i + 1;
+  // We need to keep track of the beginning of the current entry.
+  const char *b = samplerMapBuffer->getBufferStart();
+  for (const char *i = b, *e = samplerMapBuffer->getBufferEnd();; i++) {
+    // If we have a separator between declarations.
+    if ((*i == '|') || (*i == ',') || (i == e)) {
+      if (i == b) {
+        llvm::errs() << "Error: Sampler map contained an empty entry!\n";
+        return -1;
       }
 
-      // If we have a separator between declarations within a single sampler.
-      if ((*i == ',') || (i == e)) {
-        enum NormalizedCoords {
-          CLK_NORMALIZED_COORDS_FALSE = 0x00,
-          CLK_NORMALIZED_COORDS_TRUE = 0x01,
-          CLK_NORMALIZED_COORDS_NOT_SET
-        } NormalizedCoord = CLK_NORMALIZED_COORDS_NOT_SET;
+      samplerStrings.push_back(llvm::StringRef(b, i - b).trim());
 
-        enum AddressingModes {
-          CLK_ADDRESS_NONE = 0x00,
-          CLK_ADDRESS_CLAMP_TO_EDGE = 0x02,
-          CLK_ADDRESS_CLAMP = 0x04,
-          CLK_ADDRESS_MIRRORED_REPEAT = 0x08,
-          CLK_ADDRESS_REPEAT = 0x06,
-          CLK_ADDRESS_NOT_SET
-        } AddressingMode = CLK_ADDRESS_NOT_SET;
+      // And set b the next character after i.
+      b = i + 1;
+    }
 
-        enum FilterModes {
-          CLK_FILTER_NEAREST = 0x10,
-          CLK_FILTER_LINEAR = 0x20,
-          CLK_FILTER_NOT_SET
-        } FilterMode = CLK_FILTER_NOT_SET;
+    // If we have a separator between declarations within a single sampler.
+    if ((*i == ',') || (i == e)) {
+      enum NormalizedCoords {
+        CLK_NORMALIZED_COORDS_FALSE = 0x00,
+        CLK_NORMALIZED_COORDS_TRUE = 0x01,
+        CLK_NORMALIZED_COORDS_NOT_SET
+      } NormalizedCoord = CLK_NORMALIZED_COORDS_NOT_SET;
 
-        for (auto str : samplerStrings) {
-          if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
-            if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
-              llvm::errs() << "Error: Sampler map normalized coordinates was "
-                              "previously set!\n";
-              return -1;
-            }
-            NormalizedCoord = CLK_NORMALIZED_COORDS_FALSE;
-          } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
-            if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
-              llvm::errs() << "Error: Sampler map normalized coordinates was "
-                              "previously set!\n";
-              return -1;
-            }
-            NormalizedCoord = CLK_NORMALIZED_COORDS_TRUE;
-          } else if ("CLK_ADDRESS_NONE" == str) {
-            if (CLK_ADDRESS_NOT_SET != AddressingMode) {
-              llvm::errs()
-                  << "Error: Sampler map addressing mode was previously set!\n";
-              return -1;
-            }
-            AddressingMode = CLK_ADDRESS_NONE;
-          } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
-            if (CLK_ADDRESS_NOT_SET != AddressingMode) {
-              llvm::errs()
-                  << "Error: Sampler map addressing mode was previously set!\n";
-              return -1;
-            }
-            AddressingMode = CLK_ADDRESS_CLAMP_TO_EDGE;
-          } else if ("CLK_ADDRESS_CLAMP" == str) {
-            if (CLK_ADDRESS_NOT_SET != AddressingMode) {
-              llvm::errs()
-                  << "Error: Sampler map addressing mode was previously set!\n";
-              return -1;
-            }
-            AddressingMode = CLK_ADDRESS_CLAMP;
-          } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
-            if (CLK_ADDRESS_NOT_SET != AddressingMode) {
-              llvm::errs()
-                  << "Error: Sampler map addressing mode was previously set!\n";
-              return -1;
-            }
-            AddressingMode = CLK_ADDRESS_MIRRORED_REPEAT;
-          } else if ("CLK_ADDRESS_REPEAT" == str) {
-            if (CLK_ADDRESS_NOT_SET != AddressingMode) {
-              llvm::errs()
-                  << "Error: Sampler map addressing mode was previously set!\n";
-              return -1;
-            }
-            AddressingMode = CLK_ADDRESS_REPEAT;
-          } else if ("CLK_FILTER_NEAREST" == str) {
-            if (CLK_FILTER_NOT_SET != FilterMode) {
-              llvm::errs()
-                  << "Error: Sampler map filtering mode was previously set!\n";
-              return -1;
-            }
-            FilterMode = CLK_FILTER_NEAREST;
-          } else if ("CLK_FILTER_LINEAR" == str) {
-            if (CLK_FILTER_NOT_SET != FilterMode) {
-              llvm::errs()
-                  << "Error: Sampler map filtering mode was previously set!\n";
-              return -1;
-            }
-            FilterMode = CLK_FILTER_LINEAR;
-          } else {
-            llvm::errs() << "Error: Unknown sampler string '" << str
-                         << "' found!\n";
+      enum AddressingModes {
+        CLK_ADDRESS_NONE = 0x00,
+        CLK_ADDRESS_CLAMP_TO_EDGE = 0x02,
+        CLK_ADDRESS_CLAMP = 0x04,
+        CLK_ADDRESS_MIRRORED_REPEAT = 0x08,
+        CLK_ADDRESS_REPEAT = 0x06,
+        CLK_ADDRESS_NOT_SET
+      } AddressingMode = CLK_ADDRESS_NOT_SET;
+
+      enum FilterModes {
+        CLK_FILTER_NEAREST = 0x10,
+        CLK_FILTER_LINEAR = 0x20,
+        CLK_FILTER_NOT_SET
+      } FilterMode = CLK_FILTER_NOT_SET;
+
+      for (auto str : samplerStrings) {
+        if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
+          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+            llvm::errs() << "Error: Sampler map normalized coordinates was "
+                            "previously set!\n";
             return -1;
           }
-        }
-
-        if (CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
-          llvm::errs() << "Error: Sampler map entry did not contain normalized "
-                          "coordinates entry!\n";
+          NormalizedCoord = CLK_NORMALIZED_COORDS_FALSE;
+        } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
+          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+            llvm::errs() << "Error: Sampler map normalized coordinates was "
+                            "previously set!\n";
+            return -1;
+          }
+          NormalizedCoord = CLK_NORMALIZED_COORDS_TRUE;
+        } else if ("CLK_ADDRESS_NONE" == str) {
+          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+            llvm::errs()
+                << "Error: Sampler map addressing mode was previously set!\n";
+            return -1;
+          }
+          AddressingMode = CLK_ADDRESS_NONE;
+        } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
+          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+            llvm::errs()
+                << "Error: Sampler map addressing mode was previously set!\n";
+            return -1;
+          }
+          AddressingMode = CLK_ADDRESS_CLAMP_TO_EDGE;
+        } else if ("CLK_ADDRESS_CLAMP" == str) {
+          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+            llvm::errs()
+                << "Error: Sampler map addressing mode was previously set!\n";
+            return -1;
+          }
+          AddressingMode = CLK_ADDRESS_CLAMP;
+        } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
+          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+            llvm::errs()
+                << "Error: Sampler map addressing mode was previously set!\n";
+            return -1;
+          }
+          AddressingMode = CLK_ADDRESS_MIRRORED_REPEAT;
+        } else if ("CLK_ADDRESS_REPEAT" == str) {
+          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+            llvm::errs()
+                << "Error: Sampler map addressing mode was previously set!\n";
+            return -1;
+          }
+          AddressingMode = CLK_ADDRESS_REPEAT;
+        } else if ("CLK_FILTER_NEAREST" == str) {
+          if (CLK_FILTER_NOT_SET != FilterMode) {
+            llvm::errs()
+                << "Error: Sampler map filtering mode was previously set!\n";
+            return -1;
+          }
+          FilterMode = CLK_FILTER_NEAREST;
+        } else if ("CLK_FILTER_LINEAR" == str) {
+          if (CLK_FILTER_NOT_SET != FilterMode) {
+            llvm::errs()
+                << "Error: Sampler map filtering mode was previously set!\n";
+            return -1;
+          }
+          FilterMode = CLK_FILTER_LINEAR;
+        } else {
+          llvm::errs() << "Error: Unknown sampler string '" << str
+                       << "' found!\n";
           return -1;
         }
-
-        if (CLK_ADDRESS_NOT_SET == AddressingMode) {
-          llvm::errs() << "Error: Sampler map entry did not contain addressing "
-                          "mode entry!\n";
-          return -1;
-        }
-
-        if (CLK_FILTER_NOT_SET == FilterMode) {
-          llvm::errs()
-              << "Error: Sampler map entry did not contain filer mode entry!\n";
-          return -1;
-        }
-
-        // Generate an equivalent expression in string form.  Sort the
-        // strings to get a canonical ordering.
-        std::sort(samplerStrings.begin(), samplerStrings.end(),
-                  std::less<StringRef>());
-        const auto samplerExpr = std::accumulate(
-            samplerStrings.begin(), samplerStrings.end(), std::string(),
-            [](std::string left, std::string right) {
-              return left + std::string(left.empty() ? "" : "|") + right;
-            });
-
-        // SamplerMapEntries->push_back(std::make_pair(
-        //    NormalizedCoord | AddressingMode | FilterMode, samplerExpr));
-        SamplerMapEntries->emplace_back(
-            NormalizedCoord | AddressingMode | FilterMode, samplerExpr);
-
-        // And reset the sampler strings for the next sampler in the map.
-        samplerStrings.clear();
       }
 
-      // And lastly, if we are at the end of the file
-      if (i == e) {
-        break;
+      if (CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
+        llvm::errs() << "Error: Sampler map entry did not contain normalized "
+                        "coordinates entry!\n";
+        return -1;
       }
+
+      if (CLK_ADDRESS_NOT_SET == AddressingMode) {
+        llvm::errs() << "Error: Sampler map entry did not contain addressing "
+                        "mode entry!\n";
+        return -1;
+      }
+
+      if (CLK_FILTER_NOT_SET == FilterMode) {
+        llvm::errs()
+            << "Error: Sampler map entry did not contain filer mode entry!\n";
+        return -1;
+      }
+
+      // Generate an equivalent expression in string form.  Sort the
+      // strings to get a canonical ordering.
+      std::sort(samplerStrings.begin(), samplerStrings.end(),
+                std::less<StringRef>());
+      const auto samplerExpr = std::accumulate(
+          samplerStrings.begin(), samplerStrings.end(), std::string(),
+          [](std::string left, std::string right) {
+            return left + std::string(left.empty() ? "" : "|") + right;
+          });
+
+      // SamplerMapEntries->push_back(std::make_pair(
+      //    NormalizedCoord | AddressingMode | FilterMode, samplerExpr));
+      SamplerMapEntries->emplace_back(
+          NormalizedCoord | AddressingMode | FilterMode, samplerExpr);
+
+      // And reset the sampler strings for the next sampler in the map.
+      samplerStrings.clear();
+    }
+
+    // And lastly, if we are at the end of the file
+    if (i == e) {
+      break;
     }
   }
 
@@ -654,7 +668,7 @@ int Compile(const int argc, const char *const argv[]) {
   }
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
-  if (auto error = ParseSamplerMap(&SamplerMapEntries))
+  if (auto error = ParseSamplerMap("", &SamplerMapEntries))
     return error;
 
   // if no output file was provided, use a default
@@ -767,7 +781,9 @@ int Compile(const int argc, const char *const argv[]) {
 }
 
 int CompileFromSourceString(const std::string &program,
-                            const std::string &options) {
+                            const std::string &sampler_map,
+                            const std::string &options,
+                            std::vector<uint32_t> *output_binary) {
   // We need to change how one of the called passes works by spoofing
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
@@ -801,7 +817,7 @@ int CompileFromSourceString(const std::string &program,
   }
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
-  if (auto error = ParseSamplerMap(&SamplerMapEntries))
+  if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
     return error;
 
   InputFilename = "source.cl";
@@ -886,24 +902,34 @@ int CompileFromSourceString(const std::string &program,
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
-  if (OutputFilename.empty()) {
-    // if we've to output assembly
-    if (OutputAssembly) {
-      OutputFilename = "a.spvasm";
-    } else if (OutputFormat == "c") {
-      OutputFilename = "a.spvinc";
-    } else {
-      OutputFilename = "a.spv";
+  if (output_binary) {
+    if (!OutputFilename.empty()) {
+      llvm::outs() << "Warning: -o is ignored when binary container is provided.\n";
     }
-  }
-  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
+    for (auto i = 0; i < binary.size() / 4; ++i) {
+      uint32_t word = reinterpret_cast<uint32_t*>(binary.data())[i];
+      output_binary->push_back(word);
+    }
+  } else {
+    if (OutputFilename.empty()) {
+      // if we've to output assembly
+      if (OutputAssembly) {
+        OutputFilename = "a.spvasm";
+      } else if (OutputFormat == "c") {
+        OutputFilename = "a.spvinc";
+      } else {
+        OutputFilename = "a.spv";
+      }
+    }
+    llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
 
-  if (error) {
-    llvm::errs() << "Unable to open output file '" << OutputFilename
-                 << "': " << error.message() << '\n';
-    return -1;
+    if (error) {
+      llvm::errs() << "Unable to open output file '" << OutputFilename
+                   << "': " << error.message() << '\n';
+      return -1;
+    }
+    outStream << binaryStream.str();
   }
-  outStream << binaryStream.str();
 
   return 0;
 }
