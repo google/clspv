@@ -5245,10 +5245,18 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
 
 glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
   return StringSwitch<glsl::ExtInst>(Name)
+      .Case("_Z3abss", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv2_s", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv3_s", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv4_s", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absi", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv2_i", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv3_i", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv4_i", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absl", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv2_l", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv3_l", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv4_l", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z5clampiii", glsl::ExtInst::ExtInstSClamp)
       .Case("_Z5clampDv2_iS_S_", glsl::ExtInst::ExtInstSClamp)
       .Case("_Z5clampDv3_iS_S_", glsl::ExtInst::ExtInstSClamp)

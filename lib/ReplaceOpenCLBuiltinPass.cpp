@@ -68,6 +68,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   ReplaceOpenCLBuiltinPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
+  bool replaceAbs(Module &M);
   bool replaceRecip(Module &M);
   bool replaceDivide(Module &M);
   bool replaceExp10(Module &M);
@@ -112,6 +113,7 @@ ModulePass *createReplaceOpenCLBuiltinPass() {
 bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   bool Changed = false;
 
+  Changed |= replaceAbs(M);
   Changed |= replaceRecip(M);
   Changed |= replaceDivide(M);
   Changed |= replaceExp10(M);
@@ -140,6 +142,58 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceFract(M);
   Changed |= replaceVload(M);
   Changed |= replaceVstore(M);
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
+  bool Changed = false;
+
+  const char *Names[] = {
+    "_Z3abst",
+    "_Z3absDv2_t",
+    "_Z3absDv3_t",
+    "_Z3absDv4_t",
+    "_Z3absj",
+    "_Z3absDv2_j",
+    "_Z3absDv3_j",
+    "_Z3absDv4_j",
+    "_Z3absm",
+    "_Z3absDv2_m",
+    "_Z3absDv3_m",
+    "_Z3absDv4_m",
+  };
+
+  for (auto Name : Names) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          // Abs has one arg.
+          auto Arg = CI->getOperand(0);
+
+          // Use the argument unchanged, we know it's unsigned
+          CI->replaceAllUsesWith(Arg);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
 
   return Changed;
 }
