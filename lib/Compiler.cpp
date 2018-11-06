@@ -906,10 +906,8 @@ int CompileFromSourceString(const std::string &program,
     if (!OutputFilename.empty()) {
       llvm::outs() << "Warning: -o is ignored when binary container is provided.\n";
     }
-    for (auto i = 0; i < binary.size() / 4; ++i) {
-      uint32_t word = reinterpret_cast<uint32_t*>(binary.data())[i];
-      output_binary->push_back(word);
-    }
+    output_binary->resize(binary.size() / 4);
+    memcpy(output_binary->data(), binary.data(), binary.size());
   } else {
     if (OutputFilename.empty()) {
       // if we've to output assembly
