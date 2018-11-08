@@ -2493,8 +2493,8 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     //          i32 binding,
     //          i32 index-into-sampler-map)
     if (auto *call = dyn_cast<CallInst>(user)) {
-      const auto index_into_sampler_map =
-          dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+      const size_t index_into_sampler_map = static_cast<size_t>(
+          dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
       if (index_into_sampler_map >= sampler_map.size()) {
         errs() << "Out of bounds index to sampler map: "
                << index_into_sampler_map;
@@ -3001,8 +3001,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
       const auto old_index =
           dyn_extract<ConstantInt>(arg_node->getOperand(1))->getZExtValue();
       // Remapped argument index
-      const auto new_index =
-          dyn_extract<ConstantInt>(arg_node->getOperand(2))->getZExtValue();
+      const size_t new_index = static_cast<size_t>(
+          dyn_extract<ConstantInt>(arg_node->getOperand(2))->getZExtValue());
       const auto offset =
           dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
       const auto arg_size =
