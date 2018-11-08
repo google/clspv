@@ -1982,7 +1982,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext& Context, Module &module)
 
         Ops << MkId(STyID) << MkNum(MemberIdx) << MkNum(spv::DecorationOffset);
 
-        auto ByteOffset = StructLayout->getElementOffset(MemberIdx);
+        auto ByteOffset = static_cast<uint32_t>(StructLayout->getElementOffset(MemberIdx));
         if (offsets) {
           ByteOffset = (*offsets)[MemberIdx];
         }
@@ -3034,9 +3034,9 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
     for (auto *info : resource_var_at_index) {
       if (info) {
         auto arg = arguments[arg_index];
-        unsigned arg_size;
+        unsigned arg_size = 0;
         if (info->arg_kind == clspv::ArgKind::Pod) {
-          arg_size = DL.getTypeStoreSize(arg->getType());
+          arg_size = static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
         }
 
         descriptorMapOut << "kernel," << F.getName() << ",arg,"
@@ -6241,7 +6241,7 @@ void SPIRVProducerPass::PopulateUBOTypeMaps(Module &module) {
       for (const Metadata *offset_md : offset_vector->operands()) {
         const auto *constant_md = cast<ConstantAsMetadata>(offset_md);
         offsets.push_back(
-            cast<ConstantInt>(constant_md->getValue())->getZExtValue());
+            static_cast<uint32_t>(cast<ConstantInt>(constant_md->getValue())->getZExtValue()));
       }
       RemappedUBOTypeOffsets.insert(std::make_pair(type, offsets));
     }
