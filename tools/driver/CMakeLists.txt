@@ -17,13 +17,9 @@ add_executable(clspv ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 # Enable C++11 for our executable
 target_compile_features(clspv PRIVATE cxx_range_for)
 
-target_include_directories(clspv PRIVATE ${LLVM_INCLUDE_DIRS})
-
-target_include_directories(clspv PRIVATE ${CLANG_INCLUDE_DIRS})
-
 target_include_directories(clspv PRIVATE ${CLSPV_INCLUDE_DIRS})
 
-target_link_libraries(clspv PRIVATE clspv_core clangCodeGen LLVMAnalysis LLVMScalarOpts)
+target_link_libraries(clspv PRIVATE clspv_core)
 
 add_dependencies(clspv clspv_baked_opencl_header)
 
