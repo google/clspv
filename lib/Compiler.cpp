@@ -792,7 +792,8 @@ int Compile(const int argc, const char *const argv[]) {
 int CompileFromSourceString(const std::string &program,
                             const std::string &sampler_map,
                             const std::string &options,
-                            std::vector<uint32_t> *output_binary) {
+                            std::vector<uint32_t> *output_binary,
+                            std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries) {
   // We need to change how one of the called passes works by spoofing
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
@@ -870,64 +871,30 @@ int CompileFromSourceString(const std::string &program,
   llvm::raw_svector_ostream binaryStream(binary);
   std::string descriptor_map;
   llvm::legacy::PassManager pm;
-  std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
   if (auto error =
           PopulatePassManager(&pm, &binaryStream,
-                              &descriptor_map_entries, &SamplerMapEntries))
+                              descriptor_map_entries, &SamplerMapEntries))
     return error;
   pm.run(*module);
 
   // Write outputs
 
-  // Write the descriptor map, if requested.
-  std::error_code error;
+  // Write the descriptor map. This is required.
+  assert(desriptor_map_entries && "Valid descriptor map container is required.");
   if (!DescriptorMapFilename.empty()) {
-    llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
-                                               llvm::sys::fs::F_RW |
-                                                   llvm::sys::fs::F_Text);
-    if (error) {
-      llvm::errs() << "Unable to open descriptor map file '"
-                   << DescriptorMapFilename << "': " << error.message() << '\n';
-      return -1;
-    }
-    std::string descriptor_map_string;
-    std::ostringstream str(descriptor_map_string);
-    for (const auto &entry : descriptor_map_entries) {
-      str << entry << "\n";
-    }
-    descriptor_map_out_fd << str.str();
-    descriptor_map_out_fd.close();
+    llvm::errs() << "Warning: -descriptormap is ignored descriptor map container is provided.\n";
   }
 
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
-  if (output_binary) {
-    if (!OutputFilename.empty()) {
-      llvm::outs() << "Warning: -o is ignored when binary container is provided.\n";
-    }
-    output_binary->resize(binary.size() / 4);
-    memcpy(output_binary->data(), binary.data(), binary.size());
-  } else {
-    if (OutputFilename.empty()) {
-      // if we've to output assembly
-      if (OutputAssembly) {
-        OutputFilename = "a.spvasm";
-      } else if (OutputFormat == "c") {
-        OutputFilename = "a.spvinc";
-      } else {
-        OutputFilename = "a.spv";
-      }
-    }
-    llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
-
-    if (error) {
-      llvm::errs() << "Unable to open output file '" << OutputFilename
-                   << "': " << error.message() << '\n';
-      return -1;
-    }
-    outStream << binaryStream.str();
+  assert(output_binary && "Valid binary container is required.");
+  if (!OutputFilename.empty()) {
+    llvm::outs()
+        << "Warning: -o is ignored when binary container is provided.\n";
   }
+  output_binary->resize(binary.size() / 4);
+  memcpy(output_binary->data(), binary.data(), binary.size());
 
   return 0;
 }
