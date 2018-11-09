@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CLSPV_INCLUDE_CLSPV_COMPILER_H_
+#define CLSPV_INCLUDE_CLSPV_COMPILER_H_
+
+#include <string>
+#include <vector>
+
 namespace clspv {
 // DEPRECATED: This function will be replaced by an expanded API.
 int Compile(const int argc, const char *const argv[]);
@@ -21,3 +27,5 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary);
 } // namespace clspv
+
+#endif // CLSPV_INCLUDE_CLSPV_COMPILER_H_

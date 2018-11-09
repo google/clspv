@@ -3027,13 +3027,15 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
           static_cast<uint32_t>(old_index),
           argKind,
           static_cast<uint32_t>(spec_id),
-          static_cast<uint32_t>(
-              GetTypeAllocSize(func_ty->getParamType(unsigned(new_index))
-                                   ->getPointerElementType(),
-                               DL)),
+          // This will be set below for pointer-to-local args.
+          0,
           static_cast<uint32_t>(offset),
           static_cast<uint32_t>(arg_size)};
-      if (spec_id <= 0) {
+      if (spec_id > 0) {
+        kernel_data.local_element_size = static_cast<uint32_t>(GetTypeAllocSize(
+            func_ty->getParamType(unsigned(new_index))->getPointerElementType(),
+            DL));
+      } else {
         auto *info = resource_var_at_index[new_index];
         assert(info);
         descriptor_set = info->descriptor_set;

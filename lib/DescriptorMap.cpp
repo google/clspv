@@ -99,13 +99,15 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
       } else {
         str << ",descriptorSet," << entry.descriptor_set << ",binding,"
             << entry.binding << ",offset,";
-        if (kernel_data.arg_kind == ArgKind::Pod) {
+        if (kernel_data.arg_kind == ArgKind::Pod ||
+            kernel_data.arg_kind == ArgKind::PodUBO) {
           str << kernel_data.pod_offset;
         } else {
           str << "0";
         }
         str << ",argKind," << GetArgKindName(kernel_data.arg_kind);
-        if (kernel_data.arg_kind == ArgKind::Pod) {
+        if (kernel_data.arg_kind == ArgKind::Pod ||
+            kernel_data.arg_kind == ArgKind::PodUBO) {
           str << ",argSize," << kernel_data.pod_arg_size;
         }
       }
@@ -113,7 +115,7 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     }
     case DescriptorMapEntry::Kind::Constant: {
       const auto &constant_data = entry.constant_data;
-      str << ",descriptorSet," << entry.descriptor_set
+      str << "descriptorSet," << entry.descriptor_set
           << ",binding," << entry.binding
           << ",kind," << GetArgKindName(constant_data.constant_kind)
           << ",hexbytes," << constant_data.hex_bytes;
