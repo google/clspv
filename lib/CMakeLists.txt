@@ -21,6 +21,7 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp

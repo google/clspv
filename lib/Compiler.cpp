@@ -31,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 #include "clspv/opencl_builtins_header.h"
@@ -39,6 +40,7 @@
 
 #include <numeric>
 #include <string>
+#include <sstream>
 
 using namespace clang;
 
@@ -509,12 +511,26 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 }
 
 // Populates |pm| with necessary passes to optimize and legalize the IR.
-void PopulatePassManager(llvm::legacy::PassManager *pm,
-                         llvm::raw_svector_ostream *binaryStream,
-                         llvm::raw_string_ostream *descriptor_map_out,
-                         llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
-                             *SamplerMapEntries) {
+int PopulatePassManager(
+    llvm::legacy::PassManager *pm, llvm::raw_svector_ostream *binaryStream,
+    std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
+    llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
+        *SamplerMapEntries) {
   llvm::PassManagerBuilder pmBuilder;
+
+  switch (OptimizationLevel) {
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case 's':
+  case 'z':
+    break;
+  default:
+    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
+                 << " specified!\n";
+    return -1;
+  }
 
   switch (OptimizationLevel) {
   case '0':
@@ -634,8 +650,10 @@ void PopulatePassManager(llvm::legacy::PassManager *pm,
   // anymore so leave this right before SPIR-V generation.
   pm->add(clspv::createUBOTypeTransformPass());
   pm->add(clspv::createSPIRVProducerPass(
-      *binaryStream, *descriptor_map_out, *SamplerMapEntries,
+      *binaryStream, descriptor_map_entries, *SamplerMapEntries,
       OutputAssembly.getValue(), OutputFormat == "c"));
+
+  return 0;
 }
 } // namespace
 
@@ -652,20 +670,6 @@ int Compile(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
-
-  switch (OptimizationLevel) {
-  case '0':
-  case '1':
-  case '2':
-  case '3':
-  case 's':
-  case 'z':
-    break;
-  default:
-    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
-                 << " specified!\n";
-    return -1;
-  }
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
   if (auto error = ParseSamplerMap("", &SamplerMapEntries))
@@ -730,10 +734,12 @@ int Compile(const int argc, const char *const argv[]) {
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
   std::string descriptor_map;
-  llvm::raw_string_ostream descriptor_map_out(descriptor_map);
   llvm::legacy::PassManager pm;
-  PopulatePassManager(&pm, &binaryStream, &descriptor_map_out,
-                      &SamplerMapEntries);
+  std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
+  if (auto error =
+          PopulatePassManager(&pm, &binaryStream,
+                              &descriptor_map_entries, &SamplerMapEntries))
+    return error;
   pm.run(*module);
 
   // Write outputs
@@ -741,8 +747,6 @@ int Compile(const int argc, const char *const argv[]) {
   // Write the descriptor map, if requested.
   std::error_code error;
   if (!DescriptorMapFilename.empty()) {
-    descriptor_map_out.flush();
-
     llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
                                                llvm::sys::fs::F_RW |
                                                    llvm::sys::fs::F_Text);
@@ -751,7 +755,12 @@ int Compile(const int argc, const char *const argv[]) {
                    << DescriptorMapFilename << "': " << error.message() << '\n';
       return -1;
     }
-    descriptor_map_out_fd << descriptor_map;
+    std::string descriptor_map_string;
+    std::ostringstream str(descriptor_map_string);
+    for (const auto &entry : descriptor_map_entries) {
+      str << entry << "\n";
+    }
+    descriptor_map_out_fd << str.str();
     descriptor_map_out_fd.close();
   }
 
@@ -801,20 +810,6 @@ int CompileFromSourceString(const std::string &program,
   llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
   llvm::cl::ParseCommandLineOptions(argc, &argv[0]);
-
-  switch (OptimizationLevel) {
-  case '0':
-  case '1':
-  case '2':
-  case '3':
-  case 's':
-  case 'z':
-    break;
-  default:
-    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
-                 << " specified!\n";
-    return -1;
-  }
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
   if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
@@ -874,10 +869,12 @@ int CompileFromSourceString(const std::string &program,
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
   std::string descriptor_map;
-  llvm::raw_string_ostream descriptor_map_out(descriptor_map);
   llvm::legacy::PassManager pm;
-  PopulatePassManager(&pm, &binaryStream, &descriptor_map_out,
-                      &SamplerMapEntries);
+  std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
+  if (auto error =
+          PopulatePassManager(&pm, &binaryStream,
+                              &descriptor_map_entries, &SamplerMapEntries))
+    return error;
   pm.run(*module);
 
   // Write outputs
@@ -885,8 +882,6 @@ int CompileFromSourceString(const std::string &program,
   // Write the descriptor map, if requested.
   std::error_code error;
   if (!DescriptorMapFilename.empty()) {
-    descriptor_map_out.flush();
-
     llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
                                                llvm::sys::fs::F_RW |
                                                    llvm::sys::fs::F_Text);
@@ -895,7 +890,12 @@ int CompileFromSourceString(const std::string &program,
                    << DescriptorMapFilename << "': " << error.message() << '\n';
       return -1;
     }
-    descriptor_map_out_fd << descriptor_map;
+    std::string descriptor_map_string;
+    std::ostringstream str(descriptor_map_string);
+    for (const auto &entry : descriptor_map_entries) {
+      str << entry << "\n";
+    }
+    descriptor_map_out_fd << str.str();
     descriptor_map_out_fd.close();
   }
 

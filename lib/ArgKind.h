@@ -20,23 +20,12 @@
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/DenseMap.h"
 
-namespace clspv {
+#include "clspv/ArgKind.h"
 
-enum class ArgKind : int {
-  Buffer,
-  BufferUBO,
-  Local,
-  Pod,
-  ReadOnlyImage,
-  WriteOnlyImage,
-  Sampler,
-};
+namespace clspv {
 
 // Maps an LLVM type for a kernel argument to an argument kind.
 ArgKind GetArgKindForType(llvm::Type *type);
-
-// Converts an ArgKind to its string name.
-const char* GetArgKindName(ArgKind);
 
 // Maps an LLVM type for a kernel argument to an argument
 // kind suitable for a descriptor map.  The result is one of:
