@@ -100,6 +100,10 @@ llvm::cl::opt<bool> hack_phis(
     llvm::cl::desc(
         "Scalarize phi instructions of struct type before code generation"));
 
+llvm::cl::opt<bool> hack_block_order(
+    "hack-block-order", llvm::cl::init(false),
+    llvm::cl::desc("Order basic blocks using structured order"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -137,14 +141,13 @@ bool HackInserts() { return hack_inserts; }
 bool HackSignedCompareFixup() { return hack_signed_compare_fixup; }
 bool HackUndef() { return hack_undef; }
 bool HackPhis() { return hack_phis; }
+bool HackBlockOrder() { return hack_block_order; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }
 bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
-bool ConstantArgsInUniformBuffer() {
-  return constant_args_in_uniform_buffer;
-}
+bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 
 } // namespace Option
 } // namespace clspv

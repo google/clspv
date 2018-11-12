@@ -61,6 +61,9 @@ bool HackUndef();
 // Returns true if code generation should avoid creating OpPhi of structs.
 bool HackPhis();
 
+// Returns true if basic blocks should be in "structured" order.
+bool HackBlockOrder();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
