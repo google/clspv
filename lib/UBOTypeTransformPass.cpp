@@ -218,6 +218,10 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
 
 StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
                                                 Module &M) {
+  // We'll never have to remap an opaque struct.
+  if (struct_ty->isOpaque())
+    return struct_ty;
+
   bool changed = false;
   SmallVector<Type *, 8> elements;
   SmallVector<uint64_t, 8> offsets;
