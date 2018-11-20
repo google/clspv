@@ -30,12 +30,15 @@ python utils/fetch_sources.py
 :: #########################################
 if %VS_VERSION% == 2017 (
   call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
+  set GENERATOR="Visual Studio 15 2017 Win64"
   echo "Using VS 2017..."
 ) else if %VS_VERSION% == 2015 (
   call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x64
+  set GENERATOR="Visual Studio 14 2015 Win64"
   echo "Using VS 2015..."
 ) else if %VS_VERSION% == 2013 (
   call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x64
+  set GENERATOR="Visual Studio 12 2013 Win64"
   echo "Using VS 2013..."
 )
 
@@ -53,20 +56,14 @@ if "%KOKORO_GITHUB_COMMIT%." == "." (
   set BUILD_SHA=%KOKORO_GITHUB_COMMIT%
 )
 
-cmake -GNinja -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DCMAKE_C_COMPILER=cl.exe -DCMAKE_CXX_COMPILER=cl.exe ..
+cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DLLVM_TARGETS_TO_BUILD="" ..
 
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 
 echo "Build everything... %DATE% %TIME%"
-ninja
+cmake --build .
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Build Completed %DATE% %TIME%"
-
-:: Run tests.
-echo "Running Tests... %DATE% %TIME%"
-ninja check-spirv
-if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
-echo "Tests Completed %DATE% %TIME%"
 
 :: Clean up some directories.
 rm -rf %SRC%\build
