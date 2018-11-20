@@ -38,6 +38,7 @@
 
 #include "FrontendPlugin.h"
 
+#include <cassert>
 #include <numeric>
 #include <string>
 #include <sstream>
@@ -880,7 +881,7 @@ int CompileFromSourceString(const std::string &program,
   // Write outputs
 
   // Write the descriptor map. This is required.
-  assert(desriptor_map_entries && "Valid descriptor map container is required.");
+  assert(descriptor_map_entries && "Valid descriptor map container is required.");
   if (!DescriptorMapFilename.empty()) {
     llvm::errs() << "Warning: -descriptormap is ignored descriptor map container is provided.\n";
   }
