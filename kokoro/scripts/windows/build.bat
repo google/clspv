@@ -65,6 +65,11 @@ cmake --build .
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Build Completed %DATE% %TIME%"
 
+echo "Run tests... %DATE% %TIME%"
+cmake --build . --target check-spirv
+if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
+echo "Tests Completed %DATE% %TIME%"
+
 :: Clean up some directories.
 rm -rf %SRC%\build
 rm -rf %SRC%\third_party

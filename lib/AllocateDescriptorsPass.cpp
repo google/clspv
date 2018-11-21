@@ -222,7 +222,9 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
 
     // Now replace calls to __translate_sampler_initializer
     if (init_fn) {
-      for (auto user : init_fn->users()) {
+      // Copy users, to avoid modifying the list in place.
+      SmallVector<User *, 8> users(init_fn->users());
+      for (auto user : users) {
         if (auto *call = dyn_cast<CallInst>(user)) {
           auto const_val = dyn_cast<ConstantInt>(call->getArgOperand(0));
 
@@ -255,6 +257,14 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
           call->replaceAllUsesWith(new_call);
           call->eraseFromParent();
         }
+      }
+      if (!init_fn->user_empty()) {
+        errs() << "Function: " << init_fn->getName().str()
+               << " still has users after rewrite\n";
+        for (auto U : init_fn->users()) {
+          errs() << " User: " << *U << "\n";
+        }
+        llvm_unreachable("Unexpected uses remain");
       }
       init_fn->eraseFromParent();
     }
@@ -716,14 +726,15 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
 
   int next_id = clspv::FirstLocalSpecId();
   // Maps argument type to assigned SpecIds.
-  DenseMap<Type*, SmallVector<int, 4>> spec_id_types;
+  DenseMap<Type *, SmallVector<int, 4>> spec_id_types;
   // Tracks SpecIds assigned in the current function.
   DenseSet<int> function_spec_ids;
   // Tracks newly allocated spec ids.
-  std::vector<std::pair<Type*, int>> function_allocations;
+  std::vector<std::pair<Type *, int>> function_allocations;
 
   // Allocates a SpecId for |type|.
-  auto GetSpecId = [&next_id, &spec_id_types, &function_spec_ids, &function_allocations](Type *type) {
+  auto GetSpecId = [&next_id, &spec_id_types, &function_spec_ids,
+                    &function_allocations](Type *type) {
     const bool always_distinct_sets =
         clspv::Option::DistinctKernelDescriptorSets();
 
@@ -779,7 +790,8 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
         auto *array_ty = ArrayType::get(argTy->getPointerElementType(), 0);
-        auto *ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
+        auto *ptr_ty =
+            PointerType::get(array_ty, argTy->getPointerAddressSpace());
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
