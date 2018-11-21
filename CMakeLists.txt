@@ -22,7 +22,7 @@ endif()
 
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
-if (NOT DEFINED ${CMAKE_BUILD_TYPE})
+if (NOT DEFINED CMAKE_BUILD_TYPE)
   message(STATUS "CMAKE_BUILD_TYPE was not specified, defaulting to Debug")
   set(CMAKE_BUILD_TYPE Debug)
 endif()
