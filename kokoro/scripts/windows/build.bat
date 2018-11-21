@@ -61,9 +61,14 @@ cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DLLVM_TARGETS_TO_BUILD="" .
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 
 echo "Build everything... %DATE% %TIME%"
-cmake --build .
+cmake --build . --config %BUILD_TYPE%
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Build Completed %DATE% %TIME%"
+
+echo "Run tests... %DATE% %TIME%"
+cmake --build . --target check-spirv --config %BUILD_TYPE%
+if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
+echo "Tests Completed %DATE% %TIME%"
 
 :: Clean up some directories.
 rm -rf %SRC%\build

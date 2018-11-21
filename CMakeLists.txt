@@ -20,6 +20,13 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(clspv)
 endif()
 
+# Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
+# running unit tests correctly on Windows.
+if (NOT DEFINED CMAKE_BUILD_TYPE)
+  message(STATUS "CMAKE_BUILD_TYPE was not specified, defaulting to Debug")
+  set(CMAKE_BUILD_TYPE Debug)
+endif()
+
 # Check if required third-party dependencies exist.
 macro(use_component path)
 if(NOT IS_DIRECTORY ${path})

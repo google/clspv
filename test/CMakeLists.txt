@@ -14,9 +14,15 @@
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.in ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg @ONLY)
 
+# Visual Studio generates puts LLVM executables in different location.
+set (LLVM_BINARY_SUBDIR bin)
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+  set (LLVM_BINARY_SUBDIR ${CMAKE_BUILD_TYPE}/bin)
+endif()
+
 add_custom_target(check-spirv
-  COMMAND ${LLVM_SOURCE_DIR}/utils/lit/lit.py --verbose ${CMAKE_CURRENT_BINARY_DIR}
-    --path ${LLVM_BINARY_DIR}/bin
+  COMMAND python ${LLVM_SOURCE_DIR}/utils/lit/lit.py --verbose ${CMAKE_CURRENT_BINARY_DIR}
+    --path ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"
   DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt FileCheck not

@@ -367,7 +367,9 @@ bool ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
 
   for (auto *F : WorkList) {
     Changed = true;
-    for (auto U : F->users()) {
+    // Copy users to avoid modifying the list in place.
+    SmallVector<User *, 8> users(F->users());
+    for (auto U : users) {
       if (auto *CI = dyn_cast<CallInst>(U)) {
         CI->eraseFromParent();
       }
