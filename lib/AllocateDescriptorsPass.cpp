@@ -608,7 +608,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           addr_space = argTy->getPointerAddressSpace();
           break;
         }
-        case clspv::ArgKind::Pod: {
+        case clspv::ArgKind::Pod:
+        case clspv::ArgKind::PodUBO: {
           // If original argument is:
           //   Elem %arg
           // Then make a StorageBuffer struct whose element is pod-type:
@@ -677,7 +678,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // in the runtime array we'll make.
           replacement = Builder.CreateGEP(call, {zero, zero, zero});
           break;
-        case clspv::ArgKind::Pod: {
+        case clspv::ArgKind::Pod:
+        case clspv::ArgKind::PodUBO: {
           // Replace with a load of the start of the (virtual) variable.
           auto *gep = Builder.CreateGEP(call, {zero, zero});
           replacement = Builder.CreateLoad(gep);

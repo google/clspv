@@ -74,6 +74,8 @@ const char *GetArgKindName(ArgKind kind) {
     return "local";
   case ArgKind::Pod:
     return "pod";
+  case ArgKind::PodUBO:
+    return "pod_ubo";
   case ArgKind::ReadOnlyImage:
     return "ro_image";
   case ArgKind::WriteOnlyImage:
@@ -84,6 +86,29 @@ const char *GetArgKindName(ArgKind kind) {
   errs() << "Unhandled case in clspv::GetArgKindForType: " << int(kind) << "\n";
   llvm_unreachable("Unhandled case in clspv::GetArgKindForType");
   return "";
+}
+
+ArgKind GetArgKindFromName(const std::string &name) {
+  if (name == "buffer") {
+    return ArgKind::Buffer;
+  } else if (name == "buffer_ubo") {
+    return ArgKind::BufferUBO;
+  } else if (name == "local") {
+    return ArgKind::Local;
+  } else if (name == "pod") {
+    return ArgKind::Pod;
+  } else if (name == "pod_ubo") {
+    return ArgKind::PodUBO;
+  } else if (name == "ro_image") {
+    return ArgKind::ReadOnlyImage;
+  } else if (name == "wo_image") {
+    return ArgKind::WriteOnlyImage;
+  } else if (name == "sampler") {
+    return ArgKind::Sampler;
+  }
+
+  llvm_unreachable("Unhandled case in clspv::GetArgKindFromName");
+  return ArgKind::Buffer;
 }
 
 bool IsLocalPtr(llvm::Type *type) {

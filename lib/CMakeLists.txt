@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(clspv_core STATIC
+add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
@@ -21,6 +21,7 @@ add_library(clspv_core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
@@ -62,7 +63,7 @@ target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
 
 target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
 
-target_include_directories(clspv_core PRIVATE ${CLSPV_INCLUDE_DIRS})
+target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
 
 target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
 
