@@ -593,9 +593,8 @@ The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,
 
 #### Math Functions
 
-The `acospi()`, `asinpi()`, `atanpi()`, `atan2pi()`, `cbrt()`, `copysign()`,
-`cospi()`, `erf()`, `erfc()`, `expm1()`, `fdim()`, `fmod()`, `hypot()`,
-`ilogb()`, `lgamma()`, `lgamma_r()`, `log1p()`, `logb()`, `maxmag()`,
+The `cbrt()`, `copysign()`, `cospi()`, `erf()`, `erfc()`, `expm1()`, `fdim()`,
+`hypot()`, `ilogb()`, `lgamma()`, `lgamma_r()`, `log1p()`, `logb()`, `maxmag()`,
 `minmag()`, `nan()`, `nextafter()`, `pown()`, `remainder()`, `remquo()`,
 `rint()`, `rootn()`, `sincos()`, `sinpi()`, `tanpi()`, and `tgamma()` built-in
 functions **must not** be used.
