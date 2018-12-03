@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CLSPV_INCLUDE_CLSPV_ADDRESS_SPACE_H_
+#define CLSPV_INCLUDE_CLSPV_ADDRESS_SPACE_H_
+
 namespace clspv {
 namespace AddressSpace {
 enum Type {
@@ -26,3 +29,5 @@ enum Type {
 };
 }
 }
+
+#endif // CLSPV_INCLUDE_CLSPV_ADDRESS_SPACE_H_

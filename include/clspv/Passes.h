@@ -14,6 +14,7 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "clspv/DescriptorMap.h"
 

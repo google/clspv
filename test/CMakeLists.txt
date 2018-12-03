@@ -20,11 +20,20 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set (LLVM_BINARY_SUBDIR ${CMAKE_BUILD_TYPE}/bin)
 endif()
 
+set(CLSPV_TEST_DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt)
+if (NOT ${EXTERNAL_LLVM} EQUAL 1)
+  set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} FileCheck not)
+endif()
+
+# Use absolute paths in case of external LLVM.
+get_filename_component(LIT_PATH ${LLVM_SOURCE_DIR}/utils/lit/lit.py ABSOLUTE)
+get_filename_component(FILECHECK_PATH ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR} ABSOLUTE)
+
 add_custom_target(check-spirv
-  COMMAND python ${LLVM_SOURCE_DIR}/utils/lit/lit.py --verbose ${CMAKE_CURRENT_BINARY_DIR}
-    --path ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR}
+  COMMAND python ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
+    --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"
-  DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt FileCheck not
+  DEPENDS ${CLSPV_TEST_DEPENDS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

@@ -47,10 +47,6 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
 	add_compile_options("-Wno-noexcept-type")
 endif()
 
-
-use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
-use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
-
 if (NOT DEFINED SPIRV_HEADERS_SOURCE_DIR)
   set(SPIRV_HEADERS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Headers)
   use_component(${SPIRV_HEADERS_SOURCE_DIR})
@@ -73,33 +69,52 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
+if (${EXTERNAL_LLVM} EQUAL 1)
+  if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
+    message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_SOURCE_DIR to be specified")
+  endif()
+  if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR)
+    message(FATAL_ERROR "External LLVM requires CLSPV_CLANG_SOURCE_DIR to be specified")
+  endif()
+  if (NOT DEFINED CLSPV_LLVM_BINARY_DIR)
+    message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_BINARY_DIR to be specified")
+  endif()
+else()
+  use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
+  use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
+
+  set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
+  set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
+  set(CLSPV_LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm)
+
+  # First tell LLVM where to find clang.
+  set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
+
+  # Then pull in LLVM for building.
+  add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 set(CLSPV_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CLSPV_BINARY_DIR}/include
 )
 
-# First tell LLVM where to find clang.
-set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
-
-# Then pull in LLVM for building.
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm EXCLUDE_FROM_ALL)
-
 set(SPIRV_HEADERS_INCLUDE_DIRS
   ${SPIRV_HEADERS_SOURCE_DIR}/include/
 )
 
-set(LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
-set(LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm)
+set(LLVM_SOURCE_DIR ${CLSPV_LLVM_SOURCE_DIR})
+set(LLVM_BINARY_DIR ${CLSPV_LLVM_BINARY_DIR})
 set(LLVM_INCLUDE_DIRS
   ${LLVM_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm/include
+  ${CLSPV_LLVM_BINARY_DIR}/include
 )
 
-set(CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
+set(CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
 set(CLANG_INCLUDE_DIRS
   ${CLANG_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm/tools/clang/include
+  ${CLSPV_LLVM_BINARY_DIR}/tools/clang/include
 )
 
 if(NOT WIN32)
