@@ -148,7 +148,7 @@ bool ReorderBasicBlocksPass::runOnFunction(Function &F) {
     // will be ordered contiguously within the binary.
     //
     // Assumes CFG has been structurized.
-    const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
+    const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     std::deque<BasicBlock *> order;
     DenseSet<BasicBlock *> visited;
     StructuredOrder(&*F.begin(), LI, &order, &visited);

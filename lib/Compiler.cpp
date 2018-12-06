@@ -611,6 +611,7 @@ int PopulatePassManager(
   // Now we add any of the LLVM optimizations we wanted
   pmBuilder.populateModulePassManager(*pm);
 
+
   // Unhide loads from __constant address space.  Undoes the action of
   // HideConstantLoadsPass.
   pm->add(clspv::createUnhideConstantLoadsPass());
