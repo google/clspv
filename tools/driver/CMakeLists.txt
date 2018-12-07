@@ -21,8 +21,6 @@ target_include_directories(clspv PRIVATE ${CLSPV_INCLUDE_DIRS})
 
 target_link_libraries(clspv PRIVATE clspv_core)
 
-add_dependencies(clspv clspv_baked_opencl_header)
-
 set_target_properties(clspv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)
