@@ -67,7 +67,7 @@ target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
 
 target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
 
-add_dependencies(clspv_core clspv_c_strings clspv_glsl)
+add_dependencies(clspv_core clspv_baked_opencl_header clspv_c_strings clspv_glsl)
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
