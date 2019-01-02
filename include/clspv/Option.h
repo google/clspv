@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef CLSPV_INCLUDE_CLSPV_OPTION_H_
+#define CLSPV_INCLUDE_CLSPV_OPTION_H_
+
 namespace clspv {
 namespace Option {
 
@@ -87,3 +90,5 @@ bool ConstantArgsInUniformBuffer();
 
 } // namespace Option
 } // namespace clspv
+
+#endif // CLSPV_INCLUDE_CLSPV_OPTION_H_
