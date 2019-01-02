@@ -18,8 +18,9 @@ __kernel void foo(__global int* data, __constant int* c) {
 // CHECK-DAG: OpDecorate [[var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[var]] Binding 1
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[int]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
+// CHECK: [[int_16384:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 16384
+// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[int]] [[int_16384]]
+// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
 // CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
 // CHECK: [[ptr_int:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0

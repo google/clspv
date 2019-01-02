@@ -27,22 +27,24 @@ __kernel void foo(__global outer* data, __constant inner* c) {
 // CHECK-DAG: OpMemberDecorate [[inner]] 1 Offset 4
 // CHECK-DAG: OpMemberDecorate [[inner]] 2 Offset 16
 // CHECK-DAG: OpMemberDecorate [[inner]] 3 Offset 20
-// CHECK-DAG: OpDecorate [[inner_runtime:%[0-9a-zA-Z_]+]] ArrayStride 32
 // CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 64
 // CHECK-DAG: OpDecorate [[data:%[0-9a-zA-Z_]+]] Binding 0
 // CHECK-DAG: OpDecorate [[data]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[c:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[c]] DescriptorSet 0
+// CHECK: OpDecorate [[array:%[0-9a-zA-Z_]+]] ArrayStride 32
+// CHECK: OpDecorate [[inner_array:%[0-9a-zA-Z_]+]] ArrayStride 32
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK: [[inner]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]]
 // CHECK: [[two:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
-// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[inner]] [[two]]
+// CHECK: [[array]] = OpTypeArray [[inner]] [[two]]
 // CHECK: [[outer:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
 // CHECK: [[runtime]] = OpTypeRuntimeArray [[outer]]
 // CHECK: [[block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[block]]
-// CHECK: [[inner_runtime]] = OpTypeRuntimeArray [[inner]]
-// CHECK: [[c_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner_runtime]]
+// CHECK: [[int_2048:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2048
+// CHECK: [[inner_array]] = OpTypeArray [[inner]] [[int_2048]]
+// CHECK: [[c_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner_array]]
 // CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[c_struct]]
 // CHECK: [[c_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 // CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]

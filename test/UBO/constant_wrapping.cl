@@ -41,8 +41,9 @@ __kernel void foo(__global inner* data, __constant outer* c) {
 // CHECK: [[two:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
 // CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[inner]] [[two]]
 // CHECK: [[outer:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
-// CHECK: [[runtime]] = OpTypeRuntimeArray [[outer]]
-// CHECK: [[block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
+// CHECK: [[int_1024:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 1024
+// CHECK: [[ubo_array:%[0-9a-zA-Z_]+]] = OpTypeArray [[outer]] [[int_1024]]
+// CHECK: [[block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
 // CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[block]]
 // CHECK: [[c_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 // CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]

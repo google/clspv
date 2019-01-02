@@ -22,18 +22,19 @@ __kernel void foo(__global outer* data, __constant outer* c) {
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,c,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,buffer_ubo
 
-// CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 16
 // CHECK-DAG: OpDecorate [[var:%[0-9a-zA-Z_]+]] NonWritable
 // CHECK-DAG: OpDecorate [[var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[var]] Binding 1
+// CHECK: OpDecorate [[array:%[0-9a-zA-Z_]+]] ArrayStride 16
 // CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK: [[float4:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 4
 // CHECK: [[inner:%[0-9a-zA-Z_]+]] = OpTypeStruct [[float4]]
 // CHECK: [[outer:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner]]
-// CHECK: [[runtime]] = OpTypeRuntimeArray [[outer]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
-// CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
+// CHECK: [[array]] = OpTypeArray [[outer]] [[int_4096]]
+// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
+// CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
 // CHECK: [[ptr_float4:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[float4]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[var]] = OpVariable [[ptr]] Uniform

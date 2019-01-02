@@ -122,6 +122,11 @@ llvm::cl::opt<bool> constant_args_in_uniform_buffer(
     "constant-args-ubo", llvm::cl::init(false),
     llvm::cl::desc("Put pointer-to-constant kernel args in UBOs."));
 
+// Default to 64kB.
+llvm::cl::opt<uint64_t> maximum_ubo_size(
+    "max-ubo-size", llvm::cl::init(64 << 10),
+    llvm::cl::desc("Specify the maximum UBO array size in bytes."));
+
 } // namespace
 
 namespace clspv {
@@ -148,6 +153,7 @@ bool ModuleConstantsInStorageBuffer() {
 bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
+uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
 
 } // namespace Option
 } // namespace clspv

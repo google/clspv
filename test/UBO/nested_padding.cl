@@ -32,6 +32,7 @@ __kernel void foo(__global outer* data, __constant outer* c) {
 // CHECK-DAG: OpDecorate [[data]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[c:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[c]] DescriptorSet 0
+// CHECK: OpDecorate [[ubo_array:%[0-9a-zA-Z_]+]] ArrayStride 64
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK: [[inner]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]]
 // CHECK: [[two:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
@@ -40,7 +41,10 @@ __kernel void foo(__global outer* data, __constant outer* c) {
 // CHECK: [[runtime]] = OpTypeRuntimeArray [[outer]]
 // CHECK: [[block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[block]]
-// CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[block]]
+// CHECK: [[int_1024:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 1024
+// CHECK: [[ubo_array]] = OpTypeArray [[outer]] [[int_1024]]
+// CHECK: [[ubo_block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
+// CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_block]]
 // CHECK: [[c_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 // CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0

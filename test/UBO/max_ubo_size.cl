@@ -1,13 +1,14 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -S -o %t.spvasm -descriptormap=%t.map
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -S -o %t.spvasm -descriptormap=%t.map -max-ubo-size=64
 // RUN: FileCheck %s < %t.spvasm
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -descriptormap=%t2.map
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -descriptormap=%t2.map -max-ubo-size=64
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// Checking for correct offsets and array strides.
+// Checking that -max-ubo-size affects the number of elements in the UBO array.
+// Struct alloca size is 32, so expect 2 elements with max size of 64.
 
 typedef struct {
   int x;
@@ -35,9 +36,10 @@ __kernel void foo(__global s* data, __constant s* c) {
 // CHECK: [[runtime]] = OpTypeRuntimeArray [[s]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
-// CHECK: [[int_2048:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2048
-// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[s]] [[int_2048]]
+// CHECK: [[int_2:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
+// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[s]] [[int_2]]
 // CHECK: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
 // CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
 // CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 // CHECK: [[c]] = OpVariable [[c_ptr]] Uniform
+

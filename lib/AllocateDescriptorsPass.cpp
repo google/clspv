@@ -588,8 +588,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         // 3) Generate no SPIR-V code for the call itself.
 
         switch (arg_kind) {
-        case clspv::ArgKind::Buffer:
-        case clspv::ArgKind::BufferUBO: {
+        case clspv::ArgKind::Buffer: {
           // If original argument is:
           //   Elem addrspace(1)*
           // Then make a zero-length array to mimic a StorageBuffer struct
@@ -601,6 +600,33 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
           // Create the type only once.
           auto *arr_type = ArrayType::get(argTy->getPointerElementType(), 0);
+          resource_type = StructType::get(arr_type);
+          // Preserve the address space in case the pointer is passed into a
+          // helper function: we don't want to change the type of the helper
+          // function parameter.
+          addr_space = argTy->getPointerAddressSpace();
+          break;
+        }
+        case clspv::ArgKind::BufferUBO: {
+          // If original argument is:
+          //   Elem addrspace(2)*
+          // Then make a n-element sized array to mimic an Uniform struct whose first
+          // element is an array:
+          //
+          //   { [n x Elem] }
+          //
+          // Use unnamed struct types so we generate less SPIR-V code.
+
+          // Max UBO size can be specified on the command line. Size the array
+          // to pretend we are using that space.
+          uint64_t struct_size = M.getDataLayout().getTypeAllocSize(
+              argTy->getPointerElementType());
+          uint64_t num_elements =
+              clspv::Option::MaxUniformBufferSize() / struct_size;
+
+          // Create the type only once.
+          auto *arr_type =
+              ArrayType::get(argTy->getPointerElementType(), num_elements);
           resource_type = StructType::get(arr_type);
           // Preserve the address space in case the pointer is passed into a
           // helper function: we don't want to change the type of the helper
