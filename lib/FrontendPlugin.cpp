@@ -45,6 +45,8 @@ private:
     CustomDiagnosticUBOUnalignedStructMember = 9,
     CustomDiagnosticUBORestrictedSize = 10,
     CustomDiagnosticUBORestrictedStruct = 11,
+    CustomDiagnosticUBOArrayStride = 12,
+    CustomDiagnosticLocationInfo = 13,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -79,6 +81,19 @@ private:
     return true;
   }
 
+  // Report a diagnostic using |diag|. If |arg_range| and |specific_range|
+  // differ, also issue a note with the specific location of the error.
+  void Report(const CustomDiagnosticType &diag, SourceRange arg_range,
+              SourceRange specific_range) {
+    Instance.getDiagnostics().Report(arg_range.getBegin(),
+                                     CustomDiagnosticsIDMap[diag]);
+    if (arg_range != specific_range) {
+      Instance.getDiagnostics().Report(
+          specific_range.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticLocationInfo]);
+    }
+  }
+
   // Returns the alignment of |QT| to satisfy standard Uniform buffer layout
   // rules.
   uint64_t GetAlignment(const QualType QT, const ASTContext &context) const {
@@ -93,19 +108,24 @@ private:
   // Returns true if |QT| is a valid layout for a Uniform buffer. Refer to
   // 14.5.4 in the Vulkan specification.
   bool IsSupportedUniformLayout(QualType QT, uint64_t offset,
-                                ASTContext &context, SourceRange SR) {
+                                ASTContext &context, SourceRange arg_range,
+                                SourceRange specific_range) {
     const auto canonical = QT.getCanonicalType();
     if (canonical->isScalarType()) {
-      if (!IsSupportedUniformScalarLayout(canonical, offset, context, SR))
+      if (!IsSupportedUniformScalarLayout(canonical, offset, context, arg_range,
+                                          specific_range))
         return false;
     } else if (canonical->isExtVectorType()) {
-      if (!IsSupportedUniformVectorLayout(canonical, offset, context, SR))
+      if (!IsSupportedUniformVectorLayout(canonical, offset, context, arg_range,
+                                          specific_range))
         return false;
     } else if (canonical->isArrayType()) {
-      if (!IsSupportedUniformArrayLayout(canonical, offset, context, SR))
+      if (!IsSupportedUniformArrayLayout(canonical, offset, context, arg_range,
+                                         specific_range))
         return false;
     } else if (canonical->isRecordType()) {
-      if (!IsSupportedUniformRecordLayout(canonical, offset, context, SR))
+      if (!IsSupportedUniformRecordLayout(canonical, offset, context, arg_range,
+                                          specific_range))
         return false;
     }
 
@@ -124,9 +144,7 @@ private:
     const auto type_size = context.getTypeSizeInChars(canonical).getQuantity();
     const auto type_align = GetAlignment(canonical, context);
     if (type_size % type_align != 0) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBORestrictedSize]);
+      Report(CustomDiagnosticUBORestrictedSize, arg_range, specific_range);
       return false;
     }
 
@@ -134,13 +152,13 @@ private:
   }
 
   bool IsSupportedUniformScalarLayout(QualType QT, uint64_t offset,
-                                      ASTContext &context, SourceRange SR) {
+                                      ASTContext &context,
+                                      SourceRange arg_range,
+                                      SourceRange specific_range) {
     // A scalar type of size N has a base alignment on N.
     const unsigned type_size = context.getTypeSizeInChars(QT).getQuantity();
     if (offset % type_size != 0) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedScalar]);
+      Report(CustomDiagnosticUBOUnalignedScalar, arg_range, specific_range);
       return false;
     }
 
@@ -148,7 +166,9 @@ private:
   }
 
   bool IsSupportedUniformVectorLayout(QualType QT, uint64_t offset,
-                                      ASTContext &context, SourceRange SR) {
+                                      ASTContext &context,
+                                      SourceRange arg_range,
+                                      SourceRange specific_range) {
     // 2-component vectors have a base alignment of 2 * (size of element).
     // 3- and 4-component vectors hae a base alignment of 4 * (size of
     // element).
@@ -157,16 +177,12 @@ private:
         context.getTypeSizeInChars(VT->getElementType()).getQuantity();
     if (VT->getNumElements() == 2) {
       if (offset % (ele_size * 2) != 0) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec2]);
+        Report(CustomDiagnosticUBOUnalignedVec2, arg_range, specific_range);
         return false;
       }
     } else if (offset % (ele_size * 4) != 0) {
       // Other vector sizes cause errors elsewhere.
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedVec4]);
+      Report(CustomDiagnosticUBOUnalignedVec4, arg_range, specific_range);
       return false;
     }
 
@@ -177,47 +193,53 @@ private:
     // multiple of 16.
     const auto size = context.getTypeSizeInChars(QT).getQuantity();
     if (size <= 16 && (offset / 16 != (offset + size - 1) / 16)) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOSmallStraddle]);
+      Report(CustomDiagnosticUBOSmallStraddle, arg_range, specific_range);
       return false;
     } else if (size > 16 && (offset % 16 != 0)) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOLargeStraddle]);
+      Report(CustomDiagnosticUBOLargeStraddle, arg_range, specific_range);
       return false;
     }
 
-    return IsSupportedUniformLayout(VT->getElementType(), offset, context, SR);
+    return IsSupportedUniformLayout(VT->getElementType(), offset, context,
+                                    arg_range, specific_range);
   }
 
   bool IsSupportedUniformArrayLayout(QualType QT, uint64_t offset,
-                                     ASTContext &context, SourceRange SR) {
+                                     ASTContext &context, SourceRange arg_range,
+                                     SourceRange specific_range) {
     // An array has a base alignment of is element type, rounded up to a
     // multiple of 16.
     const auto *AT = llvm::cast<ArrayType>(QT);
-    const auto type_align =
-        llvm::alignTo(GetAlignment(AT->getElementType(), context), 16);
+    const auto element_align = GetAlignment(AT->getElementType(), context);
+    const auto type_align = llvm::alignTo(element_align, 16);
     if (offset % type_align != 0) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedArray]);
+      Report(CustomDiagnosticUBOUnalignedArray, arg_range, specific_range);
+      return false;
+    }
+    // The ArrayStride must be a multiple of the base alignment of the array
+    // (i.e. a multiple of 16).  This means that the element size must be
+    // restricted to be the base alignment of the array.
+    const auto element_size =
+        context.getTypeSizeInChars(AT->getElementType()).getQuantity();
+    if (element_size % type_align != 0) {
+      Report(CustomDiagnosticUBOArrayStride, arg_range, specific_range);
       return false;
     }
 
-    return IsSupportedUniformLayout(AT->getElementType(), offset, context, SR);
+    return IsSupportedUniformLayout(AT->getElementType(), offset, context,
+                                    arg_range, specific_range);
   }
 
   bool IsSupportedUniformRecordLayout(QualType QT, uint64_t offset,
-                                      ASTContext &context, SourceRange SR) {
+                                      ASTContext &context,
+                                      SourceRange arg_range,
+                                      SourceRange specific_range) {
     // A structure has a base alignment of its largest member, rounded up to a
     // multiple of 16.
     const auto *RT = llvm::cast<RecordType>(QT);
     const auto type_alignment = GetAlignment(QT, context);
     if (offset % type_alignment != 0) {
-      Instance.getDiagnostics().Report(
-          SR.getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticUBOUnalignedStruct]);
+      Report(CustomDiagnosticUBOUnalignedStruct, arg_range, specific_range);
       return false;
     }
 
@@ -231,7 +253,8 @@ private:
           layout.getFieldOffset(field_no) / context.getCharWidth();
 
       // Rules must be checked recursively.
-      if (!IsSupportedUniformLayout(field_type, field_offset, context, SR)) {
+      if (!IsSupportedUniformLayout(field_type, field_offset, context,
+                                    arg_range, field_decl->getSourceRange())) {
         return false;
       }
 
@@ -250,9 +273,8 @@ private:
           // struct.
           // Both arrays and structs must be aligned to a multiple of 16 bytes.
           if (llvm::alignTo(next_available, 16) > field_offset) {
-            Instance.getDiagnostics().Report(
-                SR.getBegin(), CustomDiagnosticsIDMap
-                                   [CustomDiagnosticUBOUnalignedStructMember]);
+            Report(CustomDiagnosticUBOUnalignedStructMember, arg_range,
+                   field_decl->getSourceRange());
             return false;
           }
         }
@@ -348,6 +370,12 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Error,
             "clspv restriction: UBO structures may not have implicit padding");
+    CustomDiagnosticsIDMap[CustomDiagnosticUBOArrayStride] = DE.getCustomDiagID(
+        DiagnosticsEngine::Error,
+        "clspv restriction: to satisfy UBO ArrayStride restrictions, element "
+        "size must be a multiple of array alignment");
+    CustomDiagnosticsIDMap[CustomDiagnosticLocationInfo] =
+        DE.getCustomDiagID(DiagnosticsEngine::Note, "here");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -381,9 +409,12 @@ public:
                 type->isPointerType() &&
                 type->getPointeeType().getAddressSpace() ==
                     LangAS::opencl_constant) {
-              if (!IsSupportedUniformLayout(type->getPointeeType(), 0,
-                                            FD->getASTContext(),
-                                            P->getSourceRange())) {
+              // The argument will be generated as an array.
+              auto array_type = FD->getASTContext().getIncompleteArrayType(
+                  type->getPointeeType(), clang::ArrayType::Normal, 0);
+              if (!IsSupportedUniformArrayLayout(
+                      array_type, 0, FD->getASTContext(), P->getSourceRange(),
+                      P->getSourceRange())) {
                 return false;
               }
             }

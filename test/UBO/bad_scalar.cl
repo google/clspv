@@ -2,7 +2,7 @@
 
 struct s {
   uchar x;
-  int y;
-} __attribute((packed));
+  int y; //expected-note{{here}}
+} __attribute((packed)) __attribute((aligned(16)));
 
 __kernel void foo(__constant struct s* arg) { } //expected-error{{in an UBO, scalar elements must be aligned to their size}}
