@@ -216,14 +216,16 @@ private:
       Report(CustomDiagnosticUBOUnalignedArray, arg_range, specific_range);
       return false;
     }
-    // The ArrayStride must be a multiple of the base alignment of the array
-    // (i.e. a multiple of 16).  This means that the element size must be
-    // restricted to be the base alignment of the array.
-    const auto element_size =
-        context.getTypeSizeInChars(AT->getElementType()).getQuantity();
-    if (element_size % type_align != 0) {
-      Report(CustomDiagnosticUBOArrayStride, arg_range, specific_range);
-      return false;
+    if (!clspv::Option::RelaxedUniformBufferLayout()) {
+      // The ArrayStride must be a multiple of the base alignment of the array
+      // (i.e. a multiple of 16).  This means that the element size must be
+      // restricted to be the base alignment of the array.
+      const auto element_size =
+          context.getTypeSizeInChars(AT->getElementType()).getQuantity();
+      if (element_size % type_align != 0) {
+        Report(CustomDiagnosticUBOArrayStride, arg_range, specific_range);
+        return false;
+      }
     }
 
     return IsSupportedUniformLayout(AT->getElementType(), offset, context,
@@ -409,12 +411,14 @@ public:
                 type->isPointerType() &&
                 type->getPointeeType().getAddressSpace() ==
                     LangAS::opencl_constant) {
-              // The argument will be generated as an array.
+              // The argument will be generated as an array within a block.
+              // Generate an array type to check the validity for the generated
+              // case.
               auto array_type = FD->getASTContext().getIncompleteArrayType(
                   type->getPointeeType(), clang::ArrayType::Normal, 0);
-              if (!IsSupportedUniformArrayLayout(
-                      array_type, 0, FD->getASTContext(), P->getSourceRange(),
-                      P->getSourceRange())) {
+              if (!IsSupportedUniformLayout(array_type, 0, FD->getASTContext(),
+                                            P->getSourceRange(),
+                                            P->getSourceRange())) {
                 return false;
               }
             }

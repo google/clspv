@@ -127,6 +127,13 @@ llvm::cl::opt<int> maximum_ubo_size(
     "max-ubo-size", llvm::cl::init(64 << 10),
     llvm::cl::desc("Specify the maximum UBO array size in bytes."));
 
+llvm::cl::opt<bool> relaxed_ubo_layout(
+    "relaxed-ubo-layout",
+    llvm::cl::desc("Allow UBO layouts, that do not satisfy the restriction "
+                   "that ArrayStride is a multiple of array alignment. This "
+                   "does not generate valid SPIR-V for the Vulkan environment; "
+                   "however, some drivers may accept it."));
+
 } // namespace
 
 namespace clspv {
@@ -154,6 +161,7 @@ bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
+bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 
 } // namespace Option
 } // namespace clspv

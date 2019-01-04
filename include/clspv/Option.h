@@ -93,6 +93,10 @@ bool ConstantArgsInUniformBuffer();
 // ConstantArgsInUniformBuffer returns true.
 uint64_t MaxUniformBufferSize();
 
+// Returns true if clspv should allow UBOs that do not satisfy the restriction
+// that ArrayStride is a multiple of array alignment.
+bool RelaxedUniformBufferLayout();
+
 } // namespace Option
 } // namespace clspv
 
