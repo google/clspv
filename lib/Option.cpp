@@ -134,6 +134,12 @@ llvm::cl::opt<bool> relaxed_ubo_layout(
                    "does not generate valid SPIR-V for the Vulkan environment; "
                    "however, some drivers may accept it."));
 
+llvm::cl::opt<bool> std430_ubo_layout(
+    "std430-ubo-layout",
+    llvm::cl::desc("Allow UBO layouts that conform to std430 (SSBO) layout "
+                   "requirements. This does not generate valid SPIR-V for the "
+                   "Vulkan environment; however, some drivers may accept it."));
+
 } // namespace
 
 namespace clspv {
@@ -162,6 +168,7 @@ bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
+bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 
 } // namespace Option
 } // namespace clspv
