@@ -7,7 +7,7 @@
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-__kernel void foo(__global int* data, __constant int* c) {
+__kernel void foo(__global int4* data, __constant int4* c) {
   *data = *c;
 }
 
@@ -18,11 +18,13 @@ __kernel void foo(__global int* data, __constant int* c) {
 // CHECK-DAG: OpDecorate [[var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[var]] Binding 1
 // CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[runtime:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[int]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
+// CHECK: [[int4:%[0-9a-zA-Z_]+]] = OpTypeVector [[int]] 4
+// CHECK: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
+// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[int4]] [[int_4096]]
+// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
 // CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
-// CHECK: [[ptr_int:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
+// CHECK: [[ptr_int4:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int4]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[var]] = OpVariable [[ptr]] Uniform
-// CHECK: [[gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_int]] [[var]] [[zero]] [[zero]]
-// CHECK: OpLoad [[int]] [[gep]]
+// CHECK: [[gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_int4]] [[var]] [[zero]] [[zero]]
+// CHECK: OpLoad [[int4]] [[gep]]

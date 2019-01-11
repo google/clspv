@@ -37,7 +37,10 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 //     CHECK: [[runtime]] = OpTypeRuntimeArray [[data_type]]
 //     CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 //     CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
-//     CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
+//     CHECK: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
+//     CHECK: [[ubo_array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[int_4096]]
+//     CHECK: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
+//     CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
 //     CHECK: [[n_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[int]]
 //     CHECK: [[n_struct_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[n_struct]]
 //     CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
