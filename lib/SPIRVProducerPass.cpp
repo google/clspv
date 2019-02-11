@@ -1011,7 +1011,11 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
 
       for (User *U : CandidateUsers) {
         // Update users of gv with new gv.
-        U->replaceUsesOfWith(GV, NewGV);
+        if (!isa<Constant>(U)) {
+          // #254: Can't change operands of a constant, but this shouldn't be
+          // something that sticks around in the module.
+          U->replaceUsesOfWith(GV, NewGV);
+        }
       }
 
       // Delete original gv.

@@ -87,7 +87,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
       for (auto CI : CallsToReplace) {
         auto NewArg = CI->getArgOperand(0);
 
-        if (auto Bitcast = dyn_cast<BitCastInst>(NewArg)) {
+        if (auto Bitcast = dyn_cast<BitCastOperator>(NewArg)) {
           NewArg = Bitcast->getOperand(0);
         }
 
@@ -200,11 +200,11 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
       for (auto U : F.users()) {
         if (auto CI = dyn_cast<CallInst>(U)) {
-          assert(isa<BitCastInst>(CI->getArgOperand(0)));
-          auto Dst = dyn_cast<BitCastInst>(CI->getArgOperand(0))->getOperand(0);
+          assert(isa<BitCastOperator>(CI->getArgOperand(0)));
+          auto Dst = dyn_cast<BitCastOperator>(CI->getArgOperand(0))->getOperand(0);
 
-          assert(isa<BitCastInst>(CI->getArgOperand(1)));
-          auto Src = dyn_cast<BitCastInst>(CI->getArgOperand(1))->getOperand(0);
+          assert(isa<BitCastOperator>(CI->getArgOperand(1)));
+          auto Src = dyn_cast<BitCastOperator>(CI->getArgOperand(1))->getOperand(0);
 
           // The original type of Dst we get from the argument to the bitcast
           // instruction.
@@ -259,8 +259,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
       }
 
       for (auto CI : CallsToReplaceWithSpirvCopyMemory) {
-        auto Arg0 = dyn_cast<BitCastInst>(CI->getArgOperand(0));
-        auto Arg1 = dyn_cast<BitCastInst>(CI->getArgOperand(1));
+        auto Arg0 = dyn_cast<BitCastOperator>(CI->getArgOperand(0));
+        auto Arg1 = dyn_cast<BitCastOperator>(CI->getArgOperand(1));
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
         auto Arg4 = dyn_cast<ConstantInt>(CI->getArgOperand(4));
 
@@ -268,8 +268,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Alignment = ConstantInt::get(I32Ty, Arg3->getZExtValue());
         auto Volatile = ConstantInt::get(I32Ty, Arg4->getZExtValue());
 
-        auto Dst = dyn_cast<BitCastInst>(Arg0)->getOperand(0);
-        auto Src = dyn_cast<BitCastInst>(Arg1)->getOperand(0);
+        auto Dst = Arg0->getOperand(0);
+        auto Src = Arg1->getOperand(0);
 
         auto DstElemTy = Dst->getType()->getPointerElementType();
         auto SrcElemTy = Src->getType()->getPointerElementType();
@@ -318,7 +318,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
             SrcIndices.back() = Index;
             DstIndices.back() = Index;
 
-            auto SrcElemPtr = Builder.CreateGEP(Src, SrcIndices);
+            // Avoid the builder for Src in order to prevent the folder from
+            // creating constant expressions for constant memcpys.
+            auto SrcElemPtr =
+                GetElementPtrInst::CreateInBounds(Src, SrcIndices, "", CI);
             auto DstElemPtr = Builder.CreateGEP(Dst, DstIndices);
             NewFType =
                 NewFType != nullptr
@@ -340,8 +343,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
         // Erase the bitcasts.  A particular bitcast might be used
         // in more than one memcpy, so defer actual deleting until later.
-        BitCastsToForget.insert(Arg0);
-        BitCastsToForget.insert(Arg1);
+        if (isa<BitCastInst>(Arg0))
+          BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg0));
+        if (isa<BitCastInst>(Arg1))
+          BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg1));
       }
       for (auto* Inst : BitCastsToForget) {
         Inst->eraseFromParent();
