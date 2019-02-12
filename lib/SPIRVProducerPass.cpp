@@ -226,9 +226,10 @@ struct SPIRVProducerPass final : public ModulePass {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapEntries(descriptor_map_entries), outputAsm(outputAsm),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
-        OpExtInstImportID(0), HasVariablePointers(false), SamplerTy(nullptr),
-        WorkgroupSizeValueID(0), WorkgroupSizeVarID(0), max_local_spec_id_(0),
-        constant_i32_zero_id_(0) {}
+        OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
+        HasVariablePointers(true), SamplerTy(nullptr), WorkgroupSizeValueID(0),
+        WorkgroupSizeVarID(0), max_local_spec_id_(0), constant_i32_zero_id_(0) {
+  }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -276,8 +277,14 @@ struct SPIRVProducerPass final : public ModulePass {
   ValueList &getEntryPointInterfacesVec() { return EntryPointInterfacesVec; };
   uint32_t &getOpExtInstImportID() { return OpExtInstImportID; };
   std::vector<uint32_t> &getBuiltinDimVec() { return BuiltinDimensionVec; };
+  bool hasVariablePointersStorageBuffer() {
+    return HasVariablePointersStorageBuffer;
+  }
+  void setVariablePointersStorageBuffer(bool Val) {
+    HasVariablePointersStorageBuffer = Val;
+  }
   bool hasVariablePointers() {
-    return true; /* We use StorageBuffer everywhere */
+    return HasVariablePointers;
   };
   void setVariablePointers(bool Val) { HasVariablePointers = Val; };
   ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() {
@@ -435,6 +442,7 @@ private:
   ValueList EntryPointInterfacesVec;
   uint32_t OpExtInstImportID;
   std::vector<uint32_t> BuiltinDimensionVec;
+  bool HasVariablePointersStorageBuffer;
   bool HasVariablePointers;
   Type *SamplerTy;
   DenseMap<unsigned, uint32_t> SamplerMapIndexToIDMap;
@@ -3290,10 +3298,6 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   if (hasVariablePointers()) {
     //
-    // Generate OpCapability and OpExtension
-    //
-
-    //
     // Generate OpCapability.
     //
     // Ops[0] = Capability
@@ -3303,7 +3307,20 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
     SPIRVInstList.insert(InsertPoint,
                          new SPIRVInstruction(spv::OpCapability, Ops));
+  } else if (hasVariablePointersStorageBuffer()) {
+    //
+    // Generate OpCapability.
+    //
+    // Ops[0] = Capability
+    //
+    Ops.clear();
+    Ops << MkNum(spv::CapabilityVariablePointersStorageBuffer);
 
+    SPIRVInstList.insert(InsertPoint,
+                         new SPIRVInstruction(spv::OpCapability, Ops));
+  }
+
+  if (hasVariablePointers() || hasVariablePointersStorageBuffer()) {
     //
     // Generate OpExtension.
     //
@@ -3774,20 +3791,26 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     if (Opcode == spv::OpPtrAccessChain) {
-      setVariablePointers(true);
       // Do we need to generate ArrayStride?  Check against the GEP result type
       // rather than the pointer type of the base because when indexing into
       // an OpenCL program-scope constant, we'll swap out the LLVM base pointer
       // for something else in the SPIR-V.
       // E.g. see test/PointerAccessChain/pointer_index_is_constant_1.cl
       switch (GetStorageClass(ResultType->getAddressSpace())) {
-      case spv::StorageClassStorageBuffer:
       case spv::StorageClassUniform:
+        setVariablePointers(true);
+        // Save the need to generate an ArrayStride decoration.  But defer
+        // generation until later, so we only make one decoration.
+        getTypesNeedingArrayStride().insert(ResultType);
+        break;
+      case spv::StorageClassStorageBuffer:
+        setVariablePointersStorageBuffer(true);
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
         getTypesNeedingArrayStride().insert(ResultType);
         break;
       default:
+        setVariablePointers(true);
         break;
       }
     }
