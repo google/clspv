@@ -402,6 +402,17 @@ struct SPIRVProducerPass final : public ModulePass {
   uint64_t GetTypeStoreSize(Type *type, const DataLayout &DL);
   uint64_t GetTypeAllocSize(Type *type, const DataLayout &DL);
 
+  // Returns the base pointer of |v|.
+  Value *GetBasePointer(Value *v);
+
+  // Sets |HasVariablePointersStorageBuffer| or |HasVariablePointers| base on
+  // |address_space|.
+  void setVariablePointersCapabilities(unsigned address_space);
+
+  // Returns true if |inst| is phi or select that selects from the same
+  // structure (or null).
+  bool selectFromSameObject(Instruction *inst);
+
 private:
   static char ID;
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
@@ -2475,6 +2486,11 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       llvm_unreachable("Unsupported Constant???");
     }
 
+    if (Opcode == spv::OpConstantNull && Cst->getType()->isPointerTy()) {
+      // Null pointer requires variable pointers.
+      setVariablePointersCapabilities(Cst->getType()->getPointerAddressSpace());
+    }
+
     auto *CstInst = new SPIRVInstruction(Opcode, nextID++, Ops);
     SPIRVInstList.push_back(CstInst);
   }
@@ -3486,7 +3502,11 @@ void SPIRVProducerPass::GenerateFuncBody(Function &F) {
 
     // OpVariable instructions must come first.
     for (Instruction &I : BB) {
-      if (isa<AllocaInst>(I)) {
+      if (auto *alloca = dyn_cast<AllocaInst>(&I)) {
+        // Allocating a pointer requires variable pointers.
+        if (alloca->getAllocatedType()->isPointerTy()) {
+          setVariablePointersCapabilities(alloca->getAllocatedType()->getPointerAddressSpace());
+        }
         GenerateInstruction(I);
       }
     }
@@ -3796,21 +3816,16 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // an OpenCL program-scope constant, we'll swap out the LLVM base pointer
       // for something else in the SPIR-V.
       // E.g. see test/PointerAccessChain/pointer_index_is_constant_1.cl
-      switch (GetStorageClass(ResultType->getAddressSpace())) {
-      case spv::StorageClassUniform:
-        setVariablePointers(true);
-        // Save the need to generate an ArrayStride decoration.  But defer
-        // generation until later, so we only make one decoration.
-        getTypesNeedingArrayStride().insert(ResultType);
-        break;
+      auto address_space = ResultType->getAddressSpace();
+      setVariablePointersCapabilities(address_space);
+      switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
-        setVariablePointersStorageBuffer(true);
+      case spv::StorageClassUniform:
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
         getTypesNeedingArrayStride().insert(ResultType);
         break;
       default:
-        setVariablePointers(true);
         break;
       }
     }
@@ -3886,6 +3901,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       if (PointeeTy->isStructTy() &&
           dyn_cast<StructType>(PointeeTy)->isOpaque()) {
         Ty = PointeeTy;
+      } else {
+        // Selecting between pointers requires variable pointers.
+        setVariablePointersCapabilities(Ty->getPointerAddressSpace());
+        if (!hasVariablePointers() && !selectFromSameObject(&I)) {
+          setVariablePointers(true);
+        }
       }
     }
 
@@ -4227,6 +4248,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     //
     // Generate OpLoad.
     //
+ 
+    if (LD->getType()->isPointerTy()) {
+      // Loading a pointer requires variable pointers.
+      setVariablePointersCapabilities(LD->getType()->getPointerAddressSpace());
+    }
 
     uint32_t ResTyID = lookupType(LD->getType());
     uint32_t PointerID = VMap[LD->getPointerOperand()];
@@ -4272,6 +4298,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     //
     // Generate OpStore.
     //
+
+    if (ST->getValueOperand()->getType()->isPointerTy()) {
+      // Storing a pointer requires variable pointers.
+      setVariablePointersCapabilities(
+          ST->getValueOperand()->getType()->getPointerAddressSpace());
+    }
 
     // Ops[0] = Pointer ID
     // Ops[1] = Object ID
@@ -5045,6 +5077,15 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
                              new SPIRVInstruction(spv::OpBranch, Ops));
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
+      if (PHI->getType()->isPointerTy()) {
+        // OpPhi on pointers requires variable pointers.
+        setVariablePointersCapabilities(
+            PHI->getType()->getPointerAddressSpace());
+        if (!hasVariablePointers() && !selectFromSameObject(PHI)) {
+          setVariablePointers(true);
+        }
+      }
+
       //
       // Generate OpPhi.
       //
@@ -5194,6 +5235,12 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // Don't generate any code now.
 
       } else {
+        if (Call->getType()->isPointerTy()) {
+          // Functions returning pointers require variable pointers.
+          setVariablePointersCapabilities(
+              Call->getType()->getPointerAddressSpace());
+        }
+
         //
         // Generate OpFunctionCall.
         //
@@ -5219,7 +5266,30 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
         for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
-          Ops << MkId(VMap[Call->getOperand(i)]);
+          auto *operand = Call->getOperand(i);
+          if (operand->getType()->isPointerTy()) {
+            auto sc =
+                GetStorageClass(operand->getType()->getPointerAddressSpace());
+            if (sc == spv::StorageClassStorageBuffer) {
+              // Passing SSBO by reference requires variable pointers storage
+              // buffer.
+              setVariablePointersStorageBuffer(true);
+            } else if (sc == spv::StorageClassWorkgroup) {
+              // Workgroup references require variable pointers if they are not
+              // memory object declarations.
+              if (auto *operand_call = dyn_cast<CallInst>(operand)) {
+                // Workgroup accessor represents a variable reference.
+                if (!operand_call->getCalledFunction()->getName().startswith(
+                        clspv::WorkgroupAccessorFunction()))
+                  setVariablePointers(true);
+              } else {
+                // Arguments are function parameters.
+                if (!isa<Argument>(operand))
+                  setVariablePointers(true);
+              }
+            }
+          }
+          Ops << MkId(VMap[operand]);
         }
 
         auto *CallInst = new SPIRVInstruction(spv::OpFunctionCall,
@@ -6398,4 +6468,113 @@ uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
   }
 
   return DL.getTypeAllocSize(type);
+}
+
+void SPIRVProducerPass::setVariablePointersCapabilities(unsigned address_space) {
+  if (GetStorageClass(address_space) == spv::StorageClassStorageBuffer) {
+    setVariablePointersStorageBuffer(true);
+  } else {
+    setVariablePointers(true);
+  }
+}
+
+Value *SPIRVProducerPass::GetBasePointer(Value* v) {
+  if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
+    return GetBasePointer(gep->getPointerOperand());
+  }
+
+  // Conservatively return |inst|.
+  return v;
+}
+
+bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
+  assert(inst->getType()->isPointerTy());
+  assert(GetStorageClass(inst->getType()->getPointerAddressSpace()) ==
+         spv::StorageClassStorageBuffer);
+  if (auto *select = dyn_cast<SelectInst>(inst)) {
+    auto *true_base = GetBasePointer(select->getTrueValue());
+    auto *false_base = GetBasePointer(select->getFalseValue());
+
+    if (true_base == false_base)
+      return true;
+
+    if (auto *true_cst = dyn_cast<Constant>(true_base)) {
+      if (true_cst->isNullValue())
+        return true;
+    }
+
+    if (auto *false_cst = dyn_cast<Constant>(false_base)) {
+      if (false_cst->isNullValue())
+        return true;
+    }
+
+    if (auto *true_call = dyn_cast<CallInst>(true_base)) {
+      if (auto *false_call = dyn_cast<CallInst>(false_base)) {
+        if (true_call->getCalledFunction()->getName().startswith(
+                clspv::ResourceAccessorFunction()) &&
+            false_call->getCalledFunction()->getName().startswith(
+                clspv::ResourceAccessorFunction())) {
+          // For resource accessors, match descriptor set and binding.
+          if (true_call->getOperand(0) == false_call->getOperand(0) &&
+              true_call->getOperand(1) == false_call->getOperand(1))
+            return true;
+        } else if (true_call->getCalledFunction()->getName().startswith(
+                       clspv::WorkgroupAccessorFunction()) &&
+                   false_call->getCalledFunction()->getName().startswith(
+                       clspv::WorkgroupAccessorFunction())) {
+          // For pointer-to-workgroup resources, match the spec id.
+          if (true_call->getOperand(0) == false_call->getOperand(0))
+            return true;
+        }
+      }
+    }
+  } else if (auto *phi = dyn_cast<PHINode>(inst)) {
+    Value *value = nullptr;
+    bool ok = true;
+    for (unsigned i = 0; ok && i != phi->getNumIncomingValues(); ++i) {
+      auto *base = GetBasePointer(phi->getIncomingValue(i));
+      if (!value) {
+        if (auto *cst = dyn_cast<Constant>(value)) {
+          if (!cst->isNullValue())
+            value = base;
+        } else {
+          value = base;
+        }
+      } else if (base != value) {
+        if (auto *base_cst = dyn_cast<Constant>(base)) {
+          if (base_cst->isNullValue())
+            continue;
+        }
+
+        if (auto *value_call = dyn_cast<CallInst>(value)) {
+          if (auto *base_call = dyn_cast<CallInst>(base)) {
+            if (value_call->getCalledFunction()->getName().startswith(
+                    clspv::ResourceAccessorFunction()) &&
+                base_call->getCalledFunction()->getName().startswith(
+                    clspv::ResourceAccessorFunction())) {
+              // For resource accessors, match descriptor set and binding.
+              if (value_call->getOperand(0) != base_call->getOperand(0) ||
+                  value_call->getOperand(1) != base_call->getOperand(1))
+                continue;
+            } else if (value_call->getCalledFunction()->getName().startswith(
+                           clspv::WorkgroupAccessorFunction()) &&
+                       base_call->getCalledFunction()->getName().startswith(
+                           clspv::WorkgroupAccessorFunction())) {
+              // For pointer-to-workgroup resources, match the spec id.
+              if (value_call->getOperand(0) != base_call->getOperand(0))
+                continue;
+            }
+          }
+        }
+
+        // Values don't represent the same base.
+        ok = false;
+      }
+    }
+
+    return ok;
+  }
+
+  // Conservatively return false.
+  return false;
 }
