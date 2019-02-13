@@ -227,7 +227,7 @@ struct SPIRVProducerPass final : public ModulePass {
         descriptorMapEntries(descriptor_map_entries), outputAsm(outputAsm),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(true), SamplerTy(nullptr), WorkgroupSizeValueID(0),
+        HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
         WorkgroupSizeVarID(0), max_local_spec_id_(0), constant_i32_zero_id_(0) {
   }
 
@@ -408,6 +408,10 @@ struct SPIRVProducerPass final : public ModulePass {
   // Sets |HasVariablePointersStorageBuffer| or |HasVariablePointers| base on
   // |address_space|.
   void setVariablePointersCapabilities(unsigned address_space);
+
+  // Returns true if |lhs| and |rhs| represent the same resource or workgroup
+  // variable.
+  bool sameResource(Value *lhs, Value *rhs) const;
 
   // Returns true if |inst| is phi or select that selects from the same
   // structure (or null).
@@ -3336,19 +3340,27 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
                          new SPIRVInstruction(spv::OpCapability, Ops));
   }
 
+  // Always add the storage buffer extension
+  {
+    //
+    // Generate OpExtension.
+    //
+    // Ops[0] = Name (Literal String)
+    //
+    auto *ExtensionInst = new SPIRVInstruction(
+        spv::OpExtension, {MkString("SPV_KHR_storage_buffer_storage_class")});
+    SPIRVInstList.insert(InsertPoint, ExtensionInst);
+  }
+
   if (hasVariablePointers() || hasVariablePointersStorageBuffer()) {
     //
     // Generate OpExtension.
     //
     // Ops[0] = Name (Literal String)
     //
-    for (auto extension : {"SPV_KHR_storage_buffer_storage_class",
-                           "SPV_KHR_variable_pointers"}) {
-
-      auto *ExtensionInst =
-          new SPIRVInstruction(spv::OpExtension, {MkString(extension)});
-      SPIRVInstList.insert(InsertPoint, ExtensionInst);
-    }
+    auto *ExtensionInst = new SPIRVInstruction(
+        spv::OpExtension, {MkString("SPV_KHR_variable_pointers")});
+    SPIRVInstList.insert(InsertPoint, ExtensionInst);
   }
 
   if (ExtInstImportID) {
@@ -6483,14 +6495,40 @@ Value *SPIRVProducerPass::GetBasePointer(Value* v) {
     return GetBasePointer(gep->getPointerOperand());
   }
 
-  // Conservatively return |inst|.
+  // Conservatively return |v|.
   return v;
+}
+
+bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
+  if (auto *lhs_call = dyn_cast<CallInst>(lhs)) {
+    if (auto *rhs_call = dyn_cast<CallInst>(rhs)) {
+      if (lhs_call->getCalledFunction()->getName().startswith(
+              clspv::ResourceAccessorFunction()) &&
+          rhs_call->getCalledFunction()->getName().startswith(
+              clspv::ResourceAccessorFunction())) {
+        // For resource accessors, match descriptor set and binding.
+        if (lhs_call->getOperand(0) == rhs_call->getOperand(0) &&
+            lhs_call->getOperand(1) == rhs_call->getOperand(1))
+          return true;
+      } else if (lhs_call->getCalledFunction()->getName().startswith(
+                     clspv::WorkgroupAccessorFunction()) &&
+                 rhs_call->getCalledFunction()->getName().startswith(
+                     clspv::WorkgroupAccessorFunction())) {
+        // For workgroup resources, match spec id.
+        if (lhs_call->getOperand(0) == rhs_call->getOperand(0))
+          return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
   assert(inst->getType()->isPointerTy());
   assert(GetStorageClass(inst->getType()->getPointerAddressSpace()) ==
          spv::StorageClassStorageBuffer);
+  const bool hack_undef = clspv::Option::HackUndef();
   if (auto *select = dyn_cast<SelectInst>(inst)) {
     auto *true_base = GetBasePointer(select->getTrueValue());
     auto *false_base = GetBasePointer(select->getFalseValue());
@@ -6498,44 +6536,31 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
     if (true_base == false_base)
       return true;
 
+    // If either the true or false operand is a null, then we satisfy the same
+    // object constraint.
     if (auto *true_cst = dyn_cast<Constant>(true_base)) {
-      if (true_cst->isNullValue())
+      if (true_cst->isNullValue() || (hack_undef && isa<UndefValue>(true_base)))
         return true;
     }
 
     if (auto *false_cst = dyn_cast<Constant>(false_base)) {
-      if (false_cst->isNullValue())
+      if (false_cst->isNullValue() ||
+          (hack_undef && isa<UndefValue>(false_base)))
         return true;
     }
 
-    if (auto *true_call = dyn_cast<CallInst>(true_base)) {
-      if (auto *false_call = dyn_cast<CallInst>(false_base)) {
-        if (true_call->getCalledFunction()->getName().startswith(
-                clspv::ResourceAccessorFunction()) &&
-            false_call->getCalledFunction()->getName().startswith(
-                clspv::ResourceAccessorFunction())) {
-          // For resource accessors, match descriptor set and binding.
-          if (true_call->getOperand(0) == false_call->getOperand(0) &&
-              true_call->getOperand(1) == false_call->getOperand(1))
-            return true;
-        } else if (true_call->getCalledFunction()->getName().startswith(
-                       clspv::WorkgroupAccessorFunction()) &&
-                   false_call->getCalledFunction()->getName().startswith(
-                       clspv::WorkgroupAccessorFunction())) {
-          // For pointer-to-workgroup resources, match the spec id.
-          if (true_call->getOperand(0) == false_call->getOperand(0))
-            return true;
-        }
-      }
-    }
+    if (sameResource(true_base, false_base))
+      return true;
   } else if (auto *phi = dyn_cast<PHINode>(inst)) {
     Value *value = nullptr;
     bool ok = true;
     for (unsigned i = 0; ok && i != phi->getNumIncomingValues(); ++i) {
       auto *base = GetBasePointer(phi->getIncomingValue(i));
+      // Null values satisfy the constraint of selecting of selecting from the
+      // same object.
       if (!value) {
         if (auto *cst = dyn_cast<Constant>(value)) {
-          if (!cst->isNullValue())
+          if (!cst->isNullValue() && (!hack_undef || !isa<UndefValue>(value)))
             value = base;
         } else {
           value = base;
@@ -6544,28 +6569,12 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
         if (auto *base_cst = dyn_cast<Constant>(base)) {
           if (base_cst->isNullValue())
             continue;
+        } else if (hack_undef && isa<UndefValue>(base)) {
+          continue;
         }
 
-        if (auto *value_call = dyn_cast<CallInst>(value)) {
-          if (auto *base_call = dyn_cast<CallInst>(base)) {
-            if (value_call->getCalledFunction()->getName().startswith(
-                    clspv::ResourceAccessorFunction()) &&
-                base_call->getCalledFunction()->getName().startswith(
-                    clspv::ResourceAccessorFunction())) {
-              // For resource accessors, match descriptor set and binding.
-              if (value_call->getOperand(0) != base_call->getOperand(0) ||
-                  value_call->getOperand(1) != base_call->getOperand(1))
-                continue;
-            } else if (value_call->getCalledFunction()->getName().startswith(
-                           clspv::WorkgroupAccessorFunction()) &&
-                       base_call->getCalledFunction()->getName().startswith(
-                           clspv::WorkgroupAccessorFunction())) {
-              // For pointer-to-workgroup resources, match the spec id.
-              if (value_call->getOperand(0) != base_call->getOperand(0))
-                continue;
-            }
-          }
-        }
+        if (sameResource(value, base))
+          continue;
 
         // Values don't represent the same base.
         ok = false;
