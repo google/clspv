@@ -17,9 +17,7 @@ kernel void foo(local uint2* A, float4 val, uint n) {
 // CHECK: ; Bound: 59
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
 // CHECK: OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: [[_6:%[0-9a-zA-Z_]+]] = OpExtInstImport "GLSL.std.450"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute [[_36:%[0-9a-zA-Z_]+]] "foo"

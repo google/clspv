@@ -52,9 +52,7 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 // CHECK:  ; Bound: 55
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_33:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpEntryPoint GLCompute [[_44:%[0-9a-zA-Z_]+]] "bar"
@@ -159,9 +157,7 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 // CLUSTER:  ; Bound: 56
 // CLUSTER:  ; Schema: 0
 // CLUSTER:  OpCapability Shader
-// CLUSTER:  OpCapability VariablePointers
 // CLUSTER:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CLUSTER:  OpExtension "SPV_KHR_variable_pointers"
 // CLUSTER:  OpMemoryModel Logical GLSL450
 // CLUSTER:  OpEntryPoint GLCompute [[_34:%[0-9a-zA-Z_]+]] "foo"
 // CLUSTER:  OpEntryPoint GLCompute [[_45:%[0-9a-zA-Z_]+]] "bar"

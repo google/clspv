@@ -18,9 +18,7 @@ foo(global int* out, read_only image2d_t im)
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpCapability ImageQuery
-// CHECK: OpCapability VariablePointers
 // CHECK: OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute [[_15:%[0-9a-zA-Z_]+]] "foo"
 // CHECK: OpExecutionMode [[_15]] LocalSize 1 1 1

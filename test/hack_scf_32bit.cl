@@ -228,9 +228,7 @@ kernel void greaterthan_const_vec4(__global int* outDest, int inWidth,
 // CHECK:  ; Bound: 681
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_78:%[0-9a-zA-Z_]+]] "greaterthan_m2" [[_gl_GlobalInvocationID:%[0-9a-zA-Z_]+]]
 // CHECK:  OpEntryPoint GLCompute [[_111:%[0-9a-zA-Z_]+]] "greaterthan" [[_gl_GlobalInvocationID]]

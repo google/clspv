@@ -10,8 +10,6 @@
 // CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[entry_id:[a-zA-Z0-9_]*]] "bitcast_used_twice"
 

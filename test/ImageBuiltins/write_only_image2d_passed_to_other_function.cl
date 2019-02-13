@@ -33,9 +33,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image2
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
 // CHECK:  OpCapability StorageImageWriteWithoutFormat
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_27:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpExecutionMode [[_27]] LocalSize 1 1 1

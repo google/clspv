@@ -29,9 +29,7 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK:      ; Bound: 54
 // CHECK:      ; Schema: 0
 // CHECK:      OpCapability Shader
-// CHECK:      OpCapability VariablePointers
 // CHECK:      OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:      OpExtension "SPV_KHR_variable_pointers"
 // CHECK:      OpMemoryModel Logical GLSL450
 // CHECK:      OpEntryPoint GLCompute [[_38:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:      OpSource OpenCL_C 120

@@ -30,9 +30,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int3* a, g
 // CHECK:  ; Bound: 30
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_22:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpExecutionMode [[_22]] LocalSize 1 1 1

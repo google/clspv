@@ -20,9 +20,7 @@ kernel void foo(global int4* in, global int4* out,
 // CHECK:  ; Bound: 38
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_28:%[0-9a-zA-Z_]+]] "foo" [[_gl_GlobalInvocationID:%[0-9a-zA-Z_]+]]
 // CHECK:  OpSource OpenCL_C 120

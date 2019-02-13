@@ -10,9 +10,7 @@
 // CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
 // CHECK-NOT: OpCapability Int16
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: %[[EXT_INST:[a-zA-Z0-9_]*]] = OpExtInstImport "GLSL.std.450"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[FOO_ID:[a-zA-Z0-9_]*]] "foo"
