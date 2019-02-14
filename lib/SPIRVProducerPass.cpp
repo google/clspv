@@ -6559,18 +6559,16 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
       // Null values satisfy the constraint of selecting of selecting from the
       // same object.
       if (!value) {
-        if (auto *cst = dyn_cast<Constant>(value)) {
-          if (!cst->isNullValue() && (!hack_undef || !isa<UndefValue>(value)))
+        if (auto *cst = dyn_cast<Constant>(base)) {
+          if (!cst->isNullValue() && !(hack_undef && isa<UndefValue>(base)))
             value = base;
         } else {
           value = base;
         }
       } else if (base != value) {
         if (auto *base_cst = dyn_cast<Constant>(base)) {
-          if (base_cst->isNullValue())
+          if (base_cst->isNullValue() || (hack_undef && isa<UndefValue>(base)))
             continue;
-        } else if (hack_undef && isa<UndefValue>(base)) {
-          continue;
         }
 
         if (sameResource(value, base))
