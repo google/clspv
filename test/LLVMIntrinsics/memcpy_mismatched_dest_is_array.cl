@@ -21,9 +21,7 @@ dest_is_array(global float *A, int n, int k) {
 // CHECK:  ; Bound: 50
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_26:%[0-9a-zA-Z_]+]] "dest_is_array"
 // CHECK:  OpExecutionMode [[_26]] LocalSize 1 1 1

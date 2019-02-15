@@ -32,9 +32,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(global float* B, 
 // CHECK:  ; Bound: 39
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_23:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpEntryPoint GLCompute [[_31:%[0-9a-zA-Z_]+]] "bar"

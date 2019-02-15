@@ -24,9 +24,7 @@ void kernel __attribute__((reqd_work_group_size(1, 2, 3))) foo(void) {
 // CHECK:  ; Bound: 5
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_4:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpExecutionMode [[_4]] LocalSize 1 2 3

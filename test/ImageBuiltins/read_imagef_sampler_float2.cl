@@ -25,9 +25,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CHECK:  ; Bound: 34
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
 // CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
 // CHECK:  OpMemoryModel Logical GLSL450
 // CHECK:  OpEntryPoint GLCompute [[_25:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpExecutionMode [[_25]] LocalSize 1 1 1
@@ -91,9 +89,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CLUSTER: ; Bound: 36
 // CLUSTER: ; Schema: 0
 // CLUSTER: OpCapability Shader
-// CLUSTER: OpCapability VariablePointers
 // CLUSTER: OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CLUSTER: OpExtension "SPV_KHR_variable_pointers"
 // CLUSTER: OpMemoryModel Logical GLSL450
 // CLUSTER: OpEntryPoint GLCompute [[_26:%[a-zA-Z0-9_]+]] "foo"
 // CLUSTER: OpExecutionMode [[_26]] LocalSize 1 1 1

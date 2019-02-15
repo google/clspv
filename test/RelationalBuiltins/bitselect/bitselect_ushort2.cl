@@ -12,9 +12,7 @@
 // CHECK:     ; Schema: 0
 // CHECK-DAG: OpCapability Shader
 // CHECK-DAG: OpCapability Int16
-// CHECK-DAG: OpCapability VariablePointers
 // CHECK:     OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:     OpExtension "SPV_KHR_variable_pointers"
 // CHECK:     OpMemoryModel Logical GLSL450
 // CHECK:     OpEntryPoint GLCompute %[[__original_id_16:[0-9]+]] "foo"
 // CHECK:     OpExecutionMode %[[__original_id_16]] LocalSize 1 1 1

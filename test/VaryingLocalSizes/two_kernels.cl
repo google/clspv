@@ -29,9 +29,7 @@ void kernel bar(global uint* a)
 // CHECK: ; Bound: 44
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
-// CHECK: OpCapability VariablePointers
 // CHECK: OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute [[_20:%[a-zA-Z0-9_]+]] "foo"
 // CHECK: OpEntryPoint GLCompute [[_32:%[a-zA-Z0-9_]+]] "bar"
