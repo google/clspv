@@ -97,6 +97,10 @@ uint64_t MaxUniformBufferSize();
 // that ArrayStride is a multiple of array alignment.
 bool RelaxedUniformBufferLayout();
 
+// Returns true if clspv should allow UBOs that conform to std430 (SSBO) layout
+// requirements.
+bool Std430UniformBufferLayout();
+
 } // namespace Option
 } // namespace clspv
 

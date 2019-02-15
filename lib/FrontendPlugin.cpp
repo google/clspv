@@ -408,6 +408,7 @@ public:
 
             if (is_opencl_kernel &&
                 clspv::Option::ConstantArgsInUniformBuffer() &&
+                !clspv::Option::Std430UniformBufferLayout() &&
                 type->isPointerType() &&
                 type->getPointeeType().getAddressSpace() ==
                     LangAS::opencl_constant) {
