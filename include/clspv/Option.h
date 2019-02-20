@@ -101,6 +101,10 @@ bool RelaxedUniformBufferLayout();
 // requirements.
 bool Std430UniformBufferLayout();
 
+// Returns true if clspv should not remove unused arguments of non-kernel
+// functions.
+bool KeepUnusedArguments();
+
 } // namespace Option
 } // namespace clspv
 

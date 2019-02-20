@@ -33,6 +33,7 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/RemoveUnusedArguments.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceLLVMIntrinsicsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceOpenCLBuiltinPass.cpp
