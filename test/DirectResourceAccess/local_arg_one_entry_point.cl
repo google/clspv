@@ -49,14 +49,14 @@ __kernel void local_memory(__global int* in, __global int* out, __local int* tem
 // CHECK-DAG: [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
 // CHECK-DAG: [[__struct_7]] = OpTypeStruct [[__runtimearr_uint]]
 // CHECK-DAG: [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CHECK-DAG: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
-// CHECK-DAG: [[_10:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
 // CHECK-DAG: [[__ptr_Workgroup_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_uint]]
+// CHECK-DAG: [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK: [[_16:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]] [[__ptr_StorageBuffer_uint]] [[__ptr_Workgroup_uint]] [[_uint]]
+// CHECK-DAG: [[_10:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
 // CHECK-DAG: [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
 // CHECK-DAG: [[__ptr_Input_v3uint:%[0-9a-zA-Z_]+]] = OpTypePointer Input [[_v3uint]]
 // CHECK-DAG: [[__ptr_Input_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Input [[_uint]]
-// CHECK-DAG: [[_16:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]] [[__ptr_StorageBuffer_uint]] [[__ptr_Workgroup_uint]] [[_uint]]
 // CHECK-DAG: [[__ptr_Private_v3uint:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[_v3uint]]
 // CHECK-DAG: [[_2]] = OpSpecConstant [[_uint]] 1
 // CHECK-DAG: [[__arr_uint_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_uint]] [[_2]]

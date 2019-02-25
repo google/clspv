@@ -799,8 +799,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   };
 
   for (Function &F : M) {
-    // Handle kernel function first.
-    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    if (F.isDeclaration()) {
       continue;
     }
 
@@ -849,67 +848,16 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
       }
     }
 
-    if (const MDNode *MD =
-            dyn_cast<Function>(&F)->getMetadata("reqd_work_group_size")) {
-      // We generate constants if the WorkgroupSize builtin is being used.
-      if (HasWorkGroupBuiltin) {
-        // Collect constant information for work group size.
-        FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(0)));
-        FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(1)));
-        FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(2)));
-      }
-    }
-
-    // Collect types' information from function.
-    FindTypePerFunc(F);
-
-    // Collect constant information from function.
-    FindConstantPerFunc(F);
-  }
-
-  for (Function &F : M) {
-    // Handle non-kernel functions.
-    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-      continue;
-    }
-
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        if (I.getOpcode() == Instruction::ZExt ||
-            I.getOpcode() == Instruction::SExt ||
-            I.getOpcode() == Instruction::UIToFP) {
-          // If there is zext with i1 type, it will be changed to OpSelect. The
-          // OpSelect needs constant 0 and 1 so the constants are added here.
-
-          auto OpTy = I.getOperand(0)->getType();
-
-          if (OpTy->isIntOrIntVectorTy(1)) {
-            if (I.getOpcode() == Instruction::ZExt) {
-              FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(ConstantInt::get(I.getType(), 1));
-            } else if (I.getOpcode() == Instruction::SExt) {
-              FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(ConstantInt::getSigned(I.getType(), -1));
-            } else {
-              FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
-              FindConstant(ConstantFP::get(Context, APFloat(1.0f)));
-            }
-          }
-        } else if (CallInst *Call = dyn_cast<CallInst>(&I)) {
-          Function *Callee = Call->getCalledFunction();
-
-          // Handle image type specially.
-          if (Callee->getName().equals(
-                  "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-              Callee->getName().equals(
-                  "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f")) {
-            TypeMapType &OpImageTypeMap = getImageTypeMap();
-            Type *ImageTy =
-                Call->getArgOperand(0)->getType()->getPointerElementType();
-            OpImageTypeMap[ImageTy] = 0;
-
-            FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
-          }
+    // More things to do on kernel functions
+    if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+      if (const MDNode *MD =
+              dyn_cast<Function>(&F)->getMetadata("reqd_work_group_size")) {
+        // We generate constants if the WorkgroupSize builtin is being used.
+        if (HasWorkGroupBuiltin) {
+          // Collect constant information for work group size.
+          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(0)));
+          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(1)));
+          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(2)));
         }
       }
     }

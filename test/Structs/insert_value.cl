@@ -48,9 +48,9 @@ struct Thing {
 // CHECK-DAG: %[[CONSTANT_2_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 2
 // CHECK-DAG: %[[CONSTANT_STRUCT0_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[THING_TYPE_ID]] %[[CONSTANT_42_ID]] %[[CONSTANT_2_ID]]
 // CHECK-DAG: %[[CONSTANT_13_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 13
-// CHECK: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_TYPE_ID]]
+// CHECK-DAG: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_TYPE_ID]]
 // CHECK-DAG: %[[CONSTANT_STRUCT1_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[THING_TYPE_ID]] %[[CONSTANT_13_ID]] %[[UNDEF_ID]]
-// CHECK: %[[ARG_ID]] = OpVariable %[[ARG_POINTER_TYPE_ID]] StorageBuffer
+// CHECK-DAG: %[[ARG_ID]] = OpVariable %[[ARG_POINTER_TYPE_ID]] StorageBuffer
 
 // CHECK: %[[A_ID:[a-zA-Z0-9_]*]] = OpFunction %[[THING_TYPE_ID]] Const %[[A_AND_B_TYPE_ID]]
 // CHECK: %[[A_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
