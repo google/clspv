@@ -785,29 +785,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   FindTypesForResourceVars(M);
   FindWorkgroupVars(M);
 
-  // TODO(dneto): Delete the next 3 vars.
-
-  //#error "remove arg handling from this code"
-  // Map kernel functions to their ordinal number in the compilation unit.
-  UniqueVector<Function *> KernelOrdinal;
-
-  // Map the global variables created for kernel args to their creation
-  // order.
-  UniqueVector<GlobalVariable *> KernelArgVarOrdinal;
-
-  // For each kernel argument type, record the kernel arg global resource
-  // variables generated for that type, the function in which that variable
-  // was most recently used, and the binding number it took.  For
-  // reproducibility, we track things by ordinal number (rather than pointer),
-  // and we use a std::set rather than DenseSet since std::set maintains an
-  // ordering.  Each tuple is the ordinals of the kernel function, the binding
-  // number, and the ordinal of the kernal-arg-var.
-  //
-  // This table lets us reuse module-scope StorageBuffer variables between
-  // different kernels.
-  DenseMap<Type *, std::set<std::tuple<unsigned, unsigned, unsigned>>>
-      GVarsForType;
-
   // These function calls need a <2 x i32> as an intermediate result but not
   // the final result.
   std::unordered_set<std::string> NeedsIVec2{
@@ -822,7 +799,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
       continue;
     }
-    KernelOrdinal.insert(&F);
 
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
@@ -836,13 +812,11 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 
           if (OpTy->isIntOrIntVectorTy(1)) {
             if (I.getOpcode() == Instruction::ZExt) {
-              APInt One(32, 1);
               FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(Constant::getIntegerValue(I.getType(), One));
+              FindConstant(ConstantInt::get(I.getType(), 1));
             } else if (I.getOpcode() == Instruction::SExt) {
-              APInt MinusOne(32, UINT64_MAX, true);
               FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(Constant::getIntegerValue(I.getType(), MinusOne));
+              FindConstant(ConstantInt::getSigned(I.getType(), -1));
             } else {
               FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
               FindConstant(ConstantFP::get(Context, APFloat(1.0f)));
@@ -907,13 +881,11 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 
           if (OpTy->isIntOrIntVectorTy(1)) {
             if (I.getOpcode() == Instruction::ZExt) {
-              APInt One(32, 1);
               FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(Constant::getIntegerValue(I.getType(), One));
+              FindConstant(ConstantInt::get(I.getType(), 1));
             } else if (I.getOpcode() == Instruction::SExt) {
-              APInt MinusOne(32, UINT64_MAX, true);
               FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(Constant::getIntegerValue(I.getType(), MinusOne));
+              FindConstant(ConstantInt::getSigned(I.getType(), -1));
             } else {
               FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
               FindConstant(ConstantFP::get(Context, APFloat(1.0f)));
@@ -3668,11 +3640,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         uint32_t TrueID = 0;
         if (I.getOpcode() == Instruction::ZExt) {
-          APInt One(32, 1);
-          TrueID = VMap[Constant::getIntegerValue(I.getType(), One)];
+          TrueID = VMap[ConstantInt::get(I.getType(), 1)];
         } else if (I.getOpcode() == Instruction::SExt) {
-          APInt MinusOne(32, UINT64_MAX, true);
-          TrueID = VMap[Constant::getIntegerValue(I.getType(), MinusOne)];
+          TrueID = VMap[ConstantInt::getSigned(I.getType(), -1)];
         } else {
           TrueID = VMap[ConstantFP::get(Context, APFloat(1.0f))];
         }
