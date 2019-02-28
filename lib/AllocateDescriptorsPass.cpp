@@ -91,6 +91,7 @@ private:
   // function calls until a non-pointer value is encountered.
   std::pair<bool, bool> HasReadsAndWrites(Value *V);
 
+  // Cache for which functions' call trees contain a global barrier.
   DenseMap<Function *, bool> barrier_map_;
 
   // The sampler map, which is an array ref of pairs, each of which is the
@@ -122,7 +123,8 @@ private:
     // variables that otherwise share the same type and argument index.
     // By default this will be zero, and so it won't force any separation.
     int separation_token;
-    // An extra bit that marks whether the variable is coherent.
+    // An extra bit that marks whether the variable is coherent. This means
+    // coherent and non-coherent variables will not share a binding.
     int coherent;
   };
   struct KADDenseMapInfo {
@@ -919,6 +921,7 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
             uses_barrier = semantics->getZExtValue() & 0x40;
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
+          // Continue searching in the subfunction.
           uses_barrier =
               CallTreeContainsGlobalBarrier(call->getCalledFunction());
         }
