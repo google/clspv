@@ -81,6 +81,18 @@ private:
     return result;
   }
 
+  // Returns true if |F| or call function |F| calls contains a global barrier.
+  // Specifically, it checks that the memory semantics operand contains
+  // UniformMemory memory semantics.
+  bool CallTreeContainsGlobalBarrier(Function *F);
+
+  // Returns a pair indicating if |V| is read and/or written to.
+  // Traces the use chain looking for loads and stores and proceeding through
+  // function calls until a non-pointer value is encountered.
+  std::pair<bool, bool> HasReadsAndWrites(Value *V);
+
+  DenseMap<Function *, bool> barrier_map_;
+
   // The sampler map, which is an array ref of pairs, each of which is the
   // sampler constant as an integer, followed by the string expression for
   // the sampler.
@@ -94,9 +106,9 @@ private:
   // What makes a kernel argument require a new descriptor?
   struct KernelArgDiscriminant {
     KernelArgDiscriminant(Type *the_type = nullptr, int the_arg_index = 0,
-                          int the_separation_token = 0)
+                          int the_separation_token = 0, int is_coherent = 0)
         : type(the_type), arg_index(the_arg_index),
-          separation_token(the_separation_token) {}
+          separation_token(the_separation_token), coherent(is_coherent) {}
     // Different argument type requires different descriptor since logical
     // addressing requires strongly typed storage buffer variables.
     Type *type;
@@ -110,6 +122,8 @@ private:
     // variables that otherwise share the same type and argument index.
     // By default this will be zero, and so it won't force any separation.
     int separation_token;
+    // An extra bit that marks whether the variable is coherent.
+    int coherent;
   };
   struct KADDenseMapInfo {
     static KernelArgDiscriminant getEmptyKey() {
@@ -120,12 +134,13 @@ private:
     }
     static unsigned getHashValue(const KernelArgDiscriminant &key) {
       return unsigned(uintptr_t(key.type)) ^ key.arg_index ^
-             key.separation_token;
+             key.separation_token ^ key.coherent;
     }
     static bool isEqual(const KernelArgDiscriminant &lhs,
                         const KernelArgDiscriminant &rhs) {
       return lhs.type == rhs.type && lhs.arg_index == rhs.arg_index &&
-             lhs.separation_token == rhs.separation_token;
+             lhs.separation_token == rhs.separation_token &&
+             lhs.coherent == rhs.coherent;
     }
   };
 };
@@ -359,6 +374,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     }
     kernels_with_bodies.push_back(&F);
     auto &discriminants_list = discriminants_used_by_function[&F];
+    bool uses_barriers = CallTreeContainsGlobalBarrier(&F);
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
@@ -379,7 +395,19 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         break;
       }
 
-      KernelArgDiscriminant key(argTy, arg_index, separation_token);
+      int coherent = 0;
+      if (uses_barriers && arg_kind == clspv::ArgKind::Buffer) {
+        // Coherency is only required if the argument is an SSBO that is both
+        // read and written to. Images do not require coherency because they are
+        // either read only or write only.
+        bool reads = false;
+        bool writes = false;
+        std::tie(reads, writes) = HasReadsAndWrites(&Arg);
+        coherent = (reads && writes) ? 1 : 0;
+      }
+      outs() << " is coherent: " << coherent << "\n";
+
+      KernelArgDiscriminant key(argTy, arg_index, separation_token, coherent);
 
       // First assume no descriptor is required.
       discriminants_list.push_back(DiscriminantInfo{-1, key});
@@ -677,9 +705,10 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //  arg kind
           //  arg index
           //  discriminant index
+          //  coherent
           Type *i32 = Builder.getInt32Ty();
           FunctionType *fnTy =
-              FunctionType::get(ptrTy, {i32, i32, i32, i32, i32}, false);
+              FunctionType::get(ptrTy, {i32, i32, i32, i32, i32, i32}, false);
           var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fnTy));
         }
 
@@ -691,9 +720,11 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         auto *arg_index_arg = Builder.getInt32(arg_index);
         auto *discriminant_index_arg =
             Builder.getInt32(discriminants_list[arg_index].index);
-        auto *call =
-            Builder.CreateCall(var_fn, {set_arg, binding_arg, arg_kind_arg,
-                                        arg_index_arg, discriminant_index_arg});
+        auto *coherent_arg = Builder.getInt32(
+            discriminants_list[arg_index].discriminant.coherent);
+        auto *call = Builder.CreateCall(
+            var_fn, {set_arg, binding_arg, arg_kind_arg, arg_index_arg,
+                     discriminant_index_arg, coherent_arg});
 
         Value *replacement = nullptr;
         Value *zero = Builder.getInt32(0);
@@ -863,4 +894,90 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   }
 
   return Changed;
+}
+
+bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
+  auto iter = barrier_map_.find(F);
+  if (iter != barrier_map_.end()) {
+    return iter->second;
+  }
+
+  bool uses_barrier = false;
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
+      if (auto *call = dyn_cast<CallInst>(&I)) {
+        if (call->getCalledFunction()->getName().equals(
+                "__spirv_control_barrier")) {
+          // barrier()
+          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
+            uses_barrier = semantics->getZExtValue() & 0x40;
+          }
+        } else if (call->getCalledFunction()->getName().equals(
+                       "__spirv_memory_barrier")) {
+          // mem_fence()
+          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(1))) {
+            uses_barrier = semantics->getZExtValue() & 0x40;
+          }
+        } else if (!call->getCalledFunction()->isDeclaration()) {
+          uses_barrier =
+              CallTreeContainsGlobalBarrier(call->getCalledFunction());
+        }
+
+        if (uses_barrier)
+          break;
+      }
+    }
+
+    if (uses_barrier)
+      break;
+  }
+
+  barrier_map_.insert(std::make_pair(F, uses_barrier));
+  return uses_barrier;
+}
+
+std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
+  bool read = false;
+  bool write = false;
+  DenseSet<Value *> visited;
+  std::vector<std::pair<Value *, unsigned>> stack;
+  for (auto &Use : V->uses()) {
+    stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+  }
+
+  while (!stack.empty() || !(read && write)) {
+    Value *value = stack.back().first;
+    unsigned operand_no = stack.back().second;
+    stack.pop_back();
+    if (!visited.insert(value).second)
+      continue;
+
+    if (isa<LoadInst>(value)) {
+      read = true;
+    } else if (isa<StoreInst>(value)) {
+      write = true;
+    } else if (value->getType()->isPointerTy()) {
+      auto *call = dyn_cast<CallInst>(value);
+      if (call && !call->getCalledFunction()->isDeclaration()) {
+        // Trace through the function call and grab the right argument.
+        auto arg_iter = call->getCalledFunction()->arg_begin();
+        for (size_t i = 0; i != operand_no; ++i, ++arg_iter) {
+        }
+
+        for (auto &Use : arg_iter->uses()) {
+          stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+        }
+      } else {
+        for (auto &Use : value->uses()) {
+          stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+        }
+      }
+    } else {
+      // Conservatively, read and written.
+      read = true;
+      write = true;
+    }
+  }
+
+  return std::make_pair(read, write);
 }
