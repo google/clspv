@@ -407,7 +407,6 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         std::tie(reads, writes) = HasReadsAndWrites(&Arg);
         coherent = (reads && writes) ? 1 : 0;
       }
-      outs() << " is coherent: " << coherent << "\n";
 
       KernelArgDiscriminant key(argTy, arg_index, separation_token, coherent);
 
@@ -948,7 +947,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
     stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
   }
 
-  while (!stack.empty() || !(read && write)) {
+  while (!stack.empty() && !(read && write)) {
     Value *value = stack.back().first;
     unsigned operand_no = stack.back().second;
     stack.pop_back();
