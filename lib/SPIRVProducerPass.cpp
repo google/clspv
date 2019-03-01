@@ -6641,7 +6641,8 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
 }
 
 bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
-  if (clspv::GetArgKindForType(Arg.getType()) != clspv::ArgKind::Buffer) {
+  if (Arg.getType()->isPointerTy() &&
+      Arg.getType()->getPointerAddressSpace() == clspv::AddressSpace::Global) {
     // Only SSBOs need to be annotated as coherent.
     return false;
   }
@@ -6684,8 +6685,9 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
       // variables.
       for (unsigned i = 0; i != user->getNumOperands(); ++i) {
         Value *operand = user->getOperand(i);
-        if (clspv::GetArgKindForType(operand->getType()) ==
-            clspv::ArgKind::Buffer) {
+        if (operand->getType()->isPointerTy() &&
+            operand->getType()->getPointerAddressSpace() ==
+                clspv::AddressSpace::Global) {
           stack.push_back(operand);
         }
       }
