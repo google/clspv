@@ -79,6 +79,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceIsInfAndIsNan(Module &M);
   bool replaceAllAndAny(Module &M);
   bool replaceUpsample(Module &M);
+  bool replaceRotate(Module &M);
   bool replaceSelect(Module &M);
   bool replaceBitSelect(Module &M);
   bool replaceStepSmoothStep(Module &M);
@@ -125,6 +126,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceIsInfAndIsNan(M);
   Changed |= replaceAllAndAny(M);
   Changed |= replaceUpsample(M);
+  Changed |= replaceRotate(M);
   Changed |= replaceSelect(M);
   Changed |= replaceBitSelect(M);
   Changed |= replaceStepSmoothStep(M);
@@ -943,6 +945,107 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Module &M) {
           // OR both results
           Value *V = BinaryOperator::Create(Instruction::Or, HiShifted, LoCast,
                                             "", CI);
+
+          // Replace call with the expression
+          CI->replaceAllUsesWith(V);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceRotate(Module &M) {
+  bool Changed = false;
+
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+    // Skip symbols whose name doesn't match
+    if (!SymVal.getKey().startswith("_Z6rotate")) {
+      continue;
+    }
+    // Is there a function going by that name?
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          // Get arguments
+          auto SrcValue = CI->getOperand(0);
+          auto RotAmount = CI->getOperand(1);
+
+          // Don't touch overloads that aren't in OpenCL C
+          auto SrcType = SrcValue->getType();
+          auto RotType = RotAmount->getType();
+
+          if ((SrcType != RotType) || (CI->getType() != SrcType)) {
+            continue;
+          }
+
+          if (!SrcType->isIntOrIntVectorTy()) {
+            continue;
+          }
+
+          if ((SrcType->getScalarSizeInBits() != 8) &&
+              (SrcType->getScalarSizeInBits() != 16) &&
+              (SrcType->getScalarSizeInBits() != 32) &&
+              (SrcType->getScalarSizeInBits() != 64)) {
+            continue;
+          }
+
+          if (SrcType->isVectorTy()) {
+            if ((SrcType->getVectorNumElements() != 2) &&
+                (SrcType->getVectorNumElements() != 3) &&
+                (SrcType->getVectorNumElements() != 4) &&
+                (SrcType->getVectorNumElements() != 8) &&
+                (SrcType->getVectorNumElements() != 16)) {
+              continue;
+            }
+          }
+
+          // The approach used is to shift the top bits down, the bottom bits up
+          // and OR the two shifted values.
+
+          // The rotation amount is to be treated modulo the element size.
+          // Since SPIR-V shift ops don't support this, let's apply the
+          // modulo ahead of shifting. The element size is always a power of
+          // two so we can just AND with a mask.
+          auto ModMask = ConstantInt::get(SrcType,
+                                          SrcType->getScalarSizeInBits() - 1);
+          RotAmount = BinaryOperator::Create(Instruction::And, RotAmount,
+                                             ModMask, "", CI);
+
+          // Let's calc the amount by which to shift top bits down
+          auto ScalarSize = ConstantInt::get(SrcType,
+                                             SrcType->getScalarSizeInBits());
+          auto DownAmount = BinaryOperator::Create(Instruction::Sub, ScalarSize,
+                                                   RotAmount, "", CI);
+
+          // Now shift the bottom bits up and the top bits down
+          auto LoRotated = BinaryOperator::Create(Instruction::Shl, SrcValue,
+                                                  RotAmount, "", CI);
+          auto HiRotated = BinaryOperator::Create(Instruction::LShr, SrcValue,
+                                                  DownAmount, "", CI);
+
+          // Finally OR the two shifted values
+          Value *V = BinaryOperator::Create(Instruction::Or, LoRotated,
+                                            HiRotated, "", CI);
 
           // Replace call with the expression
           CI->replaceAllUsesWith(V);
