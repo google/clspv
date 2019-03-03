@@ -78,6 +78,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceRelational(Module &M);
   bool replaceIsInfAndIsNan(Module &M);
   bool replaceAllAndAny(Module &M);
+  bool replaceUpsample(Module &M);
   bool replaceSelect(Module &M);
   bool replaceBitSelect(Module &M);
   bool replaceStepSmoothStep(Module &M);
@@ -123,6 +124,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceRelational(M);
   Changed |= replaceIsInfAndIsNan(M);
   Changed |= replaceAllAndAny(M);
+  Changed |= replaceUpsample(M);
   Changed |= replaceSelect(M);
   Changed |= replaceBitSelect(M);
   Changed |= replaceStepSmoothStep(M);
@@ -850,6 +852,99 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
             V = SelectInst::Create(SelectSource, TrueValue, FalseValue, "", CI);
           }
 
+          CI->replaceAllUsesWith(V);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceUpsample(Module &M) {
+  bool Changed = false;
+
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+    // Skip symbols whose name doesn't match
+    if (!SymVal.getKey().startswith("_Z8upsample")) {
+      continue;
+    }
+    // Is there a function going by that name?
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          // Get arguments
+          auto HiValue = CI->getOperand(0);
+          auto LoValue = CI->getOperand(1);
+
+          // Don't touch overloads that aren't in OpenCL C
+          auto HiType = HiValue->getType();
+          auto LoType = LoValue->getType();
+
+          if (HiType != LoType) {
+            continue;
+          }
+
+          if (!HiType->isIntOrIntVectorTy()) {
+            continue;
+          }
+
+          if (HiType->getScalarSizeInBits() * 2 !=
+              CI->getType()->getScalarSizeInBits()) {
+            continue;
+          }
+
+          if ((HiType->getScalarSizeInBits() != 8) &&
+              (HiType->getScalarSizeInBits() != 16) &&
+              (HiType->getScalarSizeInBits() != 32)) {
+            continue;
+          }
+
+          if (HiType->isVectorTy()) {
+            if ((HiType->getVectorNumElements() != 2) &&
+                (HiType->getVectorNumElements() != 3) &&
+                (HiType->getVectorNumElements() != 4) &&
+                (HiType->getVectorNumElements() != 8) &&
+                (HiType->getVectorNumElements() != 16)) {
+              continue;
+            }
+          }
+
+          // Convert both operands to the result type
+          auto HiCast = CastInst::CreateZExtOrBitCast(HiValue, CI->getType(),
+                                                      "", CI);
+          auto LoCast = CastInst::CreateZExtOrBitCast(LoValue, CI->getType(),
+                                                      "", CI);
+
+          // Shift high operand
+          auto ShiftAmount = ConstantInt::get(CI->getType(),
+                                              HiType->getScalarSizeInBits());
+          auto HiShifted = BinaryOperator::Create(Instruction::Shl, HiCast,
+                                                  ShiftAmount, "", CI);
+
+          // OR both results
+          Value *V = BinaryOperator::Create(Instruction::Or, HiShifted, LoCast,
+                                            "", CI);
+
+          // Replace call with the expression
           CI->replaceAllUsesWith(V);
 
           // Lastly, remember to remove the user.
