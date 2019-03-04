@@ -3,28 +3,23 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-int bar(global int* x) { return x[0]; }
+// Both x's should be coherent. y should not be coherent because it is not read.
+void bar(global int* x, int y) { *x = y; }
 
-kernel void foo1(global int* data) {
-  int x = bar(data);
+kernel void foo(global int* x, global int* y, int c) {
+  int z = x[0];
   barrier(CLK_GLOBAL_MEM_FENCE);
-  data[1] = x;
+  global int* ptr = c ? x : y;
+  bar(ptr + 1, z);
 }
 
-kernel void foo2(global int* x, global int* y) {
-  int z = bar(x);
-  barrier(CLK_GLOBAL_MEM_FENCE);
-  y[0] = z;
-}
-
-// CHECK: OpDecorate [[data:%[a-zA-Z0-9_]+]] DescriptorSet 0
-// CHECK: OpDecorate [[data]] Binding 0
-// CHECK: OpDecorate [[data]] Coherent
 // CHECK: OpDecorate [[x:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[x]] Binding 0
+// CHECK: OpDecorate [[x]] Coherent
 // CHECK: OpDecorate [[y:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[y]] Binding 1
-// CHECK-NOT: OpDecorate [[x]] Coherent
+// CHECK-NOT: OpDecorate [[y]] Coherent
 // CHECK: OpDecorate [[param:%[a-zA-Z0-9_]+]] Coherent
 // CHECK: [[param]] = OpFunctionParameter
+
 

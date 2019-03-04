@@ -89,6 +89,9 @@ private:
   // Returns a pair indicating if |V| is read and/or written to.
   // Traces the use chain looking for loads and stores and proceeding through
   // function calls until a non-pointer value is encountered.
+  //
+  // This function assumes loads, stores and function calls are the only
+  // instructions that can read or write to memory.
   std::pair<bool, bool> HasReadsAndWrites(Value *V);
 
   // Cache for which functions' call trees contain a global barrier.
@@ -939,11 +942,18 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
 }
 
 std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
+  auto IsInterestingUser = [](const User *user) {
+    if (isa<StoreInst>(user) || isa<LoadInst>(user) || isa<CallInst>(user) || user->getType()->isPointerTy())
+      return true;
+    return false;
+  };
+
   bool read = false;
   bool write = false;
   DenseSet<Value *> visited;
   std::vector<std::pair<Value *, unsigned>> stack;
   for (auto &Use : V->uses()) {
+    if (IsInterestingUser(Use.getUser()))
     stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
   }
 
@@ -958,7 +968,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
       read = true;
     } else if (isa<StoreInst>(value)) {
       write = true;
-    } else if (value->getType()->isPointerTy()) {
+    } else {
       auto *call = dyn_cast<CallInst>(value);
       if (call && !call->getCalledFunction()->isDeclaration()) {
         // Trace through the function call and grab the right argument.
@@ -967,17 +977,26 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
         }
 
         for (auto &Use : arg_iter->uses()) {
+          auto *User = Use.getUser();
+          if (IsInterestingUser(User))
           stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+        }
+      } else if (call) {
+        // Check the attributes on the function.
+        if (!call->getCalledFunction()->doesNotAccessMemory()) {
+          if (!call->getCalledFunction()->doesNotReadMemory())
+            read = true;
+          if (!call->getCalledFunction()->onlyReadsMemory())
+            write = true;
         }
       } else {
-        for (auto &Use : value->uses()) {
-          stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+        // Trace uses that remain a pointer or a function calls.
+        for (auto &U : value->uses()) {
+          auto *User = U.getUser();
+          if (IsInterestingUser(User))
+          stack.push_back(std::make_pair(U.getUser(), U.getOperandNo()));
         }
       }
-    } else {
-      // Conservatively, read and written.
-      read = true;
-      write = true;
     }
   }
 
