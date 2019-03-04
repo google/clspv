@@ -635,6 +635,7 @@ int PopulatePassManager(
   }
 
   pm->add(clspv::createShareModuleScopeVariablesPass());
+  // This should be run after LLVM and OpenCL intrinsics are replaced.
   pm->add(clspv::createAllocateDescriptorsPass(*SamplerMapEntries));
   pm->add(llvm::createVerifierPass());
   pm->add(clspv::createDirectResourceAccessPass());
