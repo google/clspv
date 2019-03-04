@@ -6641,7 +6641,7 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
 }
 
 bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
-  if (Arg.getType()->isPointerTy() &&
+  if (!Arg.getType()->isPointerTy() ||
       Arg.getType()->getPointerAddressSpace() != clspv::AddressSpace::Global) {
     // Only SSBOs need to be annotated as coherent.
     return false;
