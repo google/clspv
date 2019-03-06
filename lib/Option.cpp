@@ -144,6 +144,9 @@ llvm::cl::opt<bool> keep_unused_arguments(
     "keep-unused-arguments", llvm::cl::init(false),
     llvm::cl::desc("Do not remove unused non-kernel function arguments."));
 
+llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(false),
+                                 llvm::cl::desc("Allow 8-bit integers"));
+
 } // namespace
 
 namespace clspv {
@@ -174,6 +177,7 @@ uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
+bool Int8Support() { return int8_support; }
 
 } // namespace Option
 } // namespace clspv

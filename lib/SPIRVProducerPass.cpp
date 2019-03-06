@@ -1653,14 +1653,17 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
 
         continue;
       } else if (isa<TruncInst>(I)) {
-        // For truncation to i8 we mask against 255.
-        Type *ToTy = I.getType();
-        if (8u == ToTy->getPrimitiveSizeInBits()) {
-          LLVMContext &Context = ToTy->getContext();
-          Constant *Cst255 = ConstantInt::get(Type::getInt32Ty(Context), 0xff);
-          FindConstant(Cst255);
+        // Special case if i8 is not generally handled.
+        if (!clspv::Option::Int8Support()) {
+          // For truncation to i8 we mask against 255.
+          Type *ToTy = I.getType();
+          if (8u == ToTy->getPrimitiveSizeInBits()) {
+            LLVMContext &Context = ToTy->getContext();
+            Constant *Cst255 =
+                ConstantInt::get(Type::getInt32Ty(Context), 0xff);
+            FindConstant(Cst255);
+          }
         }
-        // Fall through.
       } else if (isa<AtomicRMWInst>(I)) {
         LLVMContext &Context = I.getContext();
 
@@ -2026,27 +2029,29 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
         auto *Inst = new SPIRVInstruction(spv::OpTypeBool, nextID++, {});
         SPIRVInstList.push_back(Inst);
       } else {
-        // i8 is added to TypeMap as i32.
-        // No matter what LLVM type is requested first, always alias the
-        // second one's SPIR-V type to be the same as the one we generated
-        // first.
-        unsigned aliasToWidth = 0;
-        if (BitWidth == 8) {
-          aliasToWidth = 32;
-          BitWidth = 32;
-        } else if (BitWidth == 32) {
-          aliasToWidth = 8;
-        }
-        if (aliasToWidth) {
-          Type *otherType = Type::getIntNTy(Ty->getContext(), aliasToWidth);
-          auto where = TypeMap.find(otherType);
-          if (where == TypeMap.end()) {
-            // Go ahead and make it, but also map the other type to it.
-            TypeMap[otherType] = nextID;
-          } else {
-            // Alias this SPIR-V type the existing type.
-            TypeMap[Ty] = where->second;
-            break;
+        if (!clspv::Option::Int8Support()) {
+          // i8 is added to TypeMap as i32.
+          // No matter what LLVM type is requested first, always alias the
+          // second one's SPIR-V type to be the same as the one we generated
+          // first.
+          unsigned aliasToWidth = 0;
+          if (BitWidth == 8) {
+            aliasToWidth = 32;
+            BitWidth = 32;
+          } else if (BitWidth == 32) {
+            aliasToWidth = 8;
+          }
+          if (aliasToWidth) {
+            Type *otherType = Type::getIntNTy(Ty->getContext(), aliasToWidth);
+            auto where = TypeMap.find(otherType);
+            if (where == TypeMap.end()) {
+              // Go ahead and make it, but also map the other type to it.
+              TypeMap[otherType] = nextID;
+            } else {
+              // Alias this SPIR-V type the existing type.
+              TypeMap[Ty] = where->second;
+              break;
+            }
           }
         }
 
@@ -2170,8 +2175,9 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       break;
     }
     case Type::VectorTyID: {
-      // <4 x i8> is changed to i32.
-      if (Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
+      // <4 x i8> is changed to i32 if i8 is not generally supported.
+      if (!clspv::Option::Int8Support() &&
+          Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
         if (Ty->getVectorNumElements() == 4) {
           TypeMap[Ty] = lookupType(Ty->getVectorElementType());
           break;
@@ -3226,8 +3232,12 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   SPIRVInstList.insert(InsertPoint, CapInst);
 
   for (Type *Ty : getTypeList()) {
-    // Find the i16 type.
-    if (Ty->isIntegerTy(16)) {
+    if (clspv::Option::Int8Support() && Ty->isIntegerTy(8)) {
+      // Generate OpCapability for i8 type.
+      SPIRVInstList.insert(InsertPoint,
+                           new SPIRVInstruction(spv::OpCapability,
+                                                {MkNum(spv::CapabilityInt8)}));
+    } else if (Ty->isIntegerTy(16)) {
       // Generate OpCapability for i16 type.
       SPIRVInstList.insert(InsertPoint,
                            new SPIRVInstruction(spv::OpCapability,
@@ -3654,7 +3664,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         auto *Inst = new SPIRVInstruction(spv::OpSelect, nextID++, Ops);
         SPIRVInstList.push_back(Inst);
-      } else if (I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
+      } else if (!clspv::Option::Int8Support() &&
+                 I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
         // The SPIR-V target type is a 32-bit int.  Keep only the bottom
         // 8 bits.
         // Before:
@@ -4896,6 +4907,10 @@ void SPIRVProducerPass::GenerateFuncEpilogue() {
 }
 
 bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
+  // Don't specialize <4 x i8> if i8 is generally supported.
+  if (clspv::Option::Int8Support())
+    return false;
+
   LLVMContext &Context = Ty->getContext();
   if (Ty->isVectorTy()) {
     if (Ty->getVectorElementType() == Type::getInt8Ty(Context) &&
