@@ -361,4 +361,8 @@ llvm::ModulePass *createScalarizePass();
 /// LLVM inserted padding added to represent the types as laid out in OpenCL C.
 llvm::ModulePass *createUBOTypeTransformPass();
 
+/// Removes unused arguments from non-kernel functions.
+/// @return An LLVM module pass
+llvm::ModulePass *createRemoveUnusedArgumentsPass();
+
 } // namespace clspv

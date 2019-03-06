@@ -1,13 +1,13 @@
-// RUN: clspv %s -S -o %t.spvasm -no-inline-single
+// RUN: clspv %s -S -o %t.spvasm -no-inline-single -keep-unused-arguments
 // RUN: FileCheck %s < %t.spvasm
-// RUN: clspv %s -o %t.spv -no-inline-single
+// RUN: clspv %s -o %t.spv -no-inline-single -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %s -S -o %t.spvasm -no-dra -no-inline-single
+// RUN: clspv %s -S -o %t.spvasm -no-dra -no-inline-single -keep-unused-arguments
 // RUN: FileCheck %s < %t.spvasm -check-prefix=NODRA
-// RUN: clspv %s -o %t.spv -no-dra -no-inline-single
+// RUN: clspv %s -o %t.spv -no-dra -no-inline-single -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm -check-prefix=NODRA
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

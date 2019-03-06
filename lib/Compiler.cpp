@@ -642,6 +642,9 @@ int PopulatePassManager(
   // that are easy to remove.  Also replace GEPs of GEPS
   // left by replacing indirect buffer accesses.
   pm->add(clspv::createSimplifyPointerBitcastPass());
+  // Run after DRA to clean up parameters and help reduce the need for variable
+  // pointers.
+  pm->add(clspv::createRemoveUnusedArgumentsPass());
 
   pm->add(clspv::createSplatSelectConditionPass());
   pm->add(clspv::createSignedCompareFixupPass());

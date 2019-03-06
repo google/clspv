@@ -135,10 +135,14 @@ llvm::cl::opt<bool> relaxed_ubo_layout(
                    "however, some drivers may accept it."));
 
 llvm::cl::opt<bool> std430_ubo_layout(
-    "std430-ubo-layout",
+    "std430-ubo-layout", llvm::cl::init(false),
     llvm::cl::desc("Allow UBO layouts that conform to std430 (SSBO) layout "
                    "requirements. This does not generate valid SPIR-V for the "
                    "Vulkan environment; however, some drivers may accept it."));
+
+llvm::cl::opt<bool> keep_unused_arguments(
+    "keep-unused-arguments", llvm::cl::init(false),
+    llvm::cl::desc("Do not remove unused non-kernel function arguments."));
 
 } // namespace
 
@@ -169,6 +173,7 @@ bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
+bool KeepUnusedArguments() { return keep_unused_arguments; }
 
 } // namespace Option
 } // namespace clspv
