@@ -602,8 +602,7 @@ functions **must not** be used.
 #### Integer Functions
 
 The `abs_diff()`, `add_sat()`, `hadd()`, `mad_hi()`, `mad_sat()`, `mul_hi()`,
-`rhadd()`, `rotate()`, `sub_sat()` and `upsample()` built-in functions
-**must not** be used.
+`rhadd()`, `rotate()` and `sub_sat()` built-in functions **must not** be used.
 
 #### Relational Functions
 
