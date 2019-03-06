@@ -44,7 +44,6 @@ kernel void bar(float2 coord, sampler_t s, read_only image2d_t im, global float4
 // CHECK:  OpDecorate [[_34]] Binding 1
 // CHECK:  OpDecorate [[_35:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK:  OpDecorate [[_35]] Binding 2
-// CHECK:  OpDecorate [[_35]] NonWritable
 // CHECK:  OpDecorate [[_36:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK:  OpDecorate [[_36]] Binding 3
 // CHECK:  OpDecorate [[_37:%[0-9a-zA-Z_]+]] DescriptorSet 0

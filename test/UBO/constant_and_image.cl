@@ -20,7 +20,6 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 16
 // CHECK-DAG: OpDecorate [[image_var:%[0-9a-zA-Z_]+]] Binding 0
 // CHECK-DAG: OpDecorate [[image_var]] DescriptorSet 0
-// CHECK-DAG: OpDecorate [[image_var]] NonWritable
 // CHECK-DAG: OpDecorate [[sampler_var:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[sampler_var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[offset_var:%[0-9a-zA-Z_]+]] Binding 2

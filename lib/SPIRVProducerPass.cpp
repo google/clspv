@@ -2685,12 +2685,6 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
                              new SPIRVInstruction(spv::OpDecorate, Ops));
       }
       break;
-    case clspv::ArgKind::ReadOnlyImage:
-      Ops.clear();
-      Ops << MkId(info->var_id) << MkNum(spv::DecorationNonWritable);
-      SPIRVInstList.insert(DecoInsertPoint,
-                           new SPIRVInstruction(spv::OpDecorate, Ops));
-      break;
     case clspv::ArgKind::WriteOnlyImage:
       Ops.clear();
       Ops << MkId(info->var_id) << MkNum(spv::DecorationNonReadable);

@@ -17,7 +17,6 @@
 // CHECK: OpExecutionMode %[[FOO_ID]] LocalSize 1 1 1
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
-// CHECK: OpDecorate %[[ARG0_ID]] NonWritable
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[READ_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[FLOAT_TYPE_ID]] 2D 0 0 0 1 Unknown
 // CHECK-DAG: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[READ_ONLY_IMAGE_TYPE_ID]]
