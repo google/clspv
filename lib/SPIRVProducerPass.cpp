@@ -4590,7 +4590,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     if (Callee->getName().equals("_Z3absj") ||
         Callee->getName().equals("_Z3absDv2_j") ||
         Callee->getName().equals("_Z3absDv3_j") ||
-        Callee->getName().equals("_Z3absDv4_j")) {
+        Callee->getName().equals("_Z3absDv4_j") ||
+        Callee->getName().equals("_Z3absh") ||
+        Callee->getName().equals("_Z3absDv2_h") ||
+        Callee->getName().equals("_Z3absDv3_h") ||
+        Callee->getName().equals("_Z3absDv4_h")) {
       VMap[&I] = VMap[Call->getOperand(0)];
       break;
     }
