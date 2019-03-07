@@ -14,3 +14,4 @@
 
 # Bring in our command line driver folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/driver)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/clspv-opt)
