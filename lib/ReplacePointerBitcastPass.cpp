@@ -924,8 +924,6 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                              "bitcast on ReplacePointerBitcastPass");
           }
         } else {
-
-          errs() << "About to crash at 820" << M << "Aboot\n\n";
           Inst->print(errs());
           llvm_unreachable("Handle above user of scalar bitcast with gep on "
                            "ReplacePointerBitcastPass");
