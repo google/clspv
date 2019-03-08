@@ -614,8 +614,8 @@ functions **must not** be used.
 
 #### Integer Functions
 
-The `abs_diff()`, `add_sat()`, `hadd()`, `mad_hi()`, `mad_sat()`, `mul_hi()`,
-`rhadd()` and `sub_sat()` built-in functions **must not** be used.
+The `abs_diff()`, `add_sat()`, `hadd()`, `mad_sat()`, `rhadd()` and
+`sub_sat()` built-in functions **must not** be used.
 
 #### Relational Functions
 

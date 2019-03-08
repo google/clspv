@@ -4506,6 +4506,29 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
+    if ((Callee->getName() == "spirv.smul_extended") ||
+        (Callee->getName() == "spirv.umul_extended")) {
+      //
+      // Generate Op{S,U}MulExtended.
+      //
+      spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
+                           .Case("spirv.smul_extended", spv::OpSMulExtended)
+                           .Case("spirv.umul_extended", spv::OpUMulExtended);
+      SPIRVOperandList Ops;
+
+      Ops << MkId(lookupType(I.getType()));
+
+      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
+        Ops << MkId(VMap[Call->getArgOperand(i)]);
+      }
+
+      VMap[&I] = nextID;
+
+      auto *Inst = new SPIRVInstruction(opcode, nextID++, Ops);
+      SPIRVInstList.push_back(Inst);
+      break;
+    }
+
     if (Callee->getName().startswith("_Z3dot")) {
       // If the argument is a vector type, generate OpDot
       if (Call->getArgOperand(0)->getType()->isVectorTy()) {
@@ -6097,6 +6120,8 @@ void SPIRVProducerPass::WriteSPIRVAssembly() {
     case spv::OpUMod:
     case spv::OpSRem:
     case spv::OpFRem:
+    case spv::OpUMulExtended:
+    case spv::OpSMulExtended:
     case spv::OpBitwiseOr:
     case spv::OpBitwiseXor:
     case spv::OpBitwiseAnd:
@@ -6332,6 +6357,8 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpUMod:
     case spv::OpSRem:
     case spv::OpFRem:
+    case spv::OpUMulExtended:
+    case spv::OpSMulExtended:
     case spv::OpBitwiseOr:
     case spv::OpBitwiseXor:
     case spv::OpBitwiseAnd:
