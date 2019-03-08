@@ -772,6 +772,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
 
   const std::map<const char *, const char *> Map = {
       // all
+      {"_Z3allc", ""},
+      {"_Z3allDv2_c", "__spirv_allDv2_c"},
+      {"_Z3allDv3_c", "__spirv_allDv3_c"},
+      {"_Z3allDv4_c", "__spirv_allDv4_c"},
       {"_Z3alls", ""},
       {"_Z3allDv2_s", "__spirv_allDv2_s"},
       {"_Z3allDv3_s", "__spirv_allDv3_s"},
@@ -786,6 +790,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
       {"_Z3allDv4_l", "__spirv_allDv4_l"},
 
       // any
+      {"_Z3anyc", ""},
+      {"_Z3anyDv2_c", "__spirv_anyDv2_c"},
+      {"_Z3anyDv3_c", "__spirv_anyDv3_c"},
+      {"_Z3anyDv4_c", "__spirv_anyDv4_c"},
       {"_Z3anys", ""},
       {"_Z3anyDv2_s", "__spirv_anyDv2_s"},
       {"_Z3anyDv3_s", "__spirv_anyDv3_s"},

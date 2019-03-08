@@ -105,6 +105,9 @@ bool Std430UniformBufferLayout();
 // functions.
 bool KeepUnusedArguments();
 
+// Returns true if clspv should allow 8-bit integers.
+bool Int8Support();
+
 } // namespace Option
 } // namespace clspv
 

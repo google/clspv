@@ -723,8 +723,16 @@ int Compile(const int argc, const char *const argv[]) {
 
   if (clspv::Option::ConstantArgsInUniformBuffer() &&
       !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "clspv restriction: -constant-arg-ubo requires "
+    llvm::errs() << "clspv restriction: -constant-args-ubo requires "
                     "-inline-entry-points\n";
+    return -1;
+  }
+
+  // TODO: Remove when #279 is resolved.
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      clspv::Option::Int8Support()) {
+    llvm::errs() << "clspv restriction: -constant-args-ubo is currently "
+                    "incompatible with -int8\n";
     return -1;
   }
 

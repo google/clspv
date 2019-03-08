@@ -1653,14 +1653,17 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
 
         continue;
       } else if (isa<TruncInst>(I)) {
-        // For truncation to i8 we mask against 255.
-        Type *ToTy = I.getType();
-        if (8u == ToTy->getPrimitiveSizeInBits()) {
-          LLVMContext &Context = ToTy->getContext();
-          Constant *Cst255 = ConstantInt::get(Type::getInt32Ty(Context), 0xff);
-          FindConstant(Cst255);
+        // Special case if i8 is not generally handled.
+        if (!clspv::Option::Int8Support()) {
+          // For truncation to i8 we mask against 255.
+          Type *ToTy = I.getType();
+          if (8u == ToTy->getPrimitiveSizeInBits()) {
+            LLVMContext &Context = ToTy->getContext();
+            Constant *Cst255 =
+                ConstantInt::get(Type::getInt32Ty(Context), 0xff);
+            FindConstant(Cst255);
+          }
         }
-        // Fall through.
       } else if (isa<AtomicRMWInst>(I)) {
         LLVMContext &Context = I.getContext();
 
@@ -2026,27 +2029,29 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
         auto *Inst = new SPIRVInstruction(spv::OpTypeBool, nextID++, {});
         SPIRVInstList.push_back(Inst);
       } else {
-        // i8 is added to TypeMap as i32.
-        // No matter what LLVM type is requested first, always alias the
-        // second one's SPIR-V type to be the same as the one we generated
-        // first.
-        unsigned aliasToWidth = 0;
-        if (BitWidth == 8) {
-          aliasToWidth = 32;
-          BitWidth = 32;
-        } else if (BitWidth == 32) {
-          aliasToWidth = 8;
-        }
-        if (aliasToWidth) {
-          Type *otherType = Type::getIntNTy(Ty->getContext(), aliasToWidth);
-          auto where = TypeMap.find(otherType);
-          if (where == TypeMap.end()) {
-            // Go ahead and make it, but also map the other type to it.
-            TypeMap[otherType] = nextID;
-          } else {
-            // Alias this SPIR-V type the existing type.
-            TypeMap[Ty] = where->second;
-            break;
+        if (!clspv::Option::Int8Support()) {
+          // i8 is added to TypeMap as i32.
+          // No matter what LLVM type is requested first, always alias the
+          // second one's SPIR-V type to be the same as the one we generated
+          // first.
+          unsigned aliasToWidth = 0;
+          if (BitWidth == 8) {
+            aliasToWidth = 32;
+            BitWidth = 32;
+          } else if (BitWidth == 32) {
+            aliasToWidth = 8;
+          }
+          if (aliasToWidth) {
+            Type *otherType = Type::getIntNTy(Ty->getContext(), aliasToWidth);
+            auto where = TypeMap.find(otherType);
+            if (where == TypeMap.end()) {
+              // Go ahead and make it, but also map the other type to it.
+              TypeMap[otherType] = nextID;
+            } else {
+              // Alias this SPIR-V type the existing type.
+              TypeMap[Ty] = where->second;
+              break;
+            }
           }
         }
 
@@ -2170,8 +2175,9 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       break;
     }
     case Type::VectorTyID: {
-      // <4 x i8> is changed to i32.
-      if (Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
+      // <4 x i8> is changed to i32 if i8 is not generally supported.
+      if (!clspv::Option::Int8Support() &&
+          Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
         if (Ty->getVectorNumElements() == 4) {
           TypeMap[Ty] = lookupType(Ty->getVectorElementType());
           break;
@@ -3226,8 +3232,12 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   SPIRVInstList.insert(InsertPoint, CapInst);
 
   for (Type *Ty : getTypeList()) {
-    // Find the i16 type.
-    if (Ty->isIntegerTy(16)) {
+    if (clspv::Option::Int8Support() && Ty->isIntegerTy(8)) {
+      // Generate OpCapability for i8 type.
+      SPIRVInstList.insert(InsertPoint,
+                           new SPIRVInstruction(spv::OpCapability,
+                                                {MkNum(spv::CapabilityInt8)}));
+    } else if (Ty->isIntegerTy(16)) {
       // Generate OpCapability for i16 type.
       SPIRVInstList.insert(InsertPoint,
                            new SPIRVInstruction(spv::OpCapability,
@@ -3654,7 +3664,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         auto *Inst = new SPIRVInstruction(spv::OpSelect, nextID++, Ops);
         SPIRVInstList.push_back(Inst);
-      } else if (I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
+      } else if (!clspv::Option::Int8Support() &&
+                 I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
         // The SPIR-V target type is a 32-bit int.  Keep only the bottom
         // 8 bits.
         // Before:
@@ -4579,7 +4590,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     if (Callee->getName().equals("_Z3absj") ||
         Callee->getName().equals("_Z3absDv2_j") ||
         Callee->getName().equals("_Z3absDv3_j") ||
-        Callee->getName().equals("_Z3absDv4_j")) {
+        Callee->getName().equals("_Z3absDv4_j") ||
+        Callee->getName().equals("_Z3absh") ||
+        Callee->getName().equals("_Z3absDv2_h") ||
+        Callee->getName().equals("_Z3absDv3_h") ||
+        Callee->getName().equals("_Z3absDv4_h")) {
       VMap[&I] = VMap[Call->getOperand(0)];
       break;
     }
@@ -4896,6 +4911,10 @@ void SPIRVProducerPass::GenerateFuncEpilogue() {
 }
 
 bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
+  // Don't specialize <4 x i8> if i8 is generally supported.
+  if (clspv::Option::Int8Support())
+    return false;
+
   LLVMContext &Context = Ty->getContext();
   if (Ty->isVectorTy()) {
     if (Ty->getVectorElementType() == Type::getInt8Ty(Context) &&
@@ -5163,14 +5182,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           }
         }
 
-      } else if (callee_name.equals("_Z8popcounti") ||
-                 callee_name.equals("_Z8popcountj") ||
-                 callee_name.equals("_Z8popcountDv2_i") ||
-                 callee_name.equals("_Z8popcountDv3_i") ||
-                 callee_name.equals("_Z8popcountDv4_i") ||
-                 callee_name.equals("_Z8popcountDv2_j") ||
-                 callee_name.equals("_Z8popcountDv3_j") ||
-                 callee_name.equals("_Z8popcountDv4_j")) {
+      } else if (callee_name.startswith("_Z8popcount")) {
         //
         // Generate OpBitCount
         //
@@ -5343,6 +5355,10 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
 
 glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
   return StringSwitch<glsl::ExtInst>(Name)
+      .Case("_Z3absc", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv2_c", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv3_c", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z3absDv4_c", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3abss", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv2_s", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv3_s", glsl::ExtInst::ExtInstSAbs)
@@ -5355,6 +5371,14 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z3absDv2_l", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv3_l", glsl::ExtInst::ExtInstSAbs)
       .Case("_Z3absDv4_l", glsl::ExtInst::ExtInstSAbs)
+      .Case("_Z5clampccc", glsl::ExtInst::ExtInstSClamp)
+      .Case("_Z5clampDv2_cS_S_", glsl::ExtInst::ExtInstSClamp)
+      .Case("_Z5clampDv3_cS_S_", glsl::ExtInst::ExtInstSClamp)
+      .Case("_Z5clampDv4_cS_S_", glsl::ExtInst::ExtInstSClamp)
+      .Case("_Z5clamphhh", glsl::ExtInst::ExtInstUClamp)
+      .Case("_Z5clampDv2_hS_S_", glsl::ExtInst::ExtInstUClamp)
+      .Case("_Z5clampDv3_hS_S_", glsl::ExtInst::ExtInstUClamp)
+      .Case("_Z5clampDv4_hS_S_", glsl::ExtInst::ExtInstUClamp)
       .Case("_Z5clampsss", glsl::ExtInst::ExtInstSClamp)
       .Case("_Z5clampDv2_sS_S_", glsl::ExtInst::ExtInstSClamp)
       .Case("_Z5clampDv3_sS_S_", glsl::ExtInst::ExtInstSClamp)
@@ -5383,6 +5407,14 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z5clampDv2_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv3_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv4_fS_S_", glsl::ExtInst::ExtInstFClamp)
+      .Case("_Z3maxcc", glsl::ExtInst::ExtInstSMax)
+      .Case("_Z3maxDv2_cS_", glsl::ExtInst::ExtInstSMax)
+      .Case("_Z3maxDv3_cS_", glsl::ExtInst::ExtInstSMax)
+      .Case("_Z3maxDv4_cS_", glsl::ExtInst::ExtInstSMax)
+      .Case("_Z3maxhh", glsl::ExtInst::ExtInstUMax)
+      .Case("_Z3maxDv2_hS_", glsl::ExtInst::ExtInstUMax)
+      .Case("_Z3maxDv3_hS_", glsl::ExtInst::ExtInstUMax)
+      .Case("_Z3maxDv4_hS_", glsl::ExtInst::ExtInstUMax)
       .Case("_Z3maxss", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv2_sS_", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv3_sS_", glsl::ExtInst::ExtInstSMax)
@@ -5412,6 +5444,14 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z3maxDv3_fS_", glsl::ExtInst::ExtInstFMax)
       .Case("_Z3maxDv4_fS_", glsl::ExtInst::ExtInstFMax)
       .StartsWith("_Z4fmax", glsl::ExtInst::ExtInstFMax)
+      .Case("_Z3mincc", glsl::ExtInst::ExtInstSMin)
+      .Case("_Z3minDv2_cS_", glsl::ExtInst::ExtInstSMin)
+      .Case("_Z3minDv3_cS_", glsl::ExtInst::ExtInstSMin)
+      .Case("_Z3minDv4_cS_", glsl::ExtInst::ExtInstSMin)
+      .Case("_Z3minhh", glsl::ExtInst::ExtInstUMin)
+      .Case("_Z3minDv2_hS_", glsl::ExtInst::ExtInstUMin)
+      .Case("_Z3minDv3_hS_", glsl::ExtInst::ExtInstUMin)
+      .Case("_Z3minDv4_hS_", glsl::ExtInst::ExtInstUMin)
       .Case("_Z3minss", glsl::ExtInst::ExtInstSMin)
       .Case("_Z3minDv2_sS_", glsl::ExtInst::ExtInstSMin)
       .Case("_Z3minDv3_sS_", glsl::ExtInst::ExtInstSMin)
