@@ -33,9 +33,18 @@ The SPIR-V as produced from the OpenCL C language can make use of the following
 capabilities:
 
 - `Shader` as we are targeting the OpenCL C language at a Vulkan implementation.
+- `VariablePointersStorageBuffer`, from the _SPRV\_KHR\_variable\_pointers_ extension.
 - `VariablePointers`, from the _SPV\_KHR\_variable\_pointers_ extension.
-  - *Note*: The compiler always emits code that depends on `VariablePointers`
-    even though there might some cases where it is not strictly needed.
+  - *Note*: the compiler attempts to add the minimal variable pointers capability required.
+- `Int8` if char or uchar types (or composites of them) are used.
+- `Int16` if short or ushort types (or composites of them) are used.
+- `Int64` if long or ulong types (or composites of them) are used.
+- `Float16` if the half type (or composites of it) is used.
+  - *Note*: this requires enabling the _cl\_khr\_fp16_ extension in the source.
+- `Float64` if the double type (or composites of it) is used.
+- `ImageStorageWriteWithoutFormat` if _write\_only_ images are used.
+- `ImageQuery` if _get\_image\_width()_ or _get\_image\_height()_ builtins are used.
+  - *Note*: these queries are only supported for 2D images currently.
 
 ## Vulkan Interaction
 
@@ -142,6 +151,10 @@ shader is as follows:
   is specified by an integer specialization constant. The specialization
   ID is reported in the descriptor map file, generated via the `-descriptormap`
   option.
+
+The shaders produced use the GLSL450 memory model. As such, there is an assumption of
+no aliasing by default. The compiler does not generate *Aliased* decorations
+currently. Users should be aware of this and ensure they are not relying on aliasing.
 
 #### Descriptor map
 
