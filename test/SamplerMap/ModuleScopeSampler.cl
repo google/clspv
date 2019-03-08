@@ -32,7 +32,6 @@
 
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 1
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
-// CHECK: OpDecorate %[[ARG0_ID]] NonWritable
 
 // CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 1
 // CHECK: OpDecorate %[[ARG1_ID]] Binding 1

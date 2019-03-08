@@ -48,7 +48,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CHECK:  OpDecorate [[_20]] Binding 0
 // CHECK:  OpDecorate [[_21:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK:  OpDecorate [[_21]] Binding 1
-// CHECK:  OpDecorate [[_21]] NonWritable
 // CHECK:  OpDecorate [[_22:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK:  OpDecorate [[_22]] Binding 2
 // CHECK:  OpDecorate [[_23:%[0-9a-zA-Z_]+]] DescriptorSet 0

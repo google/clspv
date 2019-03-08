@@ -3,7 +3,8 @@
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// #219: Sampled images cannot be queried in Vulkan.
+// RUN: not spirv-val --target-env vulkan1.0 %t.spv
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1)))
 foo(global int* out, read_only image2d_t im)
@@ -30,7 +31,6 @@ foo(global int* out, read_only image2d_t im)
 // CHECK: OpDecorate [[_13]] Binding 0
 // CHECK: OpDecorate [[_14:%[0-9a-zA-Z_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_14]] Binding 1
-// CHECK: OpDecorate [[_14]] NonWritable
 // CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
 // CHECK-DAG: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32

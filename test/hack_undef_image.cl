@@ -45,7 +45,6 @@ void kernel foo(global float4* A, read_only image2d_t im, sampler_t sam, float2 
 // CHECK: OpDecorate [[_32]] Binding 0
 // CHECK: OpDecorate [[_33:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_33]] Binding 1
-// CHECK: OpDecorate [[_33]] NonWritable
 // CHECK: OpDecorate [[_34:%[a-zA-Z0-9_]+]] DescriptorSet 0
 // CHECK: OpDecorate [[_34]] Binding 2
 // CHECK: OpDecorate [[_35:%[a-zA-Z0-9_]+]] DescriptorSet 0
