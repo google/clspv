@@ -40,6 +40,10 @@ using namespace llvm;
 
 namespace {
 
+// Constant that represents bitfield for UniformMemory Memory Semantics from
+// SPIR-V. Used to test barrier semantics.
+const uint32_t kMemorySemanticsUniformMemory = 0x40;
+
 cl::opt<bool> ShowDescriptors("show-desc", cl::init(false), cl::Hidden,
                               cl::desc("Show descriptors"));
 
@@ -84,6 +88,10 @@ private:
   // Returns true if |F| or call function |F| calls contains a global barrier.
   // Specifically, it checks that the memory semantics operand contains
   // UniformMemory memory semantics.
+  //
+  // The compiler targets OpenCL 1.2, which only provides support for relaxed
+  // atomics which means they cannot be used as synchronization primitives.
+  // That is why the pass does not consider them for the addition of coherence.
   bool CallTreeContainsGlobalBarrier(Function *F);
 
   // Returns a pair indicating if |V| is read and/or written to.
@@ -910,6 +918,10 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
   for (auto &BB : *F) {
     for (auto &I : BB) {
       if (auto *call = dyn_cast<CallInst>(&I)) {
+        // For barrier and mem_fence semantics, only Uniform (covering Uniform
+        // and StorageBuffer storage classes) semantics are checked because
+        // Workgroup variables are inherently coherent (and do not require the
+        // decoration).
         if (call->getCalledFunction()->getName().equals(
                 "__spirv_control_barrier")) {
           // barrier()
@@ -931,6 +943,9 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
         if (uses_barrier)
           break;
       }
+
+      if (uses_barrier)
+        break;
     }
 
     if (uses_barrier)
@@ -942,8 +957,14 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
 }
 
 std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
+  // Atomics and OpenCL builtins modf and frexp are all represented as function
+  // calls.
+  //
+  // A user is interesting if reads or writes memory or could eventually read
+  // or write memory.
   auto IsInterestingUser = [](const User *user) {
-    if (isa<StoreInst>(user) || isa<LoadInst>(user) || isa<CallInst>(user) || user->getType()->isPointerTy())
+    if (isa<StoreInst>(user) || isa<LoadInst>(user) || isa<CallInst>(user) ||
+        user->getType()->isPointerTy())
       return true;
     return false;
   };
