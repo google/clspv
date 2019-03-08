@@ -24,6 +24,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
 target_compile_features(clspv-opt PRIVATE cxx_range_for)
 
 target_include_directories(clspv-opt PRIVATE ${CLSPV_INCLUDE_DIRS})
+target_include_directories(clspv-opt PRIVATE ${LLVM_INCLUDE_DIRS})
+target_link_libraries(clspv-opt PRIVATE LLVMSupport)
 
 set_target_properties(clspv-opt PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 
