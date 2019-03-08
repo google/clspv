@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-kernel void foo(global float *data, global float* x) {
+kernel void foo(global int *data, global float* x) {
   float y = data[0];
   barrier(CLK_GLOBAL_MEM_FENCE);
   *x = frexp(y, data + 1);
