@@ -5182,14 +5182,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           }
         }
 
-      } else if (callee_name.equals("_Z8popcounti") ||
-                 callee_name.equals("_Z8popcountj") ||
-                 callee_name.equals("_Z8popcountDv2_i") ||
-                 callee_name.equals("_Z8popcountDv3_i") ||
-                 callee_name.equals("_Z8popcountDv4_i") ||
-                 callee_name.equals("_Z8popcountDv2_j") ||
-                 callee_name.equals("_Z8popcountDv3_j") ||
-                 callee_name.equals("_Z8popcountDv4_j")) {
+      } else if (callee_name.startswith("_Z8popcount")) {
         //
         // Generate OpBitCount
         //
