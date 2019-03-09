@@ -265,8 +265,9 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       CalleeArgs.back()->setName(Arg.getName());
     }
     assert(ptrIndex + podIndex == F->arg_size());
-    assert(ptrIndex = PtrArgTys.size());
-    assert(podIndex = PodArgTys.size());
+    assert(ptrIndex == PtrArgTys.size());
+    assert(podIndex != 0);
+    assert(podIndex == PodArgTys.size());
 
     auto Call = Builder.CreateCall(F, CalleeArgs);
     Call->setCallingConv(F->getCallingConv());
