@@ -843,7 +843,7 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     for (Argument &Arg : F.args()) {
       Type *argTy = Arg.getType();
       const auto arg_kind = clspv::GetArgKindForType(argTy);
-      if (arg_kind == clspv::ArgKind::Local && !Arg.use_empty()) {
+      if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
         int spec_id = GetSpecId(Arg.getType());
 
