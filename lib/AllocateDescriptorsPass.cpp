@@ -926,13 +926,13 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
                 "__spirv_control_barrier")) {
           // barrier()
           if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
-            uses_barrier = semantics->getZExtValue() & 0x40;
+            uses_barrier = semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
         } else if (call->getCalledFunction()->getName().equals(
                        "__spirv_memory_barrier")) {
           // mem_fence()
           if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(1))) {
-            uses_barrier = semantics->getZExtValue() & 0x40;
+            uses_barrier = semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
           // Continue searching in the subfunction.
