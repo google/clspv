@@ -815,6 +815,7 @@ int CompileFromSourceString(const std::string &program,
       "-simplifycfg-sink-common=false",
   };
 
+  llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
 
   llvm::SmallVector<const char *, 20> argv;
