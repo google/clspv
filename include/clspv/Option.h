@@ -15,6 +15,8 @@
 #ifndef CLSPV_INCLUDE_CLSPV_OPTION_H_
 #define CLSPV_INCLUDE_CLSPV_OPTION_H_
 
+#include <cstdint>
+
 namespace clspv {
 namespace Option {
 

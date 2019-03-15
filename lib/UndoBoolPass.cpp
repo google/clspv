@@ -82,7 +82,10 @@ bool UndoBoolPass::runOnModule(Module &M) {
       OI->eraseFromParent();
     }
 
-    I->eraseFromParent();
+    // Delete trivially dead instructions.
+    if (I->use_empty()) {
+      I->eraseFromParent();
+    }
   }
 
   return Changed;
