@@ -417,6 +417,9 @@ struct SPIRVProducerPass final : public ModulePass {
   // structure (or null).
   bool selectFromSameObject(Instruction *inst);
 
+  // Returns true if |Arg| is called with a coherent resource.
+  bool CalledWithCoherentResource(Argument &Arg);
+
 private:
   static char ID;
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
@@ -492,15 +495,16 @@ private:
   // Bookkeeping for mapping kernel arguments to resource variables.
   struct ResourceVarInfo {
     ResourceVarInfo(int index_arg, unsigned set_arg, unsigned binding_arg,
-                    Function *fn, clspv::ArgKind arg_kind_arg)
+                    Function *fn, clspv::ArgKind arg_kind_arg, int coherent_arg)
         : index(index_arg), descriptor_set(set_arg), binding(binding_arg),
-          var_fn(fn), arg_kind(arg_kind_arg),
+          var_fn(fn), arg_kind(arg_kind_arg), coherent(coherent_arg),
           addr_space(fn->getReturnType()->getPointerAddressSpace()) {}
     const int index; // Index into ResourceVarInfoList
     const unsigned descriptor_set;
     const unsigned binding;
     Function *const var_fn; // The @clspv.resource.var.* function.
     const clspv::ArgKind arg_kind;
+    const int coherent;
     const unsigned addr_space; // The LLVM address space
     // The SPIR-V ID of the OpVariable.  Not populated at construction time.
     uint32_t var_id = 0;
@@ -1060,6 +1064,8 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
               dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
           const auto arg_index = unsigned(
               dyn_cast<ConstantInt>(call->getArgOperand(3))->getZExtValue());
+          const auto coherent = unsigned(
+              dyn_cast<ConstantInt>(call->getArgOperand(5))->getZExtValue());
 
           // Find or make the resource var info for this combination.
           ResourceVarInfo *rv = nullptr;
@@ -1070,7 +1076,7 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
             auto where = set_and_binding_map.find(key);
             if (where == set_and_binding_map.end()) {
               rv = new ResourceVarInfo(int(ResourceVarInfoList.size()), set,
-                                       binding, &F, arg_kind);
+                                       binding, &F, arg_kind, coherent);
               ResourceVarInfoList.emplace_back(rv);
               set_and_binding_map[key] = rv;
             } else {
@@ -1082,7 +1088,7 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
             if (first_use) {
               first_use = false;
               rv = new ResourceVarInfo(int(ResourceVarInfoList.size()), set,
-                                       binding, &F, arg_kind);
+                                       binding, &F, arg_kind, coherent);
               ResourceVarInfoList.emplace_back(rv);
             } else {
               rv = ResourceVarInfoList.back().get();
@@ -2679,6 +2685,14 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
     SPIRVInstList.insert(DecoInsertPoint,
                          new SPIRVInstruction(spv::OpDecorate, Ops));
 
+    if (info->coherent) {
+      // Decorate with Coherent if required for the variable.
+      Ops.clear();
+      Ops << MkId(info->var_id) << MkNum(spv::DecorationCoherent);
+      SPIRVInstList.insert(DecoInsertPoint,
+                           new SPIRVInstruction(spv::OpDecorate, Ops));
+    }
+
     // Generate NonWritable and NonReadable
     switch (info->arg_kind) {
     case clspv::ArgKind::Buffer:
@@ -3175,10 +3189,30 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   //
 
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+
+    // Find Insert Point for OpDecorate.
+    auto DecoInsertPoint =
+        std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
+                     [](SPIRVInstruction *Inst) -> bool {
+                       return Inst->getOpcode() != spv::OpDecorate &&
+                              Inst->getOpcode() != spv::OpMemberDecorate &&
+                              Inst->getOpcode() != spv::OpExtInstImport;
+                     });
+
     // Iterate Argument for name instead of param type from function type.
     unsigned ArgIdx = 0;
     for (Argument &Arg : F.args()) {
-      VMap[&Arg] = nextID;
+      uint32_t param_id = nextID++;
+      VMap[&Arg] = param_id;
+
+      if (CalledWithCoherentResource(Arg)) {
+        // If the arg is passed a coherent resource ever, then decorate this
+        // parameter with Coherent too.
+        SPIRVOperandList decoration_ops;
+        decoration_ops << MkId(param_id) << MkNum(spv::DecorationCoherent);
+        SPIRVInstList.insert(DecoInsertPoint,
+                             new SPIRVInstruction(spv::OpDecorate, decoration_ops));
+      }
 
       // ParamOps[0] : Result Type ID
       SPIRVOperandList ParamOps;
@@ -3200,7 +3234,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
       // Generate SPIRV instruction for parameter.
       auto *ParamInst =
-          new SPIRVInstruction(spv::OpFunctionParameter, nextID++, ParamOps);
+          new SPIRVInstruction(spv::OpFunctionParameter, param_id, ParamOps);
       SPIRVInstList.push_back(ParamInst);
 
       ArgIdx++;
@@ -6603,5 +6637,63 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
   }
 
   // Conservatively return false.
+  return false;
+}
+
+bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
+  if (!Arg.getType()->isPointerTy() ||
+      Arg.getType()->getPointerAddressSpace() != clspv::AddressSpace::Global) {
+    // Only SSBOs need to be annotated as coherent.
+    return false;
+  }
+
+  DenseSet<Value *> visited;
+  std::vector<Value *> stack;
+  for (auto *U : Arg.getParent()->users()) {
+    if (auto *call = dyn_cast<CallInst>(U)) {
+      stack.push_back(call->getOperand(Arg.getArgNo()));
+    }
+  }
+
+  while (!stack.empty()) {
+    Value *v = stack.back();
+    stack.pop_back();
+
+    if (!visited.insert(v).second)
+      continue;
+
+    auto *resource_call = dyn_cast<CallInst>(v);
+    if (resource_call &&
+        resource_call->getCalledFunction()->getName().startswith(
+            clspv::ResourceAccessorFunction())) {
+      // If this is a resource accessor function, check if the coherent operand
+      // is set.
+      const auto coherent =
+          unsigned(dyn_cast<ConstantInt>(resource_call->getArgOperand(5))
+                       ->getZExtValue());
+      if (coherent == 1)
+        return true;
+    } else if (auto *arg = dyn_cast<Argument>(v)) {
+      // If this is a function argument, trace through its callers.
+      for (auto U : arg->users()) {
+        if (auto *call = dyn_cast<CallInst>(U)) {
+          stack.push_back(call->getOperand(arg->getArgNo()));
+        }
+      }
+    } else if (auto *user = dyn_cast<User>(v)) {
+      // If this is a user, traverse all operands that could lead to resource
+      // variables.
+      for (unsigned i = 0; i != user->getNumOperands(); ++i) {
+        Value *operand = user->getOperand(i);
+        if (operand->getType()->isPointerTy() &&
+            operand->getType()->getPointerAddressSpace() ==
+                clspv::AddressSpace::Global) {
+          stack.push_back(operand);
+        }
+      }
+    }
+  }
+
+  // No coherent resource variables encountered.
   return false;
 }
