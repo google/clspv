@@ -115,7 +115,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     };
 
     // In OpenCL, kernel arguments are either pointers or POD. A composite with
-    // an element or memeber that is a pointer is not allowed.  So we'll use POD
+    // an element or member that is a pointer is not allowed.  So we'll use POD
     // as a shorthand for non-pointer.
 
     SmallVector<Type *, 8> PtrArgTys;
@@ -180,7 +180,39 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     NewFunc->setCallingConv(F->getCallingConv());
     F->setCallingConv(CallingConv::SPIR_FUNC);
 
-    NewFunc->setAttributes(F->getAttributes());
+    // Transfer attributes that don't apply to the POD arguments
+    // to the new functions.
+    auto Attributes = F->getAttributes();
+    SmallVector<std::pair<unsigned, AttributeSet>, 8> AttrBuildInfo;
+
+    // Return attributes have to come first
+    if (Attributes.hasAttributes(AttributeList::ReturnIndex)) {
+      auto idx = AttributeList::ReturnIndex;
+      auto attrs = Attributes.getRetAttributes();
+      AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+    }
+
+    // Then attributes for pointer parameters
+    for (auto &rinfo : RemapInfo) {
+      if (Attributes.hasParamAttrs(rinfo.old_index)) {
+        auto idx = rinfo.new_index + AttributeList::FirstArgIndex;
+        auto attrs = Attributes.getParamAttributes(rinfo.old_index);
+        AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+      }
+    }
+
+    // And finally function attributes. We deal with function attributes
+    // differently since the version of LLVM used by clspv has a bug in get().
+    // TODO(kpet): Add function attributes to AttrBuildInfo when updating
+    //             LLVM past r330136.
+    auto newAttributes = AttributeList::get(M.getContext(), AttrBuildInfo);
+    if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
+      auto attrs = AttrBuilder(Attributes.getFnAttributes());
+      auto idx = AttributeList::FunctionIndex;
+      newAttributes = newAttributes.addAttributes(M.getContext(), idx, attrs);
+    }
+    NewFunc->setAttributes(newAttributes);
+
     // Move OpenCL kernel named attributes.
     // TODO(dneto): Attributes starting with kernel_arg_* should be rewritten
     // to reflect change in the argument shape.
