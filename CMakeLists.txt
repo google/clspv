@@ -53,16 +53,17 @@ if (NOT DEFINED SPIRV_HEADERS_SOURCE_DIR)
 endif()
 
 if (NOT DEFINED SPIRV_TOOLS_SOURCE_DIR)
-
   set(SPIRV_TOOLS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/SPIRV-Tools)
-
   use_component(${SPIRV_TOOLS_SOURCE_DIR})
+endif()
 
+if (NOT TARGET spirv-dis)
   # First tell SPIR-V Tools where to find SPIR-V Headers
   set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
 
   # Bring in the SPIR-V Tools repository which we'll use for testing
-  add_subdirectory(${SPIRV_TOOLS_SOURCE_DIR} EXCLUDE_FROM_ALL)
+  add_subdirectory(${SPIRV_TOOLS_SOURCE_DIR}
+      ${CMAKE_CURRENT_BINARY_DIR}/third_party/SPIRV-Tools EXCLUDE_FROM_ALL)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
