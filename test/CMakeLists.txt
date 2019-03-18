@@ -20,7 +20,7 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set (LLVM_BINARY_SUBDIR ${CMAKE_BUILD_TYPE}/bin)
 endif()
 
-set(CLSPV_TEST_DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt)
+set(CLSPV_TEST_DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt clspv-opt)
 if (NOT ${EXTERNAL_LLVM} EQUAL 1)
   set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} FileCheck not)
 endif()
