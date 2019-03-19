@@ -31,17 +31,16 @@ static llvm::cl::opt<std::string>
             llvm::cl::desc("Path to LLVM's 'opt' tool."));
 
 static llvm::cl::opt<std::string>
-    clo_passes("clo-passes", llvm::cl::init(CLSPV_PASSES_SO),
-               llvm::cl::desc("Path to the libclspv_passes.so."));
+    clo_core("clo-core", llvm::cl::init(CLSPV_CORE_SO),
+             llvm::cl::desc("Path to libclspv_core.so."));
 
 int RunOpt(int argc, const char *argv[]) {
-  size_t new_argc =
-      argc + 1 /* "-load" */ + 1 /* clo_passes */ + 1 /* nullptr */;
+  size_t new_argc = argc + 1 /* "-load" */ + 1 /* clo_core */ + 1 /* nullptr */;
   const char **new_argv = new const char *[new_argc];
   size_t i = 0;
   new_argv[i++] = clo_opt.c_str();
   new_argv[i++] = "-load";
-  new_argv[i++] = clo_passes.c_str();
+  new_argv[i++] = clo_core.c_str();
   for (size_t j = 1; j < argc; j++) {
     new_argv[i++] = argv[j];
   }
@@ -103,8 +102,8 @@ int main(int argc, const char *argv[]) {
 
   llvm::cl::ParseCommandLineOptions(
       args_to_keep.size(), ConvertToCArray(args_to_keep),
-      "Clspv wrapper tool for LLVM opt.\n\nThis tool loads the clspv passes "
-      "into opt and calls it with the given options.\nAny argument not "
+      "Clspv wrapper tool for LLVM opt.\n\nThis tool loads the clspv core "
+      "library into opt and calls it with the given options.\nAny argument not "
       "recognized by this tool is passed directly to opt.\n");
 
   return RunOpt(args_to_pass.size(), ConvertToCArray(args_to_pass));

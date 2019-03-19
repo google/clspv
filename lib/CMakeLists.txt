@@ -20,9 +20,6 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
-)
-
-add_library(clspv_passes SHARED
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
@@ -58,33 +55,18 @@ add_library(clspv_passes SHARED
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
-foreach(clspv_lib clspv_core clspv_passes)
-  # Enable C++11 for our executable
-  target_compile_features(${clspv_lib} PRIVATE cxx_range_for)
+# Enable C++11 for our executable
+target_compile_features(clspv_core PRIVATE cxx_range_for)
 
-  target_include_directories(${clspv_lib} PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
+target_include_directories(clspv_core PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
 
-  target_include_directories(${clspv_lib} PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
 
-  target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
+target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
 
-  target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
-endforeach(clspv_lib)
+target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
 
 add_dependencies(clspv_core clspv_baked_opencl_header clspv_c_strings clspv_glsl)
-
-if(${EXTERNAL_LLVM} EQUAL 1)
-  include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
-
-  set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
-  llvm_map_components_to_libnames(CLSPV_LLVM_LINKS ${CLSPV_LLVM_COMPONENTS})
-
-  include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
-
-  target_link_libraries(clspv_core PRIVATE clspv_passes clangCodeGen ${CLSPV_LLVM_COMPONENTS})
-else()
-  target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
-endif()
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
@@ -95,7 +77,7 @@ endif()
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)
   install(
-    TARGETS clspv_core clspv_passes
+    TARGETS clspv_core
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )

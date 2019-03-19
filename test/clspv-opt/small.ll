@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -O -S -o %t.ll
+; RUN: clspv-opt %s -O2 -S -o %t.ll
 ; Function Attrs: nounwind
 define spir_kernel void @foo(i32 addrspace(1)* %a, i32 %b) #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 !reqd_work_group_size !7 {
 entry:
