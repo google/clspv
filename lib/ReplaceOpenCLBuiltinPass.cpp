@@ -16,6 +16,7 @@
 #include <string>
 #include <tuple>
 
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
@@ -38,6 +39,7 @@ namespace {
 
 struct ArgTypeInfo {
   enum class SignedNess {
+    None,
     Unsigned,
     Signed
   };
@@ -45,6 +47,7 @@ struct ArgTypeInfo {
 };
 
 struct FunctionInfo {
+  StringRef name;
   std::vector<ArgTypeInfo> argTypeInfos;
 };
 
@@ -57,6 +60,7 @@ bool getFunctionInfoFromMangledNameCheck(StringRef name, FunctionInfo *finfo) {
     return false;
   }
 
+  finfo->name = name.take_front(nameLen);
   name = name.drop_front(nameLen);
 
   ArgTypeInfo prev_ti;
@@ -93,6 +97,9 @@ bool getFunctionInfoFromMangledNameCheck(StringRef name, FunctionInfo *finfo) {
     case 'j': // unsigned int
     case 'm': // unsigned long
       ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+      break;
+    case 'f':
+      ti.signedness = ArgTypeInfo::SignedNess::None;
       break;
     case 'S':
       ti = prev_ti;
@@ -163,6 +170,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceAllAndAny(Module &M);
   bool replaceUpsample(Module &M);
   bool replaceRotate(Module &M);
+  bool replaceConvert(Module &M);
   bool replaceMulHiMadHi(Module &M);
   bool replaceSelect(Module &M);
   bool replaceBitSelect(Module &M);
@@ -211,6 +219,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceAllAndAny(M);
   Changed |= replaceUpsample(M);
   Changed |= replaceRotate(M);
+  Changed |= replaceConvert(M);
   Changed |= replaceMulHiMadHi(M);
   Changed |= replaceSelect(M);
   Changed |= replaceBitSelect(M);
@@ -1139,6 +1148,138 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Module &M) {
           // Finally OR the two shifted values
           Value *V = BinaryOperator::Create(Instruction::Or, LoRotated,
                                             HiRotated, "", CI);
+
+          // Replace call with the expression
+          CI->replaceAllUsesWith(V);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
+  bool Changed = false;
+
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+
+    // Skip symbols whose name obviously doesn't match
+    if (!SymVal.getKey().contains("convert_")) {
+      continue;
+    }
+
+    // Is there a function going by that name?
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+
+      // Get info from the mangled name
+      FunctionInfo finfo;
+      bool parsed = getFunctionInfoFromMangledNameCheck(F->getName(), &finfo);
+
+      // All functions of interest are handled by our mangled name parser
+      if (!parsed) {
+        continue;
+      }
+
+      // Move on if this isn't a call to convert_
+      if (!finfo.name.startswith("convert_")) {
+        continue;
+      }
+
+      // Extract the destination type from the function name
+      StringRef DstTypeName = finfo.name;
+      DstTypeName.consume_front("convert_");
+
+      auto DstSignedNess = StringSwitch<ArgTypeInfo::SignedNess>(DstTypeName)
+                        .StartsWith("char",   ArgTypeInfo::SignedNess::Signed)
+                        .StartsWith("short",  ArgTypeInfo::SignedNess::Signed)
+                        .StartsWith("int",    ArgTypeInfo::SignedNess::Signed)
+                        .StartsWith("long",   ArgTypeInfo::SignedNess::Signed)
+                        .StartsWith("uchar",  ArgTypeInfo::SignedNess::Unsigned)
+                        .StartsWith("ushort", ArgTypeInfo::SignedNess::Unsigned)
+                        .StartsWith("uint",   ArgTypeInfo::SignedNess::Unsigned)
+                        .StartsWith("ulong",  ArgTypeInfo::SignedNess::Unsigned)
+                        .Default(ArgTypeInfo::SignedNess::None);
+
+      auto SrcSignedNess = finfo.argTypeInfos[0].signedness;
+
+      bool DstIsSigned = DstSignedNess == ArgTypeInfo::SignedNess::Signed;
+      bool SrcIsSigned = SrcSignedNess == ArgTypeInfo::SignedNess::Signed;
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          // Get arguments
+          auto SrcValue = CI->getOperand(0);
+
+          // Don't touch overloads that aren't in OpenCL C
+          auto SrcType = SrcValue->getType();
+          auto DstType = CI->getType();
+
+          if ((SrcType->isVectorTy() && !DstType->isVectorTy()) ||
+              (!SrcType->isVectorTy() && DstType->isVectorTy())) {
+            continue;
+          }
+
+          if (SrcType->isVectorTy()) {
+
+            if (SrcType->getVectorNumElements() !=
+                DstType->getVectorNumElements()) {
+              continue;
+            }
+
+            if ((SrcType->getVectorNumElements() != 2) &&
+                (SrcType->getVectorNumElements() != 3) &&
+                (SrcType->getVectorNumElements() != 4) &&
+                (SrcType->getVectorNumElements() != 8) &&
+                (SrcType->getVectorNumElements() != 16)) {
+              continue;
+            }
+          }
+
+          bool SrcIsFloat = SrcType->getScalarType()->isFloatingPointTy();
+          bool DstIsFloat = DstType->getScalarType()->isFloatingPointTy();
+
+          bool SrcIsInt = SrcType->isIntOrIntVectorTy();
+          bool DstIsInt = DstType->isIntOrIntVectorTy();
+
+          Value *V;
+          if (SrcIsFloat && DstIsFloat) {
+            V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
+          } else if (SrcIsFloat && DstIsInt) {
+            if (DstIsSigned) {
+              V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "", CI);
+            } else {
+              V = CastInst::Create(Instruction::FPToUI, SrcValue, DstType, "", CI);
+            }
+          } else if (SrcIsInt && DstIsFloat) {
+            if (SrcIsSigned) {
+              V = CastInst::Create(Instruction::SIToFP, SrcValue, DstType, "", CI);
+            } else {
+              V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "", CI);
+            }
+          } else if (SrcIsInt && DstIsInt) {
+            V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "", CI);
+          } else {
+            // Not something we're supposed to handle, just move on
+            continue;
+          }
 
           // Replace call with the expression
           CI->replaceAllUsesWith(V);
