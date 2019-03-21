@@ -35,6 +35,89 @@ using namespace llvm;
 #define DEBUG_TYPE "ReplaceOpenCLBuiltin"
 
 namespace {
+
+struct ArgTypeInfo {
+  enum class SignedNess {
+    Unsigned,
+    Signed
+  };
+  SignedNess signedness;
+};
+
+struct FunctionInfo {
+  std::vector<ArgTypeInfo> argTypeInfos;
+};
+
+bool getFunctionInfoFromMangledNameCheck(StringRef name, FunctionInfo *finfo) {
+  if (!name.consume_front("_Z")) {
+    return false;
+  }
+  size_t nameLen;
+  if (name.consumeInteger(10, nameLen)) {
+    return false;
+  }
+
+  name = name.drop_front(nameLen);
+
+  ArgTypeInfo prev_ti;
+
+  while (name.size() != 0) {
+
+    ArgTypeInfo ti;
+
+    // Try parsing a vector prefix
+    if (name.consume_front("Dv")) {
+        int numElems;
+        if (name.consumeInteger(10, numElems)) {
+          return false;
+        }
+
+        if (!name.consume_front("_")) {
+          return false;
+        }
+    }
+
+    // Parse the base type
+    char typeCode = name.front();
+    name = name.drop_front(1);
+    switch(typeCode) {
+    case 'c': // char
+    case 'a': // signed char
+    case 's': // short
+    case 'i': // int
+    case 'l': // long
+      ti.signedness = ArgTypeInfo::SignedNess::Signed;
+      break;
+    case 'h': // unsigned char
+    case 't': // unsigned short
+    case 'j': // unsigned int
+    case 'm': // unsigned long
+      ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+      break;
+    case 'S':
+      ti = prev_ti;
+      if (!name.consume_front("_")) {
+        return false;
+      }
+      break;
+    default:
+      return false;
+    }
+
+    finfo->argTypeInfos.push_back(ti);
+
+    prev_ti = ti;
+  }
+
+  return true;
+};
+
+void getFunctionInfoFromMangledName(StringRef name, FunctionInfo *finfo) {
+  if (!getFunctionInfoFromMangledNameCheck(name, finfo)) {
+    llvm_unreachable("Can't parse mangled function name!");
+  }
+}
+
 uint32_t clz(uint32_t v) {
   uint32_t r;
   uint32_t shift;
@@ -80,6 +163,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceAllAndAny(Module &M);
   bool replaceUpsample(Module &M);
   bool replaceRotate(Module &M);
+  bool replaceMulHiMadHi(Module &M);
   bool replaceSelect(Module &M);
   bool replaceBitSelect(Module &M);
   bool replaceStepSmoothStep(Module &M);
@@ -127,6 +211,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceAllAndAny(M);
   Changed |= replaceUpsample(M);
   Changed |= replaceRotate(M);
+  Changed |= replaceMulHiMadHi(M);
   Changed |= replaceSelect(M);
   Changed |= replaceBitSelect(M);
   Changed |= replaceStepSmoothStep(M);
@@ -1054,6 +1139,130 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Module &M) {
           // Finally OR the two shifted values
           Value *V = BinaryOperator::Create(Instruction::Or, LoRotated,
                                             HiRotated, "", CI);
+
+          // Replace call with the expression
+          CI->replaceAllUsesWith(V);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
+  bool Changed = false;
+
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+
+    bool isMad = SymVal.getKey().startswith("_Z6mad_hi");
+    bool isMul = SymVal.getKey().startswith("_Z6mul_hi");
+
+    // Skip symbols whose name doesn't match
+    if (!isMad && !isMul) {
+      continue;
+    }
+
+    // Is there a function going by that name?
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          // Get arguments
+          auto AValue = CI->getOperand(0);
+          auto BValue = CI->getOperand(1);
+          auto CValue = CI->getOperand(2);
+
+          // Don't touch overloads that aren't in OpenCL C
+          auto AType = AValue->getType();
+          auto BType = BValue->getType();
+          auto CType = CValue->getType();
+
+          if ((AType != BType) || (CI->getType() != AType) ||
+              (isMad && (AType != CType))) {
+            continue;
+          }
+
+          if (!AType->isIntOrIntVectorTy()) {
+            continue;
+          }
+
+          if ((AType->getScalarSizeInBits() != 8) &&
+              (AType->getScalarSizeInBits() != 16) &&
+              (AType->getScalarSizeInBits() != 32) &&
+              (AType->getScalarSizeInBits() != 64)) {
+            continue;
+          }
+
+          if (AType->isVectorTy()) {
+            if ((AType->getVectorNumElements() != 2) &&
+                (AType->getVectorNumElements() != 3) &&
+                (AType->getVectorNumElements() != 4) &&
+                (AType->getVectorNumElements() != 8) &&
+                (AType->getVectorNumElements() != 16)) {
+              continue;
+            }
+          }
+
+          // Create struct type for the return type of our SPIR-V intrinsic
+          SmallVector<Type*, 2> TwoValueType = {
+            AType,
+            AType
+          };
+
+          auto ExMulRetType = StructType::create(TwoValueType);
+
+          // And a function type
+          auto NewFType = FunctionType::get(ExMulRetType, TwoValueType, false);
+
+          // Get infos from the mangled OpenCL built-in function name
+          FunctionInfo finfo;
+          getFunctionInfoFromMangledName(F->getName(), &finfo);
+
+          // Use it to select the appropriate signed/unsigned SPIR-V intrinsic
+          StringRef intrinsic;
+          if (finfo.argTypeInfos[0].signedness == ArgTypeInfo::SignedNess::Signed) {
+            intrinsic = "spirv.smul_extended";
+          } else {
+            intrinsic = "spirv.umul_extended";
+          }
+
+          // Add the intrinsic function to the module
+          auto NewF = M.getOrInsertFunction(intrinsic, NewFType);
+
+          // Call it
+          SmallVector<Value*, 4> NewFArgs = {
+            AValue,
+            BValue,
+          };
+
+          auto Call = CallInst::Create(NewF, NewFArgs, "", CI);
+
+          // Get the high part of the result
+          unsigned Idxs[] = {1};
+          Value *V = ExtractValueInst::Create(Call, Idxs, "", CI);
+
+          // If we're handling a mad_hi, add the third argument to the result
+          if (isMad) {
+            V = BinaryOperator::Create(Instruction::Add, V, CValue, "", CI);
+          }
 
           // Replace call with the expression
           CI->replaceAllUsesWith(V);
