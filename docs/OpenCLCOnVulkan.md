@@ -538,12 +538,11 @@ spaces.
 #### 8-Bit Types
 
 The `char`, `char2`, `char3`, `uchar`, `uchar2`, and `uchar3` types
-**must not** be used.
+can only be used when the `-int8` option is specified.
 
 #### 64-Bit Types
 
-The `double`, `double2`, `double3`, `double4`, `long`, `long2`, `long3`,
-`long4`, `ulong`, `ulong2`, `ulong3`, and `ulong4` types **must not** be used.
+The `double`, `double2`, `double3` and `double4` types **must not** be used.
 
 #### Images
 
