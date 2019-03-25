@@ -4470,61 +4470,54 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    if (Callee->getName().startswith("spirv.atomic")) {
-      spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
-                           .Case("spirv.atomic_add", spv::OpAtomicIAdd)
-                           .Case("spirv.atomic_sub", spv::OpAtomicISub)
-                           .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
-                           .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
-                           .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
-                           .Case("spirv.atomic_compare_exchange",
-                                 spv::OpAtomicCompareExchange)
-                           .Case("spirv.atomic_umin", spv::OpAtomicUMin)
-                           .Case("spirv.atomic_smin", spv::OpAtomicSMin)
-                           .Case("spirv.atomic_umax", spv::OpAtomicUMax)
-                           .Case("spirv.atomic_smax", spv::OpAtomicSMax)
-                           .Case("spirv.atomic_and", spv::OpAtomicAnd)
-                           .Case("spirv.atomic_or", spv::OpAtomicOr)
-                           .Case("spirv.atomic_xor", spv::OpAtomicXor)
-                           .Default(spv::OpNop);
+    // Handle SPIR-V intrinsics
+    spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
+      .Case("spirv.smul_extended", spv::OpSMulExtended)
+      .Case("spirv.umul_extended", spv::OpUMulExtended)
+      .Case("spirv.atomic_add", spv::OpAtomicIAdd)
+      .Case("spirv.atomic_sub", spv::OpAtomicISub)
+      .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
+      .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
+      .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
+      .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
+      .Case("spirv.atomic_umin", spv::OpAtomicUMin)
+      .Case("spirv.atomic_smin", spv::OpAtomicSMin)
+      .Case("spirv.atomic_umax", spv::OpAtomicUMax)
+      .Case("spirv.atomic_smax", spv::OpAtomicSMax)
+      .Case("spirv.atomic_and", spv::OpAtomicAnd)
+      .Case("spirv.atomic_or", spv::OpAtomicOr)
+      .Case("spirv.atomic_xor", spv::OpAtomicXor)
+      .Case("__spirv_control_barrier", spv::OpControlBarrier)
+      .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
+      .Case("spirv.store_null", spv::OpStore)
+      .StartsWith("__spirv_isinf", spv::OpIsInf)
+      .StartsWith("__spirv_isnan", spv::OpIsNan)
+      .StartsWith("__spirv_allDv", spv::OpAll)
+      .StartsWith("__spirv_anyDv", spv::OpAny)
+      .Default(spv::OpNop);
 
-      //
-      // Generate OpAtomic*.
-      //
+    if (opcode != spv::OpNop) {
+
       SPIRVOperandList Ops;
 
-      Ops << MkId(lookupType(I.getType()));
+      if (!I.getType()->isVoidTy()) {
+        Ops << MkId(lookupType(I.getType()));
+      }
 
       for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
         Ops << MkId(VMap[Call->getArgOperand(i)]);
       }
 
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(opcode, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
-    if ((Callee->getName() == "spirv.smul_extended") ||
-        (Callee->getName() == "spirv.umul_extended")) {
-      //
-      // Generate Op{S,U}MulExtended.
-      //
-      spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
-                           .Case("spirv.smul_extended", spv::OpSMulExtended)
-                           .Case("spirv.umul_extended", spv::OpUMulExtended);
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()));
-
-      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-        Ops << MkId(VMap[Call->getArgOperand(i)]);
+      if (!I.getType()->isVoidTy()) {
+        VMap[&I] = nextID;
       }
 
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(opcode, nextID++, Ops);
+      SPIRVInstruction *Inst;
+      if (!I.getType()->isVoidTy()) {
+        Inst = new SPIRVInstruction(opcode, nextID++, Ops);
+      } else {
+        Inst = new SPIRVInstruction(opcode, Ops);
+      }
       SPIRVInstList.push_back(Inst);
       break;
     }
@@ -4588,26 +4581,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // spirv.store_null.* intrinsics become OpStore's.
-    if (Callee->getName().startswith("spirv.store_null")) {
-      //
-      // Generate OpStore.
-      //
-
-      // Ops[0] = Pointer ID
-      // Ops[1] = Object ID
-      // Ops[2] ... Ops[n]
-      SPIRVOperandList Ops;
-
-      uint32_t PointerID = VMap[Call->getArgOperand(0)];
-      uint32_t ObjectID = VMap[Call->getArgOperand(1)];
-      Ops << MkId(PointerID) << MkId(ObjectID);
-
-      SPIRVInstList.push_back(new SPIRVInstruction(spv::OpStore, Ops));
-
-      break;
-    }
-
     // spirv.copy_memory.* intrinsics become OpMemoryMemory's.
     if (Callee->getName().startswith("spirv.copy_memory")) {
       //
@@ -4653,133 +4626,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Callee->getName().equals("_Z3absDv3_h") ||
         Callee->getName().equals("_Z3absDv4_h")) {
       VMap[&I] = VMap[Call->getOperand(0)];
-      break;
-    }
-
-    // barrier is converted to OpControlBarrier
-    if (Callee->getName().equals("__spirv_control_barrier")) {
-      //
-      // Generate OpControlBarrier.
-      //
-      // Ops[0] = Execution Scope ID
-      // Ops[1] = Memory Scope ID
-      // Ops[2] = Memory Semantics ID
-      //
-      Value *ExecutionScope = Call->getArgOperand(0);
-      Value *MemoryScope = Call->getArgOperand(1);
-      Value *MemorySemantics = Call->getArgOperand(2);
-
-      SPIRVOperandList Ops;
-      Ops << MkId(VMap[ExecutionScope]) << MkId(VMap[MemoryScope])
-          << MkId(VMap[MemorySemantics]);
-
-      SPIRVInstList.push_back(new SPIRVInstruction(spv::OpControlBarrier, Ops));
-      break;
-    }
-
-    // memory barrier is converted to OpMemoryBarrier
-    if (Callee->getName().equals("__spirv_memory_barrier")) {
-      //
-      // Generate OpMemoryBarrier.
-      //
-      // Ops[0] = Memory Scope ID
-      // Ops[1] = Memory Semantics ID
-      //
-      SPIRVOperandList Ops;
-
-      uint32_t MemoryScopeID = VMap[Call->getArgOperand(0)];
-      uint32_t MemorySemanticsID = VMap[Call->getArgOperand(1)];
-
-      Ops << MkId(MemoryScopeID) << MkId(MemorySemanticsID);
-
-      auto *Inst = new SPIRVInstruction(spv::OpMemoryBarrier, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
-    // isinf is converted to OpIsInf
-    if (Callee->getName().equals("__spirv_isinff") ||
-        Callee->getName().equals("__spirv_isinfDv2_f") ||
-        Callee->getName().equals("__spirv_isinfDv3_f") ||
-        Callee->getName().equals("__spirv_isinfDv4_f")) {
-      //
-      // Generate OpIsInf.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = X ID
-      //
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()))
-          << MkId(VMap[Call->getArgOperand(0)]);
-
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(spv::OpIsInf, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
-    // isnan is converted to OpIsNan
-    if (Callee->getName().equals("__spirv_isnanf") ||
-        Callee->getName().equals("__spirv_isnanDv2_f") ||
-        Callee->getName().equals("__spirv_isnanDv3_f") ||
-        Callee->getName().equals("__spirv_isnanDv4_f")) {
-      //
-      // Generate OpIsInf.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = X ID
-      //
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()))
-          << MkId(VMap[Call->getArgOperand(0)]);
-
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(spv::OpIsNan, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
-    // all is converted to OpAll
-    if (Callee->getName().startswith("__spirv_allDv")) {
-      //
-      // Generate OpAll.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Vector ID
-      //
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()))
-          << MkId(VMap[Call->getArgOperand(0)]);
-
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(spv::OpAll, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
-    // any is converted to OpAny
-    if (Callee->getName().startswith("__spirv_anyDv")) {
-      //
-      // Generate OpAny.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Vector ID
-      //
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()))
-          << MkId(VMap[Call->getArgOperand(0)]);
-
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(spv::OpAny, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
       break;
     }
 
