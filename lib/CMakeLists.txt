@@ -13,18 +13,17 @@
 # limitations under the License.
 
 add_library(clspv_core
+  ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineEntryPointsPass.cpp
@@ -32,6 +31,8 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerToFunctionArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/RemoveUnusedArguments.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceLLVMIntrinsicsPass.cpp
@@ -42,7 +43,6 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/ShareModuleScopeVariables.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SignedCompareFixupPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SimplifyPointerBitcastPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatSelectCondition.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UBOTypeTransformPass.cpp
@@ -65,6 +65,19 @@ target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
 target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
 
 target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
+
+if(${EXTERNAL_LLVM} EQUAL 1)
+  include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
+
+  set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
+  llvm_map_components_to_libnames(CLSPV_LLVM_LINKS ${CLSPV_LLVM_COMPONENTS})
+
+  include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
+
+  add_dependencies(clspv_core clangCodeGen ${CLSPV_LLVM_COMPONENTS})
+else()
+  add_dependencies(clspv_core clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
+endif()
 
 add_dependencies(clspv_core clspv_baked_opencl_header clspv_c_strings clspv_glsl)
 
