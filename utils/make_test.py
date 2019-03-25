@@ -46,6 +46,35 @@ CHECK_DAG_INSTRUCTION_REGEXES = (
 CHECK_DAG = '// CHECK-DAG:'
 CHECK = '// CHECK:'
 
+DROP_REGEXES = {
+    'boilerplate': (
+        r'^;',
+        r'OpCapability',
+        r'OpExtension',
+        r'OpMemoryModel',
+        r'OpEntryPoint',
+        r'OpExecutionMode',
+        r'OpSource',
+        r'OpDecorate',
+        r'OpMemberDecorate',
+    ),
+    'functions': (
+        r'OpTypeFunction',
+        r'OpFunction',
+        r'OpLabel',
+        r'OpReturn',
+        r'OpFunctionEnd',
+    ),
+    'memory': (
+        r'OpTypeRuntimeArray',
+        r'OpTypePointer',
+        r'OpVariable',
+        r'OpAccessChain',
+        r'OpLoad',
+        r'OpStore',
+    ),
+}
+
 # Keep track of the FileCheck variables we're defining
 variables = set()
 
@@ -79,10 +108,16 @@ def replace_ids_with_filecheck_variables(line):
 
     return line
 
-def process_disasm_line(line):
+def process_disasm_line(args, line):
 
     def format_line(check, line):
         return '{:{}} {}'.format(check, len(CHECK_DAG), line.strip())
+
+    # Drop the line?
+    for drop_group in args.drop:
+        for rex in DROP_REGEXES[drop_group]:
+            if re.search(rex, line):
+                return ''
 
     # First deal with IDs
     line = replace_ids_with_filecheck_variables(line)
@@ -110,7 +145,7 @@ def generate_run_section(args):
 
     return runsec
 
-def disassemble_and_post_process(spirv_module):
+def disassemble_and_post_process(args, spirv_module):
 
     ret = ''
 
@@ -126,7 +161,9 @@ def disassemble_and_post_process(spirv_module):
     for line in disasm.split('\n'):
         if line.strip() == '':
             continue
-        ret += '{}\n'.format(process_disasm_line(line))
+        processed_line = process_disasm_line(args, line)
+        if processed_line:
+            ret += '{}\n'.format(processed_line)
 
     return ret
 
@@ -151,7 +188,7 @@ def generate_test_case_from_source(args):
     subprocess.check_call(cmd)
 
     # Append the processed disassembly
-    tc += disassemble_and_post_process(spirvfile)
+    tc += disassemble_and_post_process(args, spirvfile)
 
     # Append the original source
     tc += '\n'
@@ -195,6 +232,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--clspv-options', action='append', default=[],
         help='Pass an option to clspv when building (can be used multiple times)'
+    )
+
+    parser.add_argument(
+        '--drop', action='append', default=[], choices=DROP_REGEXES.keys(),
+        help='Remove specific groups of instructions from generated SPIR-V disassembly'
     )
 
     parser.add_argument(
