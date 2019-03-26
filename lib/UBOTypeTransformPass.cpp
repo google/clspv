@@ -230,8 +230,14 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     Type *element = struct_ty->getElementType(i);
     uint64_t offset = layout->getElementOffset(i);
     const auto *array = dyn_cast<ArrayType>(element);
-    if (array && array->getElementType()->isIntegerTy(8) && offset % 16 != 0) {
+    // Unless char arrays in UBOs are supported, replace all instances with an
+    // i32.
+    const bool support_int8_array = clspv::Option::Int8Support() &&
+                                    clspv::Option::Std430UniformBufferLayout();
+    if (array && array->getElementType()->isIntegerTy(8) && !support_int8_array) {
       // This is a padding element.
+      assert((array->getNumElements() % 4 == 0) &&
+             "Non-integer sized padding!");
       elements.push_back(Type::getInt32Ty(M.getContext()));
     } else {
       elements.push_back(MapType(element, M));
