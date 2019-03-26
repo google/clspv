@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_executable(clspv-opt
-  ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-)
+add_executable(clspv-opt ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-  -DLLVM_OPT=\\\"${CLSPV_BINARY_DIR}/third_party/llvm/bin/opt\\\" \
-  -DCLSPV_CORE_SO=\\\"${CLSPV_BINARY_DIR}/lib/libclspv_core.so\\\"")
+if(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+    -DLLVM_OPT=\\\"${CLSPV_BINARY_DIR}\\third_party\\llvm\\bin\\opt.exe\\\" \
+    -DCLSPV_PASSES_SO=\\\"${CLSPV_BINARY_DIR}\\lib\\libclspv_passes.dll\\\"")
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+    -DLLVM_OPT=\\\"${CLSPV_BINARY_DIR}/third_party/llvm/bin/opt\\\" \
+    -DCLSPV_PASSES_SO=\\\"${CLSPV_BINARY_DIR}/lib/libclspv_passes.so\\\"")
+endif()
 
 # Enable C++11 for our executable
 target_compile_features(clspv-opt PRIVATE cxx_range_for)
@@ -39,4 +43,4 @@ endif()
 
 set_target_properties(clspv-opt PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 
-add_dependencies(clspv-opt clspv_core opt)
+add_dependencies(clspv-opt clspv_passes opt)

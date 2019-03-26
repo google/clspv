@@ -19,18 +19,7 @@ target_compile_features(clspv PRIVATE cxx_range_for)
 
 target_include_directories(clspv PRIVATE ${CLSPV_INCLUDE_DIRS})
 
-if(${EXTERNAL_LLVM} EQUAL 1)
-  include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
-
-  set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
-  llvm_map_components_to_libnames(CLSPV_LLVM_LINKS ${CLSPV_LLVM_COMPONENTS})
-
-  include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
-
-  target_link_libraries(clspv PRIVATE clspv_core clangCodeGen ${CLSPV_LLVM_COMPONENTS})
-else()
-  target_link_libraries(clspv PRIVATE clspv_core clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
-endif()
+target_link_libraries(clspv PRIVATE clspv_passes clspv_core)
 
 set_target_properties(clspv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 
