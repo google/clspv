@@ -19,7 +19,7 @@ target_compile_features(clspv PRIVATE cxx_range_for)
 
 target_include_directories(clspv PRIVATE ${CLSPV_INCLUDE_DIRS})
 
-target_link_libraries(clspv PRIVATE clspv_passes clspv_core)
+target_link_libraries(clspv PRIVATE clspv_core)
 
 set_target_properties(clspv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 

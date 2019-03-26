@@ -14,7 +14,7 @@
 
 # Core clspv library.  This contains support code for the driver, including
 # the pass pipeline.
-add_library(clspv_core SHARED
+add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
@@ -88,7 +88,7 @@ if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
 endif()
 
-target_link_libraries(clspv_core PRIVATE ${CLSPV_LLVM_COMPONENTS})
+target_link_libraries(clspv_core PRIVATE clspv_passes ${CLSPV_LLVM_COMPONENTS})
 add_dependencies(clspv_passes ${CLSPV_LLVM_COMPONENTS})
 
 if (MSVC)

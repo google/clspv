@@ -17,11 +17,11 @@ add_executable(clspv-opt ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
     -DLLVM_OPT=\\\"${CLSPV_BINARY_DIR}\\third_party\\llvm\\bin\\opt.exe\\\" \
-    -DCLSPV_PASSES_SO=\\\"${CLSPV_BINARY_DIR}\\lib\\libclspv_passes.dll\\\"")
+    -DCLSPV_PASSES=\\\"${CLSPV_BINARY_DIR}\\lib\\libclspv_passes.dll\\\"")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
     -DLLVM_OPT=\\\"${CLSPV_BINARY_DIR}/third_party/llvm/bin/opt\\\" \
-    -DCLSPV_PASSES_SO=\\\"${CLSPV_BINARY_DIR}/lib/libclspv_passes.so\\\"")
+    -DCLSPV_PASSES=\\\"${CLSPV_BINARY_DIR}/lib/libclspv_passes.so\\\"")
 endif()
 
 # Enable C++11 for our executable

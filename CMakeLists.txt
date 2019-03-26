@@ -20,6 +20,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(clspv)
 endif()
 
+# clspv-opt requires shared libraries to be built for LLVM.
+set(BUILD_SHARED_LIBS ON)
+
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
 if (NOT DEFINED CMAKE_BUILD_TYPE)

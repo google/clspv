@@ -31,7 +31,7 @@ static llvm::cl::opt<std::string>
             llvm::cl::desc("Path to LLVM's 'opt' tool."));
 
 static llvm::cl::opt<std::string>
-    clo_passes("clo-passes", llvm::cl::init(CLSPV_PASSES_SO),
+    clo_passes("clo-passes", llvm::cl::init(CLSPV_PASSES),
                llvm::cl::desc("Path to libclspv_passes.so."));
 
 int RunOpt(int argc, const char *argv[]) {
