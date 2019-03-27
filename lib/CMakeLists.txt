@@ -47,6 +47,7 @@ add_library(clspv_passes ${shared_attribute}
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVOp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/RemoveUnusedArguments.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp

@@ -1484,6 +1484,16 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
         if (name.startswith(clspv::WorkgroupAccessorFunction())) {
           continue;
         }
+        if (name.startswith(clspv::SPIRVOpIntrinsicFunction())) {
+          // Skip the first operand that has the SPIR-V Opcode
+          for (unsigned i = 1; i < I.getNumOperands(); i++) {
+            if (isa<Constant>(I.getOperand(i)) &&
+                !isa<GlobalValue>(I.getOperand(i))) {
+              FindConstant(I.getOperand(i));
+            }
+          }
+          continue;
+        }
       }
 
       if (isa<AllocaInst>(I)) {
@@ -4420,8 +4430,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     // Handle SPIR-V intrinsics
     spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
-      .Case("spirv.smul_extended", spv::OpSMulExtended)
-      .Case("spirv.umul_extended", spv::OpUMulExtended)
       .Case("spirv.atomic_add", spv::OpAtomicIAdd)
       .Case("spirv.atomic_sub", spv::OpAtomicISub)
       .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
@@ -4444,6 +4452,17 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       .StartsWith("__spirv_anyDv", spv::OpAny)
       .Default(spv::OpNop);
 
+    // If the switch above didn't have an entry maybe the intrinsic
+    // is using the name mangling logic.
+    bool usesMangler = false;
+    if (opcode == spv::OpNop) {
+      if (Callee->getName().startswith(clspv::SPIRVOpIntrinsicFunction())) {
+        auto OpCst = cast<ConstantInt>(Call->getOperand(0));
+        opcode = static_cast<spv::Op>(OpCst->getZExtValue());
+        usesMangler = true;
+      }
+    }
+
     if (opcode != spv::OpNop) {
 
       SPIRVOperandList Ops;
@@ -4452,7 +4471,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Ops << MkId(lookupType(I.getType()));
       }
 
-      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
+      unsigned firstOperand = usesMangler ? 1 : 0;
+      for (unsigned i = firstOperand; i < Call->getNumArgOperands(); i++) {
         Ops << MkId(VMap[Call->getArgOperand(i)]);
       }
 

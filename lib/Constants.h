@@ -32,6 +32,9 @@ inline std::string RemappedTypeOffsetMetadataName() { return "clspv.remapped.off
 // Name for module level metadata storing UBO remapped type sizes.
 inline std::string RemappedTypeSizesMetadataName() { return "clspv.remapped.type.sizes"; }
 
+// Base name for SPIR-V intrinsic functions
+inline std::string SPIRVOpIntrinsicFunction() { return "spirv.op."; }
+
 // The first useable SpecId for pointer-to-local arguments.
 // 0, 1 and 2 are reserved for workgroup size.
 inline int FirstLocalSpecId() { return 3; }

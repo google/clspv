@@ -30,6 +30,7 @@
 #include "spirv/1.0/spirv.hpp"
 
 #include "clspv/Option.h"
+#include "SPIRVOp.h"
 
 using namespace llvm;
 
@@ -1388,8 +1389,9 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
   bool Changed = false;
 
-  for (auto const &SymVal : M.getValueSymbolTable()) {
+  SmallVector<Function*, 4> FnWorklist;
 
+  for (auto const &SymVal : M.getValueSymbolTable()) {
     bool isMad = SymVal.getKey().startswith("_Z6mad_hi");
     bool isMul = SymVal.getKey().startswith("_Z6mul_hi");
 
@@ -1400,110 +1402,103 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
 
     // Is there a function going by that name?
     if (auto F = dyn_cast<Function>(SymVal.getValue())) {
-
-      SmallVector<Instruction *, 4> ToRemoves;
-
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-
-          // Get arguments
-          auto AValue = CI->getOperand(0);
-          auto BValue = CI->getOperand(1);
-          auto CValue = CI->getOperand(2);
-
-          // Don't touch overloads that aren't in OpenCL C
-          auto AType = AValue->getType();
-          auto BType = BValue->getType();
-          auto CType = CValue->getType();
-
-          if ((AType != BType) || (CI->getType() != AType) ||
-              (isMad && (AType != CType))) {
-            continue;
-          }
-
-          if (!AType->isIntOrIntVectorTy()) {
-            continue;
-          }
-
-          if ((AType->getScalarSizeInBits() != 8) &&
-              (AType->getScalarSizeInBits() != 16) &&
-              (AType->getScalarSizeInBits() != 32) &&
-              (AType->getScalarSizeInBits() != 64)) {
-            continue;
-          }
-
-          if (AType->isVectorTy()) {
-            if ((AType->getVectorNumElements() != 2) &&
-                (AType->getVectorNumElements() != 3) &&
-                (AType->getVectorNumElements() != 4) &&
-                (AType->getVectorNumElements() != 8) &&
-                (AType->getVectorNumElements() != 16)) {
-              continue;
-            }
-          }
-
-          // Create struct type for the return type of our SPIR-V intrinsic
-          SmallVector<Type*, 2> TwoValueType = {
-            AType,
-            AType
-          };
-
-          auto ExMulRetType = StructType::create(TwoValueType);
-
-          // And a function type
-          auto NewFType = FunctionType::get(ExMulRetType, TwoValueType, false);
-
-          // Get infos from the mangled OpenCL built-in function name
-          FunctionInfo finfo;
-          getFunctionInfoFromMangledName(F->getName(), &finfo);
-
-          // Use it to select the appropriate signed/unsigned SPIR-V intrinsic
-          StringRef intrinsic;
-          if (finfo.argTypeInfos[0].signedness == ArgTypeInfo::SignedNess::Signed) {
-            intrinsic = "spirv.smul_extended";
-          } else {
-            intrinsic = "spirv.umul_extended";
-          }
-
-          // Add the intrinsic function to the module
-          auto NewF = M.getOrInsertFunction(intrinsic, NewFType);
-
-          // Call it
-          SmallVector<Value*, 4> NewFArgs = {
-            AValue,
-            BValue,
-          };
-
-          auto Call = CallInst::Create(NewF, NewFArgs, "", CI);
-
-          // Get the high part of the result
-          unsigned Idxs[] = {1};
-          Value *V = ExtractValueInst::Create(Call, Idxs, "", CI);
-
-          // If we're handling a mad_hi, add the third argument to the result
-          if (isMad) {
-            V = BinaryOperator::Create(Instruction::Add, V, CValue, "", CI);
-          }
-
-          // Replace call with the expression
-          CI->replaceAllUsesWith(V);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
+      FnWorklist.push_back(F);
     }
+  }
+
+  for (auto F : FnWorklist) {
+    SmallVector<Instruction *, 4> ToRemoves;
+
+    bool isMad = F->getName().startswith("_Z6mad_hi");
+    // Walk the users of the function.
+    for (auto &U : F->uses()) {
+      if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+        // Get arguments
+        auto AValue = CI->getOperand(0);
+        auto BValue = CI->getOperand(1);
+        auto CValue = CI->getOperand(2);
+
+        // Don't touch overloads that aren't in OpenCL C
+        auto AType = AValue->getType();
+        auto BType = BValue->getType();
+        auto CType = CValue->getType();
+
+        if ((AType != BType) || (CI->getType() != AType) ||
+            (isMad && (AType != CType))) {
+          continue;
+        }
+
+        if (!AType->isIntOrIntVectorTy()) {
+          continue;
+        }
+
+        if ((AType->getScalarSizeInBits() != 8) &&
+            (AType->getScalarSizeInBits() != 16) &&
+            (AType->getScalarSizeInBits() != 32) &&
+            (AType->getScalarSizeInBits() != 64)) {
+          continue;
+        }
+
+        if (AType->isVectorTy()) {
+          if ((AType->getVectorNumElements() != 2) &&
+              (AType->getVectorNumElements() != 3) &&
+              (AType->getVectorNumElements() != 4) &&
+              (AType->getVectorNumElements() != 8) &&
+              (AType->getVectorNumElements() != 16)) {
+            continue;
+          }
+        }
+
+        // Get infos from the mangled OpenCL built-in function name
+        FunctionInfo finfo;
+        getFunctionInfoFromMangledName(F->getName(), &finfo);
+
+        // Select the appropriate signed/unsigned SPIR-V op
+        spv::Op opcode;
+        if (finfo.argTypeInfos[0].signedness == ArgTypeInfo::SignedNess::Signed) {
+          opcode = spv::OpSMulExtended;
+        } else {
+          opcode = spv::OpUMulExtended;
+        }
+
+        // Our SPIR-V op returns a struct, create a type for it
+        SmallVector<Type*, 2> TwoValueType = {
+          AType,
+          AType
+        };
+        auto ExMulRetType = StructType::create(TwoValueType);
+
+        // Call the SPIR-V op
+        auto Call = clspv::InsertSPIRVOp(CI, opcode, {Attribute::ReadNone},
+                                         ExMulRetType, {AValue, BValue});
+
+        // Get the high part of the result
+        unsigned Idxs[] = {1};
+        Value *V = ExtractValueInst::Create(Call, Idxs, "", CI);
+
+        // If we're handling a mad_hi, add the third argument to the result
+        if (isMad) {
+          V = BinaryOperator::Create(Instruction::Add, V, CValue, "", CI);
+        }
+
+        // Replace call with the expression
+        CI->replaceAllUsesWith(V);
+
+        // Lastly, remember to remove the user.
+        ToRemoves.push_back(CI);
+      }
+    }
+
+    Changed = !ToRemoves.empty();
+
+    // And cleanup the calls we don't use anymore.
+    for (auto V : ToRemoves) {
+      V->eraseFromParent();
+    }
+
+    // And remove the function we don't need either too.
+    F->eraseFromParent();
   }
 
   return Changed;
