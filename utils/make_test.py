@@ -40,6 +40,7 @@ CHECK_DAG_INSTRUCTION_REGEXES = (
     r'OpConstant[a-zA-Z]*',
     r'OpSpecConstant[a-zA-Z]*',
     r'OpCapability',
+    r'OpUndef',
     r'OpVariable',
 )
 

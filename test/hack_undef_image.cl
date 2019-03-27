@@ -72,7 +72,7 @@ void kernel foo(global float4* A, read_only image2d_t im, sampler_t sam, float2 
 // CHECK-DAG: [[_21:%[a-zA-Z0-9_]+]] = OpTypeSampledImage [[_7]]
 // CHECK-DAG: [[_float_0:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0
 // CHECK-DAG: [[_uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 0
-// CHECK: [[_24:%[a-zA-Z0-9_]+]] = OpUndef [[_7]]
+// CHECK-DAG: [[_24:%[a-zA-Z0-9_]+]] = OpUndef [[_7]]
 // CHECK-DAG: [[_float_2_5:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 2.5
 // CHECK-DAG: [[_26:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v2float]] [[_float_2_5]] [[_float_2_5]]
 // CHECK: [[_27]] = OpSpecConstant [[_uint]] 1
