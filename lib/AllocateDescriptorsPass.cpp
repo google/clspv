@@ -227,7 +227,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
     Type *i32 = Builder.getInt32Ty();
     FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32}, false);
 
-    auto *var_fn = M.getOrInsertFunction("clspv.sampler.var.literal", fn_ty);
+    auto var_fn = M.getOrInsertFunction("clspv.sampler.var.literal", fn_ty);
 
     // Map sampler literal to binding number.
     DenseMap<unsigned, unsigned> binding_for_value;
@@ -721,7 +721,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           Type *i32 = Builder.getInt32Ty();
           FunctionType *fnTy =
               FunctionType::get(ptrTy, {i32, i32, i32, i32, i32, i32}, false);
-          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fnTy));
+          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
         }
 
         // Replace uses of this argument with something dependent on a GEP
@@ -867,7 +867,8 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
           FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
-          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fn_ty));
+          var_fn =
+              cast<Function>(M.getOrInsertFunction(fn_name, fn_ty).getCallee());
         }
 
         // Generate an accessor call.

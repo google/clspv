@@ -6,7 +6,7 @@
       "subrepo" : "llvm-mirror/llvm",
       "branch" : "master",
       "subdir" : "third_party/llvm",
-      "commit" : "82f73ee5b37a2a4cc1bdad02bebaaaba71b65400"
+      "commit" : "26882c9d258b62748a7266207513a06990c8decc"
     },
     {
       "name" : "clang",
@@ -14,7 +14,7 @@
       "subrepo" : "llvm-mirror/clang",
       "branch" : "master",
       "subdir" : "third_party/clang",
-      "commit" : "82fcdc620f7367f0ffc24b8ade93539e0bfd9e30"
+      "commit" : "7c21fe2c07d1df4480ddf35a03d218e0f5b4af3d"
     },
     {
       "name" : "SPIRV-Headers",

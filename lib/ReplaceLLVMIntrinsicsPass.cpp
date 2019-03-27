@@ -15,6 +15,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -238,8 +239,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
           // Check that the alignment is a constant integer.
           assert(isa<ConstantInt>(CI->getArgOperand(3)));
-          auto Alignment =
-              dyn_cast<ConstantInt>(CI->getArgOperand(3))->getZExtValue();
+          auto Alignment = cast<MemIntrinsic>(CI)->getDestAlignment();
 
           auto TypeAlignment = Layout.getABITypeAlignment(DstElemTy);
 
@@ -252,7 +252,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           assert(0 == (Alignment % TypeAlignment));
 
           // Check that volatile is a constant.
-          assert(isa<ConstantInt>(CI->getArgOperand(4)));
+          assert(isa<ConstantInt>(CI->getArgOperand(3)));
 
           CallsToReplaceWithSpirvCopyMemory.push_back(CI);
         }
@@ -262,11 +262,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Arg0 = dyn_cast<BitCastOperator>(CI->getArgOperand(0));
         auto Arg1 = dyn_cast<BitCastOperator>(CI->getArgOperand(1));
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
-        auto Arg4 = dyn_cast<ConstantInt>(CI->getArgOperand(4));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto Alignment = ConstantInt::get(I32Ty, Arg3->getZExtValue());
-        auto Volatile = ConstantInt::get(I32Ty, Arg4->getZExtValue());
+        auto Alignment = ConstantInt::get(I32Ty, cast<MemIntrinsic>(CI)->getDestAlignment());
+        auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
 
         auto Dst = Arg0->getOperand(0);
         auto Src = Arg1->getOperand(0);

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/UniqueVector.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"

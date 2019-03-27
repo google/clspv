@@ -405,8 +405,8 @@ kernel void greaterthan_const_vec4(__global int* outDest, int inWidth,
 // CHECK:  OpSelectionMerge [[_144:%[0-9a-zA-Z_]+]] None
 // CHECK:  OpBranchConditional [[_133]] [[_134:%[0-9a-zA-Z_]+]] [[_144]]
 // CHECK:  [[_134]] = OpLabel
-// CHECK:  [[_135:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_118]] [[_uint_4294967295]]
-// CHECK:  [[_136:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_135]] [[_122]]
+// CHECK:  [[_135:%[0-9a-zA-Z_]+]] = OpBitwiseXor [[_uint]] [[_122]] [[_uint_4294967295]]
+// CHECK:  [[_136:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_135]] [[_118]]
 // CHECK:  [[_137:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_uint_3]] [[_118]]
 // CHECK:  [[_138:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_137]] [[_120]]
 // CHECK:  [[_139:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_138]] [[_136]]
@@ -447,8 +447,8 @@ kernel void greaterthan_const_vec4(__global int* outDest, int inWidth,
 // CHECK:  OpSelectionMerge [[_180:%[0-9a-zA-Z_]+]] None
 // CHECK:  OpBranchConditional [[_169]] [[_170:%[0-9a-zA-Z_]+]] [[_180]]
 // CHECK:  [[_170]] = OpLabel
-// CHECK:  [[_171:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_154]] [[_uint_4294967295]]
-// CHECK:  [[_172:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_171]] [[_158]]
+// CHECK:  [[_171:%[0-9a-zA-Z_]+]] = OpBitwiseXor [[_uint]] [[_158]] [[_uint_4294967295]]
+// CHECK:  [[_172:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_171]] [[_154]]
 // CHECK:  [[_173:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_uint_3]] [[_154]]
 // CHECK:  [[_174:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_173]] [[_156]]
 // CHECK:  [[_175:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_172]] [[_174]]
@@ -489,8 +489,8 @@ kernel void greaterthan_const_vec4(__global int* outDest, int inWidth,
 // CHECK:  OpSelectionMerge [[_216:%[0-9a-zA-Z_]+]] None
 // CHECK:  OpBranchConditional [[_205]] [[_206:%[0-9a-zA-Z_]+]] [[_216]]
 // CHECK:  [[_206]] = OpLabel
-// CHECK:  [[_207:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_190]] [[_uint_4294967295]]
-// CHECK:  [[_208:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_207]] [[_194]]
+// CHECK:  [[_207:%[0-9a-zA-Z_]+]] = OpBitwiseXor [[_uint]] [[_194]] [[_uint_4294967295]]
+// CHECK:  [[_208:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_207]] [[_190]]
 // CHECK:  [[_209:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_uint_3]] [[_190]]
 // CHECK:  [[_210:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_209]] [[_192]]
 // CHECK:  [[_211:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_208]] [[_210]]
@@ -531,8 +531,8 @@ kernel void greaterthan_const_vec4(__global int* outDest, int inWidth,
 // CHECK:  OpSelectionMerge [[_252:%[0-9a-zA-Z_]+]] None
 // CHECK:  OpBranchConditional [[_241]] [[_242:%[0-9a-zA-Z_]+]] [[_252]]
 // CHECK:  [[_242]] = OpLabel
-// CHECK:  [[_243:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_226]] [[_uint_4294967295]]
-// CHECK:  [[_244:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_243]] [[_230]]
+// CHECK:  [[_243:%[0-9a-zA-Z_]+]] = OpBitwiseXor [[_uint]] [[_230]] [[_uint_4294967295]]
+// CHECK:  [[_244:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_243]] [[_226]]
 // CHECK:  [[_245:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_uint_3]] [[_226]]
 // CHECK:  [[_246:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_245]] [[_228]]
 // CHECK:  [[_247:%[0-9a-zA-Z_]+]] = OpISub [[_uint]] [[_246]] [[_244]]

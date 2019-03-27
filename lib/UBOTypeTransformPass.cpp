@@ -330,9 +330,9 @@ bool UBOTypeTransformPass::RemapFunctions(
 
     // Insert the replacement function. Copy the calling convention, attributes
     // and metadata of the source function.
-    Constant *inserted = M.getOrInsertFunction(
-        func->getName(), replacement_type, func->getAttributes());
-    Function *replacement = cast<Function>(inserted);
+    auto inserted = M.getOrInsertFunction(func->getName(), replacement_type,
+                                          func->getAttributes());
+    Function *replacement = cast<Function>(inserted.getCallee());
     function_replacements_[func] = replacement;
     replacement->setCallingConv(func->getCallingConv());
     replacement->copyMetadata(func, 0);

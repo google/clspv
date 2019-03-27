@@ -376,6 +376,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 
   if (verify) {
     instance.getDiagnosticOpts().VerifyDiagnostics = true;
+    instance.getDiagnosticOpts().VerifyPrefixes.push_back("expected");
   }
 
   clang::LangStandard::Kind standard = clang::LangStandard::lang_opencl12;
@@ -762,8 +763,9 @@ int Compile(const int argc, const char *const argv[]) {
   std::error_code error;
   if (!DescriptorMapFilename.empty()) {
     llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
-                                               llvm::sys::fs::F_RW |
-                                                   llvm::sys::fs::F_Text);
+                                               llvm::sys::fs::CD_CreateAlways,
+                                               llvm::sys::fs::FA_Write,
+                                               llvm::sys::fs::F_Text);
     if (error) {
       llvm::errs() << "Unable to open descriptor map file '"
                    << DescriptorMapFilename << "': " << error.message() << '\n';
@@ -791,7 +793,7 @@ int Compile(const int argc, const char *const argv[]) {
       OutputFilename = "a.spv";
     }
   }
-  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::F_RW);
+  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::FA_Write);
 
   if (error) {
     llvm::errs() << "Unable to open output file '" << OutputFilename

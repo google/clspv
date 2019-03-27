@@ -161,8 +161,8 @@ bool SplatArgPass::runOnModule(Module &M) {
 
     // Create new callee function declaration with new function type.
     StringRef NewCallName(getSplatName(Callee->getName()));
-    Function *NewCallee =
-        cast<Function>(M.getOrInsertFunction(NewCallName, NewCalleeTy));
+    Function *NewCallee = cast<Function>(
+        M.getOrInsertFunction(NewCallName, NewCalleeTy).getCallee());
     NewCallee->setCallingConv(CallingConv::SPIR_FUNC);
 
     // Change target of call instruction.
