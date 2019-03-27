@@ -87,7 +87,7 @@ else()
   use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
   use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
 
-  set(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN ON)
+  option(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN "" ON)
   set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
   set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
   set(CLSPV_LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm)
