@@ -20,9 +20,6 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(clspv)
 endif()
 
-# clspv-opt requires shared libraries to be built for LLVM.
-set(BUILD_SHARED_LIBS ON)
-
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
 if (NOT DEFINED CMAKE_BUILD_TYPE)
@@ -41,7 +38,6 @@ option(SKIP_CLSPV_TOOLS_INSTALL "Skip installation" ${SKIP_CLSPV_TOOLS_INSTALL})
 if(NOT ${SKIP_CLSPV_TOOLS_INSTALL})
   set(ENABLE_CLSPV_TOOLS_INSTALL ON)
 endif()
-
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
 	# GCC 7.3 complains about LLVM code: RetryAfterSignal in lib/Support/Process.cpp
@@ -72,6 +68,16 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
+
+if (NOT MSVC)
+  set(ENABLE_CLSPV_OPT ON)
+else()
+  # clspv-opt is not supported on Windows, because LLVM opt does not support
+  # out-of-tree plugins on Windows (http://go/so/41943353).
+  # TODO(dnovillo): Need a different implementation that does not rely on
+  #                 LLVM opt.
+  set(ENABLE_CLSPV_OPT OFF)
+endif()
 
 if (NOT DEFINED EXTERNAL_LLVM)
   set(EXTERNAL_LLVM 0)
