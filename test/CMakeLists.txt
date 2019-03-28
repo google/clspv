@@ -13,7 +13,6 @@
 # limitations under the License.
 
 if (ENABLE_CLSPV_OPT)
-  set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} clspv-opt)
   set(CLSPV_TEST_SUFFIXES "['.cl', '.ll']")
 else()
   set(CLSPV_TEST_SUFFIXES "['.cl']")
