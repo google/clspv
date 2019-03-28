@@ -284,6 +284,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
 
     for (auto &BB : F) {
       for (auto &I : BB) {
+        changed |= RemapUser(&I, M);
         if (auto *call = dyn_cast<CallInst>(&I)) {
           // Update the called function if we rewrote it.
           auto iter = function_replacements_.find(call->getCalledFunction());
@@ -299,7 +300,6 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
             gep->setSourceElementType(remapped);
           }
         }
-        changed |= RemapUser(&I, M);
       }
     }
   }
