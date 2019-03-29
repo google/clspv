@@ -237,10 +237,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           // Check that the size is a multiple of the size of the pointee type.
           assert(Size % DstElemSize == 0);
 
-          // Check that the alignment is a constant integer.
-          assert(isa<ConstantInt>(CI->getArgOperand(3)));
           auto Alignment = cast<MemIntrinsic>(CI)->getDestAlignment();
-
           auto TypeAlignment = Layout.getABITypeAlignment(DstElemTy);
 
           // Check that the alignment is at least the alignment of the pointee
