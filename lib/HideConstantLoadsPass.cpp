@@ -105,7 +105,7 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
       // Make the function.
       FunctionType* fnTy = FunctionType::get(loadedTy, {loadedTy}, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
-      fn = cast<Function>(fn_constant);
+      fn = cast<Function>(fn_constant.getCallee());
       fn->addFnAttr(Attribute::ReadOnly);
     }
 

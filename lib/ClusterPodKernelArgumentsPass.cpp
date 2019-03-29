@@ -201,16 +201,13 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       }
     }
 
-    // And finally function attributes. We deal with function attributes
-    // differently since the version of LLVM used by clspv has a bug in get().
-    // TODO(kpet): Add function attributes to AttrBuildInfo when updating
-    //             LLVM past r330136.
-    auto newAttributes = AttributeList::get(M.getContext(), AttrBuildInfo);
+    // And finally function attributes.
     if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
-      auto attrs = AttrBuilder(Attributes.getFnAttributes());
       auto idx = AttributeList::FunctionIndex;
-      newAttributes = newAttributes.addAttributes(M.getContext(), idx, attrs);
+      auto attrs = Attributes.getFnAttributes();
+      AttrBuildInfo.push_back(std::make_pair(idx, attrs));
     }
+    auto newAttributes = AttributeList::get(M.getContext(), AttrBuildInfo);
     NewFunc->setAttributes(newAttributes);
 
     // Move OpenCL kernel named attributes.
