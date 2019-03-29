@@ -75,7 +75,7 @@ void ReorderBasicBlocksPass::StructuredOrder(BasicBlock *block,
     return;
 
   // Identify the merge and continue blocks for special treatment.
-  const auto *terminator = dyn_cast<TerminatorInst>(block->getTerminator());
+  const auto *terminator = block->getTerminator();
   BasicBlock *continue_block = nullptr;
   BasicBlock *merge_block = nullptr;
   if (LI.isLoopHeader(block)) {

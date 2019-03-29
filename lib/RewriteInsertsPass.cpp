@@ -228,7 +228,7 @@ class RewriteInsertsPass : public ModulePass {
        FunctionType *fnTy = FunctionType::get(
            constructed_type, elements, false);
        auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
-       fn = cast<Function>(fn_constant);
+       fn = cast<Function>(fn_constant.getCallee());
        fn->addFnAttr(Attribute::ReadOnly);
      }
      return fn;

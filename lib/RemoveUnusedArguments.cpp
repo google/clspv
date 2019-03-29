@@ -120,8 +120,8 @@ void RemoveUnusedArguments::removeUnusedParameters(
 
     // Insert the new function. Copy the calling convention, attributes and
     // metadata.
-    Constant *inserted =
-        M.getOrInsertFunction(f->getName(), new_type, f->getAttributes());
+    auto inserted =
+        M.getOrInsertFunction(f->getName(), new_type, f->getAttributes()).getCallee();
     Function *new_function = cast<Function>(inserted);
     new_function->setCallingConv(f->getCallingConv());
     new_function->copyMetadata(f, 0);

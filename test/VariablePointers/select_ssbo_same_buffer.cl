@@ -5,7 +5,8 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// Same object selection only requires VariablePointersStorageBuffer.
+// LLVM optimizes the selection to be between 1 and 2 and not pointers, so no
+// variable pointers are required.
 kernel void foo(global int* in, global int* out, int a) {
   global int* x = in + 1;
   global int* y = in + 2;
@@ -14,9 +15,6 @@ kernel void foo(global int* in, global int* out, int a) {
 }
 
 // CHECK-NOT: OpCapability VariablePointers
-// CHECK: OpCapability VariablePointersStorageBuffer
-// CHECK-NOT: OpCapability VariablePointers
-// CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[uint]]
-// CHECK: OpSelect [[ptr]]
+// CHECK-NOT: OpSelect [[ptr]]

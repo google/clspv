@@ -284,6 +284,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
 
     for (auto &BB : F) {
       for (auto &I : BB) {
+        changed |= RemapUser(&I, M);
         if (auto *call = dyn_cast<CallInst>(&I)) {
           // Update the called function if we rewrote it.
           auto iter = function_replacements_.find(call->getCalledFunction());
@@ -299,7 +300,6 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
             gep->setSourceElementType(remapped);
           }
         }
-        changed |= RemapUser(&I, M);
       }
     }
   }
@@ -330,9 +330,9 @@ bool UBOTypeTransformPass::RemapFunctions(
 
     // Insert the replacement function. Copy the calling convention, attributes
     // and metadata of the source function.
-    Constant *inserted = M.getOrInsertFunction(
-        func->getName(), replacement_type, func->getAttributes());
-    Function *replacement = cast<Function>(inserted);
+    auto inserted = M.getOrInsertFunction(func->getName(), replacement_type,
+                                          func->getAttributes());
+    Function *replacement = cast<Function>(inserted.getCallee());
     function_replacements_[func] = replacement;
     replacement->setCallingConv(func->getCallingConv());
     replacement->copyMetadata(func, 0);
