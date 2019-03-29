@@ -730,14 +730,6 @@ int Compile(const int argc, const char *const argv[]) {
     return -1;
   }
 
-  // TODO: Remove when #279 is resolved.
-  if (clspv::Option::ConstantArgsInUniformBuffer() &&
-      clspv::Option::Int8Support()) {
-    llvm::errs() << "clspv restriction: -constant-args-ubo is currently "
-                    "incompatible with -int8\n";
-    return -1;
-  }
-
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(Registry);
   llvm::initializeScalarOpts(Registry);
