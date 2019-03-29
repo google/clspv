@@ -203,7 +203,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
     // And finally function attributes.
     if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
-      auto idx = Attributes+List::FunctionIndex;
+      auto idx = AttributeList::FunctionIndex;
       auto attrs = Attributes.getFnAttributes();
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
     }
