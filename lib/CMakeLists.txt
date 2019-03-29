@@ -12,18 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Core clspv library.  This contains support code for the driver, including
+# the pass pipeline.
 add_library(clspv_core
+  ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
+)
+
+if (ENABLE_CLSPV_OPT)
+  set(shared_attribute "SHARED")
+else()
+  set(shared_attribute "")
+endif()
+
+
+# Pass library.  Transformation passes and pass-specific support are
+# defined here.  This must be loadable by LLVM opt for testing individual
+# passes.
+add_library(clspv_passes ${shared_attribute}
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineEntryPointsPass.cpp
@@ -55,42 +70,49 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
-# Enable C++11 for our executable
-target_compile_features(clspv_core PRIVATE cxx_range_for)
+foreach(clspv_lib clspv_core clspv_passes)
+  # Enable C++11 for our executable
+  target_compile_features(${clspv_lib} PRIVATE cxx_range_for)
 
-target_include_directories(clspv_core PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
+  target_include_directories(${clspv_lib} PRIVATE ${SPIRV_HEADERS_INCLUDE_DIRS})
 
-target_include_directories(clspv_core PRIVATE ${LLVM_INCLUDE_DIRS})
+  target_include_directories(${clspv_lib} PRIVATE ${LLVM_INCLUDE_DIRS})
 
-target_include_directories(clspv_core PRIVATE ${CLANG_INCLUDE_DIRS})
+  target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
 
-target_include_directories(clspv_core PUBLIC ${CLSPV_INCLUDE_DIRS})
+  target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
+endforeach(clspv_lib)
+
+set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
 
-  set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
   llvm_map_components_to_libnames(CLSPV_LLVM_LINKS ${CLSPV_LLVM_COMPONENTS})
 
-  include(${CLSPV_LLVM_BINARY_DIR}/../lib/cmake/clang/ClangConfig.cmake)
-
-  target_link_libraries(clspv_core PRIVATE clangCodeGen ${CLSPV_LLVM_COMPONENTS})
-else()
-  target_link_libraries(clspv_core PRIVATE clangCodeGen LLVMAnalysis LLVMCore LLVMScalarOpts)
+  include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/clang/ClangConfig.cmake)
 endif()
 
-add_dependencies(clspv_core clspv_baked_opencl_header clspv_c_strings clspv_glsl)
+# clspv_c_strings and clspv_glsl are used by SPIRVProducerPass.cpp.
+add_dependencies(clspv_passes clspv_c_strings clspv_glsl ${CLSPV_LLVM_COMPONENTS})
+
+# clspv_baked_opencl_header is used by Compiler.cpp.
+add_dependencies(clspv_core clspv_baked_opencl_header)
+target_link_libraries(clspv_core PRIVATE clspv_passes ${CLSPV_LLVM_COMPONENTS})
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
     # 4596: Upgrade to newer LLVM.  See https://github.com/google/clspv/issues/153
     PROPERTIES COMPILE_FLAGS "/Wall /WX /wd4710 /wd4820 /wd4625 /wd4626 /wd5026 /wd5027 /wd4061 /wd4711 /wd4996 /wd4530 /wd4577 /wd4514 /wd4365 /wd4987 /wd4774 /wd4623 /wd4571 /wd4596 /wd5039 /wd5045"
   )
+elseif (APPLE AND ENABLE_CLSPV_OPT)
+  set_target_properties(clspv_core PROPERTIES LINK_FLAGS "-Wl,-undefined,dynamic_lookup")
+  set_target_properties(clspv_passes PROPERTIES LINK_FLAGS "-Wl,-undefined,dynamic_lookup")
 endif()
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)
   install(
-    TARGETS clspv_core
+    TARGETS clspv_core clspv_passes
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )

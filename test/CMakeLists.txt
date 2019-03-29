@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if (ENABLE_CLSPV_OPT)
+  set(CLSPV_TEST_SUFFIXES "['.cl', '.ll']")
+else()
+  set(CLSPV_TEST_SUFFIXES "['.cl']")
+endif()
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.in ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg @ONLY)
 
-# Visual Studio generates puts LLVM executables in different location.
+# Visual Studio puts LLVM executables in different location.
 set (LLVM_BINARY_SUBDIR bin)
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set (LLVM_BINARY_SUBDIR ${CMAKE_BUILD_TYPE}/bin)
@@ -23,6 +29,10 @@ endif()
 set(CLSPV_TEST_DEPENDS clspv spirv-as spirv-dis spirv-val spirv-opt)
 if (NOT ${EXTERNAL_LLVM} EQUAL 1)
   set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} FileCheck not)
+endif()
+
+if (ENABLE_CLSPV_OPT)
+  set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} clspv-opt)
 endif()
 
 # Use absolute paths in case of external LLVM.
