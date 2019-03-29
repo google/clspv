@@ -26,14 +26,18 @@ static llvm::cl::opt<int> clo_verbose(
     "clo-verbose", llvm::cl::init(0),
     llvm::cl::desc("Verbosity level.  Higher values increase verbosity."));
 
-static llvm::cl::opt<std::string>
-    clo_opt("clo-opt", llvm::cl::init(LLVM_OPT),
-            llvm::cl::desc("Path to LLVM's 'opt' tool."));
+std::string clo_opt_help =
+    std::string("Path to LLVM's 'opt' tool (default: ") + LLVM_OPT + ")";
 
-static llvm::cl::opt<std::string>
-    clo_passes("clo-passes", llvm::cl::init(CLSPV_PASSES),
-               llvm::cl::desc("Path to libclspv_passes.so."));
+static llvm::cl::opt<std::string> clo_opt("clo-opt", llvm::cl::init(LLVM_OPT),
+                                          llvm::cl::desc(clo_opt_help));
 
+std::string clo_passes_help =
+    std::string("Path to libclspv_passes.so (default: ") + CLSPV_PASSES + ")";
+
+static llvm::cl::opt<std::string> clo_passes("clo-passes",
+                                             llvm::cl::init(CLSPV_PASSES),
+                                             llvm::cl::desc(clo_passes_help));
 int RunOpt(int argc, const char *argv[]) {
   size_t new_argc =
       argc + 1 /* "-load" */ + 1 /* clo_passes */ + 1 /* nullptr */;
@@ -57,7 +61,7 @@ int RunOpt(int argc, const char *argv[]) {
 
   char *new_environ[] = {NULL};
   execve(new_argv[0], const_cast<char *const *>(new_argv), new_environ);
-  perror("execve");
+  perror((std::string("Error executing ") + new_argv[0]).c_str());
   return -1;
 }
 
