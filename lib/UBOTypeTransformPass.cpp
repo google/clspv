@@ -104,6 +104,9 @@ private:
 
   // Maps a global value to its replacement.
   DenseMap<Constant *, Constant *> remapped_globals_;
+
+  // Whether char arrays are supported in UBOs.
+  bool support_int8_array_;
 };
 
 char UBOTypeTransformPass::ID = 0;
@@ -121,6 +124,10 @@ namespace {
 bool UBOTypeTransformPass::runOnModule(Module &M) {
   if (!clspv::Option::ConstantArgsInUniformBuffer())
     return false;
+
+  // Record whether char arrays are supported.
+  support_int8_array_ = clspv::Option::Int8Support() &&
+                        clspv::Option::Std430UniformBufferLayout();
 
   bool changed = false;
   for (auto &F : M) {
@@ -232,13 +239,16 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     const auto *array = dyn_cast<ArrayType>(element);
     // Unless char arrays in UBOs are supported, replace all instances with an
     // i32.
-    const bool support_int8_array = clspv::Option::Int8Support() &&
-                                    clspv::Option::Std430UniformBufferLayout();
-    if (array && array->getElementType()->isIntegerTy(8) && !support_int8_array) {
-      // This is a padding element.
-      assert((array->getNumElements() % 4 == 0) &&
-             "Non-integer sized padding!");
-      elements.push_back(Type::getInt32Ty(M.getContext()));
+    if (array && array->getElementType()->isIntegerTy(8) && !support_int8_array_) {
+      // This is a padding element. If chars are supported, replace the array
+      // with a single char, otherwise use an int replacement.
+      if (clspv::Option::Int8Support()) {
+        elements.push_back(Type::getInt8Ty(M.getContext()));
+      } else {
+        assert((array->getNumElements() % 4 == 0) &&
+               "Non-integer sized padding!");
+        elements.push_back(Type::getInt32Ty(M.getContext()));
+      }
     } else {
       elements.push_back(MapType(element, M));
     }

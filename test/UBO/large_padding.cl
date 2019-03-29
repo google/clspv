@@ -27,8 +27,9 @@ kernel void foo(global S* out, constant S* in) {
 // CHECK-DAG: OpDecorate [[in]] NonWritable
 // CHECK: OpDecorate [[ubo_array:%[0-9a-zA-Z_]+]] ArrayStride 64
 // CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[char:%[0-9a-zA-Z_]+]] = OpTypeInt 8 0
 // CHECK-DAG: [[int4:%[0-9a-zA-Z_]+]] = OpTypeVector [[int]] 4
-// CHECK: [[s]] = OpTypeStruct [[int4]] [[int]] [[int4]] [[int4]]
+// CHECK: [[s]] = OpTypeStruct [[int4]] [[char]] [[int4]] [[int4]]
 // CHECK-DAG: [[int_1024:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 1024
 // CHECK-DAG: [[ubo_array]] = OpTypeArray [[s]] [[int_1024]]
 // CHECK-DAG: [[ubo_block:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
