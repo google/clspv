@@ -4563,20 +4563,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // Nothing to do for abs with uint. Map abs's operand ID to VMap for abs
-    // with unit.
-    if (Callee->getName().equals("_Z3absj") ||
-        Callee->getName().equals("_Z3absDv2_j") ||
-        Callee->getName().equals("_Z3absDv3_j") ||
-        Callee->getName().equals("_Z3absDv4_j") ||
-        Callee->getName().equals("_Z3absh") ||
-        Callee->getName().equals("_Z3absDv2_h") ||
-        Callee->getName().equals("_Z3absDv3_h") ||
-        Callee->getName().equals("_Z3absDv4_h")) {
-      VMap[&I] = VMap[Call->getOperand(0)];
-      break;
-    }
-
     // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
     // Additionally, OpTypeSampledImage is generated.
     if (Callee->getName().equals(

@@ -248,6 +248,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
   bool Changed = false;
 
   const char *Names[] = {
+    "_Z3absh",
+    "_Z3absDv2_h",
+    "_Z3absDv3_h",
+    "_Z3absDv4_h",
     "_Z3abst",
     "_Z3absDv2_t",
     "_Z3absDv3_t",
