@@ -670,10 +670,8 @@ int PopulatePassManager(
 
   return 0;
 }
-} // namespace
 
-namespace clspv {
-int Compile(const int argc, const char *const argv[]) {
+int ParseOptions(const int argc, const char *const argv[]) {
   // We need to change how one of the called passes works by spoofing
   // ParseCommandLineOptions with the specific option.
   const int llvmArgc = 2;
@@ -682,9 +680,26 @@ int Compile(const int argc, const char *const argv[]) {
       "-simplifycfg-sink-common=false",
   };
 
+  llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
-
   llvm::cl::ParseCommandLineOptions(argc, argv);
+
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "clspv restriction: -constant-args-ubo requires "
+                    "-inline-entry-points\n";
+    return -1;
+  }
+
+  return 0;
+}
+} // namespace
+
+namespace clspv {
+int Compile(const int argc, const char *const argv[]) {
+
+  if (auto error = ParseOptions(argc, argv))
+    return error;
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
   if (auto error = ParseSamplerMap("", &SamplerMapEntries))
@@ -731,13 +746,6 @@ int Compile(const int argc, const char *const argv[]) {
     llvm::errs() << log;
   }
   if (num_errors > 0) {
-    return -1;
-  }
-
-  if (clspv::Option::ConstantArgsInUniformBuffer() &&
-      !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "clspv restriction: -constant-args-ubo requires "
-                    "-inline-entry-points\n";
     return -1;
   }
 
@@ -816,16 +824,6 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries) {
-  // We need to change how one of the called passes works by spoofing
-  // ParseCommandLineOptions with the specific option.
-  const int llvmArgc = 2;
-  const char *llvmArgv[llvmArgc] = {
-      "clspv",
-      "-simplifycfg-sink-common=false",
-  };
-
-  llvm::cl::ResetAllOptionOccurrences();
-  llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
 
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
@@ -833,7 +831,9 @@ int CompileFromSourceString(const std::string &program,
   argv.push_back(Saver.save("clspv").data());
   llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
-  llvm::cl::ParseCommandLineOptions(argc, &argv[0]);
+
+  if (auto error = ParseOptions(argc, &argv[0]))
+    return error;
 
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
   if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
@@ -872,13 +872,6 @@ int CompileFromSourceString(const std::string &program,
   auto num_errors = consumer->getNumErrors();
   if (num_errors > 0) {
     llvm::errs() << log << "\n";
-    return -1;
-  }
-
-  if (clspv::Option::ConstantArgsInUniformBuffer() &&
-      !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "clspv restriction: -constant-arg-ubo requires "
-                    "-inline-entry-points\n";
     return -1;
   }
 
