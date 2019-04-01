@@ -1,4 +1,4 @@
-// RUN: clspv %s -constant-args-ubo -verify -inline-entry-points
+// RUN: clspv %s -w -constant-args-ubo -verify -inline-entry-points
 
 struct s {
   uchar x;
