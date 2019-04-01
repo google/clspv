@@ -33,6 +33,7 @@ endif()
 
 if (ENABLE_CLSPV_OPT)
   set(CLSPV_TEST_DEPENDS ${CLSPV_TEST_DEPENDS} clspv-opt)
+  set(CLSPV_TEST_ADDITIONAL_PATH --path "$<TARGET_FILE_DIR:clspv-opt>")
 endif()
 
 # Use absolute paths in case of external LLVM.
@@ -44,6 +45,7 @@ add_custom_target(check-spirv
     --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"
+    ${CLSPV_TEST_ADDITIONAL_PATH}
   DEPENDS ${CLSPV_TEST_DEPENDS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
