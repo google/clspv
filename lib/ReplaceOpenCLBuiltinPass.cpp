@@ -50,81 +50,88 @@ struct ArgTypeInfo {
 struct FunctionInfo {
   StringRef name;
   std::vector<ArgTypeInfo> argTypeInfos;
-};
 
-bool getFunctionInfoFromMangledNameCheck(StringRef name, FunctionInfo *finfo) {
-  if (!name.consume_front("_Z")) {
-    return false;
-  }
-  size_t nameLen;
-  if (name.consumeInteger(10, nameLen)) {
-    return false;
+  bool isArgSigned(size_t arg) const {
+    assert(argTypeInfos.size() > arg);
+    return argTypeInfos[arg].signedness == ArgTypeInfo::SignedNess::Signed;
   }
 
-  finfo->name = name.take_front(nameLen);
-  name = name.drop_front(nameLen);
-
-  ArgTypeInfo prev_ti;
-
-  while (name.size() != 0) {
-
-    ArgTypeInfo ti;
-
-    // Try parsing a vector prefix
-    if (name.consume_front("Dv")) {
-        int numElems;
-        if (name.consumeInteger(10, numElems)) {
-          return false;
-        }
-
-        if (!name.consume_front("_")) {
-          return false;
-        }
+  static FunctionInfo getFromMangledName(StringRef name) {
+    FunctionInfo fi;
+    if (!getFromMangledNameCheck(name, &fi)) {
+      llvm_unreachable("Can't parse mangled function name!");
     }
+    return fi;
+  }
 
-    // Parse the base type
-    char typeCode = name.front();
-    name = name.drop_front(1);
-    switch(typeCode) {
-    case 'c': // char
-    case 'a': // signed char
-    case 's': // short
-    case 'i': // int
-    case 'l': // long
-      ti.signedness = ArgTypeInfo::SignedNess::Signed;
-      break;
-    case 'h': // unsigned char
-    case 't': // unsigned short
-    case 'j': // unsigned int
-    case 'm': // unsigned long
-      ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
-      break;
-    case 'f':
-      ti.signedness = ArgTypeInfo::SignedNess::None;
-      break;
-    case 'S':
-      ti = prev_ti;
-      if (!name.consume_front("_")) {
-        return false;
-      }
-      break;
-    default:
+  static bool getFromMangledNameCheck(StringRef name, FunctionInfo *finfo) {
+    if (!name.consume_front("_Z")) {
+      return false;
+    }
+    size_t nameLen;
+    if (name.consumeInteger(10, nameLen)) {
       return false;
     }
 
-    finfo->argTypeInfos.push_back(ti);
+    finfo->name = name.take_front(nameLen);
+    name = name.drop_front(nameLen);
 
-    prev_ti = ti;
-  }
+    ArgTypeInfo prev_ti;
 
-  return true;
+    while (name.size() != 0) {
+
+      ArgTypeInfo ti;
+
+      // Try parsing a vector prefix
+      if (name.consume_front("Dv")) {
+          int numElems;
+          if (name.consumeInteger(10, numElems)) {
+            return false;
+          }
+
+          if (!name.consume_front("_")) {
+            return false;
+          }
+      }
+
+      // Parse the base type
+      char typeCode = name.front();
+      name = name.drop_front(1);
+      switch(typeCode) {
+      case 'c': // char
+      case 'a': // signed char
+      case 's': // short
+      case 'i': // int
+      case 'l': // long
+        ti.signedness = ArgTypeInfo::SignedNess::Signed;
+        break;
+      case 'h': // unsigned char
+      case 't': // unsigned short
+      case 'j': // unsigned int
+      case 'm': // unsigned long
+        ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+        break;
+      case 'f':
+        ti.signedness = ArgTypeInfo::SignedNess::None;
+        break;
+      case 'S':
+        ti = prev_ti;
+        if (!name.consume_front("_")) {
+          return false;
+        }
+        break;
+      default:
+        return false;
+      }
+
+      finfo->argTypeInfos.push_back(ti);
+
+      prev_ti = ti;
+    }
+
+    return true;
+  };
 };
-
-void getFunctionInfoFromMangledName(StringRef name, FunctionInfo *finfo) {
-  if (!getFunctionInfoFromMangledNameCheck(name, finfo)) {
-    llvm_unreachable("Can't parse mangled function name!");
-  }
-}
 
 uint32_t clz(uint32_t v) {
   uint32_t r;
@@ -194,7 +201,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVload(Module &M);
   bool replaceVstore(Module &M);
 };
-}
+} // namespace
 
 char ReplaceOpenCLBuiltinPass::ID = 0;
 static RegisterPass<ReplaceOpenCLBuiltinPass> X("ReplaceOpenCLBuiltin",
@@ -1269,7 +1276,7 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
 
       // Get info from the mangled name
       FunctionInfo finfo;
-      bool parsed = getFunctionInfoFromMangledNameCheck(F->getName(), &finfo);
+      bool parsed = FunctionInfo::getFromMangledNameCheck(F->getName(), &finfo);
 
       // All functions of interest are handled by our mangled name parser
       if (!parsed) {
@@ -1296,10 +1303,8 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
                         .StartsWith("ulong",  ArgTypeInfo::SignedNess::Unsigned)
                         .Default(ArgTypeInfo::SignedNess::None);
 
-      auto SrcSignedNess = finfo.argTypeInfos[0].signedness;
-
       bool DstIsSigned = DstSignedNess == ArgTypeInfo::SignedNess::Signed;
-      bool SrcIsSigned = SrcSignedNess == ArgTypeInfo::SignedNess::Signed;
+      bool SrcIsSigned = finfo.isArgSigned(0);
 
       SmallVector<Instruction *, 4> ToRemoves;
 
@@ -1451,12 +1456,11 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
         }
 
         // Get infos from the mangled OpenCL built-in function name
-        FunctionInfo finfo;
-        getFunctionInfoFromMangledName(F->getName(), &finfo);
+        auto finfo = FunctionInfo::getFromMangledName(F->getName());
 
         // Select the appropriate signed/unsigned SPIR-V op
         spv::Op opcode;
-        if (finfo.argTypeInfos[0].signedness == ArgTypeInfo::SignedNess::Signed) {
+        if (finfo.isArgSigned(0)) {
           opcode = spv::OpSMulExtended;
         } else {
           opcode = spv::OpUMulExtended;
