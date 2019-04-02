@@ -159,6 +159,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
 
   bool runOnModule(Module &M) override;
   bool replaceAbs(Module &M);
+  bool replaceCopysign(Module &M);
   bool replaceRecip(Module &M);
   bool replaceDivide(Module &M);
   bool replaceExp10(Module &M);
@@ -208,6 +209,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   bool Changed = false;
 
   Changed |= replaceAbs(M);
+  Changed |= replaceCopysign(M);
   Changed |= replaceRecip(M);
   Changed |= replaceDivide(M);
   Changed |= replaceExp10(M);
@@ -279,6 +281,81 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
 
           // Use the argument unchanged, we know it's unsigned
           CI->replaceAllUsesWith(Arg);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceCopysign(Module &M) {
+  bool Changed = false;
+
+  const char *Names[] = {
+    "_Z8copysignff",
+    "_Z8copysignDv2_fS_",
+    "_Z8copysignDv3_fS_",
+    "_Z8copysignDv4_fS_",
+  };
+
+  for (auto Name : Names) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          auto XValue = CI->getOperand(0);
+          auto YValue = CI->getOperand(1);
+
+          auto Ty = XValue->getType();
+
+          Type* IntTy = Type::getIntNTy(M.getContext(), Ty->getScalarSizeInBits());
+          if (Ty->isVectorTy()) {
+            IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
+          }
+
+          // Return X with the sign of Y
+
+          // Sign bit masks
+          auto SignBit = IntTy->getScalarSizeInBits() - 1;
+          auto SignBitMask = 1 << SignBit;
+          auto SignBitMaskValue = ConstantInt::get(IntTy, SignBitMask);
+          auto NotSignBitMaskValue = ConstantInt::get(IntTy, ~SignBitMask);
+
+          IRBuilder<> Builder(CI);
+
+          // Extract sign of Y
+          auto YInt = Builder.CreateBitCast(YValue, IntTy);
+          auto YSign = Builder.CreateAnd(YInt, SignBitMaskValue);
+
+          // Clear sign bit in X
+          auto XInt = Builder.CreateBitCast(XValue, IntTy);
+          XInt = Builder.CreateAnd(XInt, NotSignBitMaskValue);
+
+          // Insert sign bit of Y into X
+          auto NewXInt = Builder.CreateOr(XInt, YSign);
+
+          // And cast back to floating-point
+          auto NewX = Builder.CreateBitCast(NewXInt, Ty);
+
+          CI->replaceAllUsesWith(NewX);
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
