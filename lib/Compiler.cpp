@@ -151,6 +151,14 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
 static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
                                   llvm::cl::desc("Verify diagnostic outputs"));
 
+static llvm::cl::opt<bool>
+    IgnoreWarnings("w", llvm::cl::init(false),
+                   llvm::cl::desc("Disable all warnings"));
+
+static llvm::cl::opt<bool>
+    WarningsAsErrors("Werror", llvm::cl::init(false),
+                   llvm::cl::desc("Turn warnings into errors"));
+
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
 int ParseSamplerMap(const std::string &sampler_map,
@@ -392,7 +400,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
-  instance.getDiagnosticOpts().IgnoreWarnings = false;
+  instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
@@ -443,10 +451,14 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   // Override the C99 inline semantics to accommodate for more OpenCL C
   // programs in the wild.
   instance.getLangOpts().GNUInline = true;
+
+  // Set up diagnostics
   instance.createDiagnostics(
       new clang::TextDiagnosticPrinter(*diagnosticsStream,
                                        &instance.getDiagnosticOpts()),
       true);
+  instance.getDiagnostics().setWarningsAsErrors(WarningsAsErrors);
+  instance.getDiagnostics().setEnableAllWarnings(true);
 
   instance.getTargetOpts().Triple = triple.str();
 
@@ -713,9 +725,12 @@ int Compile(const int argc, const char *const argv[]) {
       instance.getDiagnostics().getClient();
   consumer->finish();
 
+  auto num_warnings = consumer->getNumWarnings();
   auto num_errors = consumer->getNumErrors();
+  if ((num_errors > 0) || (num_warnings > 0)) {
+    llvm::errs() << log;
+  }
   if (num_errors > 0) {
-    llvm::errs() << log << "\n";
     return -1;
   }
 
@@ -724,6 +739,12 @@ int Compile(const int argc, const char *const argv[]) {
     llvm::errs() << "clspv restriction: -constant-args-ubo requires "
                     "-inline-entry-points\n";
     return -1;
+  }
+
+  // Don't run the passes or produce any output in verify mode.
+  // Clang doesn't always produce a valid module.
+  if (verify) {
+    return 0;
   }
 
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();

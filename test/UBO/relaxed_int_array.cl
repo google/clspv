@@ -1,4 +1,4 @@
-// RUN: clspv %s -constant-args-ubo -verify -inline-entry-points -relaxed-ubo-layout
+// RUN: clspv %s -w -constant-args-ubo -verify -inline-entry-points -relaxed-ubo-layout
 
 // With -relaxed-ubo-layout specified, the ArrayStride restriction is not checked.
 // expected-no-diagnostics
