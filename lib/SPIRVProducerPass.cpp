@@ -2309,6 +2309,9 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       Type *CFPTy = CFP->getType();
       if (CFPTy->isFloatTy()) {
         LiteralNum.push_back(FPVal & 0xFFFFFFFF);
+      } else if (CFPTy->isDoubleTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFFFFFF);
+        LiteralNum.push_back(FPVal >> 32);
       } else {
         CFPTy->print(errs());
         llvm_unreachable("Implement this ConstantFP Type");
