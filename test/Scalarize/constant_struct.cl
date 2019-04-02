@@ -1,5 +1,3 @@
-// RUN: clspv %s -S -o %t.spvasm -hack-phis -inline-entry-points
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -hack-phis -inline-entry-points
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

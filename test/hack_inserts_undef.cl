@@ -2,8 +2,6 @@
 // Check that we can remove partial chains of insertvalue
 // to avoid OpCompositeInsert entirely.
 
-// RUN: clspv %s -S -o %t.spvasm -hack-inserts -no-inline-single
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -hack-inserts -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

@@ -1,5 +1,3 @@
-// RUN: clspv - -S -o %t.spvasm < %s
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv - -o %t.spv < %s
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

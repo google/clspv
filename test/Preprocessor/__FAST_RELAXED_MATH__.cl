@@ -1,5 +1,3 @@
-// RUN: clspv -cl-fast-relaxed-math %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv -cl-fast-relaxed-math %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

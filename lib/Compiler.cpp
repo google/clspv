@@ -131,10 +131,6 @@ static llvm::cl::opt<char>
                       llvm::cl::desc("Optimization level to use"),
                       llvm::cl::value_desc("level"));
 
-static llvm::cl::opt<bool>
-    OutputAssembly("S", llvm::cl::init(false),
-                   llvm::cl::desc("This option controls output of assembly"));
-
 static llvm::cl::opt<std::string> OutputFormat(
     "mfmt", llvm::cl::init(""),
     llvm::cl::desc(
@@ -658,7 +654,7 @@ int PopulatePassManager(
   pm->add(clspv::createUBOTypeTransformPass());
   pm->add(clspv::createSPIRVProducerPass(
       *binaryStream, descriptor_map_entries, *SamplerMapEntries,
-      OutputAssembly.getValue(), OutputFormat == "c"));
+      false /* Output assembly */, OutputFormat == "c"));
 
   return 0;
 }
@@ -776,10 +772,7 @@ int Compile(const int argc, const char *const argv[]) {
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
   if (OutputFilename.empty()) {
-    // if we've to output assembly
-    if (OutputAssembly) {
-      OutputFilename = "a.spvasm";
-    } else if (OutputFormat == "c") {
+    if (OutputFormat == "c") {
       OutputFilename = "a.spvinc";
     } else {
       OutputFilename = "a.spv";

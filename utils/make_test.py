@@ -136,8 +136,6 @@ def generate_run_section(args):
     clspv_options = ' '.join(args.clspv_options)
 
     runsec = ''
-    runsec += '// RUN: clspv {} %s -S -o %t.spvasm\n'.format(clspv_options)
-    runsec += '// RUN: FileCheck %s < %t.spvasm\n'
     runsec += '// RUN: clspv {} %s -o %t.spv\n'.format(clspv_options)
     runsec += '// RUN: spirv-dis -o %t2.spvasm %t.spv\n'
     runsec += '// RUN: FileCheck %s < %t2.spvasm\n'

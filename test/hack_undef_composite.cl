@@ -1,5 +1,3 @@
-// RUN: clspv %s -S -o %t.spvasm -hack-undef
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -hack-undef
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

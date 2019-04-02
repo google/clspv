@@ -1,6 +1,4 @@
 // We have -O0 here to ensure local uint c is used.
-// RUN: clspv -O0 %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv -O0 %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

@@ -1,5 +1,3 @@
-// RUN: clspv %s -S -o %t.spvasm -f16bit_storage
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -f16bit_storage
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

@@ -1,6 +1,3 @@
-// RUN: clspv %s -S -o %t.spvasm -descriptormap=%t.map -module-constants-in-storage-buffer -no-inline-single -keep-unused-arguments
-// RUN: FileCheck %s < %t.spvasm
-// RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: clspv %s -o %t.spv -descriptormap=%t.map -module-constants-in-storage-buffer -no-inline-single -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

@@ -1,8 +1,6 @@
 // Test for https://github.com/google/clspv/issues/55
 // Extraction of char values from a uchar4.
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

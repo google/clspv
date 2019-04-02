@@ -1,5 +1,3 @@
-// RUN: clspv -I %S/SomeIncludeDirectory -I %S/AnotherIncludeDirectory %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv -I %S/SomeIncludeDirectory -I %S/AnotherIncludeDirectory %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

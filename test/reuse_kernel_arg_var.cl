@@ -14,15 +14,11 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
   *T = x;
 }
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %s -S -o %t.spvasm -cluster-pod-kernel-args
-// RUN: FileCheck -check-prefix=CLUSTER %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -cluster-pod-kernel-args
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck -check-prefix=CLUSTER %s < %t2.spvasm

@@ -4,8 +4,6 @@ kernel void foo(global uchar4* A, int n) {
  *A = (uchar4)(1,2,(uchar)n,4);
 }
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

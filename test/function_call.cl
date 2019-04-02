@@ -1,7 +1,5 @@
 // We use -O0 here because the compiler is smart enough to realise calling
 // a function that does nothing can be removed.
-// RUN: clspv -O0 %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv -O0 %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
