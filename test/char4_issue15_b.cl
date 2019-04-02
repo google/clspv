@@ -4,8 +4,6 @@
 // In this example, the char4 is mentioned before the uint.
 kernel void dup(global char4* A, global uint *B) {}
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

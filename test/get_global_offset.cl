@@ -1,7 +1,5 @@
 // We use -O0 here because get_global_offset() always returns 0, and otherwise
 // the compiler is smart enough to optimize everything away!
-// RUN: clspv -O0 %s -S -o %t.spvasm -keep-unused-arguments
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv -O0 %s -o %t.spv -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

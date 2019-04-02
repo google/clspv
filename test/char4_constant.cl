@@ -6,8 +6,6 @@ kernel void dup(global uchar4 *B) {
    *B = (uchar4)(1,128,3,4);
 }
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

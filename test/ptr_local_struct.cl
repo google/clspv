@@ -1,6 +1,3 @@
-// RUN: clspv %s -S -o %t.spvasm -descriptormap=%t.map
-// RUN: FileCheck %s < %t.spvasm
-// RUN: FileCheck %s < %t.map -check-prefix=MAP
 // RUN: clspv %s -o %t.spv -descriptormap=%t2.map
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

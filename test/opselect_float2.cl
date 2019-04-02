@@ -6,8 +6,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* A,
   *A = c ? (float2)(1.0,2.0) : (float2)(3.0,4.0);
 }
 
-// RUN: clspv %s -S -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

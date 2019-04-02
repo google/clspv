@@ -1,5 +1,3 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points -cluster-pod-kernel-args %s -S -o %t.spvasm -descriptormap=%t.map
-// RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: clspv -constant-args-ubo -inline-entry-points -cluster-pod-kernel-args %s -o %t.spv -descriptormap=%t2.map
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map

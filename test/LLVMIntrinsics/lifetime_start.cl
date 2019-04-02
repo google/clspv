@@ -2,8 +2,6 @@
 // Fixes https://github.com/google/clspv/issues/142
 
 
-// RUN: clspv %s -S -o %t.spvasm -cluster-pod-kernel-args
-// RUN: FileCheck %s < %t.spvasm
 // RUN: clspv %s -o %t.spv -cluster-pod-kernel-args
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
