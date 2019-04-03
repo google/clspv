@@ -4437,7 +4437,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       .Case("spirv.atomic_xor", spv::OpAtomicXor)
       .Case("__spirv_control_barrier", spv::OpControlBarrier)
       .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
-      .Case("spirv.store_null", spv::OpStore)
+      .StartsWith("spirv.store_null", spv::OpStore)
       .StartsWith("__spirv_isinf", spv::OpIsInf)
       .StartsWith("__spirv_isnan", spv::OpIsNan)
       .StartsWith("__spirv_allDv", spv::OpAll)
