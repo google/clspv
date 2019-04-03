@@ -67,11 +67,11 @@ private:
   EntryPointMap function_to_entry_points_;
 };
 
-char ShareModuleScopeVariablesPass::ID = 0;
-static RegisterPass<ShareModuleScopeVariablesPass>
-    X("ShareModuleScopeVariablesPass", "Share module scope variables");
-
 } // namespace
+
+char ShareModuleScopeVariablesPass::ID = 0;
+INITIALIZE_PASS(ShareModuleScopeVariablesPass, "ShareModuleScopeVariablesPass",
+                "Share module scope variables", false, false)
 
 namespace clspv {
 ModulePass *createShareModuleScopeVariablesPass() {

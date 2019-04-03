@@ -14,7 +14,10 @@
 
 // This translation unit defines all Clspv command line option variables.
 
+#include "llvm/PassRegistry.h"
 #include "llvm/Support/CommandLine.h"
+
+#include "clspv/Passes.h"
 
 namespace {
 
@@ -151,6 +154,46 @@ static llvm::cl::opt<bool>
     cplusplus("c++", llvm::cl::init(false),
               llvm::cl::desc("Enable experimental C++ support"));
 } // namespace
+
+namespace llvm {
+
+void initializeClspvPasses(PassRegistry &r) {
+  initializeAllocateDescriptorsPassPass(r);
+  initializeClusterModuleScopeConstantVarsPass(r);
+  initializeClusterPodKernelArgumentsPassPass(r);
+  initializeDirectResourceAccessPassPass(r);
+  initializeDefineOpenCLWorkItemBuiltinsPassPass(r);
+  initializeFunctionInternalizerPassPass(r);
+  initializeHideConstantLoadsPassPass(r);
+  initializeUnhideConstantLoadsPassPass(r);
+  initializeInlineEntryPointsPassPass(r);
+  initializeInlineFuncWithPointerBitCastArgPassPass(r);
+  initializeInlineFuncWithPointerToFunctionArgPassPass(r);
+  initializeInlineFuncWithSingleCallSitePassPass(r);
+  initializeOpenCLInlinerPassPass(r);
+  initializeRemoveUnusedArgumentsPass(r);
+  initializeReorderBasicBlocksPassPass(r);
+  initializeReplaceLLVMIntrinsicsPassPass(r);
+  initializeReplaceOpenCLBuiltinPassPass(r);
+  initializeReplacePointerBitcastPassPass(r);
+  initializeRewriteInsertsPassPass(r);
+  initializeScalarizePassPass(r);
+  initializeShareModuleScopeVariablesPassPass(r);
+  initializeSignedCompareFixupPassPass(r);
+  initializeSimplifyPointerBitcastPassPass(r);
+  initializeSplatArgPassPass(r);
+  initializeSplatSelectConditionPassPass(r);
+  initializeUBOTypeTransformPassPass(r);
+  initializeUndoBoolPassPass(r);
+  initializeUndoByvalPassPass(r);
+  initializeUndoGetElementPtrConstantExprPassPass(r);
+  initializeUndoSRetPassPass(r);
+  initializeUndoTranslateSamplerFoldPassPass(r);
+  initializeUndoTruncatedSwitchConditionPassPass(r);
+  initializeZeroInitializeAllocasPassPass(r);
+}
+
+} // namespace llvm
 
 namespace clspv {
 namespace Option {

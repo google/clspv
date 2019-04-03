@@ -19,6 +19,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "UndoTranslateSamplerFold"
@@ -33,8 +35,8 @@ struct UndoTranslateSamplerFoldPass : public ModulePass {
 } // namespace
 
 char UndoTranslateSamplerFoldPass::ID = 0;
-static RegisterPass<UndoTranslateSamplerFoldPass>
-    X("UndoTranslateSamplerFold", "Undo Transplate Sampler Fold Pass");
+INITIALIZE_PASS(UndoTranslateSamplerFoldPass, "UndoTranslateSamplerFold",
+                "Undo Transplate Sampler Fold Pass", false, false)
 
 namespace clspv {
 ModulePass *createUndoTranslateSamplerFoldPass() {

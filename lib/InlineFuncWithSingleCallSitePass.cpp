@@ -21,6 +21,7 @@
 
 #include "ArgKind.h"
 #include "clspv/Option.h"
+#include "clspv/Passes.h"
 
 using namespace llvm;
 
@@ -44,9 +45,9 @@ ModulePass *createInlineFuncWithSingleCallSitePass() {
 } // namespace clspv
 
 char InlineFuncWithSingleCallSitePass::ID = 0;
-static RegisterPass<InlineFuncWithSingleCallSitePass>
-    X("InlineFuncWithSingleCallSite",
-      "Inline functions with a single call site pass");
+INITIALIZE_PASS(InlineFuncWithSingleCallSitePass,
+                "InlineFuncWithSingleCallSite",
+                "Inline functions with a single call site pass", false, false)
 
 bool InlineFuncWithSingleCallSitePass::runOnModule(Module &M) {
   if (!clspv::Option::InlineSingleCallSite())

@@ -20,17 +20,10 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
 )
 
-if (ENABLE_CLSPV_OPT)
-  set(shared_attribute "SHARED")
-else()
-  set(shared_attribute "")
-endif()
-
-
 # Pass library.  Transformation passes and pass-specific support are
 # defined here.  This must be loadable by LLVM opt for testing individual
 # passes.
-add_library(clspv_passes ${shared_attribute}
+add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
@@ -107,9 +100,6 @@ if (MSVC)
     # 4596: Upgrade to newer LLVM.  See https://github.com/google/clspv/issues/153
     PROPERTIES COMPILE_FLAGS "/Wall /WX /wd4710 /wd4820 /wd4625 /wd4626 /wd5026 /wd5027 /wd4061 /wd4711 /wd4996 /wd4530 /wd4577 /wd4514 /wd4365 /wd4987 /wd4774 /wd4623 /wd4571 /wd4596 /wd5039 /wd5045"
   )
-elseif (APPLE AND ENABLE_CLSPV_OPT)
-  set_target_properties(clspv_core PROPERTIES LINK_FLAGS "-Wl,-undefined,dynamic_lookup")
-  set_target_properties(clspv_passes PROPERTIES LINK_FLAGS "-Wl,-undefined,dynamic_lookup")
 endif()
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)

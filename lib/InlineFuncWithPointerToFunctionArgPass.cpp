@@ -20,6 +20,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Passes.h"
 
 using namespace llvm;
 
@@ -60,9 +61,11 @@ bool IsProblematicFunctionType(Type *type) {
 } // namespace
 
 char InlineFuncWithPointerToFunctionArgPass::ID = 0;
-static RegisterPass<InlineFuncWithPointerToFunctionArgPass>
-    X("InlineFuncWithPointerToFunctionArgPass",
-      "Inline Function with Pointer-to-Function storage Argument Pass");
+INITIALIZE_PASS(
+    InlineFuncWithPointerToFunctionArgPass,
+    "InlineFuncWithPointerToFunctionArgPass",
+    "Inline Function with Pointer-to-Function storage Argument Pass", false,
+    false)
 
 namespace clspv {
 llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass() {

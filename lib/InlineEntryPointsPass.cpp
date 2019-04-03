@@ -20,6 +20,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "clspv/Option.h"
+#include "clspv/Passes.h"
 
 using namespace llvm;
 
@@ -43,8 +44,8 @@ ModulePass *createInlineEntryPointsPass() {
 } // namespace clspv
 
 char InlineEntryPointsPass::ID = 0;
-static RegisterPass<InlineEntryPointsPass>
-    X("InlineEntryPointsPass", "Exhaustively inline entry points");
+INITIALIZE_PASS(InlineEntryPointsPass, "InlineEntryPointsPass",
+                "Exhaustively inline entry points", false, false)
 
 bool InlineEntryPointsPass::runOnModule(Module &M) {
   bool Changed = false;

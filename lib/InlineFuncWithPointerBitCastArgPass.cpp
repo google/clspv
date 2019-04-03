@@ -21,6 +21,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithpointerbitcastarg"
@@ -36,9 +38,10 @@ struct InlineFuncWithPointerBitCastArgPass : public ModulePass {
 } // namespace
 
 char InlineFuncWithPointerBitCastArgPass::ID = 0;
-static RegisterPass<InlineFuncWithPointerBitCastArgPass>
-    X("InlineFuncWithPointerBitCastArg",
-      "Inline Function with Pointer Bitcast Argument Pass");
+INITIALIZE_PASS(InlineFuncWithPointerBitCastArgPass,
+                "InlineFuncWithPointerBitCastArg",
+                "Inline Function with Pointer Bitcast Argument Pass", false,
+                false)
 
 namespace clspv {
 llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass() {

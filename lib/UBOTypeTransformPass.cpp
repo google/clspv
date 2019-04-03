@@ -109,11 +109,11 @@ private:
   bool support_int8_array_;
 };
 
-char UBOTypeTransformPass::ID = 0;
-static RegisterPass<UBOTypeTransformPass> X("UBOTypeTransformPass",
-                                            "Transform UBO types");
-
 } // namespace
+
+char UBOTypeTransformPass::ID = 0;
+INITIALIZE_PASS(UBOTypeTransformPass, "UBOTypeTransformPass",
+                "Transform UBO types", false, false)
 
 namespace clspv {
 ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }

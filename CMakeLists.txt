@@ -69,15 +69,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
-if (NOT MSVC)
-  set(ENABLE_CLSPV_OPT ON)
-else()
-  # clspv-opt is not supported on Windows, because LLVM opt does not support
-  # out-of-tree plugins on Windows (http://go/so/41943353).
-  # TODO(dnovillo): Need a different implementation that does not rely on
-  #                 LLVM opt.
-  set(ENABLE_CLSPV_OPT OFF)
-endif()
+option(ENABLE_CLSPV_OPT "Enable the clspv-opt driver." ON)
 
 if (NOT DEFINED EXTERNAL_LLVM)
   set(EXTERNAL_LLVM 0)
@@ -104,6 +96,11 @@ else()
 
   # First tell LLVM where to find clang.
   set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
+
+  # Tell LLVM not to build any targets.
+  set(LLVM_TARGETS_TO_BUILD ""
+      CACHE STRING "Semicolon-separated list of targets to build, or \"all\".")
+
 
   # Then pull in LLVM for building.
   add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} EXCLUDE_FROM_ALL)

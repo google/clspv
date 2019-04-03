@@ -160,8 +160,8 @@ private:
 } // namespace
 
 char AllocateDescriptorsPass::ID = 0;
-static RegisterPass<AllocateDescriptorsPass> X("AllocateDescriptorsPass",
-                                               "Allocate resource descriptors");
+INITIALIZE_PASS(AllocateDescriptorsPass, "AllocateDescriptorsPass",
+                "Allocate resource descriptors", false, false)
 
 namespace clspv {
 ModulePass *createAllocateDescriptorsPass(SamplerMapType sampler_map) {

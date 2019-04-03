@@ -25,6 +25,47 @@ class ModulePass;
 class raw_pwrite_stream;
 class raw_ostream;
 template <typename T> class ArrayRef;
+
+// Clspv pass initializers.
+class PassRegistry;
+
+// Initialize all clspv passes.
+void initializeClspvPasses(PassRegistry &);
+
+// Individual pass initializers.
+void initializeAllocateDescriptorsPassPass(PassRegistry &);
+void initializeClusterModuleScopeConstantVarsPass(PassRegistry &);
+void initializeClusterPodKernelArgumentsPassPass(PassRegistry &);
+void initializeDefineOpenCLWorkItemBuiltinsPassPass(PassRegistry &);
+void initializeDirectResourceAccessPassPass(PassRegistry &);
+void initializeFunctionInternalizerPassPass(PassRegistry &);
+void initializeHideConstantLoadsPassPass(PassRegistry &);
+void initializeUnhideConstantLoadsPassPass(PassRegistry &);
+void initializeInlineEntryPointsPassPass(PassRegistry &);
+void initializeInlineFuncWithPointerBitCastArgPassPass(PassRegistry &);
+void initializeInlineFuncWithPointerToFunctionArgPassPass(PassRegistry &);
+void initializeInlineFuncWithSingleCallSitePassPass(PassRegistry &);
+void initializeOpenCLInlinerPassPass(PassRegistry &);
+void initializeRemoveUnusedArgumentsPass(PassRegistry &);
+void initializeReorderBasicBlocksPassPass(PassRegistry &);
+void initializeReplaceLLVMIntrinsicsPassPass(PassRegistry &);
+void initializeReplaceOpenCLBuiltinPassPass(PassRegistry &);
+void initializeReplacePointerBitcastPassPass(PassRegistry &);
+void initializeRewriteInsertsPassPass(PassRegistry &);
+void initializeScalarizePassPass(PassRegistry &);
+void initializeShareModuleScopeVariablesPassPass(PassRegistry &);
+void initializeSignedCompareFixupPassPass(PassRegistry &);
+void initializeSimplifyPointerBitcastPassPass(PassRegistry &);
+void initializeSplatArgPassPass(PassRegistry &);
+void initializeSplatSelectConditionPassPass(PassRegistry &);
+void initializeUBOTypeTransformPassPass(PassRegistry &);
+void initializeUndoBoolPassPass(PassRegistry &);
+void initializeUndoByvalPassPass(PassRegistry &);
+void initializeUndoGetElementPtrConstantExprPassPass(PassRegistry &);
+void initializeUndoSRetPassPass(PassRegistry &);
+void initializeUndoTranslateSamplerFoldPassPass(PassRegistry &);
+void initializeUndoTruncatedSwitchConditionPassPass(PassRegistry &);
+void initializeZeroInitializeAllocasPassPass(PassRegistry &);
 } // namespace llvm
 
 namespace clspv {

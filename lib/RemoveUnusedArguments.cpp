@@ -49,11 +49,12 @@ private:
                               const std::vector<Candidate> &candidates);
 };
 
-char RemoveUnusedArguments::ID = 0;
-static RegisterPass<RemoveUnusedArguments>
-    X("RemoveUnusuedArguments",
-      "Remove unused arguments from non-kernel functions");
 } // namespace
+
+char RemoveUnusedArguments::ID = 0;
+INITIALIZE_PASS(RemoveUnusedArguments, "RemoveUnusuedArguments",
+                "Remove unused arguments from non-kernel functions", false,
+                false)
 
 namespace clspv {
 ModulePass *createRemoveUnusedArgumentsPass() {

@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Passes.h"
 
 using namespace llvm;
 using std::string;
@@ -62,8 +63,8 @@ private:
 } // namespace
 
 char HideConstantLoadsPass::ID = 0;
-static RegisterPass<HideConstantLoadsPass>
-    X("HideConstantLoads", "Hide loads from __constant memory");
+INITIALIZE_PASS(HideConstantLoadsPass, "HideConstantLoads",
+                "Hide loads from __constant memory", false, false)
 
 namespace clspv {
 llvm::ModulePass *createHideConstantLoadsPass() {
@@ -145,8 +146,8 @@ private:
 } // namespace
 
 char UnhideConstantLoadsPass::ID = 0;
-static RegisterPass<UnhideConstantLoadsPass>
-    X2("UnhideConstantLoads", "Unhide loads from __constant memory");
+INITIALIZE_PASS(UnhideConstantLoadsPass, "UnhideConstantLoads",
+                "Unhide loads from __constant memory", false, false)
 
 namespace clspv {
 llvm::ModulePass *createUnhideConstantLoadsPass() {

@@ -27,13 +27,19 @@ inline std::string WorkgroupAccessorFunction() { return "clspv.local.var."; }
 inline std::string ResourceAccessorFunction() { return "clspv.resource.var."; }
 
 // Name for module level metadata storing UBO remapped type offsets.
-inline std::string RemappedTypeOffsetMetadataName() { return "clspv.remapped.offsets"; }
+inline std::string RemappedTypeOffsetMetadataName() {
+  return "clspv.remapped.offsets";
+}
 
 // Name for module level metadata storing UBO remapped type sizes.
-inline std::string RemappedTypeSizesMetadataName() { return "clspv.remapped.type.sizes"; }
+inline std::string RemappedTypeSizesMetadataName() {
+  return "clspv.remapped.type.sizes";
+}
 
 // Name of the function used to encode literal samplers
-inline std::string LiteralSamplerFunction() { return "clspv.sampler.var.literal"; }
+inline std::string LiteralSamplerFunction() {
+  return "clspv.sampler.var.literal";
+}
 
 // Base name for SPIR-V intrinsic functions
 inline std::string SPIRVOpIntrinsicFunction() { return "spirv.op."; }

@@ -62,8 +62,8 @@ private:
 } // namespace
 
 char SignedCompareFixupPass::ID = 0;
-static RegisterPass<SignedCompareFixupPass> X("SignedCompareFixupPass",
-                                              "Signed Integer Compare Fixup");
+INITIALIZE_PASS(SignedCompareFixupPass, "SignedCompareFixupPass",
+                "Signed Integer Compare Fixup", false, false)
 
 namespace clspv {
 ModulePass *createSignedCompareFixupPass() {

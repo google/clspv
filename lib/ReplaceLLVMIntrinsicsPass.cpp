@@ -23,6 +23,8 @@
 
 #include "spirv/1.0/spirv.hpp"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "ReplaceLLVMIntrinsics"
@@ -40,8 +42,8 @@ struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
 } // namespace
 
 char ReplaceLLVMIntrinsicsPass::ID = 0;
-static RegisterPass<ReplaceLLVMIntrinsicsPass>
-    X("ReplaceLLVMIntrinsics", "Replace LLVM intrinsics Pass");
+INITIALIZE_PASS(ReplaceLLVMIntrinsicsPass, "ReplaceLLVMIntrinsics",
+                "Replace LLVM intrinsics Pass", false, false)
 
 namespace clspv {
 ModulePass *createReplaceLLVMIntrinsicsPass() {

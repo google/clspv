@@ -18,6 +18,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "SimplifyPointerBitcast"
@@ -37,8 +39,8 @@ struct SimplifyPointerBitcastPass : public ModulePass {
 } // namespace
 
 char SimplifyPointerBitcastPass::ID = 0;
-static RegisterPass<SimplifyPointerBitcastPass>
-    X("SimplifyPointerBitcast", "Simplify Pointer Bitcast Pass");
+INITIALIZE_PASS(SimplifyPointerBitcastPass, "SimplifyPointerBitcast",
+                "Simplify Pointer Bitcast Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createSimplifyPointerBitcastPass() {

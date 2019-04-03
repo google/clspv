@@ -24,7 +24,7 @@ int GetCurrentDescriptorIndex(llvm::Module *M);
 
 // Get the current descriptor index and increment it internally
 // so that we never get this one again.  The first one is 0.
-int TakeDescriptorIndex(llvm::Module* M);
+int TakeDescriptorIndex(llvm::Module *M);
 
 } // namespace clspv
 

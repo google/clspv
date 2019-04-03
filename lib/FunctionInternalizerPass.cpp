@@ -15,6 +15,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "FunctionInternalizer"
@@ -29,8 +31,8 @@ struct FunctionInternalizerPass : public ModulePass {
 } // namespace
 
 char FunctionInternalizerPass::ID = 0;
-static RegisterPass<FunctionInternalizerPass> X("FunctionInternalizer",
-                                                "Function Internalizer Pass");
+INITIALIZE_PASS(FunctionInternalizerPass, "FunctionInternalizer",
+                "Function Internalizer Pass", false, false)
 
 namespace clspv {
 ModulePass *createFunctionInternalizerPass() {

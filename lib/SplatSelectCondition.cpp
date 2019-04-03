@@ -18,6 +18,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "splatselectcond"
@@ -32,8 +34,8 @@ struct SplatSelectConditionPass : public ModulePass {
 } // namespace
 
 char SplatSelectConditionPass::ID = 0;
-static RegisterPass<SplatSelectConditionPass> X("SplatSelectCond",
-                                                "Splat Select Condition Pass");
+INITIALIZE_PASS(SplatSelectConditionPass, "SplatSelectCond",
+                "Splat Select Condition Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createSplatSelectConditionPass() {

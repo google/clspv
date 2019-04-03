@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instruction.h"
@@ -37,8 +36,8 @@ using namespace llvm;
 // Since this function may modify the symbol table of the module containing
 // Insert, it shouldn't be used while iterating over the symbols of that module
 // unless the caller knows that no new function will be created.
-Instruction* InsertSPIRVOp(Instruction* Insert, spv::Op Opcode,
+Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
-                           Type* RetType, ArrayRef<Value*> Args);
+                           Type *RetType, ArrayRef<Value *> Args);
 
-};
+}; // namespace clspv

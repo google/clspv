@@ -23,6 +23,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "rewriteconstantexpressions"
@@ -42,8 +44,8 @@ struct ZeroInitializeAllocasPass : public ModulePass {
 } // namespace
 
 char ZeroInitializeAllocasPass::ID = 0;
-static RegisterPass<ZeroInitializeAllocasPass>
-    X("ZeroInitializeAllocasPass", "Zero-initialize stack variables");
+INITIALIZE_PASS(ZeroInitializeAllocasPass, "ZeroInitializeAllocasPass",
+                "Zero-initialize stack variables", false, false)
 
 namespace clspv {
 llvm::ModulePass *createZeroInitializeAllocasPass() {

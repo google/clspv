@@ -41,6 +41,8 @@
 
 #include "ArgKind.h"
 
+#include "clspv/Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "clusterpodkernelargs"
@@ -56,8 +58,8 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
 } // namespace
 
 char ClusterPodKernelArgumentsPass::ID = 0;
-static RegisterPass<ClusterPodKernelArgumentsPass>
-    X("ClusterPodKernelArgumentsPass", "Cluster POD Kernel Arguments Pass");
+INITIALIZE_PASS(ClusterPodKernelArgumentsPass, "ClusterPodKernelArgumentsPass",
+                "Cluster POD Kernel Arguments Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createClusterPodKernelArgumentsPass() {
