@@ -1,7 +1,7 @@
 // Test for https://github.com/google/clspv/issues/55
 // Extraction of char values from a uchar4.
 
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %s -o %t.spv -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
