@@ -167,6 +167,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
 
   bool runOnModule(Module &M) override;
   bool replaceAbs(Module &M);
+  bool replaceAbsDiff(Module &M);
   bool replaceCopysign(Module &M);
   bool replaceRecip(Module &M);
   bool replaceDivide(Module &M);
@@ -217,6 +218,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   bool Changed = false;
 
   Changed |= replaceAbs(M);
+  Changed |= replaceAbsDiff(M);
   Changed |= replaceCopysign(M);
   Changed |= replaceRecip(M);
   Changed |= replaceDivide(M);
@@ -289,6 +291,93 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
 
           // Use the argument unchanged, we know it's unsigned
           CI->replaceAllUsesWith(Arg);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
+  bool Changed = false;
+
+  const char *Names[] = {
+    "_Z8abs_diffcc",
+    "_Z8abs_diffDv2_cS_",
+    "_Z8abs_diffDv3_cS_",
+    "_Z8abs_diffDv4_cS_",
+    "_Z8abs_diffhh",
+    "_Z8abs_diffDv2_hS_",
+    "_Z8abs_diffDv3_hS_",
+    "_Z8abs_diffDv4_hS_",
+    "_Z8abs_diffss",
+    "_Z8abs_diffDv2_sS_",
+    "_Z8abs_diffDv3_sS_",
+    "_Z8abs_diffDv4_sS_",
+    "_Z8abs_difftt",
+    "_Z8abs_diffDv2_tS_",
+    "_Z8abs_diffDv3_tS_",
+    "_Z8abs_diffDv4_tS_",
+    "_Z8abs_diffii",
+    "_Z8abs_diffDv2_iS_",
+    "_Z8abs_diffDv3_iS_",
+    "_Z8abs_diffDv4_iS_",
+    "_Z8abs_diffjj",
+    "_Z8abs_diffDv2_jS_",
+    "_Z8abs_diffDv3_jS_",
+    "_Z8abs_diffDv4_jS_",
+    "_Z8abs_diffll",
+    "_Z8abs_diffDv2_lS_",
+    "_Z8abs_diffDv3_lS_",
+    "_Z8abs_diffDv4_lS_",
+    "_Z8abs_diffmm",
+    "_Z8abs_diffDv2_mS_",
+    "_Z8abs_diffDv3_mS_",
+    "_Z8abs_diffDv4_mS_",
+  };
+
+  for (auto Name : Names) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Name)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+
+          auto XValue = CI->getOperand(0);
+          auto YValue = CI->getOperand(1);
+
+          IRBuilder<> Builder(CI);
+          auto XmY = Builder.CreateSub(XValue, YValue);
+          auto YmX = Builder.CreateSub(YValue, XValue);
+
+          Value* Cmp;
+          auto finfo = FunctionInfo::getFromMangledName(F->getName());
+          if (finfo.isArgSigned(0)) {
+            Cmp = Builder.CreateICmpSGT(YValue, XValue);
+          } else {
+            Cmp = Builder.CreateICmpUGT(YValue, XValue);
+          }
+
+          auto V = Builder.CreateSelect(Cmp, YmX, XmY);
+
+          // Use the argument unchanged, we know it's unsigned
+          CI->replaceAllUsesWith(V);
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
