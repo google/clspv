@@ -669,6 +669,23 @@ int PopulatePassManager(
   // This pass generates insertions that need to be rewritten.
   pm->add(clspv::createScalarizePass());
   pm->add(clspv::createRewriteInsertsPass());
+  // UBO Transformations
+  if (clspv::Option::ConstantArgsInUniformBuffer() &&
+      !clspv::Option::InlineEntryPoints()) {
+    // MultiVersionUBOFunctionsPass will examine non-kernel functions with UBO
+    // arguments and either multi-version them as necessary or inline them if
+    // multi-versioning cannot be accomplished.
+    pm->add(clspv::createMultiVersionUBOFunctionsPass());
+    // Cleanup passes.
+    // Specialization can blindly generate GEP chains that are easily cleaned up
+    // by SimplifyPointerBitcastPass.
+    pm->add(clspv::createSimplifyPointerBitcastPass());
+    // RemoveUnusedArgumentsPass removes the actual UBO arguments that were
+    // problematic to begin with now that they have no uses.
+    pm->add(clspv::createRemoveUnusedArgumentsPass());
+    // DCE cleans up callers of the specialized functions.
+    pm->add(llvm::createDeadCodeEliminationPass());
+  }
   // This pass mucks with types to point where you shouldn't rely on DataLayout
   // anymore so leave this right before SPIR-V generation.
   pm->add(clspv::createUBOTypeTransformPass());
@@ -691,13 +708,6 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-
-  if (clspv::Option::ConstantArgsInUniformBuffer() &&
-      !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "clspv restriction: -constant-args-ubo requires "
-                    "-inline-entry-points\n";
-    return -1;
-  }
 
   if (clspv::Option::CPlusPlus() && !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "cannot use -c++ without -inline-entry-points\n";

@@ -34,6 +34,7 @@
 #include "clspv/Passes.h"
 
 #include "ArgKind.h"
+#include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
 
 using namespace llvm;
@@ -54,12 +55,6 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
-  // Return the functions reachable from entry point functions, where
-  // callers appear before callees.  OpenCL C does not permit recursion
-  // or function or pointers, so this is always well defined.  The ordering
-  // should be reproducible from one run to the next.
-  UniqueVector<Function *> CallGraphOrderedFunctions(Module &);
-
   // For each kernel argument that will map to a resource variable (descriptor),
   // try to rewrite the uses of the argument as a direct access of the resource.
   // We can only do this if all the callees of the function use the same
@@ -88,100 +83,20 @@ bool DirectResourceAccessPass::runOnModule(Module &M) {
   bool Changed = false;
 
   if (clspv::Option::DirectResourceAccess()) {
-    auto ordered_functions = CallGraphOrderedFunctions(M);
+    auto ordered_functions = clspv::CallGraphOrderedFunctions(M);
+    if (ShowDRA) {
+      outs() << "DRA: Ordered functions:\n";
+      for (Function *fun : ordered_functions) {
+        outs() << "DRA:   " << fun->getName() << "\n";
+      }
+    }
+
     for (auto *fn : ordered_functions) {
       Changed |= RewriteResourceAccesses(fn);
     }
   }
 
   return Changed;
-}
-
-UniqueVector<Function *>
-DirectResourceAccessPass::CallGraphOrderedFunctions(Module &M) {
-  // Use a topological sort.
-
-  // Make an ordered list of all functions having bodies, with kernel entry
-  // points listed first.
-  UniqueVector<Function *> functions;
-  SmallVector<Function *, 10> entry_points;
-  for (Function &F : M) {
-    if (F.isDeclaration()) {
-      continue;
-    }
-    if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-      functions.insert(&F);
-      entry_points.push_back(&F);
-    }
-  }
-  // Add the remaining functions.
-  for (Function &F : M) {
-    if (F.isDeclaration()) {
-      continue;
-    }
-    if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
-      functions.insert(&F);
-    }
-  }
-
-  // This will be a complete set of reveresed edges, i.e. with all pairs
-  // of (callee, caller).
-  using Edge = std::pair<unsigned, unsigned>;
-  auto make_edge = [&functions](Function *callee, Function *caller) {
-    return std::pair<unsigned, unsigned>{functions.idFor(callee),
-                                         functions.idFor(caller)};
-  };
-  std::set<Edge> reverse_edges;
-  // Map each function to the functions it calls, and populate |reverse_edges|.
-  std::map<Function *, SmallVector<Function *, 3>> calls_functions;
-  for (Function *callee : functions) {
-    for (auto &use : callee->uses()) {
-      if (auto *call = dyn_cast<CallInst>(use.getUser())) {
-        Function *caller = call->getParent()->getParent();
-        calls_functions[caller].push_back(callee);
-        reverse_edges.insert(make_edge(callee, caller));
-      }
-    }
-  }
-  // Sort the callees in module-order.  This helps us produce a deterministic
-  // result.
-  for (auto &pair : calls_functions) {
-    auto &callees = pair.second;
-    std::sort(callees.begin(), callees.end(),
-              [&functions](Function *lhs, Function *rhs) {
-                return functions.idFor(lhs) < functions.idFor(rhs);
-              });
-  }
-
-  // Use Kahn's algorithm for topoological sort.
-  UniqueVector<Function *> result;
-  SmallVector<Function *, 10> work_list(entry_points.begin(),
-                                        entry_points.end());
-  while (!work_list.empty()) {
-    Function *caller = work_list.back();
-    work_list.pop_back();
-    result.insert(caller);
-    auto &callees = calls_functions[caller];
-    for (auto *callee : callees) {
-      reverse_edges.erase(make_edge(callee, caller));
-      auto lower_bound = reverse_edges.lower_bound(make_edge(callee, nullptr));
-      if (lower_bound == reverse_edges.end() ||
-          lower_bound->first != functions.idFor(callee)) {
-        // Callee has no other unvisited callers.
-        work_list.push_back(callee);
-      }
-    }
-  }
-  // If reverse_edges is not empty then there was a cycle.  But we don't care
-  // about that erroneous case.
-
-  if (ShowDRA) {
-    outs() << "DRA: Ordered functions:\n";
-    for (Function *fun : result) {
-      outs() << "DRA:   " << fun->getName() << "\n";
-    }
-  }
-  return result;
 }
 
 bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {

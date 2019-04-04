@@ -46,10 +46,13 @@ public:
 
 private:
   // Returns the remapped version of |type| that satisfies UBO requirements.
-  Type *MapType(Type *type, Module &M);
+  // |rewrite| indicates whether the type can be rewritten or just rebuilt.
+  Type *MapType(Type *type, Module &M, bool rewrite);
+  Type *RebuildType(Type *type, Module &M) { return MapType(type, M, false); }
 
   // Returns the remapped version of |type| that satisfies UBO requirements.
-  StructType *MapStructType(StructType *struct_ty, Module &M);
+  // |rewrite| indicates whether the type can be rewritten or just rebuilt.
+  StructType *MapStructType(StructType *struct_ty, Module &M, bool rewrite);
 
   // Performs type mutation on |M|. Returns true if |M| was modified.
   bool RemapTypes(Module &M);
@@ -140,7 +143,7 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
         // Pre-populate the type mapping for types that must change. This
         // necessary to prevent caching what would appear to be a no-op too
         // early.
-        MapType(Arg.getType(), M);
+        MapType(Arg.getType(), M, /* rewrite = */ true);
       }
     }
   }
@@ -152,7 +155,7 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
   return changed;
 }
 
-Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
+Type *UBOTypeTransformPass::MapType(Type *type, Module &M, bool rewrite) {
   // Check the cache to see if we've fixed this type.
   auto iter = remapped_types_.find(type);
   if (iter != remapped_types_.end()) {
@@ -169,16 +172,16 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
   switch (type->getTypeID()) {
   case Type::PointerTyID: {
     PointerType *pointer = cast<PointerType>(type);
-    Type *pointee = MapType(pointer->getElementType(), M);
+    Type *pointee = MapType(pointer->getElementType(), M, rewrite);
     remapped = PointerType::get(pointee, pointer->getAddressSpace());
     break;
   }
   case Type::StructTyID:
-    remapped = MapStructType(cast<StructType>(type), M);
+    remapped = MapStructType(cast<StructType>(type), M, rewrite);
     break;
   case Type::ArrayTyID: {
     ArrayType *array = cast<ArrayType>(type);
-    Type *element = MapType(array->getElementType(), M);
+    Type *element = MapType(array->getElementType(), M, rewrite);
     remapped = ArrayType::get(element, array->getNumElements());
     break;
   }
@@ -186,9 +189,9 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
     FunctionType *function = cast<FunctionType>(type);
     SmallVector<Type *, 8> arg_types;
     for (auto *param : function->params()) {
-      arg_types.push_back(MapType(param, M));
+      arg_types.push_back(MapType(param, M, rewrite));
     }
-    remapped = FunctionType::get(MapType(function->getReturnType(), M),
+    remapped = FunctionType::get(MapType(function->getReturnType(), M, rewrite),
                                  arg_types, function->isVarArg());
     break;
   }
@@ -224,7 +227,7 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M) {
 }
 
 StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
-                                                Module &M) {
+                                                Module &M, bool rewrite) {
   // We'll never have to remap an opaque struct.
   if (struct_ty->isOpaque())
     return struct_ty;
@@ -237,10 +240,11 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     Type *element = struct_ty->getElementType(i);
     uint64_t offset = layout->getElementOffset(i);
     const auto *array = dyn_cast<ArrayType>(element);
-    // Unless char arrays in UBOs are supported, replace all instances with an
-    // i32.
-    if (array && array->getElementType()->isIntegerTy(8) &&
+    // Do not modify the element unless |rewrite| is true.
+    if (rewrite && array && array->getElementType()->isIntegerTy(8) &&
         !support_int8_array_) {
+      // Unless char arrays in UBOs are supported, replace all instances with an
+      // i32.
       // This is a padding element. If chars are supported, replace the array
       // with a single char, otherwise use an int replacement.
       if (clspv::Option::Int8Support()) {
@@ -251,7 +255,7 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
         elements.push_back(Type::getInt32Ty(M.getContext()));
       }
     } else {
-      elements.push_back(MapType(element, M));
+      elements.push_back(MapType(element, M, rewrite));
     }
     offsets.push_back(offset);
     changed |= (element != elements.back());
@@ -312,7 +316,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
         } else if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
           // Fix the extra type in the GEP
           Type *source_ty = gep->getSourceElementType();
-          Type *remapped = MapType(source_ty, M);
+          Type *remapped = RebuildType(source_ty, M);
           if (remapped != source_ty) {
             gep->setSourceElementType(remapped);
           }
@@ -331,7 +335,7 @@ bool UBOTypeTransformPass::RemapFunctions(
     SmallVectorImpl<Function *> *functions_to_modify, Module &M) {
   bool changed = false;
   for (auto &F : M) {
-    auto *remapped = MapType(F.getFunctionType(), M);
+    auto *remapped = RebuildType(F.getFunctionType(), M);
     if (F.getType() != remapped) {
       changed = true;
       functions_to_modify->push_back(&F);
@@ -343,7 +347,7 @@ bool UBOTypeTransformPass::RemapFunctions(
     // being.
     func->removeFromParent();
     auto *replacement_type =
-        cast<FunctionType>(MapType(func->getFunctionType(), M));
+        cast<FunctionType>(RebuildType(func->getFunctionType(), M));
 
     // Insert the replacement function. Copy the calling convention, attributes
     // and metadata of the source function.
@@ -375,7 +379,7 @@ bool UBOTypeTransformPass::RemapGlobalVariables(
   bool changed = false;
   for (auto &GV : M.globals()) {
     if (auto *ptr_ty = dyn_cast<PointerType>(GV.getType())) {
-      auto *remapped = MapType(ptr_ty->getElementType(), M);
+      auto *remapped = RebuildType(ptr_ty->getElementType(), M);
       if (ptr_ty->getElementType() != remapped) {
         changed = true;
         variables_to_modify->push_back(&GV);
@@ -384,7 +388,8 @@ bool UBOTypeTransformPass::RemapGlobalVariables(
   }
   for (auto *GV : *variables_to_modify) {
     GV->removeFromParent();
-    auto *replacement_type = MapType(GV->getType()->getPointerElementType(), M);
+    auto *replacement_type =
+        RebuildType(GV->getType()->getPointerElementType(), M);
 
     Constant *initializer = nullptr;
     if (auto old_init = GV->getInitializer()) {
@@ -433,7 +438,7 @@ bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
 }
 
 bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
-  Type *remapped = MapType(value->getType(), M);
+  Type *remapped = RebuildType(value->getType(), M);
   if (remapped == value->getType())
     return false;
 
@@ -443,7 +448,7 @@ bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
 
 bool UBOTypeTransformPass::RemapConstant(Constant *constant, Module &M) {
   // Rebuild the constant.
-  Type *remapped = MapType(constant->getType(), M);
+  Type *remapped = RebuildType(constant->getType(), M);
   if (remapped == constant->getType())
     return false;
 

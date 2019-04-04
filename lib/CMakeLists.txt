@@ -33,6 +33,7 @@ endif()
 add_library(clspv_passes ${shared_attribute}
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/CallGraphOrderedFunctions.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
@@ -46,6 +47,7 @@ add_library(clspv_passes ${shared_attribute}
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerToFunctionArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVOp.cpp
