@@ -32,6 +32,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
@@ -617,6 +618,7 @@ int PopulatePassManager(
 
   if (clspv::Option::CPlusPlus()) {
     pm->add(clspv::createDemangleKernelNamesPass());
+    pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
   }
 
   if (0 == pmBuilder.OptLevel) {
