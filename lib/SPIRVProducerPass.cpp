@@ -6505,7 +6505,7 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
         return true;
     } else if (auto *arg = dyn_cast<Argument>(v)) {
       // If this is a function argument, trace through its callers.
-      for (auto U : arg->users()) {
+      for (auto U : arg->getParent()->users()) {
         if (auto *call = dyn_cast<CallInst>(U)) {
           stack.push_back(call->getOperand(arg->getArgNo()));
         }
