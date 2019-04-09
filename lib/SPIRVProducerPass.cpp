@@ -3414,7 +3414,11 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   // Ops[1] = Version (LiteralNum)
   //
   Ops.clear();
-  Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(120);
+  if (clspv::Option::CPlusPlus()) {
+    Ops << MkNum(spv::SourceLanguageOpenCL_CPP) << MkNum(100);
+  } else {
+    Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(120);
+  }
 
   auto *OpenSourceInst = new SPIRVInstruction(spv::OpSource, Ops);
   SPIRVInstList.insert(InsertPoint, OpenSourceInst);

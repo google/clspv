@@ -22,6 +22,7 @@ enum Type {
   Global,            // OpenCL global memory.
   Constant,          // OpenCL constant memory.
   Local,             // OpenCL local memory.
+  Generic,           // OpenCL generic.
   Input,             // Vulkan input memory.
   Uniform,           // Vulkan uniform memory.
   UniformConstant,   // Vulkan uniform constant memory.

@@ -110,6 +110,9 @@ bool KeepUnusedArguments();
 // Returns true if clspv should allow 8-bit integers.
 bool Int8Support();
 
+// Returns true when compiling C++.
+bool CPlusPlus();
+
 } // namespace Option
 } // namespace clspv
 
