@@ -1247,7 +1247,7 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 
       // We don't want to track the type of this call as we are going to replace
       // it.
-      if (Call && ("clspv.sampler.var.literal" ==
+      if (Call && (clspv::LiteralSamplerFunction() ==
                    Call->getCalledFunction()->getName())) {
         continue;
       }
@@ -1274,7 +1274,7 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 
 void SPIRVProducerPass::FindTypesForSamplerMap(Module &M) {
   // If we are using a sampler map, find the type of the sampler.
-  if (M.getFunction("clspv.sampler.var.literal") ||
+  if (M.getFunction(clspv::LiteralSamplerFunction()) ||
       0 < getSamplerMap().size()) {
     auto SamplerStructTy = M.getTypeByName("opencl.sampler_t");
     if (!SamplerStructTy) {
@@ -1474,7 +1474,7 @@ void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
     for (Instruction &I : BB) {
       if (auto *call = dyn_cast<CallInst>(&I)) {
         auto name = call->getCalledFunction()->getName();
-        if (name == "clspv.sampler.var.literal") {
+        if (name == clspv::LiteralSamplerFunction()) {
           // We've handled these constants elsewhere, so skip it.
           continue;
         }
@@ -2459,7 +2459,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   // for them and bindings too.
   DenseSet<unsigned> used_bindings;
 
-  auto *var_fn = M.getFunction("clspv.sampler.var.literal");
+  auto *var_fn = M.getFunction(clspv::LiteralSamplerFunction());
   if (!var_fn)
     return;
   for (auto user : var_fn->users()) {
@@ -4412,7 +4412,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     // Sampler initializers become a load of the corresponding sampler.
 
-    if (Callee->getName().equals("clspv.sampler.var.literal")) {
+    if (Callee->getName().equals(clspv::LiteralSamplerFunction())) {
       // Map this to a load from the variable.
       const auto index_into_sampler_map =
           dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();

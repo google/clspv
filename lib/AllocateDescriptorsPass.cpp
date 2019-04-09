@@ -215,7 +215,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
     // generate the sampler lines in the descriptor map. That needs both the
     // literal value and the string expression for the literal.
 
-    // Generate the function type for %clspv.sampler.var.literal
+    // Generate the function type for clspv::LiteralSamplerFunction()
     IRBuilder<> Builder(M.getContext());
     auto *sampler_struct_ty = M.getTypeByName("opencl.sampler_t");
     if (!sampler_struct_ty) {
@@ -227,7 +227,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
     Type *i32 = Builder.getInt32Ty();
     FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32}, false);
 
-    auto var_fn = M.getOrInsertFunction("clspv.sampler.var.literal", fn_ty);
+    auto var_fn = M.getOrInsertFunction(clspv::LiteralSamplerFunction(), fn_ty);
 
     // Map sampler literal to binding number.
     DenseMap<unsigned, unsigned> binding_for_value;
