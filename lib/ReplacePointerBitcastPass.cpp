@@ -33,11 +33,11 @@ struct ReplacePointerBitcastPass : public ModulePass {
   // different sizes.  Otherwise returns 0.
   unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth);
   Value *CalculateNewGEPIdx(unsigned SrcTyBitWidth, unsigned DstTyBitWidth,
-                               GetElementPtrInst *GEP);
+                            GetElementPtrInst *GEP);
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char ReplacePointerBitcastPass::ID = 0;
 static RegisterPass<ReplacePointerBitcastPass>
@@ -47,7 +47,7 @@ namespace clspv {
 ModulePass *createReplacePointerBitcastPass() {
   return new ReplacePointerBitcastPass();
 }
-}
+} // namespace clspv
 
 unsigned ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
                                                      unsigned DstTyBitWidth) {
@@ -71,8 +71,9 @@ unsigned ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
   return NumIter;
 }
 
-Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(
-    unsigned SrcTyBitWidth, unsigned DstTyBitWidth, GetElementPtrInst *GEP) {
+Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(unsigned SrcTyBitWidth,
+                                                     unsigned DstTyBitWidth,
+                                                     GetElementPtrInst *GEP) {
   Value *NewGEPIdx = GEP->getOperand(1);
   IRBuilder<> Builder(GEP);
 
@@ -83,8 +84,7 @@ Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(
     }
 
     NewGEPIdx = Builder.CreateLShr(
-        NewGEPIdx,
-        Builder.getInt32(std::log2(SrcTyBitWidth / DstTyBitWidth)));
+        NewGEPIdx, Builder.getInt32(std::log2(SrcTyBitWidth / DstTyBitWidth)));
   } else if (DstTyBitWidth > SrcTyBitWidth) {
     if (GEP->getNumOperands() > 2) {
       GEP->print(errs());
@@ -92,8 +92,7 @@ Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(
     }
 
     NewGEPIdx = Builder.CreateShl(
-        NewGEPIdx,
-        Builder.getInt32(std::log2(DstTyBitWidth / SrcTyBitWidth)));
+        NewGEPIdx, Builder.getInt32(std::log2(DstTyBitWidth / SrcTyBitWidth)));
   }
 
   return NewGEPIdx;
@@ -102,7 +101,7 @@ Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(
 bool ReplacePointerBitcastPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  const DataLayout& DL = M.getDataLayout();
+  const DataLayout &DL = M.getDataLayout();
 
   SmallVector<Instruction *, 16> VectorWorkList;
   SmallVector<Instruction *, 16> ScalarWorkList;
@@ -295,8 +294,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             // 3. dst_addr = gep (float2*) dst_addr, idx
             // 4. store (float2) val, (float2*) dst_addr
             //
-            // Transformed IR: Decompose the source vector into elements, then write
-            // them one at a time.
+            // Transformed IR: Decompose the source vector into elements, then
+            // write them one at a time.
             // 1. val = load (float2*) src_addr
             // 2. val1 = (float)extract_element val, 0
             // 3. val2 = (float)extract_element val, 1
@@ -762,7 +761,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       if (SrcTy->isArrayTy()) {
         // If it's an array, consider only the first element.
         Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-        Instruction* NewSrc = GetElementPtrInst::CreateInBounds(Src, {Zero, Zero});
+        Instruction *NewSrc =
+            GetElementPtrInst::CreateInBounds(Src, {Zero, Zero});
         // errs() << "NewSrc is " << *NewSrc << "\n";
         if (auto *SrcInst = dyn_cast<Instruction>(Src)) {
           // errs() << " instruction case\n";
@@ -773,7 +773,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                            ->getParent()
                            ->getEntryBlock()
                            .getFirstInsertionPt();
-          Instruction& whereInst = *where;
+          Instruction &whereInst = *where;
           // errs() << "insert " << *NewSrc << " before " << whereInst << "\n";
           NewSrc->insertBefore(&whereInst);
         }
@@ -831,7 +831,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
         // Handle store instruction with gep.
         if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-          //errs() << " store is " << *ST << "\n";
+          // errs() << " store is " << *ST << "\n";
           if (SrcTyBitWidth == DstTyBitWidth) {
             auto STVal = Builder.CreateBitCast(ST->getValueOperand(), SrcTy);
             Value *DstAddr = Builder.CreateGEP(Src, NewAddrIdx);

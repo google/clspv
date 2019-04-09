@@ -18,8 +18,8 @@
 
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
@@ -29,8 +29,8 @@
 
 #include "spirv/1.0/spirv.hpp"
 
-#include "clspv/Option.h"
 #include "SPIRVOp.h"
+#include "clspv/Option.h"
 
 using namespace llvm;
 
@@ -39,11 +39,7 @@ using namespace llvm;
 namespace {
 
 struct ArgTypeInfo {
-  enum class SignedNess {
-    None,
-    Unsigned,
-    Signed
-  };
+  enum class SignedNess { None, Unsigned, Signed };
   SignedNess signedness;
 };
 
@@ -84,20 +80,20 @@ struct FunctionInfo {
 
       // Try parsing a vector prefix
       if (name.consume_front("Dv")) {
-          int numElems;
-          if (name.consumeInteger(10, numElems)) {
-            return false;
-          }
+        int numElems;
+        if (name.consumeInteger(10, numElems)) {
+          return false;
+        }
 
-          if (!name.consume_front("_")) {
-            return false;
-          }
+        if (!name.consume_front("_")) {
+          return false;
+        }
       }
 
       // Parse the base type
       char typeCode = name.front();
       name = name.drop_front(1);
-      switch(typeCode) {
+      switch (typeCode) {
       case 'c': // char
       case 'a': // signed char
       case 's': // short
@@ -212,7 +208,7 @@ namespace clspv {
 ModulePass *createReplaceOpenCLBuiltinPass() {
   return new ReplaceOpenCLBuiltinPass();
 }
-}
+} // namespace clspv
 
 bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   bool Changed = false;
@@ -260,22 +256,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
   bool Changed = false;
 
   const char *Names[] = {
-    "_Z3absh",
-    "_Z3absDv2_h",
-    "_Z3absDv3_h",
-    "_Z3absDv4_h",
-    "_Z3abst",
-    "_Z3absDv2_t",
-    "_Z3absDv3_t",
-    "_Z3absDv4_t",
-    "_Z3absj",
-    "_Z3absDv2_j",
-    "_Z3absDv3_j",
-    "_Z3absDv4_j",
-    "_Z3absm",
-    "_Z3absDv2_m",
-    "_Z3absDv3_m",
-    "_Z3absDv4_m",
+      "_Z3absh", "_Z3absDv2_h", "_Z3absDv3_h", "_Z3absDv4_h",
+      "_Z3abst", "_Z3absDv2_t", "_Z3absDv3_t", "_Z3absDv4_t",
+      "_Z3absj", "_Z3absDv2_j", "_Z3absDv3_j", "_Z3absDv4_j",
+      "_Z3absm", "_Z3absDv2_m", "_Z3absDv3_m", "_Z3absDv4_m",
   };
 
   for (auto Name : Names) {
@@ -316,38 +300,17 @@ bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
   bool Changed = false;
 
   const char *Names[] = {
-    "_Z8abs_diffcc",
-    "_Z8abs_diffDv2_cS_",
-    "_Z8abs_diffDv3_cS_",
-    "_Z8abs_diffDv4_cS_",
-    "_Z8abs_diffhh",
-    "_Z8abs_diffDv2_hS_",
-    "_Z8abs_diffDv3_hS_",
-    "_Z8abs_diffDv4_hS_",
-    "_Z8abs_diffss",
-    "_Z8abs_diffDv2_sS_",
-    "_Z8abs_diffDv3_sS_",
-    "_Z8abs_diffDv4_sS_",
-    "_Z8abs_difftt",
-    "_Z8abs_diffDv2_tS_",
-    "_Z8abs_diffDv3_tS_",
-    "_Z8abs_diffDv4_tS_",
-    "_Z8abs_diffii",
-    "_Z8abs_diffDv2_iS_",
-    "_Z8abs_diffDv3_iS_",
-    "_Z8abs_diffDv4_iS_",
-    "_Z8abs_diffjj",
-    "_Z8abs_diffDv2_jS_",
-    "_Z8abs_diffDv3_jS_",
-    "_Z8abs_diffDv4_jS_",
-    "_Z8abs_diffll",
-    "_Z8abs_diffDv2_lS_",
-    "_Z8abs_diffDv3_lS_",
-    "_Z8abs_diffDv4_lS_",
-    "_Z8abs_diffmm",
-    "_Z8abs_diffDv2_mS_",
-    "_Z8abs_diffDv3_mS_",
-    "_Z8abs_diffDv4_mS_",
+      "_Z8abs_diffcc",      "_Z8abs_diffDv2_cS_", "_Z8abs_diffDv3_cS_",
+      "_Z8abs_diffDv4_cS_", "_Z8abs_diffhh",      "_Z8abs_diffDv2_hS_",
+      "_Z8abs_diffDv3_hS_", "_Z8abs_diffDv4_hS_", "_Z8abs_diffss",
+      "_Z8abs_diffDv2_sS_", "_Z8abs_diffDv3_sS_", "_Z8abs_diffDv4_sS_",
+      "_Z8abs_difftt",      "_Z8abs_diffDv2_tS_", "_Z8abs_diffDv3_tS_",
+      "_Z8abs_diffDv4_tS_", "_Z8abs_diffii",      "_Z8abs_diffDv2_iS_",
+      "_Z8abs_diffDv3_iS_", "_Z8abs_diffDv4_iS_", "_Z8abs_diffjj",
+      "_Z8abs_diffDv2_jS_", "_Z8abs_diffDv3_jS_", "_Z8abs_diffDv4_jS_",
+      "_Z8abs_diffll",      "_Z8abs_diffDv2_lS_", "_Z8abs_diffDv3_lS_",
+      "_Z8abs_diffDv4_lS_", "_Z8abs_diffmm",      "_Z8abs_diffDv2_mS_",
+      "_Z8abs_diffDv3_mS_", "_Z8abs_diffDv4_mS_",
   };
 
   for (auto Name : Names) {
@@ -366,7 +329,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
           auto XmY = Builder.CreateSub(XValue, YValue);
           auto YmX = Builder.CreateSub(YValue, XValue);
 
-          Value* Cmp;
+          Value *Cmp;
           auto finfo = FunctionInfo::getFromMangledName(F->getName());
           if (finfo.isArgSigned(0)) {
             Cmp = Builder.CreateICmpSGT(YValue, XValue);
@@ -403,10 +366,10 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Module &M) {
   bool Changed = false;
 
   const char *Names[] = {
-    "_Z8copysignff",
-    "_Z8copysignDv2_fS_",
-    "_Z8copysignDv3_fS_",
-    "_Z8copysignDv4_fS_",
+      "_Z8copysignff",
+      "_Z8copysignDv2_fS_",
+      "_Z8copysignDv3_fS_",
+      "_Z8copysignDv4_fS_",
   };
 
   for (auto Name : Names) {
@@ -423,7 +386,8 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Module &M) {
 
           auto Ty = XValue->getType();
 
-          Type* IntTy = Type::getIntNTy(M.getContext(), Ty->getScalarSizeInBits());
+          Type *IntTy =
+              Type::getIntNTy(M.getContext(), Ty->getScalarSizeInBits());
           if (Ty->isVectorTy()) {
             IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
           }
@@ -795,9 +759,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
 
   using Tuple = std::tuple<const char *, unsigned>;
   const std::map<const char *, Tuple> Map = {
-      {"_Z9mem_fencej",
-       Tuple("__spirv_memory_barrier",
-        spv::MemorySemanticsSequentiallyConsistentMask)},
+      {"_Z9mem_fencej", Tuple("__spirv_memory_barrier",
+                              spv::MemorySemanticsSequentiallyConsistentMask)},
       {"_Z14read_mem_fencej",
        Tuple("__spirv_memory_barrier", spv::MemorySemanticsAcquireMask)},
       {"_Z15write_mem_fencej",
@@ -1113,7 +1076,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
             const auto Cmp = CmpInst::Create(
                 Instruction::ICmp, CmpInst::ICMP_SLT, Arg, ZeroValue, "", CI);
 
-            Value* SelectSource;
+            Value *SelectSource;
 
             // If we have a function to call, call it!
             if (0 < strlen(SPIRVIntrinsic)) {
@@ -1211,14 +1174,14 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Module &M) {
           }
 
           // Convert both operands to the result type
-          auto HiCast = CastInst::CreateZExtOrBitCast(HiValue, CI->getType(),
-                                                      "", CI);
-          auto LoCast = CastInst::CreateZExtOrBitCast(LoValue, CI->getType(),
-                                                      "", CI);
+          auto HiCast =
+              CastInst::CreateZExtOrBitCast(HiValue, CI->getType(), "", CI);
+          auto LoCast =
+              CastInst::CreateZExtOrBitCast(LoValue, CI->getType(), "", CI);
 
           // Shift high operand
-          auto ShiftAmount = ConstantInt::get(CI->getType(),
-                                              HiType->getScalarSizeInBits());
+          auto ShiftAmount =
+              ConstantInt::get(CI->getType(), HiType->getScalarSizeInBits());
           auto HiShifted = BinaryOperator::Create(Instruction::Shl, HiCast,
                                                   ShiftAmount, "", CI);
 
@@ -1306,14 +1269,14 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Module &M) {
           // Since SPIR-V shift ops don't support this, let's apply the
           // modulo ahead of shifting. The element size is always a power of
           // two so we can just AND with a mask.
-          auto ModMask = ConstantInt::get(SrcType,
-                                          SrcType->getScalarSizeInBits() - 1);
+          auto ModMask =
+              ConstantInt::get(SrcType, SrcType->getScalarSizeInBits() - 1);
           RotAmount = BinaryOperator::Create(Instruction::And, RotAmount,
                                              ModMask, "", CI);
 
           // Let's calc the amount by which to shift top bits down
-          auto ScalarSize = ConstantInt::get(SrcType,
-                                             SrcType->getScalarSizeInBits());
+          auto ScalarSize =
+              ConstantInt::get(SrcType, SrcType->getScalarSizeInBits());
           auto DownAmount = BinaryOperator::Create(Instruction::Sub, ScalarSize,
                                                    RotAmount, "", CI);
 
@@ -1381,16 +1344,17 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
       StringRef DstTypeName = finfo.name;
       DstTypeName.consume_front("convert_");
 
-      auto DstSignedNess = StringSwitch<ArgTypeInfo::SignedNess>(DstTypeName)
-                        .StartsWith("char",   ArgTypeInfo::SignedNess::Signed)
-                        .StartsWith("short",  ArgTypeInfo::SignedNess::Signed)
-                        .StartsWith("int",    ArgTypeInfo::SignedNess::Signed)
-                        .StartsWith("long",   ArgTypeInfo::SignedNess::Signed)
-                        .StartsWith("uchar",  ArgTypeInfo::SignedNess::Unsigned)
-                        .StartsWith("ushort", ArgTypeInfo::SignedNess::Unsigned)
-                        .StartsWith("uint",   ArgTypeInfo::SignedNess::Unsigned)
-                        .StartsWith("ulong",  ArgTypeInfo::SignedNess::Unsigned)
-                        .Default(ArgTypeInfo::SignedNess::None);
+      auto DstSignedNess =
+          StringSwitch<ArgTypeInfo::SignedNess>(DstTypeName)
+              .StartsWith("char", ArgTypeInfo::SignedNess::Signed)
+              .StartsWith("short", ArgTypeInfo::SignedNess::Signed)
+              .StartsWith("int", ArgTypeInfo::SignedNess::Signed)
+              .StartsWith("long", ArgTypeInfo::SignedNess::Signed)
+              .StartsWith("uchar", ArgTypeInfo::SignedNess::Unsigned)
+              .StartsWith("ushort", ArgTypeInfo::SignedNess::Unsigned)
+              .StartsWith("uint", ArgTypeInfo::SignedNess::Unsigned)
+              .StartsWith("ulong", ArgTypeInfo::SignedNess::Unsigned)
+              .Default(ArgTypeInfo::SignedNess::None);
 
       bool DstIsSigned = DstSignedNess == ArgTypeInfo::SignedNess::Signed;
       bool SrcIsSigned = finfo.isArgSigned(0);
@@ -1440,18 +1404,23 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
             V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
           } else if (SrcIsFloat && DstIsInt) {
             if (DstIsSigned) {
-              V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "", CI);
+              V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "",
+                                   CI);
             } else {
-              V = CastInst::Create(Instruction::FPToUI, SrcValue, DstType, "", CI);
+              V = CastInst::Create(Instruction::FPToUI, SrcValue, DstType, "",
+                                   CI);
             }
           } else if (SrcIsInt && DstIsFloat) {
             if (SrcIsSigned) {
-              V = CastInst::Create(Instruction::SIToFP, SrcValue, DstType, "", CI);
+              V = CastInst::Create(Instruction::SIToFP, SrcValue, DstType, "",
+                                   CI);
             } else {
-              V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "", CI);
+              V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "",
+                                   CI);
             }
           } else if (SrcIsInt && DstIsInt) {
-            V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "", CI);
+            V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "",
+                                            CI);
           } else {
             // Not something we're supposed to handle, just move on
             continue;
@@ -1483,7 +1452,7 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
   bool Changed = false;
 
-  SmallVector<Function*, 4> FnWorklist;
+  SmallVector<Function *, 4> FnWorklist;
 
   for (auto const &SymVal : M.getValueSymbolTable()) {
     bool isMad = SymVal.getKey().startswith("_Z6mad_hi");
@@ -1556,10 +1525,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHiMadHi(Module &M) {
         }
 
         // Our SPIR-V op returns a struct, create a type for it
-        SmallVector<Type*, 2> TwoValueType = {
-          AType,
-          AType
-        };
+        SmallVector<Type *, 2> TwoValueType = {AType, AType};
         auto ExMulRetType = StructType::create(TwoValueType);
 
         // Call the SPIR-V op
@@ -1740,7 +1706,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Module &M) {
           if (TrueType->isVectorTy()) {
             if (!TrueType->getScalarType()->isFloatingPointTy() &&
                 !TrueType->getScalarType()->isIntegerTy()) {
-                continue;
+              continue;
             }
             if ((TrueType->getVectorNumElements() != 2) &&
                 (TrueType->getVectorNumElements() != 3) &&
@@ -1765,15 +1731,17 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Module &M) {
             auto ScalarSize = OpType->getScalarType()->getPrimitiveSizeInBits();
             BitType = Type::getIntNTy(M.getContext(), ScalarSize);
             if (OpType->isVectorTy()) {
-              BitType = VectorType::get(BitType, OpType->getVectorNumElements());
+              BitType =
+                  VectorType::get(BitType, OpType->getVectorNumElements());
             }
 
             // Then bitcast all operands
-            PredicateValue = CastInst::CreateZExtOrBitCast(PredicateValue,
-                                                           BitType, "", CI);
-            FalseValue = CastInst::CreateZExtOrBitCast(FalseValue,
-                                                       BitType, "", CI);
-            TrueValue = CastInst::CreateZExtOrBitCast(TrueValue, BitType, "", CI);
+            PredicateValue =
+                CastInst::CreateZExtOrBitCast(PredicateValue, BitType, "", CI);
+            FalseValue =
+                CastInst::CreateZExtOrBitCast(FalseValue, BitType, "", CI);
+            TrueValue =
+                CastInst::CreateZExtOrBitCast(TrueValue, BitType, "", CI);
 
           } else {
             // The operands have an integer type, use it directly
@@ -1785,17 +1753,14 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Module &M) {
 
           // Create our negated predicate value
           auto AllOnes = Constant::getAllOnesValue(BitType);
-          auto NotPredicateValue = BinaryOperator::Create(Instruction::Xor,
-                                                          PredicateValue,
-                                                          AllOnes, "", CI);
+          auto NotPredicateValue = BinaryOperator::Create(
+              Instruction::Xor, PredicateValue, AllOnes, "", CI);
 
           // Then put everything together
-          auto BitsFalse = BinaryOperator::Create(Instruction::And,
-                                                  NotPredicateValue,
-                                                  FalseValue, "", CI);
-          auto BitsTrue = BinaryOperator::Create(Instruction::And,
-                                                 PredicateValue,
-                                                 TrueValue, "", CI);
+          auto BitsFalse = BinaryOperator::Create(
+              Instruction::And, NotPredicateValue, FalseValue, "", CI);
+          auto BitsTrue = BinaryOperator::Create(
+              Instruction::And, PredicateValue, TrueValue, "", CI);
 
           Value *V = BinaryOperator::Create(Instruction::Or, BitsFalse,
                                             BitsTrue, "", CI);
@@ -1833,12 +1798,12 @@ bool ReplaceOpenCLBuiltinPass::replaceStepSmoothStep(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
-    { "_Z4stepfDv2_f", "_Z4stepDv2_fS_" },
-    { "_Z4stepfDv3_f", "_Z4stepDv3_fS_" },
-    { "_Z4stepfDv4_f", "_Z4stepDv4_fS_" },
-    { "_Z10smoothstepffDv2_f", "_Z10smoothstepDv2_fS_S_" },
-    { "_Z10smoothstepffDv3_f", "_Z10smoothstepDv3_fS_S_" },
-    { "_Z10smoothstepffDv4_f", "_Z10smoothstepDv4_fS_S_" },
+      {"_Z4stepfDv2_f", "_Z4stepDv2_fS_"},
+      {"_Z4stepfDv3_f", "_Z4stepDv3_fS_"},
+      {"_Z4stepfDv4_f", "_Z4stepDv4_fS_"},
+      {"_Z10smoothstepffDv2_f", "_Z10smoothstepDv2_fS_S_"},
+      {"_Z10smoothstepffDv3_f", "_Z10smoothstepDv3_fS_S_"},
+      {"_Z10smoothstepffDv4_f", "_Z10smoothstepDv4_fS_S_"},
   };
 
   for (auto Pair : Map) {
@@ -1852,7 +1817,7 @@ bool ReplaceOpenCLBuiltinPass::replaceStepSmoothStep(Module &M) {
 
           auto ReplacementFn = Pair.second;
 
-          SmallVector<Value*, 2> ArgsToSplat = {CI->getOperand(0)};
+          SmallVector<Value *, 2> ArgsToSplat = {CI->getOperand(0)};
           Value *VectorArg;
 
           // First figure out which function we're dealing with
@@ -1864,25 +1829,28 @@ bool ReplaceOpenCLBuiltinPass::replaceStepSmoothStep(Module &M) {
           }
 
           // Splat arguments that need to be
-          SmallVector<Value*, 2> SplatArgs;
+          SmallVector<Value *, 2> SplatArgs;
           auto VecType = VectorArg->getType();
 
           for (auto arg : ArgsToSplat) {
-            Value* NewVectorArg = UndefValue::get(VecType);
+            Value *NewVectorArg = UndefValue::get(VecType);
             for (auto i = 0; i < VecType->getVectorNumElements(); i++) {
-              auto index =  ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
-              NewVectorArg = InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
+              auto index =
+                  ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
+              NewVectorArg =
+                  InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
             }
             SplatArgs.push_back(NewVectorArg);
           }
 
           // Replace the call with the vector/vector flavour
-          SmallVector<Type*, 3> NewArgTypes(ArgsToSplat.size() + 1, VecType);
-          const auto NewFType = FunctionType::get(CI->getType(), NewArgTypes, false);
+          SmallVector<Type *, 3> NewArgTypes(ArgsToSplat.size() + 1, VecType);
+          const auto NewFType =
+              FunctionType::get(CI->getType(), NewArgTypes, false);
 
           const auto NewF = M.getOrInsertFunction(ReplacementFn, NewFType);
 
-          SmallVector<Value*, 3> NewArgs;
+          SmallVector<Value *, 3> NewArgs;
           for (auto arg : SplatArgs) {
             NewArgs.push_back(arg);
           }
@@ -2039,15 +2007,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
   bool Changed = false;
 
   struct VectorStoreOps {
-    const char* name;
+    const char *name;
     int n;
-    Type* (*get_scalar_type_function)(LLVMContext&);
-  } vector_store_ops[] = {
-    // TODO(derekjchow): Expand this list.
-    { "_Z7vstore4Dv4_fjPU3AS1f", 4, Type::getFloatTy }
-  };
+    Type *(*get_scalar_type_function)(LLVMContext &);
+  } vector_store_ops[] = {// TODO(derekjchow): Expand this list.
+                          {"_Z7vstore4Dv4_fjPU3AS1f", 4, Type::getFloatTy}};
 
-  for (const auto& Op : vector_store_ops) {
+  for (const auto &Op : vector_store_ops) {
     auto Name = Op.name;
     auto N = Op.n;
     auto TypeFn = Op.get_scalar_type_function;
@@ -2072,8 +2038,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
               ScalarNTy, Arg2->getType()->getPointerAddressSpace());
 
           // Cast to scalarn
-          auto Cast = CastInst::CreatePointerCast(
-              Arg2, ScalarNPointerTy, "", CI);
+          auto Cast =
+              CastInst::CreatePointerCast(Arg2, ScalarNPointerTy, "", CI);
           // Index to correct address
           auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg1, "", CI);
           // Store
@@ -2103,15 +2069,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
   bool Changed = false;
 
   struct VectorLoadOps {
-    const char* name;
+    const char *name;
     int n;
-    Type* (*get_scalar_type_function)(LLVMContext&);
-  } vector_load_ops[] = {
-    // TODO(derekjchow): Expand this list.
-    { "_Z6vload4jPU3AS1Kf", 4, Type::getFloatTy }
-  };
+    Type *(*get_scalar_type_function)(LLVMContext &);
+  } vector_load_ops[] = {// TODO(derekjchow): Expand this list.
+                         {"_Z6vload4jPU3AS1Kf", 4, Type::getFloatTy}};
 
-  for (const auto& Op : vector_load_ops) {
+  for (const auto &Op : vector_load_ops) {
     auto Name = Op.name;
     auto N = Op.n;
     auto TypeFn = Op.get_scalar_type_function;
@@ -2134,8 +2098,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
               ScalarNTy, Arg1->getType()->getPointerAddressSpace());
 
           // Cast to scalarn
-          auto Cast = CastInst::CreatePointerCast(
-              Arg1, ScalarNPointerTy, "", CI);
+          auto Cast =
+              CastInst::CreatePointerCast(Arg1, ScalarNPointerTy, "", CI);
           // Index to correct address
           auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg0, "", CI);
           // Load
@@ -2155,7 +2119,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
 
       // And remove the function we don't need either too.
       F->eraseFromParent();
-
     }
   }
 
@@ -2459,7 +2422,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Module &M) {
 
       // Walk the users of the function.
       for (auto &U : F->uses()) {
-        if (auto* CI = dyn_cast<CallInst>(U.getUser())) {
+        if (auto *CI = dyn_cast<CallInst>(U.getUser())) {
           auto Index = CI->getOperand(0);
           auto Ptr = CI->getOperand(1);
 
@@ -2636,7 +2599,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
             auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
 
             // Cast the half* pointer to short*.
-            auto Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
+            auto Cast =
+                CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
 
             // Index into the correct address of the casted pointer.
             auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
@@ -2671,19 +2635,29 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
             auto Four = ConstantInt::get(IntTy, 4);
             auto FFFF = ConstantInt::get(IntTy, 0xffff);
 
-            auto IndexIsOdd = BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
+            auto IndexIsOdd =
+                BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
             // Compute index / 2
-            auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
-            auto BaseI32Ptr = CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
-            auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32, "base_i32_ptr", CI);
+            auto IndexIntoI32 =
+                BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
+            auto BaseI32Ptr = CastInst::CreatePointerCast(Arg2, IntPointerTy,
+                                                          "base_i32_ptr", CI);
+            auto OutPtr = GetElementPtrInst::Create(
+                IntTy, BaseI32Ptr, IndexIntoI32, "base_i32_ptr", CI);
             auto CurrentValue = new LoadInst(OutPtr, "current_value", CI);
-            auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
-            auto MaskBitsToWrite = BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
-            auto MaskedCurrent = BinaryOperator::CreateAnd(MaskBitsToWrite, CurrentValue, "masked_current", CI);
+            auto Shift =
+                BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+            auto MaskBitsToWrite = BinaryOperator::CreateShl(
+                FFFF, Shift, "mask_bits_to_write", CI);
+            auto MaskedCurrent = BinaryOperator::CreateAnd(
+                MaskBitsToWrite, CurrentValue, "masked_current", CI);
 
-            auto XLowerBits = BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
-            auto NewBitsToWrite = BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
-            auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite, "value_to_xor", CI);
+            auto XLowerBits =
+                BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
+            auto NewBitsToWrite = BinaryOperator::CreateShl(
+                XLowerBits, Shift, "new_bits_to_write", CI);
+            auto ValueToXor = BinaryOperator::CreateXor(
+                MaskedCurrent, NewBitsToWrite, "value_to_xor", CI);
 
             // Generate the call to atomi_xor.
             SmallVector<Type *, 5> ParamTypes;
@@ -2923,10 +2897,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceReadImageF(Module &M) {
   bool Changed = false;
 
-  const std::map<const char *, const char*> Map = {
-    { "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i", "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" },
-    { "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_i", "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_f" }
-  };
+  const std::map<const char *, const char *> Map = {
+      {"_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i",
+       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f"},
+      {"_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_i",
+       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_f"}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
@@ -2945,13 +2920,18 @@ bool ReplaceOpenCLBuiltinPass::replaceReadImageF(Module &M) {
           // The coordinate (integer type that we can't handle).
           auto Arg2 = CI->getOperand(2);
 
-          auto FloatVecTy = VectorType::get(Type::getFloatTy(M.getContext()), Arg2->getType()->getVectorNumElements());
+          auto FloatVecTy =
+              VectorType::get(Type::getFloatTy(M.getContext()),
+                              Arg2->getType()->getVectorNumElements());
 
-          auto NewFType = FunctionType::get(CI->getType(), {Arg0->getType(), Arg1->getType(), FloatVecTy}, false);
+          auto NewFType = FunctionType::get(
+              CI->getType(), {Arg0->getType(), Arg1->getType(), FloatVecTy},
+              false);
 
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
-          auto Cast = CastInst::Create(Instruction::SIToFP, Arg2, FloatVecTy, "", CI);
+          auto Cast =
+              CastInst::Create(Instruction::SIToFP, Arg2, FloatVecTy, "", CI);
 
           auto NewCI = CallInst::Create(NewF, {Arg0, Arg1, Cast}, "", CI);
 
@@ -3209,34 +3189,39 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Module &M) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
 
-    Constant *DownShuffleMask[3] = {
-        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
-        ConstantInt::get(IntTy, 2)};
+    Constant *DownShuffleMask[3] = {ConstantInt::get(IntTy, 0),
+                                    ConstantInt::get(IntTy, 1),
+                                    ConstantInt::get(IntTy, 2)};
 
     Constant *UpShuffleMask[4] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
         ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
 
-    Constant *FloatVec[3] = {
-      ConstantFP::get(FloatTy, 0.0f), UndefValue::get(FloatTy), UndefValue::get(FloatTy)
-    };
+    Constant *FloatVec[3] = {ConstantFP::get(FloatTy, 0.0f),
+                             UndefValue::get(FloatTy),
+                             UndefValue::get(FloatTy)};
 
     // Walk the users of the function.
     for (auto &U : F->uses()) {
       if (auto CI = dyn_cast<CallInst>(U.getUser())) {
         auto Vec4Ty = CI->getArgOperand(0)->getType();
-        auto Arg0 = new ShuffleVectorInst(CI->getArgOperand(0), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
-        auto Arg1 = new ShuffleVectorInst(CI->getArgOperand(1), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
+        auto Arg0 =
+            new ShuffleVectorInst(CI->getArgOperand(0), UndefValue::get(Vec4Ty),
+                                  ConstantVector::get(DownShuffleMask), "", CI);
+        auto Arg1 =
+            new ShuffleVectorInst(CI->getArgOperand(1), UndefValue::get(Vec4Ty),
+                                  ConstantVector::get(DownShuffleMask), "", CI);
         auto Vec3Ty = Arg0->getType();
 
-        auto NewFType =
-            FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
+        auto NewFType = FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
 
         auto Cross3Func = M.getOrInsertFunction("_Z5crossDv3_fS_", NewFType);
 
         auto DownResult = CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI);
 
-        auto Result = new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec), ConstantVector::get(UpShuffleMask), "", CI);
+        auto Result =
+            new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec),
+                                  ConstantVector::get(UpShuffleMask), "", CI);
 
         CI->replaceAllUsesWith(Result);
 
@@ -3284,12 +3269,12 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
   //    %fract_result = OpExtInst %float
   //       %glsl_ext Fmin %fract_intermediate %just_under_1
 
-
   using std::string;
 
   // Mapping from the fract builtin to the floor, fmin, and clspv.fract builtins
   // we need.  The clspv.fract builtin is the same as GLSL.std.450 Fract.
-  using QuadType = std::tuple<const char *, const char *, const char *, const char *>;
+  using QuadType =
+      std::tuple<const char *, const char *, const char *, const char *>;
   auto make_quad = [](const char *a, const char *b, const char *c,
                       const char *d) {
     return std::tuple<const char *, const char *, const char *, const char *>(
@@ -3297,12 +3282,15 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
   };
   const std::vector<QuadType> Functions = {
       make_quad("_Z5fractfPf", "_Z5floorff", "_Z4fminff", "clspv.fract.f"),
-      make_quad("_Z5fractDv2_fPS_", "_Z5floorDv2_f", "_Z4fminDv2_ff", "clspv.fract.v2f"),
-      make_quad("_Z5fractDv3_fPS_", "_Z5floorDv3_f", "_Z4fminDv3_ff", "clspv.fract.v3f"),
-      make_quad("_Z5fractDv4_fPS_", "_Z5floorDv4_f", "_Z4fminDv4_ff", "clspv.fract.v4f"),
+      make_quad("_Z5fractDv2_fPS_", "_Z5floorDv2_f", "_Z4fminDv2_ff",
+                "clspv.fract.v2f"),
+      make_quad("_Z5fractDv3_fPS_", "_Z5floorDv3_f", "_Z4fminDv3_ff",
+                "clspv.fract.v3f"),
+      make_quad("_Z5fractDv4_fPS_", "_Z5floorDv4_f", "_Z4fminDv4_ff",
+                "clspv.fract.v4f"),
   };
 
-  for (auto& quad : Functions) {
+  for (auto &quad : Functions) {
     const StringRef fract_name(std::get<0>(quad));
 
     // If we find a function with the matching name.
@@ -3313,7 +3301,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
       // We have some uses.
       Changed = true;
 
-      auto& Context = M.getContext();
+      auto &Context = M.getContext();
 
       const StringRef floor_name(std::get<1>(quad));
       const StringRef fmin_name(std::get<2>(quad));
@@ -3323,30 +3311,31 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
       // types are this type.
       auto result_ty = F->getReturnType();
 
-      Function* fmin_fn = M.getFunction(fmin_name);
+      Function *fmin_fn = M.getFunction(fmin_name);
       if (!fmin_fn) {
         // Make the fmin function.
-        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty, result_ty}, false);
+        FunctionType *fn_ty =
+            FunctionType::get(result_ty, {result_ty, result_ty}, false);
         fmin_fn =
             cast<Function>(M.getOrInsertFunction(fmin_name, fn_ty).getCallee());
         fmin_fn->addFnAttr(Attribute::ReadNone);
         fmin_fn->setCallingConv(CallingConv::SPIR_FUNC);
       }
 
-      Function* floor_fn = M.getFunction(floor_name);
+      Function *floor_fn = M.getFunction(floor_name);
       if (!floor_fn) {
         // Make the floor function.
-        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
+        FunctionType *fn_ty = FunctionType::get(result_ty, {result_ty}, false);
         floor_fn = cast<Function>(
             M.getOrInsertFunction(floor_name, fn_ty).getCallee());
         floor_fn->addFnAttr(Attribute::ReadNone);
         floor_fn->setCallingConv(CallingConv::SPIR_FUNC);
       }
 
-      Function* clspv_fract_fn = M.getFunction(clspv_fract_name);
+      Function *clspv_fract_fn = M.getFunction(clspv_fract_name);
       if (!clspv_fract_fn) {
         // Make the clspv_fract function.
-        FunctionType* fn_ty = FunctionType::get(result_ty, {result_ty}, false);
+        FunctionType *fn_ty = FunctionType::get(result_ty, {result_ty}, false);
         clspv_fract_fn = cast<Function>(
             M.getOrInsertFunction(clspv_fract_name, fn_ty).getCallee());
         clspv_fract_fn->addFnAttr(Attribute::ReadNone);
@@ -3356,18 +3345,18 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
       // Number of significant significand bits, whether represented or not.
       unsigned num_significand_bits;
       switch (result_ty->getScalarType()->getTypeID()) {
-        case Type::HalfTyID:
-          num_significand_bits = 11;
-          break;
-        case Type::FloatTyID:
-          num_significand_bits = 24;
-          break;
-        case Type::DoubleTyID:
-          num_significand_bits = 53;
-          break;
-        default:
-          assert(false && "Unhandled float type when processing fract builtin");
-          break;
+      case Type::HalfTyID:
+        num_significand_bits = 11;
+        break;
+      case Type::FloatTyID:
+        num_significand_bits = 24;
+        break;
+      case Type::DoubleTyID:
+        num_significand_bits = 53;
+        break;
+      default:
+        assert(false && "Unhandled float type when processing fract builtin");
+        break;
       }
       // Beware that the disassembler displays this value as
       //   OpConstant %float 1
@@ -3399,7 +3388,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
           Builder.CreateStore(floor, ptr);
 
           auto fract_intermediate = Builder.CreateCall(clspv_fract_fn, arg);
-          auto fract_result = Builder.CreateCall(fmin_fn, {fract_intermediate, just_under_one});
+          auto fract_result =
+              Builder.CreateCall(fmin_fn, {fract_intermediate, just_under_one});
 
           CI->replaceAllUsesWith(fract_result);
 

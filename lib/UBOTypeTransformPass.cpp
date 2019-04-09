@@ -239,7 +239,8 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     const auto *array = dyn_cast<ArrayType>(element);
     // Unless char arrays in UBOs are supported, replace all instances with an
     // i32.
-    if (array && array->getElementType()->isIntegerTy(8) && !support_int8_array_) {
+    if (array && array->getElementType()->isIntegerTy(8) &&
+        !support_int8_array_) {
       // This is a padding element. If chars are supported, replace the array
       // with a single char, otherwise use an int replacement.
       if (clspv::Option::Int8Support()) {

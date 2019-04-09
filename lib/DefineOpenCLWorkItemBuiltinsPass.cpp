@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
@@ -35,7 +35,9 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
   GlobalVariable *createGlobalVariable(Module &M, StringRef GlobalVarName,
                                        Type *Ty, AddressSpace::Type AddrSpace);
 
-  bool defineMappedBuiltin(Module &M, StringRef FuncName, StringRef GlobalVarName, unsigned DefaultValue, AddressSpace::Type AddrSpace = AddressSpace::Input);
+  bool defineMappedBuiltin(Module &M, StringRef FuncName,
+                           StringRef GlobalVarName, unsigned DefaultValue,
+                           AddressSpace::Type AddrSpace = AddressSpace::Input);
 
   bool defineGlobalSizeBuiltin(Module &M);
 
@@ -45,7 +47,7 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
 
   bool addWorkgroupSizeIfRequired(Module &M);
 };
-}
+} // namespace
 
 char DefineOpenCLWorkItemBuiltinsPass::ID = 0;
 static RegisterPass<DefineOpenCLWorkItemBuiltinsPass>
@@ -55,16 +57,22 @@ namespace clspv {
 ModulePass *createDefineOpenCLWorkItemBuiltinsPass() {
   return new DefineOpenCLWorkItemBuiltinsPass();
 }
-}
+} // namespace clspv
 
 bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
   bool changed = false;
 
-  changed |= defineMappedBuiltin(M, "_Z13get_global_idj", "__spirv_GlobalInvocationId", 0);
-  changed |= defineMappedBuiltin(M, "_Z14get_local_sizej", "__spirv_WorkgroupSize", 1, AddressSpace::ModuleScopePrivate);
-  changed |= defineMappedBuiltin(M, "_Z12get_local_idj", "__spirv_LocalInvocationId", 0);
-  changed |= defineMappedBuiltin(M, "_Z14get_num_groupsj", "__spirv_NumWorkgroups", 1);
-  changed |= defineMappedBuiltin(M, "_Z12get_group_idj", "__spirv_WorkgroupId", 0);
+  changed |= defineMappedBuiltin(M, "_Z13get_global_idj",
+                                 "__spirv_GlobalInvocationId", 0);
+  changed |=
+      defineMappedBuiltin(M, "_Z14get_local_sizej", "__spirv_WorkgroupSize", 1,
+                          AddressSpace::ModuleScopePrivate);
+  changed |= defineMappedBuiltin(M, "_Z12get_local_idj",
+                                 "__spirv_LocalInvocationId", 0);
+  changed |=
+      defineMappedBuiltin(M, "_Z14get_num_groupsj", "__spirv_NumWorkgroups", 1);
+  changed |=
+      defineMappedBuiltin(M, "_Z12get_group_idj", "__spirv_WorkgroupId", 0);
   changed |= defineGlobalSizeBuiltin(M);
   changed |= defineGlobalOffsetBuiltin(M);
   changed |= defineWorkDimBuiltin(M);
@@ -85,7 +93,9 @@ GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(
   return GV;
 }
 
-bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(Module &M, StringRef FuncName, StringRef GlobalVarName, unsigned DefaultValue, AddressSpace::Type AddrSpace) {
+bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
+    Module &M, StringRef FuncName, StringRef GlobalVarName,
+    unsigned DefaultValue, AddressSpace::Type AddrSpace) {
   Function *F = M.getFunction(FuncName);
 
   // If the builtin was not used in the module, don't create it!
@@ -111,7 +121,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(Module &M, StringRef 
   Value *Select1 =
       Builder.CreateSelect(Cond, &*F->arg_begin(), Builder.getInt32(0));
 
-  Value* Result = nullptr;
+  Value *Result = nullptr;
   if (GlobalVarName == "__spirv_WorkgroupSize") {
     // Ugly hack to work around implementation bugs.
     // Load the whole vector and extract the result
@@ -143,7 +153,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
   VectorType *VT = VectorType::get(IT, 3);
 
-  // Global size uses two builtin variables that might already have been created.
+  // Global size uses two builtin variables that might already have been
+  // created.
   StringRef WorkgroupSize = "__spirv_WorkgroupSize";
   StringRef NumWorkgroups = "__spirv_NumWorkgroups";
 
@@ -183,7 +194,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   // And the number of workgroups.
   Value *LoadNWG = Builder.CreateLoad(Builder.CreateGEP(NWG, Indices));
 
-  // We multiply the workgroup size by the number of workgroups to calculate the global size.
+  // We multiply the workgroup size by the number of workgroups to calculate the
+  // global size.
   Value *Mul = Builder.CreateMul(LoadWGS, LoadNWG);
 
   // We also need to select on the result of the load, because if Cond is

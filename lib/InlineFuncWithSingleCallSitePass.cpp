@@ -88,7 +88,8 @@ bool InlineFuncWithSingleCallSitePass::InlineFunctions(Module &M) {
     }
 
     // Only inline if the function has a local address space parameter.
-    if (!has_local_ptr_arg) continue;
+    if (!has_local_ptr_arg)
+      continue;
 
     if (F.getNumUses() == 1) {
       if (auto *call = dyn_cast<CallInst>(*F.user_begin()))

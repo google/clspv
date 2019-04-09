@@ -283,9 +283,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void setVariablePointersStorageBuffer(bool Val) {
     HasVariablePointersStorageBuffer = Val;
   }
-  bool hasVariablePointers() {
-    return HasVariablePointers;
-  };
+  bool hasVariablePointers() { return HasVariablePointers; };
   void setVariablePointers(bool Val) { HasVariablePointers = Val; };
   ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() {
     return samplerMap;
@@ -436,7 +434,7 @@ private:
   // Binary output writes to this stream, which might be |out| or
   // |binaryTempOut|.  It's the latter when we really want to write a C
   // initializer list.
-  raw_pwrite_stream* binaryOut;
+  raw_pwrite_stream *binaryOut;
   std::vector<version0::DescriptorMapEntry> *descriptorMapEntries;
   const bool outputAsm;
   const bool outputCInitList; // If true, output look like {0x7023, ... , 5}
@@ -2542,8 +2540,10 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     Ops << MkId(sampler_var_id) << MkNum(spv::DecorationDescriptorSet)
         << MkNum(descriptor_set);
 
-    version0::DescriptorMapEntry::SamplerData sampler_data = {SamplerLiteral.first};
-    descriptorMapEntries->emplace_back(std::move(sampler_data), descriptor_set, binding);
+    version0::DescriptorMapEntry::SamplerData sampler_data = {
+        SamplerLiteral.first};
+    descriptorMapEntries->emplace_back(std::move(sampler_data), descriptor_set,
+                                       binding);
 
     auto *DescDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
     SPIRVInstList.insert(DecoInsertPoint, DescDecoInst);
@@ -2908,8 +2908,10 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     std::string hexbytes;
     llvm::raw_string_ostream str(hexbytes);
     clspv::ConstantEmitter(DL, str).Emit(GV.getInitializer());
-    version0::DescriptorMapEntry::ConstantData constant_data = {ArgKind::Buffer, str.str()};
-    descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set, 0);
+    version0::DescriptorMapEntry::ConstantData constant_data = {ArgKind::Buffer,
+                                                                str.str()};
+    descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set,
+                                       0);
 
     // Find Insert Point for OpDecorate.
     auto DecoInsertPoint =
@@ -3001,15 +3003,10 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
       uint32_t descriptor_set = 0;
       uint32_t binding = 0;
       version0::DescriptorMapEntry::KernelArgData kernel_data = {
-          F.getName(),
-          name,
-          static_cast<uint32_t>(old_index),
-          argKind,
+          F.getName(), name, static_cast<uint32_t>(old_index), argKind,
           static_cast<uint32_t>(spec_id),
           // This will be set below for pointer-to-local args.
-          0,
-          static_cast<uint32_t>(offset),
-          static_cast<uint32_t>(arg_size)};
+          0, static_cast<uint32_t>(offset), static_cast<uint32_t>(arg_size)};
       if (spec_id > 0) {
         kernel_data.local_element_size = static_cast<uint32_t>(GetTypeAllocSize(
             func_ty->getParamType(unsigned(new_index))->getPointerElementType(),
@@ -3020,7 +3017,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
         descriptor_set = info->descriptor_set;
         binding = info->binding;
       }
-      descriptorMapEntries->emplace_back(std::move(kernel_data), descriptor_set, binding);
+      descriptorMapEntries->emplace_back(std::move(kernel_data), descriptor_set,
+                                         binding);
     }
   } else {
     // There is no argument map.
@@ -3041,7 +3039,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
           arg_size = static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
         }
 
-        // Local pointer arguments are unused in this case. Offset is always zero.
+        // Local pointer arguments are unused in this case. Offset is always
+        // zero.
         version0::DescriptorMapEntry::KernelArgData kernel_data = {
             F.getName(), arg->getName(),
             arg_index,   remap_arg_kind(clspv::GetArgKindName(info->arg_kind)),
@@ -3065,7 +3064,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
             arg_index,
             ArgKind::Local,
             static_cast<uint32_t>(local_arg_info.spec_id),
-            static_cast<uint32_t>(GetTypeAllocSize(local_arg_info.elem_type, DL)),
+            static_cast<uint32_t>(
+                GetTypeAllocSize(local_arg_info.elem_type, DL)),
             0,
             0};
         // Pointer-to-local arguments do not utilize descriptor set and binding.
@@ -3171,8 +3171,9 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
         // parameter with Coherent too.
         SPIRVOperandList decoration_ops;
         decoration_ops << MkId(param_id) << MkNum(spv::DecorationCoherent);
-        SPIRVInstList.insert(DecoInsertPoint,
-                             new SPIRVInstruction(spv::OpDecorate, decoration_ops));
+        SPIRVInstList.insert(
+            DecoInsertPoint,
+            new SPIRVInstruction(spv::OpDecorate, decoration_ops));
       }
 
       // ParamOps[0] : Result Type ID
@@ -3488,7 +3489,8 @@ void SPIRVProducerPass::GenerateFuncBody(Function &F) {
       if (auto *alloca = dyn_cast<AllocaInst>(&I)) {
         // Allocating a pointer requires variable pointers.
         if (alloca->getAllocatedType()->isPointerTy()) {
-          setVariablePointersCapabilities(alloca->getAllocatedType()->getPointerAddressSpace());
+          setVariablePointersCapabilities(
+              alloca->getAllocatedType()->getPointerAddressSpace());
         }
         GenerateInstruction(I);
       }
@@ -4230,7 +4232,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     //
     // Generate OpLoad.
     //
- 
+
     if (LD->getType()->isPointerTy()) {
       // Loading a pointer requires variable pointers.
       setVariablePointersCapabilities(LD->getType()->getPointerAddressSpace());
@@ -4432,28 +4434,29 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // Handle SPIR-V intrinsics
-    spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
-      .Case("spirv.atomic_add", spv::OpAtomicIAdd)
-      .Case("spirv.atomic_sub", spv::OpAtomicISub)
-      .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
-      .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
-      .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
-      .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
-      .Case("spirv.atomic_umin", spv::OpAtomicUMin)
-      .Case("spirv.atomic_smin", spv::OpAtomicSMin)
-      .Case("spirv.atomic_umax", spv::OpAtomicUMax)
-      .Case("spirv.atomic_smax", spv::OpAtomicSMax)
-      .Case("spirv.atomic_and", spv::OpAtomicAnd)
-      .Case("spirv.atomic_or", spv::OpAtomicOr)
-      .Case("spirv.atomic_xor", spv::OpAtomicXor)
-      .Case("__spirv_control_barrier", spv::OpControlBarrier)
-      .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
-      .StartsWith("spirv.store_null", spv::OpStore)
-      .StartsWith("__spirv_isinf", spv::OpIsInf)
-      .StartsWith("__spirv_isnan", spv::OpIsNan)
-      .StartsWith("__spirv_allDv", spv::OpAll)
-      .StartsWith("__spirv_anyDv", spv::OpAny)
-      .Default(spv::OpNop);
+    spv::Op opcode =
+        StringSwitch<spv::Op>(Callee->getName())
+            .Case("spirv.atomic_add", spv::OpAtomicIAdd)
+            .Case("spirv.atomic_sub", spv::OpAtomicISub)
+            .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
+            .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
+            .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
+            .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
+            .Case("spirv.atomic_umin", spv::OpAtomicUMin)
+            .Case("spirv.atomic_smin", spv::OpAtomicSMin)
+            .Case("spirv.atomic_umax", spv::OpAtomicUMax)
+            .Case("spirv.atomic_smax", spv::OpAtomicSMax)
+            .Case("spirv.atomic_and", spv::OpAtomicAnd)
+            .Case("spirv.atomic_or", spv::OpAtomicOr)
+            .Case("spirv.atomic_xor", spv::OpAtomicXor)
+            .Case("__spirv_control_barrier", spv::OpControlBarrier)
+            .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
+            .StartsWith("spirv.store_null", spv::OpStore)
+            .StartsWith("__spirv_isinf", spv::OpIsInf)
+            .StartsWith("__spirv_isnan", spv::OpIsNan)
+            .StartsWith("__spirv_allDv", spv::OpAll)
+            .StartsWith("__spirv_anyDv", spv::OpAny)
+            .Default(spv::OpNop);
 
     // If the switch above didn't have an entry maybe the intrinsic
     // is using the name mangling logic.
@@ -6366,7 +6369,8 @@ uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
   return DL.getTypeAllocSize(type);
 }
 
-void SPIRVProducerPass::setVariablePointersCapabilities(unsigned address_space) {
+void SPIRVProducerPass::setVariablePointersCapabilities(
+    unsigned address_space) {
   if (GetStorageClass(address_space) == spv::StorageClassStorageBuffer) {
     setVariablePointersStorageBuffer(true);
   } else {
@@ -6374,7 +6378,7 @@ void SPIRVProducerPass::setVariablePointersCapabilities(unsigned address_space) 
   }
 }
 
-Value *SPIRVProducerPass::GetBasePointer(Value* v) {
+Value *SPIRVProducerPass::GetBasePointer(Value *v) {
   if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
     return GetBasePointer(gep->getPointerOperand());
   }

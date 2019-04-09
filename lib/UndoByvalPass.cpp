@@ -30,14 +30,14 @@ struct UndoByvalPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char UndoByvalPass::ID = 0;
 static RegisterPass<UndoByvalPass> X("UndoByval", "Undo Byval Pass");
 
 namespace clspv {
 llvm::ModulePass *createUndoByvalPass() { return new UndoByvalPass(); }
-}
+} // namespace clspv
 
 bool UndoByvalPass::runOnModule(Module &M) {
   bool Changed = false;

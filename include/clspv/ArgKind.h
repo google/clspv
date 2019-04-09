@@ -31,7 +31,7 @@ enum class ArgKind : int {
 };
 
 // Converts an ArgKind to its string name.
-const char* GetArgKindName(ArgKind);
+const char *GetArgKindName(ArgKind);
 
 // Converts a string into its ArgKind.
 ArgKind GetArgKindFromName(const std::string &);

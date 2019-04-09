@@ -44,8 +44,7 @@ ModulePass *createInlineEntryPointsPass() {
 
 char InlineEntryPointsPass::ID = 0;
 static RegisterPass<InlineEntryPointsPass>
-    X("InlineEntryPointsPass",
-      "Exhaustively inline entry points");
+    X("InlineEntryPointsPass", "Exhaustively inline entry points");
 
 bool InlineEntryPointsPass::runOnModule(Module &M) {
   bool Changed = false;

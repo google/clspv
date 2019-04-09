@@ -26,7 +26,7 @@ struct FunctionInternalizerPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char FunctionInternalizerPass::ID = 0;
 static RegisterPass<FunctionInternalizerPass> X("FunctionInternalizer",
@@ -36,7 +36,7 @@ namespace clspv {
 ModulePass *createFunctionInternalizerPass() {
   return new FunctionInternalizerPass();
 }
-}
+} // namespace clspv
 
 bool FunctionInternalizerPass::runOnModule(Module &M) {
   SmallVector<Function *, 8> ToRemoves;

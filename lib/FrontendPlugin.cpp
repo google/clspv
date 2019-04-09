@@ -32,10 +32,7 @@ private:
   CompilerInstance &Instance;
   llvm::StringRef InFile;
 
-  enum Layout {
-    UBO,
-    SSBO
-  };
+  enum Layout { UBO, SSBO };
 
   enum CustomDiagnosticType {
     CustomDiagnosticVectorsMoreThan4Elements = 0,
@@ -219,7 +216,8 @@ private:
     // An array has a base alignment of is element type.
     // If the layout is UBO, the alignment is rounded up to a multiple of 16.
     const auto *AT = llvm::cast<ArrayType>(QT);
-    const auto element_align = GetAlignment(AT->getElementType(), layout, context);
+    const auto element_align =
+        GetAlignment(AT->getElementType(), layout, context);
     const auto type_align =
         layout == UBO ? llvm::alignTo(element_align, 16) : element_align;
     if (offset % type_align != 0) {
@@ -252,7 +250,8 @@ private:
     // alignment is rounded up to a multiple of 16.
     const auto *RT = llvm::cast<RecordType>(QT);
     auto type_alignment = GetAlignment(QT, layout, context);
-    if (layout == UBO) llvm::alignTo(type_alignment, 16);
+    if (layout == UBO)
+      llvm::alignTo(type_alignment, 16);
     if (offset % type_alignment != 0) {
       auto diag_id = layout == UBO ? CustomDiagnosticUBOUnalignedStruct
                                    : CustomDiagnosticSSBOUnalignedStruct;
@@ -281,7 +280,8 @@ private:
             record_layout.getFieldOffset(field_no - 1) / context.getCharWidth();
         const auto prev_size =
             context.getTypeSizeInChars(prev_canonical).getQuantity();
-        const auto prev_alignment = GetAlignment(prev_canonical, layout, context);
+        const auto prev_alignment =
+            GetAlignment(prev_canonical, layout, context);
         const auto next_available =
             prev_offset + llvm::alignTo(prev_size, prev_alignment);
         if (prev_canonical->isArrayType() || prev_canonical->isRecordType()) {
@@ -347,9 +347,8 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
         DiagnosticsEngine::Error, "pointer-to-void is not supported");
     CustomDiagnosticsIDMap[CustomDiagnosticUnalignedScalar] =
-        DE.getCustomDiagID(
-            DiagnosticsEngine::Error,
-            "scalar elements must be aligned to their size");
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "scalar elements must be aligned to their size");
     CustomDiagnosticsIDMap[CustomDiagnosticUnalignedVec2] = DE.getCustomDiagID(
         DiagnosticsEngine::Error,
         "two-component vectors must be aligned to 2 times their element size");

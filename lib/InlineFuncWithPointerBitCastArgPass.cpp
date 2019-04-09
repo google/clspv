@@ -14,8 +14,8 @@
 
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/UniqueVector.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -33,7 +33,7 @@ struct InlineFuncWithPointerBitCastArgPass : public ModulePass {
   bool InlineFunctions(Module &M);
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char InlineFuncWithPointerBitCastArgPass::ID = 0;
 static RegisterPass<InlineFuncWithPointerBitCastArgPass>
@@ -44,7 +44,7 @@ namespace clspv {
 llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass() {
   return new InlineFuncWithPointerBitCastArgPass();
 }
-}
+} // namespace clspv
 
 bool InlineFuncWithPointerBitCastArgPass::runOnModule(Module &M) {
   bool Changed = false;

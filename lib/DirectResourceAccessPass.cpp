@@ -283,7 +283,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
                                  num_gep_zeroes, call}))
             return false;
         } else if (call->getCalledFunction()->getName().startswith(
-                      clspv::WorkgroupAccessorFunction())) {
+                       clspv::WorkgroupAccessorFunction())) {
           const uint32_t spec_id = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
           if (!merge_param_info({call->getCalledFunction(), spec_id, 0,
@@ -311,8 +311,10 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
              << arg.getName() << ": " << common.base->getName() << " ("
              << common.set << "," << common.binding
              << ") zeroes: " << common.num_gep_zeroes << " sample-call ";
-      if (common.sample_call) outs() << *common.sample_call << "\n";
-      else outs() << "nullptr\n";
+      if (common.sample_call)
+        outs() << *common.sample_call << "\n";
+      else
+        outs() << "nullptr\n";
     }
   }
 
@@ -324,7 +326,7 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   Builder.SetInsertPoint(fn->getEntryBlock().getFirstNonPHI());
 
   Value *replacement = common.base;
-  if (Function* function = dyn_cast<Function>(replacement)) {
+  if (Function *function = dyn_cast<Function>(replacement)) {
     // Create the call.
     SmallVector<Value *, 8> args(common.sample_call->arg_begin(),
                                  common.sample_call->arg_end());

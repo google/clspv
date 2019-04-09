@@ -50,13 +50,16 @@ private:
 };
 
 char RemoveUnusedArguments::ID = 0;
-static RegisterPass<RemoveUnusedArguments> X("RemoveUnusuedArguments",
-                                             "Remove unused arguments from non-kernel functions");
-}
+static RegisterPass<RemoveUnusedArguments>
+    X("RemoveUnusuedArguments",
+      "Remove unused arguments from non-kernel functions");
+} // namespace
 
 namespace clspv {
-ModulePass *createRemoveUnusedArgumentsPass() { return new RemoveUnusedArguments(); }
+ModulePass *createRemoveUnusedArgumentsPass() {
+  return new RemoveUnusedArguments();
 }
+} // namespace clspv
 
 namespace {
 
@@ -71,7 +74,8 @@ bool RemoveUnusedArguments::runOnModule(Module &M) {
   return changed;
 }
 
-bool RemoveUnusedArguments::findCandidates(Module &M, std::vector<Candidate> *candidates) {
+bool RemoveUnusedArguments::findCandidates(Module &M,
+                                           std::vector<Candidate> *candidates) {
   bool changed = false;
   for (auto &F : M) {
     // Don't modify kernel functions.
@@ -84,7 +88,7 @@ bool RemoveUnusedArguments::findCandidates(Module &M, std::vector<Candidate> *ca
     size_t i = 0;
     bool local_changed = false;
     SmallVector<Value *, 8> args;
-    for (auto &Arg: F.args()) {
+    for (auto &Arg : F.args()) {
       if (Arg.use_empty()) {
         local_changed = true;
         args.push_back(nullptr);
@@ -116,12 +120,14 @@ void RemoveUnusedArguments::removeUnusedParameters(
         arg_types.push_back(arg->getType());
       }
     }
-    FunctionType *new_type = FunctionType::get(f->getReturnType(), arg_types, false);
+    FunctionType *new_type =
+        FunctionType::get(f->getReturnType(), arg_types, false);
 
     // Insert the new function. Copy the calling convention, attributes and
     // metadata.
     auto inserted =
-        M.getOrInsertFunction(f->getName(), new_type, f->getAttributes()).getCallee();
+        M.getOrInsertFunction(f->getName(), new_type, f->getAttributes())
+            .getCallee();
     Function *new_function = cast<Function>(inserted);
     new_function->setCallingConv(f->getCallingConv());
     new_function->copyMetadata(f, 0);
@@ -162,7 +168,8 @@ void RemoveUnusedArguments::removeUnusedParameters(
             args.push_back(call->getOperand(i));
           }
         }
-        CallInst *new_call = CallInst::Create(new_type, new_function, args, "", call);
+        CallInst *new_call =
+            CallInst::Create(new_type, new_function, args, "", call);
         new_call->takeName(call);
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();
@@ -174,4 +181,4 @@ void RemoveUnusedArguments::removeUnusedParameters(
   }
 }
 
-}
+} // namespace

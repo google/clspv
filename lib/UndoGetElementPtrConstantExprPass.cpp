@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -32,7 +32,7 @@ struct UndoGetElementPtrConstantExprPass : public ModulePass {
 
   bool replaceGetElementPtrConstantExpr(ConstantExpr *CE);
 };
-}
+} // namespace
 
 char UndoGetElementPtrConstantExprPass::ID = 0;
 static RegisterPass<UndoGetElementPtrConstantExprPass>
@@ -42,7 +42,7 @@ namespace clspv {
 ModulePass *createUndoGetElementPtrConstantExprPass() {
   return new UndoGetElementPtrConstantExprPass();
 }
-}
+} // namespace clspv
 
 bool UndoGetElementPtrConstantExprPass::runOnModule(Module &M) {
   bool changed = false;
@@ -100,7 +100,8 @@ bool UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
     }
   }
 
-  if (CE->user_empty()) CE->destroyConstant();
+  if (CE->user_empty())
+    CE->destroyConstant();
 
   return true;
 }

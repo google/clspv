@@ -30,7 +30,7 @@ struct UndoTranslateSamplerFoldPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char UndoTranslateSamplerFoldPass::ID = 0;
 static RegisterPass<UndoTranslateSamplerFoldPass>
@@ -40,7 +40,7 @@ namespace clspv {
 ModulePass *createUndoTranslateSamplerFoldPass() {
   return new UndoTranslateSamplerFoldPass();
 }
-}
+} // namespace clspv
 
 bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
   auto F = M.getFunction("__translate_sampler_initializer");

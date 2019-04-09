@@ -104,7 +104,8 @@ void ReorderBasicBlocksPass::StructuredOrder(BasicBlock *block,
           continue_block = bb;
       }
     }
-    // At least the latch dominates itself so we will always find a continue block.
+    // At least the latch dominates itself so we will always find a continue
+    // block.
     assert(continue_block && merge_block && "Bad loop");
   } else if (terminator->getNumSuccessors() > 1) {
     // This is potentially a selection case, but it could also be a conditional

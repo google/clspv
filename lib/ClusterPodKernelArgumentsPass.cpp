@@ -30,8 +30,8 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -57,8 +57,7 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
 
 char ClusterPodKernelArgumentsPass::ID = 0;
 static RegisterPass<ClusterPodKernelArgumentsPass>
-    X("ClusterPodKernelArgumentsPass",
-      "Cluster POD Kernel Arguments Pass");
+    X("ClusterPodKernelArgumentsPass", "Cluster POD Kernel Arguments Pass");
 
 namespace clspv {
 llvm::ModulePass *createClusterPodKernelArgumentsPass() {
@@ -84,13 +83,13 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     }
   }
 
-  SmallVector<CallInst*, 8> CallList;
+  SmallVector<CallInst *, 8> CallList;
 
   // Note: The transformation done in this pass preserves the pointer-to-local
   // arg to spec-id mapping.
   clspv::ArgIdMapType arg_spec_id_map = clspv::AllocateArgSpecIds(M);
 
-  for (Function* F : WorkList) {
+  for (Function *F : WorkList) {
     Changed = true;
 
     // An ArgMapping describes how a kernel argument is remapped.
@@ -159,8 +158,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
-               unsigned(StructLayout->getElementOffset(pod_index++)),
-               arg_size, clspv::GetArgKindForType(ArgTy), -1});
+               unsigned(StructLayout->getElementOffset(pod_index++)), arg_size,
+               clspv::GetArgKindForType(ArgTy), -1});
         }
         arg_index++;
       }
@@ -237,25 +236,25 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       //    arguments.  For POD arguments this is the offest within the POD
       //    argument struct.
       //  - Argument type
-      LLVMContext& Context = M.getContext();
-      SmallVector<Metadata*, 8> mappings;
+      LLVMContext &Context = M.getContext();
+      SmallVector<Metadata *, 8> mappings;
       for (auto &arg_mapping : RemapInfo) {
         auto *name_md = MDString::get(Context, arg_mapping.name);
         auto *old_index_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.old_index));
-        auto *new_index_md = ConstantAsMetadata::get(
-            Builder.getInt32(arg_mapping.new_index));
+        auto *new_index_md =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.new_index));
         auto *offset_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
         auto *arg_size_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
         auto argKindName = GetArgKindName(arg_mapping.arg_kind);
         auto *argtype_md = MDString::get(Context, argKindName);
-        auto *spec_id_md = ConstantAsMetadata::get(
-            Builder.getInt32(arg_mapping.spec_id));
-        auto *arg_md =
-            MDNode::get(Context, {name_md, old_index_md, new_index_md,
-                                  offset_md, arg_size_md, argtype_md, spec_id_md});
+        auto *spec_id_md =
+            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.spec_id));
+        auto *arg_md = MDNode::get(
+            Context, {name_md, old_index_md, new_index_md, offset_md,
+                      arg_size_md, argtype_md, spec_id_md});
         mappings.push_back(arg_md);
       }
 
