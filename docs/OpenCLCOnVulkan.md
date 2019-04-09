@@ -538,7 +538,7 @@ spaces.
 #### 8-Bit Types
 
 The `char`, `char2`, `char3`, `uchar`, `uchar2`, and `uchar3` types
-can only be used when the `-int8` option is specified.
+can only be used. To disable general support for these types, use `-int8=0`.
 
 #### 64-Bit Types
 

@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -descriptormap=%t.map -module-constants-in-storage-buffer
+// RUN: clspv %s -o %t.spv -descriptormap=%t.map -module-constants-in-storage-buffer -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck -check-prefix=MAP %s < %t.map

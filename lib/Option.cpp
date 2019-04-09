@@ -144,7 +144,7 @@ llvm::cl::opt<bool> keep_unused_arguments(
     "keep-unused-arguments", llvm::cl::init(false),
     llvm::cl::desc("Do not remove unused non-kernel function arguments."));
 
-llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(false),
+llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
 } // namespace
