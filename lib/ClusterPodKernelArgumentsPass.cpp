@@ -106,9 +106,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       unsigned offset;
       // Size of the argument
       unsigned arg_size;
-      // Argument type.  Same range of values as the result of
-      // clspv::GetArgKindNameForType.
-      const char* arg_kind;
+      // Argument type.
+      clspv::ArgKind arg_kind;
       // If non-negative, this argument is a pointer-to-local, and the value
       // here is the specialization constant id for the array size.
       int spec_id;
@@ -134,7 +133,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           assert(spec_id > 0);
         }
         RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
-                             0u, 0u, clspv::GetArgKindName(kind), spec_id});
+                             0u, 0u, kind, spec_id});
       } else {
         PodArgTys.push_back(ArgTy);
       }
@@ -161,7 +160,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
                unsigned(StructLayout->getElementOffset(pod_index++)),
-               arg_size, clspv::GetArgKindNameForType(ArgTy), -1});
+               arg_size, clspv::GetArgKindForType(ArgTy), -1});
         }
         arg_index++;
       }
@@ -192,9 +191,11 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
     }
 
-    // Then attributes for pointer parameters
+    // Then attributes for non-POD parameters
     for (auto &rinfo : RemapInfo) {
-      if (Attributes.hasParamAttrs(rinfo.old_index)) {
+      bool argIsPod = rinfo.arg_kind == clspv::ArgKind::Pod ||
+                      rinfo.arg_kind == clspv::ArgKind::PodUBO;
+      if (!argIsPod && Attributes.hasParamAttrs(rinfo.old_index)) {
         auto idx = rinfo.new_index + AttributeList::FirstArgIndex;
         auto attrs = Attributes.getParamAttributes(rinfo.old_index);
         AttrBuildInfo.push_back(std::make_pair(idx, attrs));
@@ -248,7 +249,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.offset));
         auto *arg_size_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
-        auto *argtype_md = MDString::get(Context, arg_mapping.arg_kind);
+        auto argKindName = GetArgKindName(arg_mapping.arg_kind);
+        auto *argtype_md = MDString::get(Context, argKindName);
         auto *spec_id_md = ConstantAsMetadata::get(
             Builder.getInt32(arg_mapping.spec_id));
         auto *arg_md =
