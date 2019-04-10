@@ -18,14 +18,22 @@
 #
 # This script assumes to be invoked at the project root directory.
 
-FILES_TO_CHECK=$(git diff --name-only master | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
+if [ "$1" = "FULL" ]; then
+  FILES_TO_CHECK=$(find . | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
+else
+  FILES_TO_CHECK=$(git diff --name-only master | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
+fi
 
 if [ -z "${FILES_TO_CHECK}" ]; then
   echo "No source code to check for formatting."
   exit 0
 fi
 
-FORMAT_DIFF=$(git diff -U0 master -- ${FILES_TO_CHECK} | python ./utils/clang-format-diff.py -p1 -style=file)
+if [ "$1" = "FULL" ]; then
+  FORMAT_DIFF=$(python ./utils/clang-format-diff.py -p1 -style=file ${FILES_TO_CHECK})
+else
+  FORMAT_DIFF=$(git diff -U0 master -- ${FILES_TO_CHECK} | python ./utils/clang-format-diff.py -p1 -style=file)
+fi
 
 if [ -z "${FORMAT_DIFF}" ]; then
   echo "All source code in PR properly formatted."
