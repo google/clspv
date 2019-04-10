@@ -845,6 +845,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               Mask = Builder.getInt32(0xFF);
             } else if (NumElement == 2) {
               Mask = Builder.getInt32(0xFFFF);
+            } else if (NumElement == 4) {
+              Mask = Builder.getInt32(0xFFFFFFFF);
             } else {
               llvm_unreachable("strange type on bitcast");
             }
@@ -855,7 +857,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             for (unsigned i = 0; i < NumElement; i++) {
               Type *TmpTy = Type::getIntNTy(M.getContext(), DstTyBitWidth);
               Value *TmpVal = Builder.CreateBitCast(STVal, TmpTy);
-              TmpVal = Builder.CreateLShr(TmpVal, Builder.getInt32(i));
+              TmpVal = Builder.CreateLShr(TmpVal,
+                                          Builder.getInt32(i * SrcTyBitWidth));
               TmpVal = Builder.CreateAnd(TmpVal, Mask);
               TmpVal = Builder.CreateTrunc(TmpVal, SrcTy);
               STValues.push_back(TmpVal);
