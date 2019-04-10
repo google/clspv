@@ -40,7 +40,7 @@ private:
   Value *ScalarizePhi(PHINode *phi);
 
   // Phi nodes that need to be deleted.
-  std::vector<PHINode*> to_delete_;
+  std::vector<PHINode *> to_delete_;
 };
 } // namespace
 

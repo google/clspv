@@ -30,7 +30,7 @@ struct OpenCLInlinerPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char OpenCLInlinerPass::ID = 0;
 static RegisterPass<OpenCLInlinerPass> X("OpenCLInliner",
@@ -38,7 +38,7 @@ static RegisterPass<OpenCLInlinerPass> X("OpenCLInliner",
 
 namespace clspv {
 ModulePass *createOpenCLInlinerPass() { return new OpenCLInlinerPass(); }
-}
+} // namespace clspv
 
 bool OpenCLInlinerPass::runOnModule(Module &M) {
   StringRef FuncNames[] = {"_Z13get_global_idj",     "_Z14get_local_sizej",

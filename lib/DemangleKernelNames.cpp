@@ -32,13 +32,15 @@ public:
 };
 
 char DemangleKernelNames::ID = 0;
-static RegisterPass<DemangleKernelNames> X("DemangleKernelNames",
-                                             "Demangle the name of kernel functions");
-}
+static RegisterPass<DemangleKernelNames>
+    X("DemangleKernelNames", "Demangle the name of kernel functions");
+} // namespace
 
 namespace clspv {
-ModulePass *createDemangleKernelNamesPass() { return new DemangleKernelNames(); }
+ModulePass *createDemangleKernelNamesPass() {
+  return new DemangleKernelNames();
 }
+} // namespace clspv
 
 namespace {
 
@@ -62,4 +64,4 @@ bool DemangleKernelNames::runOnModule(Module &M) {
   return Changed;
 }
 
-}
+} // namespace

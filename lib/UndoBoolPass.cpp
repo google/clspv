@@ -30,14 +30,14 @@ struct UndoBoolPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char UndoBoolPass::ID = 0;
 static RegisterPass<UndoBoolPass> X("UndoBool", "Undo Bool Pass");
 
 namespace clspv {
 ModulePass *createUndoBoolPass() { return new UndoBoolPass(); }
-}
+} // namespace clspv
 
 bool UndoBoolPass::runOnModule(Module &M) {
   bool Changed = false;

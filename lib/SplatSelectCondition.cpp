@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -32,15 +32,14 @@ struct SplatSelectConditionPass : public ModulePass {
 } // namespace
 
 char SplatSelectConditionPass::ID = 0;
-static RegisterPass<SplatSelectConditionPass>
-    X("SplatSelectCond", "Splat Select Condition Pass");
+static RegisterPass<SplatSelectConditionPass> X("SplatSelectCond",
+                                                "Splat Select Condition Pass");
 
 namespace clspv {
 llvm::ModulePass *createSplatSelectConditionPass() {
   return new SplatSelectConditionPass();
 }
 } // namespace clspv
-
 
 bool SplatSelectConditionPass::runOnModule(Module &M) {
   bool Changed = false;

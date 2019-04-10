@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -27,19 +27,19 @@ struct SplatArgPass : public ModulePass {
   static char ID;
   SplatArgPass() : ModulePass(ID) {}
 
-  const char* getSplatName(StringRef Name);
+  const char *getSplatName(StringRef Name);
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char SplatArgPass::ID = 0;
 static RegisterPass<SplatArgPass> X("SplatArg", "Splat Argument Pass");
 
 namespace clspv {
 llvm::ModulePass *createSplatArgPass() { return new SplatArgPass(); }
-}
+} // namespace clspv
 
-const char* SplatArgPass::getSplatName(StringRef Name) {
+const char *SplatArgPass::getSplatName(StringRef Name) {
   if (Name.equals("_Z5clampDv2_iii")) {
     return "_Z5clampDv2_iS_S_";
   } else if (Name.equals("_Z5clampDv3_iii")) {
@@ -88,7 +88,7 @@ const char* SplatArgPass::getSplatName(StringRef Name) {
     return "_Z3minDv2_iS_";
   } else if (Name.equals("_Z3minDv3_ii")) {
     return "_Z3minDv3_iS_";
-  } else if (Name.equals("_Z3minDv4_ii")) { 
+  } else if (Name.equals("_Z3minDv4_ii")) {
     return "_Z3minDv4_iS_";
   } else if (Name.equals("_Z3minDv2_jj")) {
     return "_Z3minDv2_jS_";

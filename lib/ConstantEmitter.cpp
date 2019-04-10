@@ -16,8 +16,8 @@
 
 #include <cassert>
 
-#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -46,8 +46,8 @@ void ConstantEmitter::Emit(Constant *c) {
     EmitAggregateZero(ag);
   } else {
     errs() << "Don't know how to emit " << *c << " with value id "
-           << int(c->getValueID()) << " compared to " << int(Value::ConstantVectorVal)
-           << "\n";
+           << int(c->getValueID()) << " compared to "
+           << int(Value::ConstantVectorVal) << "\n";
     llvm_unreachable("Unhandled constant");
   }
 }

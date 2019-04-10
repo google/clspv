@@ -16,8 +16,8 @@
 
 #include <cstring>
 
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -25,7 +25,6 @@
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
-
 
 using namespace llvm;
 

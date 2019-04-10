@@ -34,7 +34,7 @@ struct SimplifyPointerBitcastPass : public ModulePass {
   bool runOnBitcastFromGEP(Module &M) const;
   bool runOnGEPFromGEP(Module &M) const;
 };
-}
+} // namespace
 
 char SimplifyPointerBitcastPass::ID = 0;
 static RegisterPass<SimplifyPointerBitcastPass>
@@ -44,7 +44,7 @@ namespace clspv {
 llvm::ModulePass *createSimplifyPointerBitcastPass() {
   return new SimplifyPointerBitcastPass();
 }
-}
+} // namespace clspv
 
 bool SimplifyPointerBitcastPass::runOnModule(Module &M) {
   bool Changed = false;

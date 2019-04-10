@@ -25,11 +25,7 @@ namespace version0 {
 
 struct DescriptorMapEntry {
   // Type of the entry.
-  enum Kind {
-    Sampler,
-    KernelArg,
-    Constant
-  } kind;
+  enum Kind { Sampler, KernelArg, Constant } kind;
 
   // Common data.
   uint32_t descriptor_set;
@@ -59,29 +55,21 @@ struct DescriptorMapEntry {
     std::string hex_bytes;
   } constant_data;
 
-  DescriptorMapEntry(ConstantData &&data, uint32_t ds, uint32_t b) :
-    kind(Constant),
-    descriptor_set(ds),
-    binding(b),
-    constant_data(std::move(data))
-  { }
+  DescriptorMapEntry(ConstantData &&data, uint32_t ds, uint32_t b)
+      : kind(Constant), descriptor_set(ds), binding(b),
+        constant_data(std::move(data)) {}
 
-  DescriptorMapEntry(KernelArgData &&data, uint32_t ds, uint32_t b) :
-    kind(KernelArg),
-    descriptor_set(ds),
-    binding(b),
-    kernel_arg_data(std::move(data))
-  { }
+  DescriptorMapEntry(KernelArgData &&data, uint32_t ds, uint32_t b)
+      : kind(KernelArg), descriptor_set(ds), binding(b),
+        kernel_arg_data(std::move(data)) {}
 
-  DescriptorMapEntry(SamplerData &&data, uint32_t ds, uint32_t b) :
-    kind(Sampler),
-    descriptor_set(ds),
-    binding(b),
-    sampler_data(std::move(data))
-  { }
+  DescriptorMapEntry(SamplerData &&data, uint32_t ds, uint32_t b)
+      : kind(Sampler), descriptor_set(ds), binding(b),
+        sampler_data(std::move(data)) {}
 };
 
-std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry::Kind &kind);
+std::ostream &operator<<(std::ostream &str,
+                         const DescriptorMapEntry::Kind &kind);
 std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry);
 
 } // namespace version0

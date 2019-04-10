@@ -40,8 +40,8 @@
 
 #include <cassert>
 #include <numeric>
-#include <string>
 #include <sstream>
+#include <string>
 
 using namespace clang;
 
@@ -157,7 +157,7 @@ static llvm::cl::opt<bool>
 
 static llvm::cl::opt<bool>
     WarningsAsErrors("Werror", llvm::cl::init(false),
-                   llvm::cl::desc("Turn warnings into errors"));
+                     llvm::cl::desc("Turn warnings into errors"));
 
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
@@ -629,7 +629,6 @@ int PopulatePassManager(
   // Now we add any of the LLVM optimizations we wanted
   pmBuilder.populateModulePassManager(*pm);
 
-
   // Unhide loads from __constant address space.  Undoes the action of
   // HideConstantLoadsPass.
   pm->add(clspv::createUnhideConstantLoadsPass());
@@ -700,8 +699,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
-  if (clspv::Option::CPlusPlus() &&
-      !clspv::Option::InlineEntryPoints()) {
+  if (clspv::Option::CPlusPlus() && !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "cannot use -c++ without -inline-entry-points\n";
     return -1;
   }
@@ -783,9 +781,8 @@ int Compile(const int argc, const char *const argv[]) {
   std::string descriptor_map;
   llvm::legacy::PassManager pm;
   std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
-  if (auto error =
-          PopulatePassManager(&pm, &binaryStream,
-                              &descriptor_map_entries, &SamplerMapEntries))
+  if (auto error = PopulatePassManager(
+          &pm, &binaryStream, &descriptor_map_entries, &SamplerMapEntries))
     return error;
   pm.run(*module);
 
@@ -794,10 +791,9 @@ int Compile(const int argc, const char *const argv[]) {
   // Write the descriptor map, if requested.
   std::error_code error;
   if (!DescriptorMapFilename.empty()) {
-    llvm::raw_fd_ostream descriptor_map_out_fd(DescriptorMapFilename, error,
-                                               llvm::sys::fs::CD_CreateAlways,
-                                               llvm::sys::fs::FA_Write,
-                                               llvm::sys::fs::F_Text);
+    llvm::raw_fd_ostream descriptor_map_out_fd(
+        DescriptorMapFilename, error, llvm::sys::fs::CD_CreateAlways,
+        llvm::sys::fs::FA_Write, llvm::sys::fs::F_Text);
     if (error) {
       llvm::errs() << "Unable to open descriptor map file '"
                    << DescriptorMapFilename << "': " << error.message() << '\n';
@@ -822,7 +818,8 @@ int Compile(const int argc, const char *const argv[]) {
       OutputFilename = "a.spv";
     }
   }
-  llvm::raw_fd_ostream outStream(OutputFilename, error, llvm::sys::fs::FA_Write);
+  llvm::raw_fd_ostream outStream(OutputFilename, error,
+                                 llvm::sys::fs::FA_Write);
 
   if (error) {
     llvm::errs() << "Unable to open output file '" << OutputFilename
@@ -834,11 +831,10 @@ int Compile(const int argc, const char *const argv[]) {
   return 0;
 }
 
-int CompileFromSourceString(const std::string &program,
-                            const std::string &sampler_map,
-                            const std::string &options,
-                            std::vector<uint32_t> *output_binary,
-                            std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries) {
+int CompileFromSourceString(
+    const std::string &program, const std::string &sampler_map,
+    const std::string &options, std::vector<uint32_t> *output_binary,
+    std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries) {
 
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
@@ -902,18 +898,19 @@ int CompileFromSourceString(const std::string &program,
   llvm::raw_svector_ostream binaryStream(binary);
   std::string descriptor_map;
   llvm::legacy::PassManager pm;
-  if (auto error =
-          PopulatePassManager(&pm, &binaryStream,
-                              descriptor_map_entries, &SamplerMapEntries))
+  if (auto error = PopulatePassManager(
+          &pm, &binaryStream, descriptor_map_entries, &SamplerMapEntries))
     return error;
   pm.run(*module);
 
   // Write outputs
 
   // Write the descriptor map. This is required.
-  assert(descriptor_map_entries && "Valid descriptor map container is required.");
+  assert(descriptor_map_entries &&
+         "Valid descriptor map container is required.");
   if (!DescriptorMapFilename.empty()) {
-    llvm::errs() << "Warning: -descriptormap is ignored descriptor map container is provided.\n";
+    llvm::errs() << "Warning: -descriptormap is ignored descriptor map "
+                    "container is provided.\n";
   }
 
   // Write the resulting binary.

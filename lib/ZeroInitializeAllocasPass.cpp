@@ -43,8 +43,7 @@ struct ZeroInitializeAllocasPass : public ModulePass {
 
 char ZeroInitializeAllocasPass::ID = 0;
 static RegisterPass<ZeroInitializeAllocasPass>
-    X("ZeroInitializeAllocasPass",
-      "Zero-initialize stack variables");
+    X("ZeroInitializeAllocasPass", "Zero-initialize stack variables");
 
 namespace clspv {
 llvm::ModulePass *createZeroInitializeAllocasPass() {
@@ -60,7 +59,7 @@ bool ZeroInitializeAllocasPass::runOnModule(Module &M) {
   SmallVector<AllocaInst *, 8> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
-      for (auto iter = BB.begin(); iter != BB.end() ; ++iter) {
+      for (auto iter = BB.begin(); iter != BB.end(); ++iter) {
         if (auto *alloca = dyn_cast<AllocaInst>(&*iter)) {
           WorkList.push_back(alloca);
         }

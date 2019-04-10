@@ -105,7 +105,7 @@ void ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
 }
 
 void ShareModuleScopeVariablesPass::TraceFunction(Function *function,
-                                             Function *entry_point) {
+                                                  Function *entry_point) {
   function_to_entry_points_[function].insert(entry_point);
 
   for (auto &BB : *function) {

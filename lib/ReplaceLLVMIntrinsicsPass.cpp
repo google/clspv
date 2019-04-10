@@ -37,7 +37,7 @@ struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
   bool replaceMemcpy(Module &M);
   bool removeLifetimeDeclarations(Module &M);
 };
-}
+} // namespace
 
 char ReplaceLLVMIntrinsicsPass::ID = 0;
 static RegisterPass<ReplaceLLVMIntrinsicsPass>
@@ -47,7 +47,7 @@ namespace clspv {
 ModulePass *createReplaceLLVMIntrinsicsPass() {
   return new ReplaceLLVMIntrinsicsPass();
 }
-}
+} // namespace clspv
 
 bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
   bool Changed = false;
@@ -202,10 +202,12 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
       for (auto U : F.users()) {
         if (auto CI = dyn_cast<CallInst>(U)) {
           assert(isa<BitCastOperator>(CI->getArgOperand(0)));
-          auto Dst = dyn_cast<BitCastOperator>(CI->getArgOperand(0))->getOperand(0);
+          auto Dst =
+              dyn_cast<BitCastOperator>(CI->getArgOperand(0))->getOperand(0);
 
           assert(isa<BitCastOperator>(CI->getArgOperand(1)));
-          auto Src = dyn_cast<BitCastOperator>(CI->getArgOperand(1))->getOperand(0);
+          auto Src =
+              dyn_cast<BitCastOperator>(CI->getArgOperand(1))->getOperand(0);
 
           // The original type of Dst we get from the argument to the bitcast
           // instruction.
@@ -261,7 +263,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto Alignment = ConstantInt::get(I32Ty, cast<MemIntrinsic>(CI)->getDestAlignment());
+        auto Alignment =
+            ConstantInt::get(I32Ty, cast<MemIntrinsic>(CI)->getDestAlignment());
         auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
 
         auto Dst = Arg0->getOperand(0);
@@ -305,8 +308,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           DstIndices.push_back(Zero);
 
           // Build the function and function type only once.
-          FunctionType* NewFType = nullptr;
-          Function* NewF = nullptr;
+          FunctionType *NewFType = nullptr;
+          Function *NewF = nullptr;
 
           IRBuilder<> Builder(CI);
           for (unsigned i = 0; i < Size / DstElemSize; ++i) {
@@ -344,7 +347,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         if (isa<BitCastInst>(Arg1))
           BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg1));
       }
-      for (auto* Inst : BitCastsToForget) {
+      for (auto *Inst : BitCastsToForget) {
         Inst->eraseFromParent();
       }
     }

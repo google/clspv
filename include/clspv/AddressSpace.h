@@ -29,6 +29,6 @@ enum Type {
   ModuleScopePrivate // Vulkan private memory.
 };
 }
-}
+} // namespace clspv
 
 #endif // CLSPV_INCLUDE_CLSPV_ADDRESS_SPACE_H_

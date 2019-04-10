@@ -28,7 +28,7 @@ using namespace llvm;
 // The mangling loosely follows the Itanium convention.
 // Its purpose is solely to ensure uniqueness of names, it is not
 // meant to convey type information.
-static std::string mangleType(Type* Ty) {
+static std::string mangleType(Type *Ty) {
   if (Ty->isVectorTy()) {
     auto NumVecElems = std::to_string(Ty->getVectorNumElements());
     return "Dv" + NumVecElems + "_" + mangleType(Ty->getScalarType());
@@ -47,9 +47,9 @@ static std::string mangleType(Type* Ty) {
   llvm_unreachable("Unhandled type in SPIR-V intrinsic name mangler");
 }
 
-Instruction* InsertSPIRVOp(Instruction* Insert, spv::Op Opcode,
+Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
-                           Type* RetType, ArrayRef<Value*> Args) {
+                           Type *RetType, ArrayRef<Value *> Args) {
 
   // Prepare mangled name
   std::string MangledName = clspv::SPIRVOpIntrinsicFunction();
@@ -62,7 +62,7 @@ Instruction* InsertSPIRVOp(Instruction* Insert, spv::Op Opcode,
   // Create a function in the module
   auto M = Insert->getModule();
   auto Int32Ty = Type::getInt32Ty(M->getContext());
-  SmallVector<Type*, 8> ArgTypes = { Int32Ty };
+  SmallVector<Type *, 8> ArgTypes = {Int32Ty};
   for (auto Arg : Args) {
     ArgTypes.push_back(Arg->getType());
   }
@@ -74,7 +74,7 @@ Instruction* InsertSPIRVOp(Instruction* Insert, spv::Op Opcode,
   }
 
   // Now call it with the values we were passed
-  SmallVector<Value*, 8> ArgValues = { ConstantInt::get(Int32Ty, Opcode) };
+  SmallVector<Value *, 8> ArgValues = {ConstantInt::get(Int32Ty, Opcode)};
   for (auto Arg : Args) {
     ArgValues.push_back(Arg);
   }
@@ -82,4 +82,4 @@ Instruction* InsertSPIRVOp(Instruction* Insert, spv::Op Opcode,
   return CallInst::Create(NewF, ArgValues, "", Insert);
 }
 
-};
+}; // namespace clspv

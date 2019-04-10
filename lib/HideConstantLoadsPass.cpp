@@ -30,35 +30,34 @@ using std::string;
 
 #define DEBUG_TYPE "hideconstantloads"
 
-
 namespace {
 
-const char* kWrapFunctionPrefix = "clspv.wrap_constant_load.";
+const char *kWrapFunctionPrefix = "clspv.wrap_constant_load.";
 
 class HideConstantLoadsPass : public ModulePass {
- public:
+public:
   static char ID;
   HideConstantLoadsPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
 
- private:
-   // Return the name for the wrap function for the given type.
-   string &WrapFunctionNameForType(Type *type) {
-     auto where = function_for_type_.find(type);
-     if (where == function_for_type_.end()) {
-       // Insert it.
-       auto &result = function_for_type_[type] =
-           string(kWrapFunctionPrefix) +
-           std::to_string(function_for_type_.size());
-       return result;
-     } else {
-       return where->second;
-     }
-   }
+private:
+  // Return the name for the wrap function for the given type.
+  string &WrapFunctionNameForType(Type *type) {
+    auto where = function_for_type_.find(type);
+    if (where == function_for_type_.end()) {
+      // Insert it.
+      auto &result = function_for_type_[type] =
+          string(kWrapFunctionPrefix) +
+          std::to_string(function_for_type_.size());
+      return result;
+    } else {
+      return where->second;
+    }
+  }
 
-   // Maps a loaded type to the name of the wrap function for that type.
-   DenseMap<Type *, string> function_for_type_;
+  // Maps a loaded type to the name of the wrap function for that type.
+  DenseMap<Type *, string> function_for_type_;
 };
 } // namespace
 
@@ -71,7 +70,6 @@ llvm::ModulePass *createHideConstantLoadsPass() {
   return new HideConstantLoadsPass();
 }
 } // namespace clspv
-
 
 bool HideConstantLoadsPass::runOnModule(Module &M) {
   bool Changed = false;
@@ -99,11 +97,11 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
     auto loadedTy = load->getType();
 
     // The wrap function conceptually maps the loaded value to itself.
-    const string& fn_name = WrapFunctionNameForType(loadedTy);
-    Function* fn = M.getFunction(fn_name);
+    const string &fn_name = WrapFunctionNameForType(loadedTy);
+    Function *fn = M.getFunction(fn_name);
     if (!fn) {
       // Make the function.
-      FunctionType* fnTy = FunctionType::get(loadedTy, {loadedTy}, false);
+      FunctionType *fnTy = FunctionType::get(loadedTy, {loadedTy}, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
       fn = cast<Function>(fn_constant.getCallee());
       fn->addFnAttr(Attribute::ReadOnly);
@@ -133,16 +131,15 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
 
 namespace {
 class UnhideConstantLoadsPass : public ModulePass {
- public:
+public:
   static char ID;
   UnhideConstantLoadsPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
 
- private:
-
-   // Maps a loaded type to the name of the wrap function for that type.
-   DenseMap<Type *, string> function_for_type_;
+private:
+  // Maps a loaded type to the name of the wrap function for that type.
+  DenseMap<Type *, string> function_for_type_;
 };
 
 } // namespace
@@ -161,7 +158,7 @@ bool UnhideConstantLoadsPass::runOnModule(Module &M) {
   bool Changed = false;
 
   SmallVector<Function *, 16> WorkList;
-  for (auto& F : M.getFunctionList()) {
+  for (auto &F : M.getFunctionList()) {
     if (F.getName().startswith(kWrapFunctionPrefix)) {
       WorkList.push_back(&F);
     }
@@ -171,20 +168,20 @@ bool UnhideConstantLoadsPass::runOnModule(Module &M) {
     return Changed;
 
   SmallVector<CallInst *, 16> RemoveList;
-  for (auto* F : WorkList) {
-    for (auto& use : F->uses()) {
-      if (auto* call = dyn_cast<CallInst>(use.getUser())) {
+  for (auto *F : WorkList) {
+    for (auto &use : F->uses()) {
+      if (auto *call = dyn_cast<CallInst>(use.getUser())) {
         assert(call->getNumArgOperands() == 1);
-        auto* load = call->getArgOperand(0);
+        auto *load = call->getArgOperand(0);
         call->replaceAllUsesWith(load);
         RemoveList.push_back(call);
       }
     }
   }
-  for (auto* call : RemoveList) {
+  for (auto *call : RemoveList) {
     call->eraseFromParent();
   }
-  for (auto* F : WorkList) {
+  for (auto *F : WorkList) {
     F->eraseFromParent();
   }
 

@@ -650,8 +650,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::BufferUBO: {
           // If original argument is:
           //   Elem addrspace(2)*
-          // Then make a n-element sized array to mimic an Uniform struct whose first
-          // element is an array:
+          // Then make a n-element sized array to mimic an Uniform struct whose
+          // first element is an array:
           //
           //   { [n x Elem] }
           //
@@ -721,7 +721,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           Type *i32 = Builder.getInt32Ty();
           FunctionType *fnTy =
               FunctionType::get(ptrTy, {i32, i32, i32, i32, i32, i32}, false);
-          var_fn = cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
+          var_fn =
+              cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
         }
 
         // Replace uses of this argument with something dependent on a GEP
@@ -927,13 +928,15 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
                 "__spirv_control_barrier")) {
           // barrier()
           if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
-            uses_barrier = semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+            uses_barrier =
+                semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
         } else if (call->getCalledFunction()->getName().equals(
                        "__spirv_memory_barrier")) {
           // mem_fence()
           if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(1))) {
-            uses_barrier = semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+            uses_barrier =
+                semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
           // Continue searching in the subfunction.
@@ -976,7 +979,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
   std::vector<std::pair<Value *, unsigned>> stack;
   for (auto &Use : V->uses()) {
     if (IsInterestingUser(Use.getUser()))
-    stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+      stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
   }
 
   while (!stack.empty() && !(read && write)) {
@@ -1001,7 +1004,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
         for (auto &Use : arg_iter->uses()) {
           auto *User = Use.getUser();
           if (IsInterestingUser(User))
-          stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+            stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
         }
       } else if (call) {
         // Check the attributes on the function.
@@ -1016,7 +1019,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
         for (auto &U : value->uses()) {
           auto *User = U.getUser();
           if (IsInterestingUser(User))
-          stack.push_back(std::make_pair(U.getUser(), U.getOperandNo()));
+            stack.push_back(std::make_pair(U.getUser(), U.getOperandNo()));
         }
       }
     }

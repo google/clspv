@@ -30,18 +30,18 @@ struct UndoSRetPass : public ModulePass {
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char UndoSRetPass::ID = 0;
 static RegisterPass<UndoSRetPass> X("UndoSRet", "Undo SRet Pass");
 
 namespace clspv {
 llvm::ModulePass *createUndoSRetPass() { return new UndoSRetPass(); }
-}
+} // namespace clspv
 
 bool UndoSRetPass::runOnModule(Module &M) {
   bool Changed = false;
-  LLVMContext& Context = M.getContext();
+  LLVMContext &Context = M.getContext();
 
   SmallVector<Function *, 8> WorkList;
   for (Function &F : M) {
