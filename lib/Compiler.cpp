@@ -383,7 +383,12 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
     instance.getDiagnosticOpts().VerifyPrefixes.push_back("expected");
   }
 
-  clang::LangStandard::Kind standard = clang::LangStandard::lang_opencl12;
+  clang::LangStandard::Kind standard;
+  if (clspv::Option::CPlusPlus()) {
+    standard = clang::LangStandard::lang_openclcpp;
+  } else {
+    standard = clang::LangStandard::lang_opencl12;
+  }
 
   // We are targeting OpenCL 1.2 only
   instance.getLangOpts().OpenCLVersion = 120;
@@ -602,6 +607,10 @@ int PopulatePassManager(
     pm->add(clspv::createInlineFuncWithSingleCallSitePass());
   }
 
+  if (clspv::Option::CPlusPlus()) {
+    pm->add(clspv::createDemangleKernelNamesPass());
+  }
+
   if (0 == pmBuilder.OptLevel) {
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
@@ -687,6 +696,12 @@ int ParseOptions(const int argc, const char *const argv[]) {
       !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "clspv restriction: -constant-args-ubo requires "
                     "-inline-entry-points\n";
+    return -1;
+  }
+
+  if (clspv::Option::CPlusPlus() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "cannot use -c++ without -inline-entry-points\n";
     return -1;
   }
 

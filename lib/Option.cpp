@@ -147,6 +147,9 @@ llvm::cl::opt<bool> keep_unused_arguments(
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
+static llvm::cl::opt<bool>
+    cplusplus("c++", llvm::cl::init(false),
+                   llvm::cl::desc("Enable experimental C++ support"));
 } // namespace
 
 namespace clspv {
@@ -178,6 +181,7 @@ bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
+bool CPlusPlus() { return cplusplus; }
 
 } // namespace Option
 } // namespace clspv

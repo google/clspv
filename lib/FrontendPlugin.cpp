@@ -24,6 +24,8 @@
 
 #include "FrontendPlugin.h"
 
+#include <unordered_set>
+
 using namespace clang;
 
 namespace {
@@ -51,6 +53,7 @@ private:
     CustomDiagnosticLocationInfo = 13,
     CustomDiagnosticSSBOUnalignedArray = 14,
     CustomDiagnosticSSBOUnalignedStruct = 15,
+    CustomDiagnosticOverloadedKernel = 16,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -332,6 +335,7 @@ private:
   };
 
   DeclVisitor Visitor;
+  std::unordered_set<std::string> Kernels;
 
 public:
   explicit ExtraValidationConsumer(CompilerInstance &Instance,
@@ -402,6 +406,9 @@ public:
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "in a SSBO, structs must be aligned to their "
                            "largest element alignment");
+    CustomDiagnosticsIDMap[CustomDiagnosticOverloadedKernel] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "kernel functions can't be overloaded");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -421,6 +428,15 @@ public:
               if (attr->getKind() == attr::Kind::OpenCLKernel) {
                 is_opencl_kernel = true;
               }
+            }
+          }
+
+          if (is_opencl_kernel) {
+            if (Kernels.count(FD->getName()) != 0) {
+              auto srcRange = FD->getSourceRange();
+              Report(CustomDiagnosticOverloadedKernel, srcRange, srcRange);
+            } else {
+              Kernels.insert(FD->getName());
             }
           }
 
