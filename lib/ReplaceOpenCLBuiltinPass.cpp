@@ -256,27 +256,12 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   return Changed;
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
-  bool Changed = false;
+bool replaceCallsWithValue(
+        Module &M,
+        std::vector<const char*> Names,
+        std::function<Value*(CallInst*)> Replacer) {
 
-  const char *Names[] = {
-    "_Z3absh",
-    "_Z3absDv2_h",
-    "_Z3absDv3_h",
-    "_Z3absDv4_h",
-    "_Z3abst",
-    "_Z3absDv2_t",
-    "_Z3absDv3_t",
-    "_Z3absDv4_t",
-    "_Z3absj",
-    "_Z3absDv2_j",
-    "_Z3absDv3_j",
-    "_Z3absDv4_j",
-    "_Z3absm",
-    "_Z3absDv2_m",
-    "_Z3absDv3_m",
-    "_Z3absDv4_m",
-  };
+  bool Changed = false;
 
   for (auto Name : Names) {
     // If we find a function with the matching name.
@@ -286,11 +271,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
       // Walk the users of the function.
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // Abs has one arg.
-          auto Arg = CI->getOperand(0);
 
-          // Use the argument unchanged, we know it's unsigned
-          CI->replaceAllUsesWith(Arg);
+          auto NewValue = Replacer(CI);
+
+          if (NewValue != nullptr) {
+            CI->replaceAllUsesWith(NewValue);
+          }
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
@@ -312,10 +298,35 @@ bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
   return Changed;
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
-  bool Changed = false;
+bool ReplaceOpenCLBuiltinPass::replaceAbs(Module &M) {
 
-  const char *Names[] = {
+  std::vector<const char *> Names = {
+    "_Z3absh",
+    "_Z3absDv2_h",
+    "_Z3absDv3_h",
+    "_Z3absDv4_h",
+    "_Z3abst",
+    "_Z3absDv2_t",
+    "_Z3absDv3_t",
+    "_Z3absDv4_t",
+    "_Z3absj",
+    "_Z3absDv2_j",
+    "_Z3absDv3_j",
+    "_Z3absDv4_j",
+    "_Z3absm",
+    "_Z3absDv2_m",
+    "_Z3absDv3_m",
+    "_Z3absDv4_m",
+  };
+
+  return replaceCallsWithValue(M, Names, [](CallInst* CI) {
+    return CI->getOperand(0);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
+
+  std::vector<const char *> Names = {
     "_Z8abs_diffcc",
     "_Z8abs_diffDv2_cS_",
     "_Z8abs_diffDv3_cS_",
@@ -350,217 +361,103 @@ bool ReplaceOpenCLBuiltinPass::replaceAbsDiff(Module &M) {
     "_Z8abs_diffDv4_mS_",
   };
 
-  for (auto Name : Names) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [](CallInst* CI) {
+    auto XValue = CI->getOperand(0);
+    auto YValue = CI->getOperand(1);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+    IRBuilder<> Builder(CI);
+    auto XmY = Builder.CreateSub(XValue, YValue);
+    auto YmX = Builder.CreateSub(YValue, XValue);
 
-          auto XValue = CI->getOperand(0);
-          auto YValue = CI->getOperand(1);
-
-          IRBuilder<> Builder(CI);
-          auto XmY = Builder.CreateSub(XValue, YValue);
-          auto YmX = Builder.CreateSub(YValue, XValue);
-
-          Value* Cmp;
-          auto finfo = FunctionInfo::getFromMangledName(F->getName());
-          if (finfo.isArgSigned(0)) {
-            Cmp = Builder.CreateICmpSGT(YValue, XValue);
-          } else {
-            Cmp = Builder.CreateICmpUGT(YValue, XValue);
-          }
-
-          auto V = Builder.CreateSelect(Cmp, YmX, XmY);
-
-          // Use the argument unchanged, we know it's unsigned
-          CI->replaceAllUsesWith(V);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
+    Value* Cmp;
+    auto F = CI->getCalledFunction();
+    auto finfo = FunctionInfo::getFromMangledName(F->getName());
+    if (finfo.isArgSigned(0)) {
+      Cmp = Builder.CreateICmpSGT(YValue, XValue);
+    } else {
+      Cmp = Builder.CreateICmpUGT(YValue, XValue);
     }
-  }
 
-  return Changed;
+    return Builder.CreateSelect(Cmp, YmX, XmY);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceCopysign(Module &M) {
-  bool Changed = false;
 
-  const char *Names[] = {
+  std::vector<const char *> Names = {
     "_Z8copysignff",
     "_Z8copysignDv2_fS_",
     "_Z8copysignDv3_fS_",
     "_Z8copysignDv4_fS_",
   };
 
-  for (auto Name : Names) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    auto XValue = CI->getOperand(0);
+    auto YValue = CI->getOperand(1);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+    auto Ty = XValue->getType();
 
-          auto XValue = CI->getOperand(0);
-          auto YValue = CI->getOperand(1);
-
-          auto Ty = XValue->getType();
-
-          Type* IntTy = Type::getIntNTy(M.getContext(), Ty->getScalarSizeInBits());
-          if (Ty->isVectorTy()) {
-            IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
-          }
-
-          // Return X with the sign of Y
-
-          // Sign bit masks
-          auto SignBit = IntTy->getScalarSizeInBits() - 1;
-          auto SignBitMask = 1 << SignBit;
-          auto SignBitMaskValue = ConstantInt::get(IntTy, SignBitMask);
-          auto NotSignBitMaskValue = ConstantInt::get(IntTy, ~SignBitMask);
-
-          IRBuilder<> Builder(CI);
-
-          // Extract sign of Y
-          auto YInt = Builder.CreateBitCast(YValue, IntTy);
-          auto YSign = Builder.CreateAnd(YInt, SignBitMaskValue);
-
-          // Clear sign bit in X
-          auto XInt = Builder.CreateBitCast(XValue, IntTy);
-          XInt = Builder.CreateAnd(XInt, NotSignBitMaskValue);
-
-          // Insert sign bit of Y into X
-          auto NewXInt = Builder.CreateOr(XInt, YSign);
-
-          // And cast back to floating-point
-          auto NewX = Builder.CreateBitCast(NewXInt, Ty);
-
-          CI->replaceAllUsesWith(NewX);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
+    Type* IntTy = Type::getIntNTy(M.getContext(), Ty->getScalarSizeInBits());
+    if (Ty->isVectorTy()) {
+      IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
     }
-  }
 
-  return Changed;
+    // Return X with the sign of Y
+
+    // Sign bit masks
+    auto SignBit = IntTy->getScalarSizeInBits() - 1;
+    auto SignBitMask = 1 << SignBit;
+    auto SignBitMaskValue = ConstantInt::get(IntTy, SignBitMask);
+    auto NotSignBitMaskValue = ConstantInt::get(IntTy, ~SignBitMask);
+
+    IRBuilder<> Builder(CI);
+
+    // Extract sign of Y
+    auto YInt = Builder.CreateBitCast(YValue, IntTy);
+    auto YSign = Builder.CreateAnd(YInt, SignBitMaskValue);
+
+    // Clear sign bit in X
+    auto XInt = Builder.CreateBitCast(XValue, IntTy);
+    XInt = Builder.CreateAnd(XInt, NotSignBitMaskValue);
+
+    // Insert sign bit of Y into X
+    auto NewXInt = Builder.CreateOr(XInt, YSign);
+
+    // And cast back to floating-point
+    return Builder.CreateBitCast(NewXInt, Ty);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceRecip(Module &M) {
-  bool Changed = false;
 
-  const char *Names[] = {
+  std::vector<const char *> Names = {
       "_Z10half_recipf",       "_Z12native_recipf",     "_Z10half_recipDv2_f",
       "_Z12native_recipDv2_f", "_Z10half_recipDv3_f",   "_Z12native_recipDv3_f",
       "_Z10half_recipDv4_f",   "_Z12native_recipDv4_f",
   };
 
-  for (auto Name : Names) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
-
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // Recip has one arg.
-          auto Arg = CI->getOperand(0);
-
-          auto Div = BinaryOperator::Create(
-              Instruction::FDiv, ConstantFP::get(Arg->getType(), 1.0), Arg, "",
-              CI);
-
-          CI->replaceAllUsesWith(Div);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+  return replaceCallsWithValue(M, Names, [](CallInst* CI) {
+    // Recip has one arg.
+    auto Arg = CI->getOperand(0);
+    auto Cst1 = ConstantFP::get(Arg->getType(), 1.0);
+    return BinaryOperator::Create(Instruction::FDiv, Cst1, Arg, "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceDivide(Module &M) {
-  bool Changed = false;
 
-  const char *Names[] = {
+  std::vector<const char *> Names = {
       "_Z11half_divideff",      "_Z13native_divideff",
       "_Z11half_divideDv2_fS_", "_Z13native_divideDv2_fS_",
       "_Z11half_divideDv3_fS_", "_Z13native_divideDv3_fS_",
       "_Z11half_divideDv4_fS_", "_Z13native_divideDv4_fS_",
   };
 
-  for (auto Name : Names) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
-
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          auto Div = BinaryOperator::Create(
-              Instruction::FDiv, CI->getOperand(0), CI->getOperand(1), "", CI);
-
-          CI->replaceAllUsesWith(Div);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+  return replaceCallsWithValue(M, Names, [](CallInst* CI) {
+    auto Op0 = CI->getOperand(0);
+    auto Op1 = CI->getOperand(1);
+    return BinaryOperator::Create(Instruction::FDiv, Op0, Op1, "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceExp10(Module &M) {
@@ -2283,226 +2180,141 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Module &M) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Module &M) {
-  bool Changed = false;
 
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z11vload_half2jPU3AS1KDh",
       "_Z12vloada_half2jPU3AS1KDh", // vloada_half2 global
       "_Z11vload_half2jPU3AS2KDh",
       "_Z12vloada_half2jPU3AS2KDh", // vloada_half2 constant
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The index argument from vload_half.
-          auto Arg0 = CI->getOperand(0);
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
 
-          // The pointer argument from vload_half.
-          auto Arg1 = CI->getOperand(1);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy = PointerType::get(
+        IntTy, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              IntTy, Arg1->getType()->getPointerAddressSpace());
-          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+    // Cast the half* pointer to int*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
 
-          // Cast the half* pointer to int*.
-          auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg0, "", CI);
 
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg0, "", CI);
+    // Load from the int* we casted to.
+    auto Load = new LoadInst(Index, "", CI);
 
-          // Load from the int* we casted to.
-          auto Load = new LoadInst(Index, "", CI);
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
 
-          // Our intrinsic to unpack a float2 from an int.
-          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-          // Get our float2.
-          auto Call = CallInst::Create(NewF, Load, "", CI);
-
-          CI->replaceAllUsesWith(Call);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Get our float2.
+    return CallInst::Create(NewF, Load, "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Module &M) {
-  bool Changed = false;
 
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z11vload_half4jPU3AS1KDh",
       "_Z12vloada_half4jPU3AS1KDh",
       "_Z11vload_half4jPU3AS2KDh",
       "_Z12vloada_half4jPU3AS2KDh",
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The index argument from vload_half.
-          auto Arg0 = CI->getOperand(0);
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
 
-          // The pointer argument from vload_half.
-          auto Arg1 = CI->getOperand(1);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int2Ty = VectorType::get(IntTy, 2);
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy = PointerType::get(
+        Int2Ty, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Int2Ty = VectorType::get(IntTy, 2);
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              Int2Ty, Arg1->getType()->getPointerAddressSpace());
-          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+    // Cast the half* pointer to int2*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
 
-          // Cast the half* pointer to int2*.
-          auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
 
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
+    // Load from the int2* we casted to.
+    auto Load = new LoadInst(Index, "", CI);
 
-          // Load from the int2* we casted to.
-          auto Load = new LoadInst(Index, "", CI);
+    // Extract each element from the loaded int2.
+    auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0),
+                                        "", CI);
+    auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1),
+                                        "", CI);
 
-          // Extract each element from the loaded int2.
-          auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0),
-                                              "", CI);
-          auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1),
-                                              "", CI);
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
 
-          // Our intrinsic to unpack a float2 from an int.
-          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+    // Get the lower (x & y) components of our final float4.
+    auto Lo = CallInst::Create(NewF, X, "", CI);
 
-          // Get the lower (x & y) components of our final float4.
-          auto Lo = CallInst::Create(NewF, X, "", CI);
+    // Get the higher (z & w) components of our final float4.
+    auto Hi = CallInst::Create(NewF, Y, "", CI);
 
-          // Get the higher (z & w) components of our final float4.
-          auto Hi = CallInst::Create(NewF, Y, "", CI);
+    Constant *ShuffleMask[4] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
 
-          Constant *ShuffleMask[4] = {
-              ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
-              ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
-
-          // Combine our two float2's into one float4.
-          auto Combine = new ShuffleVectorInst(
-              Lo, Hi, ConstantVector::get(ShuffleMask), "", CI);
-
-          CI->replaceAllUsesWith(Combine);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Combine our two float2's into one float4.
+    return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask),
+                                 "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Module &M) {
-  bool Changed = false;
 
   // Replace __clspv_vloada_half2(uint Index, global uint* Ptr) with:
   //
   //    %u = load i32 %ptr
   //    %fxy = call <2 x float> Unpack2xHalf(u)
   //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z20__clspv_vloada_half2jPU3AS1Kj", // global
       "_Z20__clspv_vloada_half2jPU3AS3Kj", // local
       "_Z20__clspv_vloada_half2jPKj",      // private
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    auto Index = CI->getOperand(0);
+    auto Ptr = CI->getOperand(1);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto* CI = dyn_cast<CallInst>(U.getUser())) {
-          auto Index = CI->getOperand(0);
-          auto Ptr = CI->getOperand(1);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+    auto IndexedPtr =
+        GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
+    auto Load = new LoadInst(IndexedPtr, "", CI);
 
-          auto IndexedPtr =
-              GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
-          auto Load = new LoadInst(IndexedPtr, "", CI);
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
 
-          // Our intrinsic to unpack a float2 from an int.
-          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-          // Get our final float2.
-          auto Result = CallInst::Create(NewF, Load, "", CI);
-
-          CI->replaceAllUsesWith(Result);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = true;
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Get our final float2.
+    return CallInst::Create(NewF, Load, "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Module &M) {
-  bool Changed = false;
 
   // Replace __clspv_vloada_half4(uint Index, global uint2* Ptr) with:
   //
@@ -2512,233 +2324,181 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Module &M) {
   //    %fxy = call <2 x float> Unpack2xHalf(uint)
   //    %fzw = call <2 x float> Unpack2xHalf(uint)
   //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z20__clspv_vloada_half4jPU3AS1KDv2_j", // global
       "_Z20__clspv_vloada_half4jPU3AS3KDv2_j", // local
       "_Z20__clspv_vloada_half4jPKDv2_j",      // private
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    auto Index = CI->getOperand(0);
+    auto Ptr = CI->getOperand(1);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          auto Index = CI->getOperand(0);
-          auto Ptr = CI->getOperand(1);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int2Ty = VectorType::get(IntTy, 2);
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Int2Ty = VectorType::get(IntTy, 2);
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+    auto IndexedPtr =
+        GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
+    auto Load = new LoadInst(IndexedPtr, "", CI);
 
-          auto IndexedPtr =
-              GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
-          auto Load = new LoadInst(IndexedPtr, "", CI);
+    // Extract each element from the loaded int2.
+    auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0),
+                                        "", CI);
+    auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1),
+                                        "", CI);
 
-          // Extract each element from the loaded int2.
-          auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0),
-                                              "", CI);
-          auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1),
-                                              "", CI);
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
 
-          // Our intrinsic to unpack a float2 from an int.
-          auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+    // Get the lower (x & y) components of our final float4.
+    auto Lo = CallInst::Create(NewF, X, "", CI);
 
-          // Get the lower (x & y) components of our final float4.
-          auto Lo = CallInst::Create(NewF, X, "", CI);
+    // Get the higher (z & w) components of our final float4.
+    auto Hi = CallInst::Create(NewF, Y, "", CI);
 
-          // Get the higher (z & w) components of our final float4.
-          auto Hi = CallInst::Create(NewF, Y, "", CI);
+    Constant *ShuffleMask[4] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
 
-          Constant *ShuffleMask[4] = {
-              ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
-              ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
-
-          // Combine our two float2's into one float4.
-          auto Combine = new ShuffleVectorInst(
-              Lo, Hi, ConstantVector::get(ShuffleMask), "", CI);
-
-          CI->replaceAllUsesWith(Combine);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = true;
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Combine our two float2's into one float4.
+    return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask),
+                                 "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Module &M) {
-  bool Changed = false;
 
-  const std::vector<const char *> Map = {"_Z11vstore_halffjPU3AS1Dh",
-                                         "_Z15vstore_half_rtefjPU3AS1Dh",
-                                         "_Z15vstore_half_rtzfjPU3AS1Dh"};
+  const std::vector<const char *> Names = {"_Z11vstore_halffjPU3AS1Dh",
+                                           "_Z15vstore_half_rtefjPU3AS1Dh",
+                                           "_Z15vstore_half_rtzfjPU3AS1Dh"};
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst* CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The value to store.
-          auto Arg0 = CI->getOperand(0);
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
 
-          // The index argument from vstore_half.
-          auto Arg1 = CI->getOperand(1);
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
 
-          // The pointer argument from vstore_half.
-          auto Arg2 = CI->getOperand(2);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+    auto One = ConstantInt::get(IntTy, 1);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
-          auto One = ConstantInt::get(IntTy, 1);
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = "spirv.pack.v2f16";
 
-          // Our intrinsic to pack a float2 to an int.
-          auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+    // Insert our value into a float2 so that we can pack it.
+    auto TempVec =
+        InsertElementInst::Create(UndefValue::get(Float2Ty), Arg0,
+                                  ConstantInt::get(IntTy, 0), "", CI);
 
-          // Insert our value into a float2 so that we can pack it.
-          auto TempVec =
-              InsertElementInst::Create(UndefValue::get(Float2Ty), Arg0,
-                                        ConstantInt::get(IntTy, 0), "", CI);
+    // Pack the float2 -> half2 (in an int).
+    auto X = CallInst::Create(NewF, TempVec, "", CI);
 
-          // Pack the float2 -> half2 (in an int).
-          auto X = CallInst::Create(NewF, TempVec, "", CI);
+    Value *Ret;
+    if (clspv::Option::F16BitStorage()) {
+      auto ShortTy = Type::getInt16Ty(M.getContext());
+      auto ShortPointerTy = PointerType::get(
+          ShortTy, Arg2->getType()->getPointerAddressSpace());
 
-          if (clspv::Option::F16BitStorage()) {
-            auto ShortTy = Type::getInt16Ty(M.getContext());
-            auto ShortPointerTy = PointerType::get(
-                ShortTy, Arg2->getType()->getPointerAddressSpace());
+      // Truncate our i32 to an i16.
+      auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
 
-            // Truncate our i32 to an i16.
-            auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
+      // Cast the half* pointer to short*.
+      auto Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
 
-            // Cast the half* pointer to short*.
-            auto Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
+      // Index into the correct address of the casted pointer.
+      auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
 
-            // Index into the correct address of the casted pointer.
-            auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
+      // Store to the int* we casted to.
+      Ret = new StoreInst(Trunc, Index, CI);
+    } else {
+      // We can only write to 32-bit aligned words.
+      //
+      // Assuming base is aligned to 32-bits, replace the equivalent of
+      //   vstore_half(value, index, base)
+      // with:
+      //   uint32_t* target_ptr = (uint32_t*)(base) + index / 2;
+      //   uint32_t write_to_upper_half = index & 1u;
+      //   uint32_t shift = write_to_upper_half << 4;
+      //
+      //   // Pack the float value as a half number in bottom 16 bits
+      //   // of an i32.
+      //   uint32_t packed = spirv.pack.v2f16((float2)(value, undef));
+      //
+      //   uint32_t xor_value =   (*target_ptr & (0xffff << shift))
+      //                        ^ ((packed & 0xffff) << shift)
+      //   // We only need relaxed consistency, but OpenCL 1.2 only has
+      //   // sequentially consistent atomics.
+      //   // TODO(dneto): Use relaxed consistency.
+      //   atomic_xor(target_ptr, xor_value)
+      auto IntPointerTy = PointerType::get(
+          IntTy, Arg2->getType()->getPointerAddressSpace());
 
-            // Store to the int* we casted to.
-            auto Store = new StoreInst(Trunc, Index, CI);
+      auto Four = ConstantInt::get(IntTy, 4);
+      auto FFFF = ConstantInt::get(IntTy, 0xffff);
 
-            CI->replaceAllUsesWith(Store);
-          } else {
-            // We can only write to 32-bit aligned words.
-            //
-            // Assuming base is aligned to 32-bits, replace the equivalent of
-            //   vstore_half(value, index, base)
-            // with:
-            //   uint32_t* target_ptr = (uint32_t*)(base) + index / 2;
-            //   uint32_t write_to_upper_half = index & 1u;
-            //   uint32_t shift = write_to_upper_half << 4;
-            //
-            //   // Pack the float value as a half number in bottom 16 bits
-            //   // of an i32.
-            //   uint32_t packed = spirv.pack.v2f16((float2)(value, undef));
-            //
-            //   uint32_t xor_value =   (*target_ptr & (0xffff << shift))
-            //                        ^ ((packed & 0xffff) << shift)
-            //   // We only need relaxed consistency, but OpenCL 1.2 only has
-            //   // sequentially consistent atomics.
-            //   // TODO(dneto): Use relaxed consistency.
-            //   atomic_xor(target_ptr, xor_value)
-            auto IntPointerTy = PointerType::get(
-                IntTy, Arg2->getType()->getPointerAddressSpace());
+      auto IndexIsOdd = BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
+      // Compute index / 2
+      auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
+      auto BaseI32Ptr = CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
+      auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32, "base_i32_ptr", CI);
+      auto CurrentValue = new LoadInst(OutPtr, "current_value", CI);
+      auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+      auto MaskBitsToWrite = BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
+      auto MaskedCurrent = BinaryOperator::CreateAnd(MaskBitsToWrite, CurrentValue, "masked_current", CI);
 
-            auto Four = ConstantInt::get(IntTy, 4);
-            auto FFFF = ConstantInt::get(IntTy, 0xffff);
+      auto XLowerBits = BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
+      auto NewBitsToWrite = BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
+      auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite, "value_to_xor", CI);
 
-            auto IndexIsOdd = BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
-            // Compute index / 2
-            auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
-            auto BaseI32Ptr = CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
-            auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32, "base_i32_ptr", CI);
-            auto CurrentValue = new LoadInst(OutPtr, "current_value", CI);
-            auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
-            auto MaskBitsToWrite = BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
-            auto MaskedCurrent = BinaryOperator::CreateAnd(MaskBitsToWrite, CurrentValue, "masked_current", CI);
+      // Generate the call to atomi_xor.
+      SmallVector<Type *, 5> ParamTypes;
+      // The pointer type.
+      ParamTypes.push_back(IntPointerTy);
+      // The Types for memory scope, semantics, and value.
+      ParamTypes.push_back(IntTy);
+      ParamTypes.push_back(IntTy);
+      ParamTypes.push_back(IntTy);
+      auto NewFType = FunctionType::get(IntTy, ParamTypes, false);
+      auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
 
-            auto XLowerBits = BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
-            auto NewBitsToWrite = BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
-            auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite, "value_to_xor", CI);
+      const auto ConstantScopeDevice =
+          ConstantInt::get(IntTy, spv::ScopeDevice);
+      // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
+      // (SPIR-V Workgroup).
+      const auto AddrSpaceSemanticsBits =
+          IntPointerTy->getPointerAddressSpace() == 1
+              ? spv::MemorySemanticsUniformMemoryMask
+              : spv::MemorySemanticsWorkgroupMemoryMask;
 
-            // Generate the call to atomi_xor.
-            SmallVector<Type *, 5> ParamTypes;
-            // The pointer type.
-            ParamTypes.push_back(IntPointerTy);
-            // The Types for memory scope, semantics, and value.
-            ParamTypes.push_back(IntTy);
-            ParamTypes.push_back(IntTy);
-            ParamTypes.push_back(IntTy);
-            auto NewFType = FunctionType::get(IntTy, ParamTypes, false);
-            auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
+      // We're using relaxed consistency here.
+      const auto ConstantMemorySemantics =
+          ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                      AddrSpaceSemanticsBits);
 
-            const auto ConstantScopeDevice =
-                ConstantInt::get(IntTy, spv::ScopeDevice);
-            // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
-            // (SPIR-V Workgroup).
-            const auto AddrSpaceSemanticsBits =
-                IntPointerTy->getPointerAddressSpace() == 1
-                    ? spv::MemorySemanticsUniformMemoryMask
-                    : spv::MemorySemanticsWorkgroupMemoryMask;
-
-            // We're using relaxed consistency here.
-            const auto ConstantMemorySemantics =
-                ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
-                                            AddrSpaceSemanticsBits);
-
-            SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
-                                           ConstantMemorySemantics, ValueToXor};
-            CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
-          }
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
+      SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
+                                     ConstantMemorySemantics, ValueToXor};
+      CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
+      Ret = nullptr;
     }
-  }
 
-  return Changed;
+    return Ret;
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Module &M) {
-  bool Changed = false;
 
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z12vstore_half2Dv2_fjPU3AS1Dh",
       "_Z13vstorea_half2Dv2_fjPU3AS1Dh", // vstorea global
       "_Z13vstorea_half2Dv2_fjPU3AS3Dh", // vstorea local
@@ -2753,72 +2513,44 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Module &M) {
       "_Z17vstorea_half2_rtzDv2_fjPDh",      // vstorea private
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst* CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The value to store.
-          auto Arg0 = CI->getOperand(0);
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
 
-          // The index argument from vstore_half.
-          auto Arg1 = CI->getOperand(1);
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
 
-          // The pointer argument from vstore_half.
-          auto Arg2 = CI->getOperand(2);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy = PointerType::get(
+        IntTy, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              IntTy, Arg2->getType()->getPointerAddressSpace());
-          auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = "spirv.pack.v2f16";
 
-          // Our intrinsic to pack a float2 to an int.
-          auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+    // Turn the packed x & y into the final packing.
+    auto X = CallInst::Create(NewF, Arg0, "", CI);
 
-          // Turn the packed x & y into the final packing.
-          auto X = CallInst::Create(NewF, Arg0, "", CI);
+    // Cast the half* pointer to int*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
 
-          // Cast the half* pointer to int*.
-          auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg1, "", CI);
 
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg1, "", CI);
-
-          // Store to the int* we casted to.
-          auto Store = new StoreInst(X, Index, CI);
-
-          CI->replaceAllUsesWith(Store);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Store to the int* we casted to.
+    return new StoreInst(X, Index, CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
-  bool Changed = false;
 
-  const std::vector<const char *> Map = {
+  const std::vector<const char *> Names = {
       "_Z12vstore_half4Dv4_fjPU3AS1Dh",
       "_Z13vstorea_half4Dv4_fjPU3AS1Dh", // global
       "_Z13vstorea_half4Dv4_fjPU3AS3Dh", // local
@@ -2833,91 +2565,64 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
       "_Z17vstorea_half4_rtzDv4_fjPDh",      // private
   };
 
-  for (auto Name : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The value to store.
-          auto Arg0 = CI->getOperand(0);
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
 
-          // The index argument from vstore_half.
-          auto Arg1 = CI->getOperand(1);
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
 
-          // The pointer argument from vstore_half.
-          auto Arg2 = CI->getOperand(2);
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int2Ty = VectorType::get(IntTy, 2);
+    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy = PointerType::get(
+        Int2Ty, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
-          auto IntTy = Type::getInt32Ty(M.getContext());
-          auto Int2Ty = VectorType::get(IntTy, 2);
-          auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
-          auto NewPointerTy = PointerType::get(
-              Int2Ty, Arg2->getType()->getPointerAddressSpace());
-          auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+    Constant *LoShuffleMask[2] = {ConstantInt::get(IntTy, 0),
+                                  ConstantInt::get(IntTy, 1)};
 
-          Constant *LoShuffleMask[2] = {ConstantInt::get(IntTy, 0),
-                                        ConstantInt::get(IntTy, 1)};
+    // Extract out the x & y components of our to store value.
+    auto Lo =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(LoShuffleMask), "", CI);
 
-          // Extract out the x & y components of our to store value.
-          auto Lo =
-              new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
-                                    ConstantVector::get(LoShuffleMask), "", CI);
+    Constant *HiShuffleMask[2] = {ConstantInt::get(IntTy, 2),
+                                  ConstantInt::get(IntTy, 3)};
 
-          Constant *HiShuffleMask[2] = {ConstantInt::get(IntTy, 2),
-                                        ConstantInt::get(IntTy, 3)};
+    // Extract out the z & w components of our to store value.
+    auto Hi =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(HiShuffleMask), "", CI);
 
-          // Extract out the z & w components of our to store value.
-          auto Hi =
-              new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
-                                    ConstantVector::get(HiShuffleMask), "", CI);
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = "spirv.pack.v2f16";
 
-          // Our intrinsic to pack a float2 to an int.
-          auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+    // Turn the packed x & y into the final component of our int2.
+    auto X = CallInst::Create(NewF, Lo, "", CI);
 
-          // Turn the packed x & y into the final component of our int2.
-          auto X = CallInst::Create(NewF, Lo, "", CI);
+    // Turn the packed z & w into the final component of our int2.
+    auto Y = CallInst::Create(NewF, Hi, "", CI);
 
-          // Turn the packed z & w into the final component of our int2.
-          auto Y = CallInst::Create(NewF, Hi, "", CI);
+    auto Combine = InsertElementInst::Create(
+        UndefValue::get(Int2Ty), X, ConstantInt::get(IntTy, 0), "", CI);
+    Combine = InsertElementInst::Create(
+        Combine, Y, ConstantInt::get(IntTy, 1), "", CI);
 
-          auto Combine = InsertElementInst::Create(
-              UndefValue::get(Int2Ty), X, ConstantInt::get(IntTy, 0), "", CI);
-          Combine = InsertElementInst::Create(
-              Combine, Y, ConstantInt::get(IntTy, 1), "", CI);
+    // Cast the half* pointer to int2*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
 
-          // Cast the half* pointer to int2*.
-          auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg1, "", CI);
 
-          // Index into the correct address of the casted pointer.
-          auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg1, "", CI);
-
-          // Store to the int2* we casted to.
-          auto Store = new StoreInst(Combine, Index, CI);
-
-          CI->replaceAllUsesWith(Store);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    // Store to the int2* we casted to.
+    return new StoreInst(Combine, Index, CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceReadImageF(Module &M) {
@@ -3200,11 +2905,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceCross(Module &M) {
-  bool Changed = false;
 
-  // If we find a function with the matching name.
-  if (auto F = M.getFunction("_Z5crossDv4_fS_")) {
-    SmallVector<Instruction *, 4> ToRemoves;
+  std::vector<const char*> Names = {
+    "_Z5crossDv4_fS_",
+  };
+
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
 
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
@@ -3221,42 +2927,21 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Module &M) {
       ConstantFP::get(FloatTy, 0.0f), UndefValue::get(FloatTy), UndefValue::get(FloatTy)
     };
 
-    // Walk the users of the function.
-    for (auto &U : F->uses()) {
-      if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-        auto Vec4Ty = CI->getArgOperand(0)->getType();
-        auto Arg0 = new ShuffleVectorInst(CI->getArgOperand(0), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
-        auto Arg1 = new ShuffleVectorInst(CI->getArgOperand(1), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
-        auto Vec3Ty = Arg0->getType();
+    auto Vec4Ty = CI->getArgOperand(0)->getType();
+    auto Arg0 = new ShuffleVectorInst(CI->getArgOperand(0), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
+    auto Arg1 = new ShuffleVectorInst(CI->getArgOperand(1), UndefValue::get(Vec4Ty), ConstantVector::get(DownShuffleMask), "", CI);
+    auto Vec3Ty = Arg0->getType();
 
-        auto NewFType =
-            FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
+    auto NewFType =
+        FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
 
-        auto Cross3Func = M.getOrInsertFunction("_Z5crossDv3_fS_", NewFType);
+    auto Cross3Func = M.getOrInsertFunction("_Z5crossDv3_fS_", NewFType);
 
-        auto DownResult = CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI);
+    auto DownResult = CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI);
 
-        auto Result = new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec), ConstantVector::get(UpShuffleMask), "", CI);
+    return new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec), ConstantVector::get(UpShuffleMask), "", CI);
 
-        CI->replaceAllUsesWith(Result);
-
-        // Lastly, remember to remove the user.
-        ToRemoves.push_back(CI);
-      }
-    }
-
-    Changed = !ToRemoves.empty();
-
-    // And cleanup the calls we don't use anymore.
-    for (auto V : ToRemoves) {
-      V->eraseFromParent();
-    }
-
-    // And remove the function we don't need either too.
-    F->eraseFromParent();
-  }
-
-  return Changed;
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
