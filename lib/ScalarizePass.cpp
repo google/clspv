@@ -21,8 +21,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Passes.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 
 using namespace llvm;
 

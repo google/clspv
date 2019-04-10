@@ -31,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "Passes.h"
 #include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"

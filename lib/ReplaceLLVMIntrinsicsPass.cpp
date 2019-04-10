@@ -23,7 +23,7 @@
 
 #include "spirv/1.0/spirv.hpp"
 
-#include "clspv/Passes.h"
+#include "Passes.h"
 
 using namespace llvm;
 

@@ -23,9 +23,9 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "ArgKind.h"
+#include "Passes.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 
 using namespace llvm;
 

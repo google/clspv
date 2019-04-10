@@ -23,7 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "clspv/Passes.h"
+#include "Passes.h"
 
 using namespace llvm;
 

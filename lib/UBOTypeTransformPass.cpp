@@ -30,9 +30,9 @@
 
 #include "ArgKind.h"
 #include "Constants.h"
+#include "Passes.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 
 using namespace llvm;
 

@@ -18,8 +18,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
+#include "Passes.h"
 #include "clspv/AddressSpace.h"
-#include "clspv/Passes.h"
 
 using namespace llvm;
 using namespace clspv;

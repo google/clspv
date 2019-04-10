@@ -43,10 +43,10 @@
 
 #include "spirv/1.0/spirv.hpp"
 
+#include "Passes.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 #include "clspv/spirv_c_strings.hpp"
 #include "clspv/spirv_glsl.hpp"
 

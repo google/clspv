@@ -41,7 +41,7 @@
 
 #include "ArgKind.h"
 
-#include "clspv/Passes.h"
+#include "Passes.h"
 
 using namespace llvm;
 

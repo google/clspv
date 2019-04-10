@@ -15,7 +15,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
-#include "clspv/Passes.h"
+#include "Passes.h"
 
 using namespace llvm;
 

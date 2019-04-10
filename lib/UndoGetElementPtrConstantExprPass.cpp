@@ -19,7 +19,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "clspv/Passes.h"
+#include "Passes.h"
 
 using namespace llvm;
 
