@@ -699,8 +699,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
-  if (clspv::Option::CPlusPlus() &&
-      !clspv::Option::InlineEntryPoints()) {
+  if (clspv::Option::CPlusPlus() && !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "cannot use -c++ without -inline-entry-points\n";
     return -1;
   }

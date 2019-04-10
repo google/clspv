@@ -149,7 +149,7 @@ llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
 
 static llvm::cl::opt<bool>
     cplusplus("c++", llvm::cl::init(false),
-                   llvm::cl::desc("Enable experimental C++ support"));
+              llvm::cl::desc("Enable experimental C++ support"));
 } // namespace
 
 namespace clspv {
