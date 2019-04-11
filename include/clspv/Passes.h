@@ -377,4 +377,8 @@ llvm::ModulePass *createRemoveUnusedArgumentsPass();
 /// Demangles the name of all kernel functions.
 llvm::ModulePass *createDemangleKernelNamesPass();
 
+/// Specializes or inlines functions with UBO arguments to satisfy SPIR-V
+/// requirements.
+llvm::ModulePass *createMultiVersionUBOFunctionsPass();
+
 } // namespace clspv
