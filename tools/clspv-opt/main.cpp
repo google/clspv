@@ -1,4 +1,4 @@
-// Copyright 2017 The Clspv Authors. All rights reserved.
+// Copyright 2019 The Clspv Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -10,106 +10,115 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
 
-#include <libgen.h>
-#include <list>
-#include <stdio.h>
-#include <string>
-#include <unistd.h>
+// This driver is a stripped-down version of LLVM opt tailored to run clspv
+// passes on LLVM IR.  It only implements enough functionality to execute LLVM
+// scalar optimizations and the clspv transformations defined in clspv/Passes.h.
 
-#include "llvm/Support/CommandLine.h"
+#include "llvm/CodeGen/CommandFlags.inc"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/LegacyPassNameParser.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
 
-namespace {
+#include "clspv/Passes.h"
 
-static llvm::cl::opt<int> clo_verbose(
-    "clo-verbose", llvm::cl::init(0),
-    llvm::cl::desc("Verbosity level.  Higher values increase verbosity."));
+static llvm::cl::list<const PassInfo *, bool, PassNameParser>
+    PassList(llvm::cl::desc("Transformations available:"));
 
-std::string clo_opt_help =
-    std::string("Path to LLVM's 'opt' tool (default: ") + LLVM_OPT + ")";
+static llvm::cl::opt<std::string>
+    InputFile(llvm::cl::Positional, llvm::cl::desc("<input LLVM IR file>"),
+              llvm::cl::init("-"), llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<std::string> clo_opt("clo-opt", llvm::cl::init(LLVM_OPT),
-                                          llvm::cl::desc(clo_opt_help));
+static llvm::cl::opt<std::string>
+    OutputFile("o", llvm::cl::desc("Override output filename"),
+               llvm::cl::value_desc("filename"));
 
-std::string clo_passes_help =
-    std::string("Path to libclspv_passes.so (default: ") + CLSPV_PASSES + ")";
+static llvm::cl::opt<bool>
+    PrintEachXForm("p",
+                   llvm::cl::desc("Print module after each transformation"));
 
-static llvm::cl::opt<std::string> clo_passes("clo-passes",
-                                             llvm::cl::init(CLSPV_PASSES),
-                                             llvm::cl::desc(clo_passes_help));
-int RunOpt(int argc, const char *argv[]) {
-  size_t new_argc =
-      argc + 1 /* "-load" */ + 1 /* clo_passes */ + 1 /* nullptr */;
-  const char **new_argv = new const char *[new_argc];
-  size_t i = 0;
-  new_argv[i++] = clo_opt.c_str();
-  new_argv[i++] = "-load";
-  new_argv[i++] = clo_passes.c_str();
-  for (size_t j = 1; j < argc; j++) {
-    new_argv[i++] = argv[j];
+int main(int argc, char **argv) {
+  llvm::InitLLVM c(argc, argv);
+
+  // Initialize passes.
+  PassRegistry &registry = *llvm::PassRegistry::getPassRegistry();
+  llvm::initializeCore(registry);
+  llvm::initializeScalarOpts(registry);
+
+  // clspv passes
+  llvm::initializeClspvPasses(registry);
+
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                    "clspv IR to IR modular optimizer\n");
+
+  llvm::SMDiagnostic err;
+  llvm::LLVMContext context;
+  context.setDiscardValueNames(false);
+  std::unique_ptr<llvm::Module> module =
+      llvm::parseIRFile(InputFile, err, context, true, "");
+
+  if (!module) {
+    err.print(argv[0], errs());
+    return 1;
   }
-  new_argv[i] = nullptr;
 
-  if (clo_verbose > 0) {
-    fprintf(stderr, "Executing: ");
-    for (auto i = 0; i < new_argc - 1; i++) {
-      fprintf(stderr, "%s ", new_argv[i]);
-    }
-    fprintf(stderr, "\n");
+  // Run the verifier before doing any transformation.
+  if (llvm::verifyModule(*module, &errs())) {
+    errs() << argv[0] << ": " << InputFile
+           << ": error: input module is broken!\n";
+    return 1;
   }
 
-  char *new_environ[] = {NULL};
-  execve(new_argv[0], const_cast<char *const *>(new_argv), new_environ);
-  perror((std::string("Error executing ") + new_argv[0]).c_str());
-  return -1;
-}
+  if (OutputFile.empty())
+    OutputFile = "-";
 
-const char **ConvertToCArray(std::vector<const char *> args) {
-  const char **argv = new const char *[args.size()];
-  size_t i = 0;
-  for (const auto &arg : args)
-    argv[i++] = arg;
-  return argv;
-}
+  std::error_code ec;
+  std::unique_ptr<llvm::ToolOutputFile> out(
+      new llvm::ToolOutputFile(OutputFile, ec, sys::fs::F_None));
+  if (ec) {
+    errs() << ec.message() << '\n';
+    return 1;
+  }
 
-} // namespace
-
-int main(int argc, const char *argv[]) {
-  // Make sure that we only parse the command-line options registered for this
-  // app.  Any argument not recognized is passed as-is to 'opt'.
-  llvm::StringMap<llvm::cl::Option *> &options =
-      llvm::cl::getRegisteredOptions();
-
-  std::vector<const char *> args_to_keep;
-  args_to_keep.push_back(argv[0]);
-
-  std::vector<const char *> args_to_pass;
-  args_to_pass.push_back(argv[0]);
-
-  for (int i = 1; i < argc; ++i) {
-    std::string arg(argv[i]);
-    bool should_keep_arg = false;
-    for (const auto &option : options) {
-      // If this argument is something that we recognize, keep it.
-      if (arg.find(option.getKey().str()) != std::string::npos) {
-        should_keep_arg = true;
-        break;
-      }
-    }
-
-    if (should_keep_arg) {
-      args_to_keep.push_back(argv[i]);
+  // Add a pass for each pass requested on the command-line.
+  llvm::legacy::PassManager passes;
+  for (unsigned i = 0; i < PassList.size(); ++i) {
+    const llvm::PassInfo *pinfo = PassList[i];
+    if (pinfo->getNormalCtor()) {
+      llvm::Pass *pass = pinfo->getNormalCtor()();
+      passes.add(pass);
     } else {
-      args_to_pass.push_back(argv[i]);
+      errs() << argv[0] << ": cannot create pass: " << pinfo->getPassName()
+             << "\n";
     }
+
+    if (PrintEachXForm)
+      passes.add(llvm::createPrintModulePass(errs(), "", true));
   }
 
-  llvm::cl::ParseCommandLineOptions(
-      args_to_keep.size(), ConvertToCArray(args_to_keep),
-      "Clspv wrapper tool for LLVM opt.\n\nThis tool loads the clspv passes "
-      "library into opt and calls it with the given options.\nAny argument not "
-      "recognized by this tool is passed directly to opt.\n");
+  // Verify after all transformations have executed.
+  passes.add(llvm::createVerifierPass());
 
-  return RunOpt(args_to_pass.size(), ConvertToCArray(args_to_pass));
+  // Add a pass to print the module at the end.
+  assert(out);
+  passes.add(llvm::createPrintModulePass(out->os(), "", false));
+
+  // Print command-line options (this handles -print-options and
+  // -print-all-options).
+  llvm::cl::PrintOptionValues();
+
+  // Run all the scheduled passes.
+  passes.run(*module);
+  out->keep();
+
+  return 0;
 }

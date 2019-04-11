@@ -22,10 +22,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "ArgKind.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
+
+#include "ArgKind.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -67,11 +68,11 @@ private:
   EntryPointMap function_to_entry_points_;
 };
 
-char ShareModuleScopeVariablesPass::ID = 0;
-static RegisterPass<ShareModuleScopeVariablesPass>
-    X("ShareModuleScopeVariablesPass", "Share module scope variables");
-
 } // namespace
+
+char ShareModuleScopeVariablesPass::ID = 0;
+INITIALIZE_PASS(ShareModuleScopeVariablesPass, "ShareModuleScopeVariablesPass",
+                "Share module scope variables", false, false)
 
 namespace clspv {
 ModulePass *createShareModuleScopeVariablesPass() {

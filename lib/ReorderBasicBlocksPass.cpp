@@ -22,6 +22,8 @@
 
 #include "clspv/Option.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "reorderbbs"
@@ -58,8 +60,8 @@ private:
 } // namespace
 
 char ReorderBasicBlocksPass::ID = 0;
-static RegisterPass<ReorderBasicBlocksPass> X("ReorderBasicBlocks",
-                                              "Reorder Basic Blocks Pass");
+INITIALIZE_PASS(ReorderBasicBlocksPass, "ReorderBasicBlocks",
+                "Reorder Basic Blocks Pass", false, false)
 
 namespace clspv {
 FunctionPass *createReorderBasicBlocksPass() {

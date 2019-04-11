@@ -25,6 +25,15 @@ class ModulePass;
 class raw_pwrite_stream;
 class raw_ostream;
 template <typename T> class ArrayRef;
+
+// This initializes all the clspv passes.  When creating a new pass, you should:
+//
+// 1- Declare the pass using INITIALIZE_PASS.
+// 2- Declare the function initialize<pass_name>Pass() in lib/Passes.h.
+// 3- Add a call to the initialize<pass_name>Pass() to initializeClspvPasses().
+// 4- Your pass must include the file lib/Passes.h.
+class PassRegistry;
+void initializeClspvPasses(PassRegistry &);
 } // namespace llvm
 
 namespace clspv {

@@ -20,6 +20,8 @@
 
 #include "clspv/AddressSpace.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 using namespace clspv;
 
@@ -50,8 +52,9 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
 } // namespace
 
 char DefineOpenCLWorkItemBuiltinsPass::ID = 0;
-static RegisterPass<DefineOpenCLWorkItemBuiltinsPass>
-    X("DefineOpenCLWorkItemBuiltins", "Define OpenCL Work-Item Builtins Pass");
+INITIALIZE_PASS(DefineOpenCLWorkItemBuiltinsPass,
+                "DefineOpenCLWorkItemBuiltins",
+                "Define OpenCL Work-Item Builtins Pass", false, false)
 
 namespace clspv {
 ModulePass *createDefineOpenCLWorkItemBuiltinsPass() {

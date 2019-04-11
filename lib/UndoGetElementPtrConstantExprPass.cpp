@@ -19,6 +19,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "UndoGetElementPtrConstantExpr"
@@ -35,8 +37,9 @@ struct UndoGetElementPtrConstantExprPass : public ModulePass {
 } // namespace
 
 char UndoGetElementPtrConstantExprPass::ID = 0;
-static RegisterPass<UndoGetElementPtrConstantExprPass>
-    X("UndoGetElementPtrConstantExpr", "Undo GEP Constant Expr Pass");
+INITIALIZE_PASS(UndoGetElementPtrConstantExprPass,
+                "UndoGetElementPtrConstantExpr", "Undo GEP Constant Expr Pass",
+                false, false)
 
 namespace clspv {
 ModulePass *createUndoGetElementPtrConstantExprPass() {

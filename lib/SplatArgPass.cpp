@@ -18,6 +18,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "splatarg"
@@ -33,7 +35,7 @@ struct SplatArgPass : public ModulePass {
 } // namespace
 
 char SplatArgPass::ID = 0;
-static RegisterPass<SplatArgPass> X("SplatArg", "Splat Argument Pass");
+INITIALIZE_PASS(SplatArgPass, "SplatArg", "Splat Argument Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createSplatArgPass() { return new SplatArgPass(); }

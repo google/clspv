@@ -25,7 +25,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
+
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -62,8 +63,8 @@ private:
 } // namespace
 
 char SignedCompareFixupPass::ID = 0;
-static RegisterPass<SignedCompareFixupPass> X("SignedCompareFixupPass",
-                                              "Signed Integer Compare Fixup");
+INITIALIZE_PASS(SignedCompareFixupPass, "SignedCompareFixupPass",
+                "Signed Integer Compare Fixup", false, false)
 
 namespace clspv {
 ModulePass *createSignedCompareFixupPass() {

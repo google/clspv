@@ -31,10 +31,10 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 
 #include "ArgKind.h"
 #include "Constants.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -71,11 +71,12 @@ private:
   // same resource access.  Returns true if the module changed.
   bool RewriteAccessesForArg(Function *fn, int arg_index, Argument &arg);
 };
+
 } // namespace
 
 char DirectResourceAccessPass::ID = 0;
-static RegisterPass<DirectResourceAccessPass> X("DirectResourceAccessPass",
-                                                "Direct resource access");
+INITIALIZE_PASS(DirectResourceAccessPass, "DirectResourceAccessPass",
+                "Direct resource access", false, false)
 
 namespace clspv {
 ModulePass *createDirectResourceAccessPass() {

@@ -46,7 +46,6 @@
 #include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
 #include "clspv/spirv_c_strings.hpp"
 #include "clspv/spirv_glsl.hpp"
 
@@ -54,6 +53,7 @@
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
+#include "Passes.h"
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

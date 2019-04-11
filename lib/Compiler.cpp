@@ -37,6 +37,7 @@
 #include "clspv/opencl_builtins_header.h"
 
 #include "FrontendPlugin.h"
+#include "Passes.h"
 
 #include <cassert>
 #include <numeric>

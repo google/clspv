@@ -29,8 +29,10 @@
 
 #include "spirv/1.0/spirv.hpp"
 
-#include "SPIRVOp.h"
 #include "clspv/Option.h"
+
+#include "Passes.h"
+#include "SPIRVOp.h"
 
 using namespace llvm;
 
@@ -201,8 +203,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
 } // namespace
 
 char ReplaceOpenCLBuiltinPass::ID = 0;
-static RegisterPass<ReplaceOpenCLBuiltinPass> X("ReplaceOpenCLBuiltin",
-                                                "Replace OpenCL Builtins Pass");
+INITIALIZE_PASS(ReplaceOpenCLBuiltinPass, "ReplaceOpenCLBuiltin",
+                "Replace OpenCL Builtins Pass", false, false)
 
 namespace clspv {
 ModulePass *createReplaceOpenCLBuiltinPass() {

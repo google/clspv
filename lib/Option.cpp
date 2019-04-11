@@ -14,7 +14,10 @@
 
 // This translation unit defines all Clspv command line option variables.
 
+#include "llvm/PassRegistry.h"
 #include "llvm/Support/CommandLine.h"
+
+#include "Passes.h"
 
 namespace {
 

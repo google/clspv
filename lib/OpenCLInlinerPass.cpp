@@ -19,6 +19,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "openclinliner"
@@ -33,8 +35,8 @@ struct OpenCLInlinerPass : public ModulePass {
 } // namespace
 
 char OpenCLInlinerPass::ID = 0;
-static RegisterPass<OpenCLInlinerPass> X("OpenCLInliner",
-                                         "OpenCL Inliner Pass");
+INITIALIZE_PASS(OpenCLInlinerPass, "OpenCLInliner", "OpenCL Inliner Pass",
+                false, false)
 
 namespace clspv {
 ModulePass *createOpenCLInlinerPass() { return new OpenCLInlinerPass(); }

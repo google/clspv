@@ -49,7 +49,7 @@ private:
 
   // Emit bytes representing the first num_bits bits from the
   // array at |data|.
-  void EmitRaw(unsigned num_bits, const uint64_t* data);
+  void EmitRaw(unsigned num_bits, const uint64_t *data);
 
   // Emit a byte as a hex number to the output stream.
   void EmitByte(size_t byte);

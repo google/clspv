@@ -23,6 +23,8 @@
 
 #include "clspv/Option.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 namespace {
@@ -49,8 +51,9 @@ ModulePass *createScalarizePass() { return new ScalarizePass(); }
 } // namespace clspv
 
 char ScalarizePass::ID = 0;
-static RegisterPass<ScalarizePass>
-    X("Scalarize", "Scalarizes some instructions with composite returns");
+INITIALIZE_PASS(ScalarizePass, "Scalarize",
+                "Scalarizes some instructions with composite returns", false,
+                false)
 
 bool ScalarizePass::runOnModule(Module &M) {
   bool Changed = false;

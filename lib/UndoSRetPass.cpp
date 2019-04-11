@@ -19,6 +19,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "undosret"
@@ -33,7 +35,7 @@ struct UndoSRetPass : public ModulePass {
 } // namespace
 
 char UndoSRetPass::ID = 0;
-static RegisterPass<UndoSRetPass> X("UndoSRet", "Undo SRet Pass");
+INITIALIZE_PASS(UndoSRetPass, "UndoSRet", "Undo SRet Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createUndoSRetPass() { return new UndoSRetPass(); }

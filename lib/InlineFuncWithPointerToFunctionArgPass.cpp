@@ -21,6 +21,8 @@
 
 #include "clspv/AddressSpace.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithpointerfunctionarg"
@@ -60,9 +62,11 @@ bool IsProblematicFunctionType(Type *type) {
 } // namespace
 
 char InlineFuncWithPointerToFunctionArgPass::ID = 0;
-static RegisterPass<InlineFuncWithPointerToFunctionArgPass>
-    X("InlineFuncWithPointerToFunctionArgPass",
-      "Inline Function with Pointer-to-Function storage Argument Pass");
+INITIALIZE_PASS(
+    InlineFuncWithPointerToFunctionArgPass,
+    "InlineFuncWithPointerToFunctionArgPass",
+    "Inline Function with Pointer-to-Function storage Argument Pass", false,
+    false)
 
 namespace clspv {
 llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass() {

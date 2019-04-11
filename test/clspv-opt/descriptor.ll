@@ -1,9 +1,7 @@
-; RUN: clspv-opt %s -AllocateDescriptorsPass -clo-verbose=1 -S -o %t.ll 2> %t.out.txt
+; RUN: clspv-opt %s -AllocateDescriptorsPass -o %t.ll 2> %t.out.txt
 ; RUN: FileCheck %s < %t.ll
-; RUN: FileCheck -check-prefix=VERBOSE_OUT %s < %t.out.txt
 
 ; CHECK: %0 = call { [0 x i32] } addrspace(1)* @clspv.resource.var.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
-; VERBOSE_OUT: Executing: {{.*}}opt -load {{.*}}clspv_passes{{.*}} -AllocateDescriptorsPass {{.*}}
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"

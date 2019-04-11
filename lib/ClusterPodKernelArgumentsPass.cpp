@@ -40,6 +40,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "ArgKind.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -56,8 +57,8 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
 } // namespace
 
 char ClusterPodKernelArgumentsPass::ID = 0;
-static RegisterPass<ClusterPodKernelArgumentsPass>
-    X("ClusterPodKernelArgumentsPass", "Cluster POD Kernel Arguments Pass");
+INITIALIZE_PASS(ClusterPodKernelArgumentsPass, "ClusterPodKernelArgumentsPass",
+                "Cluster POD Kernel Arguments Pass", false, false)
 
 namespace clspv {
 llvm::ModulePass *createClusterPodKernelArgumentsPass() {

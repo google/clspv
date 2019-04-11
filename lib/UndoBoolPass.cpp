@@ -19,6 +19,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "undobool"
@@ -33,7 +35,7 @@ struct UndoBoolPass : public ModulePass {
 } // namespace
 
 char UndoBoolPass::ID = 0;
-static RegisterPass<UndoBoolPass> X("UndoBool", "Undo Bool Pass");
+INITIALIZE_PASS(UndoBoolPass, "UndoBool", "Undo Bool Pass", false, false)
 
 namespace clspv {
 ModulePass *createUndoBoolPass() { return new UndoBoolPass(); }

@@ -28,11 +28,12 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "ArgKind.h"
-#include "Constants.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
-#include "clspv/Passes.h"
+
+#include "ArgKind.h"
+#include "Constants.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -109,11 +110,11 @@ private:
   bool support_int8_array_;
 };
 
-char UBOTypeTransformPass::ID = 0;
-static RegisterPass<UBOTypeTransformPass> X("UBOTypeTransformPass",
-                                            "Transform UBO types");
-
 } // namespace
+
+char UBOTypeTransformPass::ID = 0;
+INITIALIZE_PASS(UBOTypeTransformPass, "UBOTypeTransformPass",
+                "Transform UBO types", false, false)
 
 namespace clspv {
 ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }

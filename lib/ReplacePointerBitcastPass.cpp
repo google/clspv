@@ -19,6 +19,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "replacepointerbitcast"
@@ -40,8 +42,8 @@ struct ReplacePointerBitcastPass : public ModulePass {
 } // namespace
 
 char ReplacePointerBitcastPass::ID = 0;
-static RegisterPass<ReplacePointerBitcastPass>
-    X("ReplacePointerBitcast", "Replace Pointer Bitcast Pass");
+INITIALIZE_PASS(ReplacePointerBitcastPass, "ReplacePointerBitcast",
+                "Replace Pointer Bitcast Pass", false, false)
 
 namespace clspv {
 ModulePass *createReplacePointerBitcastPass() {

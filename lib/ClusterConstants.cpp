@@ -33,6 +33,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -49,9 +50,9 @@ struct ClusterModuleScopeConstantVars : public ModulePass {
 } // namespace
 
 char ClusterModuleScopeConstantVars::ID = 0;
-static RegisterPass<ClusterModuleScopeConstantVars>
-    X("ClusterModuleScopeConstantVars",
-      "Cluster module-scope __constant variables");
+INITIALIZE_PASS(ClusterModuleScopeConstantVars,
+                "ClusterModuleScopeConstantVars",
+                "Cluster module-scope __constant variables", false, false)
 
 namespace clspv {
 llvm::ModulePass *createClusterModuleScopeConstantVars() {

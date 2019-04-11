@@ -19,6 +19,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "UndoTruncatedSwitchCondition"
@@ -97,8 +99,9 @@ private:
 } // namespace
 
 char UndoTruncatedSwitchConditionPass::ID = 0;
-static RegisterPass<UndoTruncatedSwitchConditionPass>
-    X("UndoTruncatedSwitchCondition", "Undo Truncated Switch Condition Pass");
+INITIALIZE_PASS(UndoTruncatedSwitchConditionPass,
+                "UndoTruncatedSwitchCondition",
+                "Undo Truncated Switch Condition Pass", false, false)
 
 namespace clspv {
 ModulePass *createUndoTruncatedSwitchConditionPass() {

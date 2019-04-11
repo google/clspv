@@ -29,6 +29,8 @@
 
 #include "clspv/Option.h"
 
+#include "Passes.h"
+
 using namespace llvm;
 using std::string;
 
@@ -240,9 +242,9 @@ private:
 } // namespace
 
 char RewriteInsertsPass::ID = 0;
-static RegisterPass<RewriteInsertsPass>
-    X("RewriteInserts",
-      "Rewrite chains of insertvalue to as composite-construction");
+INITIALIZE_PASS(RewriteInsertsPass, "RewriteInserts",
+                "Rewrite chains of insertvalue to as composite-construction",
+                false, false)
 
 namespace clspv {
 llvm::ModulePass *createRewriteInsertsPass() {
