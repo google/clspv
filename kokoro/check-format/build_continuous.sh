@@ -18,4 +18,5 @@ set -e
 # Display commands being run.
 set -x
 
-./build.sh FULL
+DIR=$(dirname $0)
+$DIR/build.sh FULL
