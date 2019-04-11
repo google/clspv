@@ -29,9 +29,10 @@
 
 #include "spirv/1.0/spirv.hpp"
 
+#include "clspv/Option.h"
+
 #include "Passes.h"
 #include "SPIRVOp.h"
-#include "clspv/Option.h"
 
 using namespace llvm;
 

@@ -29,11 +29,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Passes.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Passes.h"
 
 using namespace llvm;
 

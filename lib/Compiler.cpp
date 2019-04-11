@@ -31,13 +31,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
-#include "Passes.h"
 #include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 #include "clspv/opencl_builtins_header.h"
 
 #include "FrontendPlugin.h"
+#include "Passes.h"
 
 #include <cassert>
 #include <numeric>

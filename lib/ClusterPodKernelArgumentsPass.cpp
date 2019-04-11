@@ -40,7 +40,6 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "ArgKind.h"
-
 #include "Passes.h"
 
 using namespace llvm;
