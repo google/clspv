@@ -139,8 +139,10 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
       continue;
 
     for (auto &Arg : F.args()) {
-      if (clspv::GetArgKindForType(Arg.getType()) ==
-          clspv::ArgKind::BufferUBO) {
+      if ((clspv::GetArgKindForType(Arg.getType()) ==
+           clspv::ArgKind::BufferUBO) ||
+          (!Arg.getType()->isPointerTy() &&
+           clspv::Option::PodArgsInUniformBuffer())) {
         // Pre-populate the type mapping for types that must change. This
         // necessary to prevent caching what would appear to be a no-op too
         // early.

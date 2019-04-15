@@ -36,8 +36,11 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+
+#include "clspv/Option.h"
 
 #include "ArgKind.h"
 #include "Passes.h"
@@ -120,8 +123,10 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     SmallVector<Type *, 8> PtrArgTys;
     SmallVector<Type *, 8> PodArgTys;
     SmallVector<ArgMapping, 8> RemapInfo;
+    DenseMap<Argument *, unsigned> PodIndexMap;
     unsigned arg_index = 0;
     int new_index = 0;
+    unsigned pod_index = 0;
     for (Argument &Arg : F->args()) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
@@ -135,6 +140,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
         RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
                              0u, 0u, kind, spec_id});
       } else {
+        PodIndexMap[&Arg] = pod_index++;
         PodArgTys.push_back(ArgTy);
       }
       arg_index++;
@@ -144,6 +150,47 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // Use StructType::get so we reuse types where possible.
     auto PodArgsStructTy = StructType::get(Context, PodArgTys);
     SmallVector<Type *, 8> NewFuncParamTys(PtrArgTys);
+
+    if (clspv::Option::PodArgsInUniformBuffer() &&
+        !clspv::Option::Std430UniformBufferLayout()) {
+      SmallVector<Type *, 16> PaddedPodArgTys;
+      const DataLayout DL(&M);
+      const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
+      unsigned pod_index = 0;
+      for (auto &Arg : F->args()) {
+        auto arg_type = Arg.getType();
+        if (arg_type->isPointerTy())
+          continue;
+
+        // The frontend has validated individual POD arguments. When the
+        // unified struct is constructed, pad struct and array elements as
+        // necessary to achieve a 16-byte alignment.
+        if (arg_type->isStructTy() || arg_type->isArrayTy()) {
+          auto offset = StructLayout->getElementOffset(pod_index);
+          auto aligned = alignTo(offset, 16);
+          if (offset < aligned) {
+            auto int_ty = IntegerType::get(Context, 32);
+            auto char_ty = IntegerType::get(Context, 8);
+            size_t num_ints = (aligned - offset) / 4;
+            size_t num_chars = (aligned - offset) - (num_ints * 4);
+            assert((num_chars == 0 || clspv::Option::Int8Support()) &&
+                   "Char in UBO struct without char support");
+            // Fix the index for the offset of the argument.
+            // Add char padding first.
+            PodIndexMap[&Arg] += num_ints + num_chars;
+            for (size_t i = 0; i < num_chars; ++i) {
+              PaddedPodArgTys.push_back(char_ty);
+            }
+            for (size_t i = 0; i < num_ints; ++i) {
+              PaddedPodArgTys.push_back(int_ty);
+            }
+          }
+        }
+        ++pod_index;
+        PaddedPodArgTys.push_back(arg_type);
+      }
+      PodArgsStructTy = StructType::get(Context, PaddedPodArgTys);
+    }
     NewFuncParamTys.push_back(PodArgsStructTy);
 
     // We've recorded the remapping for pointer arguments.  Now record the
@@ -152,14 +199,13 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       const DataLayout DL(&M);
       const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
       arg_index = 0;
-      int pod_index = 0;
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
         if (!isa<PointerType>(ArgTy)) {
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
-               unsigned(StructLayout->getElementOffset(pod_index++)), arg_size,
+               unsigned(StructLayout->getElementOffset(PodIndexMap[&Arg])), arg_size,
                clspv::GetArgKindForType(ArgTy), -1});
         }
         arg_index++;
@@ -287,11 +333,12 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     SmallVector<Value *, 8> CalleeArgs;
     unsigned podIndex = 0;
     unsigned ptrIndex = 0;
-    for (const Argument &Arg : F->args()) {
+    for (Argument &Arg : F->args()) {
       if (isa<PointerType>(Arg.getType())) {
         CalleeArgs.push_back(CallerArgs[ptrIndex++]);
       } else {
-        CalleeArgs.push_back(Builder.CreateExtractValue(PodArg, {podIndex++}));
+        podIndex = PodIndexMap[&Arg];
+        CalleeArgs.push_back(Builder.CreateExtractValue(PodArg, {podIndex}));
       }
       CalleeArgs.back()->setName(Arg.getName());
     }

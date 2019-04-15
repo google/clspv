@@ -2976,7 +2976,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
   auto *fty = F.getType()->getPointerElementType();
   auto *func_ty = dyn_cast<FunctionType>(fty);
 
-  // If we've clustereed POD arguments, then argument details are in metadata.
+  // If we've clustered POD arguments, then argument details are in metadata.
   // If an argument maps to a resource variable, then get descriptor set and
   // binding from the resoure variable.  Other info comes from the metadata.
   const auto *arg_map = F.getMetadata("kernel_arg_map");
