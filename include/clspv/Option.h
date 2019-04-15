@@ -113,6 +113,9 @@ bool Int8Support();
 // Returns true when compiling C++.
 bool CPlusPlus();
 
+// Returns true when images are supported.
+bool ImageSupport();
+
 } // namespace Option
 } // namespace clspv
 

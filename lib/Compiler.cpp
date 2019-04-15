@@ -429,7 +429,9 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getLangOpts().FastRelaxedMath = cl_fast_relaxed_math;
 
   // Preprocessor options
-  instance.getPreprocessorOpts().addMacroDef("__IMAGE_SUPPORT__");
+  if (!clspv::Option::ImageSupport()) {
+    instance.getPreprocessorOpts().addMacroUndef("__IMAGE_SUPPORT__");
+  }
   if (cl_fast_relaxed_math) {
     instance.getPreprocessorOpts().addMacroDef("__FAST_RELAXED_MATH__");
   }

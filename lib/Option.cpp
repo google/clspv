@@ -153,6 +153,10 @@ llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
 static llvm::cl::opt<bool>
     cplusplus("c++", llvm::cl::init(false),
               llvm::cl::desc("Enable experimental C++ support"));
+
+static llvm::cl::opt<bool>
+    images("images", llvm::cl::init(true),
+           llvm::cl::desc("Enable support for images"));
 } // namespace
 
 namespace clspv {
@@ -185,6 +189,7 @@ bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
 bool CPlusPlus() { return cplusplus; }
+bool ImageSupport() { return images; }
 
 } // namespace Option
 } // namespace clspv
