@@ -3,14 +3,9 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: FileCheck --check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
-// RUN: clspv %s -o %t2.spv -descriptormap=%t2.map -pod-ubo -cluster-pod-kernel-args -int8=0
-// RUN: spirv-dis %t2.spv -o %t2.spvasm
-// RUN: FileCheck %s < %t2.spvasm
-// RUN: FileCheck --check-prefix=MAP %s < %t2.map
-// RUN: spirv-val --target-env vulkan1.0 %t2.spv
 
 typedef struct {
-  int a, b, c, d;
+  int a __attribute__((aligned(16)));
 } S;
 
 kernel void foo(global int4* out, int a, S s) {
@@ -24,16 +19,14 @@ kernel void foo(global int4* out, int a, S s) {
 // CHECK: OpMemberDecorate
 // CHECK: OpMemberDecorate [[S:%[a-zA-Z0-9_]+]] 0 Offset 0
 // CHECK: OpMemberDecorate [[S]] 1 Offset 4
-// CHECK: OpMemberDecorate [[S]] 2 Offset 8
-// CHECK: OpMemberDecorate [[S]] 3 Offset 12
 // CHECK: OpMemberDecorate [[cluster:%[a-zA-Z0-9_]+]] 0 Offset 0
 // CHECK: OpMemberDecorate [[cluster]] 1 Offset 4
 // CHECK: OpMemberDecorate [[cluster]] 2 Offset 8
 // CHECK: OpMemberDecorate [[cluster]] 3 Offset 12
 // CHECK: OpMemberDecorate [[cluster]] 4 Offset 16
 // CHECK: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK-NOT: OpTypeInt 8 0
-// CHECK: [[S]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]]
+// CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
+// CHECK: [[S]] = OpTypeStruct [[int]] [[char]]
 // CHECK: [[cluster]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]] [[S]]
 // CHECK: [[pod_var:%[a-zA-Z0-9_]+]] = OpVariable {{.*}} Uniform
 // CHECK: [[gep:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} [[pod_var]]
@@ -42,3 +35,4 @@ kernel void foo(global int4* out, int a, S s) {
 // CHECK: [[s:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[S]] [[ld]] 4
 // CHECK: [[s_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[s]] 0
 // CHECK: OpIAdd [[int]] [[s_a]] [[a]]
+

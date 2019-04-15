@@ -126,9 +126,6 @@ ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }
 namespace {
 
 bool UBOTypeTransformPass::runOnModule(Module &M) {
-  if (!clspv::Option::ConstantArgsInUniformBuffer())
-    return false;
-
   // Record whether char arrays are supported.
   support_int8_array_ = clspv::Option::Int8Support() &&
                         clspv::Option::Std430UniformBufferLayout();
@@ -139,8 +136,9 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
       continue;
 
     for (auto &Arg : F.args()) {
-      if ((clspv::GetArgKindForType(Arg.getType()) ==
-           clspv::ArgKind::BufferUBO) ||
+      if ((clspv::Option::ConstantArgsInUniformBuffer() &&
+           clspv::GetArgKindForType(Arg.getType()) ==
+               clspv::ArgKind::BufferUBO) ||
           (!Arg.getType()->isPointerTy() &&
            clspv::Option::PodArgsInUniformBuffer())) {
         // Pre-populate the type mapping for types that must change. This
