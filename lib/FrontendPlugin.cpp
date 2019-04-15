@@ -470,11 +470,11 @@ public:
               }
             }
 
-            if (is_opencl_kernel && !type->isPointerType() &&
-                clspv::Option::PodArgsInUniformBuffer()) {
-              Layout layout = UBO;
-              if (clspv::Option::Std430UniformBufferLayout())
-                layout = SSBO;
+            if (is_opencl_kernel && !type->isPointerType()) {
+              Layout layout = SSBO;
+              if (clspv::Option::PodArgsInUniformBuffer &&
+                  !clspv::Option::Std430UniformBufferLayout())
+                layout = UBO;
 
               if (!IsSupportedLayout(type, 0, layout, FD->getASTContext(),
                                      P->getSourceRange(),
