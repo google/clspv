@@ -28,6 +28,7 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -159,6 +160,12 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool>
     WarningsAsErrors("Werror", llvm::cl::init(false),
                      llvm::cl::desc("Turn warnings into errors"));
+
+static llvm::cl::opt<std::string> IROutputFile(
+    "emit-ir",
+    llvm::cl::desc(
+        "Emit LLVM IR to the given file after parsing and stop compilation."),
+    llvm::cl::value_desc("filename"));
 
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
@@ -717,6 +724,22 @@ int ParseOptions(const int argc, const char *const argv[]) {
 
   return 0;
 }
+
+int GenerateIRFile(llvm::legacy::PassManager *pm, llvm::Module &module,
+                   std::string output) {
+  std::error_code ec;
+  std::unique_ptr<llvm::ToolOutputFile> out(
+      new llvm::ToolOutputFile(output, ec, llvm::sys::fs::F_None));
+  if (ec) {
+    llvm::errs() << output << ": " << ec.message() << '\n';
+    return -1;
+  }
+  pm->add(llvm::createPrintModulePass(out->os(), "", false));
+  pm->run(module);
+  out->keep();
+  return 0;
+}
+
 } // namespace
 
 namespace clspv {
@@ -792,6 +815,13 @@ int Compile(const int argc, const char *const argv[]) {
   std::string descriptor_map;
   llvm::legacy::PassManager pm;
   std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
+
+  // If --emit-ir was requested, emit the initial LLVM IR and stop compilation.
+  if (!IROutputFile.empty()) {
+    return GenerateIRFile(&pm, *module, IROutputFile);
+  }
+
+  // Otherwise, populate the pass manager and run the regular passes.
   if (auto error = PopulatePassManager(
           &pm, &binaryStream, &descriptor_map_entries, &SamplerMapEntries))
     return error;
