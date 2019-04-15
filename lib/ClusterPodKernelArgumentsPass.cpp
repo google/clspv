@@ -205,8 +205,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
-               unsigned(StructLayout->getElementOffset(PodIndexMap[&Arg])), arg_size,
-               clspv::GetArgKindForType(ArgTy), -1});
+               unsigned(StructLayout->getElementOffset(PodIndexMap[&Arg])),
+               arg_size, clspv::GetArgKindForType(ArgTy), -1});
         }
         arg_index++;
       }
