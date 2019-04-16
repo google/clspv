@@ -331,21 +331,22 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     PodArg->setName("podargs");
 
     SmallVector<Value *, 8> CalleeArgs;
-    unsigned podIndex = 0;
+    unsigned podCount = 0;
     unsigned ptrIndex = 0;
     for (Argument &Arg : F->args()) {
       if (isa<PointerType>(Arg.getType())) {
         CalleeArgs.push_back(CallerArgs[ptrIndex++]);
       } else {
-        podIndex = PodIndexMap[&Arg];
+        podCount++;
+        unsigned podIndex = PodIndexMap[&Arg];
         CalleeArgs.push_back(Builder.CreateExtractValue(PodArg, {podIndex}));
       }
       CalleeArgs.back()->setName(Arg.getName());
     }
-    assert(ptrIndex + podIndex == F->arg_size());
+    assert(ptrIndex + podCount == F->arg_size());
     assert(ptrIndex == PtrArgTys.size());
-    assert(podIndex != 0);
-    assert(podIndex == PodArgTys.size());
+    assert(podCount != 0);
+    assert(podCount == PodArgTys.size());
 
     auto Call = Builder.CreateCall(F, CalleeArgs);
     Call->setCallingConv(F->getCallingConv());
