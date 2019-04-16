@@ -472,7 +472,7 @@ public:
 
             if (is_opencl_kernel && !type->isPointerType()) {
               Layout layout = SSBO;
-              if (clspv::Option::PodArgsInUniformBuffer &&
+              if (clspv::Option::PodArgsInUniformBuffer() &&
                   !clspv::Option::Std430UniformBufferLayout())
                 layout = UBO;
 
