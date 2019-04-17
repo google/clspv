@@ -89,8 +89,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
 
       for (auto CI : CallsToReplace) {
         auto NewArg = CI->getArgOperand(0);
-
-        if (auto Bitcast = dyn_cast<BitCastOperator>(NewArg)) {
+        auto Bitcast = dyn_cast<BitCastInst>(NewArg);
+        if (Bitcast != nullptr) {
           NewArg = Bitcast->getOperand(0);
         }
 
@@ -131,7 +131,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
 
         CI->eraseFromParent();
 
-        if (auto Bitcast = dyn_cast<BitCastInst>(NewArg)) {
+        if (Bitcast != nullptr) {
           Bitcast->eraseFromParent();
         }
       }
