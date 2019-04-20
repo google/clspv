@@ -117,6 +117,7 @@ bool UndoByvalPass::runOnModule(Module &M) {
       ValueToValueMapTy VMap;
       auto NewArg = NewFunc->arg_begin();
       for (auto &Arg : F->args()) {
+        NewArg->setName(Arg.getName());
         VMap[&Arg] = &*(NewArg++);
       }
 

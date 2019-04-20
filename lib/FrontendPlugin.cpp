@@ -469,6 +469,19 @@ public:
                 return false;
               }
             }
+
+            if (is_opencl_kernel && !type->isPointerType()) {
+              Layout layout = SSBO;
+              if (clspv::Option::PodArgsInUniformBuffer() &&
+                  !clspv::Option::Std430UniformBufferLayout())
+                layout = UBO;
+
+              if (!IsSupportedLayout(type, 0, layout, FD->getASTContext(),
+                                     P->getSourceRange(),
+                                     P->getSourceRange())) {
+                return false;
+              }
+            }
           }
 
           // Check for unsupported vector types.

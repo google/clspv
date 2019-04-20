@@ -117,6 +117,7 @@ bool UndoSRetPass::runOnModule(Module &M) {
             VMap[&Arg] = UndefValue::get(Arg.getType());
             continue;
           }
+          NewArg->setName(Arg.getName());
           VMap[&Arg] = &*(NewArg++);
         }
 
