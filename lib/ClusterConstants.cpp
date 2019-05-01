@@ -33,6 +33,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "NormalizeGlobalVariable.h"
 #include "Passes.h"
 
 using namespace llvm;
@@ -63,6 +64,8 @@ llvm::ModulePass *createClusterModuleScopeConstantVars() {
 bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
   bool Changed = false;
   LLVMContext &Context = M.getContext();
+
+  clspv::NormalizeGlobalVariables(M);
 
   SmallVector<GlobalVariable *, 8> global_constants;
   UniqueVector<Constant *> initializers;
