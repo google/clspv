@@ -22,4 +22,4 @@ namespace clspv {
 // Rewrites variable intializers.
 void NormalizeGlobalVariables(llvm::Module &M);
 
-}
+} // namespace clspv
