@@ -51,6 +51,168 @@ ModulePass *createReplacePointerBitcastPass() {
 }
 } // namespace clspv
 
+namespace {
+
+// Gathers the scalar values of |v| into |elements|. Generates new instructions
+// to extract the values.
+void GatherBaseElements(Value *v, SmallVectorImpl<Value *> *elements,
+                        IRBuilder<> &builder) {
+  auto *type = v->getType();
+  if (auto *vec_type = dyn_cast<VectorType>(type)) {
+    for (uint64_t i = 0; i != vec_type->getNumElements(); ++i) {
+      elements->push_back(builder.CreateExtractElement(v, i));
+    }
+  } else if (auto *array_type = dyn_cast<ArrayType>(type)) {
+    for (uint64_t i = 0; i != array_type->getNumElements(); ++i) {
+      auto *extract = builder.CreateExtractValue(v, {static_cast<unsigned>(i)});
+      GatherBaseElements(extract, elements, builder);
+    }
+  } else if (auto *struct_type = dyn_cast<StructType>(type)) {
+    for (unsigned i = 0; i != struct_type->getNumElements(); ++i) {
+      auto *extract = builder.CreateExtractValue(v, {i});
+      GatherBaseElements(extract, elements, builder);
+    }
+  } else {
+    elements->push_back(v);
+  }
+}
+
+// Returns a value of |dst_type| using the elemental members of |src_elements|.
+Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
+                         unsigned *used_bits, unsigned *index,
+                         IRBuilder<> &builder) {
+  auto *module = builder.GetInsertBlock()->getParent()->getParent();
+  auto &DL = module->getDataLayout();
+  auto &context = dst_type->getContext();
+  Value *dst = nullptr;
+  // Arrays, vectors and structs are annoyingly just different enough to each
+  // require their own cases.
+  if (auto *dst_array_ty = dyn_cast<ArrayType>(dst_type)) {
+    auto *ele_ty = dst_array_ty->getElementType();
+    for (uint64_t i = 0; i != dst_array_ty->getNumElements(); ++i) {
+      auto *tmp_value =
+          BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
+      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      dst = builder.CreateInsertValue(prev, tmp_value,
+                                      {static_cast<unsigned>(i)});
+    }
+  } else if (auto *dst_struct_ty = dyn_cast<StructType>(dst_type)) {
+    for (unsigned i = 0; i != dst_struct_ty->getNumElements(); ++i) {
+      auto *ele_ty = dst_struct_ty->getElementType(i);
+      auto *tmp_value =
+          BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
+      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      dst = builder.CreateInsertValue(prev, tmp_value, {i});
+    }
+  } else if (auto *dst_vec_ty = dyn_cast<VectorType>(dst_type)) {
+    auto *ele_ty = dst_vec_ty->getElementType();
+    for (uint64_t i = 0; i != dst_vec_ty->getNumElements(); ++i) {
+      auto *tmp_value =
+          BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
+      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      dst = builder.CreateInsertElement(prev, tmp_value, i);
+    }
+  } else {
+    // Scalar conversion eats up elements in src_elements.
+    auto dst_width = DL.getTypeStoreSizeInBits(dst_type);
+    uint64_t bits = 0;
+    Value *tmp_value = nullptr;
+    auto prev_bits = 0;
+    Value *ele_int_cast = nullptr;
+    while (bits < dst_width) {
+      prev_bits = bits;
+      auto *ele = src_elements[*index];
+      auto *ele_ty = ele->getType();
+      auto ele_width = DL.getTypeStoreSizeInBits(ele_ty);
+      auto remaining_bits = ele_width - *used_bits;
+      auto needed_bits = dst_width - bits;
+      // Create a reusable cast to an integer type for this element.
+      if (!ele_int_cast || cast<User>(ele_int_cast)->getOperand(0) != ele) {
+        ele_int_cast =
+            builder.CreateBitCast(ele, IntegerType::get(context, ele_width));
+      }
+      tmp_value = ele_int_cast;
+      // Some of the bits of this element were previously used, so shift the
+      // value that many bits.
+      if (*used_bits != 0) {
+        tmp_value = builder.CreateLShr(tmp_value, *used_bits);
+      }
+      // Cast to tbe destination bit width, but stay as a integer type.
+      if (ele_width != dst_width) {
+        tmp_value = builder.CreateIntCast(
+            tmp_value, IntegerType::get(context, dst_width), false);
+      }
+
+      uint64_t mask_bits = 0;
+      if (remaining_bits <= needed_bits) {
+        // Used the rest of the element.
+        mask_bits = remaining_bits;
+        *used_bits = 0;
+        ++(*index);
+        bits += remaining_bits;
+      } else {
+        // Only need part of this element.
+        mask_bits = needed_bits;
+        *used_bits += needed_bits;
+        bits += needed_bits;
+      }
+      if (mask_bits < dst_width) {
+        // Ensure only the bits that were just extracted are used.
+        uint64_t mask = (1ull << mask_bits) - 1;
+        tmp_value =
+            builder.CreateAnd(tmp_value, builder.getIntN(dst_width, mask));
+      }
+      if (dst) {
+        // Previous iteration generated an integer of the right size. That needs
+        // to be combined with the value generated this iteration.
+        tmp_value = builder.CreateShl(tmp_value, prev_bits);
+        dst = builder.CreateOr(dst, tmp_value);
+      } else {
+        dst = tmp_value;
+      }
+    }
+
+    assert(bits <= dst_width);
+    if (bits == dst_width && dst_type != dst->getType()) {
+      // Finally, cast away from the working integer type if necessary.
+      dst = builder.CreateBitCast(dst, dst_type);
+    }
+  }
+
+  return dst;
+}
+
+// Returns an equivalent value of |src| as |dst_type|.
+//
+// This function requires |src|'s and |dst_type|'s bit widths match. Does not
+// introduce new integer sizes, but generates multiple instructions to mimic a
+// generic bitcast (unless a bitcast is sufficient).
+Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
+  auto *src_type = src->getType();
+  auto *module = builder.GetInsertBlock()->getParent()->getParent();
+  auto &DL = module->getDataLayout();
+  if (!src_type->isFirstClassType() || !dst_type->isFirstClassType() ||
+      src_type->isAggregateType() || dst_type->isAggregateType()) {
+    SmallVector<Value *, 8> src_elements;
+    if (src_type->isAggregateType()) {
+      GatherBaseElements(src, &src_elements, builder);
+    } else {
+      src_elements.push_back(src);
+    }
+
+    unsigned used_bits = 0;
+    unsigned index = 0;
+    return BuildFromElements(dst_type, src_elements, &used_bits, &index,
+                             builder);
+  } else {
+    return builder.CreateBitCast(src, dst_type);
+  }
+
+  return nullptr;
+}
+
+} // namespace
+
 unsigned ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
                                                      unsigned DstTyBitWidth) {
   unsigned NumIter = 0;
@@ -835,7 +997,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
           // errs() << " store is " << *ST << "\n";
           if (SrcTyBitWidth == DstTyBitWidth) {
-            auto STVal = Builder.CreateBitCast(ST->getValueOperand(), SrcTy);
+            auto STVal = ConvertValue(ST->getValueOperand(), SrcTy, Builder);
             Value *DstAddr = Builder.CreateGEP(Src, NewAddrIdx);
             Builder.CreateStore(STVal, DstAddr);
           } else if (SrcTyBitWidth < DstTyBitWidth) {
@@ -889,7 +1051,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           if (SrcTyBitWidth == DstTyBitWidth) {
             Value *SrcAddr = Builder.CreateGEP(Src, NewAddrIdx);
             LoadInst *SrcVal = Builder.CreateLoad(SrcAddr, "src_val");
-            LD->replaceAllUsesWith(Builder.CreateBitCast(SrcVal, DstTy));
+            LD->replaceAllUsesWith(ConvertValue(SrcVal, DstTy, Builder));
           } else if (SrcTyBitWidth < DstTyBitWidth) {
             Value *SrcAddrIdx = NewAddrIdx;
 
