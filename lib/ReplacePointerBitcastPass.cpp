@@ -137,31 +137,29 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
       if (*used_bits != 0) {
         tmp_value = builder.CreateLShr(tmp_value, *used_bits);
       }
+      if (needed_bits < remaining_bits) {
+        // Ensure only the needed bits are used.
+        uint64_t mask = (1ull << needed_bits) - 1;
+        tmp_value =
+            builder.CreateAnd(tmp_value, builder.getIntN(dst_width, mask));
+      }
       // Cast to tbe destination bit width, but stay as a integer type.
       if (ele_width != dst_width) {
         tmp_value = builder.CreateIntCast(
             tmp_value, IntegerType::get(context, dst_width), false);
       }
 
-      uint64_t mask_bits = 0;
       if (remaining_bits <= needed_bits) {
         // Used the rest of the element.
-        mask_bits = remaining_bits;
         *used_bits = 0;
         ++(*index);
         bits += remaining_bits;
       } else {
         // Only need part of this element.
-        mask_bits = needed_bits;
         *used_bits += needed_bits;
         bits += needed_bits;
       }
-      if (mask_bits < dst_width) {
-        // Ensure only the bits that were just extracted are used.
-        uint64_t mask = (1ull << mask_bits) - 1;
-        tmp_value =
-            builder.CreateAnd(tmp_value, builder.getIntN(dst_width, mask));
-      }
+
       if (dst) {
         // Previous iteration generated an integer of the right size. That needs
         // to be combined with the value generated this iteration.
