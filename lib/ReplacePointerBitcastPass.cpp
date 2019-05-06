@@ -57,6 +57,8 @@ namespace {
 // to extract the values.
 void GatherBaseElements(Value *v, SmallVectorImpl<Value *> *elements,
                         IRBuilder<> &builder) {
+  auto *module = builder.GetInsertBlock()->getParent()->getParent();
+  auto &DL = module->getDataLayout();
   auto *type = v->getType();
   if (auto *vec_type = dyn_cast<VectorType>(type)) {
     for (uint64_t i = 0; i != vec_type->getNumElements(); ++i) {
@@ -68,6 +70,10 @@ void GatherBaseElements(Value *v, SmallVectorImpl<Value *> *elements,
       GatherBaseElements(extract, elements, builder);
     }
   } else if (auto *struct_type = dyn_cast<StructType>(type)) {
+    const auto *struct_layout = DL.getStructLayout(struct_type);
+    if (struct_layout->hasPadding()) {
+      llvm_unreachable("Unhandled conversion of padded struct");
+    }
     for (unsigned i = 0; i != struct_type->getNumElements(); ++i) {
       auto *extract = builder.CreateExtractValue(v, {i});
       GatherBaseElements(extract, elements, builder);
@@ -85,6 +91,15 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
   auto &DL = module->getDataLayout();
   auto &context = dst_type->getContext();
   Value *dst = nullptr;
+  uint64_t element_sum = 0;
+  // Can only successfully convert unpadded structs.
+  for (auto element : src_elements) {
+    element_sum += DL.getTypeStoreSizeInBits(element->getType());
+  }
+  if (DL.getTypeStoreSizeInBits(dst_type) != element_sum) {
+    llvm_unreachable("Elements do not sum to overall size");
+    return nullptr;
+  }
   // Arrays, vectors and structs are annoyingly just different enough to each
   // require their own cases.
   if (auto *dst_array_ty = dyn_cast<ArrayType>(dst_type)) {
@@ -97,6 +112,11 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
                                       {static_cast<unsigned>(i)});
     }
   } else if (auto *dst_struct_ty = dyn_cast<StructType>(dst_type)) {
+    const auto *struct_layout = DL.getStructLayout(dst_struct_ty);
+    if (struct_layout->hasPadding()) {
+      llvm_unreachable("Unhandled padded struct conversion");
+      return nullptr;
+    }
     for (unsigned i = 0; i != dst_struct_ty->getNumElements(); ++i) {
       auto *ele_ty = dst_struct_ty->getElementType(i);
       auto *tmp_value =
