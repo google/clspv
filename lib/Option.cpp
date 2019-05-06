@@ -154,9 +154,8 @@ static llvm::cl::opt<bool>
     cplusplus("c++", llvm::cl::init(false),
               llvm::cl::desc("Enable experimental C++ support"));
 
-static llvm::cl::opt<bool>
-    images("images", llvm::cl::init(true),
-           llvm::cl::desc("Enable support for images"));
+static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
+                                  llvm::cl::desc("Enable support for images"));
 } // namespace
 
 namespace clspv {
