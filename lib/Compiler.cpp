@@ -935,6 +935,7 @@ int CompileFromSourceString(
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(Registry);
   llvm::initializeScalarOpts(Registry);
+  llvm::initializeClspvPasses(Registry);
 
   std::unique_ptr<llvm::Module> module(action.takeModule());
 
