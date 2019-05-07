@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   llvm::initializeCore(registry);
   llvm::initializeScalarOpts(registry);
 
-  // clspv passes
+  // Initialize clspv passes.
   llvm::initializeClspvPasses(registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv,
