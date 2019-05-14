@@ -91,15 +91,6 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
   auto &DL = module->getDataLayout();
   auto &context = dst_type->getContext();
   Value *dst = nullptr;
-  uint64_t element_sum = 0;
-  // Can only successfully convert unpadded structs.
-  for (auto element : src_elements) {
-    element_sum += DL.getTypeStoreSizeInBits(element->getType());
-  }
-  if (DL.getTypeStoreSizeInBits(dst_type) != element_sum) {
-    llvm_unreachable("Elements do not sum to overall size");
-    return nullptr;
-  }
   // Arrays, vectors and structs are annoyingly just different enough to each
   // require their own cases.
   if (auto *dst_array_ty = dyn_cast<ArrayType>(dst_type)) {
@@ -216,6 +207,17 @@ Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
       GatherBaseElements(src, &src_elements, builder);
     } else {
       src_elements.push_back(src);
+    }
+
+    // Check that overall sizes make sense.
+    uint64_t element_sum = 0;
+    // Can only successfully convert unpadded structs.
+    for (auto element : src_elements) {
+      element_sum += DL.getTypeStoreSizeInBits(element->getType());
+    }
+    if (DL.getTypeStoreSizeInBits(dst_type) != element_sum) {
+      llvm_unreachable("Elements do not sum to overall size");
+      return nullptr;
     }
 
     unsigned used_bits = 0;
