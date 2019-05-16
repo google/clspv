@@ -4440,18 +4440,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Handle SPIR-V intrinsics
     spv::Op opcode =
         StringSwitch<spv::Op>(Callee->getName())
-            .Case("spirv.atomic_add", spv::OpAtomicIAdd)
-            .Case("spirv.atomic_sub", spv::OpAtomicISub)
-            .Case("spirv.atomic_exchange", spv::OpAtomicExchange)
             .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
             .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
             .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
-            .Case("spirv.atomic_umin", spv::OpAtomicUMin)
-            .Case("spirv.atomic_smin", spv::OpAtomicSMin)
-            .Case("spirv.atomic_umax", spv::OpAtomicUMax)
-            .Case("spirv.atomic_smax", spv::OpAtomicSMax)
-            .Case("spirv.atomic_and", spv::OpAtomicAnd)
-            .Case("spirv.atomic_or", spv::OpAtomicOr)
             .Case("spirv.atomic_xor", spv::OpAtomicXor)
             .Case("__spirv_control_barrier", spv::OpControlBarrier)
             .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
