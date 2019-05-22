@@ -53,6 +53,7 @@
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
+#include "NormalizeGlobalVariable.h"
 #include "Passes.h"
 
 #if defined(_MSC_VER)
@@ -877,6 +878,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
 }
 
 void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
+  clspv::NormalizeGlobalVariables(M);
+
   SmallVector<GlobalVariable *, 8> GVList;
   SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : M.globals()) {

@@ -41,6 +41,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerToFunctionArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/NormalizeGlobalVariable.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Passes.cpp
