@@ -85,13 +85,19 @@ if (${EXTERNAL_LLVM} EQUAL 1)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_BINARY_DIR to be specified")
   endif()
 else()
-  use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
-  use_component(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
+  if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
+    set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
+  endif()
+
+  if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR)
+    set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
+  endif()
+
+  use_component(${CLSPV_LLVM_SOURCE_DIR})
+  use_component(${CLSPV_CLANG_SOURCE_DIR})
 
   # Kokoro bots have older toolchains so make that LLVM check a warning.
   option(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN "" ON)
-  set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
-  set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
   set(CLSPV_LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm)
 
   # First tell LLVM where to find clang.
@@ -101,9 +107,8 @@ else()
   set(LLVM_TARGETS_TO_BUILD ""
       CACHE STRING "Semicolon-separated list of targets to build, or \"all\".")
 
-
   # Then pull in LLVM for building.
-  add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} EXCLUDE_FROM_ALL)
+  add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm EXCLUDE_FROM_ALL)
 endif()
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
