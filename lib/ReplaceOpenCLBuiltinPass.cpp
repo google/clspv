@@ -568,6 +568,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Module &M) {
           auto NewFType =
               FunctionType::get(FType->getReturnType(), Params, false);
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
+          cast<Function>(NewF.getCallee())->setCannotDuplicate();
 
           auto Arg = CI->getOperand(0);
 
