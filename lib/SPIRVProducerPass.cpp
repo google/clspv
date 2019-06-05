@@ -4821,11 +4821,11 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           getAnalysis<LoopInfoWrapperPass>(*Func).getLoopInfo();
 
       BasicBlock *BrBB = Br->getParent();
+      Loop *L = LI.getLoopFor(BrBB);
       if (LI.isLoopHeader(BrBB)) {
         Value *ContinueBB = nullptr;
         Value *MergeBB = nullptr;
 
-        Loop *L = LI.getLoopFor(BrBB);
         MergeBB = L->getExitBlock();
         if (!MergeBB) {
           // StructurizeCFG pass converts CFG into triangle shape and the cfg
@@ -4876,14 +4876,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         SPIRVInstList.insert(InsertPoint, MergeInst);
 
       } else if (Br->isConditional()) {
-        bool HasBackEdge = false;
-
-        for (unsigned i = 0; i < Br->getNumSuccessors(); i++) {
-          if (LI.isLoopHeader(Br->getSuccessor(i))) {
-            HasBackEdge = true;
-          }
-        }
-        if (!HasBackEdge) {
+        // Generate a selection merge unless this is a back-edge block.
+        if (!L || !L->isLoopLatch(BrBB)) {
           //
           // Generate OpSelectionMerge.
           //
