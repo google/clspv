@@ -4877,7 +4877,14 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
       } else if (Br->isConditional()) {
         // Generate a selection merge unless this is a back-edge block.
-        if (!L || !L->isLoopLatch(BrBB)) {
+        bool HasBackedge = false;
+        while (L && !HasBackedge) {
+          if (L->isLoopLatch(BrBB)) {
+            HasBackedge = true;
+          }
+          L = L->getParentLoop();
+        }
+        if (!HasBackedge) {
           //
           // Generate OpSelectionMerge.
           //
