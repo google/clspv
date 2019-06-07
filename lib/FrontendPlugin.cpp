@@ -54,9 +54,26 @@ private:
     CustomDiagnosticSSBOUnalignedArray = 14,
     CustomDiagnosticSSBOUnalignedStruct = 15,
     CustomDiagnosticOverloadedKernel = 16,
+    CustomDiagnosticStructContainsPointer = 17,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
+
+  bool ContainsPointerType(QualType QT) {
+    auto canonical = QT.getCanonicalType();
+    if (canonical->isPointerType()) {
+      return true;
+    } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
+      return ContainsPointerType(AT->getElementType());
+    } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
+      for (auto field_decl : RT->getDecl()->fields()) {
+        if (ContainsPointerType(field_decl->getType()))
+          return true;
+      }
+    }
+
+    return false;
+  }
 
   bool IsSupportedType(QualType QT, SourceRange SR) {
     auto *Ty = QT.getTypePtr();
@@ -81,6 +98,14 @@ private:
         Instance.getDiagnostics().Report(
             SR.getBegin(),
             CustomDiagnosticsIDMap[CustomDiagnosticVectorsMoreThan4Elements]);
+        return false;
+      }
+    } else if (canonicalType->isRecordType()) {
+      // Structures should not contain pointers.
+      if (ContainsPointerType(canonicalType)) {
+        Instance.getDiagnostics().Report(
+            SR.getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticStructContainsPointer]);
         return false;
       }
     }
@@ -409,6 +434,9 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticOverloadedKernel] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "kernel functions can't be overloaded");
+    CustomDiagnosticsIDMap[CustomDiagnosticStructContainsPointer] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "structures may not contain pointers");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
