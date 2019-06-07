@@ -221,11 +221,11 @@ struct SPIRVProducerPass final : public ModulePass {
   explicit SPIRVProducerPass(
       raw_pwrite_stream &out,
       std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
-      ArrayRef<std::pair<unsigned, std::string>> samplerMap, bool outputAsm,
+      ArrayRef<std::pair<unsigned, std::string>> samplerMap,
       bool outputCInitList)
       : ModulePass(ID), samplerMap(samplerMap), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
-        descriptorMapEntries(descriptor_map_entries), outputAsm(outputAsm),
+        descriptorMapEntries(descriptor_map_entries),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
@@ -362,27 +362,6 @@ struct SPIRVProducerPass final : public ModulePass {
   // Returns the single GLSL extended instruction used directly or
   // indirectly by the given function call.
   glsl::ExtInst getDirectOrIndirectExtInstEnum(StringRef Name);
-  void PrintResID(SPIRVInstruction *Inst);
-  void PrintOpcode(SPIRVInstruction *Inst);
-  void PrintOperand(SPIRVOperand *Op);
-  void PrintCapability(SPIRVOperand *Op);
-  void PrintExtInst(SPIRVOperand *Op);
-  void PrintAddrModel(SPIRVOperand *Op);
-  void PrintMemModel(SPIRVOperand *Op);
-  void PrintExecModel(SPIRVOperand *Op);
-  void PrintExecMode(SPIRVOperand *Op);
-  void PrintSourceLanguage(SPIRVOperand *Op);
-  void PrintFuncCtrl(SPIRVOperand *Op);
-  void PrintStorageClass(SPIRVOperand *Op);
-  void PrintDecoration(SPIRVOperand *Op);
-  void PrintBuiltIn(SPIRVOperand *Op);
-  void PrintSelectionControl(SPIRVOperand *Op);
-  void PrintLoopControl(SPIRVOperand *Op);
-  void PrintDimensionality(SPIRVOperand *Op);
-  void PrintImageFormat(SPIRVOperand *Op);
-  void PrintMemoryAccess(SPIRVOperand *Op);
-  void PrintImageOperandsType(SPIRVOperand *Op);
-  void WriteSPIRVAssembly();
   void WriteOneWord(uint32_t Word);
   void WriteResultID(SPIRVInstruction *Inst);
   void WriteWordCountAndOpcode(SPIRVInstruction *Inst);
@@ -437,7 +416,6 @@ private:
   // initializer list.
   raw_pwrite_stream *binaryOut;
   std::vector<version0::DescriptorMapEntry> *descriptorMapEntries;
-  const bool outputAsm;
   const bool outputCInitList; // If true, output look like {0x7023, ... , 5}
   uint64_t patchBoundOffset;
   uint32_t nextID;
@@ -574,10 +552,10 @@ namespace clspv {
 ModulePass *createSPIRVProducerPass(
     raw_pwrite_stream &out,
     std::vector<version0::DescriptorMapEntry> *descriptor_map_entries,
-    ArrayRef<std::pair<unsigned, std::string>> samplerMap, bool outputAsm,
+    ArrayRef<std::pair<unsigned, std::string>> samplerMap,
     bool outputCInitList) {
   return new SPIRVProducerPass(out, descriptor_map_entries, samplerMap,
-                               outputAsm, outputCInitList);
+                               outputCInitList);
 }
 } // namespace clspv
 
@@ -664,11 +642,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   // Generate SPIRV module information.
   GenerateModuleInfo(module);
 
-  if (outputAsm) {
-    WriteSPIRVAssembly();
-  } else {
-    WriteSPIRVBinary();
-  }
+  WriteSPIRVBinary();
 
   // We need to patch the SPIR-V header to set bound correctly.
   patchHeader();
@@ -701,68 +675,30 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 }
 
 void SPIRVProducerPass::outputHeader() {
-  if (outputAsm) {
-    // for ASM output the header goes into 5 comments at the beginning of the
-    // file
-    out << "; SPIR-V\n";
+  binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
+                   sizeof(spv::MagicNumber));
+  binaryOut->write(reinterpret_cast<const char *>(&spv::Version),
+                   sizeof(spv::Version));
 
-    // the major version number is in the 2nd highest byte
-    const uint32_t major = (spv::Version >> 16) & 0xFF;
+  // use Codeplay's vendor ID
+  const uint32_t vendor = 3 << 16;
+  binaryOut->write(reinterpret_cast<const char *>(&vendor), sizeof(vendor));
 
-    // the minor version number is in the 2nd lowest byte
-    const uint32_t minor = (spv::Version >> 8) & 0xFF;
-    out << "; Version: " << major << "." << minor << "\n";
+  // we record where we need to come back to and patch in the bound value
+  patchBoundOffset = binaryOut->tell();
 
-    // use Codeplay's vendor ID
-    out << "; Generator: Codeplay; 0\n";
+  // output a bad bound for now
+  binaryOut->write(reinterpret_cast<const char *>(&nextID), sizeof(nextID));
 
-    out << "; Bound: ";
-
-    // we record where we need to come back to and patch in the bound value
-    patchBoundOffset = out.tell();
-
-    // output one space per digit for the max size of a 32 bit unsigned integer
-    // (which is the maximum ID we could possibly be using)
-    for (uint32_t i = std::numeric_limits<uint32_t>::max(); 0 != i; i /= 10) {
-      out << " ";
-    }
-
-    out << "\n";
-
-    out << "; Schema: 0\n";
-  } else {
-    binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
-                     sizeof(spv::MagicNumber));
-    binaryOut->write(reinterpret_cast<const char *>(&spv::Version),
-                     sizeof(spv::Version));
-
-    // use Codeplay's vendor ID
-    const uint32_t vendor = 3 << 16;
-    binaryOut->write(reinterpret_cast<const char *>(&vendor), sizeof(vendor));
-
-    // we record where we need to come back to and patch in the bound value
-    patchBoundOffset = binaryOut->tell();
-
-    // output a bad bound for now
-    binaryOut->write(reinterpret_cast<const char *>(&nextID), sizeof(nextID));
-
-    // output the schema (reserved for use and must be 0)
-    const uint32_t schema = 0;
-    binaryOut->write(reinterpret_cast<const char *>(&schema), sizeof(schema));
-  }
+  // output the schema (reserved for use and must be 0)
+  const uint32_t schema = 0;
+  binaryOut->write(reinterpret_cast<const char *>(&schema), sizeof(schema));
 }
 
 void SPIRVProducerPass::patchHeader() {
-  if (outputAsm) {
-    // get the string representation of the max bound used (nextID will be the
-    // max ID used)
-    auto asString = std::to_string(nextID);
-    out.pwrite(asString.c_str(), asString.size(), patchBoundOffset);
-  } else {
-    // for a binary we just write the value of nextID over bound
-    binaryOut->pwrite(reinterpret_cast<char *>(&nextID), sizeof(nextID),
-                      patchBoundOffset);
-  }
+  // for a binary we just write the value of nextID over bound
+  binaryOut->pwrite(reinterpret_cast<char *>(&nextID), sizeof(nextID),
+                    patchBoundOffset);
 }
 
 void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
@@ -5446,569 +5382,6 @@ SPIRVProducerPass::getDirectOrIndirectExtInstEnum(StringRef Name) {
   if (direct != kGlslExtInstBad)
     return direct;
   return getIndirectExtInstEnum(Name);
-}
-
-void SPIRVProducerPass::PrintResID(SPIRVInstruction *Inst) {
-  out << "%" << Inst->getResultID();
-}
-
-void SPIRVProducerPass::PrintOpcode(SPIRVInstruction *Inst) {
-  spv::Op Opcode = static_cast<spv::Op>(Inst->getOpcode());
-  out << "\t" << spv::getOpName(Opcode);
-}
-
-void SPIRVProducerPass::PrintOperand(SPIRVOperand *Op) {
-  SPIRVOperandType OpTy = Op->getType();
-  switch (OpTy) {
-  default: {
-    llvm_unreachable("Unsupported SPIRV Operand Type???");
-    break;
-  }
-  case SPIRVOperandType::NUMBERID: {
-    out << "%" << Op->getNumID();
-    break;
-  }
-  case SPIRVOperandType::LITERAL_STRING: {
-    out << "\"" << Op->getLiteralStr() << "\"";
-    break;
-  }
-  case SPIRVOperandType::LITERAL_INTEGER: {
-    // TODO: Handle LiteralNum carefully.
-    auto Words = Op->getLiteralNum();
-    auto NumWords = Words.size();
-
-    if (NumWords == 1) {
-      out << Words[0];
-    } else if (NumWords == 2) {
-      uint64_t Val = (static_cast<uint64_t>(Words[1]) << 32) | Words[0];
-      out << Val;
-    } else {
-      llvm_unreachable("Handle printing arbitrary precision integer literals.");
-    }
-    break;
-  }
-  case SPIRVOperandType::LITERAL_FLOAT: {
-    // TODO: Handle LiteralNum carefully.
-    for (auto Word : Op->getLiteralNum()) {
-      APFloat APF = APFloat(APFloat::IEEEsingle(), APInt(32, Word));
-      SmallString<8> Str;
-      APF.toString(Str, 6, 2);
-      out << Str;
-    }
-    break;
-  }
-  }
-}
-
-void SPIRVProducerPass::PrintCapability(SPIRVOperand *Op) {
-  spv::Capability Cap = static_cast<spv::Capability>(Op->getNumID());
-  out << spv::getCapabilityName(Cap);
-}
-
-void SPIRVProducerPass::PrintExtInst(SPIRVOperand *Op) {
-  auto LiteralNum = Op->getLiteralNum();
-  glsl::ExtInst Ext = static_cast<glsl::ExtInst>(LiteralNum[0]);
-  out << glsl::getExtInstName(Ext);
-}
-
-void SPIRVProducerPass::PrintAddrModel(SPIRVOperand *Op) {
-  spv::AddressingModel AddrModel =
-      static_cast<spv::AddressingModel>(Op->getNumID());
-  out << spv::getAddressingModelName(AddrModel);
-}
-
-void SPIRVProducerPass::PrintMemModel(SPIRVOperand *Op) {
-  spv::MemoryModel MemModel = static_cast<spv::MemoryModel>(Op->getNumID());
-  out << spv::getMemoryModelName(MemModel);
-}
-
-void SPIRVProducerPass::PrintExecModel(SPIRVOperand *Op) {
-  spv::ExecutionModel ExecModel =
-      static_cast<spv::ExecutionModel>(Op->getNumID());
-  out << spv::getExecutionModelName(ExecModel);
-}
-
-void SPIRVProducerPass::PrintExecMode(SPIRVOperand *Op) {
-  spv::ExecutionMode ExecMode = static_cast<spv::ExecutionMode>(Op->getNumID());
-  out << spv::getExecutionModeName(ExecMode);
-}
-
-void SPIRVProducerPass::PrintSourceLanguage(SPIRVOperand *Op) {
-  spv::SourceLanguage SourceLang =
-      static_cast<spv::SourceLanguage>(Op->getNumID());
-  out << spv::getSourceLanguageName(SourceLang);
-}
-
-void SPIRVProducerPass::PrintFuncCtrl(SPIRVOperand *Op) {
-  spv::FunctionControlMask FuncCtrl =
-      static_cast<spv::FunctionControlMask>(Op->getNumID());
-  out << spv::getFunctionControlName(FuncCtrl);
-}
-
-void SPIRVProducerPass::PrintStorageClass(SPIRVOperand *Op) {
-  spv::StorageClass StClass = static_cast<spv::StorageClass>(Op->getNumID());
-  out << getStorageClassName(StClass);
-}
-
-void SPIRVProducerPass::PrintDecoration(SPIRVOperand *Op) {
-  spv::Decoration Deco = static_cast<spv::Decoration>(Op->getNumID());
-  out << getDecorationName(Deco);
-}
-
-void SPIRVProducerPass::PrintBuiltIn(SPIRVOperand *Op) {
-  spv::BuiltIn BIn = static_cast<spv::BuiltIn>(Op->getNumID());
-  out << getBuiltInName(BIn);
-}
-
-void SPIRVProducerPass::PrintSelectionControl(SPIRVOperand *Op) {
-  spv::SelectionControlMask BIn =
-      static_cast<spv::SelectionControlMask>(Op->getNumID());
-  out << getSelectionControlName(BIn);
-}
-
-void SPIRVProducerPass::PrintLoopControl(SPIRVOperand *Op) {
-  spv::LoopControlMask BIn = static_cast<spv::LoopControlMask>(Op->getNumID());
-  out << getLoopControlName(BIn);
-}
-
-void SPIRVProducerPass::PrintDimensionality(SPIRVOperand *Op) {
-  spv::Dim DIM = static_cast<spv::Dim>(Op->getNumID());
-  out << getDimName(DIM);
-}
-
-void SPIRVProducerPass::PrintImageFormat(SPIRVOperand *Op) {
-  spv::ImageFormat Format = static_cast<spv::ImageFormat>(Op->getNumID());
-  out << getImageFormatName(Format);
-}
-
-void SPIRVProducerPass::PrintMemoryAccess(SPIRVOperand *Op) {
-  out << spv::getMemoryAccessName(
-      static_cast<spv::MemoryAccessMask>(Op->getNumID()));
-}
-
-void SPIRVProducerPass::PrintImageOperandsType(SPIRVOperand *Op) {
-  auto LiteralNum = Op->getLiteralNum();
-  spv::ImageOperandsMask Type =
-      static_cast<spv::ImageOperandsMask>(LiteralNum[0]);
-  out << getImageOperandsName(Type);
-}
-
-void SPIRVProducerPass::WriteSPIRVAssembly() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
-
-  for (auto Inst : SPIRVInstList) {
-    SPIRVOperandList Ops = Inst->getOperands();
-    spv::Op Opcode = static_cast<spv::Op>(Inst->getOpcode());
-
-    switch (Opcode) {
-    default: {
-      llvm_unreachable("Unsupported SPIRV instruction");
-      break;
-    }
-    case spv::OpCapability: {
-      // Ops[0] = Capability
-      PrintOpcode(Inst);
-      out << " ";
-      PrintCapability(Ops[0]);
-      out << "\n";
-      break;
-    }
-    case spv::OpMemoryModel: {
-      // Ops[0] = Addressing Model
-      // Ops[1] = Memory Model
-      PrintOpcode(Inst);
-      out << " ";
-      PrintAddrModel(Ops[0]);
-      out << " ";
-      PrintMemModel(Ops[1]);
-      out << "\n";
-      break;
-    }
-    case spv::OpEntryPoint: {
-      // Ops[0] = Execution Model
-      // Ops[1] = EntryPoint ID
-      // Ops[2] = Name (Literal String)
-      // Ops[3] ... Ops[n] = Interface ID
-      PrintOpcode(Inst);
-      out << " ";
-      PrintExecModel(Ops[0]);
-      for (uint32_t i = 1; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpExecutionMode: {
-      // Ops[0] = Entry Point ID
-      // Ops[1] = Execution Mode
-      // Ops[2] ... Ops[n] = Optional literals according to Execution Mode
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintExecMode(Ops[1]);
-      for (uint32_t i = 2; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpSource: {
-      // Ops[0] = SourceLanguage ID
-      // Ops[1] = Version (LiteralNum)
-      PrintOpcode(Inst);
-      out << " ";
-      PrintSourceLanguage(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << "\n";
-      break;
-    }
-    case spv::OpDecorate: {
-      // Ops[0] = Target ID
-      // Ops[1] = Decoration (Block or BufferBlock)
-      // Ops[2] ... Ops[n] = Optional literals according to Decoration
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintDecoration(Ops[1]);
-      // Handle BuiltIn OpDecorate specially.
-      if (Ops[1]->getNumID() == spv::DecorationBuiltIn) {
-        out << " ";
-        PrintBuiltIn(Ops[2]);
-      } else {
-        for (uint32_t i = 2; i < Ops.size(); i++) {
-          out << " ";
-          PrintOperand(Ops[i]);
-        }
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpMemberDecorate: {
-      // Ops[0] = Structure Type ID
-      // Ops[1] = Member Index(Literal Number)
-      // Ops[2] = Decoration
-      // Ops[3] ... Ops[n] = Optional literals according to Decoration
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << " ";
-      PrintDecoration(Ops[2]);
-      for (uint32_t i = 3; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpTypePointer: {
-      // Ops[0] = Storage Class
-      // Ops[1] = Element Type ID
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      out << " ";
-      PrintStorageClass(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << "\n";
-      break;
-    }
-    case spv::OpTypeImage: {
-      // Ops[0] = Sampled Type ID
-      // Ops[1] = Dim ID
-      // Ops[2] = Depth (Literal Number)
-      // Ops[3] = Arrayed (Literal Number)
-      // Ops[4] = MS (Literal Number)
-      // Ops[5] = Sampled (Literal Number)
-      // Ops[6] = Image Format ID
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintDimensionality(Ops[1]);
-      out << " ";
-      PrintOperand(Ops[2]);
-      out << " ";
-      PrintOperand(Ops[3]);
-      out << " ";
-      PrintOperand(Ops[4]);
-      out << " ";
-      PrintOperand(Ops[5]);
-      out << " ";
-      PrintImageFormat(Ops[6]);
-      out << "\n";
-      break;
-    }
-    case spv::OpFunction: {
-      // Ops[0] : Result Type ID
-      // Ops[1] : Function Control
-      // Ops[2] : Function Type ID
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintFuncCtrl(Ops[1]);
-      out << " ";
-      PrintOperand(Ops[2]);
-      out << "\n";
-      break;
-    }
-    case spv::OpSelectionMerge: {
-      // Ops[0] = Merge Block ID
-      // Ops[1] = Selection Control
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintSelectionControl(Ops[1]);
-      out << "\n";
-      break;
-    }
-    case spv::OpLoopMerge: {
-      // Ops[0] = Merge Block ID
-      // Ops[1] = Continue Target ID
-      // Ops[2] = Selection Control
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << " ";
-      PrintLoopControl(Ops[2]);
-      out << "\n";
-      break;
-    }
-    case spv::OpImageSampleExplicitLod: {
-      // Ops[0] = Result Type ID
-      // Ops[1] = Sampled Image ID
-      // Ops[2] = Coordinate ID
-      // Ops[3] = Image Operands Type ID
-      // Ops[4] ... Ops[n] = Operands ID
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      for (uint32_t i = 0; i < 3; i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << " ";
-      PrintImageOperandsType(Ops[3]);
-      for (uint32_t i = 4; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpVariable: {
-      // Ops[0] : Result Type ID
-      // Ops[1] : Storage Class
-      // Ops[2] ... Ops[n] = Initializer IDs
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintStorageClass(Ops[1]);
-      for (uint32_t i = 2; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpExtInst: {
-      // Ops[0] = Result Type ID
-      // Ops[1] = Set ID (OpExtInstImport ID)
-      // Ops[2] = Instruction Number (Literal Number)
-      // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << " ";
-      PrintExtInst(Ops[2]);
-      for (uint32_t i = 3; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpCopyMemory: {
-      // Ops[0] = Addressing Model
-      // Ops[1] = Memory Model
-      PrintOpcode(Inst);
-      out << " ";
-      PrintOperand(Ops[0]);
-      out << " ";
-      PrintOperand(Ops[1]);
-      out << " ";
-      PrintMemoryAccess(Ops[2]);
-      out << " ";
-      PrintOperand(Ops[3]);
-      out << "\n";
-      break;
-    }
-    case spv::OpExtension:
-    case spv::OpControlBarrier:
-    case spv::OpMemoryBarrier:
-    case spv::OpBranch:
-    case spv::OpBranchConditional:
-    case spv::OpStore:
-    case spv::OpImageWrite:
-    case spv::OpReturnValue:
-    case spv::OpReturn:
-    case spv::OpFunctionEnd: {
-      PrintOpcode(Inst);
-      for (uint32_t i = 0; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    case spv::OpExtInstImport:
-    case spv::OpTypeRuntimeArray:
-    case spv::OpTypeStruct:
-    case spv::OpTypeSampler:
-    case spv::OpTypeSampledImage:
-    case spv::OpTypeInt:
-    case spv::OpTypeFloat:
-    case spv::OpTypeArray:
-    case spv::OpTypeVector:
-    case spv::OpTypeBool:
-    case spv::OpTypeVoid:
-    case spv::OpTypeFunction:
-    case spv::OpFunctionParameter:
-    case spv::OpLabel:
-    case spv::OpPhi:
-    case spv::OpLoad:
-    case spv::OpSelect:
-    case spv::OpAccessChain:
-    case spv::OpPtrAccessChain:
-    case spv::OpInBoundsAccessChain:
-    case spv::OpUConvert:
-    case spv::OpSConvert:
-    case spv::OpConvertFToU:
-    case spv::OpConvertFToS:
-    case spv::OpConvertUToF:
-    case spv::OpConvertSToF:
-    case spv::OpFConvert:
-    case spv::OpConvertPtrToU:
-    case spv::OpConvertUToPtr:
-    case spv::OpBitcast:
-    case spv::OpIAdd:
-    case spv::OpFAdd:
-    case spv::OpISub:
-    case spv::OpFSub:
-    case spv::OpIMul:
-    case spv::OpFMul:
-    case spv::OpUDiv:
-    case spv::OpSDiv:
-    case spv::OpFDiv:
-    case spv::OpUMod:
-    case spv::OpSRem:
-    case spv::OpFRem:
-    case spv::OpUMulExtended:
-    case spv::OpSMulExtended:
-    case spv::OpBitwiseOr:
-    case spv::OpBitwiseXor:
-    case spv::OpBitwiseAnd:
-    case spv::OpNot:
-    case spv::OpShiftLeftLogical:
-    case spv::OpShiftRightLogical:
-    case spv::OpShiftRightArithmetic:
-    case spv::OpBitCount:
-    case spv::OpCompositeConstruct:
-    case spv::OpCompositeExtract:
-    case spv::OpVectorExtractDynamic:
-    case spv::OpCompositeInsert:
-    case spv::OpCopyObject:
-    case spv::OpVectorInsertDynamic:
-    case spv::OpVectorShuffle:
-    case spv::OpIEqual:
-    case spv::OpINotEqual:
-    case spv::OpUGreaterThan:
-    case spv::OpUGreaterThanEqual:
-    case spv::OpULessThan:
-    case spv::OpULessThanEqual:
-    case spv::OpSGreaterThan:
-    case spv::OpSGreaterThanEqual:
-    case spv::OpSLessThan:
-    case spv::OpSLessThanEqual:
-    case spv::OpFOrdEqual:
-    case spv::OpFOrdGreaterThan:
-    case spv::OpFOrdGreaterThanEqual:
-    case spv::OpFOrdLessThan:
-    case spv::OpFOrdLessThanEqual:
-    case spv::OpFOrdNotEqual:
-    case spv::OpFUnordEqual:
-    case spv::OpFUnordGreaterThan:
-    case spv::OpFUnordGreaterThanEqual:
-    case spv::OpFUnordLessThan:
-    case spv::OpFUnordLessThanEqual:
-    case spv::OpFUnordNotEqual:
-    case spv::OpSampledImage:
-    case spv::OpFunctionCall:
-    case spv::OpConstantTrue:
-    case spv::OpConstantFalse:
-    case spv::OpConstant:
-    case spv::OpSpecConstant:
-    case spv::OpConstantComposite:
-    case spv::OpSpecConstantComposite:
-    case spv::OpConstantNull:
-    case spv::OpLogicalOr:
-    case spv::OpLogicalAnd:
-    case spv::OpLogicalNot:
-    case spv::OpLogicalNotEqual:
-    case spv::OpUndef:
-    case spv::OpIsInf:
-    case spv::OpIsNan:
-    case spv::OpAny:
-    case spv::OpAll:
-    case spv::OpImageQuerySize:
-    case spv::OpAtomicIAdd:
-    case spv::OpAtomicISub:
-    case spv::OpAtomicExchange:
-    case spv::OpAtomicIIncrement:
-    case spv::OpAtomicIDecrement:
-    case spv::OpAtomicCompareExchange:
-    case spv::OpAtomicUMin:
-    case spv::OpAtomicSMin:
-    case spv::OpAtomicUMax:
-    case spv::OpAtomicSMax:
-    case spv::OpAtomicAnd:
-    case spv::OpAtomicOr:
-    case spv::OpAtomicXor:
-    case spv::OpDot: {
-      PrintResID(Inst);
-      out << " = ";
-      PrintOpcode(Inst);
-      for (uint32_t i = 0; i < Ops.size(); i++) {
-        out << " ";
-        PrintOperand(Ops[i]);
-      }
-      out << "\n";
-      break;
-    }
-    }
-  }
 }
 
 void SPIRVProducerPass::WriteOneWord(uint32_t Word) {
