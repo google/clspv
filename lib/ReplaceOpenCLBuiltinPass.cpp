@@ -1914,25 +1914,29 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
       SmallVector<Instruction *, 4> ToRemoves;
 
       auto fname = F->getName();
-      if (!fname.consume_front("_Z")) continue;
+      if (!fname.consume_front("_Z"))
+        continue;
       size_t name_len;
-      if (fname.consumeInteger(10, name_len)) continue;
+      if (fname.consumeInteger(10, name_len))
+        continue;
       std::string name = fname.take_front(name_len);
 
       bool ok = StringSwitch<bool>(name)
-        .Case("vstore2", true)
-        .Case("vstore4", true)
-        .Case("vstore8", true)
-        .Case("vstore16", true)
-        .Default(false);
-      if (!ok) continue;
+                    .Case("vstore2", true)
+                    .Case("vstore4", true)
+                    .Case("vstore8", true)
+                    .Case("vstore16", true)
+                    .Default(false);
+      if (!ok)
+        continue;
 
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
           auto data = CI->getOperand(0);
 
           auto data_type = data->getType();
-          if (!data_type->isVectorTy()) continue;
+          if (!data_type->isVectorTy())
+            continue;
 
           auto elems = data_type->getVectorNumElements();
           if (elems != 2 && elems != 4 && elems != 8 && elems != 16)
@@ -1988,23 +1992,27 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
       SmallVector<Instruction *, 4> ToRemoves;
 
       auto fname = F->getName();
-      if (!fname.consume_front("_Z")) continue;
+      if (!fname.consume_front("_Z"))
+        continue;
       size_t name_len;
-      if (fname.consumeInteger(10, name_len)) continue;
+      if (fname.consumeInteger(10, name_len))
+        continue;
       std::string name = fname.take_front(name_len);
 
       bool ok = StringSwitch<bool>(name)
-        .Case("vload2", true)
-        .Case("vload4", true)
-        .Case("vload8", true)
-        .Case("vload16", true)
-        .Default(false);
-      if (!ok) continue;
+                    .Case("vload2", true)
+                    .Case("vload4", true)
+                    .Case("vload8", true)
+                    .Case("vload16", true)
+                    .Default(false);
+      if (!ok)
+        continue;
 
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
           auto ret_type = F->getReturnType();
-          if (!ret_type->isVectorTy()) continue;
+          if (!ret_type->isVectorTy())
+            continue;
 
           auto elems = ret_type->getVectorNumElements();
           if (elems != 2 && elems != 4 && elems != 8 && elems != 16)
