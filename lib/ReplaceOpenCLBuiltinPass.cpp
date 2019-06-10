@@ -1923,6 +1923,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
 
       bool ok = StringSwitch<bool>(name)
                     .Case("vstore2", true)
+                    .Case("vstore3", true)
                     .Case("vstore4", true)
                     .Case("vstore8", true)
                     .Case("vstore16", true)
@@ -1939,7 +1940,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
             continue;
 
           auto elems = data_type->getVectorNumElements();
-          if (elems != 2 && elems != 4 && elems != 8 && elems != 16)
+          if (elems != 2 && elems != 3 && elems != 4 && elems != 8 &&
+              elems != 16)
             continue;
 
           auto offset = CI->getOperand(1);
@@ -2001,6 +2003,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
 
       bool ok = StringSwitch<bool>(name)
                     .Case("vload2", true)
+                    .Case("vload3", true)
                     .Case("vload4", true)
                     .Case("vload8", true)
                     .Case("vload16", true)
@@ -2015,7 +2018,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
             continue;
 
           auto elems = ret_type->getVectorNumElements();
-          if (elems != 2 && elems != 4 && elems != 8 && elems != 16)
+          if (elems != 2 && elems != 3 && elems != 4 && elems != 8 &&
+              elems != 16)
             continue;
 
           auto offset = CI->getOperand(0);
