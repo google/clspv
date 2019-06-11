@@ -1902,58 +1902,76 @@ bool ReplaceOpenCLBuiltinPass::replaceMadandMad24andMul24(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
   bool Changed = false;
 
-  struct VectorStoreOps {
-    const char *name;
-    int n;
-    Type *(*get_scalar_type_function)(LLVMContext &);
-  } vector_store_ops[] = {// TODO(derekjchow): Expand this list.
-                          {"_Z7vstore4Dv4_fjPU3AS1f", 4, Type::getFloatTy}};
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+    if (!SymVal.getKey().contains("vstore"))
+      continue;
+    if (SymVal.getKey().contains("vstore_"))
+      continue;
+    if (SymVal.getKey().contains("vstorea"))
+      continue;
 
-  for (const auto &Op : vector_store_ops) {
-    auto Name = Op.name;
-    auto N = Op.n;
-    auto TypeFn = Op.get_scalar_type_function;
-    if (auto F = M.getFunction(Name)) {
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
       SmallVector<Instruction *, 4> ToRemoves;
 
-      // Walk the users of the function.
+      auto fname = F->getName();
+      if (!fname.consume_front("_Z"))
+        continue;
+      size_t name_len;
+      if (fname.consumeInteger(10, name_len))
+        continue;
+      std::string name = fname.take_front(name_len);
+
+      bool ok = StringSwitch<bool>(name)
+                    .Case("vstore2", true)
+                    .Case("vstore3", true)
+                    .Case("vstore4", true)
+                    .Case("vstore8", true)
+                    .Case("vstore16", true)
+                    .Default(false);
+      if (!ok)
+        continue;
+
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The value argument from vstoren.
-          auto Arg0 = CI->getOperand(0);
+          auto data = CI->getOperand(0);
 
-          // The index argument from vstoren.
-          auto Arg1 = CI->getOperand(1);
+          auto data_type = data->getType();
+          if (!data_type->isVectorTy())
+            continue;
 
-          // The pointer argument from vstoren.
-          auto Arg2 = CI->getOperand(2);
+          auto elems = data_type->getVectorNumElements();
+          if (elems != 2 && elems != 3 && elems != 4 && elems != 8 &&
+              elems != 16)
+            continue;
 
-          // Get types.
-          auto ScalarNTy = VectorType::get(TypeFn(M.getContext()), N);
-          auto ScalarNPointerTy = PointerType::get(
-              ScalarNTy, Arg2->getType()->getPointerAddressSpace());
+          auto offset = CI->getOperand(1);
+          auto ptr = CI->getOperand(2);
+          auto ptr_type = ptr->getType();
+          auto pointee_type = ptr_type->getPointerElementType();
+          if (pointee_type != data_type->getVectorElementType())
+            continue;
 
-          // Cast to scalarn
-          auto Cast =
-              CastInst::CreatePointerCast(Arg2, ScalarNPointerTy, "", CI);
-          // Index to correct address
-          auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg1, "", CI);
-          // Store
-          auto Store = new StoreInst(Arg0, Index, CI);
+          // Avoid pointer casts. Instead generate the correct number of stores
+          // and rely on drivers to coalesce appropriately.
+          IRBuilder<> builder(CI);
+          auto elems_const = builder.getInt32(elems);
+          auto adjust = builder.CreateMul(offset, elems_const);
+          for (auto i = 0; i < elems; ++i) {
+            auto idx = builder.getInt32(i);
+            auto add = builder.CreateAdd(adjust, idx);
+            auto gep = builder.CreateGEP(ptr, add);
+            auto extract = builder.CreateExtractElement(data, i);
+            auto store = builder.CreateStore(extract, gep);
+          }
 
-          CI->replaceAllUsesWith(Store);
           ToRemoves.push_back(CI);
         }
       }
 
       Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
       for (auto V : ToRemoves) {
         V->eraseFromParent();
       }
-
-      // And remove the function we don't need either too.
       F->eraseFromParent();
     }
   }
@@ -1964,56 +1982,76 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
   bool Changed = false;
 
-  struct VectorLoadOps {
-    const char *name;
-    int n;
-    Type *(*get_scalar_type_function)(LLVMContext &);
-  } vector_load_ops[] = {// TODO(derekjchow): Expand this list.
-                         {"_Z6vload4jPU3AS1Kf", 4, Type::getFloatTy}};
+  for (auto const &SymVal : M.getValueSymbolTable()) {
+    if (!SymVal.getKey().contains("vload"))
+      continue;
+    if (SymVal.getKey().contains("vload_"))
+      continue;
+    if (SymVal.getKey().contains("vloada"))
+      continue;
 
-  for (const auto &Op : vector_load_ops) {
-    auto Name = Op.name;
-    auto N = Op.n;
-    auto TypeFn = Op.get_scalar_type_function;
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Name)) {
+    if (auto F = dyn_cast<Function>(SymVal.getValue())) {
       SmallVector<Instruction *, 4> ToRemoves;
 
-      // Walk the users of the function.
+      auto fname = F->getName();
+      if (!fname.consume_front("_Z"))
+        continue;
+      size_t name_len;
+      if (fname.consumeInteger(10, name_len))
+        continue;
+      std::string name = fname.take_front(name_len);
+
+      bool ok = StringSwitch<bool>(name)
+                    .Case("vload2", true)
+                    .Case("vload3", true)
+                    .Case("vload4", true)
+                    .Case("vload8", true)
+                    .Case("vload16", true)
+                    .Default(false);
+      if (!ok)
+        continue;
+
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The index argument from vloadn.
-          auto Arg0 = CI->getOperand(0);
+          auto ret_type = F->getReturnType();
+          if (!ret_type->isVectorTy())
+            continue;
 
-          // The pointer argument from vloadn.
-          auto Arg1 = CI->getOperand(1);
+          auto elems = ret_type->getVectorNumElements();
+          if (elems != 2 && elems != 3 && elems != 4 && elems != 8 &&
+              elems != 16)
+            continue;
 
-          // Get types.
-          auto ScalarNTy = VectorType::get(TypeFn(M.getContext()), N);
-          auto ScalarNPointerTy = PointerType::get(
-              ScalarNTy, Arg1->getType()->getPointerAddressSpace());
+          auto offset = CI->getOperand(0);
+          auto ptr = CI->getOperand(1);
+          auto ptr_type = ptr->getType();
+          auto pointee_type = ptr_type->getPointerElementType();
+          if (pointee_type != ret_type->getVectorElementType())
+            continue;
 
-          // Cast to scalarn
-          auto Cast =
-              CastInst::CreatePointerCast(Arg1, ScalarNPointerTy, "", CI);
-          // Index to correct address
-          auto Index = GetElementPtrInst::Create(ScalarNTy, Cast, Arg0, "", CI);
-          // Load
-          auto Load = new LoadInst(Index, "", CI);
+          // Avoid pointer casts. Instead generate the correct number of loads
+          // and rely on drivers to coalesce appropriately.
+          IRBuilder<> builder(CI);
+          auto elems_const = builder.getInt32(elems);
+          Value *insert = UndefValue::get(ret_type);
+          auto adjust = builder.CreateMul(offset, elems_const);
+          for (auto i = 0; i < elems; ++i) {
+            auto idx = builder.getInt32(i);
+            auto add = builder.CreateAdd(adjust, idx);
+            auto gep = builder.CreateGEP(ptr, add);
+            auto load = builder.CreateLoad(gep);
+            insert = builder.CreateInsertElement(insert, load, i);
+          }
 
-          CI->replaceAllUsesWith(Load);
+          CI->replaceAllUsesWith(insert);
           ToRemoves.push_back(CI);
         }
       }
 
       Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
       for (auto V : ToRemoves) {
         V->eraseFromParent();
       }
-
-      // And remove the function we don't need either too.
       F->eraseFromParent();
     }
   }
