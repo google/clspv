@@ -24,7 +24,6 @@ kernel void bar(int4 coord, write_only image3d_t im, float4 a) {
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 63
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

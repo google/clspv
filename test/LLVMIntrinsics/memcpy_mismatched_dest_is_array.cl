@@ -15,7 +15,6 @@ dest_is_array(global float *A, int n, int k) {
 }
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 50
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

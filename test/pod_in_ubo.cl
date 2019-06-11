@@ -14,7 +14,6 @@ kernel void foo(int k, global int *A, int b) { *A = k + b; }
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 30
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

@@ -28,7 +28,6 @@ foo(global Thing* a, global float *b, int n) {
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 38
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
@@ -102,7 +101,6 @@ foo(global Thing* a, global float *b, int n) {
 
 // NODRA:  ; SPIR-V
 // NODRA:  ; Version: 1.0
-// NODRA:  ; Generator: Codeplay; 0
 // NODRA:  ; Bound: 38
 // NODRA:  ; Schema: 0
 // NODRA:  OpCapability Shader

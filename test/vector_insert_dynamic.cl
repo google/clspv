@@ -14,7 +14,6 @@ kernel void foo(global int4* in, global int4* out,
 }
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 38
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

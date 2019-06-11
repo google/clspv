@@ -20,7 +20,6 @@ void kernel foo(global float4* A, read_only image2d_t im, sampler_t sam, float2 
 }
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 51
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader

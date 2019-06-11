@@ -28,7 +28,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 32
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
@@ -92,7 +91,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 
 // NODRA:  ; SPIR-V
 // NODRA:  ; Version: 1.0
-// NODRA:  ; Generator: Codeplay; 0
 // NODRA:  ; Bound: 32
 // NODRA:  ; Schema: 0
 // NODRA:  OpCapability Shader

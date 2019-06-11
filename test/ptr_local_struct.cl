@@ -22,7 +22,6 @@ kernel void foo(local float *L, global float* A, float f, S local* LS, constant 
 
 // CHECK:      ; SPIR-V
 // CHECK:      ; Version: 1.0
-// CHECK:      ; Generator: Codeplay; 0
 // CHECK:      ; Bound: 54
 // CHECK:      ; Schema: 0
 // CHECK:      OpCapability Shader

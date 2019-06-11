@@ -34,7 +34,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(global float* B, 
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 48
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

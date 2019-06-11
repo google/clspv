@@ -5,7 +5,6 @@
 
 // CHECK:     ; SPIR-V
 // CHECK:     ; Version: 1.0
-// CHECK:     ; Generator: Codeplay; 0
 // CHECK:     ; Bound: 17
 // CHECK:     ; Schema: 0
 // CHECK-DAG: OpCapability Shader

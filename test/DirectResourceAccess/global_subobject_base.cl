@@ -27,7 +27,6 @@ kernel void bar(global S *A, int n, global int *B) { apple(B, A->arr, n); }
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 63
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

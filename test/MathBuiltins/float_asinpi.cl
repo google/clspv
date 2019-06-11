@@ -9,7 +9,6 @@ void kernel foo(global float* A, float x)
 }
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 30
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader

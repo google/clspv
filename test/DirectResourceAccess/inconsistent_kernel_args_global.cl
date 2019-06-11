@@ -12,7 +12,6 @@ kernel void foo(global int *A, global int *B, int n) { apple(B, A, n); }
 kernel void bar(global int *A, int n, global int *B) { apple(B, A, n); }
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 48
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

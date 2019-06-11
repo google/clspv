@@ -23,7 +23,6 @@ void kernel bar(global uint* a)
 
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 44
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
