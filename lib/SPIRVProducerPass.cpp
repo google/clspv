@@ -680,8 +680,8 @@ void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::Version),
                    sizeof(spv::Version));
 
-  // use Codeplay's vendor ID
-  const uint32_t vendor = 3 << 16;
+  // use Google's vendor ID
+  const uint32_t vendor = 21 << 16;
   binaryOut->write(reinterpret_cast<const char *>(&vendor), sizeof(vendor));
 
   // we record where we need to come back to and patch in the bound value
