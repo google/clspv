@@ -4386,10 +4386,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             .Case("__spirv_control_barrier", spv::OpControlBarrier)
             .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
             .StartsWith("spirv.store_null", spv::OpStore)
-            .StartsWith("__spirv_isinf", spv::OpIsInf)
-            .StartsWith("__spirv_isnan", spv::OpIsNan)
-            .StartsWith("__spirv_allDv", spv::OpAll)
-            .StartsWith("__spirv_anyDv", spv::OpAny)
             .Default(spv::OpNop);
 
     // If the switch above didn't have an entry maybe the intrinsic
