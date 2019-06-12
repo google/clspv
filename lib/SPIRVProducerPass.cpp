@@ -2474,15 +2474,15 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     } else {
       descriptor_set = SamplerLiteralToDescriptorSetMap[SamplerLiteral.first];
       binding = SamplerLiteralToBindingMap[SamplerLiteral.first];
+
+      version0::DescriptorMapEntry::SamplerData sampler_data = {
+          SamplerLiteral.first};
+      descriptorMapEntries->emplace_back(std::move(sampler_data),
+                                         descriptor_set, binding);
     }
 
     Ops << MkId(sampler_var_id) << MkNum(spv::DecorationDescriptorSet)
         << MkNum(descriptor_set);
-
-    version0::DescriptorMapEntry::SamplerData sampler_data = {
-        SamplerLiteral.first};
-    descriptorMapEntries->emplace_back(std::move(sampler_data), descriptor_set,
-                                       binding);
 
     auto *DescDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
     SPIRVInstList.insert(DecoInsertPoint, DescDecoInst);
