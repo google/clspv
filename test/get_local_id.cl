@@ -12,7 +12,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 34
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

@@ -12,7 +12,6 @@ kernel void foo(global uint* A, float2 val, uint n) {
 
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 43
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader

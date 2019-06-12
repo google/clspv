@@ -8,7 +8,6 @@ kernel void foo(global float2 *A, float2 x, float2 y) {
 }
 // CHECK: ; SPIR-V
 // CHECK: ; Version: 1.0
-// CHECK: ; Generator: Codeplay; 0
 // CHECK: ; Bound: 31
 // CHECK: ; Schema: 0
 // CHECK: OpCapability Shader

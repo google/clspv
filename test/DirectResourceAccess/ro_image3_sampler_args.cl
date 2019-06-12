@@ -18,7 +18,6 @@ kernel void bar(float4 coord, sampler_t s, read_only image3d_t im, global float4
     apple(im, s, 3 * coord, A); }
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 73
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

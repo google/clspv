@@ -20,7 +20,6 @@ kernel void foo(global uint* A, uint i) { *A = ppp[i].a; }
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 35
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

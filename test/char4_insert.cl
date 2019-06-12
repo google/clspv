@@ -14,7 +14,6 @@ kernel void foo(global uchar4* A, int n) {
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 39
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader

@@ -20,7 +20,6 @@ __kernel void local_memory(__global int* in, __global int* out, __local int* tem
 
 // CHECK:     ; SPIR-V
 // CHECK:     ; Version: 1.0
-// CHECK:     ; Generator: Codeplay; 0
 // CHECK:     ; Bound: 55
 // CHECK:     ; Schema: 0
 // CHECK:     OpCapability Shader

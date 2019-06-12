@@ -44,7 +44,6 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 55
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
@@ -149,7 +148,6 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 
 // CLUSTER:  ; SPIR-V
 // CLUSTER:  ; Version: 1.0
-// CLUSTER:  ; Generator: Codeplay; 0
 // CLUSTER:  ; Bound: 56
 // CLUSTER:  ; Schema: 0
 // CLUSTER:  OpCapability Shader

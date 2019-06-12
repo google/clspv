@@ -17,7 +17,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 
 // CHECK:  ; SPIR-V
 // CHECK:  ; Version: 1.0
-// CHECK:  ; Generator: Codeplay; 0
 // CHECK:  ; Bound: 34
 // CHECK:  ; Schema: 0
 // CHECK:  OpCapability Shader
@@ -80,7 +79,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 
 // CLUSTER: ; SPIR-V
 // CLUSTER: ; Version: 1.0
-// CLUSTER: ; Generator: Codeplay; 0
 // CLUSTER: ; Bound: 36
 // CLUSTER: ; Schema: 0
 // CLUSTER: OpCapability Shader
