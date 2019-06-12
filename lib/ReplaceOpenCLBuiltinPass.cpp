@@ -829,15 +829,15 @@ bool ReplaceOpenCLBuiltinPass::replaceRelational(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
   bool Changed = false;
 
-  const std::map<const char *, std::pair<const char *, int32_t>> Map = {
-      {"_Z5isinff", {"__spirv_isinff", 1}},
-      {"_Z5isinfDv2_f", {"__spirv_isinfDv2_f", -1}},
-      {"_Z5isinfDv3_f", {"__spirv_isinfDv3_f", -1}},
-      {"_Z5isinfDv4_f", {"__spirv_isinfDv4_f", -1}},
-      {"_Z5isnanf", {"__spirv_isnanf", 1}},
-      {"_Z5isnanDv2_f", {"__spirv_isnanDv2_f", -1}},
-      {"_Z5isnanDv3_f", {"__spirv_isnanDv3_f", -1}},
-      {"_Z5isnanDv4_f", {"__spirv_isnanDv4_f", -1}},
+  const std::map<const char *, std::pair<spv::Op, int32_t>> Map = {
+      {"_Z5isinff", {spv::OpIsInf, 1}},
+      {"_Z5isinfDv2_f", {spv::OpIsInf, -1}},
+      {"_Z5isinfDv3_f", {spv::OpIsInf, -1}},
+      {"_Z5isinfDv4_f", {spv::OpIsInf, -1}},
+      {"_Z5isnanf", {spv::OpIsNan, 1}},
+      {"_Z5isnanDv2_f", {spv::OpIsNan, -1}},
+      {"_Z5isnanDv3_f", {spv::OpIsNan, -1}},
+      {"_Z5isnanDv4_f", {spv::OpIsNan, -1}},
   };
 
   for (auto Pair : Map) {
@@ -850,8 +850,7 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
           const auto CITy = CI->getType();
 
-          // The fake SPIR-V intrinsic to generate.
-          auto SPIRVIntrinsic = Pair.second.first;
+          auto SPIRVOp = Pair.second.first;
 
           // The value to return for true.
           auto TrueValue = ConstantInt::getSigned(CITy, Pair.second.second);
@@ -863,15 +862,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
               M.getContext(),
               CITy->isVectorTy() ? CITy->getVectorNumElements() : 1);
 
-          auto NewFType =
-              FunctionType::get(CorrespondingBoolTy,
-                                F->getFunctionType()->getParamType(0), false);
-
-          auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-          auto Arg = CI->getOperand(0);
-
-          auto NewCI = CallInst::Create(NewF, Arg, "", CI);
+          auto NewCI =
+              clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
+                                   CorrespondingBoolTy, {CI->getOperand(0)});
 
           const auto Select =
               SelectInst::Create(NewCI, TrueValue, FalseValue, "", CI);
@@ -901,42 +894,42 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
   bool Changed = false;
 
-  const std::map<const char *, const char *> Map = {
+  const std::map<const char *, spv::Op> Map = {
       // all
-      {"_Z3allc", ""},
-      {"_Z3allDv2_c", "__spirv_allDv2_c"},
-      {"_Z3allDv3_c", "__spirv_allDv3_c"},
-      {"_Z3allDv4_c", "__spirv_allDv4_c"},
-      {"_Z3alls", ""},
-      {"_Z3allDv2_s", "__spirv_allDv2_s"},
-      {"_Z3allDv3_s", "__spirv_allDv3_s"},
-      {"_Z3allDv4_s", "__spirv_allDv4_s"},
-      {"_Z3alli", ""},
-      {"_Z3allDv2_i", "__spirv_allDv2_i"},
-      {"_Z3allDv3_i", "__spirv_allDv3_i"},
-      {"_Z3allDv4_i", "__spirv_allDv4_i"},
-      {"_Z3alll", ""},
-      {"_Z3allDv2_l", "__spirv_allDv2_l"},
-      {"_Z3allDv3_l", "__spirv_allDv3_l"},
-      {"_Z3allDv4_l", "__spirv_allDv4_l"},
+      {"_Z3allc", spv::OpNop},
+      {"_Z3allDv2_c", spv::OpAll},
+      {"_Z3allDv3_c", spv::OpAll},
+      {"_Z3allDv4_c", spv::OpAll},
+      {"_Z3alls", spv::OpNop},
+      {"_Z3allDv2_s", spv::OpAll},
+      {"_Z3allDv3_s", spv::OpAll},
+      {"_Z3allDv4_s", spv::OpAll},
+      {"_Z3alli", spv::OpNop},
+      {"_Z3allDv2_i", spv::OpAll},
+      {"_Z3allDv3_i", spv::OpAll},
+      {"_Z3allDv4_i", spv::OpAll},
+      {"_Z3alll", spv::OpNop},
+      {"_Z3allDv2_l", spv::OpAll},
+      {"_Z3allDv3_l", spv::OpAll},
+      {"_Z3allDv4_l", spv::OpAll},
 
       // any
-      {"_Z3anyc", ""},
-      {"_Z3anyDv2_c", "__spirv_anyDv2_c"},
-      {"_Z3anyDv3_c", "__spirv_anyDv3_c"},
-      {"_Z3anyDv4_c", "__spirv_anyDv4_c"},
-      {"_Z3anys", ""},
-      {"_Z3anyDv2_s", "__spirv_anyDv2_s"},
-      {"_Z3anyDv3_s", "__spirv_anyDv3_s"},
-      {"_Z3anyDv4_s", "__spirv_anyDv4_s"},
-      {"_Z3anyi", ""},
-      {"_Z3anyDv2_i", "__spirv_anyDv2_i"},
-      {"_Z3anyDv3_i", "__spirv_anyDv3_i"},
-      {"_Z3anyDv4_i", "__spirv_anyDv4_i"},
-      {"_Z3anyl", ""},
-      {"_Z3anyDv2_l", "__spirv_anyDv2_l"},
-      {"_Z3anyDv3_l", "__spirv_anyDv3_l"},
-      {"_Z3anyDv4_l", "__spirv_anyDv4_l"},
+      {"_Z3anyc", spv::OpNop},
+      {"_Z3anyDv2_c", spv::OpAny},
+      {"_Z3anyDv3_c", spv::OpAny},
+      {"_Z3anyDv4_c", spv::OpAny},
+      {"_Z3anys", spv::OpNop},
+      {"_Z3anyDv2_s", spv::OpAny},
+      {"_Z3anyDv3_s", spv::OpAny},
+      {"_Z3anyDv4_s", spv::OpAny},
+      {"_Z3anyi", spv::OpNop},
+      {"_Z3anyDv2_i", spv::OpAny},
+      {"_Z3anyDv3_i", spv::OpAny},
+      {"_Z3anyDv4_i", spv::OpAny},
+      {"_Z3anyl", spv::OpNop},
+      {"_Z3anyDv2_l", spv::OpAny},
+      {"_Z3anyDv3_l", spv::OpAny},
+      {"_Z3anyDv4_l", spv::OpAny},
   };
 
   for (auto Pair : Map) {
@@ -947,8 +940,6 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
       // Walk the users of the function.
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          // The fake SPIR-V intrinsic to generate.
-          auto SPIRVIntrinsic = Pair.second;
 
           auto Arg = CI->getOperand(0);
 
@@ -975,15 +966,14 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
             Value *SelectSource;
 
             // If we have a function to call, call it!
-            if (0 < strlen(SPIRVIntrinsic)) {
+            const auto SPIRVOp = Pair.second;
 
-              const auto NewFType = FunctionType::get(
-                  Type::getInt1Ty(M.getContext()), Cmp->getType(), false);
+            if (SPIRVOp != spv::OpNop) {
 
-              const auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+              const auto BoolTy = Type::getInt1Ty(M.getContext());
 
-              const auto NewCI = CallInst::Create(NewF, Cmp, "", CI);
-
+              const auto NewCI = clspv::InsertSPIRVOp(
+                  CI, SPIRVOp, {Attribute::ReadNone}, BoolTy, {Cmp});
               SelectSource = NewCI;
 
             } else {
