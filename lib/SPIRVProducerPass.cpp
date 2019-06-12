@@ -229,7 +229,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), max_local_spec_id_(0), constant_i32_zero_id_(0) {
+        WorkgroupSizeVarID(0), max_local_spec_id_(0) {
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
@@ -345,9 +345,6 @@ struct SPIRVProducerPass final : public ModulePass {
   void HandleDeferredInstruction();
   void HandleDeferredDecorations(const DataLayout &DL);
   bool is4xi8vec(Type *Ty) const;
-  // Return the SPIR-V Id for 32-bit constant zero.  The constant must already
-  // have been created.
-  uint32_t GetI32Zero();
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
@@ -538,10 +535,6 @@ private:
   // A mapping from a remapped type to its real sizes.
   DenseMap<Type *, std::tuple<uint64_t, uint64_t, uint64_t>>
       RemappedUBOTypeSizes;
-
-  // The ID of 32-bit integer zero constant.  This is only valid after
-  // GenerateSPIRVConstants has run.
-  uint32_t constant_i32_zero_id_;
 };
 
 char SPIRVProducerPass::ID;
@@ -561,8 +554,6 @@ ModulePass *createSPIRVProducerPass(
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
   binaryOut = outputCInitList ? &binaryTempOut : &out;
-
-  constant_i32_zero_id_ = 0; // Reset, for the benefit of validity checks.
 
   PopulateUBOTypeMaps(module);
 
@@ -2246,10 +2237,6 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         Opcode = spv::OpConstant;
 
         Ops << MkInteger(LiteralNum);
-
-        if (BitWidth == 32 && V == 0) {
-          constant_i32_zero_id_ = nextID;
-        }
       }
     } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(Cst)) {
       uint64_t FPVal = CFP->getValueAPF().bitcastToAPInt().getZExtValue();
@@ -4717,14 +4704,6 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
   }
 
   return false;
-}
-
-uint32_t SPIRVProducerPass::GetI32Zero() {
-  if (0 == constant_i32_zero_id_) {
-    llvm_unreachable("Requesting a 32-bit integer constant but it is not "
-                     "defined in the SPIR-V module");
-  }
-  return constant_i32_zero_id_;
 }
 
 void SPIRVProducerPass::HandleDeferredInstruction() {
