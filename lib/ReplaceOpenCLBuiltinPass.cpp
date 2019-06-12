@@ -862,9 +862,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
               M.getContext(),
               CITy->isVectorTy() ? CITy->getVectorNumElements() : 1);
 
-          auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
-                                            CorrespondingBoolTy,
-                                            {CI->getOperand(0)});
+          auto NewCI =
+              clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
+                                   CorrespondingBoolTy, {CI->getOperand(0)});
 
           const auto Select =
               SelectInst::Create(NewCI, TrueValue, FalseValue, "", CI);
@@ -972,10 +972,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
 
               const auto BoolTy = Type::getInt1Ty(M.getContext());
 
-              const auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp,
-                                                      {Attribute::ReadNone},
-                                                      BoolTy,
-                                                      {Cmp});
+              const auto NewCI = clspv::InsertSPIRVOp(
+                  CI, SPIRVOp, {Attribute::ReadNone}, BoolTy, {Cmp});
               SelectSource = NewCI;
 
             } else {

@@ -33,7 +33,7 @@ static std::string mangleType(Type *Ty) {
     auto NumVecElems = std::to_string(Ty->getVectorNumElements());
     return "Dv" + NumVecElems + "_" + mangleType(Ty->getScalarType());
   } else if (Ty->isIntegerTy()) {
-    switch(Ty->getScalarSizeInBits()) {
+    switch (Ty->getScalarSizeInBits()) {
     case 1:
       return "b";
     case 8:
@@ -46,7 +46,7 @@ static std::string mangleType(Type *Ty) {
       return "m";
     }
   } else if (Ty->isFloatingPointTy()) {
-    switch(Ty->getScalarSizeInBits()) {
+    switch (Ty->getScalarSizeInBits()) {
     case 32:
       return "f";
     case 64:
