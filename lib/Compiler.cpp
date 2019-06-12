@@ -619,7 +619,6 @@ int PopulatePassManager(
   }
 
   if (clspv::Option::CPlusPlus()) {
-    pm->add(clspv::createDemangleKernelNamesPass());
     pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
   }
 
