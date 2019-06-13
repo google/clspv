@@ -229,8 +229,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), max_local_spec_id_(0) {
-  }
+        WorkgroupSizeVarID(0), max_local_spec_id_(0) {}
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
