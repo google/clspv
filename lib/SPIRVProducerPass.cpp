@@ -4383,8 +4383,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
             .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
             .Case("spirv.atomic_xor", spv::OpAtomicXor)
-            .Case("__spirv_control_barrier", spv::OpControlBarrier)
-            .Case("__spirv_memory_barrier", spv::OpMemoryBarrier)
             .StartsWith("spirv.store_null", spv::OpStore)
             .Default(spv::OpNop);
 

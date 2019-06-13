@@ -924,17 +924,16 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
         // and StorageBuffer storage classes) semantics are checked because
         // Workgroup variables are inherently coherent (and do not require the
         // decoration).
-        if (call->getCalledFunction()->getName().equals(
-                "__spirv_control_barrier")) {
+        if (call->getCalledFunction()->getName().startswith("spirv.op.224")) {
           // barrier()
-          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
+          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
             uses_barrier =
                 semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
-        } else if (call->getCalledFunction()->getName().equals(
-                       "__spirv_memory_barrier")) {
+        } else if (call->getCalledFunction()->getName().startswith(
+                       "spirv.op.225")) {
           // mem_fence()
-          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(1))) {
+          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
             uses_barrier =
                 semantics->getZExtValue() & kMemorySemanticsUniformMemory;
           }
