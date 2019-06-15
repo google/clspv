@@ -169,6 +169,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceCopysign(Module &M);
   bool replaceRecip(Module &M);
   bool replaceDivide(Module &M);
+  bool replaceDot(Module &M);
   bool replaceExp10(Module &M);
   bool replaceLog10(Module &M);
   bool replaceBarrier(Module &M);
@@ -220,6 +221,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceCopysign(M);
   Changed |= replaceRecip(M);
   Changed |= replaceDivide(M);
+  Changed |= replaceDot(M);
   Changed |= replaceExp10(M);
   Changed |= replaceLog10(M);
   Changed |= replaceBarrier(M);
@@ -419,6 +421,31 @@ bool ReplaceOpenCLBuiltinPass::replaceDivide(Module &M) {
     auto Op0 = CI->getOperand(0);
     auto Op1 = CI->getOperand(1);
     return BinaryOperator::Create(Instruction::FDiv, Op0, Op1, "", CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceDot(Module &M) {
+
+  std::vector<const char *> Names = {
+      "_Z3dotff",
+      "_Z3dotDv2_fS_",
+      "_Z3dotDv3_fS_",
+      "_Z3dotDv4_fS_",
+  };
+
+  return replaceCallsWithValue(M, Names, [](CallInst *CI) {
+    auto Op0 = CI->getOperand(0);
+    auto Op1 = CI->getOperand(1);
+
+    Value *V;
+    if (Op0->getType()->isVectorTy()) {
+      V = clspv::InsertSPIRVOp(CI, spv::OpDot, {Attribute::ReadNone},
+                               CI->getType(), {Op0, Op1});
+    } else {
+      V = BinaryOperator::Create(Instruction::FMul, Op0, Op1, "", CI);
+    }
+
+    return V;
   });
 }
 

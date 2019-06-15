@@ -4426,44 +4426,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    if (Callee->getName().startswith("_Z3dot")) {
-      // If the argument is a vector type, generate OpDot
-      if (Call->getArgOperand(0)->getType()->isVectorTy()) {
-        //
-        // Generate OpDot.
-        //
-        SPIRVOperandList Ops;
-
-        Ops << MkId(lookupType(I.getType()));
-
-        for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-          Ops << MkId(VMap[Call->getArgOperand(i)]);
-        }
-
-        VMap[&I] = nextID;
-
-        auto *Inst = new SPIRVInstruction(spv::OpDot, nextID++, Ops);
-        SPIRVInstList.push_back(Inst);
-      } else {
-        //
-        // Generate OpFMul.
-        //
-        SPIRVOperandList Ops;
-
-        Ops << MkId(lookupType(I.getType()));
-
-        for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-          Ops << MkId(VMap[Call->getArgOperand(i)]);
-        }
-
-        VMap[&I] = nextID;
-
-        auto *Inst = new SPIRVInstruction(spv::OpFMul, nextID++, Ops);
-        SPIRVInstList.push_back(Inst);
-      }
-      break;
-    }
-
     if (Callee->getName().startswith("_Z4fmod")) {
       // OpenCL fmod(x,y) is x - y * trunc(x/y)
       // The sign for a non-zero result is taken from x.
