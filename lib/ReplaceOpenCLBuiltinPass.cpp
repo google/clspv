@@ -572,107 +572,69 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Module &M) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceBarrier(Module &M) {
-  bool Changed = false;
 
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
-  const std::map<const char *, const char *> Map = {
-      {"_Z7barrierj", "__spirv_control_barrier"}};
+  const std::vector<const char *> Names = {
+      {"_Z7barrierj"},
+  };
 
-  for (auto Pair : Map) {
-    // If we find a function with the matching name.
-    if (auto F = M.getFunction(Pair.first)) {
-      SmallVector<Instruction *, 4> ToRemoves;
+  return replaceCallsWithValue(M, Names, [](CallInst *CI) {
+    auto Arg = CI->getOperand(0);
 
-      // Walk the users of the function.
-      for (auto &U : F->uses()) {
-        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          auto FType = F->getFunctionType();
-          SmallVector<Type *, 3> Params;
-          for (unsigned i = 0; i < 3; i++) {
-            Params.push_back(FType->getParamType(0));
-          }
-          auto NewFType =
-              FunctionType::get(FType->getReturnType(), Params, false);
-          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
-          cast<Function>(NewF.getCallee())->setCannotDuplicate();
+    // We need to map the OpenCL constants to the SPIR-V equivalents.
+    const auto LocalMemFence =
+        ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
+    const auto GlobalMemFence =
+        ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
+    const auto ConstantSequentiallyConsistent = ConstantInt::get(
+        Arg->getType(), spv::MemorySemanticsSequentiallyConsistentMask);
+    const auto ConstantScopeDevice =
+        ConstantInt::get(Arg->getType(), spv::ScopeDevice);
+    const auto ConstantScopeWorkgroup =
+        ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
 
-          auto Arg = CI->getOperand(0);
+    // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
+    const auto LocalMemFenceMask =
+        BinaryOperator::Create(Instruction::And, LocalMemFence, Arg, "", CI);
+    const auto WorkgroupShiftAmount =
+        clz(spv::MemorySemanticsWorkgroupMemoryMask) - clz(CLK_LOCAL_MEM_FENCE);
+    const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
+        Instruction::Shl, LocalMemFenceMask,
+        ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
 
-          // We need to map the OpenCL constants to the SPIR-V equivalents.
-          const auto LocalMemFence =
-              ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
-          const auto GlobalMemFence =
-              ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
-          const auto ConstantSequentiallyConsistent = ConstantInt::get(
-              Arg->getType(), spv::MemorySemanticsSequentiallyConsistentMask);
-          const auto ConstantScopeDevice =
-              ConstantInt::get(Arg->getType(), spv::ScopeDevice);
-          const auto ConstantScopeWorkgroup =
-              ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
+    // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
+    const auto GlobalMemFenceMask =
+        BinaryOperator::Create(Instruction::And, GlobalMemFence, Arg, "", CI);
+    const auto UniformShiftAmount =
+        clz(spv::MemorySemanticsUniformMemoryMask) - clz(CLK_GLOBAL_MEM_FENCE);
+    const auto MemorySemanticsUniform = BinaryOperator::Create(
+        Instruction::Shl, GlobalMemFenceMask,
+        ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
 
-          // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
-          const auto LocalMemFenceMask = BinaryOperator::Create(
-              Instruction::And, LocalMemFence, Arg, "", CI);
-          const auto WorkgroupShiftAmount =
-              clz(spv::MemorySemanticsWorkgroupMemoryMask) -
-              clz(CLK_LOCAL_MEM_FENCE);
-          const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
-              Instruction::Shl, LocalMemFenceMask,
-              ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
+    // And combine the above together, also adding in
+    // MemorySemanticsSequentiallyConsistentMask.
+    auto MemorySemantics =
+        BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
+                               ConstantSequentiallyConsistent, "", CI);
+    MemorySemantics = BinaryOperator::Create(Instruction::Or, MemorySemantics,
+                                             MemorySemanticsUniform, "", CI);
 
-          // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
-          const auto GlobalMemFenceMask = BinaryOperator::Create(
-              Instruction::And, GlobalMemFence, Arg, "", CI);
-          const auto UniformShiftAmount =
-              clz(spv::MemorySemanticsUniformMemoryMask) -
-              clz(CLK_GLOBAL_MEM_FENCE);
-          const auto MemorySemanticsUniform = BinaryOperator::Create(
-              Instruction::Shl, GlobalMemFenceMask,
-              ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
+    // For Memory Scope if we used CLK_GLOBAL_MEM_FENCE, we need to use
+    // Device Scope, otherwise Workgroup Scope.
+    const auto Cmp =
+        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ, GlobalMemFenceMask,
+                        GlobalMemFence, "", CI);
+    const auto MemoryScope = SelectInst::Create(Cmp, ConstantScopeDevice,
+                                                ConstantScopeWorkgroup, "", CI);
 
-          // And combine the above together, also adding in
-          // MemorySemanticsSequentiallyConsistentMask.
-          auto MemorySemantics =
-              BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
-                                     ConstantSequentiallyConsistent, "", CI);
-          MemorySemantics = BinaryOperator::Create(
-              Instruction::Or, MemorySemantics, MemorySemanticsUniform, "", CI);
+    // Lastly, the Execution Scope is always Workgroup Scope.
+    const auto ExecutionScope = ConstantScopeWorkgroup;
 
-          // For Memory Scope if we used CLK_GLOBAL_MEM_FENCE, we need to use
-          // Device Scope, otherwise Workgroup Scope.
-          const auto Cmp =
-              CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
-                              GlobalMemFenceMask, GlobalMemFence, "", CI);
-          const auto MemoryScope = SelectInst::Create(
-              Cmp, ConstantScopeDevice, ConstantScopeWorkgroup, "", CI);
-
-          // Lastly, the Execution Scope is always Workgroup Scope.
-          const auto ExecutionScope = ConstantScopeWorkgroup;
-
-          auto NewCI = CallInst::Create(
-              NewF, {ExecutionScope, MemoryScope, MemorySemantics}, "", CI);
-
-          CI->replaceAllUsesWith(NewCI);
-
-          // Lastly, remember to remove the user.
-          ToRemoves.push_back(CI);
-        }
-      }
-
-      Changed = !ToRemoves.empty();
-
-      // And cleanup the calls we don't use anymore.
-      for (auto V : ToRemoves) {
-        V->eraseFromParent();
-      }
-
-      // And remove the function we don't need either too.
-      F->eraseFromParent();
-    }
-  }
-
-  return Changed;
+    return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
+                                {Attribute::NoDuplicate}, CI->getType(),
+                                {ExecutionScope, MemoryScope, MemorySemantics});
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
@@ -680,14 +642,14 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
 
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
-  using Tuple = std::tuple<const char *, unsigned>;
+  using Tuple = std::tuple<spv::Op, unsigned>;
   const std::map<const char *, Tuple> Map = {
-      {"_Z9mem_fencej", Tuple("__spirv_memory_barrier",
+      {"_Z9mem_fencej", Tuple(spv::OpMemoryBarrier,
                               spv::MemorySemanticsSequentiallyConsistentMask)},
       {"_Z14read_mem_fencej",
-       Tuple("__spirv_memory_barrier", spv::MemorySemanticsAcquireMask)},
+       Tuple(spv::OpMemoryBarrier, spv::MemorySemanticsAcquireMask)},
       {"_Z15write_mem_fencej",
-       Tuple("__spirv_memory_barrier", spv::MemorySemanticsReleaseMask)}};
+       Tuple(spv::OpMemoryBarrier, spv::MemorySemanticsReleaseMask)}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
@@ -697,14 +659,6 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
       // Walk the users of the function.
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          auto FType = F->getFunctionType();
-          SmallVector<Type *, 2> Params;
-          for (unsigned i = 0; i < 2; i++) {
-            Params.push_back(FType->getParamType(0));
-          }
-          auto NewFType =
-              FunctionType::get(FType->getReturnType(), Params, false);
-          auto NewF = M.getOrInsertFunction(std::get<0>(Pair.second), NewFType);
 
           auto Arg = CI->getOperand(0);
 
@@ -749,8 +703,9 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Module &M) {
           // Memory Scope is always device.
           const auto MemoryScope = ConstantScopeDevice;
 
-          auto NewCI =
-              CallInst::Create(NewF, {MemoryScope, MemorySemantics}, "", CI);
+          const auto SPIRVOp = std::get<0>(Pair.second);
+          auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {}, CI->getType(),
+                                            {MemoryScope, MemorySemantics});
 
           CI->replaceAllUsesWith(NewCI);
 
