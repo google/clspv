@@ -95,19 +95,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
         }
 
         auto NumBytes = cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
-
         auto Ty = NewArg->getType();
         auto PointeeTy = Ty->getPointerElementType();
-
-        auto NewFType =
-            FunctionType::get(F.getReturnType(), {Ty, PointeeTy}, false);
-
-        // Create our fake intrinsic to initialize it to 0.
-        auto SPIRVIntrinsic = "spirv.store_null";
-
-        auto NewF =
-            Function::Create(NewFType, F.getLinkage(), SPIRVIntrinsic, &M);
-
         auto Zero = Constant::getNullValue(PointeeTy);
 
         const auto num_stores = NumBytes / Layout.getTypeAllocSize(PointeeTy);
@@ -116,7 +105,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
         assert((num_stores & 0xFFFFFFFF) == num_stores);
 
         // Generate the first store.
-        CallInst::Create(NewF, {NewArg, Zero}, "", CI);
+        new StoreInst(Zero, NewArg, CI);
 
         // Generate subsequent stores, but only if needed.
         if (num_stores) {
@@ -125,7 +114,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
           auto Ptr = NewArg;
           for (uint32_t i = 1; i < num_stores; i++) {
             Ptr = GetElementPtrInst::Create(PointeeTy, Ptr, {One}, "", CI);
-            CallInst::Create(NewF, {Ptr, Zero}, "", CI);
+            new StoreInst(Zero, Ptr, CI);
           }
         }
 
