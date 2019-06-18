@@ -4369,7 +4369,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
             .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
             .Case("spirv.atomic_xor", spv::OpAtomicXor)
-            .StartsWith("spirv.store_null", spv::OpStore)
             .Default(spv::OpNop);
 
     // If the switch above didn't have an entry maybe the intrinsic
