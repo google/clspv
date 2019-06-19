@@ -4363,13 +4363,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // Handle SPIR-V intrinsics
-    spv::Op opcode =
-        StringSwitch<spv::Op>(Callee->getName())
-            .Case("spirv.atomic_inc", spv::OpAtomicIIncrement)
-            .Case("spirv.atomic_dec", spv::OpAtomicIDecrement)
-            .Case("spirv.atomic_compare_exchange", spv::OpAtomicCompareExchange)
-            .Case("spirv.atomic_xor", spv::OpAtomicXor)
-            .Default(spv::OpNop);
+    spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
+                         .Case("spirv.atomic_xor", spv::OpAtomicXor)
+                         .Default(spv::OpNop);
 
     // If the switch above didn't have an entry maybe the intrinsic
     // is using the name mangling logic.
