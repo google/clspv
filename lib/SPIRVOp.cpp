@@ -52,6 +52,10 @@ static std::string mangleType(Type *Ty) {
     case 64:
       return "d";
     }
+  } else if (Ty->isPointerTy()) {
+    auto PtrTy = cast<PointerType>(Ty);
+    auto AS = std::to_string(PtrTy->getAddressSpace());
+    return "P" + AS + mangleType(PtrTy->getElementType());
   }
 
   llvm_unreachable("Unhandled type in SPIR-V intrinsic name mangler");

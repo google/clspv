@@ -2667,31 +2667,31 @@ bool ReplaceOpenCLBuiltinPass::replaceReadImageF(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
   bool Changed = false;
 
-  const std::map<const char *, const char *> Map = {
-      {"_Z8atom_incPU3AS1Vi", "spirv.atomic_inc"},
-      {"_Z8atom_incPU3AS3Vi", "spirv.atomic_inc"},
-      {"_Z8atom_incPU3AS1Vj", "spirv.atomic_inc"},
-      {"_Z8atom_incPU3AS3Vj", "spirv.atomic_inc"},
-      {"_Z8atom_decPU3AS1Vi", "spirv.atomic_dec"},
-      {"_Z8atom_decPU3AS3Vi", "spirv.atomic_dec"},
-      {"_Z8atom_decPU3AS1Vj", "spirv.atomic_dec"},
-      {"_Z8atom_decPU3AS3Vj", "spirv.atomic_dec"},
-      {"_Z12atom_cmpxchgPU3AS1Viii", "spirv.atomic_compare_exchange"},
-      {"_Z12atom_cmpxchgPU3AS3Viii", "spirv.atomic_compare_exchange"},
-      {"_Z12atom_cmpxchgPU3AS1Vjjj", "spirv.atomic_compare_exchange"},
-      {"_Z12atom_cmpxchgPU3AS3Vjjj", "spirv.atomic_compare_exchange"},
-      {"_Z10atomic_incPU3AS1Vi", "spirv.atomic_inc"},
-      {"_Z10atomic_incPU3AS3Vi", "spirv.atomic_inc"},
-      {"_Z10atomic_incPU3AS1Vj", "spirv.atomic_inc"},
-      {"_Z10atomic_incPU3AS3Vj", "spirv.atomic_inc"},
-      {"_Z10atomic_decPU3AS1Vi", "spirv.atomic_dec"},
-      {"_Z10atomic_decPU3AS3Vi", "spirv.atomic_dec"},
-      {"_Z10atomic_decPU3AS1Vj", "spirv.atomic_dec"},
-      {"_Z10atomic_decPU3AS3Vj", "spirv.atomic_dec"},
-      {"_Z14atomic_cmpxchgPU3AS1Viii", "spirv.atomic_compare_exchange"},
-      {"_Z14atomic_cmpxchgPU3AS3Viii", "spirv.atomic_compare_exchange"},
-      {"_Z14atomic_cmpxchgPU3AS1Vjjj", "spirv.atomic_compare_exchange"},
-      {"_Z14atomic_cmpxchgPU3AS3Vjjj", "spirv.atomic_compare_exchange"}};
+  const std::map<const char *, spv::Op> Map = {
+      {"_Z8atom_incPU3AS1Vi", spv::OpAtomicIIncrement},
+      {"_Z8atom_incPU3AS3Vi", spv::OpAtomicIIncrement},
+      {"_Z8atom_incPU3AS1Vj", spv::OpAtomicIIncrement},
+      {"_Z8atom_incPU3AS3Vj", spv::OpAtomicIIncrement},
+      {"_Z8atom_decPU3AS1Vi", spv::OpAtomicIDecrement},
+      {"_Z8atom_decPU3AS3Vi", spv::OpAtomicIDecrement},
+      {"_Z8atom_decPU3AS1Vj", spv::OpAtomicIDecrement},
+      {"_Z8atom_decPU3AS3Vj", spv::OpAtomicIDecrement},
+      {"_Z12atom_cmpxchgPU3AS1Viii", spv::OpAtomicCompareExchange},
+      {"_Z12atom_cmpxchgPU3AS3Viii", spv::OpAtomicCompareExchange},
+      {"_Z12atom_cmpxchgPU3AS1Vjjj", spv::OpAtomicCompareExchange},
+      {"_Z12atom_cmpxchgPU3AS3Vjjj", spv::OpAtomicCompareExchange},
+      {"_Z10atomic_incPU3AS1Vi", spv::OpAtomicIIncrement},
+      {"_Z10atomic_incPU3AS3Vi", spv::OpAtomicIIncrement},
+      {"_Z10atomic_incPU3AS1Vj", spv::OpAtomicIIncrement},
+      {"_Z10atomic_incPU3AS3Vj", spv::OpAtomicIIncrement},
+      {"_Z10atomic_decPU3AS1Vi", spv::OpAtomicIDecrement},
+      {"_Z10atomic_decPU3AS3Vi", spv::OpAtomicIDecrement},
+      {"_Z10atomic_decPU3AS1Vj", spv::OpAtomicIDecrement},
+      {"_Z10atomic_decPU3AS3Vj", spv::OpAtomicIDecrement},
+      {"_Z14atomic_cmpxchgPU3AS1Viii", spv::OpAtomicCompareExchange},
+      {"_Z14atomic_cmpxchgPU3AS3Viii", spv::OpAtomicCompareExchange},
+      {"_Z14atomic_cmpxchgPU3AS1Vjjj", spv::OpAtomicCompareExchange},
+      {"_Z14atomic_cmpxchgPU3AS3Vjjj", spv::OpAtomicCompareExchange}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
@@ -2701,37 +2701,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
       // Walk the users of the function.
       for (auto &U : F->uses()) {
         if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-          auto FType = F->getFunctionType();
-          SmallVector<Type *, 5> ParamTypes;
-
-          // The pointer type.
-          ParamTypes.push_back(FType->getParamType(0));
 
           auto IntTy = Type::getInt32Ty(M.getContext());
-
-          // The memory scope type.
-          ParamTypes.push_back(IntTy);
-
-          // The memory semantics type.
-          ParamTypes.push_back(IntTy);
-
-          if (2 < CI->getNumArgOperands()) {
-            // The unequal memory semantics type.
-            ParamTypes.push_back(IntTy);
-
-            // The value type.
-            ParamTypes.push_back(FType->getParamType(2));
-
-            // The comparator type.
-            ParamTypes.push_back(FType->getParamType(1));
-          } else if (1 < CI->getNumArgOperands()) {
-            // The value type.
-            ParamTypes.push_back(FType->getParamType(1));
-          }
-
-          auto NewFType =
-              FunctionType::get(FType->getReturnType(), ParamTypes, false);
-          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
           // We need to map the OpenCL constants to the SPIR-V equivalents.
           const auto ConstantScopeDevice =
@@ -2765,7 +2736,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Module &M) {
             Params.push_back(CI->getArgOperand(1));
           }
 
-          auto NewCI = CallInst::Create(NewF, Params, "", CI);
+          auto NewCI =
+              clspv::InsertSPIRVOp(CI, Pair.second, {}, CI->getType(), Params);
 
           CI->replaceAllUsesWith(NewCI);
 
