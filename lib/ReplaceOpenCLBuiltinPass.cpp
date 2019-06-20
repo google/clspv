@@ -171,6 +171,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceDivide(Module &M);
   bool replaceDot(Module &M);
   bool replaceExp10(Module &M);
+  bool replaceFmod(Module &M);
   bool replaceLog10(Module &M);
   bool replaceBarrier(Module &M);
   bool replaceMemFence(Module &M);
@@ -223,6 +224,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceDivide(M);
   Changed |= replaceDot(M);
   Changed |= replaceExp10(M);
+  Changed |= replaceFmod(M);
   Changed |= replaceLog10(M);
   Changed |= replaceBarrier(M);
   Changed |= replaceMemFence(M);
@@ -508,6 +510,26 @@ bool ReplaceOpenCLBuiltinPass::replaceExp10(Module &M) {
   }
 
   return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceFmod(Module &M) {
+
+  std::vector<const char *> Names = {
+      "_Z4fmodff",
+      "_Z4fmodDv2_fS_",
+      "_Z4fmodDv3_fS_",
+      "_Z4fmodDv4_fS_",
+  };
+
+  // OpenCL fmod(x,y) is x - y * trunc(x/y)
+  // The sign for a non-zero result is taken from x.
+  // (Try an example.)
+  // So translate to FRem
+  return replaceCallsWithValue(M, Names, [](CallInst *CI) {
+    auto Op0 = CI->getOperand(0);
+    auto Op1 = CI->getOperand(1);
+    return BinaryOperator::Create(Instruction::FRem, Op0, Op1, "", CI);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceLog10(Module &M) {
