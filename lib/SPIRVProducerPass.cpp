@@ -4405,27 +4405,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    if (Callee->getName().startswith("_Z4fmod")) {
-      // OpenCL fmod(x,y) is x - y * trunc(x/y)
-      // The sign for a non-zero result is taken from x.
-      // (Try an example.)
-      // So translate to OpFRem
-
-      SPIRVOperandList Ops;
-
-      Ops << MkId(lookupType(I.getType()));
-
-      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-        Ops << MkId(VMap[Call->getArgOperand(i)]);
-      }
-
-      VMap[&I] = nextID;
-
-      auto *Inst = new SPIRVInstruction(spv::OpFRem, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
-      break;
-    }
-
     // spirv.copy_memory.* intrinsics become OpMemoryMemory's.
     if (Callee->getName().startswith("spirv.copy_memory")) {
       //
