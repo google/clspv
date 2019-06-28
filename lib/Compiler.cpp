@@ -809,10 +809,6 @@ int Compile(const int argc, const char *const argv[]) {
   if (result || num_errors > 0) {
     return -1;
   }
-  //if (result) {
-  //  llvm::errs() << "unexpected error\n";
-  //  return -1;
-  //}
 
   // Don't run the passes or produce any output in verify mode.
   // Clang doesn't always produce a valid module.
@@ -945,10 +941,6 @@ int CompileFromSourceString(
     llvm::errs() << log << "\n";
     return -1;
   }
-  //if (result) {
-  //  llvm::errs() << "unexpected error\n";
-  //  return -1;
-  //}
 
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(Registry);
