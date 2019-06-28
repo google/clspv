@@ -50,7 +50,6 @@ set(BAKE_FILE_DATA_VARIABLE_NAME opencl_builtins_header_data)
 set(BAKE_FILE_SIZE_VARIABLE_NAME opencl_builtins_header_size)
 set(BAKE_FILE_DATA_BASE_VARIABLE_NAME opencl_base_builtins_header_data)
 set(BAKE_FILE_SIZE_BASE_VARIABLE_NAME opencl_base_builtins_header_size)
-set(BAKE_FILE_INCLUDE_VARIABLE_NAME opencl_builtins_include_dir)
 set(BAKE_FILE_CMAKE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/bake_file.cmakescript)
 
 add_custom_command(OUTPUT ${BAKE_FILE_OUTPUT_FILE}
