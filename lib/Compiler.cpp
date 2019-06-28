@@ -483,8 +483,6 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
-  // instance.getPreprocessorOpts().addRemappedFile(
-  //    overiddenInputFilename, errorOrInputFile.get().release());
   instance.getPreprocessorOpts().addRemappedFile(overiddenInputFilename,
                                                  memory_buffer.release());
 
@@ -506,6 +504,12 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
                                     opencl_builtins_header_size - 1));
 
   instance.getPreprocessorOpts().Includes.push_back("openclc.h");
+
+  std::unique_ptr<llvm::MemoryBuffer> openCLBaseBuiltinMemoryBuffer(
+      new OpenCLBuiltinMemoryBuffer(opencl_base_builtins_header_data,
+                                    opencl_base_builtins_header_size - 1));
+
+  instance.getPreprocessorOpts().Includes.push_back("opencl-c-base.h");
 
   // Add the VULKAN macro.
   instance.getPreprocessorOpts().addMacroDef("VULKAN=100");
@@ -532,6 +536,13 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 
   instance.getSourceManager().overrideFileContents(
       entry, std::move(openCLBuiltinMemoryBuffer));
+
+  auto base_entry = instance.getFileManager().getVirtualFile(
+      includePrefix + "opencl-c-base.h",
+      openCLBaseBuiltinMemoryBuffer->getBufferSize(), 0);
+
+  instance.getSourceManager().overrideFileContents(
+      base_entry, std::move(openCLBaseBuiltinMemoryBuffer));
 
   return 0;
 }
@@ -783,7 +794,7 @@ int Compile(const int argc, const char *const argv[]) {
     return -1;
   }
 
-  action.Execute();
+  auto result = action.Execute();
   action.EndSourceFile();
 
   clang::DiagnosticConsumer *const consumer =
@@ -795,9 +806,13 @@ int Compile(const int argc, const char *const argv[]) {
   if ((num_errors > 0) || (num_warnings > 0)) {
     llvm::errs() << log;
   }
-  if (num_errors > 0) {
+  if (result || num_errors > 0) {
     return -1;
   }
+  //if (result) {
+  //  llvm::errs() << "unexpected error\n";
+  //  return -1;
+  //}
 
   // Don't run the passes or produce any output in verify mode.
   // Clang doesn't always produce a valid module.
@@ -918,7 +933,7 @@ int CompileFromSourceString(
     return -1;
   }
 
-  action.Execute();
+  auto result = action.Execute();
   action.EndSourceFile();
 
   clang::DiagnosticConsumer *const consumer =
@@ -926,10 +941,14 @@ int CompileFromSourceString(
   consumer->finish();
 
   auto num_errors = consumer->getNumErrors();
-  if (num_errors > 0) {
+  if (result || num_errors > 0) {
     llvm::errs() << log << "\n";
     return -1;
   }
+  //if (result) {
+  //  llvm::errs() << "unexpected error\n";
+  //  return -1;
+  //}
 
   llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(Registry);

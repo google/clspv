@@ -24,6 +24,12 @@ if(NOT DEFINED BAKE_FILE_OUTPUT_FILE)
   )
 endif()
 
+if(NOT DEFINED BAKE_FILE_BASE_HEADER_FILE)
+  message(FATAL_ERROR
+    "Required cmake variable BAKE_FILE_BASE_HEADER_FILE not set!"
+  )
+endif()
+
 if(NOT DEFINED BAKE_FILE_DATA_VARIABLE_NAME)
   message(FATAL_ERROR
     "Required cmake variable BAKE_FILE_DATA_VARIABLE_NAME not set!"
@@ -36,6 +42,17 @@ if(NOT DEFINED BAKE_FILE_SIZE_VARIABLE_NAME)
   )
 endif()
 
+if(NOT DEFINED BAKE_FILE_DATA_BASE_VARIABLE_NAME)
+  message(FATAL_ERROR
+    "Required cmake variable BAKE_FILE_DATA_BASE_VARIBLE_NAME not set!"
+  )
+endif()
+
+if(NOT DEFINED BAKE_FILE_SIZE_BASE_VARIABLE_NAME)
+  message(FATAL_ERROR
+    "Required cmake variable BAKE_FILE_SIZE_BASE_VARIBLE_NAME not set!"
+  )
+endif()
 
 if(NOT EXISTS ${BAKE_FILE_INPUT_FILE})
   message(FATAL_ERROR "File '${BAKE_FILE_INPUT_FILE}' does not exist!")
@@ -46,6 +63,12 @@ file(READ "${BAKE_FILE_INPUT_FILE}" contents HEX)
 string(LENGTH ${contents} contentsSize)
 # + 1 for the added null terminator
 math(EXPR contentsSize "(${contentsSize} / 2) + 1")
+
+file(READ "${BAKE_FILE_BASE_HEADER_FILE}" baseContents HEX)
+
+string(LENGTH ${baseContents} baseContentsSize)
+# + 1 for the add null terminator
+math(EXPR baseContentsSize "(${baseContentsSize} / 2) + 1")
 
 string(TOUPPER "${BAKE_FILE_OUTPUT_FILE}" header_ifndef)
 string(REGEX REPLACE "[^A-Z]" "_" header_ifndef "${header_ifndef}")
@@ -78,6 +101,14 @@ file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "static const unsigned int ${BAKE_FILE_SI
 file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "static const char ${BAKE_FILE_DATA_VARIABLE_NAME}[${BAKE_FILE_SIZE_VARIABLE_NAME}] = {\n")
 
 string(REGEX MATCHALL ".." output "${contents}")
+string(REGEX REPLACE ";" "',\n  '\\\\x" output "${output}")
+
+file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "  '\\x${output}',\n  '\\0'\n};\n\n")
+
+file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "static const unsigned int ${BAKE_FILE_SIZE_BASE_VARIABLE_NAME} = ${baseContentsSize};\n")
+file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "static const char ${BAKE_FILE_DATA_BASE_VARIABLE_NAME}[${BAKE_FILE_SIZE_BASE_VARIABLE_NAME}] = {\n")
+
+string(REGEX MATCHALL ".." output "${baseContents}")
 string(REGEX REPLACE ";" "',\n  '\\\\x" output "${output}")
 
 file(APPEND "${BAKE_FILE_OUTPUT_FILE}" "  '\\x${output}',\n  '\\0'\n};\n\n")

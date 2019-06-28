@@ -598,7 +598,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Module &M) {
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
   const std::vector<const char *> Names = {
-      {"_Z7barrierj"},
+      "_Z7barrierj",
   };
 
   return replaceCallsWithValue(M, Names, [](CallInst *CI) {
