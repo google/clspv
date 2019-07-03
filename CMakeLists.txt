@@ -15,6 +15,15 @@
 
 cmake_minimum_required(VERSION 3.4.3)
 
+if(NOT COMMAND find_host_package)
+  macro(find_host_package)
+    find_package(${ARGN})
+  endmacro()
+endif()
+
+# Tests require Python3
+find_host_package(PythonInterp 3 REQUIRED)
+
 # If we are the parent CMakeLists.txt, need to declare a project
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(clspv)
