@@ -3,10 +3,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Bound: 5
-// CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpExtension "SPV_KHR_storage_buffer_storage_class"
 // CHECK: OpMemoryModel Logical GLSL450
