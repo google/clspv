@@ -19,8 +19,11 @@ set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
 
-:: Force usage of python 3.6
-set PATH=C:\python36;%PATH%
+choco install cmake --pre --yes --no-progress
+choco upgrade cmake --pre --yes --no-progress
+
+:: Force usage of python 3.6 and add cmake to the path.
+set PATH=C:\python36;"C:\Program Files\CMake\bin";%PATH%
 
 cd %SRC%
 python utils/fetch_sources.py
@@ -29,15 +32,12 @@ python utils/fetch_sources.py
 :: set up msvc build env
 :: #########################################
 if %VS_VERSION% == 2017 (
-  call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
   set GENERATOR="Visual Studio 15 2017 Win64"
   echo "Using VS 2017..."
 ) else if %VS_VERSION% == 2015 (
-  call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x64
   set GENERATOR="Visual Studio 14 2015 Win64"
   echo "Using VS 2015..."
 ) else if %VS_VERSION% == 2013 (
-  call "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x64
   set GENERATOR="Visual Studio 12 2013 Win64"
   echo "Using VS 2013..."
 )
@@ -56,7 +56,7 @@ if "%KOKORO_GITHUB_COMMIT%." == "." (
   set BUILD_SHA=%KOKORO_GITHUB_COMMIT%
 )
 
-cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DLLVM_TARGETS_TO_BUILD="" ..
+cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DLLVM_TARGETS_TO_BUILD="" .. -Thost=x64
 
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 
