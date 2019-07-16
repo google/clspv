@@ -103,7 +103,8 @@ bool MultiVersionUBOFunctionsPass::runOnModule(Module &M) {
 
     bool local_changed = false;
     size_t count = 0;
-    for (auto user : fn->users()) {
+    SmallVector<User *, 8> users(fn->users());
+    for (auto user : users) {
       if (auto call = dyn_cast<CallInst>(user)) {
         std::vector<ResourceInfo> resources;
         if (AnalyzeCall(fn, call, &resources)) {
