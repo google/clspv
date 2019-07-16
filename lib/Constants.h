@@ -15,6 +15,8 @@
 #ifndef CLSPV_LIB_CONSTANTS_H_
 #define CLSPV_LIB_CONSTANTS_H_
 
+#include <string>
+
 namespace clspv {
 
 // Name for module level metadata storing workgroup argument spec ids.
