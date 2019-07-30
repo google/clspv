@@ -17,6 +17,8 @@ set(SPIRV_C_STRINGS_OUTPUT_FILE ${CLSPV_BINARY_DIR}/include/clspv/spirv_c_string
 set(SPIRV_C_STRINGS_NAMESPACE spv)
 set(SPIRV_C_STRINGS_PYTHON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/spirv_c_strings.py)
 
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/include/clspv")
+
 add_custom_target(clspv_c_strings
   DEPENDS ${SPIRV_C_STRINGS_OUTPUT_FILE})
 
