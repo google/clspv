@@ -22,61 +22,17 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // MAP-NEXT: kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 
 
-// CHECK:  ; SPIR-V
-// CHECK:  ; Version: 1.0
-// CHECK:  ; Bound: 32
-// CHECK:  ; Schema: 0
-// CHECK:  OpCapability Shader
-// CHECK:  OpCapability VariablePointers
-// CHECK:  OpExtension "SPV_KHR_storage_buffer_storage_class"
-// CHECK:  OpExtension "SPV_KHR_variable_pointers"
-// CHECK:  OpMemoryModel Logical GLSL450
-// CHECK:  OpEntryPoint GLCompute [[_27:%[0-9a-zA-Z_]+]] "foo" [[_gl_LocalInvocationID:%[0-9a-zA-Z_]+]]
-// CHECK:  OpExecutionMode [[_27]] LocalSize 4 1 1
-// CHECK:  OpSource OpenCL_C 120
-// CHECK:  OpDecorate [[__runtimearr_uint:%[0-9a-zA-Z_]+]] ArrayStride 4
-// CHECK:  OpMemberDecorate [[__struct_3:%[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:  OpDecorate [[__struct_3]] Block
-// CHECK:  OpMemberDecorate [[__struct_10:%[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:  OpDecorate [[_gl_LocalInvocationID]] BuiltIn LocalInvocationId
 // CHECK:  OpDecorate [[_18:%[0-9a-zA-Z_]+]] DescriptorSet 1
 // CHECK:  OpDecorate [[_18]] Binding 0
-// CHECK:  OpDecorate [[_19:%[0-9a-zA-Z_]+]] DescriptorSet 0
-// CHECK:  OpDecorate [[_19]] Binding 0
 // CHECK:  OpDecorate [[__arr_uint_uint_4:%[0-9a-zA-Z_]+]] ArrayStride 4
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK-DAG:  [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
-// CHECK-DAG:  [[__struct_3]] = OpTypeStruct [[__runtimearr_uint]]
-// CHECK-DAG:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
-// CHECK-DAG:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
-// CHECK-DAG:  [[_6:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK-DAG:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // CHECK-DAG:  [[_uint_4:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 4
-// CHECK-DAG:  [[__arr_uint_uint_4]] = OpTypeArray [[_uint]] [[_uint_4]]
-// CHECK-DAG:  [[__struct_10]] = OpTypeStruct [[__arr_uint_uint_4]]
+// CHECK-DAG:  [[__arr_uint_uint_4:%[0-9a-zA-Z_]+]] = OpTypeArray [[_uint]] [[_uint_4]]
+// CHECK-DAG:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__arr_uint_uint_4]]
 // CHECK-DAG:  [[__ptr_StorageBuffer__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_10]]
-// CHECK-DAG:  [[_12:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_uint]] [[__ptr_StorageBuffer_uint]]
-// CHECK-DAG:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
-// CHECK-DAG:  [[__ptr_Input_v3uint:%[0-9a-zA-Z_]+]] = OpTypePointer Input [[_v3uint]]
 // CHECK-DAG:  [[__ptr_Input_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Input [[_uint]]
-// CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK-DAG:  [[_gl_LocalInvocationID]] = OpVariable [[__ptr_Input_v3uint]] Input
 // CHECK-DAG:  [[_18]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
-// CHECK-DAG:  [[_19]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
-// CHECK:  [[_20:%[0-9a-zA-Z_]+]] = OpFunction [[_uint]] Pure [[_12]]
-// CHECK:  [[_21:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[__ptr_StorageBuffer_uint]]
-// CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Input_uint]] [[_gl_LocalInvocationID]] [[_uint_0]]
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_23]]
-// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_18]] [[_uint_0]] [[_24]]
-// CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_25]]
-// CHECK:  OpReturnValue [[_26]]
-// CHECK:  OpFunctionEnd
-// CHECK:  [[_27]] = OpFunction [[_void]] None [[_6]]
-// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLabel
-// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_19]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_18]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[_20]] [[_30]]
-// CHECK:  OpStore [[_29]] [[_31]]
-// CHECK:  OpReturn
-// CHECK:  OpFunctionEnd
+// CHECK:  [[bar:%[0-9a-zA-Z_]+]] = OpFunction {{.*}}
+// CHECK:  = OpFunction {{.*}}
+// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_18]]
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[bar]] [[_30]]
