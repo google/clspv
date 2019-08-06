@@ -461,7 +461,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   llvm::Triple triple("spir-unknown-unknown");
 
   instance.getInvocation().setLangDefaults(
-      instance.getLangOpts(), clang::InputKind::OpenCL, triple,
+      instance.getLangOpts(), clang::InputKind(clang::Language::OpenCL), triple,
       instance.getPreprocessorOpts(), standard);
 
   // Override the C99 inline semantics to accommodate for more OpenCL C
@@ -776,8 +776,8 @@ int Compile(const int argc, const char *const argv[]) {
   }
 
   clang::CompilerInstance instance;
-  clang::FrontendInputFile kernelFile(overiddenInputFilename,
-                                      clang::InputKind::OpenCL);
+  clang::FrontendInputFile kernelFile(
+      overiddenInputFilename, clang::InputKind(clang::Language::OpenCL));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
   if (auto error = SetCompilerInstanceOptions(
@@ -910,8 +910,8 @@ int CompileFromSourceString(
   llvm::StringRef overiddenInputFilename = InputFilename.getValue();
 
   clang::CompilerInstance instance;
-  clang::FrontendInputFile kernelFile(overiddenInputFilename,
-                                      clang::InputKind::OpenCL);
+  clang::FrontendInputFile kernelFile(
+      overiddenInputFilename, clang::InputKind(clang::Language::OpenCL));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
   if (auto error =
