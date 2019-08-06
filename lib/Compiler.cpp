@@ -614,6 +614,16 @@ int PopulatePassManager(
   //   %3 = load float %2
   pm->add(llvm::createPromoteMemoryToRegisterPass());
 
+  // Try to deal with pointer bitcasts early. This can prevent problems like
+  // issue #409 where LLVM is looser about access chain addressing than SPIR-V.
+  // This needs to happens before instcombine and after replacing OpenCL
+  // builtins.  This run of the pass will not handle all pointer bitcasts that
+  // could be handled. It should be run again after other optimizations (e.g
+  // InlineFuncWithPointerBitCastArgPass).
+  pm->add(clspv::createSimplifyPointerBitcastPass());
+  pm->add(clspv::createReplacePointerBitcastPass());
+  pm->add(llvm::createDeadCodeEliminationPass());
+
   // Hide loads from __constant address space away from instcombine.
   // This prevents us from generating select between pointers-to-__constant.
   // See https://github.com/google/clspv/issues/71
