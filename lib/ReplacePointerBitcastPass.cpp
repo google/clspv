@@ -321,7 +321,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 break;
               }
             }
-            if (!ok) continue;
+            if (!ok) {
+              continue;
+            }
 
             Type *SrcEleTy =
                 I.getOperand(0)->getType()->getPointerElementType();
@@ -1011,7 +1013,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
     // Only dead code has been generated up to this point so it is safe to bail
     // out.
-    if (BailOut) continue;
+    if (BailOut) {
+      continue;
+    }
 
     for (User *BitCastUser : Inst->users()) {
       Value *NewAddrIdx = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
