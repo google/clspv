@@ -289,6 +289,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
   SmallVector<Instruction *, 16> VectorWorkList;
   SmallVector<Instruction *, 16> ScalarWorkList;
+  SmallVector<User *, 16> UserWorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
@@ -296,6 +297,34 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         if (isa<BitCastInst>(&I) && isa<PointerType>(I.getType())) {
           Value *Src = I.getOperand(0);
           if (isa<PointerType>(Src->getType())) {
+            // Check if this bitcast is one that can be handled during this run
+            // of the pass. If not, just skip it and don't make changes to the
+            // module. These checks are coarse level checks that only the right
+            // instructions appear. Rejected bitcasts might be able to be
+            // handled later in the flow after further optimization.
+            UserWorkList.clear();
+            for (auto User : I.users()) {
+              UserWorkList.push_back(User);
+            }
+            bool ok = true;
+            while (!UserWorkList.empty()) {
+              auto User = UserWorkList.back();
+              UserWorkList.pop_back();
+
+              if (isa<GetElementPtrInst>(User)) {
+                for (auto GEPUser : User->users()) {
+                  UserWorkList.push_back(GEPUser);
+                }
+              } else if (!isa<StoreInst>(User) && !isa<LoadInst>(User)) {
+                // Cannot handle this bitcast.
+                ok = false;
+                break;
+              }
+            }
+            if (!ok) {
+              continue;
+            }
+
             Type *SrcEleTy =
                 I.getOperand(0)->getType()->getPointerElementType();
             Type *DstEleTy = I.getType()->getPointerElementType();
@@ -921,6 +950,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     unsigned SrcTyBitWidth;
     unsigned DstTyBitWidth;
 
+    bool BailOut = false;
     SrcTy = Src->getType()->getPointerElementType();
     DstTy = Inst->getType()->getPointerElementType();
     int iter_count = 0;
@@ -947,6 +977,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Instruction *NewSrc =
             GetElementPtrInst::CreateInBounds(Src, {Zero, Zero});
+        Changed = true;
         // errs() << "NewSrc is " << *NewSrc << "\n";
         if (auto *SrcInst = dyn_cast<Instruction>(Src)) {
           // errs() << " instruction case\n";
@@ -964,11 +995,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         Src = NewSrc;
         SrcTy = Src->getType()->getPointerElementType();
       } else {
-        errs() << "Replace pointer bitcasts: unhandled case: non-array "
-                  "non-vector source type "
-               << *SrcTy << " is wider than dest type " << *DstTy << "\n";
-        llvm_unreachable("ReplacePointerBitcastPass: non-array non-vector "
-                         "source type is wider than dest type");
+        BailOut = true;
+        break;
       }
       if (iter_count > 1000) {
         llvm_unreachable("ReplacePointerBitcastPass: Too many iterations!");
@@ -982,6 +1010,12 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     errs() << "  DstTy elem " << *DstTy << " bit width " << DstTyBitWidth
            << "\n";
 #endif
+
+    // Only dead code has been generated up to this point so it is safe to bail
+    // out.
+    if (BailOut) {
+      continue;
+    }
 
     for (User *BitCastUser : Inst->users()) {
       Value *NewAddrIdx = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
