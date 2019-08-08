@@ -616,7 +616,7 @@ int PopulatePassManager(
 
   // Try to deal with pointer bitcasts early. This can prevent problems like
   // issue #409 where LLVM is looser about access chain addressing than SPIR-V.
-  // This needs to happens before instcombine and after replacing OpenCL
+  // This needs to happen before instcombine and after replacing OpenCL
   // builtins.  This run of the pass will not handle all pointer bitcasts that
   // could be handled. It should be run again after other optimizations (e.g
   // InlineFuncWithPointerBitCastArgPass).
