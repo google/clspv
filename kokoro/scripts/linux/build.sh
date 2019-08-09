@@ -28,8 +28,10 @@ BUILD_TYPE="Debug"
 
 CMAKE_C_CXX_COMPILER=""
 if [ $COMPILER = "clang" ]; then
+  # Use newer clang than default.
   CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/clang-5.0 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-5.0"
 else
+  # Use newer gcc than default.
   CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/gcc-5 -DCMAKE_CXX_COMPILER=/usr/bin/g++-5"
 fi
 
