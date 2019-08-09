@@ -94,12 +94,13 @@ if (${EXTERNAL_LLVM} EQUAL 1)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_BINARY_DIR to be specified")
   endif()
 else()
+  # Setup to use the LLVM monorepo.
   if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
-    set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm)
+    set(CLSPV_LLVM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/llvm)
   endif()
 
   if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR)
-    set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/clang)
+    set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/clang)
   endif()
 
   use_component(${CLSPV_LLVM_SOURCE_DIR})
