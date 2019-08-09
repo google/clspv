@@ -27,11 +27,10 @@ SKIP_TESTS="False"
 BUILD_TYPE="Debug"
 
 CMAKE_C_CXX_COMPILER=""
-if [ $COMPILER = "clang" ]
-then
-  sudo ln -s /usr/bin/clang-3.8 /usr/bin/clang
-  sudo ln -s /usr/bin/clang++-3.8 /usr/bin/clang++
-  CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
+if [ $COMPILER = "clang" ]; then
+  CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/clang-5.0 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-5.0"
+else
+  CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/gcc-5 -DCMAKE_CXX_COMPILER=/usr/bin/g++-5"
 fi
 
 # Possible configurations are:
