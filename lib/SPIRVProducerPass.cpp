@@ -2768,19 +2768,21 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   const auto AS = PTy->getAddressSpace();
   Ops << MkId(lookupType(Ty)) << MkNum(GetStorageClass(AS));
 
-  if (GV.hasInitializer()) {
-    InitializerID = VMap[GV.getInitializer()];
-  }
-
   const bool module_scope_constant_external_init =
       (AS == AddressSpace::Constant) && GV.hasInitializer() &&
       clspv::Option::ModuleConstantsInStorageBuffer();
 
-  if (0 != InitializerID) {
-    if (!module_scope_constant_external_init) {
-      // Emit the ID of the intiializer as part of the variable definition.
-      Ops << MkId(InitializerID);
+  if (GV.hasInitializer()) {
+    auto GVInit = GV.getInitializer();
+    if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init) {
+      assert(VMap.count(GVInit) == 1);
+      InitializerID = VMap[GVInit];
     }
+  }
+
+  if (0 != InitializerID) {
+    // Emit the ID of the intiializer as part of the variable definition.
+    Ops << MkId(InitializerID);
   }
   const uint32_t var_id = nextID++;
 
