@@ -3,8 +3,11 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK-DAG: %[[__original_id_29:[0-9]+]] = OpVariable {{.*}} Workgroup
-// CHECK-DAG: %[[__original_id_1:[0-9]+]] = OpVariable {{.*}} Workgroup
+// CHECK: OpUndef
+// CHECK-NOT: OpVariable {{.*}} Workgroup %
+// CHECK: OpVariable {{.*}} Workgroup
+// CHECK-NOT: OpVariable {{.*}} Workgroup %
+// CHECK: OpVariable {{.*}} Workgroup
 
 __kernel void
 top_scan(__global uint * isums,
