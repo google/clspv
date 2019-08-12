@@ -154,7 +154,7 @@ def disassemble_and_post_process(args, spirv_module):
         spirv_module
     ]
 
-    disasm = subprocess.check_output(cmd)
+    disasm = subprocess.check_output(cmd).decode('utf-8')
 
     # Process the disassembly
     for line in disasm.split('\n'):
