@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(CLSPV_GENERATED_INCLUDES_DIR ${CLSPV_BINARY_DIR}/include/clspv)
+
 set(SPIRV_C_STRINGS_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/1.0/spirv.hpp)
-set(SPIRV_C_STRINGS_OUTPUT_FILE ${CLSPV_BINARY_DIR}/include/clspv/spirv_c_strings.hpp)
+set(SPIRV_C_STRINGS_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/spirv_c_strings.hpp)
 set(SPIRV_C_STRINGS_NAMESPACE spv)
 set(SPIRV_C_STRINGS_PYTHON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/spirv_c_strings.py)
 
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/include/clspv")
+file(MAKE_DIRECTORY "${CLSPV_GENERATED_INCLUDES_DIR}")
 
 add_custom_target(clspv_c_strings
   DEPENDS ${SPIRV_C_STRINGS_OUTPUT_FILE})
@@ -44,7 +46,7 @@ add_custom_command(OUTPUT ${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE}
 )
 
 set(BAKE_FILE_INPUT_FILE ${STRIP_BANNED_OPENCL_FEATURES_OUTPUT_FILE})
-set(BAKE_FILE_OUTPUT_FILE ${CLSPV_BINARY_DIR}/include/clspv/opencl_builtins_header.h)
+set(BAKE_FILE_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/opencl_builtins_header.h)
 set(BAKE_FILE_BASE_HEADER_FILE ${CLANG_SOURCE_DIR}/lib/Headers/opencl-c-base.h)
 set(BAKE_FILE_DATA_VARIABLE_NAME opencl_builtins_header_data)
 set(BAKE_FILE_SIZE_VARIABLE_NAME opencl_builtins_header_size)
@@ -70,7 +72,7 @@ add_custom_target(clspv_baked_opencl_header
 )
 
 set(SPIRV_GLSL_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/1.0/extinst.glsl.std.450.grammar.json)
-set(SPIRV_GLSL_OUTPUT_FILE ${CLSPV_BINARY_DIR}/include/clspv/spirv_glsl.hpp)
+set(SPIRV_GLSL_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/spirv_glsl.hpp)
 set(SSPIRV_GLSL_PYTHON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/spirv_glsl.py)
 
 add_custom_target(clspv_glsl
