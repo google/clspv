@@ -18,7 +18,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 
-#include "spirv/1.0/spirv.hpp"
+#include "spirv/unified1/spirv.hpp"
 
 namespace clspv {
 
