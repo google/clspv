@@ -27,7 +27,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spirv/1.0/spirv.hpp"
+#include "spirv/unified1/spirv.hpp"
 
 #include "clspv/Option.h"
 
