@@ -1270,6 +1270,23 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
     FindType(type);
   }
 
+  // If module constants are clustered in a storage buffer then that struct
+  // needs layout decorations.
+  if (clspv::Option::ModuleConstantsInStorageBuffer()) {
+    for (GlobalVariable &GV : M.globals()) {
+      PointerType *PTy = cast<PointerType>(GV.getType());
+      const auto AS = PTy->getAddressSpace();
+      const bool module_scope_constant_external_init =
+          (AS == AddressSpace::Constant) && GV.hasInitializer();
+      const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
+      if (module_scope_constant_external_init &&
+          spv::BuiltInMax == BuiltinType) {
+        StructTypesNeedingBlock.insert(
+            cast<StructType>(PTy->getPointerElementType()));
+      }
+    }
+  }
+
   // Traverse the arrays and structures underneath each Block, and
   // mark them as needing layout.
   std::vector<Type *> work_list(StructTypesNeedingBlock.begin(),
