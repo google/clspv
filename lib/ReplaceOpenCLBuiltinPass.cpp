@@ -906,23 +906,14 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceIsFinite(Module &M) {
-  std::vector<const char*> Names = {
-    "_Z8isfiniteh",
-    "_Z8isfiniteDv2_h",
-    "_Z8isfiniteDv3_h",
-    "_Z8isfiniteDv4_h",
-    "_Z8isfinitef",
-    "_Z8isfiniteDv2_f",
-    "_Z8isfiniteDv3_f",
-    "_Z8isfiniteDv4_f",
-    "_Z8isfinited",
-    "_Z8isfiniteDv2_d",
-    "_Z8isfiniteDv3_d",
-    "_Z8isfiniteDv4_d",
+  std::vector<const char *> Names = {
+      "_Z8isfiniteh",     "_Z8isfiniteDv2_h", "_Z8isfiniteDv3_h",
+      "_Z8isfiniteDv4_h", "_Z8isfinitef",     "_Z8isfiniteDv2_f",
+      "_Z8isfiniteDv3_f", "_Z8isfiniteDv4_f", "_Z8isfinited",
+      "_Z8isfiniteDv2_d", "_Z8isfiniteDv3_d", "_Z8isfiniteDv4_d",
   };
 
   return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
-
     auto &C = M.getContext();
     auto Val = CI->getOperand(0);
     auto ValTy = Val->getType();
@@ -933,12 +924,19 @@ bool ReplaceOpenCLBuiltinPass::replaceIsFinite(Module &M) {
 
     // Create Mask
     auto ScalarSize = ValTy->getScalarSizeInBits();
-    Value* InfMask;
+    Value *InfMask;
     switch (ScalarSize) {
-      case 16: InfMask = ConstantInt::get(IntTy, 0x7C00U); break;
-      case 32: InfMask = ConstantInt::get(IntTy, 0x7F800000U); break;
-      case 64: InfMask = ConstantInt::get(IntTy, 0x7FF0000000000000ULL); break;
-      default: llvm_unreachable("Unsupported floating-point type");
+    case 16:
+      InfMask = ConstantInt::get(IntTy, 0x7C00U);
+      break;
+    case 32:
+      InfMask = ConstantInt::get(IntTy, 0x7F800000U);
+      break;
+    case 64:
+      InfMask = ConstantInt::get(IntTy, 0x7FF0000000000000ULL);
+      break;
+    default:
+      llvm_unreachable("Unsupported floating-point type");
     }
 
     IRBuilder<> Builder(CI);
