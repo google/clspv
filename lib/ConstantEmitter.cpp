@@ -70,7 +70,7 @@ void ConstantEmitter::AlignTo(size_t alignment) {
 
 void ConstantEmitter::EmitStruct(ConstantStruct *c) {
   const StructLayout *sl = Layout.getStructLayout(c->getType());
-  AlignTo(sl->getAlignment()); // Might be redundant.
+  AlignTo(sl->getAlignment().value()); // Might be redundant.
   const size_t BaseOffset = Offset;
   for (unsigned i = 0; i < c->getNumOperands(); ++i) {
     EmitZeroes(sl->getElementOffset(i) - (Offset - BaseOffset));
@@ -98,7 +98,7 @@ void ConstantEmitter::EmitAggregateZero(ConstantAggregateZero *c) {
   if (StructType *sty = dyn_cast<StructType>(c->getType())) {
 
     const StructLayout *sl = Layout.getStructLayout(sty);
-    AlignTo(sl->getAlignment()); // Might be redundant.
+    AlignTo(sl->getAlignment().value()); // Might be redundant.
     const size_t BaseOffset = Offset;
     for (unsigned i = 0; i < c->getNumElements(); ++i) {
       EmitZeroes(sl->getElementOffset(i) - (Offset - BaseOffset));
