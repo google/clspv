@@ -159,6 +159,14 @@ Type *getBoolOrBoolVectorTy(LLVMContext &C, unsigned elements) {
   }
 }
 
+Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
+  Type *IntTy = Type::getIntNTy(C, Ty->getScalarSizeInBits());
+  if (Ty->isVectorTy()) {
+    IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
+  }
+  return IntTy;
+}
+
 struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   static char ID;
   ReplaceOpenCLBuiltinPass() : ModulePass(ID) {}
@@ -177,6 +185,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceMemFence(Module &M);
   bool replaceRelational(Module &M);
   bool replaceIsInfAndIsNan(Module &M);
+  bool replaceIsFinite(Module &M);
   bool replaceAllAndAny(Module &M);
   bool replaceUpsample(Module &M);
   bool replaceRotate(Module &M);
@@ -230,6 +239,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceMemFence(M);
   Changed |= replaceRelational(M);
   Changed |= replaceIsInfAndIsNan(M);
+  Changed |= replaceIsFinite(M);
   Changed |= replaceAllAndAny(M);
   Changed |= replaceUpsample(M);
   Changed |= replaceRotate(M);
@@ -893,6 +903,60 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Module &M) {
   }
 
   return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceIsFinite(Module &M) {
+  std::vector<const char *> Names = {
+      "_Z8isfiniteh",     "_Z8isfiniteDv2_h", "_Z8isfiniteDv3_h",
+      "_Z8isfiniteDv4_h", "_Z8isfinitef",     "_Z8isfiniteDv2_f",
+      "_Z8isfiniteDv3_f", "_Z8isfiniteDv4_f", "_Z8isfinited",
+      "_Z8isfiniteDv2_d", "_Z8isfiniteDv3_d", "_Z8isfiniteDv4_d",
+  };
+
+  return replaceCallsWithValue(M, Names, [&M](CallInst *CI) {
+    auto &C = M.getContext();
+    auto Val = CI->getOperand(0);
+    auto ValTy = Val->getType();
+    auto RetTy = CI->getType();
+
+    // Get a suitable integer type to represent the number
+    auto IntTy = getIntOrIntVectorTyForCast(C, ValTy);
+
+    // Create Mask
+    auto ScalarSize = ValTy->getScalarSizeInBits();
+    Value *InfMask;
+    switch (ScalarSize) {
+    case 16:
+      InfMask = ConstantInt::get(IntTy, 0x7C00U);
+      break;
+    case 32:
+      InfMask = ConstantInt::get(IntTy, 0x7F800000U);
+      break;
+    case 64:
+      InfMask = ConstantInt::get(IntTy, 0x7FF0000000000000ULL);
+      break;
+    default:
+      llvm_unreachable("Unsupported floating-point type");
+    }
+
+    IRBuilder<> Builder(CI);
+
+    // Bitcast to int
+    auto ValInt = Builder.CreateBitCast(Val, IntTy);
+
+    // Mask and compare
+    auto InfBits = Builder.CreateAnd(InfMask, ValInt);
+    auto Cmp = Builder.CreateICmp(CmpInst::ICMP_EQ, InfBits, InfMask);
+
+    auto RetFalse = ConstantInt::get(RetTy, 0);
+    Value *RetTrue;
+    if (ValTy->isVectorTy()) {
+      RetTrue = ConstantInt::getSigned(RetTy, -1);
+    } else {
+      RetTrue = ConstantInt::get(RetTy, 1);
+    }
+    return Builder.CreateSelect(Cmp, RetFalse, RetTrue);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Module &M) {
@@ -1618,12 +1682,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Module &M) {
           if (OpType->getScalarType()->isFloatingPointTy()) {
 
             // First create the new type
-            auto ScalarSize = OpType->getScalarType()->getPrimitiveSizeInBits();
-            BitType = Type::getIntNTy(M.getContext(), ScalarSize);
-            if (OpType->isVectorTy()) {
-              BitType =
-                  VectorType::get(BitType, OpType->getVectorNumElements());
-            }
+            BitType = getIntOrIntVectorTyForCast(M.getContext(), OpType);
 
             // Then bitcast all operands
             PredicateValue =
