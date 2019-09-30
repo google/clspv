@@ -120,12 +120,11 @@ static llvm::cl::opt<std::string>
     InputFilename(llvm::cl::Positional, llvm::cl::desc("<input .cl file>"),
                   llvm::cl::init("-"));
 
-static llvm::cl::opt<clang::Language>
-    InputLanguage("x", llvm::cl::desc("Select input type"),
-                  llvm::cl::init(clang::Language::OpenCL),
-                  llvm::cl::values(
-                    clEnumValN(clang::Language::OpenCL, "cl", "OpenCL source"),
-                    clEnumValN(clang::Language::LLVM_IR, "ir", "LLVM IR")));
+static llvm::cl::opt<clang::Language> InputLanguage(
+    "x", llvm::cl::desc("Select input type"),
+    llvm::cl::init(clang::Language::OpenCL),
+    llvm::cl::values(clEnumValN(clang::Language::OpenCL, "cl", "OpenCL source"),
+                     clEnumValN(clang::Language::LLVM_IR, "ir", "LLVM IR")));
 
 static llvm::cl::opt<std::string>
     OutputFilename("o", llvm::cl::desc("Override output filename"),
@@ -789,7 +788,7 @@ int Compile(const int argc, const char *const argv[]) {
   // If we are reading our input file from stdin.
   if ("-" == InputFilename) {
     // We need to overwrite the file name we use.
-    switch(InputLanguage) {
+    switch (InputLanguage) {
     case clang::Language::OpenCL:
       overiddenInputFilename = "stdin.cl";
       break;
@@ -800,8 +799,8 @@ int Compile(const int argc, const char *const argv[]) {
   }
 
   clang::CompilerInstance instance;
-  clang::FrontendInputFile kernelFile(
-      overiddenInputFilename, clang::InputKind(InputLanguage));
+  clang::FrontendInputFile kernelFile(overiddenInputFilename,
+                                      clang::InputKind(InputLanguage));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
   if (auto error = SetCompilerInstanceOptions(
