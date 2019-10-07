@@ -795,6 +795,10 @@ int Compile(const int argc, const char *const argv[]) {
     case clang::Language::LLVM_IR:
       overiddenInputFilename = "stdin.ll";
       break;
+    default:
+      // Default to fix compiler warnings/errors. Option parsing will reject a
+      // bad enum value for the option so there is no need for a message.
+      return -1;
     }
   }
 
