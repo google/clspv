@@ -3,9 +3,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: ; SPIR-V
-// CHECK: ; Version: 1.0
-// CHECK: ; Schema: 0
 // CHECK: OpCapability Shader
 // CHECK: OpMemoryModel Logical GLSL450
 // CHECK: OpEntryPoint GLCompute %[[entry_id:[a-zA-Z0-9_]*]] "bitcast_used_twice"
