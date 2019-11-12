@@ -45,6 +45,7 @@ void initializeSignedCompareFixupPassPass(PassRegistry &);
 void initializeSimplifyPointerBitcastPassPass(PassRegistry &);
 void initializeSplatArgPassPass(PassRegistry &);
 void initializeSplatSelectConditionPassPass(PassRegistry &);
+void initializeSpecializeImageTypesPassPass(PassRegistry &);
 void initializeUBOTypeTransformPassPass(PassRegistry &);
 void initializeUndoBoolPassPass(PassRegistry &);
 void initializeUndoByvalPassPass(PassRegistry &);

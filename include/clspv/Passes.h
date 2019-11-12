@@ -378,4 +378,7 @@ llvm::ModulePass *createRemoveUnusedArgumentsPass();
 /// requirements.
 llvm::ModulePass *createMultiVersionUBOFunctionsPass();
 
+/// Specialize image types.
+llvm::ModulePass *createSpecializeImageTypesPass();
+
 } // namespace clspv
