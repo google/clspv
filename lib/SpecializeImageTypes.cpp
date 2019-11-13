@@ -83,21 +83,31 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
 
   DenseMap<Function *, SmallVector<Type *, 8>> remapped_args;
   for (auto f : kernels) {
-    outs() << "Function: " << f->getName() << "\n";
+    // outs() << "Function: " << f->getName() << "\n";
     bool local_changed = false;
     SmallVector<Type *, 8> remapped;
     for (auto &Arg : f->args()) {
-      outs() << " Arg: " << Arg.getName() << "\n";
+      // outs() << " Arg: " << Arg.getName() << "\n";
       remapped.push_back(Arg.getType());
       if (IsImageType(Arg.getType())) {
-        outs() << "  Image: " << Arg << "\n";
+        // outs() << "  Image: " << Arg << "\n";
         Type *new_type = RemapType(&Arg);
-        if (new_type) {
-          outs() << "   new type: " << *new_type << "\n";
-          local_changed = true;
-          SpecializeArg(f, &Arg, new_type);
-          remapped.back() = new_type;
+        if (!new_type) {
+          // Assume the sampled type is float.
+          std::string name =
+              cast<StructType>(Arg.getType()->getPointerElementType())
+                  ->getName();
+          name += ".float";
+          if (name.find("ro_t") != std::string::npos)
+            name += ".sampled";
+          auto new_struct = StructType::create(Arg.getContext(), name);
+          new_type = PointerType::get(new_struct,
+                                      Arg.getType()->getPointerAddressSpace());
         }
+        // outs() << "   new type: " << *new_type << "\n";
+        local_changed = true;
+        SpecializeArg(f, &Arg, new_type);
+        remapped.back() = new_type;
       }
     }
     if (local_changed) {
@@ -136,7 +146,13 @@ bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
       f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f" ||
       f->getName() == "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f" ||
       f->getName() == "_Z12write_imagei14ocl_image2d_woDv2_iDv4_i" ||
-      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") {
+      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j" ||
+      f->getName() == "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv2_f" ||
+      f->getName() == "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv2_f" ||
+      f->getName() == "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv2_f" ||
+      f->getName() == "_Z12write_imagef14ocl_image3d_woDv2_iDv4_f" ||
+      f->getName() == "_Z12write_imagei14ocl_image3d_woDv2_iDv4_i" ||
+      f->getName() == "_Z13write_imageui14ocl_image3d_woDv2_iDv4_j") {
     return true;
   }
 
@@ -219,12 +235,10 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
       if (auto call = dyn_cast<CallInst>(u.getUser())) {
         auto called = call->getCalledFunction();
         if (IsImageBuiltin(called)) {
-          outs() << "OLD BUILTIN CALL: " << *call << "\n";
           auto new_func = ReplaceImageBuiltin(called, new_type);
           call->setCalledFunction(new_func);
           if (called->getNumUses() == 0)
             called->eraseFromParent();
-          outs() << "NEW BUILTIN CALL: " << *call << "\n";
         } else {
           SpecializeArg(called, called->getArg(u.getOperandNo()), new_type);
         }
