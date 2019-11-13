@@ -133,7 +133,10 @@ bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
   // TODO(alan-baker): finish these
   if (f->getName() == "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" ||
       f->getName() == "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") {
+      f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f" ||
+      f->getName() == "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f" ||
+      f->getName() == "_Z12write_imagei14ocl_image2d_woDv2_iDv4_i" ||
+      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") {
     return true;
   }
 
@@ -162,10 +165,13 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
           called->getName().contains("write_imagef")) {
         name += ".float";
       } else if (called->getName().contains("read_imageui") ||
-                 called->getName().contains("read_imagei")) {
+                 called->getName().contains("write_imageui")) {
         name += ".uint";
-      } else {
+      } else if (called->getName().contains("read_imagei") ||
+                 called->getName().contains("write_imagei")) {
         name += ".int";
+      } else {
+        assert(false && "Unhandled image builtin");
       }
 
       if (called->getName().contains("read_image") &&
@@ -298,6 +304,7 @@ void SpecializeImageTypesPass::RewriteFunction(
   for (auto old_arg_iter = f->arg_begin(), new_arg_iter = new_func->arg_begin();
        old_arg_iter != f->arg_end(); ++old_arg_iter, ++new_arg_iter) {
     old_arg_iter->replaceAllUsesWith(&*new_arg_iter);
+    new_arg_iter->takeName(&*old_arg_iter);
   }
 
   // There are no calls to |f| yet so we don't need to worry about updating
