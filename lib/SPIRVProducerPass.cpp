@@ -814,7 +814,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
                M.getTypeByName("opencl.image3d_wo_t.int")) {
       // Nothing for now...
     } else {
-      assert(false && "Unknown image sample type");
+      // This was likely an UndefValue.
+      FindType(Type::getFloatTy(Context));
     }
 
     // Collect types' information from function.
@@ -1867,7 +1868,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
                 new SPIRVInstruction(spv::OpTypeVector, v4int32ID, vecOps);
             SPIRVInstList.push_back(int_vec);
           } else {
-            assert(false && "Unknown image sample type");
+            // This was likely an UndefValue.
+            SampledTyID = lookupType(Type::getFloatTy(Context));
           }
           Ops << MkId(SampledTyID);
 

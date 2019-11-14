@@ -19,8 +19,9 @@ void kernel foo(global float4* A, read_only image2d_t im, sampler_t sam, float2 
   *A = read_imagef(im, sam, bar(coord, im));
 }
 // CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK-DAG: [[_7:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
-// CHECK-DAG: [[_24:%[a-zA-Z0-9_]+]] = OpUndef [[_7]]
+// CHECK-DAG: [[used:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 1 Unknown
+// CHECK-DAG: [[unused:%[a-zA-Z0-9_]+]] = OpTypeImage [[_float]] 2D 0 0 0 2 Unknown
+// CHECK-DAG: [[_24:%[a-zA-Z0-9_]+]] = OpUndef [[unused]]
 // CHECK: [[_36:%[a-zA-Z0-9_]+]] = OpFunction
-// CHECK: [[_38:%[a-zA-Z0-9_]+]] = OpFunctionParameter [[_7]]
+// CHECK: [[_38:%[a-zA-Z0-9_]+]] = OpFunctionParameter [[unused]]
 // CHECK: [[_48:%[a-zA-Z0-9_]+]] = OpFunctionCall {{.*}} [[_36]] {{.*}} [[_24]]

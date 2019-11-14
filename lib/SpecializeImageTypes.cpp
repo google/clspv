@@ -83,14 +83,11 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
 
   DenseMap<Function *, SmallVector<Type *, 8>> remapped_args;
   for (auto f : kernels) {
-    // outs() << "Function: " << f->getName() << "\n";
     bool local_changed = false;
     SmallVector<Type *, 8> remapped;
     for (auto &Arg : f->args()) {
-      // outs() << " Arg: " << Arg.getName() << "\n";
       remapped.push_back(Arg.getType());
       if (IsImageType(Arg.getType())) {
-        // outs() << "  Image: " << Arg << "\n";
         Type *new_type = RemapType(&Arg);
         if (!new_type) {
           // Assume the sampled type is float.
@@ -100,11 +97,12 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
           name += ".float";
           if (name.find("ro_t") != std::string::npos)
             name += ".sampled";
-          auto new_struct = StructType::create(Arg.getContext(), name);
+          StructType *new_struct = M.getTypeByName(name);
+          if (!new_struct)
+            new_struct = StructType::create(Arg.getContext(), name);
           new_type = PointerType::get(new_struct,
                                       Arg.getType()->getPointerAddressSpace());
         }
-        // outs() << "   new type: " << *new_type << "\n";
         local_changed = true;
         SpecializeArg(f, &Arg, new_type);
         remapped.back() = new_type;
@@ -195,7 +193,11 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
         name += ".sampled";
       }
 
-      StructType *new_struct = StructType::create(call->getContext(), name);
+      StructType *new_struct =
+          call->getParent()->getParent()->getParent()->getTypeByName(name);
+      if (!new_struct) {
+        new_struct = StructType::create(call->getContext(), name);
+      }
       PointerType *new_pointer =
           PointerType::get(new_struct, imageTy->getPointerAddressSpace());
       return new_pointer;
@@ -219,6 +221,9 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
 void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
                                              Type *new_type) {
+  if (arg->getType() == new_type)
+    return;
+
   // First replace the uses.
   std::vector<Value *> stack;
   stack.push_back(arg);
@@ -241,6 +246,8 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
             called->eraseFromParent();
         } else {
           SpecializeArg(called, called->getArg(u.getOperandNo()), new_type);
+          // Ensure the called function type matches the called function's type.
+          call->setCalledFunction(call->getCalledFunction());
         }
       }
 
@@ -294,6 +301,10 @@ void SpecializeImageTypesPass::RewriteFunction(
   auto module = f->getParent();
   auto func_type =
       FunctionType::get(f->getReturnType(), remapped, f->isVarArg());
+
+  if (func_type == f->getFunctionType())
+    return;
+
   f->removeFromParent();
 
   auto callee =
@@ -321,9 +332,7 @@ void SpecializeImageTypesPass::RewriteFunction(
     new_arg_iter->takeName(&*old_arg_iter);
   }
 
-  // There are no calls to |f| yet so we don't need to worry about updating
-  // calls.
-
+  f->replaceAllUsesWith(new_func);
   delete f;
 }
 
