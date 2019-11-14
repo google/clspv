@@ -20,9 +20,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "ArgKind.h"
 #include "Constants.h"
 #include "Passes.h"
 
+using namespace clspv;
 using namespace llvm;
 
 namespace {
@@ -34,9 +36,6 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
-  // Returns true if |type| is an OpenCL image type.
-  bool IsImageType(Type *type) const;
-
   // Returns true if |f| is an OpenCL image builtin function.
   bool IsImageBuiltin(Function *f) const;
 
@@ -72,7 +71,6 @@ ModulePass *createSpecializeImageTypesPass() {
 namespace {
 
 bool SpecializeImageTypesPass::runOnModule(Module &M) {
-  // outs() << M << "\n";
   bool changed = false;
   SmallVector<Function *, 8> kernels;
   for (auto &F : M) {
@@ -126,17 +124,6 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
   return true;
 }
 
-bool SpecializeImageTypesPass::IsImageType(Type *type) const {
-  if (auto ptrTy = dyn_cast<PointerType>(type)) {
-    if (auto structTy = dyn_cast<StructType>(ptrTy->getPointerElementType())) {
-      if (structTy->getName().startswith("opencl.image"))
-        return true;
-    }
-  }
-
-  return false;
-}
-
 bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
   // TODO(alan-baker): finish these
   if (f->getName() == "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" ||
@@ -171,6 +158,7 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
     if (IsImageBuiltin(called)) {
+      // Specialize the image type based on the it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
       std::string name =
@@ -278,6 +266,7 @@ Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
   if (auto replaced = f->getParent()->getFunction(name))
     return replaced;
 
+  // Change the image argument to the specialized type.
   SmallVector<Type *, 4> paramTys;
   for (auto &Arg : f->args()) {
     if (IsImageType(Arg.getType()))
