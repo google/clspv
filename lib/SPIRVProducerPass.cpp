@@ -36,6 +36,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -50,6 +51,7 @@
 #include "clspv/spirv_glsl.hpp"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
@@ -719,15 +721,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   FindTypesForResourceVars(M);
   FindWorkgroupVars(M);
 
-  // These function calls need a <2 x i32> as an intermediate result but not
-  // the final result.
-  std::unordered_set<std::string> NeedsIVec2{
-      "_Z15get_image_width14ocl_image2d_ro",
-      "_Z15get_image_width14ocl_image2d_wo",
-      "_Z16get_image_height14ocl_image2d_ro",
-      "_Z16get_image_height14ocl_image2d_wo",
-  };
-
   for (Function &F : M) {
     if (F.isDeclaration()) {
       continue;
@@ -759,18 +752,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           StringRef callee_name = Call->getCalledFunction()->getName();
 
           // Handle image type specially.
-          if (callee_name.startswith(
-                  "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-              callee_name.startswith(
-                  "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
-              callee_name.startswith(
-                  "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
-              callee_name.startswith(
-                  "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f") ||
-              callee_name.startswith(
-                  "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
-              callee_name.startswith(
-                  "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f")) {
+          if (clspv::IsSampledImageRead(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
@@ -780,7 +762,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
-          if (NeedsIVec2.find(callee_name) != NeedsIVec2.end()) {
+          //if (NeedsIVec2.find(callee_name) != NeedsIVec2.end()) {
+          if (clspv::IsGetImageHeight(callee_name) || clspv::IsGetImageWidth(callee_name)) {
             FindType(VectorType::get(Type::getInt32Ty(Context), 2));
           }
         }
@@ -801,6 +784,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
       }
     }
 
+    // TODO(alan-baker): make this better.
     if (M.getTypeByName("opencl.image2d_ro_t.float") ||
         M.getTypeByName("opencl.image2d_ro_t.float.sampled") ||
         M.getTypeByName("opencl.image2d_wo_t.float") ||
@@ -3279,17 +3263,15 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   { // OpCapability ImageQuery
     bool hasImageQuery = false;
-    for (const char *imageQuery : {
-             "_Z15get_image_width14ocl_image2d_ro",
-             "_Z15get_image_width14ocl_image2d_wo",
-             "_Z16get_image_height14ocl_image2d_ro",
-             "_Z16get_image_height14ocl_image2d_wo",
-         }) {
-      if (module.getFunction(imageQuery)) {
-        hasImageQuery = true;
-        break;
+    for (const auto &SymVal : module.getValueSymbolTable()) {
+      if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+        if (clspv::IsGetImageHeight(F) || clspv::IsGetImageWidth(F)) {
+          hasImageQuery = true;
+          break;
+        }
       }
     }
+
     if (hasImageQuery) {
       auto *ImageQueryCapInst = new SPIRVInstruction(
           spv::OpCapability, {MkNum(spv::CapabilityImageQuery)});
@@ -4525,18 +4507,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
     // Additionally, OpTypeSampledImage is generated.
-    if (Callee->getName().startswith(
-            "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-        Callee->getName().startswith(
-            "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
-        Callee->getName().startswith(
-            "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
-        Callee->getName().startswith(
-            "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f") ||
-        Callee->getName().startswith(
-            "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
-        Callee->getName().startswith(
-            "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f")) {
+    if (clspv::IsSampledImageRead(Callee)) {
       //
       // Generate OpSampledImage.
       //
@@ -4610,19 +4581,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // write_imagef is mapped to OpImageWrite.
-    if (Callee->getName().startswith(
-            "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
-        Callee->getName().startswith(
-            "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f") ||
-        Callee->getName().startswith(
-            "_Z12write_imagei14ocl_image2d_wo_Dv2_iDv4_i") ||
-        Callee->getName().startswith(
-            "_Z12write_imagei14ocl_image3d_wo_Dv4_iDv4_f") ||
-        Callee->getName().startswith(
-            "_Z13write_imageui14ocl_image2d_wo_Dv2_iDv2_j") ||
-        Callee->getName().startswith(
-            "_Z13_write_imageui14ocl_image3d_wo_Dv4_iDv4_j")) {
+    // write_image is mapped to OpImageWrite.
+    if (clspv::IsImageWrite(Callee)) {
       //
       // Generate OpImageWrite.
       //
@@ -4641,6 +4601,17 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       uint32_t ImageID = VMap[Image];
       uint32_t CoordinateID = VMap[Coordinate];
       uint32_t TexelID = VMap[Texel];
+
+      const bool is_int_image = Callee->getName().contains(".int");
+      if (is_int_image) {
+        // Generate a bitcast to v4int and use it as the texel value.
+        uint32_t castID = nextID++;
+        Ops << MkId(v4int32ID) << MkId(TexelID);
+        auto cast = new SPIRVInstruction(spv::OpBitcast, castID, Ops);
+        SPIRVInstList.push_back(cast);
+        Ops.clear();
+        TexelID = castID;
+      }
       Ops << MkId(ImageID) << MkId(CoordinateID) << MkId(TexelID);
 
       auto *Inst = new SPIRVInstruction(spv::OpImageWrite, Ops);
@@ -4648,11 +4619,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // get_image_width is mapped to OpImageQuerySize
-    if (Callee->getName().equals("_Z15get_image_width14ocl_image2d_ro") ||
-        Callee->getName().equals("_Z15get_image_width14ocl_image2d_wo") ||
-        Callee->getName().equals("_Z16get_image_height14ocl_image2d_ro") ||
-        Callee->getName().equals("_Z16get_image_height14ocl_image2d_wo")) {
+    // get_image_* is mapped to OpImageQuerySize
+    if (clspv::IsGetImageHeight(Callee) || clspv::IsGetImageWidth(Callee)) {
       //
       // Generate OpImageQuerySize, then pull out the right component.
       // Assume 2D image for now.

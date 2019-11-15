@@ -26,6 +26,7 @@ add_library(clspv_core
 add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Builtins.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CallGraphOrderedFunctions.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp

@@ -21,8 +21,11 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "Constants.h"
 #include "Passes.h"
+
+#include <unordered_set>
 
 using namespace clspv;
 using namespace llvm;
@@ -37,7 +40,7 @@ public:
 
 private:
   // Returns true if |f| is an OpenCL image builtin function.
-  bool IsImageBuiltin(Function *f) const;
+  //bool IsImageBuiltin(Function *f) const;
 
   // Returns the specialized image type for |arg|.
   Type *RemapType(Argument *arg);
@@ -54,6 +57,8 @@ private:
 
   // Rewrites |f| to have arguments of |remapped| types.
   void RewriteFunction(Function *f, const ArrayRef<Type *> &remapped);
+
+  std::unordered_set<Type *> specialized_images_;
 };
 
 } // namespace
@@ -101,6 +106,7 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
           new_type = PointerType::get(new_struct,
                                       Arg.getType()->getPointerAddressSpace());
         }
+        specialized_images_.insert(new_type);
         local_changed = true;
         SpecializeArg(f, &Arg, new_type);
         remapped.back() = new_type;
@@ -124,25 +130,27 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
   return true;
 }
 
-bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
-  // TODO(alan-baker): finish these
-  if (f->getName() == "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f" ||
-      f->getName() == "_Z12write_imagei14ocl_image2d_woDv2_iDv4_i" ||
-      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j" ||
-      f->getName() == "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv2_f" ||
-      f->getName() == "_Z12write_imagef14ocl_image3d_woDv2_iDv4_f" ||
-      f->getName() == "_Z12write_imagei14ocl_image3d_woDv2_iDv4_i" ||
-      f->getName() == "_Z13write_imageui14ocl_image3d_woDv2_iDv4_j") {
-    return true;
-  }
-
-  return false;
-}
+//bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
+//  return IsSampledImageReadBuiltin(f) || IsImageWriteBuiltin(f);
+//  // TODO(alan-baker): finish these
+//  if (f->getName() == "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" ||
+//      f->getName() == "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f" ||
+//      f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f" ||
+//      f->getName() == "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f" ||
+//      f->getName() == "_Z12write_imagei14ocl_image2d_woDv2_iDv4_i" ||
+//      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j" ||
+//      f->getName() == "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f" ||
+//      f->getName() == "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f" ||
+//      f->getName() == "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f" ||
+//      f->getName() == "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f" ||
+//      //f->getName() == "_Z12write_imagei14ocl_image3d_woDv4_iDv4_i" ||
+//      f->getName() == "_Z12write_imagei14ocl_image3d_woDv4_iS0_" ||
+//      f->getName() == "_Z13write_imageui14ocl_image3d_woDv4_iDv4_j") {
+//    return true;
+//  }
+//
+//  return false;
+//}
 
 Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
   for (auto &U : arg->uses()) {
@@ -157,10 +165,15 @@ Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
 Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
-    if (IsImageBuiltin(called)) {
+    if (IsSampledImageRead(called) || IsImageWrite(called)) {
       // Specialize the image type based on the it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
+
+      // Check if this type is already specialized.
+      if (specialized_images_.count(imageTy))
+        return imageTy;
+
       std::string name =
           cast<StructType>(imageTy->getPointerElementType())->getName();
       if (called->getName().contains("read_imagef") ||
