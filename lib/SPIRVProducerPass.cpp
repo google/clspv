@@ -762,12 +762,21 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           if (callee_name.startswith(
                   "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
               callee_name.startswith(
-                  "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f")) {
+                  "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
+              callee_name.startswith(
+                  "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
+              callee_name.startswith(
+                  "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f") ||
+              callee_name.startswith(
+                  "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
+              callee_name.startswith(
+                  "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f")) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
             OpImageTypeMap[ImageTy] = 0;
 
+            // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
@@ -1247,10 +1256,14 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
   for (const auto *info : ModuleOrderedResourceVars) {
     if (info->arg_kind == clspv::ArgKind::ReadOnlyImage ||
         info->arg_kind == clspv::ArgKind::WriteOnlyImage) {
-      // We need "float" for the sampled component type.
+      if (IsIntImageType(info->var_fn->getReturnType())) {
+        // Nothing for now...
+      } else if (IsUintImageType(info->var_fn->getReturnType())) {
+        FindType(Type::getInt32Ty(M.getContext()));
+      }
+
+      // We need "float" either for the sampled type or for the Lod operand.
       FindType(Type::getFloatTy(M.getContext()));
-      // We only need to find it once.
-      break;
     }
   }
 
@@ -1843,6 +1856,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           //
           SPIRVOperandList Ops;
 
+          uint32_t ImageTyID = nextID++;
           uint32_t SampledTyID = 0;
           if (STy->getName().contains(".float")) {
             SampledTyID = lookupType(Type::getFloatTy(Context));
@@ -1907,7 +1921,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           // TODO: Set up Image Format.
           Ops << MkNum(spv::ImageFormatUnknown);
 
-          auto *Inst = new SPIRVInstruction(spv::OpTypeImage, nextID++, Ops);
+          auto *Inst = new SPIRVInstruction(spv::OpTypeImage, ImageTyID, Ops);
           SPIRVInstList.push_back(Inst);
           break;
         }
@@ -4520,9 +4534,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Callee->getName().startswith(
             "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f") ||
         Callee->getName().startswith(
-            "_Z12read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
+            "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
         Callee->getName().startswith(
-            "_Z12read_imagei14ocl_image3d_ro11ocl_samplerDv4_f")) {
+            "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f")) {
       //
       // Generate OpSampledImage.
       //
@@ -4560,8 +4574,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
+      const bool is_int_image = Callee->getName().contains(".int");
       uint32_t result_type = 0;
-      if (Callee->getName().contains(".int")) {
+      if (is_int_image) {
         result_type = v4int32ID;
       } else {
         result_type = lookupType(Call->getType());
@@ -4573,10 +4588,25 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
       Ops << MkId(VMap[CstFP0]);
 
-      VMap[&I] = nextID;
+      uint32_t final_id = nextID++;
+      VMap[&I] = final_id;
 
-      Inst = new SPIRVInstruction(spv::OpImageSampleExplicitLod, nextID++, Ops);
+      uint32_t image_id = final_id;
+      if (is_int_image) {
+        // Int image requires a bitcast from v4int to v4uint.
+        image_id = nextID++;
+      }
+
+      Inst = new SPIRVInstruction(spv::OpImageSampleExplicitLod, image_id, Ops);
       SPIRVInstList.push_back(Inst);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << MkId(lookupType(Call->getType())) << MkId(image_id);
+        Inst = new SPIRVInstruction(spv::OpBitcast, final_id, Ops);
+        SPIRVInstList.push_back(Inst);
+      }
       break;
     }
 

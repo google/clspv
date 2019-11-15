@@ -52,6 +52,18 @@ bool IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 // struct type is sent back through the ptr argument.
 bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 
+// Returns true if the given type is a float image type.
+// Before image specialization, all images are considered float images.
+bool IsFloatImageType(llvm::Type *type);
+
+// Returns true if the given type is an int image type.
+// Can only return true after image specialization.
+bool IsIntImageType(llvm::Type *type);
+
+// Returns true if the given type is an uint image type.
+// Can only return true after image specialization.
+bool IsUintImageType(llvm::Type *type);
+
 using ArgIdMapType = llvm::DenseMap<const llvm::Argument *, int>;
 
 // Returns a mapping from pointer-to-local Argument to a specialization constant

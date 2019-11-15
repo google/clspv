@@ -150,6 +150,34 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   return isImageType;
 }
 
+bool IsFloatImageType(Type *type) {
+  return !IsIntImageType(type) && !IsUintImageType(type);
+}
+
+bool IsIntImageType(Type *type) {
+  Type *ty = nullptr;
+  if (IsImageType(type, &ty)) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains(".int"))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool IsUintImageType(Type *type) {
+  Type *ty = nullptr;
+  if (IsImageType(type, &ty)) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains(".uint"))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 ArgIdMapType AllocateArgSpecIds(Module &M) {
   ArgIdMapType result;
 
