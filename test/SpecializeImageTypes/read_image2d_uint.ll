@@ -13,8 +13,6 @@ target triple = "spir-unknown-unknown"
 %opencl.image2d_ro_t = type opaque
 %opencl.sampler_t = type opaque
 
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
-
 define spir_kernel void @read_uint(%opencl.image2d_ro_t addrspace(1)* %image, <2 x float> %coord, <4 x i32> addrspace(1)* nocapture %data) local_unnamed_addr #0 {
 entry:
   %0 = tail call %opencl.sampler_t addrspace(2)* @__translate_sampler_initializer(i32 23) #2

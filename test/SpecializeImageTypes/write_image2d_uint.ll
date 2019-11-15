@@ -12,8 +12,6 @@ target triple = "spir-unknown-unknown"
 
 %opencl.image2d_wo_t = type opaque
 
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
-
 define spir_kernel void @write_uint(%opencl.image2d_wo_t addrspace(1)* %image, <2 x i32> %coord, <4 x i32> addrspace(1)* nocapture %data) local_unnamed_addr #0 {
 entry:
   %ld = load <4 x i32>, <4 x i32> addrspace(1)* %data, align 16
