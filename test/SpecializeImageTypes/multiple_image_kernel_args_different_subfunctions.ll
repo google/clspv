@@ -5,13 +5,13 @@
 ; CHECK-DAG: %[[WO_IM:opencl.image2d_wo_t.int]] = type opaque
 ; CHECK-DAG: declare spir_func <4 x float> @_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f.[[RO_IM]](%[[RO_IM]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, <2 x float>)
 ; CHECK-DAG: declare spir_func void @_Z12write_imagei14ocl_image2d_woDv2_iDv4_i.[[WO_IM]](%[[WO_IM]] addrspace(1)*, <2 x i32>, <4 x i32>)
+; CHECK: define spir_kernel void @k1
+; CHECK: call spir_func <4 x float> @foo(%[[RO_IM]] addrspace(1)* %ro,
+; CHECK: call spir_func void @bar(%[[WO_IM]] addrspace(1)* %wo,
 ; CHECK-DAG: define spir_func <4 x float> @foo
 ; CHECK-DAG: call spir_func <4 x float> @_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f.[[RO_IM]](%[[RO_IM]] addrspace(1)* %ro
 ; CHECK-DAG: define spir_func void @bar
 ; CHECK-DAG: call spir_func void @_Z12write_imagei14ocl_image2d_woDv2_iDv4_i.[[WO_IM]](%[[WO_IM]] addrspace(1)* %wo
-; CHECK: define spir_kernel void @k1
-; CHECK: call spir_func <4 x float> @foo(%[[RO_IM]] addrspace(1)* %ro,
-; CHECK: call spir_func void @bar(%[[WO_IM]] addrspace(1)* %wo,
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -25,6 +27,7 @@
 #include "Constants.h"
 #include "Passes.h"
 
+#include <unordered_map>
 #include <unordered_set>
 
 using namespace clspv;
@@ -52,10 +55,18 @@ private:
   // |type|.
   Function *ReplaceImageBuiltin(Function *f, Type *type);
 
-  // Rewrites |f| to have arguments of |remapped| types.
-  void RewriteFunction(Function *f, const ArrayRef<Type *> &remapped);
+  // Rewrites |f| using the |remapped_args_| to determine to updated types.
+  void RewriteFunction(Function *f);
 
-  std::unordered_set<Type *> specialized_images_;
+  // Tracks the generation of specialized types so they are not further
+  // specialized.
+  DenseSet<Type *> specialized_images_;
+
+  // Maps an argument to a specialized type.
+  DenseMap<Argument *, Type *> remapped_args_;
+
+  // Tracks which functions need rewritten due to modified arguments.
+  DenseSet<Function *> functions_to_modify_;
 };
 
 } // namespace
@@ -81,12 +92,9 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
     kernels.push_back(&F);
   }
 
-  DenseMap<Function *, SmallVector<Type *, 8>> remapped_args;
   for (auto f : kernels) {
     bool local_changed = false;
-    SmallVector<Type *, 8> remapped;
     for (auto &Arg : f->args()) {
-      remapped.push_back(Arg.getType());
       if (IsImageType(Arg.getType())) {
         Type *new_type = RemapType(&Arg);
         if (!new_type) {
@@ -107,25 +115,23 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
         specialized_images_.insert(new_type);
         local_changed = true;
         SpecializeArg(f, &Arg, new_type);
-        remapped.back() = new_type;
       }
-    }
-    if (local_changed) {
-      remapped_args[f] = remapped;
     }
 
     changed |= local_changed;
   }
 
-  for (auto f : kernels) {
-    auto where = remapped_args.find(f);
-    if (where == remapped_args.end())
-      continue;
-
-    RewriteFunction(f, where->second);
+  // Keep functions in the same relative order.
+  std::vector<Function *> to_rewrite;
+  for (auto &F : M) {
+    if (functions_to_modify_.count(&F))
+      to_rewrite.push_back(&F);
+  }
+  for (auto f : to_rewrite) {
+    RewriteFunction(f);
   }
 
-  return true;
+  return changed;
 }
 
 Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
@@ -194,10 +200,14 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
 void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
                                              Type *new_type) {
-  if (arg->getType() == new_type)
+  auto where = remapped_args_.find(arg);
+  if (where != remapped_args_.end())
     return;
 
-  // First replace the uses.
+  remapped_args_[arg] = new_type;
+  functions_to_modify_.insert(f);
+
+  // Fix all uses of |arg|.
   std::vector<Value *> stack;
   stack.push_back(arg);
   while (!stack.empty()) {
@@ -229,18 +239,6 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
       }
     }
   }
-
-  // Second, update the function.
-  if (f->getCallingConv() != CallingConv::SPIR_KERNEL) {
-    SmallVector<Type *, 8> remapped;
-    for (auto &Arg : f->args()) {
-      if (arg == &Arg)
-        remapped.push_back(new_type);
-      else
-        remapped.push_back(Arg.getType());
-    }
-    RewriteFunction(f, remapped);
-  }
 }
 
 Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
@@ -270,11 +268,20 @@ Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
   return new_func;
 }
 
-void SpecializeImageTypesPass::RewriteFunction(
-    Function *f, const ArrayRef<Type *> &remapped) {
+void SpecializeImageTypesPass::RewriteFunction(Function *f) {
   auto module = f->getParent();
+
+  SmallVector<Type *, 8> arg_types;
+  for (auto &arg : f->args()) {
+    auto where = remapped_args_.find(&arg);
+    if (where == remapped_args_.end())
+      arg_types.push_back(arg.getType());
+    else
+      arg_types.push_back(where->second);
+  }
+
   auto func_type =
-      FunctionType::get(f->getReturnType(), remapped, f->isVarArg());
+      FunctionType::get(f->getReturnType(), arg_types, f->isVarArg());
 
   if (func_type == f->getFunctionType())
     return;
@@ -302,11 +309,23 @@ void SpecializeImageTypesPass::RewriteFunction(
   // Replace args uses.
   for (auto old_arg_iter = f->arg_begin(), new_arg_iter = new_func->arg_begin();
        old_arg_iter != f->arg_end(); ++old_arg_iter, ++new_arg_iter) {
+    // Mutate the old arg type to satisfy RAUW.
+    old_arg_iter->mutateType(new_arg_iter->getType());
     old_arg_iter->replaceAllUsesWith(&*new_arg_iter);
     new_arg_iter->takeName(&*old_arg_iter);
   }
 
-  f->replaceAllUsesWith(new_func);
+  // Copy uses because they will be modified.
+  SmallVector<Value *, 8> users;
+  for (auto U : f->users()) {
+    users.push_back(U);
+  }
+
+  for (auto U : users) {
+    if (auto call = dyn_cast<CallInst>(U)) {
+      call->setCalledFunction(new_func);
+    }
+  }
   delete f;
 }
 
