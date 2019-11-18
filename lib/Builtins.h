@@ -21,37 +21,59 @@
 namespace clspv {
 
 bool IsImageBuiltin(llvm::StringRef name);
-inline bool IsImageBuiltin(llvm::Function *f) { return IsImageBuiltin(f->getName()); }
+inline bool IsImageBuiltin(llvm::Function *f) {
+  return IsImageBuiltin(f->getName());
+}
 
 bool IsSampledImageRead(llvm::StringRef name);
-inline bool IsSampledImageRead(llvm::Function *f) { return IsSampledImageRead(f->getName()); }
+inline bool IsSampledImageRead(llvm::Function *f) {
+  return IsSampledImageRead(f->getName());
+}
 
 bool IsFloatSampledImageRead(llvm::StringRef name);
-inline bool IsFloatSampledImageRead(llvm::Function *f) { return IsFloatSampledImageRead(f->getName()); }
+inline bool IsFloatSampledImageRead(llvm::Function *f) {
+  return IsFloatSampledImageRead(f->getName());
+}
 
 bool IsUintSampledImageRead(llvm::StringRef name);
-inline bool IsUintSampledImageRead(llvm::Function *f) { return IsUintSampledImageRead(f->getName()); }
+inline bool IsUintSampledImageRead(llvm::Function *f) {
+  return IsUintSampledImageRead(f->getName());
+}
 
 bool IsIntSampledImageRead(llvm::StringRef name);
-inline bool IsIntSampledImageRead(llvm::Function *f) { return IsIntSampledImageRead(f->getName()); }
+inline bool IsIntSampledImageRead(llvm::Function *f) {
+  return IsIntSampledImageRead(f->getName());
+}
 
 bool IsImageWrite(llvm::StringRef name);
-inline bool IsImageWrite(llvm::Function *f) { return IsImageWrite(f->getName()); }
+inline bool IsImageWrite(llvm::Function *f) {
+  return IsImageWrite(f->getName());
+}
 
 bool IsFloatImageWrite(llvm::StringRef name);
-inline bool IsFloatImageWrite(llvm::Function *f) { return IsFloatImageWrite(f->getName()); }
+inline bool IsFloatImageWrite(llvm::Function *f) {
+  return IsFloatImageWrite(f->getName());
+}
 
 bool IsUintImageWrite(llvm::StringRef name);
-inline bool IsUintImageWrite(llvm::Function *f) { return IsUintImageWrite(f->getName()); }
+inline bool IsUintImageWrite(llvm::Function *f) {
+  return IsUintImageWrite(f->getName());
+}
 
 bool IsIntImageWrite(llvm::StringRef name);
-inline bool IsIntImageWrite(llvm::Function *f) { return IsIntImageWrite(f->getName()); }
+inline bool IsIntImageWrite(llvm::Function *f) {
+  return IsIntImageWrite(f->getName());
+}
 
 bool IsGetImageHeight(llvm::StringRef name);
-inline bool IsGetImageHeight(llvm::Function *f) { return IsGetImageHeight(f->getName()); }
+inline bool IsGetImageHeight(llvm::Function *f) {
+  return IsGetImageHeight(f->getName());
+}
 
 bool IsGetImageWidth(llvm::StringRef name);
-inline bool IsGetImageWidth(llvm::Function *f) { return IsGetImageWidth(f->getName()); }
+inline bool IsGetImageWidth(llvm::Function *f) {
+  return IsGetImageWidth(f->getName());
+}
 
 } // namespace clspv
 

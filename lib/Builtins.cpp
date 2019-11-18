@@ -17,11 +17,14 @@
 using namespace llvm;
 
 bool clspv::IsImageBuiltin(StringRef name) {
-  return clspv::IsSampledImageRead(name) || clspv::IsImageWrite(name) || clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name);
+  return clspv::IsSampledImageRead(name) || clspv::IsImageWrite(name) ||
+         clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name);
 }
 
 bool clspv::IsSampledImageRead(StringRef name) {
-  return clspv::IsFloatSampledImageRead(name) || clspv::IsUintSampledImageRead(name) || clspv::IsIntSampledImageRead(name);
+  return clspv::IsFloatSampledImageRead(name) ||
+         clspv::IsUintSampledImageRead(name) ||
+         clspv::IsIntSampledImageRead(name);
 }
 
 bool clspv::IsFloatSampledImageRead(StringRef name) {
@@ -49,17 +52,18 @@ bool clspv::IsIntSampledImageRead(StringRef name) {
 }
 
 bool clspv::IsImageWrite(StringRef name) {
-  return clspv::IsFloatImageWrite(name) || clspv::IsUintImageWrite(name) || clspv::IsIntImageWrite(name);
+  return clspv::IsFloatImageWrite(name) || clspv::IsUintImageWrite(name) ||
+         clspv::IsIntImageWrite(name);
 }
 
 bool clspv::IsFloatImageWrite(StringRef name) {
   return name.startswith("_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
-    name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f");
+         name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f");
 }
 
 bool clspv::IsUintImageWrite(StringRef name) {
   return name.startswith("_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") ||
-    name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j");
+         name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j");
 }
 
 bool clspv::IsIntImageWrite(StringRef name) {
@@ -70,10 +74,10 @@ bool clspv::IsIntImageWrite(StringRef name) {
 
 bool clspv::IsGetImageHeight(StringRef name) {
   return name.startswith("_Z16get_image_height14ocl_image2d_ro") ||
-    name.startswith("_Z16get_image_height14ocl_image2d_wo");
+         name.startswith("_Z16get_image_height14ocl_image2d_wo");
 }
 
 bool clspv::IsGetImageWidth(StringRef name) {
   return name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
-    name.startswith("_Z15get_image_width14ocl_image2d_wo");
+         name.startswith("_Z15get_image_width14ocl_image2d_wo");
 }
