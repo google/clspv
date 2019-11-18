@@ -1975,8 +1975,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
     case Type::FloatTyID:
     case Type::DoubleTyID: {
       uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
-      SPIRVOperand *WidthOp = new SPIRVOperand(
-          SPIRVOperandType::LITERAL_INTEGER, BitWidth);
+      SPIRVOperand *WidthOp =
+          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, BitWidth);
 
       SPIRVInstList.push_back(
           new SPIRVInstruction(spv::OpTypeFloat, nextID++, WidthOp));
