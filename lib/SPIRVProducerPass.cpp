@@ -762,8 +762,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
-          //if (NeedsIVec2.find(callee_name) != NeedsIVec2.end()) {
-          if (clspv::IsGetImageHeight(callee_name) || clspv::IsGetImageWidth(callee_name)) {
+          if (clspv::IsGetImageHeight(callee_name) ||
+              clspv::IsGetImageWidth(callee_name)) {
             FindType(VectorType::get(Type::getInt32Ty(Context), 2));
           }
         }
@@ -4545,7 +4545,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      const bool is_int_image = Callee->getName().contains(".int");
+      const bool is_int_image = IsIntImageType(Image->getType());
       uint32_t result_type = 0;
       if (is_int_image) {
         result_type = v4int32ID;
@@ -4602,7 +4602,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       uint32_t CoordinateID = VMap[Coordinate];
       uint32_t TexelID = VMap[Texel];
 
-      const bool is_int_image = Callee->getName().contains(".int");
+      const bool is_int_image = IsIntImageType(Image->getType());
       if (is_int_image) {
         // Generate a bitcast to v4int and use it as the texel value.
         uint32_t castID = nextID++;

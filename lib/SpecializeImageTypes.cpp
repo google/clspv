@@ -39,9 +39,6 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
-  // Returns true if |f| is an OpenCL image builtin function.
-  //bool IsImageBuiltin(Function *f) const;
-
   // Returns the specialized image type for |arg|.
   Type *RemapType(Argument *arg);
 
@@ -93,7 +90,8 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
       if (IsImageType(Arg.getType())) {
         Type *new_type = RemapType(&Arg);
         if (!new_type) {
-          // Assume the sampled type is float.
+          // No specializing information found, assume the image is sampled with
+          // a float type.
           std::string name =
               cast<StructType>(Arg.getType()->getPointerElementType())
                   ->getName();
@@ -130,28 +128,6 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
   return true;
 }
 
-//bool SpecializeImageTypesPass::IsImageBuiltin(Function *f) const {
-//  return IsSampledImageReadBuiltin(f) || IsImageWriteBuiltin(f);
-//  // TODO(alan-baker): finish these
-//  if (f->getName() == "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f" ||
-//      f->getName() == "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f" ||
-//      f->getName() == "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f" ||
-//      f->getName() == "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f" ||
-//      f->getName() == "_Z12write_imagei14ocl_image2d_woDv2_iDv4_i" ||
-//      f->getName() == "_Z13write_imageui14ocl_image2d_woDv2_iDv4_j" ||
-//      f->getName() == "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f" ||
-//      f->getName() == "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f" ||
-//      f->getName() == "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f" ||
-//      f->getName() == "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f" ||
-//      //f->getName() == "_Z12write_imagei14ocl_image3d_woDv4_iDv4_i" ||
-//      f->getName() == "_Z12write_imagei14ocl_image3d_woDv4_iS0_" ||
-//      f->getName() == "_Z13write_imageui14ocl_image3d_woDv4_iDv4_j") {
-//    return true;
-//  }
-//
-//  return false;
-//}
-
 Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
   for (auto &U : arg->uses()) {
     if (auto new_type = RemapUse(U.getUser(), U.getOperandNo())) {
@@ -176,21 +152,17 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
       std::string name =
           cast<StructType>(imageTy->getPointerElementType())->getName();
-      if (called->getName().contains("read_imagef") ||
-          called->getName().contains("write_imagef")) {
+      if (IsFloatSampledImageRead(called) || IsFloatImageWrite(called)) {
         name += ".float";
-      } else if (called->getName().contains("read_imageui") ||
-                 called->getName().contains("write_imageui")) {
+      } else if (IsUintSampledImageRead(called) || IsUintImageWrite(called)) {
         name += ".uint";
-      } else if (called->getName().contains("read_imagei") ||
-                 called->getName().contains("write_imagei")) {
+      } else if (IsIntSampledImageRead(called) || IsIntImageWrite(called)) {
         name += ".int";
       } else {
         assert(false && "Unhandled image builtin");
       }
 
-      if (called->getName().contains("read_image") &&
-          called->getName().contains("ocl_sampler")) {
+      if (IsSampledImageRead(called)) {
         name += ".sampled";
       }
 
