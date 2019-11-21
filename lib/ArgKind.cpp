@@ -151,7 +151,7 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
 }
 
 bool IsFloatImageType(Type *type) {
-  return !IsIntImageType(type) && !IsUintImageType(type);
+  return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
 }
 
 bool IsIntImageType(Type *type) {

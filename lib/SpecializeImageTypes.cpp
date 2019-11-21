@@ -27,9 +27,6 @@
 #include "Constants.h"
 #include "Passes.h"
 
-#include <unordered_map>
-#include <unordered_set>
-
 using namespace clspv;
 using namespace llvm;
 
@@ -93,7 +90,6 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
   }
 
   for (auto f : kernels) {
-    bool local_changed = false;
     for (auto &Arg : f->args()) {
       if (IsImageType(Arg.getType())) {
         Type *new_type = RemapType(&Arg);
@@ -113,12 +109,10 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
                                       Arg.getType()->getPointerAddressSpace());
         }
         specialized_images_.insert(new_type);
-        local_changed = true;
+        changed = true;
         SpecializeArg(f, &Arg, new_type);
       }
     }
-
-    changed |= local_changed;
   }
 
   // Keep functions in the same relative order.
@@ -148,7 +142,7 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
     if (IsSampledImageRead(called) || IsImageWrite(called)) {
-      // Specialize the image type based on the it's usage in the builtin.
+      // Specialize the image type based on it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
 

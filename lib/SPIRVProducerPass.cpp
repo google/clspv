@@ -1847,24 +1847,28 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           } else if (STy->getName().contains(".uint")) {
             SampledTyID = lookupType(Type::getInt32Ty(Context));
           } else if (STy->getName().contains(".int")) {
-            // Generate a signed 32-bit integer
-            int32ID = nextID++;
-            SPIRVOperandList intOps;
-            intOps << MkNum(32);
-            intOps << MkNum(1);
-            auto signed_int =
-                new SPIRVInstruction(spv::OpTypeInt, int32ID, intOps);
-            SPIRVInstList.push_back(signed_int);
+            // Generate a signed 32-bit integer if necessary.
+            if (int32ID == 0) {
+              int32ID = nextID++;
+              SPIRVOperandList intOps;
+              intOps << MkNum(32);
+              intOps << MkNum(1);
+              auto signed_int =
+                  new SPIRVInstruction(spv::OpTypeInt, int32ID, intOps);
+              SPIRVInstList.push_back(signed_int);
+            }
             SampledTyID = int32ID;
 
-            // Generate a vec4 of the signed int.
-            v4int32ID = nextID++;
-            SPIRVOperandList vecOps;
-            vecOps << MkId(int32ID);
-            vecOps << MkNum(4);
-            auto int_vec =
-                new SPIRVInstruction(spv::OpTypeVector, v4int32ID, vecOps);
-            SPIRVInstList.push_back(int_vec);
+            // Generate a vec4 of the signed int if necessary.
+            if (v4int32ID == 0) {
+              v4int32ID = nextID++;
+              SPIRVOperandList vecOps;
+              vecOps << MkId(int32ID);
+              vecOps << MkNum(4);
+              auto int_vec =
+                  new SPIRVInstruction(spv::OpTypeVector, v4int32ID, vecOps);
+              SPIRVInstList.push_back(int_vec);
+            }
           } else {
             // This was likely an UndefValue.
             SampledTyID = lookupType(Type::getFloatTy(Context));
@@ -1895,9 +1899,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           // 1 indicates will be used with sampler
           // 2 indicates will be used without a sampler (a storage image)
           uint32_t Sampled = 1;
-          if (STy->getName().startswith("opencl.image2d_wo_t") ||
-              STy->getName().startswith("opencl.image3d_wo_t") ||
-              !STy->getName().contains(".sampled")) {
+          if (!STy->getName().contains(".sampled")) {
             Sampled = 2;
           }
           Ops << MkNum(Sampled);
