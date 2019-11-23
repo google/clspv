@@ -407,14 +407,25 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   }
 
   clang::LangStandard::Kind standard;
-  if (clspv::Option::CPlusPlus()) {
-    standard = clang::LangStandard::lang_openclcpp;
-  } else {
+  switch (clspv::Option::Language()) {
+  case clspv::Option::SourceLanguage::OpenCL_C_10:
+    standard = clang::LangStandard::lang_opencl10;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_11:
+    standard = clang::LangStandard::lang_opencl11;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_12:
     standard = clang::LangStandard::lang_opencl12;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_20:
+    standard = clang::LangStandard::lang_opencl20;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP:
+    standard = clang::LangStandard::lang_openclcpp;
+    break;
+  default:
+    llvm_unreachable("Unknown source language");
   }
-
-  // We are targeting OpenCL 1.2 only
-  instance.getLangOpts().OpenCLVersion = 120;
 
   instance.getLangOpts().C99 = true;
   instance.getLangOpts().RTTI = false;
@@ -653,7 +664,7 @@ int PopulatePassManager(
     pm->add(clspv::createInlineFuncWithSingleCallSitePass());
   }
 
-  if (clspv::Option::CPlusPlus()) {
+  if (clspv::Option::LanguageUsesGenericAddressSpace()) {
     pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
   }
 
@@ -758,8 +769,10 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
-  if (clspv::Option::CPlusPlus() && !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "cannot use -c++ without -inline-entry-points\n";
+  if (clspv::Option::LanguageUsesGenericAddressSpace() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "cannot compile languages that use the generic address "
+                    "space (e.g. CLC++, CL2.0) without -inline-entry-points\n";
     return -1;
   }
 

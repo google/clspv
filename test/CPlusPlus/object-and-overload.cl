@@ -1,4 +1,4 @@
-// RUN: clspv -c++ -inline-entry-points -descriptormap=%t.dmap %s -o %t.spv
+// RUN: clspv -cl-std=CLC++ -inline-entry-points -descriptormap=%t.dmap %s -o %t.spv
 // RUN: FileCheck %s < %t.dmap -check-prefix=MAP
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm

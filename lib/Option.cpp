@@ -18,6 +18,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "Passes.h"
+#include "clspv/Option.h"
 
 namespace {
 
@@ -150,9 +151,19 @@ llvm::cl::opt<bool> keep_unused_arguments(
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
-static llvm::cl::opt<bool>
-    cplusplus("c++", llvm::cl::init(false),
-              llvm::cl::desc("Enable experimental C++ support"));
+llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
+    "cl-std", llvm::cl::desc("Select OpenCL standard"),
+    llvm::cl::init(clspv::Option::SourceLanguage::OpenCL_C_12),
+    llvm::cl::values(clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_10,
+                                "CL1.0", "OpenCL C 1.0"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_11,
+                                "CL1.1", "OpenCL C 1.1"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_12,
+                                "CL1.2", "OpenCL C 1.2"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_20,
+                                "CL2.0", "OpenCL C 2.0"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP,
+                                "CLC++", "C++ for OpenCL")));
 
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));
@@ -189,10 +200,10 @@ bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
-bool CPlusPlus() { return cplusplus; }
 bool ImageSupport() { return images; }
 bool UseSamplerMap() { return use_sampler_map; }
 void SetUseSamplerMap(bool use) { use_sampler_map = use; }
+SourceLanguage Language() { return cl_std; }
 
 } // namespace Option
 } // namespace clspv
