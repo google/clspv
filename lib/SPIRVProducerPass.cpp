@@ -3729,6 +3729,16 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             new SPIRVInstruction(GetSPIRVBinaryOpcode(I), nextID++, Ops);
         SPIRVInstList.push_back(Inst);
       }
+    } else if (I.getOpcode() == Instruction::FNeg) {
+      // The only unary operator.
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Operand 0
+      SPIRVOperandList ops;
+
+      ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)]);
+      auto *Inst = new SPIRVInstruction(spv::OpFNegate, nextID++, ops);
+      SPIRVInstList.push_back(Inst);
     } else {
       I.print(errs());
       llvm_unreachable("Unsupported instruction???");
@@ -5524,6 +5534,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpConvertPtrToU:
     case spv::OpConvertUToPtr:
     case spv::OpBitcast:
+    case spv::OpFNegate:
     case spv::OpIAdd:
     case spv::OpFAdd:
     case spv::OpISub:
