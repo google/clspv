@@ -36,6 +36,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -50,6 +51,7 @@
 #include "clspv/spirv_glsl.hpp"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
@@ -416,6 +418,11 @@ private:
   uint64_t patchBoundOffset;
   uint32_t nextID;
 
+  // ID for OpTypeInt 32 1.
+  uint32_t int32ID = 0;
+  // ID for OpTypeVector %int 4.
+  uint32_t v4int32ID = 0;
+
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   TypeMapType TypeMap;
   // Maps an LLVM image type to its SPIR-V ID.
@@ -714,15 +721,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   FindTypesForResourceVars(M);
   FindWorkgroupVars(M);
 
-  // These function calls need a <2 x i32> as an intermediate result but not
-  // the final result.
-  std::unordered_set<std::string> NeedsIVec2{
-      "_Z15get_image_width14ocl_image2d_ro",
-      "_Z15get_image_width14ocl_image2d_wo",
-      "_Z16get_image_height14ocl_image2d_ro",
-      "_Z16get_image_height14ocl_image2d_wo",
-  };
-
   for (Function &F : M) {
     if (F.isDeclaration()) {
       continue;
@@ -754,19 +752,18 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           StringRef callee_name = Call->getCalledFunction()->getName();
 
           // Handle image type specially.
-          if (callee_name.equals(
-                  "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-              callee_name.equals(
-                  "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f")) {
+          if (clspv::IsSampledImageRead(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
             OpImageTypeMap[ImageTy] = 0;
 
+            // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
-          if (NeedsIVec2.find(callee_name) != NeedsIVec2.end()) {
+          if (clspv::IsGetImageHeight(callee_name) ||
+              clspv::IsGetImageWidth(callee_name)) {
             FindType(VectorType::get(Type::getInt32Ty(Context), 2));
           }
         }
@@ -787,11 +784,30 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
       }
     }
 
-    if (M.getTypeByName("opencl.image2d_ro_t") ||
-        M.getTypeByName("opencl.image2d_wo_t") ||
-        M.getTypeByName("opencl.image3d_ro_t") ||
-        M.getTypeByName("opencl.image3d_wo_t")) {
-      // Assume Image type's sampled type is float type.
+    // TODO(alan-baker): make this better.
+    if (M.getTypeByName("opencl.image2d_ro_t.float") ||
+        M.getTypeByName("opencl.image2d_ro_t.float.sampled") ||
+        M.getTypeByName("opencl.image2d_wo_t.float") ||
+        M.getTypeByName("opencl.image3d_ro_t.float") ||
+        M.getTypeByName("opencl.image3d_ro_t.float.sampled") ||
+        M.getTypeByName("opencl.image3d_wo_t.float")) {
+      FindType(Type::getFloatTy(Context));
+    } else if (M.getTypeByName("opencl.image2d_ro_t.uint") ||
+               M.getTypeByName("opencl.image2d_ro_t.uint.sampled") ||
+               M.getTypeByName("opencl.image2d_wo_t.uint") ||
+               M.getTypeByName("opencl.image3d_ro_t.uint") ||
+               M.getTypeByName("opencl.image3d_ro_t.uint.sampled") ||
+               M.getTypeByName("opencl.image3d_wo_t.uint")) {
+      FindType(Type::getInt32Ty(Context));
+    } else if (M.getTypeByName("opencl.image2d_ro_t.int") ||
+               M.getTypeByName("opencl.image2d_ro_t.int.sampled") ||
+               M.getTypeByName("opencl.image2d_wo_t.int") ||
+               M.getTypeByName("opencl.image3d_ro_t.int") ||
+               M.getTypeByName("opencl.image3d_ro_t.int.sampled") ||
+               M.getTypeByName("opencl.image3d_wo_t.int")) {
+      // Nothing for now...
+    } else {
+      // This was likely an UndefValue.
       FindType(Type::getFloatTy(Context));
     }
 
@@ -1224,10 +1240,14 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
   for (const auto *info : ModuleOrderedResourceVars) {
     if (info->arg_kind == clspv::ArgKind::ReadOnlyImage ||
         info->arg_kind == clspv::ArgKind::WriteOnlyImage) {
-      // We need "float" for the sampled component type.
+      if (IsIntImageType(info->var_fn->getReturnType())) {
+        // Nothing for now...
+      } else if (IsUintImageType(info->var_fn->getReturnType())) {
+        FindType(Type::getInt32Ty(M.getContext()));
+      }
+
+      // We need "float" either for the sampled type or for the Lod operand.
       FindType(Type::getFloatTy(M.getContext()));
-      // We only need to find it once.
-      break;
     }
   }
 
@@ -1803,10 +1823,10 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           auto *Inst = new SPIRVInstruction(spv::OpTypeSampler, nextID++, Ops);
           SPIRVInstList.push_back(Inst);
           break;
-        } else if (STy->getName().equals("opencl.image2d_ro_t") ||
-                   STy->getName().equals("opencl.image2d_wo_t") ||
-                   STy->getName().equals("opencl.image3d_ro_t") ||
-                   STy->getName().equals("opencl.image3d_wo_t")) {
+        } else if (STy->getName().startswith("opencl.image2d_ro_t") ||
+                   STy->getName().startswith("opencl.image2d_wo_t") ||
+                   STy->getName().startswith("opencl.image3d_ro_t") ||
+                   STy->getName().startswith("opencl.image3d_wo_t")) {
           //
           // Generate OpTypeImage
           //
@@ -1820,13 +1840,44 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           //
           SPIRVOperandList Ops;
 
-          // TODO: Changed Sampled Type according to situations.
-          uint32_t SampledTyID = lookupType(Type::getFloatTy(Context));
+          uint32_t ImageTyID = nextID++;
+          uint32_t SampledTyID = 0;
+          if (STy->getName().contains(".float")) {
+            SampledTyID = lookupType(Type::getFloatTy(Context));
+          } else if (STy->getName().contains(".uint")) {
+            SampledTyID = lookupType(Type::getInt32Ty(Context));
+          } else if (STy->getName().contains(".int")) {
+            // Generate a signed 32-bit integer if necessary.
+            if (int32ID == 0) {
+              int32ID = nextID++;
+              SPIRVOperandList intOps;
+              intOps << MkNum(32);
+              intOps << MkNum(1);
+              auto signed_int =
+                  new SPIRVInstruction(spv::OpTypeInt, int32ID, intOps);
+              SPIRVInstList.push_back(signed_int);
+            }
+            SampledTyID = int32ID;
+
+            // Generate a vec4 of the signed int if necessary.
+            if (v4int32ID == 0) {
+              v4int32ID = nextID++;
+              SPIRVOperandList vecOps;
+              vecOps << MkId(int32ID);
+              vecOps << MkNum(4);
+              auto int_vec =
+                  new SPIRVInstruction(spv::OpTypeVector, v4int32ID, vecOps);
+              SPIRVInstList.push_back(int_vec);
+            }
+          } else {
+            // This was likely an UndefValue.
+            SampledTyID = lookupType(Type::getFloatTy(Context));
+          }
           Ops << MkId(SampledTyID);
 
           spv::Dim DimID = spv::Dim2D;
-          if (STy->getName().equals("opencl.image3d_ro_t") ||
-              STy->getName().equals("opencl.image3d_wo_t")) {
+          if (STy->getName().startswith("opencl.image3d_ro_t") ||
+              STy->getName().startswith("opencl.image3d_wo_t")) {
             DimID = spv::Dim3D;
           }
           Ops << MkNum(DimID);
@@ -1848,8 +1899,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           // 1 indicates will be used with sampler
           // 2 indicates will be used without a sampler (a storage image)
           uint32_t Sampled = 1;
-          if (STy->getName().equals("opencl.image2d_wo_t") ||
-              STy->getName().equals("opencl.image3d_wo_t")) {
+          if (!STy->getName().contains(".sampled")) {
             Sampled = 2;
           }
           Ops << MkNum(Sampled);
@@ -1857,7 +1907,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           // TODO: Set up Image Format.
           Ops << MkNum(spv::ImageFormatUnknown);
 
-          auto *Inst = new SPIRVInstruction(spv::OpTypeImage, nextID++, Ops);
+          auto *Inst = new SPIRVInstruction(spv::OpTypeImage, ImageTyID, Ops);
           SPIRVInstList.push_back(Inst);
           break;
         }
@@ -3200,8 +3250,8 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
                                             {MkNum(spv::CapabilityFloat64)}));
     } else if (auto *STy = dyn_cast<StructType>(Ty)) {
       if (STy->isOpaque()) {
-        if (STy->getName().equals("opencl.image2d_wo_t") ||
-            STy->getName().equals("opencl.image3d_wo_t")) {
+        if (STy->getName().startswith("opencl.image2d_wo_t") ||
+            STy->getName().startswith("opencl.image3d_wo_t")) {
           // Generate OpCapability for write only image type.
           SPIRVInstList.insert(
               InsertPoint,
@@ -3215,17 +3265,15 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   { // OpCapability ImageQuery
     bool hasImageQuery = false;
-    for (const char *imageQuery : {
-             "_Z15get_image_width14ocl_image2d_ro",
-             "_Z15get_image_width14ocl_image2d_wo",
-             "_Z16get_image_height14ocl_image2d_ro",
-             "_Z16get_image_height14ocl_image2d_wo",
-         }) {
-      if (module.getFunction(imageQuery)) {
-        hasImageQuery = true;
-        break;
+    for (const auto &SymVal : module.getValueSymbolTable()) {
+      if (auto F = dyn_cast<Function>(SymVal.getValue())) {
+        if (clspv::IsGetImageHeight(F) || clspv::IsGetImageWidth(F)) {
+          hasImageQuery = true;
+          break;
+        }
       }
     }
+
     if (hasImageQuery) {
       auto *ImageQueryCapInst = new SPIRVInstruction(
           spv::OpCapability, {MkNum(spv::CapabilityImageQuery)});
@@ -4461,10 +4509,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
     // Additionally, OpTypeSampledImage is generated.
-    if (Callee->getName().equals(
-            "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-        Callee->getName().equals(
-            "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f")) {
+    if (clspv::IsSampledImageRead(Callee)) {
       //
       // Generate OpSampledImage.
       //
@@ -4502,24 +4547,44 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      Ops << MkId(lookupType(Call->getType())) << MkId(SampledImageID)
-          << MkId(VMap[Coordinate]) << MkNum(spv::ImageOperandsLodMask);
+      const bool is_int_image = IsIntImageType(Image->getType());
+      uint32_t result_type = 0;
+      if (is_int_image) {
+        result_type = v4int32ID;
+      } else {
+        result_type = lookupType(Call->getType());
+      }
+
+      Ops << MkId(result_type) << MkId(SampledImageID) << MkId(VMap[Coordinate])
+          << MkNum(spv::ImageOperandsLodMask);
 
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
       Ops << MkId(VMap[CstFP0]);
 
-      VMap[&I] = nextID;
+      uint32_t final_id = nextID++;
+      VMap[&I] = final_id;
 
-      Inst = new SPIRVInstruction(spv::OpImageSampleExplicitLod, nextID++, Ops);
+      uint32_t image_id = final_id;
+      if (is_int_image) {
+        // Int image requires a bitcast from v4int to v4uint.
+        image_id = nextID++;
+      }
+
+      Inst = new SPIRVInstruction(spv::OpImageSampleExplicitLod, image_id, Ops);
       SPIRVInstList.push_back(Inst);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << MkId(lookupType(Call->getType())) << MkId(image_id);
+        Inst = new SPIRVInstruction(spv::OpBitcast, final_id, Ops);
+        SPIRVInstList.push_back(Inst);
+      }
       break;
     }
 
-    // write_imagef is mapped to OpImageWrite.
-    if (Callee->getName().equals(
-            "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
-        Callee->getName().equals(
-            "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f")) {
+    // write_image is mapped to OpImageWrite.
+    if (clspv::IsImageWrite(Callee)) {
       //
       // Generate OpImageWrite.
       //
@@ -4538,6 +4603,17 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       uint32_t ImageID = VMap[Image];
       uint32_t CoordinateID = VMap[Coordinate];
       uint32_t TexelID = VMap[Texel];
+
+      const bool is_int_image = IsIntImageType(Image->getType());
+      if (is_int_image) {
+        // Generate a bitcast to v4int and use it as the texel value.
+        uint32_t castID = nextID++;
+        Ops << MkId(v4int32ID) << MkId(TexelID);
+        auto cast = new SPIRVInstruction(spv::OpBitcast, castID, Ops);
+        SPIRVInstList.push_back(cast);
+        Ops.clear();
+        TexelID = castID;
+      }
       Ops << MkId(ImageID) << MkId(CoordinateID) << MkId(TexelID);
 
       auto *Inst = new SPIRVInstruction(spv::OpImageWrite, Ops);
@@ -4545,11 +4621,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // get_image_width is mapped to OpImageQuerySize
-    if (Callee->getName().equals("_Z15get_image_width14ocl_image2d_ro") ||
-        Callee->getName().equals("_Z15get_image_width14ocl_image2d_wo") ||
-        Callee->getName().equals("_Z16get_image_height14ocl_image2d_ro") ||
-        Callee->getName().equals("_Z16get_image_height14ocl_image2d_wo")) {
+    // get_image_* is mapped to OpImageQuerySize
+    if (clspv::IsGetImageHeight(Callee) || clspv::IsGetImageWidth(Callee)) {
       //
       // Generate OpImageQuerySize, then pull out the right component.
       // Assume 2D image for now.

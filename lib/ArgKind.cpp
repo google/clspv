@@ -39,7 +39,7 @@ ArgKind GetArgKindForType(Type *type) {
     if (IsImageType(type, &image_type)) {
       StringRef name = dyn_cast<StructType>(image_type)->getName();
       // OpenCL 1.2 only has read-only or write-only images.
-      return name.endswith("_ro_t") ? ArgKind::ReadOnlyImage
+      return name.contains("_ro_t") ? ArgKind::ReadOnlyImage
                                     : ArgKind::WriteOnlyImage;
     }
     switch (type->getPointerAddressSpace()) {
@@ -136,10 +136,10 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
       if (STy->isOpaque()) {
-        if (STy->getName().equals("opencl.image2d_ro_t") ||
-            STy->getName().equals("opencl.image2d_wo_t") ||
-            STy->getName().equals("opencl.image3d_ro_t") ||
-            STy->getName().equals("opencl.image3d_wo_t")) {
+        if (STy->getName().startswith("opencl.image2d_ro_t") ||
+            STy->getName().startswith("opencl.image2d_wo_t") ||
+            STy->getName().startswith("opencl.image3d_ro_t") ||
+            STy->getName().startswith("opencl.image3d_wo_t")) {
           isImageType = true;
           if (struct_type_ptr)
             *struct_type_ptr = STy;
@@ -148,6 +148,34 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
     }
   }
   return isImageType;
+}
+
+bool IsFloatImageType(Type *type) {
+  return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
+}
+
+bool IsIntImageType(Type *type) {
+  Type *ty = nullptr;
+  if (IsImageType(type, &ty)) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains(".int"))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool IsUintImageType(Type *type) {
+  Type *ty = nullptr;
+  if (IsImageType(type, &ty)) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains(".uint"))
+        return true;
+    }
+  }
+
+  return false;
 }
 
 ArgIdMapType AllocateArgSpecIds(Module &M) {

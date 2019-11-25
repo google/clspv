@@ -691,6 +691,9 @@ int PopulatePassManager(
   }
 
   pm->add(clspv::createShareModuleScopeVariablesPass());
+  // Specialize images before assigning descriptors to disambiguate the various
+  // types.
+  pm->add(clspv::createSpecializeImageTypesPass());
   // This should be run after LLVM and OpenCL intrinsics are replaced.
   pm->add(clspv::createAllocateDescriptorsPass(*SamplerMapEntries));
   pm->add(llvm::createVerifierPass());
