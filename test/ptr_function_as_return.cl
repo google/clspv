@@ -3,11 +3,11 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-int* inner(int arr[]) {
+int* inner(int* arr) {
   return &arr[0];
 }
 
-int* helper(int arr[]) {
+int* helper(int* arr) {
   return inner(arr);
 }
 
