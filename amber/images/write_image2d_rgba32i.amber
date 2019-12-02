@@ -1,0 +1,34 @@
+#!amber
+
+SHADER compute write_imagef OPENCL-C
+kernel void foo(write_only image2d_t image, global int4* data) {
+  int gid_x = get_global_id(0);
+  int gid_y = get_global_id(1);
+  int linear = 2 * gid_y + gid_x;
+  int2 coord = (int2)(gid_x, gid_y);
+  write_imagei(image, coord, data[linear]);
+}
+END
+
+BUFFER texture DATA_TYPE vec4<int32> WIDTH 2 HEIGHT 2 FILL 0.0
+BUFFER data DATA_TYPE vec4<int32> DATA
+-1 2 -3 4
+-2 3 -4 1
+-3 4 -1 2
+-4 1 -2 3
+END
+
+PIPELINE compute read_pipe
+  ATTACH write_imagef ENTRY_POINT foo
+  BIND BUFFER data KERNEL ARG_NAME data
+  BIND BUFFER texture KERNEL ARG_NAME image
+END
+
+RUN read_pipe 2 2 1
+
+EXPECT texture IDX 0  EQ -1 2 -3 4
+EXPECT texture IDX 16 EQ -2 3 -4 1
+EXPECT texture IDX 32 EQ -3 4 -1 2
+EXPECT texture IDX 48 EQ -4 1 -2 3
+
+
