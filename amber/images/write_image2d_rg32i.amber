@@ -18,13 +18,13 @@ BUFFER data DATA_TYPE vec4<int32> DATA
 -4 1 -2 3
 END
 
-PIPELINE compute read_pipe
+PIPELINE compute write_pipe
   ATTACH write_imagef ENTRY_POINT foo
   BIND BUFFER data KERNEL ARG_NAME data
   BIND BUFFER texture KERNEL ARG_NAME image
 END
 
-RUN read_pipe 2 2 1
+RUN write_pipe 2 2 1
 
 EXPECT texture IDX 0  EQ -1 2
 EXPECT texture IDX 8  EQ -2 3
