@@ -4768,15 +4768,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
     }
 
     if (BranchInst *Br = dyn_cast<BranchInst>(Inst)) {
-      // Check whether basic block, which has this branch instruction, is loop
-      // header or not. If it is loop header, generate OpLoopMerge and
-      // OpBranchConditional.
-      Function *Func = Br->getParent()->getParent();
-      DominatorTree &DT =
-          getAnalysis<DominatorTreeWrapperPass>(*Func).getDomTree();
-      const LoopInfo &LI =
-          getAnalysis<LoopInfoWrapperPass>(*Func).getLoopInfo();
-
+      // Check whether this branch needs to be preceeded by merge instruction.
       BasicBlock *BrBB = Br->getParent();
       if (ContinueBlocks.count(BrBB)) {
         //
@@ -5895,8 +5887,8 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps(Module &module) {
     for (auto BB : order) {
       auto terminator = BB->getTerminator();
       auto branch = dyn_cast<BranchInst>(terminator);
-      auto L = LI.getLoopFor(BB);
       if (LI.isLoopHeader(BB)) {
+        auto L = LI.getLoopFor(BB);
         BasicBlock *ContinueBB = nullptr;
         BasicBlock *MergeBB = nullptr;
 
@@ -5921,6 +5913,9 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps(Module &module) {
             }
 
             // Check whether block dominates block with back-edge.
+            // The loop latch is the single block with a back-edge. If it was
+            // possible, StructurizeCFG made the loop conform to this
+            // requirement, otherwise |Latch| is a nullptr.
             if (DT.dominates(loop_block, Latch)) {
               ContinueBB = loop_block;
             }
