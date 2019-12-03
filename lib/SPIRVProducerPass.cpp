@@ -5067,7 +5067,11 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
         for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
           auto *operand = Call->getOperand(i);
-          if (operand->getType()->isPointerTy()) {
+          auto *operand_type = operand->getType();
+          // Images and samplers can be passed as function parameters without
+          // variable pointers.
+          if (operand_type->isPointerTy() && !IsImageType(operand_type) &&
+              !IsSamplerType(operand_type)) {
             auto sc =
                 GetStorageClass(operand->getType()->getPointerAddressSpace());
             if (sc == spv::StorageClassStorageBuffer) {
