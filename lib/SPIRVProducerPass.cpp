@@ -52,6 +52,7 @@
 
 #include "ArgKind.h"
 #include "Builtins.h"
+#include "ComputeStructuredOrder.h"
 #include "ConstantEmitter.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
@@ -373,6 +374,9 @@ struct SPIRVProducerPass final : public ModulePass {
   // Populate UBO remapped type maps.
   void PopulateUBOTypeMaps(Module &module);
 
+  // Populate the merge and continue block maps.
+  void PopulateStructuredCFGMaps(Module &module);
+
   // Wrapped methods of DataLayout accessors. If |type| was remapped for UBOs,
   // uses the internal map, otherwise it falls back on the data layout.
   uint64_t GetTypeSizeInBits(Type *type, const DataLayout &DL);
@@ -545,6 +549,11 @@ private:
   // A mapping from a remapped type to its real sizes.
   DenseMap<Type *, std::tuple<uint64_t, uint64_t, uint64_t>>
       RemappedUBOTypeSizes;
+
+  // Maps basic block to its merge block.
+  DenseMap<BasicBlock *, BasicBlock *> MergeBlocks;
+  // Maps basic block to its continue block.
+  DenseMap<BasicBlock *, BasicBlock *> ContinueBlocks;
 };
 
 char SPIRVProducerPass::ID;
@@ -566,6 +575,7 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   PopulateUBOTypeMaps(module);
+  PopulateStructuredCFGMaps(module);
 
   // SPIR-V always begins with its header information
   outputHeader();
@@ -4761,52 +4771,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
     }
 
     if (BranchInst *Br = dyn_cast<BranchInst>(Inst)) {
-      // Check whether basic block, which has this branch instruction, is loop
-      // header or not. If it is loop header, generate OpLoopMerge and
-      // OpBranchConditional.
-      Function *Func = Br->getParent()->getParent();
-      DominatorTree &DT =
-          getAnalysis<DominatorTreeWrapperPass>(*Func).getDomTree();
-      const LoopInfo &LI =
-          getAnalysis<LoopInfoWrapperPass>(*Func).getLoopInfo();
-
+      // Check whether this branch needs to be preceeded by merge instruction.
       BasicBlock *BrBB = Br->getParent();
-      Loop *L = LI.getLoopFor(BrBB);
-      if (LI.isLoopHeader(BrBB)) {
-        Value *ContinueBB = nullptr;
-        Value *MergeBB = nullptr;
-
-        MergeBB = L->getExitBlock();
-        if (!MergeBB) {
-          // StructurizeCFG pass converts CFG into triangle shape and the cfg
-          // has regions with single entry/exit. As a result, loop should not
-          // have multiple exits.
-          llvm_unreachable("Loop has multiple exits???");
-        }
-
-        if (L->isLoopLatch(BrBB)) {
-          ContinueBB = BrBB;
-        } else {
-          // From SPIR-V spec 2.11, Continue Target must dominate that back-edge
-          // block.
-          BasicBlock *Header = L->getHeader();
-          BasicBlock *Latch = L->getLoopLatch();
-          for (BasicBlock *BB : L->blocks()) {
-            if (BB == Header) {
-              continue;
-            }
-
-            // Check whether block dominates block with back-edge.
-            if (DT.dominates(BB, Latch)) {
-              ContinueBB = BB;
-            }
-          }
-
-          if (!ContinueBB) {
-            llvm_unreachable("Wrong continue block from loop");
-          }
-        }
-
+      if (ContinueBlocks.count(BrBB)) {
         //
         // Generate OpLoopMerge.
         //
@@ -4815,41 +4782,29 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // Ops[2] = Selection Control
         SPIRVOperandList Ops;
 
-        // StructurizeCFG pass already manipulated CFG. Just use false block of
-        // branch instruction as merge block.
+        auto MergeBB = MergeBlocks[BrBB];
+        auto ContinueBB = ContinueBlocks[BrBB];
         uint32_t MergeBBID = VMap[MergeBB];
         uint32_t ContinueBBID = VMap[ContinueBB];
         Ops << MkId(MergeBBID) << MkId(ContinueBBID)
-            << MkNum(spv::SelectionControlMaskNone);
+            << MkNum(spv::LoopControlMaskNone);
 
         auto *MergeInst = new SPIRVInstruction(spv::OpLoopMerge, Ops);
         SPIRVInstList.insert(InsertPoint, MergeInst);
+      } else if (MergeBlocks.count(BrBB)) {
+        //
+        // Generate OpSelectionMerge.
+        //
+        // Ops[0] = Merge Block ID
+        // Ops[1] = Selection Control
+        SPIRVOperandList Ops;
 
-      } else if (Br->isConditional()) {
-        // Generate a selection merge unless this is a back-edge block.
-        bool HasBackedge = false;
-        while (L && !HasBackedge) {
-          if (L->isLoopLatch(BrBB)) {
-            HasBackedge = true;
-          }
-          L = L->getParentLoop();
-        }
-        if (!HasBackedge) {
-          //
-          // Generate OpSelectionMerge.
-          //
-          // Ops[0] = Merge Block ID
-          // Ops[1] = Selection Control
-          SPIRVOperandList Ops;
+        auto MergeBB = MergeBlocks[BrBB];
+        uint32_t MergeBBID = VMap[MergeBB];
+        Ops << MkId(MergeBBID) << MkNum(spv::SelectionControlMaskNone);
 
-          // StructurizeCFG pass already manipulated CFG. Just use false block
-          // of branch instruction as merge block.
-          uint32_t MergeBBID = VMap[Br->getSuccessor(1)];
-          Ops << MkId(MergeBBID) << MkNum(spv::SelectionControlMaskNone);
-
-          auto *MergeInst = new SPIRVInstruction(spv::OpSelectionMerge, Ops);
-          SPIRVInstList.insert(InsertPoint, MergeInst);
-        }
+        auto *MergeInst = new SPIRVInstruction(spv::OpSelectionMerge, Ops);
+        SPIRVInstList.insert(InsertPoint, MergeInst);
       }
 
       if (Br->isConditional()) {
@@ -5921,4 +5876,91 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
 
   // No coherent resource variables encountered.
   return false;
+}
+
+void SPIRVProducerPass::PopulateStructuredCFGMaps(Module &module) {
+  // First, track loop merges and continues.
+  DenseSet<BasicBlock *> LoopMergesAndContinues;
+  for (auto &F : module) {
+    if (F.isDeclaration())
+      continue;
+
+    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
+    const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
+    std::deque<BasicBlock *> order;
+    DenseSet<BasicBlock *> visited;
+    clspv::ComputeStructuredOrder(&*F.begin(), &DT, LI, &order, &visited);
+
+    for (auto BB : order) {
+      auto terminator = BB->getTerminator();
+      auto branch = dyn_cast<BranchInst>(terminator);
+      if (LI.isLoopHeader(BB)) {
+        auto L = LI.getLoopFor(BB);
+        BasicBlock *ContinueBB = nullptr;
+        BasicBlock *MergeBB = nullptr;
+
+        MergeBB = L->getExitBlock();
+        if (!MergeBB) {
+          // StructurizeCFG pass converts CFG into triangle shape and the cfg
+          // has regions with single entry/exit. As a result, loop should not
+          // have multiple exits.
+          llvm_unreachable("Loop has multiple exits???");
+        }
+
+        if (L->isLoopLatch(BB)) {
+          ContinueBB = BB;
+        } else {
+          // From SPIR-V spec 2.11, Continue Target must dominate that back-edge
+          // block.
+          BasicBlock *Header = L->getHeader();
+          BasicBlock *Latch = L->getLoopLatch();
+          for (auto *loop_block : L->blocks()) {
+            if (loop_block == Header) {
+              continue;
+            }
+
+            // Check whether block dominates block with back-edge.
+            // The loop latch is the single block with a back-edge. If it was
+            // possible, StructurizeCFG made the loop conform to this
+            // requirement, otherwise |Latch| is a nullptr.
+            if (DT.dominates(loop_block, Latch)) {
+              ContinueBB = loop_block;
+            }
+          }
+
+          if (!ContinueBB) {
+            llvm_unreachable("Wrong continue block from loop");
+          }
+        }
+
+        // Record the continue and merge blocks.
+        MergeBlocks[BB] = MergeBB;
+        ContinueBlocks[BB] = ContinueBB;
+        LoopMergesAndContinues.insert(MergeBB);
+        LoopMergesAndContinues.insert(ContinueBB);
+      } else if (branch && branch->isConditional()) {
+        auto L = LI.getLoopFor(BB);
+        bool HasBackedge = false;
+        while (L && !HasBackedge) {
+          if (L->isLoopLatch(BB)) {
+            HasBackedge = true;
+          }
+          L = L->getParentLoop();
+        }
+
+        if (!HasBackedge) {
+          // Only need a merge if the branch doesn't include a loop break or
+          // continue.
+          auto true_bb = branch->getSuccessor(0);
+          auto false_bb = branch->getSuccessor(1);
+          if (!LoopMergesAndContinues.count(true_bb) &&
+              !LoopMergesAndContinues.count(false_bb)) {
+            // StructurizeCFG pass already manipulated CFG. Just use false block
+            // of branch instruction as merge block.
+            MergeBlocks[BB] = false_bb;
+          }
+        }
+      }
+    }
+  }
 }
