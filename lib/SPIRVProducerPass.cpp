@@ -269,6 +269,7 @@ struct SPIRVProducerPass final : public ModulePass {
     return where->second;
   }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
+  TypeList &getImageTypeList() { return ImageTypeList; }
   TypeList &getTypeList() { return Types; };
   ValueList &getConstantList() { return Constants; };
   ValueMapType &getValueMap() { return ValueMap; }
@@ -427,6 +428,9 @@ private:
   TypeMapType TypeMap;
   // Maps an LLVM image type to its SPIR-V ID.
   TypeMapType ImageTypeMap;
+  // A unique-vector of LLVM image types. This list is used to provide
+  // deterministic traversal of image types.
+  TypeList ImageTypeList;
   // A unique-vector of LLVM types that map to a SPIR-V type.
   TypeList Types;
   ValueList Constants;
@@ -757,6 +761,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
             OpImageTypeMap[ImageTy] = 0;
+            getImageTypeList().insert(ImageTy);
 
             // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
@@ -2196,8 +2201,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
   }
 
   // Generate OpTypeSampledImage.
-  TypeMapType &OpImageTypeMap = getImageTypeMap();
-  for (auto &ImageType : OpImageTypeMap) {
+  for (auto &ImgTy : getImageTypeList()) {
     //
     // Generate OpTypeSampledImage.
     //
@@ -2205,11 +2209,10 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
     //
     SPIRVOperandList Ops;
 
-    Type *ImgTy = ImageType.first;
     Ops << MkId(TypeMap[ImgTy]);
 
-    // Update OpImageTypeMap.
-    ImageType.second = nextID;
+    // Update the image type map.
+    getImageTypeMap()[ImgTy] = nextID;
 
     auto *Inst = new SPIRVInstruction(spv::OpTypeSampledImage, nextID++, Ops);
     SPIRVInstList.push_back(Inst);
