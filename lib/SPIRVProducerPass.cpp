@@ -2508,7 +2508,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     //          i32 binding,
     //          i32 (index-into-sampler-map|sampler_mask))
     if (auto *call = dyn_cast<CallInst>(user)) {
-      const size_t third_param = static_cast<unsigned>(
+      const auto third_param = static_cast<unsigned>(
           dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
       auto sampler_value = third_param;
       if (clspv::Option::UseSamplerMap()) {
