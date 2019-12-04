@@ -1,7 +1,12 @@
 // RUN: clspv -samplermap=%S/issue-157.samplermap %s -o %t.spv
-// RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-dis -o %t.spvasm %t.spv
+// RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %s -o %t2.spv
+// RUN: spirv-dis -o %t2.spvasm %t2.spv
+// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t2.spv
 
 // CHECK-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK-DAG: %[[double:[0-9a-zA-Z_]+]] = OpTypeFloat 64

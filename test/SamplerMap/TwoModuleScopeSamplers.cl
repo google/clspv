@@ -1,7 +1,12 @@
 // RUN: clspv -samplermap %S/foo.samplermap %s -o %t.spv
-// RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-dis -o %t.spvasm %t.spv
+// RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+//
+// RUN: clspv %s -o %t2.spv
+// RUN: spirv-dis -o %t2.spvasm %t2.spv
+// RUN: FileCheck -check-prefix=NOMAP %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t2.spv
 
 // CHECK: OpDecorate %[[SAMPLER_MAP_ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[SAMPLER_MAP_ARG0_ID]] Binding 0
@@ -41,3 +46,23 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image2d
     *a = read_imagef(i, s1, c);
   }
 }
+
+// NOMAP: OpDecorate [[S0:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// NOMAP: OpDecorate [[S0]] Binding 1
+// NOMAP: OpDecorate [[S1:%[a-zA-Z0-9_]+]] DescriptorSet 0
+// NOMAP: OpDecorate [[S1]] Binding 0
+// NOMAP-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// NOMAP-DAG: [[v2float:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 2
+// NOMAP-DAG: [[v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 4
+// NOMAP-DAG: [[image:%[a-zA-Z0-9_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
+// NOMAP-DAG: [[sampler:%[a-zA-Z0-9_]+]] = OpTypeSampler
+// NOMAP-DAG: [[sampled_image:%[a-zA-Z0-9_]+]] = OpTypeSampledImage [[image]]
+// NOMAP-DAG: [[sampler_ptr:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[sampler]]
+// NOMAP-DAG: [[S0]] = OpVariable [[sampler_ptr]] UniformConstant
+// NOMAP-DAG: [[S1]] = OpVariable [[sampler_ptr]] UniformConstant
+// NOMAP: [[S1_LD:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[S1]]
+// NOMAP: [[else_sampled:%[a-zA-Z0-9_]+]] = OpSampledImage [[sampled_image]] {{.*}} [[S1_LD]]
+// NOMAP: OpImageSampleExplicitLod [[v4float]] [[else_sampled]]
+// NOMAP: [[S0_LD:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[S0]]
+// NOMAP: [[then_sampled:%[a-zA-Z0-9_]+]] = OpSampledImage [[sampled_image]] {{.*}} [[S0_LD]]
+// NOMAP: OpImageSampleExplicitLod [[v4float]] [[then_sampled]]

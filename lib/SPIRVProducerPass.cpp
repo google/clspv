@@ -452,7 +452,8 @@ private:
   bool HasVariablePointersStorageBuffer;
   bool HasVariablePointers;
   Type *SamplerTy;
-  DenseMap<unsigned, uint32_t> SamplerMapIndexToIDMap;
+  DenseMap<unsigned, unsigned> SamplerLiteralToIDMap;
+  ;
 
   // If a function F has a pointer-to-__constant parameter, then this variable
   // will map F's type to (G, index of the parameter), where in a first phase
@@ -618,10 +619,8 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   // Generate SPIRV constants.
   GenerateSPIRVConstants();
 
-  // If we have a sampler map, we might have literal samplers to generate.
-  if (0 < getSamplerMap().size()) {
-    GenerateSamplers(module);
-  }
+  // Generate literal samplers if necessary.
+  GenerateSamplers(module);
 
   // Generate SPIRV variables.
   for (GlobalVariable &GV : module.globals()) {
@@ -2484,8 +2483,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
 
   auto &sampler_map = getSamplerMap();
-  SamplerMapIndexToIDMap.clear();
-  DenseMap<unsigned, unsigned> SamplerLiteralToIDMap;
+  SamplerLiteralToIDMap.clear();
   DenseMap<unsigned, unsigned> SamplerLiteralToDescriptorSetMap;
   DenseMap<unsigned, unsigned> SamplerLiteralToBindingMap;
 
@@ -2495,8 +2493,10 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   DenseSet<unsigned> used_bindings;
 
   auto *var_fn = M.getFunction(clspv::LiteralSamplerFunction());
+  // Return if there are no literal samplers.
   if (!var_fn)
     return;
+
   for (auto user : var_fn->users()) {
     // Populate SamplerLiteralToDescriptorSetMap and
     // SamplerLiteralToBindingMap.
@@ -2506,17 +2506,19 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     //       @clspv.sampler.var.literal(
     //          i32 descriptor,
     //          i32 binding,
-    //          i32 index-into-sampler-map)
+    //          i32 (index-into-sampler-map|sampler_mask))
     if (auto *call = dyn_cast<CallInst>(user)) {
-      const size_t index_into_sampler_map = static_cast<size_t>(
+      const size_t third_param = static_cast<size_t>(
           dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
-      if (index_into_sampler_map >= sampler_map.size()) {
-        errs() << "Out of bounds index to sampler map: "
-               << index_into_sampler_map;
-        llvm_unreachable("bad sampler init: out of bounds");
+      auto sampler_value = third_param;
+      if (clspv::Option::UseSamplerMap()) {
+        if (third_param >= sampler_map.size()) {
+          errs() << "Out of bounds index to sampler map: " << third_param;
+          llvm_unreachable("bad sampler init: out of bounds");
+        }
+        sampler_value = sampler_map[third_param].first;
       }
 
-      auto sampler_value = sampler_map[index_into_sampler_map].first;
       const auto descriptor_set = static_cast<unsigned>(
           dyn_cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
       const auto binding = static_cast<unsigned>(
@@ -2528,8 +2530,24 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     }
   }
 
-  unsigned index = 0;
-  for (auto SamplerLiteral : sampler_map) {
+  DenseSet<size_t> seen;
+  for (auto user : var_fn->users()) {
+    if (!isa<CallInst>(user))
+      continue;
+
+    auto call = cast<CallInst>(user);
+    const unsigned third_param = static_cast<unsigned>(
+        dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
+
+    // Already allocated a variable for this value.
+    if (!seen.insert(third_param).second)
+      continue;
+
+    auto sampler_value = third_param;
+    if (clspv::Option::UseSamplerMap()) {
+      sampler_value = sampler_map[third_param].first;
+    }
+
     // Generate OpVariable.
     //
     // GIDOps[0] : Result Type ID
@@ -2543,8 +2561,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     auto *Inst = new SPIRVInstruction(spv::OpVariable, sampler_var_id, Ops);
     SPIRVInstList.push_back(Inst);
 
-    SamplerMapIndexToIDMap[index] = sampler_var_id;
-    SamplerLiteralToIDMap[SamplerLiteral.first] = sampler_var_id;
+    SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
 
     // Find Insert Point for OpDecorate.
     auto DecoInsertPoint =
@@ -2562,7 +2579,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
 
     unsigned descriptor_set;
     unsigned binding;
-    if (SamplerLiteralToBindingMap.find(SamplerLiteral.first) ==
+    if (SamplerLiteralToBindingMap.find(sampler_value) ==
         SamplerLiteralToBindingMap.end()) {
       // This sampler is not actually used.  Find the next one.
       for (binding = 0; used_bindings.count(binding); binding++)
@@ -2570,11 +2587,10 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
       descriptor_set = 0; // Literal samplers always use descriptor set 0.
       used_bindings.insert(binding);
     } else {
-      descriptor_set = SamplerLiteralToDescriptorSetMap[SamplerLiteral.first];
-      binding = SamplerLiteralToBindingMap[SamplerLiteral.first];
+      descriptor_set = SamplerLiteralToDescriptorSetMap[sampler_value];
+      binding = SamplerLiteralToBindingMap[sampler_value];
 
-      version0::DescriptorMapEntry::SamplerData sampler_data = {
-          SamplerLiteral.first};
+      version0::DescriptorMapEntry::SamplerData sampler_data = {sampler_value};
       descriptorMapEntries->emplace_back(std::move(sampler_data),
                                          descriptor_set, binding);
     }
@@ -2594,8 +2610,6 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
 
     auto *BindDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
     SPIRVInstList.insert(DecoInsertPoint, BindDecoInst);
-
-    index++;
   }
 }
 
@@ -4493,16 +4507,19 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     if (Callee->getName().equals(clspv::LiteralSamplerFunction())) {
       // Map this to a load from the variable.
-      const auto index_into_sampler_map =
+      const auto third_param =
           dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
+      auto sampler_value = third_param;
+      if (clspv::Option::UseSamplerMap()) {
+        sampler_value = getSamplerMap()[third_param].first;
+      }
 
       // Generate an OpLoad
       SPIRVOperandList Ops;
       const auto load_id = nextID++;
 
       Ops << MkId(lookupType(SamplerTy->getPointerElementType()))
-          << MkId(SamplerMapIndexToIDMap[static_cast<unsigned>(
-                 index_into_sampler_map)]);
+          << MkId(SamplerLiteralToIDMap[sampler_value]);
 
       auto *Inst = new SPIRVInstruction(spv::OpLoad, load_id, Ops);
       SPIRVInstList.push_back(Inst);

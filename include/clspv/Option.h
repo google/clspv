@@ -116,6 +116,12 @@ bool CPlusPlus();
 // Returns true when images are supported.
 bool ImageSupport();
 
+// Returns true when using a sampler map.
+bool UseSamplerMap();
+
+// Sets whether or not to use the sampler map.
+void SetUseSamplerMap(bool use);
+
 } // namespace Option
 } // namespace clspv
 

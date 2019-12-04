@@ -148,7 +148,7 @@ static llvm::cl::opt<std::string> OutputFormat(
     llvm::cl::value_desc("format"));
 
 static llvm::cl::opt<std::string>
-    SamplerMap("samplermap", llvm::cl::desc("Literal sampler map"),
+    SamplerMap("samplermap", llvm::cl::desc("DEPRECATED - Literal sampler map"),
                llvm::cl::value_desc("filename"));
 
 static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
@@ -185,6 +185,7 @@ int ParseSamplerMap(const std::string &sampler_map,
     // Parse the sampler map from the provided string.
     samplerMapBuffer = llvm::MemoryBuffer::getMemBuffer(sampler_map);
 
+    clspv::Option::SetUseSamplerMap(true);
     if (!SamplerMap.empty()) {
       llvm::outs() << "Warning: -samplermap is ignored when the sampler map is "
                       "provided through a string.\n";
@@ -201,11 +202,17 @@ int ParseSamplerMap(const std::string &sampler_map,
       return -1;
     }
 
+    clspv::Option::SetUseSamplerMap(true);
     samplerMapBuffer = std::move(errorOrSamplerMapFile.get());
     if (0 == samplerMapBuffer->getBufferSize()) {
       llvm::errs() << "Error: Sampler map was an empty file!\n";
       return -1;
     }
+  }
+
+  if (clspv::Option::UseSamplerMap()) {
+    llvm::outs()
+        << "Warning: use of the sampler map is deprecated and unnecessary\n";
   }
 
   // No sampler map to parse.
