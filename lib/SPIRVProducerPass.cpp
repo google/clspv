@@ -2508,7 +2508,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
     //          i32 binding,
     //          i32 (index-into-sampler-map|sampler_mask))
     if (auto *call = dyn_cast<CallInst>(user)) {
-      const size_t third_param = static_cast<size_t>(
+      const size_t third_param = static_cast<unsigned>(
           dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
       auto sampler_value = third_param;
       if (clspv::Option::UseSamplerMap()) {
@@ -4507,8 +4507,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     if (Callee->getName().equals(clspv::LiteralSamplerFunction())) {
       // Map this to a load from the variable.
-      const auto third_param =
-          dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
+      const auto third_param = static_cast<unsigned>(
+          dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
       auto sampler_value = third_param;
       if (clspv::Option::UseSamplerMap()) {
         sampler_value = getSamplerMap()[third_param].first;
