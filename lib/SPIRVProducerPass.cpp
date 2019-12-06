@@ -58,6 +58,7 @@
 #include "DescriptorCounter.h"
 #include "NormalizeGlobalVariable.h"
 #include "Passes.h"
+#include "Types.h"
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
@@ -777,9 +778,25 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
-          if (clspv::IsGetImageHeight(callee_name) ||
-              clspv::IsGetImageWidth(callee_name)) {
-            FindType(VectorType::get(Type::getInt32Ty(Context), 2));
+          if (clspv::IsImageQuery(callee_name)) {
+            Type *ImageTy = Call->getOperand(0)->getType();
+            const uint32_t dim = ImageDimensionality(ImageTy);
+            uint32_t components = dim;
+            if (components > 1) {
+              // OpImageQuerySize* return |components| components.
+              FindType(VectorType::get(Type::getInt32Ty(Context), components));
+              if (dim == 3 && IsGetImageDim(callee_name)) {
+                // get_image_dim for 3D images returns an int4.
+                FindType(
+                    VectorType::get(Type::getInt32Ty(Context), components + 1));
+              }
+            }
+
+            if (clspv::IsSampledImageType(ImageTy)) {
+              // All sampled image queries need a integer 0 for the Lod
+              // operand.
+              FindConstant(ConstantInt::get(Context, APInt(32, 0)));
+            }
           }
         }
       }
@@ -3280,7 +3297,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     bool hasImageQuery = false;
     for (const auto &SymVal : module.getValueSymbolTable()) {
       if (auto F = dyn_cast<Function>(SymVal.getValue())) {
-        if (clspv::IsGetImageHeight(F) || clspv::IsGetImageWidth(F)) {
+        if (clspv::IsImageQuery(F)) {
           hasImageQuery = true;
           break;
         }
@@ -4644,44 +4661,103 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // get_image_* is mapped to OpImageQuerySize
-    if (clspv::IsGetImageHeight(Callee) || clspv::IsGetImageWidth(Callee)) {
+    // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
+    if (clspv::IsImageQuery(Callee)) {
       //
-      // Generate OpImageQuerySize, then pull out the right component.
-      // Assume 2D image for now.
+      // Generate OpImageQuerySize[Lod]
       //
       // Ops[0] = Image ID
       //
-      // %sizes = OpImageQuerySizes %uint2 %im
-      // %result = OpCompositeExtract %uint %sizes 0-or-1
+      // Result type has components equal to the dimensionality of the image,
+      // plus 1 if the image is arrayed.
+      //
+      // %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%int_0]
       SPIRVOperandList Ops;
 
       // Implement:
-      //     %sizes = OpImageQuerySizes %uint2 %im
-      uint32_t SizesTypeID =
-          TypeMap[VectorType::get(Type::getInt32Ty(Context), 2)];
+      //     %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%uint_0]
+      uint32_t SizesTypeID = 0;
+
       Value *Image = Call->getArgOperand(0);
+      const uint32_t dim = ImageDimensionality(Image->getType());
+      const uint32_t components = dim;
+      if (components == 1) {
+        // 1D images aren't currently supported.
+        SizesTypeID = TypeMap[Type::getInt32Ty(Context)];
+      } else {
+        SizesTypeID = TypeMap[VectorType::get(Type::getInt32Ty(Context), dim)];
+      }
       uint32_t ImageID = VMap[Image];
       Ops << MkId(SizesTypeID) << MkId(ImageID);
+      spv::Op opcode = spv::OpImageQuerySize;
+      if (clspv::IsSampledImageType(Image->getType())) {
+        opcode = spv::OpImageQuerySizeLod;
+        // Need explicit 0 for Lod operand.
+        Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
+        Ops << MkId(VMap[CstInt0]);
+      }
 
       uint32_t SizesID = nextID++;
-      auto *QueryInst =
-          new SPIRVInstruction(spv::OpImageQuerySize, SizesID, Ops);
+      auto *QueryInst = new SPIRVInstruction(opcode, SizesID, Ops);
       SPIRVInstList.push_back(QueryInst);
 
-      // Reset value map entry since we generated an intermediate instruction.
-      VMap[&I] = nextID;
+      // May require an extra instruction to create the appropriate result of
+      // the builtin function.
+      if (clspv::IsGetImageDim(Callee)) {
+        // get_image_dim returns an int2 for any 2D image (even arrayed) and an
+        // int4 for 3D images.
+        if (dim == 3) {
+          // Reset value map entry since we generated an intermediate
+          // instruction.
+          VMap[&I] = nextID;
 
-      // Implement:
-      //     %result = OpCompositeExtract %uint %sizes 0-or-1
-      Ops.clear();
-      Ops << MkId(TypeMap[I.getType()]) << MkId(SizesID);
+          // Implement:
+          //   %result = OpCompositeConstruct %uint4 %sizes %uint_0
+          Ops.clear();
+          Ops << MkId(lookupType(VectorType::get(Type::getInt32Ty(Context), 4)))
+              << MkId(SizesID);
 
-      uint32_t component = Callee->getName().contains("height") ? 1 : 0;
-      Ops << MkNum(component);
+          Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
+          Ops << MkId(VMap[CstInt0]);
 
-      auto *Inst = new SPIRVInstruction(spv::OpCompositeExtract, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
+          auto *Inst =
+              new SPIRVInstruction(spv::OpCompositeConstruct, nextID++, Ops);
+          SPIRVInstList.push_back(Inst);
+        } else if (dim != components) {
+          // Reset value map entry since we generated an intermediate
+          // instruction.
+          VMap[&I] = nextID;
+
+          // Implement:
+          //   %result = OpVectorShuffle %uint2 %sizes %sizes 0 1
+          Ops.clear();
+          Ops << MkId(lookupType(VectorType::get(Type::getInt32Ty(Context), 2)))
+              << MkId(SizesID) << MkId(SizesID) << MkNum(0) << MkNum(1);
+
+          auto *Inst =
+              new SPIRVInstruction(spv::OpVectorShuffle, nextID++, Ops);
+          SPIRVInstList.push_back(Inst);
+        }
+      } else if (components > 1) {
+        // Reset value map entry since we generated an intermediate instruction.
+        VMap[&I] = nextID;
+
+        // Implement:
+        //     %result = OpCompositeExtract %uint %sizes <component number>
+        Ops.clear();
+        Ops << MkId(TypeMap[I.getType()]) << MkId(SizesID);
+
+        uint32_t component = 0;
+        if (IsGetImageHeight(Callee))
+          component = 1;
+        else if (IsGetImageDepth(Callee))
+          component = 2;
+        Ops << MkNum(component);
+
+        auto *Inst =
+            new SPIRVInstruction(spv::OpCompositeExtract, nextID++, Ops);
+        SPIRVInstList.push_back(Inst);
+      }
       break;
     }
 
@@ -5570,6 +5646,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpSampledImage:
     case spv::OpImageSampleExplicitLod:
     case spv::OpImageQuerySize:
+    case spv::OpImageQuerySizeLod:
     case spv::OpSelect:
     case spv::OpPhi:
     case spv::OpLoad:

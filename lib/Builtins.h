@@ -86,6 +86,24 @@ inline bool IsGetImageWidth(llvm::Function *f) {
   return IsGetImageWidth(f->getName());
 }
 
+// Returns true if the function is an OpenCL image depth query.
+bool IsGetImageDepth(llvm::StringRef name);
+inline bool IsGetImageDepth(llvm::Function *f) {
+  return IsGetImageDepth(f->getName());
+}
+
+// Returns true if the function is an OpenCL image dim query.
+bool IsGetImageDim(llvm::StringRef name);
+inline bool IsGetImageDim(llvm::Function *f) {
+  return IsGetImageDim(f->getName());
+}
+
+// Returns true if the function is an OpenCL image query.
+bool IsImageQuery(llvm::StringRef name);
+inline bool IsImageQuery(llvm::Function *f) {
+  return IsImageQuery(f->getName());
+}
+
 } // namespace clspv
 
 #endif // CLSPV_LIB_BUILTINS_H_
