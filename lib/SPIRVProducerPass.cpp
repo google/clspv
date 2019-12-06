@@ -4704,9 +4704,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // May require an extra instruction to create the appropriate result of
       // the builtin function.
       if (clspv::IsGetImageDim(Callee)) {
-        // get_image_dim returns an int2 for any 2D image (even arrayed) and an
-        // int4 for 3D images.
         if (dim == 3) {
+          // get_image_dim returns an int4 for 3D images.
+          //
           // Reset value map entry since we generated an intermediate
           // instruction.
           VMap[&I] = nextID;
@@ -4724,6 +4724,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
               new SPIRVInstruction(spv::OpCompositeConstruct, nextID++, Ops);
           SPIRVInstList.push_back(Inst);
         } else if (dim != components) {
+          // get_image_dim return an int2 regardless of the arrayedness of the
+          // image. If the image is arrayed an element must be dropped from the
+          // query result.
+          //
           // Reset value map entry since we generated an intermediate
           // instruction.
           VMap[&I] = nextID;

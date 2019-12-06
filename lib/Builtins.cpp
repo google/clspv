@@ -100,5 +100,5 @@ bool clspv::IsGetImageDim(StringRef name) {
 
 bool clspv::IsImageQuery(StringRef name) {
   return clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name) ||
-         clspv::IsGetImageDepth(name);
+         clspv::IsGetImageDepth(name) || clspv::IsGetImageDim(name);
 }
