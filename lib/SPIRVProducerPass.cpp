@@ -4689,16 +4689,16 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       }
       uint32_t ImageID = VMap[Image];
       Ops << MkId(SizesTypeID) << MkId(ImageID);
-      spv::Op opcode = spv::OpImageQuerySize;
+      spv::Op query_opcode = spv::OpImageQuerySize;
       if (clspv::IsSampledImageType(Image->getType())) {
-        opcode = spv::OpImageQuerySizeLod;
+        query_opcode = spv::OpImageQuerySizeLod;
         // Need explicit 0 for Lod operand.
         Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
         Ops << MkId(VMap[CstInt0]);
       }
 
       uint32_t SizesID = nextID++;
-      auto *QueryInst = new SPIRVInstruction(opcode, SizesID, Ops);
+      auto *QueryInst = new SPIRVInstruction(query_opcode, SizesID, Ops);
       SPIRVInstList.push_back(QueryInst);
 
       // May require an extra instruction to create the appropriate result of
