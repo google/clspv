@@ -26,6 +26,8 @@
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
+#include "Types.h"
+
 using namespace llvm;
 
 namespace clspv {
@@ -113,69 +115,6 @@ ArgKind GetArgKindFromName(const std::string &name) {
 bool IsLocalPtr(llvm::Type *type) {
   return type->isPointerTy() &&
          type->getPointerAddressSpace() == clspv::AddressSpace::Local;
-}
-
-bool IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
-  bool isSamplerType = false;
-  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
-      if (STy->isOpaque()) {
-        if (STy->getName().equals("opencl.sampler_t")) {
-          isSamplerType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
-        }
-      }
-    }
-  }
-  return isSamplerType;
-}
-
-bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
-  bool isImageType = false;
-  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
-      if (STy->isOpaque()) {
-        if (STy->getName().startswith("opencl.image2d_ro_t") ||
-            STy->getName().startswith("opencl.image2d_wo_t") ||
-            STy->getName().startswith("opencl.image3d_ro_t") ||
-            STy->getName().startswith("opencl.image3d_wo_t")) {
-          isImageType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
-        }
-      }
-    }
-  }
-  return isImageType;
-}
-
-bool IsFloatImageType(Type *type) {
-  return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
-}
-
-bool IsIntImageType(Type *type) {
-  Type *ty = nullptr;
-  if (IsImageType(type, &ty)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
-      if (struct_ty->getName().contains(".int"))
-        return true;
-    }
-  }
-
-  return false;
-}
-
-bool IsUintImageType(Type *type) {
-  Type *ty = nullptr;
-  if (IsImageType(type, &ty)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
-      if (struct_ty->getName().contains(".uint"))
-        return true;
-    }
-  }
-
-  return false;
 }
 
 ArgIdMapType AllocateArgSpecIds(Module &M) {

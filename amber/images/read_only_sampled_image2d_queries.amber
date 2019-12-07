@@ -1,0 +1,46 @@
+#!amber
+
+SHADER compute image_queries OPENCL-C
+kernel void foo(read_only image2d_t small, read_only image2d_t medium,
+                read_only image2d_t large, global int* out) {
+  int i = 0;
+  out[i++] = get_image_width(small);
+  out[i++] = get_image_height(small);
+  out[i++] = get_image_dim(small).x;
+  out[i++] = get_image_dim(small).y;
+
+  out[i++] = get_image_width(medium);
+  out[i++] = get_image_height(medium);
+  out[i++] = get_image_dim(medium).x;
+  out[i++] = get_image_dim(medium).y;
+
+  out[i++] = get_image_width(large);
+  out[i++] = get_image_height(large);
+  out[i++] = get_image_dim(large).x;
+  out[i++] = get_image_dim(large).y;
+}
+END
+
+BUFFER out_buf DATA_TYPE int32 SIZE 12 FILL 0
+BUFFER small_i DATA_TYPE vec4<float> WIDTH 2 HEIGHT 2 FILL 0.0
+BUFFER medium_i DATA_TYPE vec4<float> WIDTH 16 HEIGHT 32 FILL 0.0
+BUFFER large_i DATA_TYPE vec4<float> WIDTH 2048 HEIGHT 1024 FILL 0.0
+
+PIPELINE compute query_pipe
+  ATTACH image_queries ENTRY_POINT foo
+  BIND BUFFER out_buf KERNEL ARG_NAME out
+  BIND BUFFER small_i KERNEL ARG_NAME small
+  BIND BUFFER medium_i KERNEL ARG_NAME medium
+  BIND BUFFER large_i KERNEL ARG_NAME large
+END
+
+RUN query_pipe 1 1 1
+
+# Small image queries.
+EXPECT out_buf IDX 0 EQ 2 2 2 2
+
+# Medium image queries.
+EXPECT out_buf IDX 16 EQ 16 32 16 32
+
+# Large image queries.
+EXPECT out_buf IDX 32 EQ 2048 1024 2048 1024

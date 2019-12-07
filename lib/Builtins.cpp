@@ -18,7 +18,7 @@ using namespace llvm;
 
 bool clspv::IsImageBuiltin(StringRef name) {
   return clspv::IsSampledImageRead(name) || clspv::IsImageWrite(name) ||
-         clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name);
+         clspv::IsImageQuery(name);
 }
 
 bool clspv::IsSampledImageRead(StringRef name) {
@@ -74,10 +74,31 @@ bool clspv::IsIntImageWrite(StringRef name) {
 
 bool clspv::IsGetImageHeight(StringRef name) {
   return name.startswith("_Z16get_image_height14ocl_image2d_ro") ||
-         name.startswith("_Z16get_image_height14ocl_image2d_wo");
+         name.startswith("_Z16get_image_height14ocl_image2d_wo") ||
+         name.startswith("_Z16get_image_height14ocl_image3d_ro") ||
+         name.startswith("_Z16get_image_height14ocl_image3d_wo");
 }
 
 bool clspv::IsGetImageWidth(StringRef name) {
   return name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
-         name.startswith("_Z15get_image_width14ocl_image2d_wo");
+         name.startswith("_Z15get_image_width14ocl_image2d_wo") ||
+         name.startswith("_Z15get_image_width14ocl_image3d_ro") ||
+         name.startswith("_Z15get_image_width14ocl_image3d_wo");
+}
+
+bool clspv::IsGetImageDepth(StringRef name) {
+  return name.startswith("_Z15get_image_depth14ocl_image3d_ro") ||
+         name.startswith("_Z15get_image_depth14ocl_image3d_wo");
+}
+
+bool clspv::IsGetImageDim(StringRef name) {
+  return name.startswith("_Z13get_image_dim14ocl_image2d_ro") ||
+         name.startswith("_Z13get_image_dim14ocl_image2d_wo") ||
+         name.startswith("_Z13get_image_dim14ocl_image3d_ro") ||
+         name.startswith("_Z13get_image_dim14ocl_image3d_wo");
+}
+
+bool clspv::IsImageQuery(StringRef name) {
+  return clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name) ||
+         clspv::IsGetImageDepth(name) || clspv::IsGetImageDim(name);
 }
