@@ -670,9 +670,5 @@ The `printf()` built-in function **must not** be used.
 
 #### Image Read and Write Functions
 
-The `get_image_channel_data_type()`, `get_image_channel_order()`,
-`read_imagei()`, `read_imageui()`, `write_imagei()` and `write_imageui()`
+The `get_image_channel_data_type()` and `get_image_channel_order()`
 built-in functions **must not** be used.
-
-The versions of the `read_imagef()` built-in functions that use integer vector
-types to specify which coordinate to sample **must not** be used.

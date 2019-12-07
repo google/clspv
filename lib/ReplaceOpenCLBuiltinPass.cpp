@@ -204,7 +204,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVstoreHalf(Module &M);
   bool replaceVstoreHalf2(Module &M);
   bool replaceVstoreHalf4(Module &M);
-  bool replaceReadImageF(Module &M);
+  bool replaceSampledReadImageWithIntCoords(Module &M);
   bool replaceAtomics(Module &M);
   bool replaceCross(Module &M);
   bool replaceFract(Module &M);
@@ -258,7 +258,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceVstoreHalf(M);
   Changed |= replaceVstoreHalf2(M);
   Changed |= replaceVstoreHalf4(M);
-  Changed |= replaceReadImageF(M);
+  Changed |= replaceSampledReadImageWithIntCoords(M);
   Changed |= replaceAtomics(M);
   Changed |= replaceCross(M);
   Changed |= replaceFract(M);
@@ -2682,14 +2682,27 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceReadImageF(Module &M) {
+bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
+      // TODO 1D, 1Darray
+      // 2D
+      {"_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i",
+       "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f"},
+      {"_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i",
+       "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f"},
       {"_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i",
        "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f"},
-      {"_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_i",
-       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv4_f"}};
+      // TODO 2D array
+      // 3D
+      {"_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i",
+       "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f"},
+      {"_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i",
+       "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f"},
+      {"_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i",
+       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f"}
+  };
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
