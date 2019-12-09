@@ -41,14 +41,6 @@ Compile a set of kernels into a SPIR-V binary module:
 
     clspv foo.cl -o foo.spv
 
-Emit SPIR-V assembly:
-
-    clspv -S foo.cl -o foo.spvasm
-
-Emit SPIR-V assembly to standard output:
-
-    clspv -S foo.cl -o -
-
 Emit the binary as a C initializer list, for easy embedding of a shader in
 in a C or C++ program source:
 
