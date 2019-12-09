@@ -538,7 +538,7 @@ spaces.
 #### 8-Bit Types
 
 The `char`, `char2`, `char3`, `uchar`, `uchar2`, and `uchar3` types
-can only be used. To disable general support for these types, use `-int8=0`.
+can be used. To disable general support for these types, use `-int8=0`.
 
 #### 64-Bit Types
 
@@ -546,7 +546,7 @@ The `double`, `double2`, `double3` and `double4` types **must not** be used.
 
 #### Images
 
-The `image2d_array_t`, `image1d_t`, `image1d_buffer_t`, and `image1d_array_t`
+The `image2d_array_t`, `image1d_buffer_t`, and `image1d_array_t`
 types **must not** be used.
 
 #### Samplers
