@@ -2701,8 +2701,7 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
       {"_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i",
        "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f"},
       {"_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i",
-       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f"}
-  };
+       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f"}};
 
   for (auto Pair : Map) {
     // If we find a function with the matching name.
