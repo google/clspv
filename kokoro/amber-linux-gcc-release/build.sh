@@ -18,5 +18,5 @@ set -e
 # Display commands being run.
 set -x
 
-# Dummy implementation.
-exit 0
+SCRIPT_DIR=`dirname "$BASH_SOURCE"`
+source $SCRIPT_DIR/../scripts/linux/build-amber.sh RELEASE gcc
