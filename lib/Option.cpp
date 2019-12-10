@@ -156,6 +156,8 @@ static llvm::cl::opt<bool>
 
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));
+
+static bool use_sampler_map = false;
 } // namespace
 
 namespace clspv {
@@ -189,6 +191,8 @@ bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
 bool CPlusPlus() { return cplusplus; }
 bool ImageSupport() { return images; }
+bool UseSamplerMap() { return use_sampler_map; }
+void SetUseSamplerMap(bool use) { use_sampler_map = use; }
 
 } // namespace Option
 } // namespace clspv

@@ -18,6 +18,14 @@ The following subjects are covered:
 - Restrictions on the OpenCL C language as is to be consumed by a Vulkan
   implementation.
 
+## Deprecation Notice
+
+The sampler map is deprecated. It is no longer necessary to specify a sampler
+map for literal samplers. Refer to the bindings generated for the literal
+samplers in descriptor map. The -samplermap option is still accepted, but
+support will be removed at later date. A single sampler binding is generated
+for each unique literal sampler in the program.
+
 ## SPIR-V Features
 
 The SPIR-V as produced from the OpenCL C language can make use of the following
