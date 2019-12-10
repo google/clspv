@@ -86,7 +86,7 @@ cd $SRC
 cd $BUILD_ROOT/github
 git clone https://github.com/google/amber.git amber
 cd $BUILD_ROOT/github/amber
-/usr/bin/python3 tools/git-sync-deps
+/usr/bin/python3 tools/git-sync-deps --with-clspv --with-swiftshader
 
 mkdir build && cd $BUILD_ROOT/github/amber/build
 
