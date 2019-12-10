@@ -265,8 +265,6 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
   if (init_fn) {
     // Copy users, to avoid modifying the list in place.
     SmallVector<User *, 8> users(init_fn->users());
-    if (!users.empty()) {
-    }
     for (auto user : users) {
       if (auto *call = dyn_cast<CallInst>(user)) {
         auto const_val = dyn_cast<ConstantInt>(call->getArgOperand(0));
