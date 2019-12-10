@@ -41,7 +41,9 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
       if (STy->isOpaque()) {
-        if (STy->getName().startswith("opencl.image2d_ro_t") ||
+        if (STy->getName().startswith("opencl.image1d_ro_t") ||
+            STy->getName().startswith("opencl.image1d_wo_t") ||
+            STy->getName().startswith("opencl.image2d_ro_t") ||
             STy->getName().startswith("opencl.image2d_wo_t") ||
             STy->getName().startswith("opencl.image3d_ro_t") ||
             STy->getName().startswith("opencl.image3d_wo_t")) {
@@ -59,6 +61,8 @@ uint32_t clspv::ImageDimensionality(Type *type) {
   Type *ty = nullptr;
   if (IsImageType(type, &ty)) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains("image1d"))
+        return 1;
       if (struct_ty->getName().contains("image2d"))
         return 2;
       if (struct_ty->getName().contains("image3d"))

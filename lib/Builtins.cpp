@@ -28,25 +28,31 @@ bool clspv::IsSampledImageRead(StringRef name) {
 }
 
 bool clspv::IsFloatSampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
+  return name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_samplerf") ||
+         name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i") ||
          name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i");
 }
 
 bool clspv::IsUintSampledImageRead(StringRef name) {
-  return name.startswith(
+  return name.startswith("_Z12read_imageui14ocl_image1d_ro11ocl_samplerf") ||
+         name.startswith(
              "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith(
              "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith("_Z12read_imageui14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith(
              "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i") ||
          name.startswith("_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i");
 }
 
 bool clspv::IsIntSampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
+  return name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_samplerf") ||
+         name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i") ||
          name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i");
 }
@@ -57,18 +63,21 @@ bool clspv::IsImageWrite(StringRef name) {
 }
 
 bool clspv::IsFloatImageWrite(StringRef name) {
-  return name.startswith("_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
+  return name.startswith("_Z12write_imagef14ocl_image1d_woiDv4_f") ||
+         name.startswith("_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
          name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f");
 }
 
 bool clspv::IsUintImageWrite(StringRef name) {
-  return name.startswith("_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") ||
+  return name.startswith("_Z13write_imageui14ocl_image1d_woiDv4_j") ||
+         name.startswith("_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") ||
          name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j");
 }
 
 bool clspv::IsIntImageWrite(StringRef name) {
   // Odd mangling for 3d writes.
-  return name.startswith("_Z12write_imagei14ocl_image2d_woDv2_iDv4_i") ||
+  return name.startswith("_Z12write_imagei14ocl_image1d_woiDv4_i") ||
+         name.startswith("_Z12write_imagei14ocl_image2d_woDv2_iDv4_i") ||
          name.startswith("_Z12write_imagei14ocl_image3d_woDv4_iS0_");
 }
 
@@ -80,7 +89,9 @@ bool clspv::IsGetImageHeight(StringRef name) {
 }
 
 bool clspv::IsGetImageWidth(StringRef name) {
-  return name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
+  return name.startswith("_Z15get_image_width14ocl_image1d_ro") ||
+         name.startswith("_Z15get_image_width14ocl_image1d_wo") ||
+         name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
          name.startswith("_Z15get_image_width14ocl_image2d_wo") ||
          name.startswith("_Z15get_image_width14ocl_image3d_ro") ||
          name.startswith("_Z15get_image_width14ocl_image3d_wo");

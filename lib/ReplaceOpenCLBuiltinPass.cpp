@@ -33,6 +33,7 @@
 
 #include "Passes.h"
 #include "SPIRVOp.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -2686,7 +2687,14 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
   bool Changed = false;
 
   const std::map<const char *, const char *> Map = {
-      // TODO 1D, 1Darray
+      // 1D
+      {"_Z11read_imagei14ocl_image1d_ro11ocl_sampleri",
+       "_Z11read_imagei14ocl_image1d_ro11ocl_samplerf"},
+      {"_Z12read_imageui14ocl_image1d_ro11ocl_sampleri",
+       "_Z12read_imageui14ocl_image1d_ro11ocl_samplerf"},
+      {"_Z11read_imagef14ocl_image1d_ro11ocl_sampleri",
+       "_Z11read_imagef14ocl_image1d_ro11ocl_samplerf"},
+      // TODO 1Darray
       // 2D
       {"_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i",
        "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f"},
@@ -2720,18 +2728,26 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
           // The coordinate (integer type that we can't handle).
           auto Arg2 = CI->getOperand(2);
 
-          auto FloatVecTy =
-              VectorType::get(Type::getFloatTy(M.getContext()),
-                              Arg2->getType()->getVectorNumElements());
+          uint32_t dim = clspv::ImageDimensionality(Arg0->getType());
+          // TODO(alan-baker): when arrayed images are supported fix component
+          // calculation.
+          uint32_t components = dim;
+          Type *float_ty = nullptr;
+          if (components == 1) {
+            float_ty = Type::getFloatTy(M.getContext());
+          } else {
+            float_ty = VectorType::get(Type::getFloatTy(M.getContext()),
+                                       Arg2->getType()->getVectorNumElements());
+          }
 
           auto NewFType = FunctionType::get(
-              CI->getType(), {Arg0->getType(), Arg1->getType(), FloatVecTy},
+              CI->getType(), {Arg0->getType(), Arg1->getType(), float_ty},
               false);
 
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
           auto Cast =
-              CastInst::Create(Instruction::SIToFP, Arg2, FloatVecTy, "", CI);
+              CastInst::Create(Instruction::SIToFP, Arg2, float_ty, "", CI);
 
           auto NewCI = CallInst::Create(NewF, {Arg0, Arg1, Cast}, "", CI);
 
