@@ -50,6 +50,11 @@ inline std::string SPIRVOpIntrinsicFunction() { return "spirv.op."; }
 // 0, 1 and 2 are reserved for workgroup size.
 inline int FirstLocalSpecId() { return 3; }
 
+// Name of the literal sampler initializer function.
+inline std::string TranslateSamplerInitializerFunction() {
+  return "__translate_sampler_initializer";
+}
+
 } // namespace clspv
 
 #endif

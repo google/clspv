@@ -187,7 +187,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
     outs() << "Allocate literal sampler descriptors\n";
   }
   bool Changed = false;
-  auto init_fn = M.getFunction("__translate_sampler_initializer");
+  auto init_fn = M.getFunction(clspv::TranslateSamplerInitializerFunction());
   if (!init_fn)
     return Changed;
 

@@ -31,6 +31,7 @@
 
 #include "clspv/Option.h"
 
+#include "Constants.h"
 #include "Passes.h"
 #include "SPIRVOp.h"
 #include "Types.h"
@@ -205,6 +206,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVstoreHalf(Module &M);
   bool replaceVstoreHalf2(Module &M);
   bool replaceVstoreHalf4(Module &M);
+  bool replaceUnsampledReadImage(Module &M);
   bool replaceSampledReadImageWithIntCoords(Module &M);
   bool replaceAtomics(Module &M);
   bool replaceCross(Module &M);
@@ -259,6 +261,8 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceVstoreHalf(M);
   Changed |= replaceVstoreHalf2(M);
   Changed |= replaceVstoreHalf4(M);
+  // Replace unsampled reads before converting sampled read coordinates.
+  Changed |= replaceUnsampledReadImage(M);
   Changed |= replaceSampledReadImageWithIntCoords(M);
   Changed |= replaceAtomics(M);
   Changed |= replaceCross(M);
@@ -2681,6 +2685,105 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
     // Store to the int2* we casted to.
     return new StoreInst(Combine, Index, CI);
   });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
+  bool Changed = false;
+  const std::map<const char *, const char *> Map = {
+      // 1D
+      {"_Z11read_imagef14ocl_image1d_roi",
+       "_Z11read_imagef14ocl_image1d_ro11ocl_sampleri"},
+      {"_Z11read_imagei14ocl_image1d_roi",
+       "_Z11read_imagei14ocl_image1d_ro11ocl_sampleri"},
+      {"_Z12read_imageui14ocl_image1d_roi",
+       "_Z12read_imageui14ocl_image1d_ro11ocl_sampleri"},
+      // TODO 1D array
+      // 2D
+      {"_Z11read_imagef14ocl_image2d_roDv2_i",
+       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i"},
+      {"_Z11read_imagei14ocl_image2d_roDv2_i",
+       "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i"},
+      {"_Z12read_imageui14ocl_image2d_roDv2_i",
+       "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i"},
+      // TODO 2D array
+      // 3D
+      {"_Z11read_imagef14ocl_image3d_roDv4_i",
+       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i"},
+      {"_Z11read_imagei14ocl_image3d_roDv4_i",
+       "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i"},
+      {"_Z12read_imageui14ocl_image3d_roDv4_i",
+       "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i"}};
+
+  Function *translate_sampler =
+      M.getFunction(clspv::TranslateSamplerInitializerFunction());
+  Type *sampler_type = M.getTypeByName("opencl.sampler_t");
+  for (auto Pair : Map) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Pair.first)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          // The image.
+          auto Image = CI->getOperand(0);
+
+          // The coordinate.
+          auto Coord = CI->getOperand(1);
+
+          // Create the sampler translation function if necessary.
+          if (!translate_sampler) {
+            // Create the sampler type if necessary.
+            if (!sampler_type) {
+              sampler_type =
+                  StructType::create(M.getContext(), "opencl.sampler_t");
+              sampler_type = sampler_type->getPointerTo(2);
+            }
+            auto fn_type = FunctionType::get(
+                sampler_type, {Type::getInt32Ty(M.getContext())}, false);
+            auto callee = M.getOrInsertFunction(
+                clspv::TranslateSamplerInitializerFunction(), fn_type);
+            translate_sampler = cast<Function>(callee.getCallee());
+          }
+
+          auto NewFType = FunctionType::get(
+              CI->getType(), {Image->getType(), sampler_type, Coord->getType()},
+              false);
+
+          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
+
+          // Sampler is:
+          // CLK_ADDRESS_NONE = 0
+          // CLK_FILTER_NEAREST = 0x10
+          // CLK_NORMALIZED_COORDS_FALSE = 0
+          const uint64_t data_mask = 0x10;
+          auto NewSamplerCI = CallInst::Create(
+              translate_sampler,
+              {ConstantInt::get(Type::getInt32Ty(M.getContext()), data_mask)},
+              "", CI);
+          auto NewCI =
+              CallInst::Create(NewF, {Image, NewSamplerCI, Coord}, "", CI);
+
+          CI->replaceAllUsesWith(NewCI);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
