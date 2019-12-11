@@ -29,6 +29,7 @@
 
 #include "spirv/1.0/spirv.hpp"
 
+#include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 #include "Constants.h"
@@ -2737,7 +2738,8 @@ bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
             if (!sampler_type) {
               sampler_type =
                   StructType::create(M.getContext(), "opencl.sampler_t");
-              sampler_type = sampler_type->getPointerTo(2);
+              sampler_type =
+                  sampler_type->getPointerTo(clspv::AddressSpace::Constant);
             }
             auto fn_type = FunctionType::get(
                 sampler_type, {Type::getInt32Ty(M.getContext())}, false);
