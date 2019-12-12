@@ -19,6 +19,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "Constants.h"
 #include "Passes.h"
 
 using namespace llvm;
@@ -45,7 +46,7 @@ ModulePass *createUndoTranslateSamplerFoldPass() {
 } // namespace clspv
 
 bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
-  auto F = M.getFunction("__translate_sampler_initializer");
+  auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction());
 
   if (!F) {
     return false;
@@ -64,8 +65,9 @@ bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
         BadCalls.push_back(CI);
       } else {
         Arg->print(errs());
-        llvm_unreachable(
-            "Unhandled argument to __translate_sampler_initializer!");
+        std::string msg = "Unhandled argument to ";
+        msg += clspv::TranslateSamplerInitializerFunction();
+        llvm_unreachable(msg.c_str());
       }
     }
   }
