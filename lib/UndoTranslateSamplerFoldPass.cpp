@@ -65,8 +65,9 @@ bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
         BadCalls.push_back(CI);
       } else {
         Arg->print(errs());
-        llvm_unreachable(std::string("Unhandled argument to ") +
-                         clspv::TranslateSamplerInitializerFunction());
+        std::string msg = "Unhandled argument to ";
+        msg += clspv::TranslateSamplerInitializerFunction();
+        llvm_unreachable(msg.c_str());
       }
     }
   }
