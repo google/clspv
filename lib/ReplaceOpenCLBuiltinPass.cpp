@@ -615,6 +615,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Module &M) {
 
   const std::vector<const char *> Names = {
       "_Z7barrierj",
+      // OpenCL 2.0 alias for barrier.
+      "_Z18work_group_barrierj"
   };
 
   return replaceCallsWithValue(M, Names, [](CallInst *CI) {

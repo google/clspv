@@ -46,6 +46,15 @@ def main():
         output.write("\nfloat2 __attribute((overloadable)) __clspv_vloada_half2(size_t, const __global uint*);")
         output.write("\nfloat2 __attribute((overloadable)) __clspv_vloada_half2(size_t, const __local uint*);")
         output.write("\nfloat2 __attribute((overloadable)) __clspv_vloada_half2(size_t, const __private uint*);")
+        output.write("\n");
+        # Define the OpenCL 2.0 work_group_barrier alias.
+        output.write("\n#if !defined(__OPENCL_CPP_VERSION__) && (__OPENCL_C_VERSION__ < CL_VERSION_2_0)\n")
+        output.write("#define __ovld __attribute__((overloadable))\n")
+        output.write("#define __conv __attribute__((convergent))\n")
+        output.write("void __ovld __conv work_group_barrier(cl_mem_fence_flags flags);\n")
+        output.write("#undef __ovld\n")
+        output.write("#undef __conv\n")
+        output.write("#endif\n");
 
 if __name__ == '__main__':
     main()
