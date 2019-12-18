@@ -2356,6 +2356,8 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       } else if (CFPTy->isDoubleTy()) {
         LiteralNum.push_back(FPVal & 0xFFFFFFFF);
         LiteralNum.push_back(FPVal >> 32);
+      } else if (CFPTy->isHalfTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFF);
       } else {
         CFPTy->print(errs());
         llvm_unreachable("Implement this ConstantFP Type");
