@@ -101,10 +101,10 @@ struct SPIRVOperand {
   explicit SPIRVOperand(SPIRVOperandType Ty, ArrayRef<uint32_t> NumVec)
       : Type(Ty), LiteralNum(NumVec.begin(), NumVec.end()) {}
 
-  SPIRVOperandType getType() { return Type; };
-  uint32_t getNumID() { return LiteralNum[0]; };
-  std::string getLiteralStr() { return LiteralStr; };
-  ArrayRef<uint32_t> getLiteralNum() { return LiteralNum; };
+  SPIRVOperandType getType() const { return Type; };
+  uint32_t getNumID() const { return LiteralNum[0]; };
+  std::string getLiteralStr() const { return LiteralStr; };
+  ArrayRef<uint32_t> getLiteralNum() const { return LiteralNum; };
 
   uint32_t GetNumWords() const {
     switch (Type) {
@@ -134,61 +134,65 @@ public:
     contents_ = std::move(other.contents_);
     other.contents_.clear();
   }
-  SPIRVOperandList(ArrayRef<SPIRVOperand *> init)
+  SPIRVOperandList(ArrayRef<std::shared_ptr<SPIRVOperand>> init)
       : contents_(init.begin(), init.end()) {}
-  operator ArrayRef<SPIRVOperand *>() { return contents_; }
-  void push_back(SPIRVOperand *op) { contents_.push_back(op); }
+  operator ArrayRef<std::shared_ptr<SPIRVOperand>>() { return contents_; }
+  void push_back(std::shared_ptr<SPIRVOperand> op) { contents_.push_back(op); }
   void clear() { contents_.clear(); }
   size_t size() const { return contents_.size(); }
-  SPIRVOperand *&operator[](size_t i) { return contents_[i]; }
+  const SPIRVOperand *operator[](size_t i) { return contents_[i].get(); }
 
-  const SmallVector<SPIRVOperand *, 8> &getOperands() const {
+  const SmallVector<std::shared_ptr<SPIRVOperand>, 8> &getOperands() const {
     return contents_;
   }
 
 private:
-  SmallVector<SPIRVOperand *, 8> contents_;
+  SmallVector<std::shared_ptr<SPIRVOperand>, 8> contents_;
 };
 
-SPIRVOperandList &operator<<(SPIRVOperandList &list, SPIRVOperand *elem) {
+SPIRVOperandList &operator<<(SPIRVOperandList &list,
+                             std::shared_ptr<SPIRVOperand> elem) {
   list.push_back(elem);
   return list;
 }
 
-SPIRVOperand *MkNum(uint32_t num) {
-  return new SPIRVOperand(LITERAL_INTEGER, num);
+std::shared_ptr<SPIRVOperand> MkNum(uint32_t num) {
+  return std::make_shared<SPIRVOperand>(LITERAL_INTEGER, num);
 }
-SPIRVOperand *MkInteger(ArrayRef<uint32_t> num_vec) {
-  return new SPIRVOperand(LITERAL_INTEGER, num_vec);
+std::shared_ptr<SPIRVOperand> MkInteger(ArrayRef<uint32_t> num_vec) {
+  return std::make_shared<SPIRVOperand>(LITERAL_INTEGER, num_vec);
 }
-SPIRVOperand *MkFloat(ArrayRef<uint32_t> num_vec) {
-  return new SPIRVOperand(LITERAL_FLOAT, num_vec);
+std::shared_ptr<SPIRVOperand> MkFloat(ArrayRef<uint32_t> num_vec) {
+  return std::make_shared<SPIRVOperand>(LITERAL_FLOAT, num_vec);
 }
-SPIRVOperand *MkId(uint32_t id) { return new SPIRVOperand(NUMBERID, id); }
-SPIRVOperand *MkString(StringRef str) {
-  return new SPIRVOperand(LITERAL_STRING, str);
+std::shared_ptr<SPIRVOperand> MkId(uint32_t id) {
+  return std::make_shared<SPIRVOperand>(NUMBERID, id);
+}
+std::shared_ptr<SPIRVOperand> MkString(StringRef str) {
+  return std::make_shared<SPIRVOperand>(LITERAL_STRING, str);
 }
 
 struct SPIRVInstruction {
   // Create an instruction with an opcode and no result ID, and with the given
   // operands.  This computes its own word count.
-  explicit SPIRVInstruction(spv::Op Opc, ArrayRef<SPIRVOperand *> Ops)
+  explicit SPIRVInstruction(spv::Op Opc,
+                            ArrayRef<std::shared_ptr<SPIRVOperand>> Ops)
       : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0),
         Operands(Ops.begin(), Ops.end()) {
-    for (auto *operand : Ops) {
+    for (auto &operand : Ops) {
       WordCount += uint16_t(operand->GetNumWords());
     }
   }
   // Create an instruction with an opcode and a no-zero result ID, and
   // with the given operands.  This computes its own word count.
   explicit SPIRVInstruction(spv::Op Opc, uint32_t ResID,
-                            ArrayRef<SPIRVOperand *> Ops)
+                            ArrayRef<std::shared_ptr<SPIRVOperand>> Ops)
       : WordCount(2), Opcode(static_cast<uint16_t>(Opc)), ResultID(ResID),
         Operands(Ops.begin(), Ops.end()) {
     if (ResID == 0) {
       llvm_unreachable("Result ID of 0 was provided");
     }
-    for (auto *operand : Ops) {
+    for (auto &operand : Ops) {
       WordCount += operand->GetNumWords();
     }
   }
@@ -196,13 +200,15 @@ struct SPIRVInstruction {
   uint32_t getWordCount() const { return WordCount; }
   uint16_t getOpcode() const { return Opcode; }
   uint32_t getResultID() const { return ResultID; }
-  ArrayRef<SPIRVOperand *> getOperands() const { return Operands; }
+  ArrayRef<std::shared_ptr<SPIRVOperand>> getOperands() const {
+    return Operands;
+  }
 
 private:
   uint32_t WordCount; // Check the 16-bit bound at code generation time.
   uint16_t Opcode;
   uint32_t ResultID;
-  SmallVector<SPIRVOperand *, 4> Operands;
+  SmallVector<std::shared_ptr<SPIRVOperand>, 4> Operands;
 };
 
 struct SPIRVProducerPass final : public ModulePass {
@@ -234,6 +240,12 @@ struct SPIRVProducerPass final : public ModulePass {
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
         WorkgroupSizeVarID(0), max_local_spec_id_(0) {}
+
+  virtual ~SPIRVProducerPass() {
+    for (auto *Inst : SPIRVInsts) {
+      delete Inst;
+    }
+  }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<DominatorTreeWrapperPass>();
@@ -366,7 +378,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void WriteOneWord(uint32_t Word);
   void WriteResultID(SPIRVInstruction *Inst);
   void WriteWordCountAndOpcode(SPIRVInstruction *Inst);
-  void WriteOperand(SPIRVOperand *Op);
+  void WriteOperand(const SPIRVOperand *Op);
   void WriteSPIRVBinary();
 
   // Returns true if |type| is compatible with OpConstantNull.
@@ -2070,8 +2082,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
     case Type::FloatTyID:
     case Type::DoubleTyID: {
       uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
-      SPIRVOperand *WidthOp =
-          new SPIRVOperand(SPIRVOperandType::LITERAL_INTEGER, BitWidth);
+      auto WidthOp = MkNum(BitWidth);
 
       SPIRVInstList.push_back(
           new SPIRVInstruction(spv::OpTypeFloat, nextID++, WidthOp));
@@ -5516,7 +5527,7 @@ void SPIRVProducerPass::WriteWordCountAndOpcode(SPIRVInstruction *Inst) {
   WriteOneWord(Word);
 }
 
-void SPIRVProducerPass::WriteOperand(SPIRVOperand *Op) {
+void SPIRVProducerPass::WriteOperand(const SPIRVOperand *Op) {
   SPIRVOperandType OpTy = Op->getType();
   switch (OpTy) {
   default: {
