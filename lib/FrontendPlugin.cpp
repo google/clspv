@@ -93,7 +93,7 @@ private:
           return true;
       }
     }
- 
+
     seen->erase(canonical.getTypePtr());
     return false;
   }
