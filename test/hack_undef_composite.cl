@@ -22,5 +22,3 @@ kernel void foo(global struct a* struct_out, int n) {
 // CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[float]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[uint]] [[uint]] [[array]]
 // CHECK-NOT: OpUndef
-// CHECK: OpConstantNull [[struct]]
-// CHECK-NOT: OpUndef

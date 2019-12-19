@@ -6,6 +6,8 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// Issue #473: rewrite as a clspv-opt test
+// XFAIL: *
 
 __kernel void myTest(__global float* jasper)
 {
