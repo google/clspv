@@ -2,6 +2,8 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// Issue #473: rewrite as a clspv-opt test
+// XFAIL: *
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1)))
 dest_is_array(global float *A, int n, int k) {
