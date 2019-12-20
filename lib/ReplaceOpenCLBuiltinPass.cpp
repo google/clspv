@@ -2697,8 +2697,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Module &M) {
   bool Changed = false;
   const std::map<const char *, const char *> Map = {
       // 1D
-      {"_Z11read_imageh14ocl_image1d_roi",
-       "_Z11read_imagef14ocl_image1d_roi"},
+      {"_Z11read_imageh14ocl_image1d_roi", "_Z11read_imagef14ocl_image1d_roi"},
       {"_Z11read_imageh14ocl_image1d_ro11ocl_sampleri",
        "_Z11read_imagef14ocl_image1d_ro11ocl_sampleri"},
       {"_Z11read_imageh14ocl_image1d_ro11ocl_samplerf",
@@ -2742,8 +2741,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Module &M) {
 
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
-          auto NewCI =
-              CallInst::Create(NewF, args, "", CI);
+          auto NewCI = CallInst::Create(NewF, args, "", CI);
 
           // Convert to the half type.
           auto Cast = CastInst::CreateFPCast(NewCI, CI->getType(), "", CI);
