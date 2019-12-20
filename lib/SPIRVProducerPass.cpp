@@ -128,79 +128,123 @@ private:
 
 class SPIRVOperandList {
 public:
+  typedef std::unique_ptr<SPIRVOperand> element_type;
+  typedef SmallVector<element_type, 8> container_type;
+  typedef container_type::iterator iterator;
   SPIRVOperandList() {}
   SPIRVOperandList(const SPIRVOperandList &other) = delete;
   SPIRVOperandList(SPIRVOperandList &&other) {
     contents_ = std::move(other.contents_);
     other.contents_.clear();
   }
-  SPIRVOperandList(ArrayRef<std::shared_ptr<SPIRVOperand>> init)
-      : contents_(init.begin(), init.end()) {}
-  operator ArrayRef<std::shared_ptr<SPIRVOperand>>() { return contents_; }
-  void push_back(std::shared_ptr<SPIRVOperand> op) { contents_.push_back(op); }
+  iterator begin() { return contents_.begin(); }
+  iterator end() { return contents_.end(); }
+  operator ArrayRef<element_type>() { return contents_; }
+  void push_back(element_type op) { contents_.push_back(std::move(op)); }
   void clear() { contents_.clear(); }
   size_t size() const { return contents_.size(); }
   const SPIRVOperand *operator[](size_t i) { return contents_[i].get(); }
 
-  const SmallVector<std::shared_ptr<SPIRVOperand>, 8> &getOperands() const {
-    return contents_;
-  }
+  const container_type &getOperands() const { return contents_; }
 
 private:
-  SmallVector<std::shared_ptr<SPIRVOperand>, 8> contents_;
+  container_type contents_;
 };
 
 SPIRVOperandList &operator<<(SPIRVOperandList &list,
-                             std::shared_ptr<SPIRVOperand> elem) {
-  list.push_back(elem);
+                             std::unique_ptr<SPIRVOperand> elem) {
+  list.push_back(std::move(elem));
   return list;
 }
 
-std::shared_ptr<SPIRVOperand> MkNum(uint32_t num) {
-  return std::make_shared<SPIRVOperand>(LITERAL_INTEGER, num);
+std::unique_ptr<SPIRVOperand> MkNum(uint32_t num) {
+  return std::make_unique<SPIRVOperand>(LITERAL_INTEGER, num);
 }
-std::shared_ptr<SPIRVOperand> MkInteger(ArrayRef<uint32_t> num_vec) {
-  return std::make_shared<SPIRVOperand>(LITERAL_INTEGER, num_vec);
+std::unique_ptr<SPIRVOperand> MkInteger(ArrayRef<uint32_t> num_vec) {
+  return std::make_unique<SPIRVOperand>(LITERAL_INTEGER, num_vec);
 }
-std::shared_ptr<SPIRVOperand> MkFloat(ArrayRef<uint32_t> num_vec) {
-  return std::make_shared<SPIRVOperand>(LITERAL_FLOAT, num_vec);
+std::unique_ptr<SPIRVOperand> MkFloat(ArrayRef<uint32_t> num_vec) {
+  return std::make_unique<SPIRVOperand>(LITERAL_FLOAT, num_vec);
 }
-std::shared_ptr<SPIRVOperand> MkId(uint32_t id) {
-  return std::make_shared<SPIRVOperand>(NUMBERID, id);
+std::unique_ptr<SPIRVOperand> MkId(uint32_t id) {
+  return std::make_unique<SPIRVOperand>(NUMBERID, id);
 }
-std::shared_ptr<SPIRVOperand> MkString(StringRef str) {
-  return std::make_shared<SPIRVOperand>(LITERAL_STRING, str);
+std::unique_ptr<SPIRVOperand> MkString(StringRef str) {
+  return std::make_unique<SPIRVOperand>(LITERAL_STRING, str);
 }
 
 struct SPIRVInstruction {
-  // Create an instruction with an opcode and no result ID, and with the given
-  // operands.  This computes its own word count.
-  explicit SPIRVInstruction(spv::Op Opc,
-                            ArrayRef<std::shared_ptr<SPIRVOperand>> Ops)
-      : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0),
-        Operands(Ops.begin(), Ops.end()) {
+  // Creates an instruction with an opcode and no result ID, and with the given
+  // operands.  This computes its own word count.  Takes ownership of the
+  // operands and clears |Ops|.
+  SPIRVInstruction(spv::Op Opc, SPIRVOperandList &Ops)
+      : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0) {
     for (auto &operand : Ops) {
       WordCount += uint16_t(operand->GetNumWords());
     }
-  }
-  // Create an instruction with an opcode and a no-zero result ID, and
-  // with the given operands.  This computes its own word count.
-  explicit SPIRVInstruction(spv::Op Opc, uint32_t ResID,
-                            ArrayRef<std::shared_ptr<SPIRVOperand>> Ops)
-      : WordCount(2), Opcode(static_cast<uint16_t>(Opc)), ResultID(ResID),
-        Operands(Ops.begin(), Ops.end()) {
-    if (ResID == 0) {
-      llvm_unreachable("Result ID of 0 was provided");
+    Operands.reserve(Ops.size());
+    for (auto &ptr : Ops) {
+      Operands.emplace_back(std::move(ptr));
+      ptr.reset(nullptr);
     }
+    Ops.clear();
+  }
+  // Creates an instruction with an opcode and a no-zero result ID, and
+  // with the given operands.  This computes its own word count. Takes ownership
+  // of the operands and clears |Ops|.
+  SPIRVInstruction(spv::Op Opc, uint32_t ResID, SPIRVOperandList &Ops)
+      : WordCount(2), Opcode(static_cast<uint16_t>(Opc)), ResultID(ResID) {
     for (auto &operand : Ops) {
       WordCount += operand->GetNumWords();
     }
+    Operands.reserve(Ops.size());
+    for (auto &ptr : Ops) {
+      Operands.emplace_back(std::move(ptr));
+      ptr.reset(nullptr);
+    }
+    if (ResID == 0) {
+      llvm_unreachable("Result ID of 0 was provided");
+    }
+    Ops.clear();
   }
+
+  // Creates an instruction with an opcode and no result ID, and with the single
+  // operand. This computes its own word count.
+  SPIRVInstruction(spv::Op Opc, SPIRVOperandList::element_type operand)
+      : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0) {
+    WordCount += operand->GetNumWords();
+    Operands.emplace_back(std::move(operand));
+    operand.reset(nullptr);
+  }
+  // Creates an instruction with an opcode and a non-zero result ID, and
+  // with the single operand.  This computes its own word count.
+  SPIRVInstruction(spv::Op Opc, uint32_t ResID,
+                   SPIRVOperandList::element_type operand)
+      : WordCount(2), Opcode(static_cast<uint16_t>(Opc)), ResultID(ResID) {
+    WordCount += operand->GetNumWords();
+    if (ResID == 0) {
+      llvm_unreachable("Result ID of 0 was provided");
+    }
+    Operands.emplace_back(std::move(operand));
+    operand.reset(nullptr);
+  }
+  // Creates an instruction with an opcode and a no-zero result ID, and no
+  // operands.
+  SPIRVInstruction(spv::Op Opc, uint32_t ResID)
+      : WordCount(2), Opcode(static_cast<uint16_t>(Opc)), ResultID(ResID) {
+    if (ResID == 0) {
+      llvm_unreachable("Result ID of 0 was provided");
+    }
+  }
+  // Creates an instruction with an opcode, no result ID, no type ID, and no
+  // operands.
+  SPIRVInstruction(spv::Op Opc)
+      : WordCount(1), Opcode(static_cast<uint16_t>(Opc)), ResultID(0) {}
 
   uint32_t getWordCount() const { return WordCount; }
   uint16_t getOpcode() const { return Opcode; }
   uint32_t getResultID() const { return ResultID; }
-  ArrayRef<std::shared_ptr<SPIRVOperand>> getOperands() const {
+  ArrayRef<std::unique_ptr<SPIRVOperand>> getOperands() const {
     return Operands;
   }
 
@@ -208,7 +252,7 @@ private:
   uint32_t WordCount; // Check the 16-bit bound at code generation time.
   uint16_t Opcode;
   uint32_t ResultID;
-  SmallVector<std::shared_ptr<SPIRVOperand>, 4> Operands;
+  SmallVector<std::unique_ptr<SPIRVOperand>, 4> Operands;
 };
 
 struct SPIRVProducerPass final : public ModulePass {
@@ -378,7 +422,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void WriteOneWord(uint32_t Word);
   void WriteResultID(SPIRVInstruction *Inst);
   void WriteWordCountAndOpcode(SPIRVInstruction *Inst);
-  void WriteOperand(const SPIRVOperand *Op);
+  void WriteOperand(const std::unique_ptr<SPIRVOperand> &Op);
   void WriteSPIRVBinary();
 
   // Returns true if |type| is compatible with OpConstantNull.
@@ -465,7 +509,6 @@ private:
   bool HasVariablePointers;
   Type *SamplerTy;
   DenseMap<unsigned, unsigned> SamplerLiteralToIDMap;
-  ;
 
   // If a function F has a pointer-to-__constant parameter, then this variable
   // will map F's type to (G, index of the parameter), where in a first phase
@@ -2041,7 +2084,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
 
       if (BitWidth == 1) {
-        auto *Inst = new SPIRVInstruction(spv::OpTypeBool, nextID++, {});
+        auto *Inst = new SPIRVInstruction(spv::OpTypeBool, nextID++);
         SPIRVInstList.push_back(Inst);
       } else {
         if (!clspv::Option::Int8Support()) {
@@ -2085,7 +2128,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       auto WidthOp = MkNum(BitWidth);
 
       SPIRVInstList.push_back(
-          new SPIRVInstruction(spv::OpTypeFloat, nextID++, WidthOp));
+          new SPIRVInstruction(spv::OpTypeFloat, nextID++, std::move(WidthOp)));
       break;
     }
     case Type::ArrayTyID: {
@@ -2214,7 +2257,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       break;
     }
     case Type::VoidTyID: {
-      auto *Inst = new SPIRVInstruction(spv::OpTypeVoid, nextID++, {});
+      auto *Inst = new SPIRVInstruction(spv::OpTypeVoid, nextID++);
       SPIRVInstList.push_back(Inst);
       break;
     }
@@ -3288,7 +3331,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   SPIRVOperandList Ops;
 
   auto *CapInst =
-      new SPIRVInstruction(spv::OpCapability, {MkNum(spv::CapabilityShader)});
+      new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityShader));
   SPIRVInstList.insert(InsertPoint, CapInst);
 
   bool write_without_format = false;
@@ -3297,29 +3340,29 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   for (Type *Ty : getTypeList()) {
     if (clspv::Option::Int8Support() && Ty->isIntegerTy(8)) {
       // Generate OpCapability for i8 type.
-      SPIRVInstList.insert(InsertPoint,
-                           new SPIRVInstruction(spv::OpCapability,
-                                                {MkNum(spv::CapabilityInt8)}));
+      SPIRVInstList.insert(
+          InsertPoint,
+          new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt8)));
     } else if (Ty->isIntegerTy(16)) {
       // Generate OpCapability for i16 type.
-      SPIRVInstList.insert(InsertPoint,
-                           new SPIRVInstruction(spv::OpCapability,
-                                                {MkNum(spv::CapabilityInt16)}));
+      SPIRVInstList.insert(
+          InsertPoint,
+          new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt16)));
     } else if (Ty->isIntegerTy(64)) {
       // Generate OpCapability for i64 type.
-      SPIRVInstList.insert(InsertPoint,
-                           new SPIRVInstruction(spv::OpCapability,
-                                                {MkNum(spv::CapabilityInt64)}));
+      SPIRVInstList.insert(
+          InsertPoint,
+          new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt64)));
     } else if (Ty->isHalfTy()) {
       // Generate OpCapability for half type.
-      SPIRVInstList.insert(
-          InsertPoint, new SPIRVInstruction(spv::OpCapability,
-                                            {MkNum(spv::CapabilityFloat16)}));
+      SPIRVInstList.insert(InsertPoint,
+                           new SPIRVInstruction(spv::OpCapability,
+                                                MkNum(spv::CapabilityFloat16)));
     } else if (Ty->isDoubleTy()) {
       // Generate OpCapability for double type.
-      SPIRVInstList.insert(
-          InsertPoint, new SPIRVInstruction(spv::OpCapability,
-                                            {MkNum(spv::CapabilityFloat64)}));
+      SPIRVInstList.insert(InsertPoint,
+                           new SPIRVInstruction(spv::OpCapability,
+                                                MkNum(spv::CapabilityFloat64)));
     } else if (auto *STy = dyn_cast<StructType>(Ty)) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_wo_t") ||
@@ -4857,7 +4900,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       // Generate OpReturn.
       //
-      SPIRVInstList.push_back(new SPIRVInstruction(spv::OpReturn, {}));
+      SPIRVInstList.push_back(new SPIRVInstruction(spv::OpReturn));
     } else {
       //
       // Generate OpReturnValue.
@@ -4884,7 +4927,7 @@ void SPIRVProducerPass::GenerateFuncEpilogue() {
   // Generate OpFunctionEnd
   //
 
-  auto *Inst = new SPIRVInstruction(spv::OpFunctionEnd, {});
+  auto *Inst = new SPIRVInstruction(spv::OpFunctionEnd);
   SPIRVInstList.push_back(Inst);
 }
 
@@ -5527,7 +5570,7 @@ void SPIRVProducerPass::WriteWordCountAndOpcode(SPIRVInstruction *Inst) {
   WriteOneWord(Word);
 }
 
-void SPIRVProducerPass::WriteOperand(const SPIRVOperand *Op) {
+void SPIRVProducerPass::WriteOperand(const std::unique_ptr<SPIRVOperand> &Op) {
   SPIRVOperandType OpTy = Op->getType();
   switch (OpTy) {
   default: {
@@ -5573,7 +5616,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
 
   for (auto Inst : SPIRVInstList) {
-    SPIRVOperandList Ops{Inst->getOperands()};
+    const auto &Ops = Inst->getOperands();
     spv::Op Opcode = static_cast<spv::Op>(Inst->getOpcode());
 
     switch (Opcode) {
