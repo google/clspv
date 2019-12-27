@@ -36,6 +36,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
@@ -914,6 +915,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   }
 }
 
+template<typename T, typename U>
+static void replaceAllUsesUnsafe(T* Old, U* New) {
+  while (!Old->use_empty())
+    Old->use_begin()->set(New);
+  Old->dropAllReferences();
+}
+
 void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
   clspv::NormalizeGlobalVariables(M);
 
@@ -956,9 +964,9 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
       // Create new gv with ModuleScopePrivate address space.
       Type *NewGVTy = GV->getType()->getPointerElementType();
       GlobalVariable *NewGV = new GlobalVariable(
-          M, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
-          nullptr, GV->getThreadLocalMode(), AddressSpace::ModuleScopePrivate);
-      NewGV->takeName(GV);
+          M, NewGVTy, GV->isConstant(), GV->getLinkage(), GV->getInitializer(),
+          "", nullptr, GV->getThreadLocalMode(),
+          AddressSpace::ModuleScopePrivate);
 
       const SmallVector<User *, 8> GVUsers(GV->user_begin(), GV->user_end());
       SmallVector<User *, 8> CandidateUsers;
@@ -990,20 +998,22 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
             }
           }
         }
-
-        CandidateUsers.push_back(GVU);
       }
 
-      for (User *U : CandidateUsers) {
-        // Update users of gv with new gv.
-        if (!isa<Constant>(U)) {
-          // #254: Can't change operands of a constant, but this shouldn't be
-          // something that sticks around in the module.
-          U->replaceUsesOfWith(GV, NewGV);
-        }
+      for (auto &&U : GV->users()) {
+        if (!isa<BitCastOperator>(U)) continue;
+
+        auto BC = cast<BitCastOperator>(U);
+        auto PtrTy = BC->getDestTy()->getPointerElementType()->getPointerTo(
+          AddressSpace::ModuleScopePrivate);
+        auto NewBC = ConstantExpr::getBitCast(NewGV, PtrTy);
+
+        replaceAllUsesUnsafe(BC, NewBC);
       }
+      replaceAllUsesUnsafe(GV, NewGV);
 
       // Delete original gv.
+      NewGV->takeName(GV);
       GV->eraseFromParent();
     }
   }
@@ -2516,6 +2526,25 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
         // And add an operand to the composite we are constructing
         Ops << MkId(ElementConstantID);
       }
+    } else if (auto GV = dyn_cast<GlobalVariable>(Cst)) {
+      assert(GV->hasInitializer() && VMap.count(GV->getInitializer()) &&
+             "Uninitialised, unvisited global should not show up here!");
+
+      Opcode = spv::OpVariable;
+
+      auto InitID = VMap[GV->getInitializer()];
+
+      Ops << MkNum(spv::StorageClassPrivate) << MkId(InitID);
+    } else if (auto CE = dyn_cast<ConstantExpr>(Cst)) {
+      assert(CE->getOpcode() == Instruction::BitCast &&
+             "Can only handle bitcast constexprs!");
+      while (!CE->use_empty()) {
+        if (auto I = dyn_cast<Instruction>(CE->use_begin()->getUser())) {
+          CE->getAsInstruction()->insertBefore(I);
+          CE->use_begin()->set(I->getPrevNonDebugInstruction());
+        }
+      }
+      continue;
     } else if (Cst->isNullValue()) {
       Opcode = spv::OpConstantNull;
     } else {
