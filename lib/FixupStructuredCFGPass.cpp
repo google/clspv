@@ -79,7 +79,7 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
     // Look for cases where the merge block (unique exit) of the inner loop is
     // the same block as the outer loop's continue target (loop latch).
     if (auto parent = loop->getParentLoop()) {
-      if (auto exit_block = loop->getExitBlock()) {
+      if (auto exit_block = loop->getUniqueExitBlock()) {
         if (exit_block == parent->getLoopLatch()) {
           // Create a new basic block to act as the merge of the loop.
           auto new_exit =
@@ -108,12 +108,15 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
             assert(phi_values.size() == loop_preds.size());
             if (phi_values.size() == 1) {
               // Special case: don't bother creating a single input phi.
-              phi->replaceUsesOfWith(loop_preds[0], new_exit);
+              // Instead, add the single value as an incoming value for the new
+              // exit.
+              phi->addIncoming(phi_values[0], new_exit);
             } else if (!phi_values.empty()) {
               auto new_phi = PHINode::Create(phi->getType(), phi_values.size(), "", new_exit->getTerminator());
               for (auto i = 0; i < phi_values.size(); ++i) {
                 new_phi->addIncoming(phi_values[i], loop_preds[i]);
               }
+              phi->addIncoming(new_phi, new_exit);
             }
           }
           // Remove the loop predecessors from the old exit block.
