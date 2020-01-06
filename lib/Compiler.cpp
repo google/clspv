@@ -685,6 +685,8 @@ int PopulatePassManager(
   pm->add(clspv::createUndoTruncatedSwitchConditionPass());
   pm->add(llvm::createStructurizeCFGPass(false));
   // Must be run after structurize cfg.
+  pm->add(clspv::createFixupStructuredCFGPass());
+  // Must be run after structured cfg fixup.
   pm->add(clspv::createReorderBasicBlocksPass());
   pm->add(clspv::createUndoGetElementPtrConstantExprPass());
   pm->add(clspv::createSplatArgPass());

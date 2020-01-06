@@ -25,6 +25,7 @@ void initializeClusterModuleScopeConstantVarsPass(PassRegistry &);
 void initializeClusterPodKernelArgumentsPassPass(PassRegistry &);
 void initializeDefineOpenCLWorkItemBuiltinsPassPass(PassRegistry &);
 void initializeDirectResourceAccessPassPass(PassRegistry &);
+void initializeFixupStructuredCFGPassPass(PassRegistry &);
 void initializeFunctionInternalizerPassPass(PassRegistry &);
 void initializeHideConstantLoadsPassPass(PassRegistry &);
 void initializeUnhideConstantLoadsPassPass(PassRegistry &);
