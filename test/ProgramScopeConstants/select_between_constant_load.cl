@@ -48,10 +48,9 @@ kernel void foo(global float *A, int c, int i) {
 // CHECK: [[_54:%[a-zA-Z0-9_]+]] = OpPhi [[_float:%[a-zA-Z0-9_]+]] [[_52:%[a-zA-Z0-9_]+]] [[_50:%[a-zA-Z0-9_]+]] [[_20:%[a-zA-Z0-9_]+]] [[_42:%[a-zA-Z0-9_]+]]
 // CHECK: OpSelectionMerge [[_56:%[a-zA-Z0-9_]+]] None
 // CHECK: OpBranchConditional [[_55:%[a-zA-Z0-9_]+]] [[_58:%[a-zA-Z0-9_]+]] [[_56:%[a-zA-Z0-9_]+]]
-// CHECK: [[_56:%[a-zA-Z0-9_]+]] = OpLabel
-// CHECK: [[_57:%[a-zA-Z0-9_]+]] = OpPhi [[_float:%[a-zA-Z0-9_]+]] [[_54:%[a-zA-Z0-9_]+]] [[_53:%[a-zA-Z0-9_]+]] [[_60:%[a-zA-Z0-9_]+]] [[_58:%[a-zA-Z0-9_]+]]
 // CHECK: [[_58:%[a-zA-Z0-9_]+]] = OpLabel
 // CHECK: [[_59:%[a-zA-Z0-9_]+]] = OpAccessChain [[__ptr_Private_float:%[a-zA-Z0-9_]+]] [[_36:%[a-zA-Z0-9_]+]] [[_47:%[a-zA-Z0-9_]+]]
 // CHECK: [[_60:%[a-zA-Z0-9_]+]] = OpLoad [[_float:%[a-zA-Z0-9_]+]] [[_59:%[a-zA-Z0-9_]+]]
 // CHECK: OpBranch [[_56:%[a-zA-Z0-9_]+]]
-// CHECK: OpFunctionEnd
+// CHECK: [[_56:%[a-zA-Z0-9_]+]] = OpLabel
+// CHECK: [[_57:%[a-zA-Z0-9_]+]] = OpPhi [[_float:%[a-zA-Z0-9_]+]] [[_54:%[a-zA-Z0-9_]+]] [[_53:%[a-zA-Z0-9_]+]] [[_60:%[a-zA-Z0-9_]+]] [[_58:%[a-zA-Z0-9_]+]]
