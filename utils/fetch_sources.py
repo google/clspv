@@ -84,7 +84,7 @@ class GoodCommit(object):
     def GetUrl(self, style='https'):
         """Returns the URL for the repository."""
         host = SITE_TO_HOST[self.site]
-        sep = '/' if (style is 'https') else ':'
+        sep = '/' if (style == 'https') else ':'
         return '{style}://{host}{sep}{subrepo}'.format(
                     style=style,
                     host=host,
