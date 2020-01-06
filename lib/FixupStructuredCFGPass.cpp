@@ -89,14 +89,16 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
 
           // Collect the exit's predecessors from within the loop.
           SmallVector<BasicBlock *, 4> loop_preds;
-          for (auto iter = pred_begin(exit_block); iter != pred_end(exit_block); ++iter) {
+          for (auto iter = pred_begin(exit_block); iter != pred_end(exit_block);
+               ++iter) {
             if (loop->getBlocksSet().count(*iter)) {
               loop_preds.push_back(*iter);
             }
           }
-          // Split the phi nodes so that all predecessor from within the loop
+          // Split the phi nodes so that all predecessors from within the loop
           // are part of a new phi in the new exit block.
-          for (auto iter = exit_block->begin(); &*iter != exit_block->getFirstNonPHI(); ++iter) {
+          for (auto iter = exit_block->begin();
+               &*iter != exit_block->getFirstNonPHI(); ++iter) {
             PHINode *phi = cast<PHINode>(&*iter);
             SmallVector<Value *, 4> phi_values;
             for (auto pred : loop_preds) {
@@ -112,7 +114,8 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
               // exit.
               phi->addIncoming(phi_values[0], new_exit);
             } else if (!phi_values.empty()) {
-              auto new_phi = PHINode::Create(phi->getType(), phi_values.size(), "", new_exit->getTerminator());
+              auto new_phi = PHINode::Create(phi->getType(), phi_values.size(),
+                                             "", new_exit->getTerminator());
               for (auto i = 0; i < phi_values.size(); ++i) {
                 new_phi->addIncoming(phi_values[i], loop_preds[i]);
               }
