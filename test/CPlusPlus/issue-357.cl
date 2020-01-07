@@ -1,4 +1,4 @@
-// RUN: clspv -c++ -inline-entry-points -descriptormap=%t.map %s -o %t.spv
+// RUN: clspv -cl-std=CLC++ -inline-entry-points -descriptormap=%t.map %s -o %t.spv
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 // RUN: FileCheck %s -check-prefix=MAP < %t.map
 
