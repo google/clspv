@@ -1,5 +1,6 @@
 #!amber
 
+# Test for issue #481. Checks that the splitting occurs correctly.
 SHADER compute foo OPENCL-C
 kernel void foo(global int *in, global int * out, int m, int n) {
   int sum = 0;
