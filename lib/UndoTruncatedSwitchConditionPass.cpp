@@ -82,6 +82,30 @@ private:
       auto *ext_false = ZeroExtend(sel->getFalseValue());
       result =
           SelectInst::Create(sel->getCondition(), ext_true, ext_false, "", sel);
+    } else if (auto *binop = dyn_cast<BinaryOperator>(v)) {
+      // White-list binary operators that are ok to transform.
+      if (binop->getOpcode() == Instruction::Add ||
+          binop->getOpcode() == Instruction::Sub ||
+          binop->getOpcode() == Instruction::Mul ||
+          binop->getOpcode() == Instruction::And ||
+          binop->getOpcode() == Instruction::Or ||
+          binop->getOpcode() == Instruction::Xor) {
+        auto *op1 = ZeroExtend(binop->getOperand(0));
+        auto *op2 = ZeroExtend(binop->getOperand(1));
+        auto new_binop =
+            BinaryOperator::Create(binop->getOpcode(), op1, op2, "", binop);
+        // Now, and the extended version to keep the range of the output
+        // restricted to the original bit width.
+        result = BinaryOperator::Create(
+            Instruction::And, new_binop,
+            ConstantInt::get(
+                i32_,
+                (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+            "", binop);
+      } else {
+        errs() << "Unhandled instruction feeding switch " << *v << "\n";
+        llvm_unreachable("Unhandled instruction feeding switch!");
+      }
     } else {
       errs() << "Unhandled instruction feeding switch " << *v << "\n";
       llvm_unreachable("Unhandled instruction feeding switch!");
@@ -112,6 +136,7 @@ ModulePass *createUndoTruncatedSwitchConditionPass() {
 bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
   bool Changed = false;
 
+  llvm::outs() << M << "\n";
   SmallVector<SwitchInst *, 8> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -163,6 +188,7 @@ bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
       zombie->eraseFromParent();
     }
   }
+  llvm::outs() << "AFTER\n" << M << "\n";
 
   return Changed;
 }
