@@ -37,13 +37,12 @@
 // CHECK: OpSelectionMerge %[[END_LABEL_ID:[a-zA-Z0-9_]*]] None
 // CHECK: OpBranchConditional %[[PHI_ID]] %[[IF_LABEL_ID:[a-zA-Z0-9_]*]] %[[END_LABEL_ID]]
 
-// CHECK: %[[END_LABEL_ID]] = OpLabel
-// CHECK: OpReturn
-
 // CHECK: %[[IF_LABEL_ID]] = OpLabel
 // CHECK: OpStore {{.*}} %[[CONSTANT_13_ID]]
 // CHECK: OpBranch %[[END_LABEL_ID]]
-// CHECK: OpFunctionEnd
+
+// CHECK: %[[END_LABEL_ID]] = OpLabel
+// CHECK: OpReturn
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a)
 {

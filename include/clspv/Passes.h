@@ -381,4 +381,9 @@ llvm::ModulePass *createMultiVersionUBOFunctionsPass();
 /// Specialize image types.
 llvm::ModulePass *createSpecializeImageTypesPass();
 
+/// Fixes up the structurized cfg to have valid structured control flow.
+/// Currently performs the following changes:
+/// * Add a block to split a continue block used a merge block.
+llvm::FunctionPass *createFixupStructuredCFGPass();
+
 } // namespace clspv
