@@ -46,21 +46,21 @@ exit:
 define spir_kernel void @addf(i32 %x, i32 %y) {
 entry:
   ; CHECK-LABEL addf
-  ; CHECK: [[add:%[a-zA-Z0-9_]+]] = add i32 4, %mul
-  ; CHECK-NEXT: [[and:%[a-zA-Z0-9_]+]] = and i32 [[sub]], 7
+  ; CHECK: [[add:%[a-zA-Z0-9_]+]] = add i32 16, %mul
+  ; CHECK-NEXT: [[and:%[a-zA-Z0-9_]+]] = and i32 [[sub]], 31
   ; CHECK-NEXT: switch i32 [[and]], label %default [
   ; CHECK-NEXT:   i32 1, label %one_label
   ; CHECK-NEXT:   i32 2, label %two_label
   ; CHECK-NEXT:   i32 3, label %three_label
-  ; CHECK-NEXT:   i32 4, label %four_label
+  ; CHECK-NEXT:   i32 16, label %sixteen_label
   %mul = mul i32 %x, %y
-  %trunc = trunc i32 %mul to i3
-  %add = add nuw i3 -4, %trunc
-  switch i3 %add, label %default [
-    i3 1, label %one_label
-    i3 2, label %two_label
-    i3 3, label %three_label
-    i3 -4, label %four_label
+  %trunc = trunc i32 %mul to i5
+  %add = add nuw i5 -16, %trunc
+  switch i5 %add, label %default [
+    i5 1, label %one_label
+    i5 2, label %two_label
+    i5 3, label %three_label
+    i5 -16, label %sixteen_label
   ]
 
 default:
@@ -75,7 +75,7 @@ two_label:
 three_label:
   br label %exit
 
-four_label:
+sixteen_label:
   br label %exit
 
 exit:

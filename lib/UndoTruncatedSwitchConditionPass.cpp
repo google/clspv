@@ -136,7 +136,6 @@ ModulePass *createUndoTruncatedSwitchConditionPass() {
 bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  llvm::outs() << M << "\n";
   SmallVector<SwitchInst *, 8> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -188,7 +187,6 @@ bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
       zombie->eraseFromParent();
     }
   }
-  llvm::outs() << "AFTER\n" << M << "\n";
 
   return Changed;
 }
