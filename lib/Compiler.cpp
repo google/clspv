@@ -239,91 +239,80 @@ int ParseSamplerMap(const std::string &sampler_map,
 
     // If we have a separator between declarations within a single sampler.
     if ((*i == ',') || (i == e)) {
-      enum NormalizedCoords {
-        CLK_NORMALIZED_COORDS_FALSE = 0x00,
-        CLK_NORMALIZED_COORDS_TRUE = 0x01,
-        CLK_NORMALIZED_COORDS_NOT_SET
-      } NormalizedCoord = CLK_NORMALIZED_COORDS_NOT_SET;
 
-      enum AddressingModes {
-        CLK_ADDRESS_NONE = 0x00,
-        CLK_ADDRESS_CLAMP_TO_EDGE = 0x02,
-        CLK_ADDRESS_CLAMP = 0x04,
-        CLK_ADDRESS_MIRRORED_REPEAT = 0x08,
-        CLK_ADDRESS_REPEAT = 0x06,
-        CLK_ADDRESS_NOT_SET
-      } AddressingMode = CLK_ADDRESS_NOT_SET;
-
-      enum FilterModes {
-        CLK_FILTER_NEAREST = 0x10,
-        CLK_FILTER_LINEAR = 0x20,
-        CLK_FILTER_NOT_SET
-      } FilterMode = CLK_FILTER_NOT_SET;
+      clspv::version0::SamplerNormalizedCoords NormalizedCoord =
+          clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET;
+      clspv::version0::SamplerAddressingMode AddressingMode =
+          clspv::version0::CLK_ADDRESS_NOT_SET;
+      clspv::version0::SamplerFilterMode FilterMode =
+          clspv::version0::CLK_FILTER_NOT_SET;
 
       for (auto str : samplerStrings) {
         if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
-          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
+              NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = CLK_NORMALIZED_COORDS_FALSE;
+          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_FALSE;
         } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
-          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
+              NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = CLK_NORMALIZED_COORDS_TRUE;
+          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_TRUE;
         } else if ("CLK_ADDRESS_NONE" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_NONE;
+          AddressingMode = clspv::version0::CLK_ADDRESS_NONE;
         } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_CLAMP_TO_EDGE;
+          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP_TO_EDGE;
         } else if ("CLK_ADDRESS_CLAMP" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_CLAMP;
+          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP;
         } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_MIRRORED_REPEAT;
+          AddressingMode = clspv::version0::CLK_ADDRESS_MIRRORED_REPEAT;
         } else if ("CLK_ADDRESS_REPEAT" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_REPEAT;
+          AddressingMode = clspv::version0::CLK_ADDRESS_REPEAT;
         } else if ("CLK_FILTER_NEAREST" == str) {
-          if (CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = CLK_FILTER_NEAREST;
+          FilterMode = clspv::version0::CLK_FILTER_NEAREST;
         } else if ("CLK_FILTER_LINEAR" == str) {
-          if (CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = CLK_FILTER_LINEAR;
+          FilterMode = clspv::version0::CLK_FILTER_LINEAR;
         } else {
           llvm::errs() << "Error: Unknown sampler string '" << str
                        << "' found!\n";
@@ -331,19 +320,19 @@ int ParseSamplerMap(const std::string &sampler_map,
         }
       }
 
-      if (CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
+      if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
         llvm::errs() << "Error: Sampler map entry did not contain normalized "
                         "coordinates entry!\n";
         return -1;
       }
 
-      if (CLK_ADDRESS_NOT_SET == AddressingMode) {
+      if (clspv::version0::CLK_ADDRESS_NOT_SET == AddressingMode) {
         llvm::errs() << "Error: Sampler map entry did not contain addressing "
                         "mode entry!\n";
         return -1;
       }
 
-      if (CLK_FILTER_NOT_SET == FilterMode) {
+      if (clspv::version0::CLK_FILTER_NOT_SET == FilterMode) {
         llvm::errs()
             << "Error: Sampler map entry did not contain filer mode entry!\n";
         return -1;
