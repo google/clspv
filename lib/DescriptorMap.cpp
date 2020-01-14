@@ -56,19 +56,19 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     // Addressing mode.
     const auto addressing_mode = mask & 0xe;
     switch (addressing_mode) {
-    case 0:
+    case CLK_ADDRESS_NONE:
       str << "CLK_ADDRESS_NONE";
       break;
-    case 2:
+    case CLK_ADDRESS_CLAMP_TO_EDGE:
       str << "CLK_ADDRESS_CLAMP_TO_EDGE";
       break;
-    case 4:
+    case CLK_ADDRESS_CLAMP:
       str << "CLK_ADDRESS_CLAMP";
       break;
-    case 6:
+    case CLK_ADDRESS_REPEAT:
       str << "CLK_ADDRESS_REPEAT";
       break;
-    case 8:
+    case CLK_ADDRESS_MIRRORED_REPEAT:
       str << "CLK_ADDRESS_MIRRORED_REPEAT";
       break;
     default:
@@ -78,9 +78,9 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     str << "|";
     // Filtering mode.
     const auto filtering_mode = mask & 0x30;
-    if (filtering_mode == 0x10) {
+    if (filtering_mode == CLK_FILTER_NEAREST) {
       str << "CLK_FILTER_NEAREST";
-    } else if (filtering_mode == 0x20) {
+    } else if (filtering_mode == CLK_FILTER_LINEAR) {
       str << "CLK_FILTER_LINEAR";
     } else {
       assert(0 && "Unexpected sampler filtering mode.");

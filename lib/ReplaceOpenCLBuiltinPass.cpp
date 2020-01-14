@@ -30,6 +30,7 @@
 #include "spirv/1.0/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 
 #include "Constants.h"
@@ -2908,11 +2909,10 @@ bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
 
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
-          // Sampler is:
-          // CLK_ADDRESS_NONE = 0
-          // CLK_FILTER_NEAREST = 0x10
-          // CLK_NORMALIZED_COORDS_FALSE = 0
-          const uint64_t data_mask = 0x10;
+          const uint64_t data_mask =
+              clspv::version0::CLK_ADDRESS_NONE |
+              clspv::version0::CLK_FILTER_NEAREST |
+              clspv::version0::CLK_NORMALIZED_COORDS_FALSE;
           auto NewSamplerCI = CallInst::Create(
               translate_sampler,
               {ConstantInt::get(Type::getInt32Ty(M.getContext()), data_mask)},

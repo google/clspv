@@ -23,6 +23,27 @@
 namespace clspv {
 namespace version0 {
 
+enum SamplerNormalizedCoords {
+  CLK_NORMALIZED_COORDS_FALSE = 0x00,
+  CLK_NORMALIZED_COORDS_TRUE = 0x01,
+  CLK_NORMALIZED_COORDS_NOT_SET
+};
+
+enum SamplerAddressingMode {
+  CLK_ADDRESS_NONE = 0x00,
+  CLK_ADDRESS_CLAMP_TO_EDGE = 0x02,
+  CLK_ADDRESS_CLAMP = 0x04,
+  CLK_ADDRESS_MIRRORED_REPEAT = 0x08,
+  CLK_ADDRESS_REPEAT = 0x06,
+  CLK_ADDRESS_NOT_SET
+};
+
+enum SamplerFilterMode {
+  CLK_FILTER_NEAREST = 0x10,
+  CLK_FILTER_LINEAR = 0x20,
+  CLK_FILTER_NOT_SET
+};
+
 struct DescriptorMapEntry {
   // Type of the entry.
   enum Kind { Sampler, KernelArg, Constant } kind;
