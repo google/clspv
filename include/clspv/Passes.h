@@ -37,20 +37,31 @@ void initializeClspvPasses(PassRegistry &);
 } // namespace llvm
 
 namespace clspv {
+
+/// Declare a structure with all enabled push constants and attach metadata to
+/// the module for use by the utilities that abstract push constant usage.
+/// @return An LLVM module pass.
+llvm::ModulePass *createDeclarePushConstantsPass();
+
 /// Define the work-item builtins that OpenCL has.
 /// @return An LLVM module pass.
 ///
 /// These OpenCL work-item builtins are in this pass mapped to LLVM module-scope
 /// global variables, such that:
-/// - get_global_id() is mapped to a variable named "__spirv_GlobalInvocationId"
+/// - get_global_id() is mapped to a variable named
+/// "__spirv_GlobalInvocationId".
+//    When support for the global offset is enabled, the global offset is added
+//    to "__spirv_GlobalInvocationId".
 /// - get_local_size() is mapped to a variable named "__spirv_WorkgroupSize"
 /// - get_local_id() is mapped to a variable named "__spirv_LocalInvocationId"
 /// - get_num_groups() is mapped to a variable named "__spirv_NumWorkgroups"
 /// - get_group_id() is mapped to a variable named "__spirv_WorkgroupId"
 ///
 /// These OpenCL work-item builtins are also defined:
-/// - get_work_dim() always returns 3
-/// - get_global_offset() always returns 0
+/// - get_work_dim() returns either always 3 or a value passed as a push
+//    constant
+/// - get_global_offset() returns either always 0 or a value passed as a push
+//    constant
 /// - get_global_size() is implemented by multiplying the result from
 ///   get_local_size() by the result from get_num_groups()
 ///

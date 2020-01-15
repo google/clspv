@@ -19,8 +19,11 @@
 #include "llvm/Pass.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
 
+#include "Constants.h"
 #include "Passes.h"
+#include "PushConstant.h"
 
 using namespace llvm;
 using namespace clspv;
@@ -40,6 +43,8 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
   bool defineMappedBuiltin(Module &M, StringRef FuncName,
                            StringRef GlobalVarName, unsigned DefaultValue,
                            AddressSpace::Type AddrSpace = AddressSpace::Input);
+
+  bool defineGlobalIDBuiltin(Module &M);
 
   bool defineGlobalSizeBuiltin(Module &M);
 
@@ -65,8 +70,9 @@ ModulePass *createDefineOpenCLWorkItemBuiltinsPass() {
 bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
   bool changed = false;
 
-  changed |= defineMappedBuiltin(M, "_Z13get_global_idj",
-                                 "__spirv_GlobalInvocationId", 0);
+  changed |= defineGlobalOffsetBuiltin(M);
+  changed |= defineGlobalIDBuiltin(M);
+
   changed |=
       defineMappedBuiltin(M, "_Z14get_local_sizej", "__spirv_WorkgroupSize", 1,
                           AddressSpace::ModuleScopePrivate);
@@ -77,7 +83,6 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
   changed |=
       defineMappedBuiltin(M, "_Z12get_group_idj", "__spirv_WorkgroupId", 0);
   changed |= defineGlobalSizeBuiltin(M);
-  changed |= defineGlobalOffsetBuiltin(M);
   changed |= defineWorkDimBuiltin(M);
   changed |= addWorkgroupSizeIfRequired(M);
 
@@ -95,6 +100,28 @@ GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(
 
   return GV;
 }
+
+namespace {
+Value *inBoundsDimensionCondition(IRBuilder<> &Builder, Value *Dim) {
+  // Vulkan has 3 dimensions for work-items, but the OpenCL API is written
+  // such that it could have more. We have to check whether the value provided
+  // was less than 3...
+  return Builder.CreateICmp(CmpInst::ICMP_ULT, Dim, Builder.getInt32(3));
+}
+
+Value *inBoundsDimensionIndex(IRBuilder<> &Builder, Value *Dim) {
+  auto Cond = inBoundsDimensionCondition(Builder, Dim);
+  // Select dimension 0 if the requested dimension was greater than
+  // 2, otherwise return the requested dimension.
+  return Builder.CreateSelect(Cond, Dim, Builder.getInt32(0));
+}
+
+Value *inBoundsDimensionOrDefaultValue(IRBuilder<> &Builder, Value *Dim,
+                                       Value *Val, int DefaultValue) {
+  auto Cond = inBoundsDimensionCondition(Builder, Dim);
+  return Builder.CreateSelect(Cond, Val, Builder.getInt32(DefaultValue));
+}
+} // namespace
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     Module &M, StringRef FuncName, StringRef GlobalVarName,
@@ -114,33 +141,66 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  // Vulkan has 3 dimensions for work-items, but the OpenCL API is written
-  // such that it could have more. We have to check whether the value provided
-  // was less than 3...
-  Value *Cond = Builder.CreateICmp(CmpInst::ICMP_ULT, &*F->arg_begin(),
-                                   Builder.getInt32(3));
-  // .. then (for our index into GV) make sure we don't go beyond the bounds
-  // of GV.
-  Value *Select1 =
-      Builder.CreateSelect(Cond, &*F->arg_begin(), Builder.getInt32(0));
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
 
   Value *Result = nullptr;
   if (GlobalVarName == "__spirv_WorkgroupSize") {
     // Ugly hack to work around implementation bugs.
     // Load the whole vector and extract the result
     Value *LoadVec = Builder.CreateLoad(GV);
-    Result = Builder.CreateExtractElement(LoadVec, Select1);
+    Result = Builder.CreateExtractElement(LoadVec, InBoundsDim);
   } else {
-    Value *Indices[] = {Builder.getInt32(0), Select1};
+    Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
     Value *GEP = Builder.CreateGEP(GV, Indices);
     Result = Builder.CreateLoad(GEP);
   }
 
-  // We also need to select on the result of the load, because if Cond is
-  // false, we need to return the default value to the user.
   Value *Select2 =
-      Builder.CreateSelect(Cond, Result, Builder.getInt32(DefaultValue));
+      inBoundsDimensionOrDefaultValue(Builder, Dim, Result, DefaultValue);
   Builder.CreateRet(Select2);
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
+
+  Function *F = M.getFunction("_Z13get_global_idj");
+
+  // If the builtin was not used in the module, don't create it!
+  if (nullptr == F) {
+    return false;
+  }
+
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  VectorType *VT = VectorType::get(IT, 3);
+
+  GlobalVariable *GV = createGlobalVariable(M, "__spirv_GlobalInvocationId", VT,
+                                            AddressSpace::Input);
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+
+  Value *Result = nullptr;
+  Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
+  Value *GEP = Builder.CreateGEP(GV, Indices);
+  Result = Builder.CreateLoad(GEP);
+
+  auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
+
+  // If we have a global offset we need to add it
+  Value *Ret = GidBase;
+  if (clspv::Option::GlobalOffset()) {
+    auto Goff =
+        Builder.CreateCall(M.getFunction("_Z17get_global_offsetj"), Dim);
+    Goff->setCallingConv(CallingConv::SPIR_FUNC);
+    Ret = Builder.CreateAdd(GidBase, Goff);
+  }
+
+  Builder.CreateRet(Ret);
 
   return true;
 }
@@ -179,17 +239,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  // Vulkan has 3 dimensions for work-items, but the OpenCL API is written
-  // such that it could have more. We have to check whether the value provided
-  // was less than 3...
-  Value *Cond = Builder.CreateICmp(CmpInst::ICMP_ULT, &*F->arg_begin(),
-                                   Builder.getInt32(3));
-  // ... then (for our index into GV) make sure we don't go beyond the bounds
-  // of GV.
-  Value *Select1 =
-      Builder.CreateSelect(Cond, &*F->arg_begin(), Builder.getInt32(0));
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
 
-  Value *Indices[] = {Builder.getInt32(0), Select1};
+  Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
 
   // Load the workgroup size.
   Value *LoadWGS = Builder.CreateLoad(Builder.CreateGEP(WGS, Indices));
@@ -201,9 +254,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   // global size.
   Value *Mul = Builder.CreateMul(LoadWGS, LoadNWG);
 
-  // We also need to select on the result of the load, because if Cond is
-  // false, we need to return the default value (1) to the user.
-  Value *Select2 = Builder.CreateSelect(Cond, Mul, Builder.getInt32(1));
+  auto Select2 = inBoundsDimensionOrDefaultValue(Builder, Dim, Mul, 1);
   Builder.CreateRet(Select2);
 
   return true;
@@ -212,16 +263,36 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   Function *F = M.getFunction("_Z17get_global_offsetj");
 
-  // If the builtin was not used in the module, don't create it!
-  if (nullptr == F) {
+  // If global offset support is disabled and the builtin not used in the
+  // module, don't create it. Otherwise, always define it as it's used in global
+  // ID calculations.
+  if (!clspv::Option::GlobalOffset() && (nullptr == F)) {
     return false;
+  } else {
+    auto &C = M.getContext();
+    auto Int32Ty = IntegerType::get(C, 32);
+    auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+    F = cast<Function>(
+        M.getOrInsertFunction("_Z17get_global_offsetj", FType).getCallee());
   }
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  // Get global offset is easy for us as it only returns 0.
-  Builder.CreateRet(Builder.getInt32(0));
+  if (clspv::Option::GlobalOffset()) {
+    auto Dim = &*F->arg_begin();
+    auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+    Value *Indices[] = {Builder.getInt32(0), Dim};
+    auto GoffPtr =
+        GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
+    auto GoffDimPtr = Builder.CreateInBoundsGEP(GoffPtr, Indices);
+    auto GoffDim = Builder.CreateLoad(GoffDimPtr);
+    auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, GoffDim, 0);
+    Builder.CreateRet(Ret);
+  } else {
+    // Get global offset is easy for us as it only returns 0.
+    Builder.CreateRet(Builder.getInt32(0));
+  }
 
   return true;
 }
@@ -237,8 +308,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  // Get global offset is easy for us as it only returns 3.
-  Builder.CreateRet(Builder.getInt32(3));
+  if (clspv::Option::WorkDim()) {
+    auto WDPtr = GetPushConstantPointer(BB, clspv::PushConstant::Dimensions);
+    auto WD = Builder.CreateLoad(WDPtr);
+    Builder.CreateRet(WD);
+  } else {
+    // Get global offset is easy for us as it only returns 3.
+    Builder.CreateRet(Builder.getInt32(3));
+  }
 
   return true;
 }

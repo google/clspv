@@ -386,6 +386,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateSPIRVTypes(LLVMContext &context, Module &module);
   void GenerateSPIRVConstants();
   void GenerateModuleInfo(Module &M);
+  void GeneratePushConstantDescriptormapEntries(Module &M);
   void GenerateGlobalVar(GlobalVariable &GV);
   void GenerateWorkgroupVars();
   // Generate descriptor map entries for resource variables associated with
@@ -439,6 +440,9 @@ struct SPIRVProducerPass final : public ModulePass {
   uint64_t GetTypeSizeInBits(Type *type, const DataLayout &DL);
   uint64_t GetTypeStoreSize(Type *type, const DataLayout &DL);
   uint64_t GetTypeAllocSize(Type *type, const DataLayout &DL);
+  uint32_t GetExplicitLayoutStructMemberOffset(StructType *type,
+                                               unsigned member,
+                                               const DataLayout &DL);
 
   // Returns the base pointer of |v|.
   Value *GetBasePointer(Value *v);
@@ -647,7 +651,8 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
     // If the GV is one of our special __spirv_* variables, remove the
     // initializer as it was only placed there to force LLVM to not throw the
     // value away.
-    if (GV.getName().startswith("__spirv_")) {
+    if (GV.getName().startswith("__spirv_") ||
+        GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
       GV.setInitializer(nullptr);
     }
 
@@ -676,6 +681,9 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 
   // Generate literal samplers if necessary.
   GenerateSamplers(module);
+
+  // Generate descriptor map entries for all push constants
+  GeneratePushConstantDescriptormapEntries(module);
 
   // Generate SPIRV variables.
   for (GlobalVariable &GV : module.globals()) {
@@ -1049,7 +1057,7 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
   // the same (type,arg_index) pair.  Since we can decorate a resource
   // variable with only exactly one DescriptorSet and Binding, we are
   // forced in this case to make distinct resource variables whenever
-  // the same clspv.reource.var.X function is seen with disintct
+  // the same clspv.resource.var.X function is seen with disintct
   // (set,binding) values.
   const bool always_distinct_sets =
       clspv::Option::DistinctKernelDescriptorSets();
@@ -1461,6 +1469,15 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
     }
   }
 
+  for (const GlobalVariable &GV : M.globals()) {
+    if (GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
+      auto Ty = cast<PointerType>(GV.getType())->getPointerElementType();
+      assert(Ty->isStructTy() && "Push constants have to be structures.");
+      auto STy = cast<StructType>(Ty);
+      StructTypesNeedingBlock.insert(STy);
+    }
+  }
+
   // Traverse the arrays and structures underneath each Block, and
   // mark them as needing layout.
   std::vector<Type *> work_list(StructTypesNeedingBlock.begin(),
@@ -1832,6 +1849,8 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
     return spv::StorageClassUniform;
   case AddressSpace::ModuleScopePrivate:
     return spv::StorageClassPrivate;
+  case AddressSpace::PushConstant:
+    return spv::StorageClassPushConstant;
   }
 }
 
@@ -2102,36 +2121,26 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
                                 Inst->getOpcode() != spv::OpExtInstImport;
                        });
 
-      const auto StructLayout = DL.getStructLayout(STy);
-      // Search for the correct offsets if this type was remapped.
-      std::vector<uint32_t> *offsets = nullptr;
-      auto iter = RemappedUBOTypeOffsets.find(STy);
-      if (iter != RemappedUBOTypeOffsets.end()) {
-        offsets = &iter->second;
-      }
+      if (TypesNeedingLayout.idFor(STy)) {
+        for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
+             MemberIdx++) {
+          // Ops[0] = Structure Type ID
+          // Ops[1] = Member Index(Literal Number)
+          // Ops[2] = Decoration (Offset)
+          // Ops[3] = Byte Offset (Literal Number)
+          Ops.clear();
 
-      // #error TODO(dneto): Only do this if in TypesNeedingLayout.
-      for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
-           MemberIdx++) {
-        // Ops[0] = Structure Type ID
-        // Ops[1] = Member Index(Literal Number)
-        // Ops[2] = Decoration (Offset)
-        // Ops[3] = Byte Offset (Literal Number)
-        Ops.clear();
+          Ops << MkId(STyID) << MkNum(MemberIdx)
+              << MkNum(spv::DecorationOffset);
 
-        Ops << MkId(STyID) << MkNum(MemberIdx) << MkNum(spv::DecorationOffset);
+          const auto ByteOffset =
+              GetExplicitLayoutStructMemberOffset(STy, MemberIdx, DL);
 
-        auto ByteOffset =
-            static_cast<uint32_t>(StructLayout->getElementOffset(MemberIdx));
-        if (offsets) {
-          ByteOffset = (*offsets)[MemberIdx];
+          Ops << MkNum(ByteOffset);
+
+          auto *DecoInst = new SPIRVInstruction(spv::OpMemberDecorate, Ops);
+          SPIRVInstList.insert(DecoInsertPoint, DecoInst);
         }
-        // const auto ByteOffset =
-        //    uint32_t(StructLayout->getElementOffset(MemberIdx));
-        Ops << MkNum(ByteOffset);
-
-        auto *DecoInst = new SPIRVInstruction(spv::OpMemberDecorate, Ops);
-        SPIRVInstList.insert(DecoInsertPoint, DecoInst);
       }
 
       // Generate OpDecorate.
@@ -2850,6 +2859,230 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
   }
 }
 
+namespace {
+
+bool isScalarType(Type *type) {
+  return type->isIntegerTy() || type->isFloatTy();
+}
+
+unsigned structAlignment(StructType *type,
+                         std::function<unsigned(Type *)> alignFn) {
+  unsigned maxAlign = 1;
+  for (unsigned i = 0; i < type->getStructNumElements(); i++) {
+    unsigned align = alignFn(type->getStructElementType(i));
+    maxAlign = std::max(align, maxAlign);
+  }
+  return maxAlign;
+}
+
+unsigned scalarAlignment(Type *type) {
+  // A scalar of size N has a scalar alignment of N.
+  if (isScalarType(type)) {
+    return type->getScalarSizeInBits() / 8;
+  }
+
+  // A vector or matrix type has a scalar alignment equal to that of its
+  // component type.
+  if (type->isVectorTy()) {
+    return scalarAlignment(type->getVectorElementType());
+  }
+
+  // An array type has a scalar alignment equal to that of its element type.
+  if (type->isArrayTy()) {
+    return scalarAlignment(type->getArrayElementType());
+  }
+
+  // A structure has a scalar alignment equal to the largest scalar alignment of
+  // any of its members.
+  if (type->isStructTy()) {
+    return structAlignment(cast<StructType>(type), scalarAlignment);
+  }
+
+  llvm_unreachable("Unsupported type");
+}
+
+unsigned baseAlignment(Type *type) {
+  // A scalar has a base alignment equal to its scalar alignment.
+  if (isScalarType(type)) {
+    return scalarAlignment(type);
+  }
+
+  if (type->isVectorTy()) {
+    unsigned numElems = type->getVectorNumElements();
+
+    // A two-component vector has a base alignment equal to twice its scalar
+    // alignment.
+    if (numElems == 2) {
+      return 2 * scalarAlignment(type);
+    }
+    // A three- or four-component vector has a base alignment equal to four
+    // times its scalar alignment.
+    if ((numElems == 3) || (numElems == 4)) {
+      return 4 * scalarAlignment(type);
+    }
+  }
+
+  // An array has a base alignment equal to the base alignment of its element
+  // type.
+  if (type->isArrayTy()) {
+    return baseAlignment(type->getArrayElementType());
+  }
+
+  // A structure has a base alignment equal to the largest base alignment of any
+  // of its members.
+  if (type->isStructTy()) {
+    return structAlignment(cast<StructType>(type), baseAlignment);
+  }
+
+  // TODO A row-major matrix of C columns has a base alignment equal to the base
+  // alignment of a vector of C matrix components.
+  // TODO A column-major matrix has a base alignment equal to the base alignment
+  // of the matrix column type.
+
+  llvm_unreachable("Unsupported type");
+}
+
+unsigned roundUpToMultipleOf(unsigned num, unsigned multiple) {
+  return ((num + multiple - 1) / multiple) * multiple;
+}
+
+unsigned extendedAlignment(Type *type) {
+  // A scalar, vector or matrix type has an extended alignment equal to its base
+  // alignment.
+  // TODO matrix type
+  if (isScalarType(type) || type->isVectorTy()) {
+    return baseAlignment(type);
+  }
+
+  // An array or structure type has an extended alignment equal to the largest
+  // extended alignment of any of its members, rounded up to a multiple of 16
+  if (type->isStructTy()) {
+    unsigned salign =
+        structAlignment(cast<StructType>(type), extendedAlignment);
+    return roundUpToMultipleOf(salign, 16);
+  }
+
+  if (type->isArrayTy()) {
+    unsigned salign = extendedAlignment(type->getArrayElementType());
+    return roundUpToMultipleOf(salign, 16);
+  }
+
+  llvm_unreachable("Unsupported type");
+}
+
+unsigned standardAlignment(Type *type, spv::StorageClass sclass) {
+  // If the scalarBlockLayout feature is enabled on the device then every member
+  // must be aligned according to its scalar alignment
+  if (clspv::Option::ScalarBlockLayout()) {
+    return scalarAlignment(type);
+  }
+
+  // All vectors must be aligned according to their scalar alignment
+  if (type->isVectorTy()) {
+    return scalarAlignment(type);
+  }
+
+  // If the uniformBufferStandardLayout feature is not enabled on the device,
+  // then any member of an OpTypeStruct with a storage class of Uniform and a
+  // decoration of Block must be aligned according to its extended alignment.
+  if (!clspv::Option::Std430UniformBufferLayout() &&
+      sclass == spv::StorageClassUniform) {
+    return extendedAlignment(type);
+  }
+
+  // Every other member must be aligned according to its base alignment
+  return baseAlignment(type);
+}
+
+bool improperlyStraddles(const DataLayout &DL, Type *type, unsigned offset) {
+  assert(type->isVectorTy());
+
+  unsigned size = DL.getTypeStoreSize(type);
+
+  // It is a vector with total size less than or equal to 16 bytes, and has
+  // Offset decorations placing its first byte at F and its last byte at L,
+  // where floor(F / 16) != floor(L / 16).
+  if ((size <= 16) && (offset % 16 + size > 16)) {
+    return true;
+  }
+
+  // It is a vector with total size greater than 16 bytes and has its Offset
+  // decorations placing its first byte at a non-integer multiple of 16
+  if ((size > 16) && (offset % 16 != 0)) {
+    return true;
+  }
+
+  return false;
+}
+
+// See 14.5 Shader Resource Interface in Vulkan spec
+bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
+                           spv::StorageClass SClass, unsigned Offset,
+                           unsigned PreviousMemberOffset) {
+
+  auto MemberType = STy->getElementType(Member);
+  unsigned Align = standardAlignment(MemberType, SClass);
+  auto &DL = M.getDataLayout();
+
+  // The Offset decoration of any member must be a multiple of its alignment
+  if (Offset % Align != 0) {
+    return false;
+  }
+
+  // TODO Any ArrayStride or MatrixStride decoration must be a multiple of the
+  // alignment of the array or matrix as defined above
+
+  if (!clspv::Option::ScalarBlockLayout()) {
+    // Vectors must not improperly straddle, as defined above
+    if (MemberType->isVectorTy() &&
+        improperlyStraddles(DL, MemberType, Offset)) {
+      return true;
+    }
+
+    // The Offset decoration of a member must not place it between the end
+    // of a structure or an array and the next multiple of the alignment of that
+    // structure or array
+    if (Member > 0) {
+      auto PType = STy->getElementType(Member - 1);
+      if (PType->isStructTy() || PType->isArrayTy()) {
+        unsigned PAlign = standardAlignment(PType, SClass);
+        if (Offset - PreviousMemberOffset < PAlign) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+} // namespace
+
+void SPIRVProducerPass::GeneratePushConstantDescriptormapEntries(Module &M) {
+
+  if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
+    auto const &DL = M.getDataLayout();
+    auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
+    auto STy = cast<StructType>(GV->getValueType());
+
+    for (unsigned i = 0; i < STy->getNumElements(); i++) {
+      auto pc = static_cast<clspv::PushConstant>(
+          mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
+      auto memberType = STy->getElementType(i);
+      auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
+      unsigned previousOffset = 0;
+      if (i > 0) {
+        previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
+      }
+      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
+      assert(isValidExplicitLayout(M, STy, i, spv::StorageClassPushConstant,
+                                   offset, previousOffset));
+      version0::DescriptorMapEntry::PushConstantData data = {pc, offset, size};
+      descriptorMapEntries->emplace_back(std::move(data));
+    }
+  }
+}
+
 void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   Module &M = *GV.getParent();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
@@ -3028,7 +3261,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   }
 
   if (0 != InitializerID) {
-    // Emit the ID of the intiializer as part of the variable definition.
+    // Emit the ID of the initializer as part of the variable definition.
     Ops << MkId(InitializerID);
   }
   const uint32_t var_id = nextID++;
@@ -6062,6 +6295,24 @@ uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
   }
 
   return DL.getTypeAllocSize(type);
+}
+
+uint32_t SPIRVProducerPass::GetExplicitLayoutStructMemberOffset(
+    StructType *type, unsigned member, const DataLayout &DL) {
+  const auto StructLayout = DL.getStructLayout(type);
+  // Search for the correct offsets if this type was remapped.
+  std::vector<uint32_t> *offsets = nullptr;
+  auto iter = RemappedUBOTypeOffsets.find(type);
+  if (iter != RemappedUBOTypeOffsets.end()) {
+    offsets = &iter->second;
+  }
+  auto ByteOffset =
+      static_cast<uint32_t>(StructLayout->getElementOffset(member));
+  if (offsets) {
+    ByteOffset = (*offsets)[member];
+  }
+
+  return ByteOffset;
 }
 
 void SPIRVProducerPass::setVariablePointersCapabilities(

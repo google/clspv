@@ -17,6 +17,8 @@
 
 #include "clspv/DescriptorMap.h"
 
+#include "PushConstant.h"
+
 namespace clspv {
 namespace version0 {
 
@@ -31,6 +33,9 @@ std::ostream &operator<<(std::ostream &str,
     break;
   case DescriptorMapEntry::Kind::Constant:
     str << "constant";
+    break;
+  case DescriptorMapEntry::Kind::PushConstant:
+    str << "pushconstant";
     break;
   default:
     assert(0 && "Unhandled descriptor map entry kind.");
@@ -120,6 +125,12 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
         << entry.binding << ",kind,"
         << GetArgKindName(constant_data.constant_kind) << ",hexbytes,"
         << constant_data.hex_bytes;
+    break;
+  }
+  case DescriptorMapEntry::Kind::PushConstant: {
+    const auto &data = entry.push_constant_data;
+    str << "name," << GetPushConstantName(data.pc) << ",offset," << data.offset
+        << ",size," << data.size;
     break;
   }
   default:

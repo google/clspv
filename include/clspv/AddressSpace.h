@@ -18,15 +18,16 @@
 namespace clspv {
 namespace AddressSpace {
 enum Type {
-  Private = 0,       // OpenCL private memory.
-  Global,            // OpenCL global memory.
-  Constant,          // OpenCL constant memory.
-  Local,             // OpenCL local memory.
-  Generic,           // OpenCL generic.
-  Input,             // Vulkan input memory.
-  Uniform,           // Vulkan uniform memory.
-  UniformConstant,   // Vulkan uniform constant memory.
-  ModuleScopePrivate // Vulkan private memory.
+  Private = 0,        // OpenCL private memory.
+  Global,             // OpenCL global memory.
+  Constant,           // OpenCL constant memory.
+  Local,              // OpenCL local memory.
+  Generic,            // OpenCL generic.
+  Input,              // Vulkan input memory.
+  Uniform,            // Vulkan uniform memory.
+  UniformConstant,    // Vulkan uniform constant memory.
+  ModuleScopePrivate, // Vulkan private memory.
+  PushConstant,       // Vulkan push constant.
 };
 }
 } // namespace clspv
