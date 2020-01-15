@@ -1404,7 +1404,7 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
 
           // Lastly, remember to remove the user.
           ToRemoves.push_back(CI);
-          }
+        }
       }
 
       Changed = !ToRemoves.empty();
