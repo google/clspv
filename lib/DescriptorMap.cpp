@@ -47,14 +47,14 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     str << mask << ",samplerExpr,\"";
     // See opencl-c.h for sampler expression definitions.
     // Coordinate normalization.
-    if (mask & 0x1) {
+    if (mask & kSamplerNormalizedCoordsMask) {
       str << "CLK_NORMALIZED_COORDS_TRUE";
     } else {
       str << "CLK_NORMALIZED_COORDS_FALSE";
     }
     str << "|";
     // Addressing mode.
-    const auto addressing_mode = mask & 0xe;
+    const auto addressing_mode = mask & kSamplerAddressMask;
     switch (addressing_mode) {
     case CLK_ADDRESS_NONE:
       str << "CLK_ADDRESS_NONE";
@@ -77,7 +77,7 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     }
     str << "|";
     // Filtering mode.
-    const auto filtering_mode = mask & 0x30;
+    const auto filtering_mode = mask & kSamplerFilterMask;
     if (filtering_mode == CLK_FILTER_NEAREST) {
       str << "CLK_FILTER_NEAREST";
     } else if (filtering_mode == CLK_FILTER_LINEAR) {
