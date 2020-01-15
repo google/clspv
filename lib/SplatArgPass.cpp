@@ -60,6 +60,12 @@ const char *SplatArgPass::getSplatName(StringRef Name) {
     return "_Z5clampDv3_fS_S_";
   } else if (Name.equals("_Z5clampDv4_fff")) {
     return "_Z5clampDv4_fS_S_";
+  } else if (Name.equals("_Z5clampDv2_DhDhDh")) {
+    return "_Z5clampDv2_DhS_S_";
+  } else if (Name.equals("_Z5clampDv3_DhDhDh")) {
+    return "_Z5clampDv3_DhS_S_";
+  } else if (Name.equals("_Z5clampDv4_DhDhDh")) {
+    return "_Z5clampDv4_DhS_S_";
 
   } else if (Name.equals("_Z3maxDv2_ii")) {
     return "_Z3maxDv2_iS_";
@@ -79,12 +85,24 @@ const char *SplatArgPass::getSplatName(StringRef Name) {
     return "_Z3maxDv3_fS_";
   } else if (Name.equals("_Z3maxDv4_ff")) {
     return "_Z3maxDv4_fS_";
+  } else if (Name.equals("_Z3maxDv2_DhDh")) {
+    return "_Z3maxDv2_DhS_";
+  } else if (Name.equals("_Z3maxDv3_DhDh")) {
+    return "_Z3maxDv3_DhS_";
+  } else if (Name.equals("_Z3maxDv4_DhDh")) {
+    return "_Z3maxDv4_DhS_";
   } else if (Name.equals("_Z4fmaxDv2_ff")) {
     return "_Z4fmaxDv2_fS_";
   } else if (Name.equals("_Z4fmaxDv3_ff")) {
     return "_Z4fmaxDv3_fS_";
   } else if (Name.equals("_Z4fmaxDv4_ff")) {
     return "_Z4fmaxDv4_fS_";
+  } else if (Name.equals("_Z4fmaxDv2_DhDh")) {
+    return "_Z4fmaxDv2_DhS_";
+  } else if (Name.equals("_Z4fmaxDv3_DhDh")) {
+    return "_Z4fmaxDv3_DhS_";
+  } else if (Name.equals("_Z4fmaxDv4_DhDh")) {
+    return "_Z4fmaxDv4_DhS_";
 
   } else if (Name.equals("_Z3minDv2_ii")) {
     return "_Z3minDv2_iS_";
@@ -104,12 +122,24 @@ const char *SplatArgPass::getSplatName(StringRef Name) {
     return "_Z3minDv3_fS_";
   } else if (Name.equals("_Z3minDv4_ff")) {
     return "_Z3minDv4_fS_";
+  } else if (Name.equals("_Z3minDv2_DhDh")) {
+    return "_Z3minDv2_DhS_";
+  } else if (Name.equals("_Z3minDv3_DhDh")) {
+    return "_Z3minDv3_DhS_";
+  } else if (Name.equals("_Z3minDv4_DhDh")) {
+    return "_Z3minDv4_DhS_";
   } else if (Name.equals("_Z4fminDv2_ff")) {
     return "_Z4fminDv2_fS_";
   } else if (Name.equals("_Z4fminDv3_ff")) {
     return "_Z4fminDv3_fS_";
   } else if (Name.equals("_Z4fminDv4_ff")) {
     return "_Z4fminDv4_fS_";
+  } else if (Name.equals("_Z4fminDv2_DhDh")) {
+    return "_Z4fminDv2_DhS_";
+  } else if (Name.equals("_Z4fminDv3_DhDh")) {
+    return "_Z4fminDv3_DhS_";
+  } else if (Name.equals("_Z4fminDv4_DhDh")) {
+    return "_Z4fminDv4_DhS_";
 
   } else if (Name.equals("_Z3mixDv2_fS_f")) {
     return "_Z3mixDv2_fS_S_";
@@ -117,6 +147,12 @@ const char *SplatArgPass::getSplatName(StringRef Name) {
     return "_Z3mixDv3_fS_S_";
   } else if (Name.equals("_Z3mixDv4_fS_f")) {
     return "_Z3mixDv4_fS_S_";
+  } else if (Name.equals("_Z3mixDv2_DhS_Dh")) {
+    return "_Z3mixDv2_DhS_S_";
+  } else if (Name.equals("_Z3mixDv3_DhS_Dh")) {
+    return "_Z3mixDv3_DhS_S_";
+  } else if (Name.equals("_Z3mixDv4_DhS_Dh")) {
+    return "_Z3mixDv4_DhS_S_";
   }
 
   return nullptr;
