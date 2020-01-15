@@ -97,33 +97,37 @@ struct FunctionInfo {
       }
 
       // Parse the base type
-      char typeCode = name.front();
-      name = name.drop_front(1);
-      switch (typeCode) {
-      case 'c': // char
-      case 'a': // signed char
-      case 's': // short
-      case 'i': // int
-      case 'l': // long
-        ti.signedness = ArgTypeInfo::SignedNess::Signed;
-        break;
-      case 'h': // unsigned char
-      case 't': // unsigned short
-      case 'j': // unsigned int
-      case 'm': // unsigned long
-        ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
-        break;
-      case 'f':
+      if (name.consume_front("Dh")) {
         ti.signedness = ArgTypeInfo::SignedNess::None;
-        break;
-      case 'S':
-        ti = prev_ti;
-        if (!name.consume_front("_")) {
+      } else {
+        char typeCode = name.front();
+        name = name.drop_front(1);
+        switch (typeCode) {
+        case 'c': // char
+        case 'a': // signed char
+        case 's': // short
+        case 'i': // int
+        case 'l': // long
+          ti.signedness = ArgTypeInfo::SignedNess::Signed;
+          break;
+        case 'h': // unsigned char
+        case 't': // unsigned short
+        case 'j': // unsigned int
+        case 'm': // unsigned long
+          ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+          break;
+        case 'f':
+          ti.signedness = ArgTypeInfo::SignedNess::None;
+          break;
+        case 'S':
+          ti = prev_ti;
+          if (!name.consume_front("_")) {
+            return false;
+          }
+          break;
+        default:
           return false;
         }
-        break;
-      default:
-        return false;
       }
 
       finfo->argTypeInfos.push_back(ti);
@@ -1366,7 +1370,10 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
           bool DstIsInt = DstType->isIntOrIntVectorTy();
 
           Value *V;
-          if (SrcIsFloat && DstIsFloat) {
+          if (SrcType == DstType && DstIsSigned == SrcIsSigned) {
+            // Unnecessary cast operation.
+            V = SrcValue;
+          } else if (SrcIsFloat && DstIsFloat) {
             V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
           } else if (SrcIsFloat && DstIsInt) {
             if (DstIsSigned) {
