@@ -103,30 +103,30 @@ struct FunctionInfo {
         char typeCode = name.front();
         name = name.drop_front(1);
         switch (typeCode) {
-          case 'c': // char
-          case 'a': // signed char
-          case 's': // short
-          case 'i': // int
-          case 'l': // long
-            ti.signedness = ArgTypeInfo::SignedNess::Signed;
-            break;
-          case 'h': // unsigned char
-          case 't': // unsigned short
-          case 'j': // unsigned int
-          case 'm': // unsigned long
-            ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
-            break;
-          case 'f':
-            ti.signedness = ArgTypeInfo::SignedNess::None;
-            break;
-          case 'S':
-            ti = prev_ti;
-            if (!name.consume_front("_")) {
-              return false;
-            }
-            break;
-          default:
+        case 'c': // char
+        case 'a': // signed char
+        case 's': // short
+        case 'i': // int
+        case 'l': // long
+          ti.signedness = ArgTypeInfo::SignedNess::Signed;
+          break;
+        case 'h': // unsigned char
+        case 't': // unsigned short
+        case 'j': // unsigned int
+        case 'm': // unsigned long
+          ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+          break;
+        case 'f':
+          ti.signedness = ArgTypeInfo::SignedNess::None;
+          break;
+        case 'S':
+          ti = prev_ti;
+          if (!name.consume_front("_")) {
             return false;
+          }
+          break;
+        default:
+          return false;
         }
       }
 
