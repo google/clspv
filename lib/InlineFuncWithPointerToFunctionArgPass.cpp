@@ -107,7 +107,7 @@ bool InlineFuncWithPointerToFunctionArgPass::InlineFunctions(Module &M) {
     InlineFunctionInfo IFI;
     CallSite CS(Call);
     // Disable generation of lifetime intrinsic.
-    Changed |= InlineFunction(CS, IFI, nullptr, false);
+    Changed |= InlineFunction(CS, IFI, nullptr, false).isSuccess();
   }
 
   // Remove dead functions.

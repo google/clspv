@@ -67,7 +67,7 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
 
       for (CallInst *CI : Calls) {
         InlineFunctionInfo info;
-        changed |= InlineFunction(CI, info);
+        changed |= InlineFunction(CI, info).isSuccess();
       }
 
       // If we inlined all the calls to the function, remove it.
