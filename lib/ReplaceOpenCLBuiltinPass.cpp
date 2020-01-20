@@ -30,6 +30,7 @@
 #include "spirv/1.0/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 
 #include "Constants.h"
@@ -96,33 +97,37 @@ struct FunctionInfo {
       }
 
       // Parse the base type
-      char typeCode = name.front();
-      name = name.drop_front(1);
-      switch (typeCode) {
-      case 'c': // char
-      case 'a': // signed char
-      case 's': // short
-      case 'i': // int
-      case 'l': // long
-        ti.signedness = ArgTypeInfo::SignedNess::Signed;
-        break;
-      case 'h': // unsigned char
-      case 't': // unsigned short
-      case 'j': // unsigned int
-      case 'm': // unsigned long
-        ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
-        break;
-      case 'f':
+      if (name.consume_front("Dh")) {
         ti.signedness = ArgTypeInfo::SignedNess::None;
-        break;
-      case 'S':
-        ti = prev_ti;
-        if (!name.consume_front("_")) {
+      } else {
+        char typeCode = name.front();
+        name = name.drop_front(1);
+        switch (typeCode) {
+        case 'c': // char
+        case 'a': // signed char
+        case 's': // short
+        case 'i': // int
+        case 'l': // long
+          ti.signedness = ArgTypeInfo::SignedNess::Signed;
+          break;
+        case 'h': // unsigned char
+        case 't': // unsigned short
+        case 'j': // unsigned int
+        case 'm': // unsigned long
+          ti.signedness = ArgTypeInfo::SignedNess::Unsigned;
+          break;
+        case 'f':
+          ti.signedness = ArgTypeInfo::SignedNess::None;
+          break;
+        case 'S':
+          ti = prev_ti;
+          if (!name.consume_front("_")) {
+            return false;
+          }
+          break;
+        default:
           return false;
         }
-        break;
-      default:
-        return false;
       }
 
       finfo->argTypeInfos.push_back(ti);
@@ -207,6 +212,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVstoreHalf(Module &M);
   bool replaceVstoreHalf2(Module &M);
   bool replaceVstoreHalf4(Module &M);
+  bool replaceHalfReadImage(Module &M);
+  bool replaceHalfWriteImage(Module &M);
   bool replaceUnsampledReadImage(Module &M);
   bool replaceSampledReadImageWithIntCoords(Module &M);
   bool replaceAtomics(Module &M);
@@ -262,6 +269,9 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   Changed |= replaceVstoreHalf(M);
   Changed |= replaceVstoreHalf2(M);
   Changed |= replaceVstoreHalf4(M);
+  // Replace the half image builtins before handling other image builtins.
+  Changed |= replaceHalfReadImage(M);
+  Changed |= replaceHalfWriteImage(M);
   // Replace unsampled reads before converting sampled read coordinates.
   Changed |= replaceUnsampledReadImage(M);
   Changed |= replaceSampledReadImageWithIntCoords(M);
@@ -1360,7 +1370,10 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Module &M) {
           bool DstIsInt = DstType->isIntOrIntVectorTy();
 
           Value *V;
-          if (SrcIsFloat && DstIsFloat) {
+          if (SrcType == DstType && DstIsSigned == SrcIsSigned) {
+            // Unnecessary cast operation.
+            V = SrcValue;
+          } else if (SrcIsFloat && DstIsFloat) {
             V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
           } else if (SrcIsFloat && DstIsInt) {
             if (DstIsSigned) {
@@ -1894,6 +1907,10 @@ bool ReplaceOpenCLBuiltinPass::replaceMadandMad24andMul24(Module &M) {
           {"_Z3madDv2_fS_S_", {Instruction::FMul, Instruction::FAdd}},
           {"_Z3madDv3_fS_S_", {Instruction::FMul, Instruction::FAdd}},
           {"_Z3madDv4_fS_S_", {Instruction::FMul, Instruction::FAdd}},
+          {"_Z3madDhDhDh", {Instruction::FMul, Instruction::FAdd}},
+          {"_Z3madDv2_DhS_S_", {Instruction::FMul, Instruction::FAdd}},
+          {"_Z3madDv3_DhS_S_", {Instruction::FMul, Instruction::FAdd}},
+          {"_Z3madDv4_DhS_S_", {Instruction::FMul, Instruction::FAdd}},
           {"_Z5mad24iii", {Instruction::Mul, Instruction::Add}},
           {"_Z5mad24Dv2_iS_S_", {Instruction::Mul, Instruction::Add}},
           {"_Z5mad24Dv3_iS_S_", {Instruction::Mul, Instruction::Add}},
@@ -2688,6 +2705,152 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Module &M) {
   });
 }
 
+bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Module &M) {
+  bool Changed = false;
+  const std::map<const char *, const char *> Map = {
+      // 1D
+      {"_Z11read_imageh14ocl_image1d_roi", "_Z11read_imagef14ocl_image1d_roi"},
+      {"_Z11read_imageh14ocl_image1d_ro11ocl_sampleri",
+       "_Z11read_imagef14ocl_image1d_ro11ocl_sampleri"},
+      {"_Z11read_imageh14ocl_image1d_ro11ocl_samplerf",
+       "_Z11read_imagef14ocl_image1d_ro11ocl_samplerf"},
+      // TODO 1D array
+      // 2D
+      {"_Z11read_imageh14ocl_image2d_roDv2_i",
+       "_Z11read_imagef14ocl_image2d_roDv2_i"},
+      {"_Z11read_imageh14ocl_image2d_ro11ocl_samplerDv2_i",
+       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i"},
+      {"_Z11read_imageh14ocl_image2d_ro11ocl_samplerDv2_f",
+       "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f"},
+      // TODO 2D array
+      // 3D
+      {"_Z11read_imageh14ocl_image3d_roDv4_i",
+       "_Z11read_imagef14ocl_image3d_roDv4_i"},
+      {"_Z11read_imageh14ocl_image3d_ro11ocl_samplerDv4_i",
+       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i"},
+      {"_Z11read_imageh14ocl_image3d_ro11ocl_samplerDv4_f",
+       "_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f"}};
+
+  for (auto Pair : Map) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Pair.first)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          SmallVector<Type *, 3> types;
+          SmallVector<Value *, 3> args;
+          for (auto i = 0; i < CI->getNumArgOperands(); ++i) {
+            types.push_back(CI->getArgOperand(i)->getType());
+            args.push_back(CI->getArgOperand(i));
+          }
+
+          auto NewFType = FunctionType::get(
+              VectorType::get(Type::getFloatTy(M.getContext()),
+                              CI->getType()->getVectorNumElements()),
+              types, false);
+
+          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
+
+          auto NewCI = CallInst::Create(NewF, args, "", CI);
+
+          // Convert to the half type.
+          auto Cast = CastInst::CreateFPCast(NewCI, CI->getType(), "", CI);
+
+          CI->replaceAllUsesWith(Cast);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Module &M) {
+  bool Changed = false;
+  const std::map<const char *, const char *> Map = {
+      // 1D
+      {"_Z12write_imageh14ocl_image1d_woiDv4_Dh",
+       "_Z12write_imagef14ocl_image1d_woiDv4_f"},
+      // TODO 1D array
+      // 2D
+      {"_Z12write_imageh14ocl_image2d_woDv2_iDv4_Dh",
+       "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f"},
+      // TODO 2D array
+      // 3D
+      {"_Z12write_imageh14ocl_image3d_woDv4_iDv4_Dh",
+       "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f"}};
+
+  for (auto Pair : Map) {
+    // If we find a function with the matching name.
+    if (auto F = M.getFunction(Pair.first)) {
+      SmallVector<Instruction *, 4> ToRemoves;
+
+      // Walk the users of the function.
+      for (auto &U : F->uses()) {
+        if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+          SmallVector<Type *, 3> types(3);
+          SmallVector<Value *, 3> args(3);
+
+          // Image
+          types[0] = CI->getArgOperand(0)->getType();
+          args[0] = CI->getArgOperand(0);
+
+          // Coord
+          types[1] = CI->getArgOperand(1)->getType();
+          args[1] = CI->getArgOperand(1);
+
+          // Data
+          types[2] = VectorType::get(
+              Type::getFloatTy(M.getContext()),
+              CI->getArgOperand(2)->getType()->getVectorNumElements());
+
+          auto NewFType =
+              FunctionType::get(Type::getVoidTy(M.getContext()), types, false);
+
+          auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
+
+          // Convert data to the float type.
+          auto Cast =
+              CastInst::CreateFPCast(CI->getArgOperand(2), types[2], "", CI);
+          args[2] = Cast;
+
+          auto NewCI = CallInst::Create(NewF, args, "", CI);
+
+          // Lastly, remember to remove the user.
+          ToRemoves.push_back(CI);
+        }
+      }
+
+      Changed = !ToRemoves.empty();
+
+      // And cleanup the calls we don't use anymore.
+      for (auto V : ToRemoves) {
+        V->eraseFromParent();
+      }
+
+      // And remove the function we don't need either too.
+      F->eraseFromParent();
+    }
+  }
+
+  return Changed;
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
   bool Changed = false;
   const std::map<const char *, const char *> Map = {
@@ -2718,6 +2881,9 @@ bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
   Function *translate_sampler =
       M.getFunction(clspv::TranslateSamplerInitializerFunction());
   Type *sampler_type = M.getTypeByName("opencl.sampler_t");
+  if (sampler_type) {
+    sampler_type = sampler_type->getPointerTo(clspv::AddressSpace::Constant);
+  }
   for (auto Pair : Map) {
     // If we find a function with the matching name.
     if (auto F = M.getFunction(Pair.first)) {
@@ -2754,11 +2920,10 @@ bool ReplaceOpenCLBuiltinPass::replaceUnsampledReadImage(Module &M) {
 
           auto NewF = M.getOrInsertFunction(Pair.second, NewFType);
 
-          // Sampler is:
-          // CLK_ADDRESS_NONE = 0
-          // CLK_FILTER_NEAREST = 0x10
-          // CLK_NORMALIZED_COORDS_FALSE = 0
-          const uint64_t data_mask = 0x10;
+          const uint64_t data_mask =
+              clspv::version0::CLK_ADDRESS_NONE |
+              clspv::version0::CLK_FILTER_NEAREST |
+              clspv::version0::CLK_NORMALIZED_COORDS_FALSE;
           auto NewSamplerCI = CallInst::Create(
               translate_sampler,
               {ConstantInt::get(Type::getInt32Ty(M.getContext()), data_mask)},

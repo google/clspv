@@ -2420,6 +2420,8 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
       } else if (CFPTy->isDoubleTy()) {
         LiteralNum.push_back(FPVal & 0xFFFFFFFF);
         LiteralNum.push_back(FPVal >> 32);
+      } else if (CFPTy->isHalfTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFF);
       } else {
         CFPTy->print(errs());
         llvm_unreachable("Implement this ConstantFP Type");
@@ -3575,10 +3577,25 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   // Ops[1] = Version (LiteralNum)
   //
   Ops.clear();
-  if (clspv::Option::CPlusPlus()) {
-    Ops << MkNum(spv::SourceLanguageOpenCL_CPP) << MkNum(100);
-  } else {
+  switch (clspv::Option::Language()) {
+  case clspv::Option::SourceLanguage::OpenCL_C_10:
+    Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(100);
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_11:
+    Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(110);
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_12:
     Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(120);
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_20:
+    Ops << MkNum(spv::SourceLanguageOpenCL_C) << MkNum(200);
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP:
+    Ops << MkNum(spv::SourceLanguageOpenCL_CPP) << MkNum(100);
+    break;
+  default:
+    Ops << MkNum(spv::SourceLanguageUnknown) << MkNum(0);
+    break;
   }
 
   auto *OpenSourceInst = new SPIRVInstruction(spv::OpSource, Ops);
@@ -5399,6 +5416,10 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z5clampDv2_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv3_fS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z5clampDv4_fS_S_", glsl::ExtInst::ExtInstFClamp)
+      .Case("_Z5clampDhDhDh", glsl::ExtInst::ExtInstFClamp)
+      .Case("_Z5clampDv2_DhS_S_", glsl::ExtInst::ExtInstFClamp)
+      .Case("_Z5clampDv3_DhS_S_", glsl::ExtInst::ExtInstFClamp)
+      .Case("_Z5clampDv4_DhS_S_", glsl::ExtInst::ExtInstFClamp)
       .Case("_Z3maxcc", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv2_cS_", glsl::ExtInst::ExtInstSMax)
       .Case("_Z3maxDv3_cS_", glsl::ExtInst::ExtInstSMax)
@@ -5435,6 +5456,10 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z3maxDv2_fS_", glsl::ExtInst::ExtInstFMax)
       .Case("_Z3maxDv3_fS_", glsl::ExtInst::ExtInstFMax)
       .Case("_Z3maxDv4_fS_", glsl::ExtInst::ExtInstFMax)
+      .Case("_Z3maxDhDh", glsl::ExtInst::ExtInstFMax)
+      .Case("_Z3maxDv2_DhS_", glsl::ExtInst::ExtInstFMax)
+      .Case("_Z3maxDv3_DhS_", glsl::ExtInst::ExtInstFMax)
+      .Case("_Z3maxDv4_DhS_", glsl::ExtInst::ExtInstFMax)
       .StartsWith("_Z4fmax", glsl::ExtInst::ExtInstFMax)
       .Case("_Z3mincc", glsl::ExtInst::ExtInstSMin)
       .Case("_Z3minDv2_cS_", glsl::ExtInst::ExtInstSMin)
@@ -5472,6 +5497,10 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
       .Case("_Z3minDv2_fS_", glsl::ExtInst::ExtInstFMin)
       .Case("_Z3minDv3_fS_", glsl::ExtInst::ExtInstFMin)
       .Case("_Z3minDv4_fS_", glsl::ExtInst::ExtInstFMin)
+      .Case("_Z3minDhDh", glsl::ExtInst::ExtInstFMin)
+      .Case("_Z3minDv2_DhS_", glsl::ExtInst::ExtInstFMin)
+      .Case("_Z3minDv3_DhS_", glsl::ExtInst::ExtInstFMin)
+      .Case("_Z3minDv4_DhS_", glsl::ExtInst::ExtInstFMin)
       .StartsWith("_Z4fmin", glsl::ExtInst::ExtInstFMin)
       .StartsWith("_Z7degrees", glsl::ExtInst::ExtInstDegrees)
       .StartsWith("_Z7radians", glsl::ExtInst::ExtInstRadians)

@@ -110,9 +110,6 @@ bool KeepUnusedArguments();
 // Returns true if clspv should allow 8-bit integers.
 bool Int8Support();
 
-// Returns true when compiling C++.
-bool CPlusPlus();
-
 // Returns true when images are supported.
 bool ImageSupport();
 
@@ -121,6 +118,24 @@ bool UseSamplerMap();
 
 // Sets whether or not to use the sampler map.
 void SetUseSamplerMap(bool use);
+
+// Returns the source language.
+enum class SourceLanguage {
+  Unknown,
+  OpenCL_C_10,
+  OpenCL_C_11,
+  OpenCL_C_12,
+  OpenCL_C_20,
+  OpenCL_CPP
+};
+
+SourceLanguage Language();
+
+// Returns true when the source language makes use of the generic address space.
+static bool LanguageUsesGenericAddressSpace() {
+  return (Language() == SourceLanguage::OpenCL_CPP) ||
+         ((Language() == SourceLanguage::OpenCL_C_20));
+}
 
 } // namespace Option
 } // namespace clspv

@@ -30,7 +30,6 @@
 // CHECK: %[[ELSE_SAMPLE_ID:[a-zA-Z0-9_]*]] = OpImageSampleExplicitLod %[[FLOAT4_TYPE_ID]] %[[ELSE_SAMPLED_IMAGE_ID]] %[[C_LOAD_ID]] Lod %[[FP_CONSTANT_0_ID]]
 // CHECK: OpLabel
 // CHECK: OpLabel
-// CHECK: OpLabel
 // CHECK: %[[IF_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[SAMPLER_TYPE_ID]] %[[SAMPLER_MAP_ARG0_ID]]
 // CHECK: %[[IF_SAMPLED_IMAGE_ID:[a-zA-Z0-9_]*]] = OpSampledImage %[[SAMPLED_IMAGE_TYPE_ID]] %[[I_LOAD_ID]] %[[IF_LOAD_ID]]
 // CHECK: %[[IF_SAMPLE_ID:[a-zA-Z0-9_]*]] = OpImageSampleExplicitLod %[[FLOAT4_TYPE_ID]] %[[IF_SAMPLED_IMAGE_ID]] %[[C_LOAD_ID]] Lod %[[FP_CONSTANT_0_ID]]

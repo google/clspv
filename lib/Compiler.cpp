@@ -239,91 +239,80 @@ int ParseSamplerMap(const std::string &sampler_map,
 
     // If we have a separator between declarations within a single sampler.
     if ((*i == ',') || (i == e)) {
-      enum NormalizedCoords {
-        CLK_NORMALIZED_COORDS_FALSE = 0x00,
-        CLK_NORMALIZED_COORDS_TRUE = 0x01,
-        CLK_NORMALIZED_COORDS_NOT_SET
-      } NormalizedCoord = CLK_NORMALIZED_COORDS_NOT_SET;
 
-      enum AddressingModes {
-        CLK_ADDRESS_NONE = 0x00,
-        CLK_ADDRESS_CLAMP_TO_EDGE = 0x02,
-        CLK_ADDRESS_CLAMP = 0x04,
-        CLK_ADDRESS_MIRRORED_REPEAT = 0x08,
-        CLK_ADDRESS_REPEAT = 0x06,
-        CLK_ADDRESS_NOT_SET
-      } AddressingMode = CLK_ADDRESS_NOT_SET;
-
-      enum FilterModes {
-        CLK_FILTER_NEAREST = 0x10,
-        CLK_FILTER_LINEAR = 0x20,
-        CLK_FILTER_NOT_SET
-      } FilterMode = CLK_FILTER_NOT_SET;
+      clspv::version0::SamplerNormalizedCoords NormalizedCoord =
+          clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET;
+      clspv::version0::SamplerAddressingMode AddressingMode =
+          clspv::version0::CLK_ADDRESS_NOT_SET;
+      clspv::version0::SamplerFilterMode FilterMode =
+          clspv::version0::CLK_FILTER_NOT_SET;
 
       for (auto str : samplerStrings) {
         if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
-          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
+              NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = CLK_NORMALIZED_COORDS_FALSE;
+          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_FALSE;
         } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
-          if (CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
+          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
+              NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = CLK_NORMALIZED_COORDS_TRUE;
+          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_TRUE;
         } else if ("CLK_ADDRESS_NONE" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_NONE;
+          AddressingMode = clspv::version0::CLK_ADDRESS_NONE;
         } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_CLAMP_TO_EDGE;
+          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP_TO_EDGE;
         } else if ("CLK_ADDRESS_CLAMP" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_CLAMP;
+          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP;
         } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_MIRRORED_REPEAT;
+          AddressingMode = clspv::version0::CLK_ADDRESS_MIRRORED_REPEAT;
         } else if ("CLK_ADDRESS_REPEAT" == str) {
-          if (CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = CLK_ADDRESS_REPEAT;
+          AddressingMode = clspv::version0::CLK_ADDRESS_REPEAT;
         } else if ("CLK_FILTER_NEAREST" == str) {
-          if (CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = CLK_FILTER_NEAREST;
+          FilterMode = clspv::version0::CLK_FILTER_NEAREST;
         } else if ("CLK_FILTER_LINEAR" == str) {
-          if (CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = CLK_FILTER_LINEAR;
+          FilterMode = clspv::version0::CLK_FILTER_LINEAR;
         } else {
           llvm::errs() << "Error: Unknown sampler string '" << str
                        << "' found!\n";
@@ -331,19 +320,19 @@ int ParseSamplerMap(const std::string &sampler_map,
         }
       }
 
-      if (CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
+      if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
         llvm::errs() << "Error: Sampler map entry did not contain normalized "
                         "coordinates entry!\n";
         return -1;
       }
 
-      if (CLK_ADDRESS_NOT_SET == AddressingMode) {
+      if (clspv::version0::CLK_ADDRESS_NOT_SET == AddressingMode) {
         llvm::errs() << "Error: Sampler map entry did not contain addressing "
                         "mode entry!\n";
         return -1;
       }
 
-      if (CLK_FILTER_NOT_SET == FilterMode) {
+      if (clspv::version0::CLK_FILTER_NOT_SET == FilterMode) {
         llvm::errs()
             << "Error: Sampler map entry did not contain filer mode entry!\n";
         return -1;
@@ -407,14 +396,25 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   }
 
   clang::LangStandard::Kind standard;
-  if (clspv::Option::CPlusPlus()) {
-    standard = clang::LangStandard::lang_openclcpp;
-  } else {
+  switch (clspv::Option::Language()) {
+  case clspv::Option::SourceLanguage::OpenCL_C_10:
+    standard = clang::LangStandard::lang_opencl10;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_11:
+    standard = clang::LangStandard::lang_opencl11;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_12:
     standard = clang::LangStandard::lang_opencl12;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_20:
+    standard = clang::LangStandard::lang_opencl20;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP:
+    standard = clang::LangStandard::lang_openclcpp;
+    break;
+  default:
+    llvm_unreachable("Unknown source language");
   }
-
-  // We are targeting OpenCL 1.2 only
-  instance.getLangOpts().OpenCLVersion = 120;
 
   instance.getLangOpts().C99 = true;
   instance.getLangOpts().RTTI = false;
@@ -653,7 +653,7 @@ int PopulatePassManager(
     pm->add(clspv::createInlineFuncWithSingleCallSitePass());
   }
 
-  if (clspv::Option::CPlusPlus()) {
+  if (clspv::Option::LanguageUsesGenericAddressSpace()) {
     pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
   }
 
@@ -685,6 +685,8 @@ int PopulatePassManager(
   pm->add(clspv::createUndoTruncatedSwitchConditionPass());
   pm->add(llvm::createStructurizeCFGPass(false));
   // Must be run after structurize cfg.
+  pm->add(clspv::createFixupStructuredCFGPass());
+  // Must be run after structured cfg fixup.
   pm->add(clspv::createReorderBasicBlocksPass());
   pm->add(clspv::createUndoGetElementPtrConstantExprPass());
   pm->add(clspv::createSplatArgPass());
@@ -758,8 +760,10 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
-  if (clspv::Option::CPlusPlus() && !clspv::Option::InlineEntryPoints()) {
-    llvm::errs() << "cannot use -c++ without -inline-entry-points\n";
+  if (clspv::Option::LanguageUsesGenericAddressSpace() &&
+      !clspv::Option::InlineEntryPoints()) {
+    llvm::errs() << "cannot compile languages that use the generic address "
+                    "space (e.g. CLC++, CL2.0) without -inline-entry-points\n";
     return -1;
   }
 

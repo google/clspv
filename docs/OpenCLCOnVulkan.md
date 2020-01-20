@@ -41,7 +41,7 @@ The SPIR-V as produced from the OpenCL C language can make use of the following
 capabilities:
 
 - `Shader` as we are targeting the OpenCL C language at a Vulkan implementation.
-- `VariablePointersStorageBuffer`, from the _SPRV\_KHR\_variable\_pointers_ extension.
+- `VariablePointersStorageBuffer`, from the _SPV\_KHR\_variable\_pointers_ extension.
 - `VariablePointers`, from the _SPV\_KHR\_variable\_pointers_ extension.
   - *Note*: the compiler attempts to add the minimal variable pointers capability required.
 - `Int8` if char or uchar types (or composites of them) are used.

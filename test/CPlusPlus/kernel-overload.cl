@@ -1,4 +1,4 @@
-// RUN: clspv -w -c++ -inline-entry-points -verify %s
+// RUN: clspv -w -cl-std=CLC++ -inline-entry-points -verify %s
 
 void kernel test(global int* ptr) {} //expected-note{{previous definition is here}}
 void kernel test(local int* ptr) {}

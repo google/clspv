@@ -1,0 +1,30 @@
+#!amber
+
+# Test for issue #481. Checks that the splitting occurs correctly.
+SHADER compute foo OPENCL-C
+kernel void foo(global int *in, global int * out, int m, int n) {
+  int sum = 0;
+  for (int i = 0; i < n; ++i) {
+    int j = 0;
+    do {
+      sum += in[i * m + j];
+    } while (++j < m);
+  }
+  *out = sum;
+}
+END
+
+BUFFER in DATA_TYPE int32 SIZE 32 SERIES_FROM 0 INC_BY 1
+BUFFER out DATA_TYPE int32 SIZE 1 FILL 0
+
+PIPELINE compute pipe
+  ATTACH foo ENTRY_POINT foo
+  SET KERNEL ARG_NAME m AS int32 4
+  SET KERNEL ARG_NAME n AS int32 8
+  BIND BUFFER in KERNEL ARG_NAME in
+  BIND BUFFER out KERNEL ARG_NAME out
+END
+
+RUN pipe 1 1 1
+
+EXPECT out IDX 0 EQ 496
