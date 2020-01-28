@@ -1255,9 +1255,9 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
         continue;
       }
 
-      // #497: InsertValue and ExtractValue map to OpCompositeExtract which
-      // takes literal values for indices. As a result don't map the type of
-      // indices.
+      // #497: InsertValue and ExtractValue map to OpCompositeInsert and
+      // OpCompositeExtract which takes literal values for indices. As a result
+      // don't map the type of indices.
       if (I.getOpcode() == Instruction::ExtractValue) {
         FindType(I.getOperand(0)->getType());
         continue;
