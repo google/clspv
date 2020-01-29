@@ -487,11 +487,11 @@ public:
           }
 
           if (is_opencl_kernel) {
-            if (Kernels.count(FD->getName()) != 0) {
+            if (Kernels.count(FD->getName().str()) != 0) {
               auto srcRange = FD->getSourceRange();
               Report(CustomDiagnosticOverloadedKernel, srcRange, srcRange);
             } else {
-              Kernels.insert(FD->getName());
+              Kernels.insert(FD->getName().str());
             }
           }
 

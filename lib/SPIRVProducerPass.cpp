@@ -3111,7 +3111,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
     std::string kind =
         clspv::Option::PodArgsInUniformBuffer() && argKind.equals("pod")
             ? "pod_ubo"
-            : argKind;
+            : argKind.str();
     return GetArgKindFromName(kind);
   };
 
@@ -3145,8 +3145,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
       uint32_t descriptor_set = 0;
       uint32_t binding = 0;
       version0::DescriptorMapEntry::KernelArgData kernel_data = {
-          F.getName(), name, static_cast<uint32_t>(old_index), argKind,
-          static_cast<uint32_t>(spec_id),
+          F.getName().str(), name.str(), static_cast<uint32_t>(old_index),
+          argKind, static_cast<uint32_t>(spec_id),
           // This will be set below for pointer-to-local args.
           0, static_cast<uint32_t>(offset), static_cast<uint32_t>(arg_size)};
       if (spec_id > 0) {
@@ -3184,10 +3184,14 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
         // Local pointer arguments are unused in this case. Offset is always
         // zero.
         version0::DescriptorMapEntry::KernelArgData kernel_data = {
-            F.getName(), arg->getName(),
-            arg_index,   remap_arg_kind(clspv::GetArgKindName(info->arg_kind)),
-            0,           0,
-            0,           arg_size};
+            F.getName().str(),
+            arg->getName().str(),
+            arg_index,
+            remap_arg_kind(clspv::GetArgKindName(info->arg_kind)),
+            0,
+            0,
+            0,
+            arg_size};
         descriptorMapEntries->emplace_back(std::move(kernel_data),
                                            info->descriptor_set, info->binding);
       }
@@ -3201,8 +3205,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
         auto &local_arg_info = LocalSpecIdInfoMap[where->second];
         // Pod arguments members are unused in this case.
         version0::DescriptorMapEntry::KernelArgData kernel_data = {
-            F.getName(),
-            arg->getName(),
+            F.getName().str(),
+            arg->getName().str(),
             arg_index,
             ArgKind::Local,
             static_cast<uint32_t>(local_arg_info.spec_id),
@@ -4363,7 +4367,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     Type *ArgTy = CmpI->getOperand(0)->getType();
     if (isa<PointerType>(ArgTy)) {
       CmpI->print(errs());
-      std::string name = I.getParent()->getParent()->getName();
+      std::string name = I.getParent()->getParent()->getName().str();
       errs()
           << "\nPointer equality test is not supported by SPIR-V for Vulkan, "
           << "in function " << name << "\n";

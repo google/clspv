@@ -344,8 +344,9 @@ int ParseSamplerMap(const std::string &sampler_map,
                 std::less<StringRef>());
       const auto samplerExpr = std::accumulate(
           samplerStrings.begin(), samplerStrings.end(), std::string(),
-          [](std::string left, std::string right) {
-            return left + std::string(left.empty() ? "" : "|") + right;
+          [](llvm::StringRef left, llvm::StringRef right) {
+            return left.str() + std::string(left.empty() ? "" : "|") +
+                   right.str();
           });
 
       // SamplerMapEntries->push_back(std::make_pair(
@@ -492,7 +493,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 
   instance.getTargetOpts().Triple = triple.str();
 
-  instance.getCodeGenOpts().MainFileName = overiddenInputFilename;
+  instance.getCodeGenOpts().MainFileName = overiddenInputFilename.str();
   instance.getCodeGenOpts().PreserveVec3Type = true;
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
