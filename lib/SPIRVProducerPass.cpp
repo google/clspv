@@ -1255,6 +1255,39 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
         continue;
       }
 
+      // #497: InsertValue and ExtractValue map to OpCompositeInsert and
+      // OpCompositeExtract which takes literal values for indices. As a result
+      // don't map the type of indices.
+      if (I.getOpcode() == Instruction::ExtractValue) {
+        FindType(I.getOperand(0)->getType());
+        continue;
+      }
+      if (I.getOpcode() == Instruction::InsertValue) {
+        FindType(I.getOperand(0)->getType());
+        FindType(I.getOperand(1)->getType());
+        continue;
+      }
+
+      // #497: InsertElement and ExtractElement map to OpCompositeExtract if
+      // the index is a constant. In such a case don't map the index type.
+      if (I.getOpcode() == Instruction::ExtractElement) {
+        FindType(I.getOperand(0)->getType());
+        Value *op1 = I.getOperand(1);
+        if (!isa<Constant>(op1) || isa<GlobalValue>(op1)) {
+          FindType(op1->getType());
+        }
+        continue;
+      }
+      if (I.getOpcode() == Instruction::InsertElement) {
+        FindType(I.getOperand(0)->getType());
+        FindType(I.getOperand(1)->getType());
+        Value *op2 = I.getOperand(2);
+        if (!isa<Constant>(op2) || isa<GlobalValue>(op2)) {
+          FindType(op2->getType());
+        }
+        continue;
+      }
+
       // Work through the operands of the instruction.
       for (unsigned i = 0; i < I.getNumOperands(); i++) {
         Value *const Op = I.getOperand(i);
