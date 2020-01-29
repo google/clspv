@@ -1995,7 +1995,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Module &M) {
       size_t name_len;
       if (fname.consumeInteger(10, name_len))
         continue;
-      std::string name = fname.take_front(name_len);
+      std::string name = fname.take_front(name_len).str();
 
       bool ok = StringSwitch<bool>(name)
                     .Case("vstore2", true)
@@ -2075,7 +2075,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Module &M) {
       size_t name_len;
       if (fname.consumeInteger(10, name_len))
         continue;
-      std::string name = fname.take_front(name_len);
+      std::string name = fname.take_front(name_len).str();
 
       bool ok = StringSwitch<bool>(name)
                     .Case("vload2", true)

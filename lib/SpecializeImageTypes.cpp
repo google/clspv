@@ -98,7 +98,8 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
           // a float type.
           std::string name =
               cast<StructType>(Arg.getType()->getPointerElementType())
-                  ->getName();
+                  ->getName()
+                  .str();
           name += ".float";
           if (name.find("ro_t") != std::string::npos)
             name += ".sampled";
@@ -151,7 +152,7 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
         return imageTy;
 
       std::string name =
-          cast<StructType>(imageTy->getPointerElementType())->getName();
+          cast<StructType>(imageTy->getPointerElementType())->getName().str();
       if (IsFloatSampledImageRead(called) || IsFloatImageWrite(called)) {
         name += ".float";
       } else if (IsUintSampledImageRead(called) || IsUintImageWrite(called)) {
@@ -237,7 +238,7 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
 
 Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
                                                         Type *type) {
-  std::string name = f->getName();
+  std::string name = f->getName().str();
   name += ".";
   name += cast<StructType>(type->getPointerElementType())->getName();
   if (auto replaced = f->getParent()->getFunction(name))
