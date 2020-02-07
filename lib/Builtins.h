@@ -52,25 +52,25 @@ inline bool IsIntSampledImageRead(llvm::Function *f) {
 
 // Returns true if the function is an OpenCL image read.
 bool IsUnsampledImageRead(llvm::StringRef name);
-inline bool IsUnsampledImageRead(llvm::Function* f) {
+inline bool IsUnsampledImageRead(llvm::Function *f) {
   return IsUnsampledImageRead(f->getName());
 }
 
 // Returns true if the function is an OpenCL image read of float type.
 bool IsFloatUnsampledImageRead(llvm::StringRef name);
-inline bool IsFloatUnsampledImageRead(llvm::Function* f) {
+inline bool IsFloatUnsampledImageRead(llvm::Function *f) {
   return IsFloatUnsampledImageRead(f->getName());
 }
 
 // Returns true if the function is an OpenCL image read of uint type.
 bool IsUintUnsampledImageRead(llvm::StringRef name);
-inline bool IsUintUnsampledImageRead(llvm::Function* f) {
+inline bool IsUintUnsampledImageRead(llvm::Function *f) {
   return IsUintUnsampledImageRead(f->getName());
 }
 
 // Returns true if the function is an OpenCL image read of int type.
 bool IsIntUnsampledImageRead(llvm::StringRef name);
-inline bool IsIntUnsampledImageRead(llvm::Function* f) {
+inline bool IsIntUnsampledImageRead(llvm::Function *f) {
   return IsIntUnsampledImageRead(f->getName());
 }
 
