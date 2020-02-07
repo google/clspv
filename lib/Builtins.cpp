@@ -17,8 +17,8 @@
 using namespace llvm;
 
 bool clspv::IsImageBuiltin(StringRef name) {
-  return clspv::IsSampledImageRead(name) || clspv::IsImageWrite(name) ||
-         clspv::IsImageQuery(name);
+  return clspv::IsSampledImageRead(name) || clspv::IsUnsampledImageRead(name) ||
+         clspv::IsImageWrite(name) || clspv::IsImageQuery(name);
 }
 
 bool clspv::IsSampledImageRead(StringRef name) {
@@ -55,6 +55,30 @@ bool clspv::IsIntSampledImageRead(StringRef name) {
          name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i") ||
          name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i");
+}
+
+bool clspv::IsUnsampledImageRead(StringRef name) {
+  return clspv::IsFloatUnsampledImageRead(name) ||
+         clspv::IsUintUnsampledImageRead(name) ||
+         clspv::IsIntUnsampledImageRead(name);
+}
+
+bool clspv::IsFloatUnsampledImageRead(StringRef name) {
+  return name.startswith("_Z11read_imagef14ocl_image1d_roi") ||
+         name.startswith("_Z11read_imagef14ocl_image2d_roDv2_i") ||
+         name.startswith("_Z11read_imagef14ocl_image3d_roDv4_i");
+}
+
+bool clspv::IsUintUnsampledImageRead(StringRef name) {
+  return name.startswith("_Z12read_imageui14ocl_image1d_roi") ||
+         name.startswith("_Z12read_imageui14ocl_image2d_roDv2_i") ||
+         name.startswith("_Z12read_imageui14ocl_image3d_roDv4_i");
+}
+
+bool clspv::IsIntUnsampledImageRead(StringRef name) {
+  return name.startswith("_Z11read_imagei14ocl_image1d_roi") ||
+         name.startswith("_Z11read_imagei14ocl_image2d_roDv2_i") ||
+         name.startswith("_Z11read_imagei14ocl_image3d_roDv4_i");
 }
 
 bool clspv::IsImageWrite(StringRef name) {
