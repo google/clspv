@@ -821,15 +821,22 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           StringRef callee_name = Call->getCalledFunction()->getName();
 
           // Handle image type specially.
-          if (clspv::IsSampledImageRead(callee_name)) {
+          if (clspv::IsImageBuiltin(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
             OpImageTypeMap[ImageTy] = 0;
             getImageTypeList().insert(ImageTy);
+          }
 
+          if (clspv::IsSampledImageRead(callee_name)) {
             // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
+          }
+
+          if (clspv::IsUnsampledImageRead(callee_name)) {
+            // All unsampled reads need an integer 0 for the Lod operand.
+            FindConstant(ConstantInt::get(Context, APInt(32, 0)));
           }
 
           if (clspv::IsImageQuery(callee_name)) {
@@ -4800,8 +4807,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       // Ops[0] = Result Type ID
       // Ops[1] = Image ID
       // Ops[2] = Coordinate ID
-      //
-      // No image operands are necessary.
+      // Ops[3] = Lod
+      // Ops[4] = 0
       //
       SPIRVOperandList Ops;
 
@@ -4813,7 +4820,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         result_type = lookupType(Call->getType());
       }
 
-      Ops << MkId(result_type) << MkId(VMap[Image]) << MkId(VMap[Coordinate]);
+      Ops << MkId(result_type) << MkId(VMap[Image]) << MkId(VMap[Coordinate])
+          << MkNum(spv::ImageOperandsLodMask);
+
+      Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
+      Ops << MkId(VMap[CstInt0]);
 
       uint32_t final_id = nextID++;
       VMap[&I] = final_id;

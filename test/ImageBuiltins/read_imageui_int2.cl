@@ -12,8 +12,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image2d
 // CHECK-DAG:  [[_v4uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 4
 // CHECK-DAG:  [[_4:%[0-9a-zA-Z_]+]] = OpTypeImage [[_uint]] 2D 0 0 0 1 Unknown
 // CHECK-DAG:  [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
+// CHECK-DAG:  [[_int0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_4]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_v2uint]]
-// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageFetch [[_v4uint]] [[_28]] [[_30]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageFetch [[_v4uint]] [[_28]] [[_30]] Lod [[_int0]]
 // CHECK:  OpStore {{.*}} [[_33]]
 

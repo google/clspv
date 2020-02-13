@@ -9,9 +9,10 @@
 // CHECK-DAG: %[[READ_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[FLOAT_TYPE_ID]] 3D 0 0 0 1 Unknown
 // CHECK-DAG: %[[FLOAT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
 // CHECK-DAG: %[[INT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[INT_TYPE_ID]] 4
+// CHECK-DAG: %[[INT0:[a-zA-Z0-9_]*]] = OpConstant %[[INT_TYPE_ID]] 0
 // CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[READ_ONLY_IMAGE_TYPE_ID]]
 // CHECK: %[[C_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[INT4_TYPE_ID]]
-// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpImageFetch %[[FLOAT4_TYPE_ID]] %[[I_LOAD_ID]] %[[C_LOAD_ID]]
+// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpImageFetch %[[FLOAT4_TYPE_ID]] %[[I_LOAD_ID]] %[[C_LOAD_ID]] Lod %[[INT0]]
 // CHECK: OpStore {{.*}} %[[OP_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d_t i, int4 c, global float4* a)

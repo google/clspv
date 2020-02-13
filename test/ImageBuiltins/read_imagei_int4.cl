@@ -13,9 +13,10 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d
 // CHECK-DAG:  [[_int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 1
 // CHECK-DAG:  [[_v4int:%[0-9a-zA-Z_]+]] = OpTypeVector [[_int]] 4
 // CHECK-DAG:  [[_4:%[0-9a-zA-Z_]+]] = OpTypeImage [[_int]] 3D 0 0 0 1 Unknown
+// CHECK-DAG:  [[_int0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_4]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_v4uint]]
-// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageFetch [[_v4int]] [[_28]] [[_30]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageFetch [[_v4int]] [[_28]] [[_30]] Lod [[_int0]]
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]
 // CHECK:  OpStore {{.*}} [[cast]]
 
