@@ -8,12 +8,10 @@ target triple = "spir-unknown-unknown"
 
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast float %conv to i32
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i32 [[cast]], 0
-; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and i32 [[shr]], 65535
-; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = trunc i32 [[and]] to i16
+; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = trunc i32 [[shr]] to i16
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast float %conv to i32
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i32 [[cast]], 16
-; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and i32 [[shr]], 65535
-; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = trunc i32 [[and]] to i16
+; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = trunc i32 [[shr]] to i16
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i16, i16 addrspace(1)* %soa, i32 %2
 ; CHECK: store i16 [[trunc0]], i16 addrspace(1)* [[gep]]
 ; CHECK: [[add1:%[a-zA-Z0-9_.]+]] = add i32 %2, 1

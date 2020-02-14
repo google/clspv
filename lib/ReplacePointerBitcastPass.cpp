@@ -1057,27 +1057,14 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           } else if (SrcTyBitWidth < DstTyBitWidth) {
             unsigned NumElement = DstTyBitWidth / SrcTyBitWidth;
 
-            // Create Mask.
-            Constant *Mask = nullptr;
-            if (NumElement == 1) {
-              Mask = Builder.getInt32(0xFF);
-            } else if (NumElement == 2) {
-              Mask = Builder.getInt32(0xFFFF);
-            } else if (NumElement == 4) {
-              Mask = Builder.getInt32(0xFFFFFFFF);
-            } else {
-              llvm_unreachable("strange type on bitcast");
-            }
-
             // Create store values.
             Value *STVal = ST->getValueOperand();
             SmallVector<Value *, 8> STValues;
             for (unsigned i = 0; i < NumElement; i++) {
               Type *TmpTy = Type::getIntNTy(M.getContext(), DstTyBitWidth);
               Value *TmpVal = Builder.CreateBitCast(STVal, TmpTy);
-              TmpVal = Builder.CreateLShr(TmpVal,
-                                          Builder.getInt32(i * SrcTyBitWidth));
-              TmpVal = Builder.CreateAnd(TmpVal, Mask);
+              TmpVal = Builder.CreateLShr(
+                  TmpVal, Builder.getIntN(DstTyBitWidth, i * SrcTyBitWidth));
               TmpVal = Builder.CreateTrunc(TmpVal, SrcTy);
               STValues.push_back(TmpVal);
             }
