@@ -1,0 +1,47 @@
+
+# Contributor: Jehferson Mello <vilelasagna@gmail.com>
+pkgname=clspv-git
+pkgver=r339.51952280
+pkgrel=1
+pkgdesc="Clspv is a prototype compiler for a subset of OpenCL C to Vulkan compute shaders"
+arch=('i686' 'x86_64')
+url="https://github.com/google/clspv"
+license=('Apache')
+groups=()
+depends=('zlib' 'ncurses')
+makedepends=('cmake' 'python' 'git' 'ninja')
+source=("${pkgname}::git+${url}.git")
+md5sums=('SKIP')
+
+pkgver() {
+  cd "${pkgname}"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  mkdir -p "${pkgname}/build"
+  cd "${pkgname}"
+  python utils/fetch_sources.py
+
+}
+
+build() {
+  cd "${pkgname}/build"
+  cmake \
+    -G Ninja \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_INSTALL_PREFIX=/usr/local/ \
+    ..
+
+  cmake --build .
+}
+
+check() {
+	cd "${pkgname}/build"
+	cmake --build . --target check-spirv
+}
+
+package() {
+	cd "${pkgname}/build"
+	cmake --install . --prefix "${pkgdir}/usr/local"
+}
