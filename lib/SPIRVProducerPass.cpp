@@ -842,7 +842,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           if (clspv::IsImageQuery(callee_name)) {
             Type *ImageTy = Call->getOperand(0)->getType();
             const uint32_t dim = ImageDimensionality(ImageTy);
-            uint32_t components = dim;
+            uint32_t components = dim + (clspv::IsArrayImageType(ImageTy) ? 1 : 0);
             if (components > 1) {
               // OpImageQuerySize* return |components| components.
               FindType(VectorType::get(Type::getInt32Ty(Context), components));
@@ -886,7 +886,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
         M.getTypeByName("opencl.image2d_wo_t.float") ||
         M.getTypeByName("opencl.image3d_ro_t.float") ||
         M.getTypeByName("opencl.image3d_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image3d_wo_t.float")) {
+        M.getTypeByName("opencl.image3d_wo_t.float") ||
+        M.getTypeByName("opencl.image1d_array_ro_t.float") ||
+        M.getTypeByName("opencl.image1d_array_ro_t.float.sampled") ||
+        M.getTypeByName("opencl.image1d_array_wo_t.float") ||
+        M.getTypeByName("opencl.image2d_array_ro_t.float") ||
+        M.getTypeByName("opencl.image2d_array_ro_t.float.sampled") ||
+        M.getTypeByName("opencl.image2d_array_wo_t.float")) {
       FindType(Type::getFloatTy(Context));
     } else if (M.getTypeByName("opencl.image1d_ro_t.uint") ||
                M.getTypeByName("opencl.image1d_ro_t.uint.sampled") ||
@@ -896,7 +902,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
                M.getTypeByName("opencl.image2d_wo_t.uint") ||
                M.getTypeByName("opencl.image3d_ro_t.uint") ||
                M.getTypeByName("opencl.image3d_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image3d_wo_t.uint")) {
+               M.getTypeByName("opencl.image3d_wo_t.uint") ||
+               M.getTypeByName("opencl.image1d_array_ro_t.uint") ||
+               M.getTypeByName("opencl.image1d_array_ro_t.uint.sampled") ||
+               M.getTypeByName("opencl.image1d_array_wo_t.uint") ||
+               M.getTypeByName("opencl.image2d_array_ro_t.uint") ||
+               M.getTypeByName("opencl.image2d_array_ro_t.uint.sampled") ||
+               M.getTypeByName("opencl.image2d_array_wo_t.uint")) {
       FindType(Type::getInt32Ty(Context));
     } else if (M.getTypeByName("opencl.image1d_ro_t.int") ||
                M.getTypeByName("opencl.image1d_ro_t.int.sampled") ||
@@ -906,7 +918,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
                M.getTypeByName("opencl.image2d_wo_t.int") ||
                M.getTypeByName("opencl.image3d_ro_t.int") ||
                M.getTypeByName("opencl.image3d_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image3d_wo_t.int")) {
+               M.getTypeByName("opencl.image3d_wo_t.int") ||
+               M.getTypeByName("opencl.image1d_array_ro_t.int") ||
+               M.getTypeByName("opencl.image1d_array_ro_t.int.sampled") ||
+               M.getTypeByName("opencl.image1d_array_wo_t.int") ||
+               M.getTypeByName("opencl.image2d_array_ro_t.int") ||
+               M.getTypeByName("opencl.image2d_array_ro_t.int.sampled") ||
+               M.getTypeByName("opencl.image2d_array_wo_t.int")) {
       // Nothing for now...
     } else {
       // This was likely an UndefValue.
@@ -1960,8 +1978,12 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           break;
         } else if (STy->getName().startswith("opencl.image1d_ro_t") ||
                    STy->getName().startswith("opencl.image1d_wo_t") ||
+                   STy->getName().startswith("opencl.image1d_array_ro_t") ||
+                   STy->getName().startswith("opencl.image1d_array_wo_t") ||
                    STy->getName().startswith("opencl.image2d_ro_t") ||
                    STy->getName().startswith("opencl.image2d_wo_t") ||
+                   STy->getName().startswith("opencl.image2d_array_ro_t") ||
+                   STy->getName().startswith("opencl.image2d_array_wo_t") ||
                    STy->getName().startswith("opencl.image3d_ro_t") ||
                    STy->getName().startswith("opencl.image3d_wo_t")) {
           //
@@ -2014,7 +2036,9 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
 
           spv::Dim DimID = spv::Dim2D;
           if (STy->getName().startswith("opencl.image1d_ro_t") ||
-              STy->getName().startswith("opencl.image1d_wo_t")) {
+              STy->getName().startswith("opencl.image1d_wo_t") ||
+              STy->getName().startswith("opencl.image1d_array_ro_t") ||
+              STy->getName().startswith("opencl.image1d_array_wo_t")) {
             DimID = spv::Dim1D;
           } else if (STy->getName().startswith("opencl.image3d_ro_t") ||
                      STy->getName().startswith("opencl.image3d_wo_t")) {
@@ -2025,13 +2049,13 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           // TODO: Set up Depth.
           Ops << MkNum(0);
 
-          // TODO: Set up Arrayed.
-          Ops << MkNum(0);
+          uint32_t arrayed = STy->getName().contains("_array_") ? 1 : 0;
+          Ops << MkNum(arrayed);
 
           // TODO: Set up MS.
           Ops << MkNum(0);
 
-          // TODO: Set up Sampled.
+          // Set up Sampled.
           //
           // From Spec
           //
@@ -3412,12 +3436,16 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     } else if (auto *STy = dyn_cast<StructType>(Ty)) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_wo_t") ||
+            STy->getName().startswith("opencl.image1d_array_wo_t") ||
             STy->getName().startswith("opencl.image2d_wo_t") ||
+            STy->getName().startswith("opencl.image2d_array_wo_t") ||
             STy->getName().startswith("opencl.image3d_wo_t")) {
           write_without_format = true;
         }
         if (STy->getName().startswith("opencl.image1d_ro_t") ||
-            STy->getName().startswith("opencl.image1d_wo_t")) {
+            STy->getName().startswith("opencl.image1d_wo_t") ||
+            STy->getName().startswith("opencl.image1d_array_ro_t") ||
+            STy->getName().startswith("opencl.image1d_array_wo_t")) {
           if (STy->getName().contains(".sampled"))
             sampled_1d = true;
           else
@@ -4905,13 +4933,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       Value *Image = Call->getArgOperand(0);
       const uint32_t dim = ImageDimensionality(Image->getType());
-      // TODO(alan-baker): fix component calculation when arrayed images are
-      // supported.
-      const uint32_t components = dim;
+      const uint32_t components =
+          dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
       if (components == 1) {
         SizesTypeID = TypeMap[Type::getInt32Ty(Context)];
       } else {
-        SizesTypeID = TypeMap[VectorType::get(Type::getInt32Ty(Context), dim)];
+        SizesTypeID =
+            TypeMap[VectorType::get(Type::getInt32Ty(Context), components)];
       }
       uint32_t ImageID = VMap[Image];
       Ops << MkId(SizesTypeID) << MkId(ImageID);

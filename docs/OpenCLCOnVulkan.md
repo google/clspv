@@ -51,8 +51,9 @@ capabilities:
   - *Note*: this requires enabling the _cl\_khr\_fp16_ extension in the source.
 - `Float64` if the double type (or composites of it) is used.
 - `ImageStorageWriteWithoutFormat` if _write\_only_ images are used.
-- `ImageQuery` if _get\_image\_width()_ or _get\_image\_height()_ builtins are used.
-  - *Note*: these queries are only supported for 2D images currently.
+- `ImageQuery` if any image query is used.
+- `Image1D` if a _write\_only_ image is used.
+- `Sampled1D` if a _read\_only_ image is used.
 
 ## Vulkan Interaction
 
@@ -554,8 +555,7 @@ The `double`, `double2`, `double3` and `double4` types **must not** be used.
 
 #### Images
 
-The `image2d_array_t`, `image1d_buffer_t`, and `image1d_array_t`
-types **must not** be used.
+The `image1d_buffer_t` type **must not** be used.
 
 #### Samplers
 
