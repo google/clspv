@@ -142,7 +142,8 @@ Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
 Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
-    if (IsSampledImageRead(called) || IsImageWrite(called)) {
+    if (IsSampledImageRead(called) || IsUnsampledImageRead(called) ||
+        IsImageWrite(called)) {
       // Specialize the image type based on it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
@@ -153,17 +154,22 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
       std::string name =
           cast<StructType>(imageTy->getPointerElementType())->getName().str();
-      if (IsFloatSampledImageRead(called) || IsFloatImageWrite(called)) {
+      if (IsFloatSampledImageRead(called) ||
+          IsFloatUnsampledImageRead(called) || IsFloatImageWrite(called)) {
         name += ".float";
-      } else if (IsUintSampledImageRead(called) || IsUintImageWrite(called)) {
+      } else if (IsUintSampledImageRead(called) ||
+                 IsUintUnsampledImageRead(called) || IsUintImageWrite(called)) {
         name += ".uint";
-      } else if (IsIntSampledImageRead(called) || IsIntImageWrite(called)) {
+      } else if (IsIntSampledImageRead(called) ||
+                 IsIntUnsampledImageRead(called) || IsIntImageWrite(called)) {
         name += ".int";
       } else {
         assert(false && "Unhandled image builtin");
       }
 
-      if (IsSampledImageRead(called)) {
+      // Both sampled and unsampled reads generate an OpTypeImage with Sampled
+      // operand of 1.
+      if (IsSampledImageRead(called) || IsUnsampledImageRead(called)) {
         name += ".sampled";
       }
 

@@ -821,15 +821,22 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           StringRef callee_name = Call->getCalledFunction()->getName();
 
           // Handle image type specially.
-          if (clspv::IsSampledImageRead(callee_name)) {
+          if (clspv::IsImageBuiltin(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
             OpImageTypeMap[ImageTy] = 0;
             getImageTypeList().insert(ImageTy);
+          }
 
+          if (clspv::IsSampledImageRead(callee_name)) {
             // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
+          }
+
+          if (clspv::IsUnsampledImageRead(callee_name)) {
+            // All unsampled reads need an integer 0 for the Lod operand.
+            FindConstant(ConstantInt::get(Context, APInt(32, 0)));
           }
 
           if (clspv::IsImageQuery(callee_name)) {
@@ -4712,8 +4719,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
-    // Additionally, OpTypeSampledImage is generated.
+    // read_image (with a sampler) is converted to OpSampledImage and
+    // OpImageSampleExplicitLod.  Additionally, OpTypeSampledImage is
+    // generated.
     if (clspv::IsSampledImageRead(Callee)) {
       //
       // Generate OpSampledImage.
@@ -4776,6 +4784,58 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       }
 
       Inst = new SPIRVInstruction(spv::OpImageSampleExplicitLod, image_id, Ops);
+      SPIRVInstList.push_back(Inst);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << MkId(lookupType(Call->getType())) << MkId(image_id);
+        Inst = new SPIRVInstruction(spv::OpBitcast, final_id, Ops);
+        SPIRVInstList.push_back(Inst);
+      }
+      break;
+    }
+
+    // read_image (without a sampler) is mapped to OpImageFetch.
+    if (clspv::IsUnsampledImageRead(Callee)) {
+      Value *Image = Call->getArgOperand(0);
+      Value *Coordinate = Call->getArgOperand(1);
+
+      //
+      // Generate OpImageFetch
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Image ID
+      // Ops[2] = Coordinate ID
+      // Ops[3] = Lod
+      // Ops[4] = 0
+      //
+      SPIRVOperandList Ops;
+
+      const bool is_int_image = IsIntImageType(Image->getType());
+      uint32_t result_type = 0;
+      if (is_int_image) {
+        result_type = v4int32ID;
+      } else {
+        result_type = lookupType(Call->getType());
+      }
+
+      Ops << MkId(result_type) << MkId(VMap[Image]) << MkId(VMap[Coordinate])
+          << MkNum(spv::ImageOperandsLodMask);
+
+      Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
+      Ops << MkId(VMap[CstInt0]);
+
+      uint32_t final_id = nextID++;
+      VMap[&I] = final_id;
+
+      uint32_t image_id = final_id;
+      if (is_int_image) {
+        // Int image requires a bitcast from v4int to v4uint.
+        image_id = nextID++;
+      }
+
+      auto *Inst = new SPIRVInstruction(spv::OpImageFetch, image_id, Ops);
       SPIRVInstList.push_back(Inst);
 
       if (is_int_image) {
@@ -5826,6 +5886,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpVariable:
     case spv::OpFunctionCall:
     case spv::OpSampledImage:
+    case spv::OpImageFetch:
     case spv::OpImageSampleExplicitLod:
     case spv::OpImageQuerySize:
     case spv::OpImageQuerySizeLod:
