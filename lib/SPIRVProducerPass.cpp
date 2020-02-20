@@ -842,7 +842,8 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           if (clspv::IsImageQuery(callee_name)) {
             Type *ImageTy = Call->getOperand(0)->getType();
             const uint32_t dim = ImageDimensionality(ImageTy);
-            uint32_t components = dim + (clspv::IsArrayImageType(ImageTy) ? 1 : 0);
+            uint32_t components =
+                dim + (clspv::IsArrayImageType(ImageTy) ? 1 : 0);
             if (components > 1) {
               // OpImageQuerySize* return |components| components.
               FindType(VectorType::get(Type::getInt32Ty(Context), components));
