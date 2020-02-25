@@ -31,6 +31,9 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 // returns 0.
 uint32_t ImageDimensionality(llvm::Type *type);
 
+// Returns true if the given type is an array image type.
+bool IsArrayImageType(llvm::Type *type);
+
 // Returns true if the given type is a sampled image type. Can only return true
 // after image specialization.
 bool IsSampledImageType(llvm::Type *type);

@@ -43,8 +43,12 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_ro_t") ||
             STy->getName().startswith("opencl.image1d_wo_t") ||
+            STy->getName().startswith("opencl.image1d_array_ro_t") ||
+            STy->getName().startswith("opencl.image1d_array_wo_t") ||
             STy->getName().startswith("opencl.image2d_ro_t") ||
             STy->getName().startswith("opencl.image2d_wo_t") ||
+            STy->getName().startswith("opencl.image2d_array_ro_t") ||
+            STy->getName().startswith("opencl.image2d_array_wo_t") ||
             STy->getName().startswith("opencl.image3d_ro_t") ||
             STy->getName().startswith("opencl.image3d_wo_t")) {
           isImageType = true;
@@ -71,6 +75,23 @@ uint32_t clspv::ImageDimensionality(Type *type) {
   }
 
   return 0;
+}
+
+bool clspv::IsArrayImageType(Type *type) {
+  bool isArrayImageType = false;
+  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
+    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
+      if (STy->isOpaque()) {
+        if (STy->getName().startswith("opencl.image1d_array_ro_t") ||
+            STy->getName().startswith("opencl.image1d_array_wo_t") ||
+            STy->getName().startswith("opencl.image2d_array_ro_t") ||
+            STy->getName().startswith("opencl.image2d_array_wo_t")) {
+          isArrayImageType = true;
+        }
+      }
+    }
+  }
+  return isArrayImageType;
 }
 
 bool clspv::IsSampledImageType(Type *type) {

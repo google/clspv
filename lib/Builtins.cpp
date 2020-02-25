@@ -31,9 +31,17 @@ bool clspv::IsFloatSampledImageRead(StringRef name) {
   return name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_samplerf") ||
          name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith(
+             "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
+         name.startswith(
+             "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
          name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i");
+         name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i") ||
+         name.startswith(
+             "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
+         name.startswith(
+             "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_i");
 }
 
 bool clspv::IsUintSampledImageRead(StringRef name) {
@@ -42,19 +50,36 @@ bool clspv::IsUintSampledImageRead(StringRef name) {
              "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith(
              "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith(
+             "_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
+         name.startswith(
+             "_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
          name.startswith("_Z12read_imageui14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith(
              "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith("_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i");
+         name.startswith(
+             "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i") ||
+         name.startswith(
+             "_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
+         name.startswith(
+             "_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_i");
 }
 
 bool clspv::IsIntSampledImageRead(StringRef name) {
   return name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_samplerf") ||
          name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
          name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f") ||
+         name.startswith(
+             "_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
+         name.startswith(
+             "_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
          name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_sampleri") ||
          name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i");
+         name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i") ||
+         name.startswith(
+             "_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
+         name.startswith(
+             "_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_i");
 }
 
 bool clspv::IsUnsampledImageRead(StringRef name) {
@@ -66,19 +91,25 @@ bool clspv::IsUnsampledImageRead(StringRef name) {
 bool clspv::IsFloatUnsampledImageRead(StringRef name) {
   return name.startswith("_Z11read_imagef14ocl_image1d_roi") ||
          name.startswith("_Z11read_imagef14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z11read_imagef14ocl_image3d_roDv4_i");
+         name.startswith("_Z11read_imagef14ocl_image3d_roDv4_i") ||
+         name.startswith("_Z11read_imagef20ocl_image1d_array_roDv2_i") ||
+         name.startswith("_Z11read_imagef20ocl_image2d_array_roDv4_i");
 }
 
 bool clspv::IsUintUnsampledImageRead(StringRef name) {
   return name.startswith("_Z12read_imageui14ocl_image1d_roi") ||
          name.startswith("_Z12read_imageui14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z12read_imageui14ocl_image3d_roDv4_i");
+         name.startswith("_Z12read_imageui14ocl_image3d_roDv4_i") ||
+         name.startswith("_Z12read_imageui20ocl_image1d_array_roDv2_i") ||
+         name.startswith("_Z12read_imageui20ocl_image2d_array_roDv4_i");
 }
 
 bool clspv::IsIntUnsampledImageRead(StringRef name) {
   return name.startswith("_Z11read_imagei14ocl_image1d_roi") ||
          name.startswith("_Z11read_imagei14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z11read_imagei14ocl_image3d_roDv4_i");
+         name.startswith("_Z11read_imagei14ocl_image3d_roDv4_i") ||
+         name.startswith("_Z11read_imagei20ocl_image1d_array_roDv2_i") ||
+         name.startswith("_Z11read_imagei20ocl_image2d_array_roDv4_i");
 }
 
 bool clspv::IsImageWrite(StringRef name) {
@@ -89,27 +120,35 @@ bool clspv::IsImageWrite(StringRef name) {
 bool clspv::IsFloatImageWrite(StringRef name) {
   return name.startswith("_Z12write_imagef14ocl_image1d_woiDv4_f") ||
          name.startswith("_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
-         name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f");
+         name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f") ||
+         name.startswith("_Z12write_imagef20ocl_image1d_array_woDv2_iDv4_f") ||
+         name.startswith("_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f");
 }
 
 bool clspv::IsUintImageWrite(StringRef name) {
   return name.startswith("_Z13write_imageui14ocl_image1d_woiDv4_j") ||
          name.startswith("_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") ||
-         name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j");
+         name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j") ||
+         name.startswith("_Z13write_imageui20ocl_image1d_array_woDv2_iDv4_j") ||
+         name.startswith("_Z13write_imageui20ocl_image2d_array_woDv4_iDv4_j");
 }
 
 bool clspv::IsIntImageWrite(StringRef name) {
-  // Odd mangling for 3d writes.
+  // Odd mangling for 2d array and 3d writes.
   return name.startswith("_Z12write_imagei14ocl_image1d_woiDv4_i") ||
          name.startswith("_Z12write_imagei14ocl_image2d_woDv2_iDv4_i") ||
-         name.startswith("_Z12write_imagei14ocl_image3d_woDv4_iS0_");
+         name.startswith("_Z12write_imagei14ocl_image3d_woDv4_iS0_") ||
+         name.startswith("_Z12write_imagei20ocl_image1d_array_woDv2_iDv4_i") ||
+         name.startswith("_Z12write_imagei20ocl_image2d_array_woDv4_iS0_");
 }
 
 bool clspv::IsGetImageHeight(StringRef name) {
   return name.startswith("_Z16get_image_height14ocl_image2d_ro") ||
          name.startswith("_Z16get_image_height14ocl_image2d_wo") ||
          name.startswith("_Z16get_image_height14ocl_image3d_ro") ||
-         name.startswith("_Z16get_image_height14ocl_image3d_wo");
+         name.startswith("_Z16get_image_height14ocl_image3d_wo") ||
+         name.startswith("_Z16get_image_height20ocl_image2d_array_ro") ||
+         name.startswith("_Z16get_image_height20ocl_image2d_array_wo");
 }
 
 bool clspv::IsGetImageWidth(StringRef name) {
@@ -118,7 +157,11 @@ bool clspv::IsGetImageWidth(StringRef name) {
          name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
          name.startswith("_Z15get_image_width14ocl_image2d_wo") ||
          name.startswith("_Z15get_image_width14ocl_image3d_ro") ||
-         name.startswith("_Z15get_image_width14ocl_image3d_wo");
+         name.startswith("_Z15get_image_width14ocl_image3d_wo") ||
+         name.startswith("_Z15get_image_width20ocl_image1d_array_ro") ||
+         name.startswith("_Z15get_image_width20ocl_image1d_array_wo") ||
+         name.startswith("_Z15get_image_width20ocl_image2d_array_ro") ||
+         name.startswith("_Z15get_image_width20ocl_image2d_array_wo");
 }
 
 bool clspv::IsGetImageDepth(StringRef name) {
@@ -130,7 +173,9 @@ bool clspv::IsGetImageDim(StringRef name) {
   return name.startswith("_Z13get_image_dim14ocl_image2d_ro") ||
          name.startswith("_Z13get_image_dim14ocl_image2d_wo") ||
          name.startswith("_Z13get_image_dim14ocl_image3d_ro") ||
-         name.startswith("_Z13get_image_dim14ocl_image3d_wo");
+         name.startswith("_Z13get_image_dim14ocl_image3d_wo") ||
+         name.startswith("_Z13get_image_dim20ocl_image2d_array_ro") ||
+         name.startswith("_Z13get_image_dim20ocl_image2d_array_wo");
 }
 
 bool clspv::IsImageQuery(StringRef name) {

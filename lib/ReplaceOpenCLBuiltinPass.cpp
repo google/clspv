@@ -2712,7 +2712,13 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Module &M) {
        "_Z11read_imagef14ocl_image1d_ro11ocl_sampleri"},
       {"_Z11read_imageh14ocl_image1d_ro11ocl_samplerf",
        "_Z11read_imagef14ocl_image1d_ro11ocl_samplerf"},
-      // TODO 1D array
+      // 1D array
+      {"_Z11read_imageh20ocl_image1d_array_roDv2_i",
+       "_Z11read_imagef20ocl_image1d_array_roDv2_i"},
+      {"_Z11read_imageh20ocl_image1d_array_ro11ocl_samplerDv2_i",
+       "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_i"},
+      {"_Z11read_imageh20ocl_image1d_array_ro11ocl_samplerDv2_f",
+       "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_f"},
       // 2D
       {"_Z11read_imageh14ocl_image2d_roDv2_i",
        "_Z11read_imagef14ocl_image2d_roDv2_i"},
@@ -2720,7 +2726,13 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Module &M) {
        "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i"},
       {"_Z11read_imageh14ocl_image2d_ro11ocl_samplerDv2_f",
        "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f"},
-      // TODO 2D array
+      // 2D array
+      {"_Z11read_imageh20ocl_image2d_array_roDv4_i",
+       "_Z11read_imagef20ocl_image2d_array_roDv4_i"},
+      {"_Z11read_imageh20ocl_image2d_array_ro11ocl_samplerDv4_i",
+       "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_i"},
+      {"_Z11read_imageh20ocl_image2d_array_ro11ocl_samplerDv4_f",
+       "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f"},
       // 3D
       {"_Z11read_imageh14ocl_image3d_roDv4_i",
        "_Z11read_imagef14ocl_image3d_roDv4_i"},
@@ -2784,11 +2796,15 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Module &M) {
       // 1D
       {"_Z12write_imageh14ocl_image1d_woiDv4_Dh",
        "_Z12write_imagef14ocl_image1d_woiDv4_f"},
-      // TODO 1D array
+      // 1D array
+      {"_Z12write_imageh20ocl_image1d_array_woDv2_iDv4_Dh",
+       "_Z12write_imagef20ocl_image1d_array_woDv2_iDv4_f"},
       // 2D
       {"_Z12write_imageh14ocl_image2d_woDv2_iDv4_Dh",
        "_Z12write_imagef14ocl_image2d_woDv2_iDv4_f"},
-      // TODO 2D array
+      // 2D array
+      {"_Z12write_imageh20ocl_image2d_array_woDv4_iDv4_Dh",
+       "_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f"},
       // 3D
       {"_Z12write_imageh14ocl_image3d_woDv4_iDv4_Dh",
        "_Z12write_imagef14ocl_image3d_woDv4_iDv4_f"}};
@@ -2860,7 +2876,13 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
        "_Z12read_imageui14ocl_image1d_ro11ocl_samplerf"},
       {"_Z11read_imagef14ocl_image1d_ro11ocl_sampleri",
        "_Z11read_imagef14ocl_image1d_ro11ocl_samplerf"},
-      // TODO 1Darray
+      // 1D array
+      {"_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_i",
+       "_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_f"},
+      {"_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_i",
+       "_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_f"},
+      {"_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_i",
+       "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_f"},
       // 2D
       {"_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i",
        "_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f"},
@@ -2868,7 +2890,13 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
        "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f"},
       {"_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i",
        "_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f"},
-      // TODO 2D array
+      // 2D array
+      {"_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_i",
+       "_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_f"},
+      {"_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_i",
+       "_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_f"},
+      {"_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_i",
+       "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f"},
       // 3D
       {"_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i",
        "_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f"},
@@ -2895,9 +2923,8 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(Module &M) {
           auto Arg2 = CI->getOperand(2);
 
           uint32_t dim = clspv::ImageDimensionality(Arg0->getType());
-          // TODO(alan-baker): when arrayed images are supported fix component
-          // calculation.
-          uint32_t components = dim;
+          uint32_t components =
+              dim + (clspv::IsArrayImageType(Arg0->getType()) ? 1 : 0);
           Type *float_ty = nullptr;
           if (components == 1) {
             float_ty = Type::getFloatTy(M.getContext());
