@@ -142,8 +142,8 @@ Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
 Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
-    if (IsSampledImageRead(called) || IsUnsampledImageRead(called) ||
-        IsImageWrite(called)) {
+    if (Builtins::IsSampledImageRead(called) || Builtins::IsUnsampledImageRead(called) ||
+        Builtins::IsImageWrite(called)) {
       // Specialize the image type based on it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
@@ -154,14 +154,14 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
       std::string name =
           cast<StructType>(imageTy->getPointerElementType())->getName().str();
-      if (IsFloatSampledImageRead(called) ||
-          IsFloatUnsampledImageRead(called) || IsFloatImageWrite(called)) {
+      if (Builtins::IsFloatSampledImageRead(called) ||
+          Builtins::IsFloatUnsampledImageRead(called) || Builtins::IsFloatImageWrite(called)) {
         name += ".float";
-      } else if (IsUintSampledImageRead(called) ||
-                 IsUintUnsampledImageRead(called) || IsUintImageWrite(called)) {
+      } else if (Builtins::IsUintSampledImageRead(called) ||
+                 Builtins::IsUintUnsampledImageRead(called) || Builtins::IsUintImageWrite(called)) {
         name += ".uint";
-      } else if (IsIntSampledImageRead(called) ||
-                 IsIntUnsampledImageRead(called) || IsIntImageWrite(called)) {
+      } else if (Builtins::IsIntSampledImageRead(called) ||
+                 Builtins::IsIntUnsampledImageRead(called) || Builtins::IsIntImageWrite(called)) {
         name += ".int";
       } else {
         assert(false && "Unhandled image builtin");
@@ -169,7 +169,7 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
       // Both sampled and unsampled reads generate an OpTypeImage with Sampled
       // operand of 1.
-      if (IsSampledImageRead(called) || IsUnsampledImageRead(called)) {
+      if (Builtins::IsSampledImageRead(called) || Builtins::IsUnsampledImageRead(called)) {
         name += ".sampled";
       }
 
@@ -223,7 +223,7 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
     for (auto &u : value->uses()) {
       if (auto call = dyn_cast<CallInst>(u.getUser())) {
         auto called = call->getCalledFunction();
-        if (IsImageBuiltin(called)) {
+        if (Builtins::IsImageBuiltin(called)) {
           auto new_func = ReplaceImageBuiltin(called, new_type);
           call->setCalledFunction(new_func);
           if (called->getNumUses() == 0)

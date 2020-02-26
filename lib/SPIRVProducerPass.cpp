@@ -42,7 +42,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spirv/1.0/spirv.hpp"
+#include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
@@ -72,6 +72,9 @@ namespace {
 
 cl::opt<bool> ShowResourceVars("show-rv", cl::init(false), cl::Hidden,
                                cl::desc("Show resource variable creation"));
+
+cl::opt<std::string> SPIRVVersion("spirv-version", cl::init("1.0"), cl::Hidden,
+                                    cl::desc("Select SPIR-V version (i.e. 1.5)"));
 
 // These hacks exist to help transition code generation algorithms
 // without making huge noise in detailed test output.
@@ -262,6 +265,7 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef UniqueVector<Value *> ValueList;
   typedef std::vector<std::pair<Value *, uint32_t>> EntryPointVecType;
   typedef std::list<SPIRVInstruction *> SPIRVInstructionList;
+  typedef std::set<uint32_t> CapabilitySetType;
   // A vector of tuples, each of which is:
   // - the LLVM instruction that we will later generate SPIR-V code for
   // - where the SPIR-V instruction should be inserted
@@ -271,6 +275,9 @@ struct SPIRVProducerPass final : public ModulePass {
       DeferredInstVecType;
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
+
+  uint32_t majorVersion;
+  uint32_t minorVersion;
 
   explicit SPIRVProducerPass(
       raw_pwrite_stream &out,
@@ -283,7 +290,13 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), max_local_spec_id_(0) {}
+        WorkgroupSizeVarID(0), max_local_spec_id_(0) {
+    size_t pos;
+    majorVersion = std::stol(SPIRVVersion, &pos);
+    assert(majorVersion == 1 && "SPIRV major version must be 1");
+    minorVersion = std::atol(&SPIRVVersion[pos+1]);
+    assert(minorVersion <= 5 && "SPIRV minor version must be <= 5");
+  }
 
   virtual ~SPIRVProducerPass() {
     for (auto *Inst : SPIRVInsts) {
@@ -326,6 +339,7 @@ struct SPIRVProducerPass final : public ModulePass {
 
     return where->second;
   }
+  CapabilitySetType &getCapabilitySet() { return CapabilitySet; }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
   TypeList &getImageTypeList() { return ImageTypeList; }
   TypeList &getTypeList() { return Types; };
@@ -338,6 +352,8 @@ struct SPIRVProducerPass final : public ModulePass {
   ValueList &getEntryPointInterfacesVec() { return EntryPointInterfacesVec; };
   uint32_t &getOpExtInstImportID() { return OpExtInstImportID; };
   std::vector<uint32_t> &getBuiltinDimVec() { return BuiltinDimensionVec; };
+
+  void addCapability(uint32_t c) { CapabilitySet.emplace(c); }
   bool hasVariablePointersStorageBuffer() {
     return HasVariablePointersStorageBuffer;
   }
@@ -485,6 +501,8 @@ private:
   // ID for OpTypeVector %int 4.
   uint32_t v4int32ID = 0;
 
+  // Set of Capabilities required
+  CapabilitySetType CapabilitySet;
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   TypeMapType TypeMap;
   // Maps an LLVM image type to its SPIR-V ID.
@@ -743,8 +761,10 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
                    sizeof(spv::MagicNumber));
-  binaryOut->write(reinterpret_cast<const char *>(&spv::Version),
-                   sizeof(spv::Version));
+
+  uint32_t version = 0x00010000 | (minorVersion << 8);
+  binaryOut->write(reinterpret_cast<const char *>(&version),
+                   sizeof(version));
 
   // use Google's vendor ID
   const uint32_t vendor = 21 << 16;
@@ -819,9 +839,10 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           }
         } else if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           StringRef callee_name = Call->getCalledFunction()->getName();
+          auto callee_code = Builtins::Lookup(callee_name);
 
           // Handle image type specially.
-          if (clspv::IsImageBuiltin(callee_name)) {
+          if (clspv::Builtins::IsImageBuiltin(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
@@ -829,17 +850,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             getImageTypeList().insert(ImageTy);
           }
 
-          if (clspv::IsSampledImageRead(callee_name)) {
+          if (clspv::Builtins::IsSampledImageRead(callee_name)) {
             // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
-          }
-
-          if (clspv::IsUnsampledImageRead(callee_name)) {
+          } else if (clspv::Builtins::IsUnsampledImageRead(callee_name)) {
             // All unsampled reads need an integer 0 for the Lod operand.
             FindConstant(ConstantInt::get(Context, APInt(32, 0)));
-          }
-
-          if (clspv::IsImageQuery(callee_name)) {
+          } else if (clspv::Builtins::IsImageQuery(callee_name)) {
             Type *ImageTy = Call->getOperand(0)->getType();
             const uint32_t dim = ImageDimensionality(ImageTy);
             uint32_t components =
@@ -847,7 +864,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             if (components > 1) {
               // OpImageQuerySize* return |components| components.
               FindType(VectorType::get(Type::getInt32Ty(Context), components));
-              if (dim == 3 && IsGetImageDim(callee_name)) {
+              if (dim == 3 && Builtins::IsGetImageDim(callee_name)) {
                 // get_image_dim for 3D images returns an int4.
                 FindType(
                     VectorType::get(Type::getInt32Ty(Context), components + 1));
@@ -859,6 +876,9 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
               // operand.
               FindConstant(ConstantInt::get(Context, APInt(32, 0)));
             }
+          } else if (callee_code == Builtins::ESubGroupBroadcast) {
+              // TODO: collect all constants during conversion below, then insert in entry
+              FindConstant(ConstantInt::get(Context, APInt(32, spv::ScopeSubgroup)));
           }
         }
       }
@@ -2777,6 +2797,9 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
           case clspv::ArgKind::Pod:
             // The call maps to the variable directly.
             VMap[call] = info->var_id;
+            if (minorVersion >= 5) {
+                getEntryPointInterfacesVec().insert(call);
+            }
             break;
           case clspv::ArgKind::Sampler:
           case clspv::ArgKind::ReadOnlyImage:
@@ -3405,6 +3428,11 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
       new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityShader));
   SPIRVInstList.insert(InsertPoint, CapInst);
 
+  for (auto cap : getCapabilitySet()) {
+      auto *CapInst = new SPIRVInstruction(spv::OpCapability, MkNum(cap));
+      SPIRVInstList.insert(InsertPoint, CapInst);
+  }
+
   bool write_without_format = false;
   bool sampled_1d = false;
   bool image_1d = false;
@@ -3480,7 +3508,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     bool hasImageQuery = false;
     for (const auto &SymVal : module.getValueSymbolTable()) {
       if (auto F = dyn_cast<Function>(SymVal.getValue())) {
-        if (clspv::IsImageQuery(F)) {
+        if (clspv::Builtins::IsImageQuery(F)) {
           hasImageQuery = true;
           break;
         }
@@ -4748,10 +4776,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // read_image (with a sampler) is converted to OpSampledImage and
-    // OpImageSampleExplicitLod.  Additionally, OpTypeSampledImage is
-    // generated.
-    if (clspv::IsSampledImageRead(Callee)) {
+    // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
+    // Additionally, OpTypeSampledImage is generated.
+    if (clspv::Builtins::IsSampledImageRead(Callee)) {
       //
       // Generate OpSampledImage.
       //
@@ -4826,7 +4853,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // read_image (without a sampler) is mapped to OpImageFetch.
-    if (clspv::IsUnsampledImageRead(Callee)) {
+    if (clspv::Builtins::IsUnsampledImageRead(Callee)) {
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
 
@@ -4878,7 +4905,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // write_image is mapped to OpImageWrite.
-    if (clspv::IsImageWrite(Callee)) {
+    if (clspv::Builtins::IsImageWrite(Callee)) {
       //
       // Generate OpImageWrite.
       //
@@ -4916,7 +4943,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
-    if (clspv::IsImageQuery(Callee)) {
+    if (clspv::Builtins::IsImageQuery(Callee)) {
       //
       // Generate OpImageQuerySize[Lod]
       //
@@ -4958,7 +4985,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // May require an extra instruction to create the appropriate result of
       // the builtin function.
-      if (clspv::IsGetImageDim(Callee)) {
+      if (clspv::Builtins::IsGetImageDim(Callee)) {
         if (dim == 3) {
           // get_image_dim returns an int4 for 3D images.
           //
@@ -5007,9 +5034,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Ops << MkId(TypeMap[I.getType()]) << MkId(SizesID);
 
         uint32_t component = 0;
-        if (IsGetImageHeight(Callee))
+        if (Builtins::IsGetImageHeight(Callee))
           component = 1;
-        else if (IsGetImageDepth(Callee))
+        else if (Builtins::IsGetImageDepth(Callee))
           component = 2;
         Ops << MkNum(component);
 
@@ -5203,6 +5230,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           new SPIRVInstruction(spv::OpPhi, std::get<2>(*DeferredInst), Ops));
     } else if (CallInst *Call = dyn_cast<CallInst>(Inst)) {
       Function *Callee = Call->getCalledFunction();
+      LLVMContext& Context = Callee->getContext();
+      auto IntTy = Type::getInt32Ty(Context);
+      auto callee_code = Builtins::Lookup(Callee);
       auto callee_name = Callee->getName();
       glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(callee_name);
 
@@ -5236,9 +5266,6 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           // Generate one more instruction that uses the result of the extended
           // instruction.  Its result id is one more than the id of the
           // extended instruction.
-          LLVMContext &Context =
-              Call->getParent()->getParent()->getParent()->getContext();
-
           auto generate_extra_inst = [this, &Context, &Call, &DeferredInst,
                                       &VMap, &SPIRVInstList, &InsertPoint](
                                          spv::Op opcode, Constant *constant) {
@@ -5268,7 +5295,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           switch (IndirectExtInst) {
           case glsl::ExtInstFindUMsb: // Implementing clz
             generate_extra_inst(
-                spv::OpISub, ConstantInt::get(Type::getInt32Ty(Context), 31));
+                spv::OpISub, ConstantInt::get(IntTy, 31));
             break;
           case glsl::ExtInstAcos:  // Implementing acospi
           case glsl::ExtInstAsin:  // Implementing asinpi
@@ -5284,7 +5311,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           }
         }
 
-      } else if (callee_name.startswith("_Z8popcount")) {
+      } else if (callee_code == Builtins::EPopcount) {
         //
         // Generate OpBitCount
         //
@@ -5324,6 +5351,37 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // We have already mapped the call's result value to an ID.
         // Don't generate any code now.
 
+      } else if (callee_code == Builtins::ESubGroupBroadcast) {
+
+        // requires SPIRV version 5
+        assert(minorVersion >= 5 && "Sub-group support requires SPIR-V version 1.5 or greater");
+
+        //
+        // Generate OpGroupNonUniformBroadcast
+        //
+        // Ops[0] = Result Type ID
+        // Ops[1] = ScopeSubgroup
+        // Ops[2] = Value ID
+        // Ops[3] = Local ID
+
+        SPIRVOperandList Ops;
+
+        // The result type.
+        Ops << MkId(lookupType(Call->getType()));
+
+        // Subgroup Scope
+        Ops << MkId(VMap[ConstantInt::get(Context, APInt(32, spv::ScopeSubgroup))]);
+
+        for (Use &use : Call->arg_operands()) {
+          Ops << MkId(VMap[use.get()]);
+        }
+
+        SPIRVInstList.insert(
+            InsertPoint, new SPIRVInstruction(spv::OpGroupNonUniformBroadcast,
+                                              std::get<2>(*DeferredInst), Ops));
+
+        // Add Capability
+        addCapability(spv::CapabilityGroupNonUniformBallot);
       } else {
         if (Call->getType()->isPointerTy()) {
           // Functions returning pointers require variable pointers.
@@ -5460,240 +5518,120 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
 }
 
 glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
+
+  const auto& fi = Builtins::Lookup(Name);
+  switch (fi) {
+  case Builtins::EClamp: {
+      auto param_type = fi.getParameter(0);
+      if (param_type.type == Type::FloatTyID) {
+          return glsl::ExtInst::ExtInstFClamp;
+      }
+      return param_type.sign ? glsl::ExtInst::ExtInstSClamp : glsl::ExtInst::ExtInstUClamp;
+  }
+  case Builtins::EMax: {
+      auto param_type = fi.getParameter(0);
+      if (param_type.type == Type::FloatTyID) {
+          return glsl::ExtInst::ExtInstFMax;
+      }
+      return param_type.sign ? glsl::ExtInst::ExtInstSMax : glsl::ExtInst::ExtInstUMax;
+  }
+  case Builtins::EMin: {
+      auto param_type = fi.getParameter(0);
+      if (param_type.type == Type::FloatTyID) {
+          return glsl::ExtInst::ExtInstFMin;
+      }
+      return param_type.sign ? glsl::ExtInst::ExtInstSMin : glsl::ExtInst::ExtInstUMin;
+  }
+  case Builtins::EAbs:                              return glsl::ExtInst::ExtInstSAbs;
+  case Builtins::EFmax:                             return glsl::ExtInst::ExtInstFMax;
+  case Builtins::EFmin:                             return glsl::ExtInst::ExtInstFMin;
+  case Builtins::EDegrees:                          return glsl::ExtInst::ExtInstDegrees;
+  case Builtins::ERadians:                          return glsl::ExtInst::ExtInstRadians;
+  case Builtins::EMix:                              return glsl::ExtInst::ExtInstFMix;
+  case Builtins::EAcos:
+  case Builtins::EAcospi:                           return glsl::ExtInst::ExtInstAcos;
+  case Builtins::EAcosh:                            return glsl::ExtInst::ExtInstAcosh;
+  case Builtins::EAsin:
+  case Builtins::EAsinpi:                           return glsl::ExtInst::ExtInstAsin;
+  case Builtins::EAsinh:                            return glsl::ExtInst::ExtInstAsinh;
+  case Builtins::EAtan:
+  case Builtins::EAtanpi:                           return glsl::ExtInst::ExtInstAtan;
+  case Builtins::EAtanh:                            return glsl::ExtInst::ExtInstAtanh;
+  case Builtins::EAtan2:
+  case Builtins::EAtan2pi:                          return glsl::ExtInst::ExtInstAtan2;
+  case Builtins::ECeil:                             return glsl::ExtInst::ExtInstCeil;
+  case Builtins::ESin:
+  case Builtins::EHalfSin:
+  case Builtins::ENativeSin:                        return glsl::ExtInst::ExtInstSin;
+  case Builtins::ESinh:                             return glsl::ExtInst::ExtInstSinh;
+  case Builtins::ECos:
+  case Builtins::EHalfCos:
+  case Builtins::ENativeCos:                        return glsl::ExtInst::ExtInstCos;
+  case Builtins::ECosh:                             return glsl::ExtInst::ExtInstCosh;
+  case Builtins::ETan:
+  case Builtins::EHalfTan:
+  case Builtins::ENativeTan:                        return glsl::ExtInst::ExtInstTan;
+  case Builtins::ETanh:                             return glsl::ExtInst::ExtInstTanh;
+  case Builtins::EExp:
+  case Builtins::EHalfExp:
+  case Builtins::ENativeExp:                        return glsl::ExtInst::ExtInstExp;
+  case Builtins::EExp2:
+  case Builtins::EHalfExp2:
+  case Builtins::ENativeExp2:                       return glsl::ExtInst::ExtInstExp2;
+  case Builtins::ELog:
+  case Builtins::EHalfLog:
+  case Builtins::ENativeLog:                        return glsl::ExtInst::ExtInstLog;
+  case Builtins::ELog2:
+  case Builtins::EHalfLog2:
+  case Builtins::ENativeLog2:                       return glsl::ExtInst::ExtInstLog2;
+  case Builtins::EFabs:                             return glsl::ExtInst::ExtInstFAbs;
+  case Builtins::EFma:                              return glsl::ExtInst::ExtInstFma;
+  case Builtins::EFloor:                            return glsl::ExtInst::ExtInstFloor;
+  case Builtins::ELdexp:                            return glsl::ExtInst::ExtInstLdexp;
+  case Builtins::EPow:
+  case Builtins::EPowr:
+  case Builtins::EHalfPowr:
+  case Builtins::ENativePowr:                       return glsl::ExtInst::ExtInstPow;
+  case Builtins::ERound:                            return glsl::ExtInst::ExtInstRound;
+  case Builtins::ESqrt:
+  case Builtins::EHalfSqrt:
+  case Builtins::ENativeSqrt:                       return glsl::ExtInst::ExtInstSqrt;
+  case Builtins::ERsqrt:
+  case Builtins::EHalfRsqrt:
+  case Builtins::ENativeRsqrt:                      return glsl::ExtInst::ExtInstInverseSqrt;
+  case Builtins::ETrunc:                            return glsl::ExtInst::ExtInstTrunc;
+  case Builtins::EFrexp:                            return glsl::ExtInst::ExtInstFrexp;
+  case Builtins::EFract:                            return glsl::ExtInst::ExtInstFract;
+  case Builtins::ESign:                             return glsl::ExtInst::ExtInstFSign;
+  case Builtins::ELength:
+  case Builtins::EFastLength:                       return glsl::ExtInst::ExtInstLength;
+  case Builtins::EDistance:
+  case Builtins::EFastDistance:                     return glsl::ExtInst::ExtInstDistance;
+  case Builtins::EStep:                             return glsl::ExtInst::ExtInstStep;
+  case Builtins::ESmoothstep:                       return glsl::ExtInst::ExtInstSmoothStep;
+  case Builtins::ECross:                            return glsl::ExtInst::ExtInstCross;
+  case Builtins::ENormalize:
+  case Builtins::EFastNormalize:                    return glsl::ExtInst::ExtInstNormalize;
+  default: break;
+  }
+          
   return StringSwitch<glsl::ExtInst>(Name)
-      .Case("_Z3absc", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv2_c", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv3_c", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv4_c", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3abss", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv2_s", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv3_s", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv4_s", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absi", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv2_i", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv3_i", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv4_i", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absl", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv2_l", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv3_l", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z3absDv4_l", glsl::ExtInst::ExtInstSAbs)
-      .Case("_Z5clampccc", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv2_cS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv3_cS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv4_cS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clamphhh", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv2_hS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv3_hS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv4_hS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampsss", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv2_sS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv3_sS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv4_sS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampttt", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv2_tS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv3_tS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv4_tS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampiii", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv2_iS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv3_iS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv4_iS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampjjj", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv2_jS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv3_jS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv4_jS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clamplll", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv2_lS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv3_lS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampDv4_lS_S_", glsl::ExtInst::ExtInstSClamp)
-      .Case("_Z5clampmmm", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv2_mS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv3_mS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampDv4_mS_S_", glsl::ExtInst::ExtInstUClamp)
-      .Case("_Z5clampfff", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv2_fS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv3_fS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv4_fS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDhDhDh", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv2_DhS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv3_DhS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z5clampDv4_DhS_S_", glsl::ExtInst::ExtInstFClamp)
-      .Case("_Z3maxcc", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv2_cS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv3_cS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv4_cS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxhh", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv2_hS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv3_hS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv4_hS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxss", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv2_sS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv3_sS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv4_sS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxtt", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv2_tS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv3_tS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv4_tS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxii", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv2_iS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv3_iS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv4_iS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxjj", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv2_jS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv3_jS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv4_jS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxll", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv2_lS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv3_lS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxDv4_lS_", glsl::ExtInst::ExtInstSMax)
-      .Case("_Z3maxmm", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv2_mS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv3_mS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxDv4_mS_", glsl::ExtInst::ExtInstUMax)
-      .Case("_Z3maxff", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv2_fS_", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv3_fS_", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv4_fS_", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDhDh", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv2_DhS_", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv3_DhS_", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3maxDv4_DhS_", glsl::ExtInst::ExtInstFMax)
-      .StartsWith("_Z4fmax", glsl::ExtInst::ExtInstFMax)
-      .Case("_Z3mincc", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv2_cS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv3_cS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv4_cS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minhh", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv2_hS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv3_hS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv4_hS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minss", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv2_sS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv3_sS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv4_sS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3mintt", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv2_tS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv3_tS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv4_tS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minii", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv2_iS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv3_iS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv4_iS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minjj", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv2_jS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv3_jS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv4_jS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minll", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv2_lS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv3_lS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minDv4_lS_", glsl::ExtInst::ExtInstSMin)
-      .Case("_Z3minmm", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv2_mS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv3_mS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minDv4_mS_", glsl::ExtInst::ExtInstUMin)
-      .Case("_Z3minff", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv2_fS_", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv3_fS_", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv4_fS_", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDhDh", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv2_DhS_", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv3_DhS_", glsl::ExtInst::ExtInstFMin)
-      .Case("_Z3minDv4_DhS_", glsl::ExtInst::ExtInstFMin)
-      .StartsWith("_Z4fmin", glsl::ExtInst::ExtInstFMin)
-      .StartsWith("_Z7degrees", glsl::ExtInst::ExtInstDegrees)
-      .StartsWith("_Z7radians", glsl::ExtInst::ExtInstRadians)
-      .StartsWith("_Z3mix", glsl::ExtInst::ExtInstFMix)
-      .StartsWith("_Z4acos", glsl::ExtInst::ExtInstAcos)
-      .StartsWith("_Z5acosh", glsl::ExtInst::ExtInstAcosh)
-      .StartsWith("_Z4asin", glsl::ExtInst::ExtInstAsin)
-      .StartsWith("_Z5asinh", glsl::ExtInst::ExtInstAsinh)
-      .StartsWith("_Z4atan", glsl::ExtInst::ExtInstAtan)
-      .StartsWith("_Z5atan2", glsl::ExtInst::ExtInstAtan2)
-      .StartsWith("_Z5atanh", glsl::ExtInst::ExtInstAtanh)
-      .StartsWith("_Z4ceil", glsl::ExtInst::ExtInstCeil)
-      .StartsWith("_Z3sin", glsl::ExtInst::ExtInstSin)
-      .StartsWith("_Z4sinh", glsl::ExtInst::ExtInstSinh)
-      .StartsWith("_Z8half_sin", glsl::ExtInst::ExtInstSin)
-      .StartsWith("_Z10native_sin", glsl::ExtInst::ExtInstSin)
-      .StartsWith("_Z3cos", glsl::ExtInst::ExtInstCos)
-      .StartsWith("_Z4cosh", glsl::ExtInst::ExtInstCosh)
-      .StartsWith("_Z8half_cos", glsl::ExtInst::ExtInstCos)
-      .StartsWith("_Z10native_cos", glsl::ExtInst::ExtInstCos)
-      .StartsWith("_Z3tan", glsl::ExtInst::ExtInstTan)
-      .StartsWith("_Z4tanh", glsl::ExtInst::ExtInstTanh)
-      .StartsWith("_Z8half_tan", glsl::ExtInst::ExtInstTan)
-      .StartsWith("_Z10native_tan", glsl::ExtInst::ExtInstTan)
-      .StartsWith("_Z3exp", glsl::ExtInst::ExtInstExp)
-      .StartsWith("_Z8half_exp", glsl::ExtInst::ExtInstExp)
-      .StartsWith("_Z10native_exp", glsl::ExtInst::ExtInstExp)
-      .StartsWith("_Z4exp2", glsl::ExtInst::ExtInstExp2)
-      .StartsWith("_Z9half_exp2", glsl::ExtInst::ExtInstExp2)
-      .StartsWith("_Z11native_exp2", glsl::ExtInst::ExtInstExp2)
-      .StartsWith("_Z3log", glsl::ExtInst::ExtInstLog)
-      .StartsWith("_Z8half_log", glsl::ExtInst::ExtInstLog)
-      .StartsWith("_Z10native_log", glsl::ExtInst::ExtInstLog)
-      .StartsWith("_Z4log2", glsl::ExtInst::ExtInstLog2)
-      .StartsWith("_Z9half_log2", glsl::ExtInst::ExtInstLog2)
-      .StartsWith("_Z11native_log2", glsl::ExtInst::ExtInstLog2)
-      .StartsWith("_Z4fabs", glsl::ExtInst::ExtInstFAbs)
-      .StartsWith("_Z3fma", glsl::ExtInst::ExtInstFma)
-      .StartsWith("_Z5floor", glsl::ExtInst::ExtInstFloor)
-      .StartsWith("_Z5ldexp", glsl::ExtInst::ExtInstLdexp)
-      .StartsWith("_Z3pow", glsl::ExtInst::ExtInstPow)
-      .StartsWith("_Z4powr", glsl::ExtInst::ExtInstPow)
-      .StartsWith("_Z9half_powr", glsl::ExtInst::ExtInstPow)
-      .StartsWith("_Z11native_powr", glsl::ExtInst::ExtInstPow)
-      .StartsWith("_Z5round", glsl::ExtInst::ExtInstRound)
-      .StartsWith("_Z4sqrt", glsl::ExtInst::ExtInstSqrt)
-      .StartsWith("_Z9half_sqrt", glsl::ExtInst::ExtInstSqrt)
-      .StartsWith("_Z11native_sqrt", glsl::ExtInst::ExtInstSqrt)
-      .StartsWith("_Z5rsqrt", glsl::ExtInst::ExtInstInverseSqrt)
-      .StartsWith("_Z10half_rsqrt", glsl::ExtInst::ExtInstInverseSqrt)
-      .StartsWith("_Z12native_rsqrt", glsl::ExtInst::ExtInstInverseSqrt)
-      .StartsWith("_Z5trunc", glsl::ExtInst::ExtInstTrunc)
-      .StartsWith("_Z5frexp", glsl::ExtInst::ExtInstFrexp)
-      .StartsWith("_Z4sign", glsl::ExtInst::ExtInstFSign)
-      .StartsWith("_Z6length", glsl::ExtInst::ExtInstLength)
-      .StartsWith("_Z11fast_length", glsl::ExtInst::ExtInstLength)
-      .StartsWith("_Z8distance", glsl::ExtInst::ExtInstDistance)
-      .StartsWith("_Z13fast_distance", glsl::ExtInst::ExtInstDistance)
-      .StartsWith("_Z4step", glsl::ExtInst::ExtInstStep)
-      .StartsWith("_Z10smoothstep", glsl::ExtInst::ExtInstSmoothStep)
-      .Case("_Z5crossDv3_fS_", glsl::ExtInst::ExtInstCross)
-      .StartsWith("_Z9normalize", glsl::ExtInst::ExtInstNormalize)
-      .StartsWith("_Z14fast_normalize", glsl::ExtInst::ExtInstNormalize)
       .StartsWith("llvm.fmuladd.", glsl::ExtInst::ExtInstFma)
       .Case("spirv.unpack.v2f16", glsl::ExtInst::ExtInstUnpackHalf2x16)
       .Case("spirv.pack.v2f16", glsl::ExtInst::ExtInstPackHalf2x16)
-      .Case("clspv.fract.f", glsl::ExtInst::ExtInstFract)
-      .Case("clspv.fract.v2f", glsl::ExtInst::ExtInstFract)
-      .Case("clspv.fract.v3f", glsl::ExtInst::ExtInstFract)
-      .Case("clspv.fract.v4f", glsl::ExtInst::ExtInstFract)
       .Default(kGlslExtInstBad);
 }
 
 glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(StringRef Name) {
-  // Check indirect cases.
-  return StringSwitch<glsl::ExtInst>(Name)
-      .StartsWith("_Z3clz", glsl::ExtInst::ExtInstFindUMsb)
-      // Use exact match on float arg because these need a multiply
-      // of a constant of the right floating point type.
-      .Case("_Z6acospif", glsl::ExtInst::ExtInstAcos)
-      .Case("_Z6acospiDv2_f", glsl::ExtInst::ExtInstAcos)
-      .Case("_Z6acospiDv3_f", glsl::ExtInst::ExtInstAcos)
-      .Case("_Z6acospiDv4_f", glsl::ExtInst::ExtInstAcos)
-      .Case("_Z6asinpif", glsl::ExtInst::ExtInstAsin)
-      .Case("_Z6asinpiDv2_f", glsl::ExtInst::ExtInstAsin)
-      .Case("_Z6asinpiDv3_f", glsl::ExtInst::ExtInstAsin)
-      .Case("_Z6asinpiDv4_f", glsl::ExtInst::ExtInstAsin)
-      .Case("_Z6atanpif", glsl::ExtInst::ExtInstAtan)
-      .Case("_Z6atanpiDv2_f", glsl::ExtInst::ExtInstAtan)
-      .Case("_Z6atanpiDv3_f", glsl::ExtInst::ExtInstAtan)
-      .Case("_Z6atanpiDv4_f", glsl::ExtInst::ExtInstAtan)
-      .Case("_Z7atan2piff", glsl::ExtInst::ExtInstAtan2)
-      .Case("_Z7atan2piDv2_fS_", glsl::ExtInst::ExtInstAtan2)
-      .Case("_Z7atan2piDv3_fS_", glsl::ExtInst::ExtInstAtan2)
-      .Case("_Z7atan2piDv4_fS_", glsl::ExtInst::ExtInstAtan2)
-      .Default(kGlslExtInstBad);
+  switch (Builtins::Lookup(Name)) {
+  case Builtins::EClz:                              return glsl::ExtInst::ExtInstFindUMsb;
+  case Builtins::EAcospi:                           return glsl::ExtInst::ExtInstAcos;
+  case Builtins::EAsinpi:                           return glsl::ExtInst::ExtInstAsin;
+  case Builtins::EAtanpi:                           return glsl::ExtInst::ExtInstAtan;
+  case Builtins::EAtan2pi:                          return glsl::ExtInst::ExtInstAtan2;
+  default: break;
+  }
+  return kGlslExtInstBad;
 }
 
 glsl::ExtInst
@@ -5935,6 +5873,7 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
     case spv::OpAtomicAnd:
     case spv::OpAtomicOr:
     case spv::OpAtomicXor:
+    case spv::OpGroupNonUniformBroadcast:
     case spv::OpDot: {
       WriteWordCountAndOpcode(Inst);
       WriteOperand(Ops[0]);
