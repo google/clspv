@@ -58,12 +58,12 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   auto &C = M.getContext();
 
-  if (clspv::Option::WorkDim()) {
-    PushConstants.push_back(clspv::PushConstant::Dimensions);
-  }
-
   if (clspv::Option::GlobalOffset()) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
+  }
+
+  if (clspv::Option::WorkDim()) {
+    PushConstants.push_back(clspv::PushConstant::Dimensions);
   }
 
   if (PushConstants.size() > 0) {

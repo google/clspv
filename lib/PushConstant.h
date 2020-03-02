@@ -22,8 +22,14 @@
 
 namespace clspv {
 
+// Returns the name of the push constant from its enum.
 const char *GetPushConstantName(PushConstant);
+
+// Returns a type valid in the module passed for the push constant specified.
 llvm::Type *GetPushConstantType(llvm::Module &, PushConstant);
+
+// Returns a pointer to the push constant passed. Instructions to create the
+// pointer are appended to the basic block provided.
 llvm::Value *GetPushConstantPointer(llvm::BasicBlock *, PushConstant);
 
 } // namespace clspv

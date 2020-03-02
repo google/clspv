@@ -39,6 +39,7 @@
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -2942,10 +2943,6 @@ unsigned baseAlignment(Type *type) {
   llvm_unreachable("Unsupported type");
 }
 
-unsigned roundUpToMultipleOf(unsigned num, unsigned multiple) {
-  return ((num + multiple - 1) / multiple) * multiple;
-}
-
 unsigned extendedAlignment(Type *type) {
   // A scalar, vector or matrix type has an extended alignment equal to its base
   // alignment.
@@ -2959,12 +2956,12 @@ unsigned extendedAlignment(Type *type) {
   if (type->isStructTy()) {
     unsigned salign =
         structAlignment(cast<StructType>(type), extendedAlignment);
-    return roundUpToMultipleOf(salign, 16);
+    return alignTo(salign, 16);
   }
 
   if (type->isArrayTy()) {
     unsigned salign = extendedAlignment(type->getArrayElementType());
-    return roundUpToMultipleOf(salign, 16);
+    return alignTo(salign, 16);
   }
 
   llvm_unreachable("Unsupported type");
@@ -2997,7 +2994,7 @@ unsigned standardAlignment(Type *type, spv::StorageClass sclass) {
 bool improperlyStraddles(const DataLayout &DL, Type *type, unsigned offset) {
   assert(type->isVectorTy());
 
-  unsigned size = DL.getTypeStoreSize(type);
+  auto size = DL.getTypeStoreSize(type);
 
   // It is a vector with total size less than or equal to 16 bytes, and has
   // Offset decorations placing its first byte at F and its last byte at L,

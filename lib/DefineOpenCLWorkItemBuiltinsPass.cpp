@@ -263,12 +263,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   Function *F = M.getFunction("_Z17get_global_offsetj");
 
-  // If global offset support is disabled and the builtin not used in the
-  // module, don't create it. Otherwise, always define it as it's used in global
-  // ID calculations.
+  // Only define get_global_offset when it is used or the option is enabled
+  // (since it is used in global ID calculations).
   if (!clspv::Option::GlobalOffset() && (nullptr == F)) {
     return false;
-  } else {
+  }
+
+  // If get_global_offset isn't used then we need to declare it.
+  if (F == nullptr) {
     auto &C = M.getContext();
     auto Int32Ty = IntegerType::get(C, 32);
     auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
