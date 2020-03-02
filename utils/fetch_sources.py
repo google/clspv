@@ -20,8 +20,9 @@
 from __future__ import print_function
 
 import argparse
+import errno
 import json
-import distutils.dir_util
+import os
 import os.path
 import subprocess
 import sys
@@ -42,6 +43,22 @@ DEPS_REMOTE = 'deps'
 SITE_TO_HOST = { 'github' : 'github.com' }
 
 VERBOSE = True
+
+
+def mkdir_p(directory):
+    """Make the directory, and all its ancestors, as required. Any of the directories
+    are allowed to already exist."""
+    if directory == "":
+        # We're being asked to make the current directory.
+        return
+
+    try:
+        os.makedirs(directory)
+    except OSError as e:
+        if e.errno == errno.EEXIST and os.path.isdir(directory):
+            pass
+        else:
+            raise
 
 
 def command_output(cmd, directory, fail_ok=False):
@@ -103,7 +120,7 @@ class GoodCommit(object):
                                     cwd=self.subdir)
 
     def Clone(self):
-        distutils.dir_util.mkpath(self.subdir)
+        mkdir_p(self.subdir)
         command_output(['git', 'clone', self.GetUrl(), '.'], self.subdir)
 
     def Fetch(self):
@@ -142,7 +159,7 @@ def main():
 
     args = parser.parse_args()
 
-    distutils.dir_util.mkpath(args.dir)
+    mkdir_p(args.dir)
     print('Change directory to {d}'.format(d=args.dir))
     os.chdir(args.dir)
 
