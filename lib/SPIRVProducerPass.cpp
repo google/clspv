@@ -2866,17 +2866,17 @@ bool isScalarType(Type *type) {
   return type->isIntegerTy() || type->isFloatTy();
 }
 
-unsigned structAlignment(StructType *type,
-                         std::function<unsigned(Type *)> alignFn) {
-  unsigned maxAlign = 1;
+uint64_t structAlignment(StructType *type,
+                         std::function<uint64_t(Type *)> alignFn) {
+  uint64_t maxAlign = 1;
   for (unsigned i = 0; i < type->getStructNumElements(); i++) {
-    unsigned align = alignFn(type->getStructElementType(i));
+    uint64_t align = alignFn(type->getStructElementType(i));
     maxAlign = std::max(align, maxAlign);
   }
   return maxAlign;
 }
 
-unsigned scalarAlignment(Type *type) {
+uint64_t scalarAlignment(Type *type) {
   // A scalar of size N has a scalar alignment of N.
   if (isScalarType(type)) {
     return type->getScalarSizeInBits() / 8;
@@ -2902,7 +2902,7 @@ unsigned scalarAlignment(Type *type) {
   llvm_unreachable("Unsupported type");
 }
 
-unsigned baseAlignment(Type *type) {
+uint64_t baseAlignment(Type *type) {
   // A scalar has a base alignment equal to its scalar alignment.
   if (isScalarType(type)) {
     return scalarAlignment(type);
@@ -2943,7 +2943,7 @@ unsigned baseAlignment(Type *type) {
   llvm_unreachable("Unsupported type");
 }
 
-unsigned extendedAlignment(Type *type) {
+uint64_t extendedAlignment(Type *type) {
   // A scalar, vector or matrix type has an extended alignment equal to its base
   // alignment.
   // TODO matrix type
@@ -2954,20 +2954,19 @@ unsigned extendedAlignment(Type *type) {
   // An array or structure type has an extended alignment equal to the largest
   // extended alignment of any of its members, rounded up to a multiple of 16
   if (type->isStructTy()) {
-    unsigned salign =
-        structAlignment(cast<StructType>(type), extendedAlignment);
+    auto salign = structAlignment(cast<StructType>(type), extendedAlignment);
     return alignTo(salign, 16);
   }
 
   if (type->isArrayTy()) {
-    unsigned salign = extendedAlignment(type->getArrayElementType());
+    auto salign = extendedAlignment(type->getArrayElementType());
     return alignTo(salign, 16);
   }
 
   llvm_unreachable("Unsupported type");
 }
 
-unsigned standardAlignment(Type *type, spv::StorageClass sclass) {
+uint64_t standardAlignment(Type *type, spv::StorageClass sclass) {
   // If the scalarBlockLayout feature is enabled on the device then every member
   // must be aligned according to its scalar alignment
   if (clspv::Option::ScalarBlockLayout()) {
@@ -3018,7 +3017,7 @@ bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
                            unsigned PreviousMemberOffset) {
 
   auto MemberType = STy->getElementType(Member);
-  unsigned Align = standardAlignment(MemberType, SClass);
+  auto Align = standardAlignment(MemberType, SClass);
   auto &DL = M.getDataLayout();
 
   // The Offset decoration of any member must be a multiple of its alignment
@@ -3042,7 +3041,7 @@ bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
     if (Member > 0) {
       auto PType = STy->getElementType(Member - 1);
       if (PType->isStructTy() || PType->isArrayTy()) {
-        unsigned PAlign = standardAlignment(PType, SClass);
+        auto PAlign = standardAlignment(PType, SClass);
         if (Offset - PreviousMemberOffset < PAlign) {
           return false;
         }
