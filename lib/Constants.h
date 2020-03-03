@@ -55,6 +55,12 @@ inline std::string TranslateSamplerInitializerFunction() {
   return "__translate_sampler_initializer";
 }
 
+// Name of the global variable storing all push constants
+inline std::string PushConstantsVariableName() { return "__push_constants"; }
+
+// Name for module level metadata storing push constant indices.
+inline std::string PushConstantsMetadataName() { return "push_constants"; }
+
 } // namespace clspv
 
 #endif

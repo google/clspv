@@ -608,6 +608,7 @@ int PopulatePassManager(
   }
 
   pm->add(clspv::createZeroInitializeAllocasPass());
+  pm->add(clspv::createDeclarePushConstantsPass());
   pm->add(clspv::createDefineOpenCLWorkItemBuiltinsPass());
 
   if (0 < pmBuilder.OptLevel) {
@@ -765,6 +766,11 @@ int ParseOptions(const int argc, const char *const argv[]) {
       !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "cannot compile languages that use the generic address "
                     "space (e.g. CLC++, CL2.0) without -inline-entry-points\n";
+    return -1;
+  }
+
+  if (clspv::Option::ScalarBlockLayout()) {
+    llvm::errs() << "scalar block layout support unimplemented\n";
     return -1;
   }
 

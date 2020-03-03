@@ -168,6 +168,18 @@ llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));
 
+static llvm::cl::opt<bool>
+    scalar_block_layout("scalar-block-layout", llvm::cl::init(false),
+                        llvm::cl::desc("Assume VK_EXT_scalar_block_layout"));
+
+static llvm::cl::opt<bool> work_dim(
+    "work-dim", llvm::cl::init(false),
+    llvm::cl::desc("Enable support for get_work_dim() built-in function"));
+
+static llvm::cl::opt<bool>
+    global_offset("global-offset", llvm::cl::init(false),
+                  llvm::cl::desc("Enable support for global offsets"));
+
 static bool use_sampler_map = false;
 } // namespace
 
@@ -204,6 +216,9 @@ bool ImageSupport() { return images; }
 bool UseSamplerMap() { return use_sampler_map; }
 void SetUseSamplerMap(bool use) { use_sampler_map = use; }
 SourceLanguage Language() { return cl_std; }
+bool ScalarBlockLayout() { return scalar_block_layout; }
+bool WorkDim() { return work_dim; }
+bool GlobalOffset() { return global_offset; }
 
 } // namespace Option
 } // namespace clspv

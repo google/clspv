@@ -23,6 +23,7 @@ class PassRegistry;
 void initializeAllocateDescriptorsPassPass(PassRegistry &);
 void initializeClusterModuleScopeConstantVarsPass(PassRegistry &);
 void initializeClusterPodKernelArgumentsPassPass(PassRegistry &);
+void initializeDeclarePushConstantsPassPass(PassRegistry &);
 void initializeDefineOpenCLWorkItemBuiltinsPassPass(PassRegistry &);
 void initializeDirectResourceAccessPassPass(PassRegistry &);
 void initializeFixupStructuredCFGPassPass(PassRegistry &);

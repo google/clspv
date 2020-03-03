@@ -425,6 +425,27 @@ Take a closer look at the hexadecimal bytes in the example. They are:
 - `0000c03f`: the float value 1.5
 - `000000000000000000000000`: 12 zero bytes representing the zero-initialized third Foo value.
 
+#### Push constants
+
+Some features, when enabled, require values to be passed by the application via
+push constants. For each value requested by clspv, an entry will be present in
+the descriptor map. The format is:
+
+- `pushconstant` to indicate the entry is a push constant
+- `name` to indicate the name of the requested push constant follows
+- the name of the push constant requested
+- `offset` to indicate the offset at which the push constant is expected follows
+- the offset within push constants at which the entry is expected
+- `size` to indicate that the total size follows
+- the total size of the push constant that will be used.
+
+Here is a list of the push constants currently supported:
+- `dimensions`: the number of dimensions returned by `get_work_dim()`.
+  A 32-bit integer value.
+- `global_offset`: the 3D global offset used by `get_global_offset()` and in
+  global ID calculations. A vector of 3 32-bit integer values. Lower
+  dimensions come first in memory.
+
 ### Attributes
 
 The following attributes are ignored in the OpenCL C source, and thus have
@@ -508,11 +529,13 @@ arithmetic.
 
 The OpenCL C work-item functions map to Vulkan SPIR-V as follows:
 
-- `get_work_dim()` will **always** return _3_.
+- `get_work_dim()` is mapped to the `dimensions` push constant when `-work-dim`
+   is enabled, otherwise it always returns 3.
 - `get_global_size()` is implemented by multiplying the result from
   `get_local_size()` by the result from `get_num_groups()`.
 - `get_global_id()` is mapped to a SPIR-V variable decorated with
-  `GlobalInvocationId`.
+  `GlobalInvocationId`. The global offset is added to that variable when
+   `-global-offset` is enabled.
 - `get_local_size()` is mapped to a SPIR-V variable decorated with
   `WorkgroupSize`.
 - `get_local_id()` is mapped to a SPIR-V variable decorated with
@@ -521,7 +544,8 @@ The OpenCL C work-item functions map to Vulkan SPIR-V as follows:
   `NumWorkgroups`.
 - `get_group_id()` is mapped to a SPIR-V variable decorated with
   `WorkgroupId`.
-- `get_global_offset()` will **always** return _0_.
+- `get_global_offset()` is mapped to the `global_offset` push constant when
+  `-global-offset` is enabled, otherwise it always returns 0.
 
 ## OpenCL C Restrictions
 

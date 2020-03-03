@@ -294,7 +294,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
   SmallVector<Function *, 16> functions_to_modify;
   changed |= RemapFunctions(&functions_to_modify, M);
 
-  // GLobal variables with transformed types require rebuilding.
+  // Global variables with transformed types require rebuilding.
   SmallVector<GlobalVariable *, 16> variables_to_modify;
   changed |= RemapGlobalVariables(&variables_to_modify, M);
 

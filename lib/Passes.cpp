@@ -21,6 +21,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeClusterModuleScopeConstantVarsPass(r);
   initializeClusterPodKernelArgumentsPassPass(r);
   initializeDirectResourceAccessPassPass(r);
+  initializeDeclarePushConstantsPassPass(r);
   initializeDefineOpenCLWorkItemBuiltinsPassPass(r);
   initializeFixupStructuredCFGPassPass(r);
   initializeFunctionInternalizerPassPass(r);

@@ -32,6 +32,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterConstants.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ComputeStructuredOrder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ConstantEmitter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DeclarePushConstantsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
@@ -47,6 +48,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Passes.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/PushConstant.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVOp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/RemoveUnusedArguments.cpp

@@ -27,7 +27,7 @@ using namespace llvm;
 namespace {
 
 // We keep the current counter in a named metadata node in the module.
-// It looks likk this:
+// It looks like this:
 //
 // !"clspv.descriptor.index" = !{!3}
 // !3 = !{i32 0}

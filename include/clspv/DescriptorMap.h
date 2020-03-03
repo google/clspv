@@ -19,6 +19,7 @@
 #include <string>
 
 #include "clspv/ArgKind.h"
+#include "clspv/PushConstant.h"
 
 namespace clspv {
 namespace version0 {
@@ -49,7 +50,7 @@ const unsigned kSamplerFilterMask = 0x30;
 
 struct DescriptorMapEntry {
   // Type of the entry.
-  enum Kind { Sampler, KernelArg, Constant } kind;
+  enum Kind { Sampler, KernelArg, Constant, PushConstant } kind;
 
   // Common data.
   uint32_t descriptor_set;
@@ -78,6 +79,16 @@ struct DescriptorMapEntry {
     ArgKind constant_kind;
     std::string hex_bytes;
   } constant_data;
+
+  struct PushConstantData {
+    clspv::PushConstant pc;
+    uint32_t offset;
+    uint32_t size;
+  } push_constant_data;
+
+  DescriptorMapEntry(PushConstantData &&data)
+      : kind(PushConstant), descriptor_set(-1), binding(-1),
+        push_constant_data(std::move(data)) {}
 
   DescriptorMapEntry(ConstantData &&data, uint32_t ds, uint32_t b)
       : kind(Constant), descriptor_set(ds), binding(b),

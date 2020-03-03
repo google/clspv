@@ -137,6 +137,15 @@ static bool LanguageUsesGenericAddressSpace() {
          ((Language() == SourceLanguage::OpenCL_C_20));
 }
 
+// Returns true when SPV_EXT_scalar_block_layout can be used.
+bool ScalarBlockLayout();
+
+// Returns true when support for get_work_dim() is enabled.
+bool WorkDim();
+
+// Returns true when support for global offset is enabled.
+bool GlobalOffset();
+
 } // namespace Option
 } // namespace clspv
 

@@ -43,10 +43,11 @@ ModulePass *createOpenCLInlinerPass() { return new OpenCLInlinerPass(); }
 } // namespace clspv
 
 bool OpenCLInlinerPass::runOnModule(Module &M) {
+  auto WorkDimName = "_Z12get_work_dimv";
   StringRef FuncNames[] = {"_Z13get_global_idj",     "_Z14get_local_sizej",
                            "_Z12get_local_idj",      "_Z14get_num_groupsj",
                            "_Z12get_group_idj",      "_Z15get_global_sizej",
-                           "_Z17get_global_offsetj", "_Z12get_work_dimj"};
+                           "_Z17get_global_offsetj", WorkDimName};
   bool changed = false;
 
   for (StringRef FuncName : FuncNames) {
@@ -57,9 +58,11 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
       for (User *U : F->users()) {
         // Find only the calls to the function.
         if (CallInst *CI = dyn_cast<CallInst>(U)) {
-          // Check if the call instruction is using a constant argument.
-          if (isa<Constant>(CI->getArgOperand(0))) {
-            // We found a function we want to inline!
+          // If the called function doesn't take an argument or is using a
+          // constant argument, add the call to the list of to-be-inlined calls.
+          if (CI->getCalledFunction()->getName() == WorkDimName) {
+            Calls.push_back(CI);
+          } else if (isa<Constant>(CI->getArgOperand(0))) {
             Calls.push_back(CI);
           }
         }
