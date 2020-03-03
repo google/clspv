@@ -49,16 +49,16 @@ std::string GetUnmangledName(const std::string &str, size_t *pos) {
   }
   size_t name_pos = end - str.data();
 
-  std::string real_name = str.substr(name_pos, name_len);
   *pos = name_pos + name_len;
-  return real_name;
+  return str.substr(name_pos, name_len);
 }
 
 // capture parameter type and qualifiers based on Itanium ABI with OpenCL types
-bool GetParameterType(const std::string &mangled_name,
-                      clspv::Builtins::ParamTypeInfo *type_info, size_t *pos) {
+// - return new parsing position pos, or zero for error
+size_t GetParameterType(const std::string &mangled_name,
+                        clspv::Builtins::ParamTypeInfo *type_info, size_t pos) {
   // Parse a parameter type encoding
-  char type_code = mangled_name[(*pos)++];
+  char type_code = mangled_name[pos++];
 
   int blen = 1;
   switch (type_code) {
@@ -71,23 +71,23 @@ bool GetParameterType(const std::string &mangled_name,
   case 'V': // volatile
     return GetParameterType(mangled_name, type_info, pos);
   case 'U': { // Address space
-    std::string address_space = GetUnmangledName(mangled_name, pos);
+    std::string address_space = GetUnmangledName(mangled_name, &pos);
     return GetParameterType(mangled_name, type_info, pos);
   }
-
+    // OCL types
   case 'D':
-    type_code = mangled_name[(*pos)++];
+    type_code = mangled_name[pos++];
     if (type_code == 'v') { // OCL vector
       char *end;
-      int numElems = strtol(&mangled_name[*pos], &end, 10);
+      int numElems = strtol(&mangled_name[pos], &end, 10);
       if (!numElems) {
-        return false;
+        return 0;
       }
       type_info->vector_size = numElems;
-      *pos = end - mangled_name.data();
+      pos = end - mangled_name.data();
 
-      if (mangled_name[(*pos)++] != '_') {
-        return false;
+      if (mangled_name[pos++] != '_') {
+        return 0;
       }
       return GetParameterType(mangled_name, type_info, pos);
     } else if (type_code == 'h') { // OCL half
@@ -95,7 +95,11 @@ bool GetParameterType(const std::string &mangled_name,
       type_info->is_signed = true;
       type_info->byte_len = 2;
     } else {
-      assert(0);
+#ifdef DEBUG
+      printf("Func: %s\n", mangled_name.c_str());
+      llvm_unreachable("failed to demangle name");
+#endif
+      return 0;
     }
     break;
 
@@ -133,11 +137,6 @@ bool GetParameterType(const std::string &mangled_name,
     break;
   case 'v': // void
     break;
-  case 'S':
-    if (mangled_name[(*pos)++] != '_') {
-      return false;
-    }
-    break;
   case '1':
   case '2':
   case '3':
@@ -148,20 +147,20 @@ bool GetParameterType(const std::string &mangled_name,
   case '8':
   case '9': {
     type_info->type_id = Type::StructTyID;
-    (*pos)--;
-    type_info->name = GetUnmangledName(mangled_name, pos);
+    pos--;
+    type_info->name = GetUnmangledName(mangled_name, &pos);
     break;
   }
   case '.':
-    return false;
+    return 0;
   default:
 #ifdef DEBUG
     printf("Func: %s\n", mangled_name.c_str());
     llvm_unreachable("failed to demangle name");
 #endif
-    return false;
+    return 0;
   }
-  return true;
+  return pos;
 }
 } // namespace
 
@@ -169,10 +168,11 @@ bool GetParameterType(const std::string &mangled_name,
 // FunctionInfo::GetFromMangledNameCheck
 //   - parse mangled name as far as possible. Some names are an aggregate of
 //   fields separated by '.'
+//   - extract name and parameter types, and return type for 'convert' functions
+//   - return true if the mangled name can be fully parsed
 bool Builtins::FunctionInfo::GetFromMangledNameCheck(
     const std::string &mangled_name) {
   size_t pos = 0;
-  size_t len;
   if (mangled_name[pos++] != '_' || mangled_name[pos++] != 'Z') {
     name_ = mangled_name;
     return false;
@@ -181,7 +181,7 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
   name_ = GetUnmangledName(mangled_name, &pos);
 
   if (!name_.compare(0, 8, "convert_")) {
-    // deduce return type from name
+    // deduce return type from name, only for convert
     char tok = name_[8];
     return_type_.is_signed = tok != 'u'; // unsigned
     return_type_.type_id = tok == 'f' ? Type::FloatTyID : Type::IntegerTyID;
@@ -191,13 +191,20 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
 
   auto mangled_name_len = mangled_name.length();
   while (pos < mangled_name_len) {
-    ParamTypeInfo type_info = prev_type_info;
-    if (!GetParameterType(mangled_name, &type_info, &pos)) {
+    ParamTypeInfo type_info;
+    if (mangled_name[pos] == 'S') {
+      // handle duplicate param_type
+      if (mangled_name[pos + 1] != '_') {
+        return false;
+      }
+      params_.push_back(prev_type_info);
+      pos += 2;
+    } else if (pos = GetParameterType(mangled_name, &type_info, pos)) {
+      params_.push_back(type_info);
+      prev_type_info = type_info;
+    } else {
       return false;
     }
-    params_.push_back(std::move(type_info));
-
-    prev_type_info = type_info;
   }
 
   return true;
