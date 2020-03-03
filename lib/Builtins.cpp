@@ -14,171 +14,328 @@
 
 #include "Builtins.h"
 
+#include <stdlib.h>
+#include <unordered_map>
+
 using namespace llvm;
+using namespace clspv;
 
-bool clspv::IsImageBuiltin(StringRef name) {
-  return clspv::IsSampledImageRead(name) || clspv::IsUnsampledImageRead(name) ||
-         clspv::IsImageWrite(name) || clspv::IsImageQuery(name);
+namespace {
+////////////////////////////////////////////////////////////////////////////////
+////  Convert Builtin function name to a Type enum
+////////////////////////////////////////////////////////////////////////////////
+Builtins::BuiltinType LookupBuiltinType(const std::string &name) {
+
+  // Build static map of builtin function names
+#include "BuiltinsMap.inc"
+
+  auto ii = s_func_map.find(name.c_str());
+  if (ii != s_func_map.end()) {
+    return (*ii).second;
+  }
+  return Builtins::kBuiltinNone;
 }
 
-bool clspv::IsSampledImageRead(StringRef name) {
-  return clspv::IsFloatSampledImageRead(name) ||
-         clspv::IsUintSampledImageRead(name) ||
-         clspv::IsIntSampledImageRead(name);
+////////////////////////////////////////////////////////////////////////////////
+////  Mangled name parsing utilities
+////////////////////////////////////////////////////////////////////////////////
+
+// capture real name of function and struct types
+std::string GetUnmangledName(const std::string &str, size_t *pos) {
+  char *end;
+  int name_len = strtol(&str[*pos], &end, 10);
+  if (!name_len) {
+    return "";
+  }
+  size_t name_pos = end - str.data();
+
+  std::string real_name = str.substr(name_pos, name_len);
+  *pos = name_pos + name_len;
+  return real_name;
 }
 
-bool clspv::IsFloatSampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_samplerf") ||
-         name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f") ||
-         name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f") ||
-         name.startswith(
-             "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
-         name.startswith(
-             "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
-         name.startswith("_Z11read_imagef14ocl_image1d_ro11ocl_sampleri") ||
-         name.startswith("_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith("_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_i") ||
-         name.startswith(
-             "_Z11read_imagef20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
-         name.startswith(
-             "_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_i");
+// capture parameter type and qualifiers based on Itanium ABI with OpenCL types
+bool GetParameterType(const std::string &mangled_name,
+                      clspv::Builtins::ParamTypeInfo *type_info, size_t *pos) {
+  // Parse a parameter type encoding
+  char type_code = mangled_name[(*pos)++];
+
+  int blen = 1;
+  switch (type_code) {
+    // qualifiers
+  case 'P': // Pointer
+  case 'R': // Reference
+    return GetParameterType(mangled_name, type_info, pos);
+  case 'k': // ??? not part of cxxabi
+  case 'K': // const
+  case 'V': // volatile
+    return GetParameterType(mangled_name, type_info, pos);
+  case 'U': { // Address space
+    std::string address_space = GetUnmangledName(mangled_name, pos);
+    return GetParameterType(mangled_name, type_info, pos);
+  }
+
+  case 'D':
+    type_code = mangled_name[(*pos)++];
+    if (type_code == 'v') { // OCL vector
+      char *end;
+      int numElems = strtol(&mangled_name[*pos], &end, 10);
+      if (!numElems) {
+        return false;
+      }
+      type_info->vector_size = numElems;
+      *pos = end - mangled_name.data();
+
+      if (mangled_name[(*pos)++] != '_') {
+        return false;
+      }
+      return GetParameterType(mangled_name, type_info, pos);
+    } else if (type_code == 'h') { // OCL half
+      type_info->type_id = Type::FloatTyID;
+      type_info->is_signed = true;
+      type_info->byte_len = 2;
+    } else {
+      assert(0);
+    }
+    break;
+
+    // element types
+  case 'l':
+    blen <<= 1; // long
+  case 'i':
+    blen <<= 1; // int
+  case 's':
+    blen <<= 1; // short
+  case 'c':     // char
+  case 'a':     // signed char
+    type_info->type_id = Type::IntegerTyID;
+    type_info->is_signed = true;
+    type_info->byte_len = blen;
+    break;
+  case 'm':
+    blen <<= 1; // unsigned long
+  case 'j':
+    blen <<= 1; // unsigned int
+  case 't':
+    blen <<= 1; // unsigned short
+  case 'h':     // unsigned char
+    type_info->type_id = Type::IntegerTyID;
+    type_info->is_signed = false;
+    type_info->byte_len = blen;
+    break;
+  case 'd':
+    blen = 2; // double float
+  case 'f':
+    blen <<= 2; // single float
+    type_info->type_id = Type::FloatTyID;
+    type_info->is_signed = true;
+    type_info->byte_len = blen;
+    break;
+  case 'v': // void
+    break;
+  case 'S':
+    if (mangled_name[(*pos)++] != '_') {
+      return false;
+    }
+    break;
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9': {
+    type_info->type_id = Type::StructTyID;
+    (*pos)--;
+    type_info->name = GetUnmangledName(mangled_name, pos);
+    break;
+  }
+  case '.':
+    return false;
+  default:
+#ifdef DEBUG
+    printf("Func: %s\n", mangled_name.c_str());
+    llvm_unreachable("failed to demangle name");
+#endif
+    return false;
+  }
+  return true;
+}
+} // namespace
+
+////////////////////////////////////////////////////////////////////////////////
+// FunctionInfo::GetFromMangledNameCheck
+//   - parse mangled name as far as possible. Some names are an aggregate of
+//   fields separated by '.'
+bool Builtins::FunctionInfo::GetFromMangledNameCheck(
+    const std::string &mangled_name) {
+  size_t pos = 0;
+  size_t len;
+  if (mangled_name[pos++] != '_' || mangled_name[pos++] != 'Z') {
+    name_ = mangled_name;
+    return false;
+  }
+
+  name_ = GetUnmangledName(mangled_name, &pos);
+
+  if (!name_.compare(0, 8, "convert_")) {
+    // deduce return type from name
+    char tok = name_[8];
+    return_type_.is_signed = tok != 'u'; // unsigned
+    return_type_.type_id = tok == 'f' ? Type::FloatTyID : Type::IntegerTyID;
+  }
+
+  ParamTypeInfo prev_type_info;
+
+  auto mangled_name_len = mangled_name.length();
+  while (pos < mangled_name_len) {
+    ParamTypeInfo type_info = prev_type_info;
+    if (!GetParameterType(mangled_name, &type_info, &pos)) {
+      return false;
+    }
+    params_.push_back(std::move(type_info));
+
+    prev_type_info = type_info;
+  }
+
+  return true;
 }
 
-bool clspv::IsUintSampledImageRead(StringRef name) {
-  return name.startswith("_Z12read_imageui14ocl_image1d_ro11ocl_samplerf") ||
-         name.startswith(
-             "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_f") ||
-         name.startswith(
-             "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f") ||
-         name.startswith(
-             "_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
-         name.startswith(
-             "_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
-         name.startswith("_Z12read_imageui14ocl_image1d_ro11ocl_sampleri") ||
-         name.startswith(
-             "_Z12read_imageui14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith(
-             "_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_i") ||
-         name.startswith(
-             "_Z12read_imageui20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
-         name.startswith(
-             "_Z12read_imageui20ocl_image2d_array_ro11ocl_samplerDv4_i");
+////////////////////////////////////////////////////////////////////////////////
+// FunctionInfo ctor - parses mangled name
+Builtins::FunctionInfo::FunctionInfo(const std::string &mangled_name) {
+  is_valid_ = GetFromMangledNameCheck(mangled_name);
+  type_ = LookupBuiltinType(name_);
 }
 
-bool clspv::IsIntSampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_samplerf") ||
-         name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_f") ||
-         name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_f") ||
-         name.startswith(
-             "_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_f") ||
-         name.startswith(
-             "_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_f") ||
-         name.startswith("_Z11read_imagei14ocl_image1d_ro11ocl_sampleri") ||
-         name.startswith("_Z11read_imagei14ocl_image2d_ro11ocl_samplerDv2_i") ||
-         name.startswith("_Z11read_imagei14ocl_image3d_ro11ocl_samplerDv4_i") ||
-         name.startswith(
-             "_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_i") ||
-         name.startswith(
-             "_Z11read_imagei20ocl_image2d_array_ro11ocl_samplerDv4_i");
+// get const ParamTypeInfo for nth parameter
+const Builtins::ParamTypeInfo &
+Builtins::FunctionInfo::getParameter(size_t _arg) const {
+  assert(params_.size() > _arg);
+  return params_[_arg];
 }
 
-bool clspv::IsUnsampledImageRead(StringRef name) {
-  return clspv::IsFloatUnsampledImageRead(name) ||
-         clspv::IsUintUnsampledImageRead(name) ||
-         clspv::IsIntUnsampledImageRead(name);
+////////////////////////////////////////////////////////////////////////////////
+////  Lookup interface
+////   - only demangle once for any name encountered
+////////////////////////////////////////////////////////////////////////////////
+const Builtins::FunctionInfo &
+Builtins::Lookup(const std::string &mangled_name) {
+  static std::unordered_map<std::string, FunctionInfo> s_mangled_map;
+  auto fi = s_mangled_map.emplace(mangled_name, mangled_name);
+  return (*fi.first).second;
 }
 
-bool clspv::IsFloatUnsampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagef14ocl_image1d_roi") ||
-         name.startswith("_Z11read_imagef14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z11read_imagef14ocl_image3d_roDv4_i") ||
-         name.startswith("_Z11read_imagef20ocl_image1d_array_roDv2_i") ||
-         name.startswith("_Z11read_imagef20ocl_image2d_array_roDv4_i");
+////////////////////////////////////////////////////////////////////////////////
+////  Legacy interface
+////////////////////////////////////////////////////////////////////////////////
+bool Builtins::IsImageBuiltin(StringRef name) {
+  auto func_type = Lookup(name).getType();
+  return func_type > kType_Image_Start && func_type < kType_Image_End;
 }
 
-bool clspv::IsUintUnsampledImageRead(StringRef name) {
-  return name.startswith("_Z12read_imageui14ocl_image1d_roi") ||
-         name.startswith("_Z12read_imageui14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z12read_imageui14ocl_image3d_roDv4_i") ||
-         name.startswith("_Z12read_imageui20ocl_image1d_array_roDv2_i") ||
-         name.startswith("_Z12read_imageui20ocl_image2d_array_roDv4_i");
+bool Builtins::IsSampledImageRead(StringRef name) {
+  return IsFloatSampledImageRead(name) || IsUintSampledImageRead(name) ||
+         IsIntSampledImageRead(name);
 }
 
-bool clspv::IsIntUnsampledImageRead(StringRef name) {
-  return name.startswith("_Z11read_imagei14ocl_image1d_roi") ||
-         name.startswith("_Z11read_imagei14ocl_image2d_roDv2_i") ||
-         name.startswith("_Z11read_imagei14ocl_image3d_roDv4_i") ||
-         name.startswith("_Z11read_imagei20ocl_image1d_array_roDv2_i") ||
-         name.startswith("_Z11read_imagei20ocl_image2d_array_roDv4_i");
+bool Builtins::IsFloatSampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImagef) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name == "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsImageWrite(StringRef name) {
-  return clspv::IsFloatImageWrite(name) || clspv::IsUintImageWrite(name) ||
-         clspv::IsIntImageWrite(name);
+bool Builtins::IsUintSampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImageui) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name == "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsFloatImageWrite(StringRef name) {
-  return name.startswith("_Z12write_imagef14ocl_image1d_woiDv4_f") ||
-         name.startswith("_Z12write_imagef14ocl_image2d_woDv2_iDv4_f") ||
-         name.startswith("_Z12write_imagef14ocl_image3d_woDv4_iDv4_f") ||
-         name.startswith("_Z12write_imagef20ocl_image1d_array_woDv2_iDv4_f") ||
-         name.startswith("_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f");
+bool Builtins::IsIntSampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImagei) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name == "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsUintImageWrite(StringRef name) {
-  return name.startswith("_Z13write_imageui14ocl_image1d_woiDv4_j") ||
-         name.startswith("_Z13write_imageui14ocl_image2d_woDv2_iDv4_j") ||
-         name.startswith("_Z13write_imageui14ocl_image3d_woDv4_iDv4_j") ||
-         name.startswith("_Z13write_imageui20ocl_image1d_array_woDv2_iDv4_j") ||
-         name.startswith("_Z13write_imageui20ocl_image2d_array_woDv4_iDv4_j");
+bool Builtins::IsUnsampledImageRead(StringRef name) {
+  return IsFloatUnsampledImageRead(name) || IsUintUnsampledImageRead(name) ||
+         IsIntUnsampledImageRead(name);
 }
 
-bool clspv::IsIntImageWrite(StringRef name) {
-  // Odd mangling for 2d array and 3d writes.
-  return name.startswith("_Z12write_imagei14ocl_image1d_woiDv4_i") ||
-         name.startswith("_Z12write_imagei14ocl_image2d_woDv2_iDv4_i") ||
-         name.startswith("_Z12write_imagei14ocl_image3d_woDv4_iS0_") ||
-         name.startswith("_Z12write_imagei20ocl_image1d_array_woDv2_iDv4_i") ||
-         name.startswith("_Z12write_imagei20ocl_image2d_array_woDv4_iS0_");
+bool Builtins::IsFloatUnsampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImagef) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name != "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsGetImageHeight(StringRef name) {
-  return name.startswith("_Z16get_image_height14ocl_image2d_ro") ||
-         name.startswith("_Z16get_image_height14ocl_image2d_wo") ||
-         name.startswith("_Z16get_image_height14ocl_image3d_ro") ||
-         name.startswith("_Z16get_image_height14ocl_image3d_wo") ||
-         name.startswith("_Z16get_image_height20ocl_image2d_array_ro") ||
-         name.startswith("_Z16get_image_height20ocl_image2d_array_wo");
+bool Builtins::IsUintUnsampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImageui) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name != "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsGetImageWidth(StringRef name) {
-  return name.startswith("_Z15get_image_width14ocl_image1d_ro") ||
-         name.startswith("_Z15get_image_width14ocl_image1d_wo") ||
-         name.startswith("_Z15get_image_width14ocl_image2d_ro") ||
-         name.startswith("_Z15get_image_width14ocl_image2d_wo") ||
-         name.startswith("_Z15get_image_width14ocl_image3d_ro") ||
-         name.startswith("_Z15get_image_width14ocl_image3d_wo") ||
-         name.startswith("_Z15get_image_width20ocl_image1d_array_ro") ||
-         name.startswith("_Z15get_image_width20ocl_image1d_array_wo") ||
-         name.startswith("_Z15get_image_width20ocl_image2d_array_ro") ||
-         name.startswith("_Z15get_image_width20ocl_image2d_array_wo");
+bool Builtins::IsIntUnsampledImageRead(StringRef _name) {
+  const auto &fi = Lookup(_name);
+  if (fi.getType() == kReadImagei) {
+    const auto &pi = fi.getParameter(1);
+    return pi.name != "ocl_sampler";
+  }
+  return false;
 }
 
-bool clspv::IsGetImageDepth(StringRef name) {
-  return name.startswith("_Z15get_image_depth14ocl_image3d_ro") ||
-         name.startswith("_Z15get_image_depth14ocl_image3d_wo");
+bool Builtins::IsImageWrite(StringRef name) {
+  auto func_code = Lookup(name).getType();
+  return func_code == kWriteImagef || func_code == kWriteImageui ||
+         func_code == kWriteImagei || func_code == kWriteImageh;
 }
 
-bool clspv::IsGetImageDim(StringRef name) {
-  return name.startswith("_Z13get_image_dim14ocl_image2d_ro") ||
-         name.startswith("_Z13get_image_dim14ocl_image2d_wo") ||
-         name.startswith("_Z13get_image_dim14ocl_image3d_ro") ||
-         name.startswith("_Z13get_image_dim14ocl_image3d_wo") ||
-         name.startswith("_Z13get_image_dim20ocl_image2d_array_ro") ||
-         name.startswith("_Z13get_image_dim20ocl_image2d_array_wo");
+bool Builtins::IsFloatImageWrite(StringRef name) {
+  return Lookup(name) == kWriteImagef;
 }
 
-bool clspv::IsImageQuery(StringRef name) {
-  return clspv::IsGetImageHeight(name) || clspv::IsGetImageWidth(name) ||
-         clspv::IsGetImageDepth(name) || clspv::IsGetImageDim(name);
+bool Builtins::IsUintImageWrite(StringRef name) {
+  return Lookup(name) == kWriteImageui;
+}
+
+bool Builtins::IsIntImageWrite(StringRef name) {
+  return Lookup(name) == kWriteImagei;
+}
+
+bool Builtins::IsGetImageHeight(StringRef name) {
+  return Lookup(name) == kGetImageHeight;
+}
+
+bool Builtins::IsGetImageWidth(StringRef name) {
+  return Lookup(name) == kGetImageWidth;
+}
+
+bool Builtins::IsGetImageDepth(StringRef name) {
+  return Lookup(name) == kGetImageDepth;
+}
+
+bool Builtins::IsGetImageDim(StringRef name) {
+  return Lookup(name) == kGetImageDim;
+}
+
+bool Builtins::IsImageQuery(StringRef name) {
+  auto func_code = Lookup(name).getType();
+  return func_code == kGetImageHeight || func_code == kGetImageWidth ||
+         func_code == kGetImageDepth || func_code == kGetImageDim;
 }
