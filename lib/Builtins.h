@@ -30,15 +30,16 @@ struct ParamTypeInfo {
   bool is_signed = false;                            // is element type signed
   llvm::Type::TypeID type_id = llvm::Type::VoidTyID; // element type
   int byte_len = 0;                                  // element byte length
-  int vector_size = 0;                               // number of elements (0 == not a vector)
-  std::string name;                                  // struct name
+  int vector_size = 0; // number of elements (0 == not a vector)
+  std::string name;    // struct name
 };
 
 class FunctionInfo {
   bool is_valid_ = false;
   Builtins::BuiltinType type_ = Builtins::kBuiltinNone;
   std::string name_;
-  ParamTypeInfo return_type_; // only used for convert, where return type is embedded in the name
+  ParamTypeInfo return_type_; // only used for convert, where return type is
+                              // embedded in the name
   std::vector<ParamTypeInfo> params_;
 
 public:
@@ -50,6 +51,7 @@ public:
   operator int() const { return type_; }
   const std::string &getName() const { return name_; }
   const ParamTypeInfo &getParameter(size_t arg) const;
+  const ParamTypeInfo &getLastParameter() const { return params_.back(); }
   size_t getParameterCount() const { return params_.size(); }
   const ParamTypeInfo &getReturnType() const { return return_type_; }
 
