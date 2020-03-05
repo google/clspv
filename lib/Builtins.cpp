@@ -26,7 +26,7 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////
 Builtins::BuiltinType LookupBuiltinType(const std::string &name) {
 
-  // Build static map of builtin function names
+// Build static map of builtin function names
 #include "BuiltinsMap.inc"
 
   auto ii = s_func_map.find(name.c_str());
