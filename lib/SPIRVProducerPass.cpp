@@ -67,6 +67,7 @@
 
 using namespace llvm;
 using namespace clspv;
+using namespace clspv::Builtins;
 using namespace mdconst;
 
 namespace {
@@ -830,7 +831,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
           StringRef callee_name = Call->getCalledFunction()->getName();
 
           // Handle image type specially.
-          if (clspv::IsImageBuiltin(callee_name)) {
+          if (IsImageBuiltin(callee_name)) {
             TypeMapType &OpImageTypeMap = getImageTypeMap();
             Type *ImageTy =
                 Call->getArgOperand(0)->getType()->getPointerElementType();
@@ -838,17 +839,17 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
             getImageTypeList().insert(ImageTy);
           }
 
-          if (clspv::IsSampledImageRead(callee_name)) {
+          if (IsSampledImageRead(callee_name)) {
             // All sampled reads need a floating point 0 for the Lod operand.
             FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
           }
 
-          if (clspv::IsUnsampledImageRead(callee_name)) {
+          if (IsUnsampledImageRead(callee_name)) {
             // All unsampled reads need an integer 0 for the Lod operand.
             FindConstant(ConstantInt::get(Context, APInt(32, 0)));
           }
 
-          if (clspv::IsImageQuery(callee_name)) {
+          if (IsImageQuery(callee_name)) {
             Type *ImageTy = Call->getOperand(0)->getType();
             const uint32_t dim = ImageDimensionality(ImageTy);
             uint32_t components =
@@ -863,7 +864,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
               }
             }
 
-            if (clspv::IsSampledImageType(ImageTy)) {
+            if (IsSampledImageType(ImageTy)) {
               // All sampled image queries need a integer 0 for the Lod
               // operand.
               FindConstant(ConstantInt::get(Context, APInt(32, 0)));
@@ -3709,7 +3710,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     bool hasImageQuery = false;
     for (const auto &SymVal : module.getValueSymbolTable()) {
       if (auto F = dyn_cast<Function>(SymVal.getValue())) {
-        if (clspv::IsImageQuery(F)) {
+        if (IsImageQuery(F)) {
           hasImageQuery = true;
           break;
         }
@@ -4980,7 +4981,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // read_image (with a sampler) is converted to OpSampledImage and
     // OpImageSampleExplicitLod.  Additionally, OpTypeSampledImage is
     // generated.
-    if (clspv::IsSampledImageRead(Callee)) {
+    if (IsSampledImageRead(Callee)) {
       //
       // Generate OpSampledImage.
       //
@@ -5055,7 +5056,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // read_image (without a sampler) is mapped to OpImageFetch.
-    if (clspv::IsUnsampledImageRead(Callee)) {
+    if (IsUnsampledImageRead(Callee)) {
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
 
@@ -5107,7 +5108,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // write_image is mapped to OpImageWrite.
-    if (clspv::IsImageWrite(Callee)) {
+    if (IsImageWrite(Callee)) {
       //
       // Generate OpImageWrite.
       //
@@ -5145,7 +5146,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
-    if (clspv::IsImageQuery(Callee)) {
+    if (IsImageQuery(Callee)) {
       //
       // Generate OpImageQuerySize[Lod]
       //
@@ -5174,7 +5175,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       uint32_t ImageID = VMap[Image];
       Ops << MkId(SizesTypeID) << MkId(ImageID);
       spv::Op query_opcode = spv::OpImageQuerySize;
-      if (clspv::IsSampledImageType(Image->getType())) {
+      if (IsSampledImageType(Image->getType())) {
         query_opcode = spv::OpImageQuerySizeLod;
         // Need explicit 0 for Lod operand.
         Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
@@ -5187,7 +5188,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // May require an extra instruction to create the appropriate result of
       // the builtin function.
-      if (clspv::IsGetImageDim(Callee)) {
+      if (IsGetImageDim(Callee)) {
         if (dim == 3) {
           // get_image_dim returns an int4 for 3D images.
           //

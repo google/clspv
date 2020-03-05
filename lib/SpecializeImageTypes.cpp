@@ -28,6 +28,7 @@
 #include "Types.h"
 
 using namespace clspv;
+using namespace clspv::Builtins;
 using namespace llvm;
 
 namespace {
