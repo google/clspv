@@ -14,7 +14,7 @@
 
 #include "Builtins.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <unordered_map>
 
 using namespace llvm;
@@ -60,7 +60,6 @@ size_t GetParameterType(const std::string &mangled_name,
   // Parse a parameter type encoding
   char type_code = mangled_name[pos++];
 
-  int blen = 1;
   switch (type_code) {
     // qualifiers
   case 'P': // Pointer
@@ -96,7 +95,7 @@ size_t GetParameterType(const std::string &mangled_name,
       type_info->byte_len = 2;
     } else {
 #ifdef DEBUG
-      printf("Func: %s\n", mangled_name.c_str());
+      llvm::outs() << "Func: " << mangled_name << "\n";
       llvm_unreachable("failed to demangle name");
 #endif
       return 0;
@@ -104,36 +103,25 @@ size_t GetParameterType(const std::string &mangled_name,
     break;
 
     // element types
-  case 'l':
-    blen <<= 1; // long
-  case 'i':
-    blen <<= 1; // int
-  case 's':
-    blen <<= 1; // short
-  case 'c':     // char
-  case 'a':     // signed char
+  case 'l': // long
+  case 'i': // int
+  case 's': // short
+  case 'c': // char
+  case 'a': // signed char
     type_info->type_id = Type::IntegerTyID;
     type_info->is_signed = true;
-    type_info->byte_len = blen;
     break;
-  case 'm':
-    blen <<= 1; // unsigned long
-  case 'j':
-    blen <<= 1; // unsigned int
-  case 't':
-    blen <<= 1; // unsigned short
-  case 'h':     // unsigned char
+  case 'm': // unsigned long
+  case 'j': // unsigned int
+  case 't': // unsigned short
+  case 'h': // unsigned char
     type_info->type_id = Type::IntegerTyID;
     type_info->is_signed = false;
-    type_info->byte_len = blen;
     break;
-  case 'd':
-    blen = 2; // double float
-  case 'f':
-    blen <<= 2; // single float
+  case 'd': // double float
+  case 'f': // single float
     type_info->type_id = Type::FloatTyID;
     type_info->is_signed = true;
-    type_info->byte_len = blen;
     break;
   case 'v': // void
     break;
@@ -145,20 +133,45 @@ size_t GetParameterType(const std::string &mangled_name,
   case '6':
   case '7':
   case '8':
-  case '9': {
+  case '9':
     type_info->type_id = Type::StructTyID;
     pos--;
     type_info->name = GetUnmangledName(mangled_name, &pos);
     break;
-  }
   case '.':
     return 0;
   default:
 #ifdef DEBUG
-    printf("Func: %s\n", mangled_name.c_str());
+    llvm::outs() << "Func: " << mangled_name << "\n";
     llvm_unreachable("failed to demangle name");
 #endif
     return 0;
+  }
+
+  // capture byte_len
+  switch (type_code) {
+    // element types
+  case 'l': // long
+  case 'm': // unsigned long
+  case 'd': // double float
+    type_info->byte_len = 8;
+    break;
+  case 'i': // int
+  case 'j': // unsigned int
+  case 'f': // single float
+    type_info->byte_len = 4;
+    break;
+  case 's': // short
+  case 't': // unsigned short
+    type_info->byte_len = 2;
+    break;
+  case 'c': // char
+  case 'a': // signed char
+  case 'h': // unsigned char
+    type_info->byte_len = 1;
+    break;
+  default:
+    break;
   }
   return pos;
 }
