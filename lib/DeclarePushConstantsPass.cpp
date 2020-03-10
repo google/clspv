@@ -62,6 +62,13 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
+  if ((clspv::Option::Language() ==
+       clspv::Option::SourceLanguage::OpenCL_C_20) ||
+      (clspv::Option::Language() ==
+       clspv::Option::SourceLanguage::OpenCL_CPP)) {
+    PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
+  }
+
   if (clspv::Option::WorkDim()) {
     PushConstants.push_back(clspv::PushConstant::Dimensions);
   }

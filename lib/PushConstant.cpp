@@ -34,6 +34,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "dimensions";
   case PushConstant::GlobalOffset:
     return "global_offset";
+  case PushConstant::EnqueuedLocalSize:
+    return "enqueued_local_size";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -45,6 +47,8 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
   case PushConstant::Dimensions:
     return IntegerType::get(C, 32);
   case PushConstant::GlobalOffset:
+    return VectorType::get(IntegerType::get(C, 32), 3);
+  case PushConstant::EnqueuedLocalSize:
     return VectorType::get(IntegerType::get(C, 32), 3);
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantType");
