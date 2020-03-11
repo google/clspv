@@ -20,6 +20,7 @@ namespace clspv {
 enum class PushConstant : int {
   Dimensions,
   GlobalOffset,
+  EnqueuedLocalSize,
 };
 
 } // namespace clspv

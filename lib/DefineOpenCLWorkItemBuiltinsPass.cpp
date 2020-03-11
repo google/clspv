@@ -52,6 +52,8 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
 
   bool defineWorkDimBuiltin(Module &M);
 
+  bool defineEnqueuedLocalSizeBuiltin(Module &M);
+
   bool addWorkgroupSizeIfRequired(Module &M);
 };
 } // namespace
@@ -84,6 +86,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
       defineMappedBuiltin(M, "_Z12get_group_idj", "__spirv_WorkgroupId", 0);
   changed |= defineGlobalSizeBuiltin(M);
   changed |= defineWorkDimBuiltin(M);
+  changed |= defineEnqueuedLocalSizeBuiltin(M);
   changed |= addWorkgroupSizeIfRequired(M);
 
   return changed;
@@ -318,6 +321,31 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
     // Get global offset is easy for us as it only returns 3.
     Builder.CreateRet(Builder.getInt32(3));
   }
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
+    Module &M) {
+
+  Function *F = M.getFunction("_Z23get_enqueued_local_sizej");
+
+  // If the builtin was not used in the module, don't create it!
+  if (nullptr == F) {
+    return false;
+  }
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+  Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
+  auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::EnqueuedLocalSize);
+  auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
+  auto Size = Builder.CreateLoad(DimPtr);
+  auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
+  Builder.CreateRet(Ret);
 
   return true;
 }

@@ -445,6 +445,9 @@ Here is a list of the push constants currently supported:
 - `global_offset`: the 3D global offset used by `get_global_offset()` and in
   global ID calculations. A vector of 3 32-bit integer values. Lower
   dimensions come first in memory.
+- `enqueued_local_size`: the 3D local work size returned by
+  `get_enqueued_local_size()`. A vector of 3 32-bit integer values. Lower
+  dimensions come first in memory.
 
 ### Attributes
 
