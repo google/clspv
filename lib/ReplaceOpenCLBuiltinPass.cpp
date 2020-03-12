@@ -453,10 +453,8 @@ bool ReplaceOpenCLBuiltinPass::replaceDivide(Module &M) {
 bool ReplaceOpenCLBuiltinPass::replaceDot(Module &M) {
 
   std::vector<const char *> Names = {
-      "_Z3dotff",
-      "_Z3dotDv2_fS_",
-      "_Z3dotDv3_fS_",
-      "_Z3dotDv4_fS_",
+      "_Z3dotff",   "_Z3dotDv2_fS_",  "_Z3dotDv3_fS_",  "_Z3dotDv4_fS_",
+      "_Z3dotDhDh", "_Z3dotDv2_DhS_", "_Z3dotDv3_DhS_", "_Z3dotDv4_DhS_",
   };
 
   return replaceCallsWithValue(M, Names, [](CallInst *CI) {
