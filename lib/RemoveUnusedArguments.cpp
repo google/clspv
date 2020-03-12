@@ -53,7 +53,7 @@ private:
 } // namespace
 
 char RemoveUnusedArguments::ID = 0;
-INITIALIZE_PASS(RemoveUnusedArguments, "RemoveUnusuedArguments",
+INITIALIZE_PASS(RemoveUnusedArguments, "RemoveUnusedArguments",
                 "Remove unused arguments from non-kernel functions", false,
                 false)
 
