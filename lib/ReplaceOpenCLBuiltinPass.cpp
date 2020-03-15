@@ -3326,7 +3326,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Module &M) {
           ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
       if (result_ty->isVectorTy()) {
         just_under_one = ConstantVector::getSplat(
-            result_ty->getVectorNumElements(), just_under_one);
+            {result_ty->getVectorNumElements(), false}, just_under_one);
       }
 
       IRBuilder<> Builder(Context);

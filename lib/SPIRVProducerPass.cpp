@@ -1180,7 +1180,7 @@ bool SPIRVProducerPass::FindExtInst(Module &M) {
                 // Register the splat vector of the value with the same
                 // width as the result of the instruction.
                 auto *vec_constant = ConstantVector::getSplat(
-                    static_cast<unsigned>(vectorTy->getNumElements()),
+                    {static_cast<unsigned>(vectorTy->getNumElements()), false},
                     constant);
                 FindConstant(vec_constant);
                 FindType(vec_constant->getType());
@@ -5485,7 +5485,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
             if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
               constant = ConstantVector::getSplat(
-                  static_cast<unsigned>(vectorTy->getNumElements()), constant);
+                  {static_cast<unsigned>(vectorTy->getNumElements()), false},
+                  constant);
             }
             Ops << MkId(VMap[constant]) << MkId(std::get<2>(*DeferredInst));
 
