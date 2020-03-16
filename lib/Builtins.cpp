@@ -231,7 +231,7 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
         return false;
       }
       params_.push_back(params_.back());
-    } else if (pos = GetParameterType(mangled_name, &type_info, pos)) {
+    } else if ((pos = GetParameterType(mangled_name, &type_info, pos))) {
       params_.push_back(type_info);
     } else {
       return false;
