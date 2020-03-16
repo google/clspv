@@ -36,6 +36,10 @@ struct DeclarePushConstantsPass : public ModulePass {
   static char ID;
   DeclarePushConstantsPass() : ModulePass(ID) {}
 
+  bool shouldDeclareDimensions(Module &M);
+  bool shouldDeclareEnqueuedLocalSize(Module &M);
+  bool shouldDeclareGlobalOffset(Module &M);
+
   bool runOnModule(Module &M) override;
 };
 } // namespace
@@ -50,6 +54,28 @@ ModulePass *createDeclarePushConstantsPass() {
 }
 } // namespace clspv
 
+bool DeclarePushConstantsPass::shouldDeclareDimensions(Module &M) {
+  bool isEnabled = clspv::Option::WorkDim();
+  bool isUsed = M.getFunction("_Z12get_work_dimv") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
+  bool isEnabled = ((clspv::Option::Language() ==
+                     clspv::Option::SourceLanguage::OpenCL_C_20) ||
+                    (clspv::Option::Language() ==
+                     clspv::Option::SourceLanguage::OpenCL_CPP));
+  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool DeclarePushConstantsPass::shouldDeclareGlobalOffset(Module &M) {
+  bool isEnabled = clspv::Option::GlobalOffset();
+  bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
+                (M.getFunction("_Z13get_global_idj") != nullptr);
+  return isEnabled && isUsed;
+}
+
 bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   bool changed = false;
@@ -58,18 +84,15 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   auto &C = M.getContext();
 
-  if (clspv::Option::GlobalOffset()) {
+  if (shouldDeclareGlobalOffset(M)) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
-  if ((clspv::Option::Language() ==
-       clspv::Option::SourceLanguage::OpenCL_C_20) ||
-      (clspv::Option::Language() ==
-       clspv::Option::SourceLanguage::OpenCL_CPP)) {
+  if (shouldDeclareEnqueuedLocalSize(M)) {
     PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
   }
 
-  if (clspv::Option::WorkDim()) {
+  if (shouldDeclareDimensions(M)) {
     PushConstants.push_back(clspv::PushConstant::Dimensions);
   }
 

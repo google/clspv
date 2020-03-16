@@ -265,15 +265,21 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   Function *F = M.getFunction("_Z17get_global_offsetj");
+  bool isSupportEnabled = clspv::Option::GlobalOffset();
+  bool isUsedDirectly = F != nullptr;
+  bool isUsedIndirectly =
+      isSupportEnabled && M.getFunction("_Z13get_global_idj") != nullptr;
+  bool isUsed = isUsedDirectly || isUsedIndirectly;
 
   // Only define get_global_offset when it is used or the option is enabled
-  // (since it is used in global ID calculations).
-  if (!clspv::Option::GlobalOffset() && (nullptr == F)) {
+  // and get_global_id is used (since it is used in global ID calculations).
+  if (!isUsed) {
     return false;
   }
 
-  // If get_global_offset isn't used then we need to declare it.
-  if (F == nullptr) {
+  // If get_global_offset isn't used but get_global_id is then we need to
+  // declare it ourselves.
+  if (isUsedIndirectly && !isUsedDirectly) {
     auto &C = M.getContext();
     auto Int32Ty = IntegerType::get(C, 32);
     auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
@@ -284,7 +290,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  if (clspv::Option::GlobalOffset()) {
+  if (isSupportEnabled) {
     auto Dim = &*F->arg_begin();
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
     Value *Indices[] = {Builder.getInt32(0), Dim};
