@@ -47,6 +47,8 @@ static std::string mangleType(Type *Ty) {
     }
   } else if (Ty->isFloatingPointTy()) {
     switch (Ty->getScalarSizeInBits()) {
+    case 16:
+      return "Dh";
     case 32:
       return "f";
     case 64:
