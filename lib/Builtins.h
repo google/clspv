@@ -32,6 +32,8 @@ struct ParamTypeInfo {
   int byte_len = 0;                                  // element byte length
   int vector_size = 0; // number of elements (0 == not a vector)
   std::string name;    // struct name
+
+  bool isSampler() const;
 };
 
 class FunctionInfo {
