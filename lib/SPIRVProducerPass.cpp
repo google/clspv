@@ -6201,7 +6201,7 @@ bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
     return true;
   }
   case Type::ArrayTyID:
-    return IsTypeNullable(cast<CompositeType>(type)->getTypeAtIndex(0u));
+    return IsTypeNullable(cast<SequentialType>(type)->getElementType());
   case Type::StructTyID: {
     const StructType *struct_type = cast<StructType>(type);
     // Images and samplers are not nullable.

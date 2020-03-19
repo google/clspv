@@ -483,11 +483,15 @@ Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
     // CompositeType doesn't implement getNumElements().
     unsigned num_elements =
         struct_ty ? struct_ty->getNumElements() : seq_ty->getNumElements();
-    auto *remapped_comp_ty = cast<CompositeType>(remapped_ty);
     SmallVector<Constant *, 8> rebuilt_constants;
     for (unsigned i = 0; i != num_elements; ++i) {
       Constant *element_constant = agg_constant->getAggregateElement(i);
-      Type *remapped_ele_ty = remapped_comp_ty->getTypeAtIndex(i);
+      Type *remapped_ele_ty = nullptr;
+      if (struct_ty) {
+        remapped_ele_ty = cast<StructType>(remapped_ty)->getTypeAtIndex(i);
+      } else {
+        remapped_ele_ty = cast<SequentialType>(remapped_ty)->getElementType();
+      }
       if (remapped_ele_ty != element_constant->getType()) {
         rebuilt_constants.push_back(
             RebuildConstant(element_constant, remapped_ele_ty, M));
