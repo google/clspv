@@ -161,7 +161,7 @@ bool SplatArgPass::runOnModule(Module &M) {
       case Builtins::kMin:
       case Builtins::kFmin: {
         auto &param_info = func_info.getParameter(0);
-        uint vec_size = param_info.vector_size;
+        uint32_t vec_size = param_info.vector_size;
         bool last_is_scalar = func_info.getLastParameter().vector_size == 0;
         if (vec_size != 0 && last_is_scalar) {
           std::string NewFName =
