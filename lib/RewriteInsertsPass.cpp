@@ -218,7 +218,7 @@ private:
   }
 
   // Get or create the composite construct function definition.
-  Function *GetConstructFunction(Module &M, CompositeType *constructed_type) {
+  Function *GetConstructFunction(Module &M, Type *constructed_type) {
     // Get or create the composite construct function definition.
     const string &fn_name = WrapFunctionNameForType(constructed_type);
     Function *fn = M.getFunction(fn_name);
@@ -226,8 +226,14 @@ private:
       // Make the function.
       SmallVector<Type *, 16> elements;
       unsigned num_elements = GetNumElements(constructed_type);
-      for (unsigned i = 0; i != num_elements; ++i)
-        elements.push_back(constructed_type->getTypeAtIndex(i));
+      if (auto struct_ty = dyn_cast<StructType>(constructed_type)) {
+        for (unsigned i = 0; i != num_elements; ++i)
+          elements.push_back(struct_ty->getTypeAtIndex(i));
+      } else {
+        elements.resize(
+            num_elements,
+            cast<SequentialType>(constructed_type)->getElementType());
+      }
       FunctionType *fnTy = FunctionType::get(constructed_type, elements, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
       fn = cast<Function>(fn_constant.getCallee());
@@ -301,8 +307,7 @@ bool RewriteInsertsPass::ReplaceCompleteInsertionChains(Module &M) {
       }
     }
 
-    CompositeType *resultTy =
-        cast<CompositeType>(insertions->back()->getType());
+    auto *resultTy = insertions->back()->getType();
     Function *fn = GetConstructFunction(M, resultTy);
 
     // Replace the chain.
