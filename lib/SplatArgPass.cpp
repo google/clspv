@@ -52,25 +52,14 @@ namespace clspv {
 llvm::ModulePass *createSplatArgPass() { return new SplatArgPass(); }
 } // namespace clspv
 
-namespace {
-int log2i(int val) {
-  if (val <= 0)
-    return -1;
-  int log2 = 0;
-  while (val >>= 1)
-    log2++;
-  return log2;
-}
-} // namespace
-
 // Programmatically convert mangled_name to vectorized version
 std::string
 SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
                            const Builtins::ParamTypeInfo &param_info,
                            bool three_params) {
   const char *type_code = "f";
-  int index = log2i(param_info.byte_len);
-  assert(index >= 0 && index <= 3);
+  uint32_t index = Log2_32(param_info.byte_len);
+  assert(index <= 3);
   const char *signed_int_type_tbl[] = {"c", "s", "i", "l"};
   const char *unsigned_int_type_tbl[] = {"h", "t", "j", "m"};
   const char *float_type_tbl[] = {"", "Dh", "f", "d"};
@@ -151,11 +140,10 @@ bool SplatArgPass::runOnModule(Module &M) {
     // process only function declarations
     if (F.empty() && !F.use_empty()) {
       auto &func_info = Builtins::Lookup(&F);
-      bool has_3_params = false;
-      switch (func_info.getType()) {
+      auto func_type = func_info.getType();
+      switch (func_type) {
       case Builtins::kClamp:
       case Builtins::kMix:
-        has_3_params = true;
       case Builtins::kMax:
       case Builtins::kFmax:
       case Builtins::kMin:
@@ -164,6 +152,8 @@ bool SplatArgPass::runOnModule(Module &M) {
         uint32_t vec_size = param_info.vector_size;
         bool last_is_scalar = func_info.getLastParameter().vector_size == 0;
         if (vec_size != 0 && last_is_scalar) {
+          bool has_3_params =
+              func_type == Builtins::kClamp || func_type == Builtins::kMix;
           std::string NewFName =
               getSplatName(func_info, param_info, has_3_params);
           Function *NewCallee = getReplacementFunction(F, NewFName);

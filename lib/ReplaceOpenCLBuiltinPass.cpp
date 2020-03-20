@@ -27,7 +27,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spirv/unified1/spirv.hpp"
+#include "spirv/1.0/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
@@ -175,7 +175,7 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
   std::list<Function *> func_list;
   for (auto &F : M.getFunctionList()) {
     // process only function declarations
-    if (F.empty() && runOnFunction(F)) {
+    if (F.isDeclaration() && runOnFunction(F)) {
       func_list.push_front(&F);
     }
   }

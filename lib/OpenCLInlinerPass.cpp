@@ -60,8 +60,7 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
         if (CallInst *CI = dyn_cast<CallInst>(U)) {
           // If the called function doesn't take an argument or is using a
           // constant argument, add the call to the list of to-be-inlined calls.
-          if (func_info.getType() == Builtins::kGetWorkDim ||
-              isa<Constant>(CI->getArgOperand(0))) {
+          if (F.arg_empty() || isa<Constant>(CI->getArgOperand(0))) {
             Calls.push_back(CI);
           }
         }
