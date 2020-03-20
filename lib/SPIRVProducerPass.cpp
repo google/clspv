@@ -75,6 +75,9 @@ namespace {
 cl::opt<bool> ShowResourceVars("show-rv", cl::init(false), cl::Hidden,
                                cl::desc("Show resource variable creation"));
 
+cl::opt<bool> ShowProducerIR("show-producer-ir", cl::init(false), cl::ReallyHidden,
+                             cl::desc("Dump the IR at the start of SPIRVProducer"));
+
 // These hacks exist to help transition code generation algorithms
 // without making huge noise in detailed test output.
 const bool Hack_generate_runtime_array_stride_early = true;
@@ -635,6 +638,9 @@ ModulePass *createSPIRVProducerPass(
 } // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &module) {
+  if (ShowProducerIR) {
+    llvm::outs() << module << "\n";
+  }
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
   PopulateUBOTypeMaps(module);
@@ -5404,7 +5410,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
                              new SPIRVInstruction(spv::OpBranch, Ops));
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
-      if (PHI->getType()->isPointerTy()) {
+      if (PHI->getType()->isPointerTy() && !IsSamplerType(PHI->getType()) &&
+          !IsImageType(PHI->getType())) {
         // OpPhi on pointers requires variable pointers.
         setVariablePointersCapabilities(
             PHI->getType()->getPointerAddressSpace());
