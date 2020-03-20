@@ -130,7 +130,7 @@ def main():
         header_blocker = re.sub("[^A-Z]", "_", header_blocker)
         output.write("#ifndef %s\n" % header_blocker)
         output.write("#define %s\n" % header_blocker)
-        output.write("#include \"spirv/1.0/spirv.hpp\"\n")
+        output.write("#include \"spirv/unified1/spirv.hpp\"\n")
         output.write("namespace %s{\n" % args.namespace)
         for line in content:
             output.write(line)
