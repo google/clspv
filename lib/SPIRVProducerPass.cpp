@@ -75,8 +75,9 @@ namespace {
 cl::opt<bool> ShowResourceVars("show-rv", cl::init(false), cl::Hidden,
                                cl::desc("Show resource variable creation"));
 
-cl::opt<bool> ShowProducerIR("show-producer-ir", cl::init(false), cl::ReallyHidden,
-                             cl::desc("Dump the IR at the start of SPIRVProducer"));
+cl::opt<bool>
+    ShowProducerIR("show-producer-ir", cl::init(false), cl::ReallyHidden,
+                   cl::desc("Dump the IR at the start of SPIRVProducer"));
 
 // These hacks exist to help transition code generation algorithms
 // without making huge noise in detailed test output.
