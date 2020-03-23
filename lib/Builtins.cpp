@@ -109,6 +109,7 @@ size_t GetParameterType(const std::string &mangled_name,
       type_info->type_id = Type::FloatTyID;
       type_info->is_signed = true;
       type_info->byte_len = 2;
+      return pos;
     } else {
 #ifdef DEBUG
       llvm::outs() << "Func: " << mangled_name << "\n";
@@ -255,6 +256,11 @@ Builtins::FunctionInfo::getParameter(size_t _arg) const {
   return params_[_arg];
 }
 
+// Test for OCL Sampler parameter type
+bool Builtins::ParamTypeInfo::isSampler() const {
+  return type_id == Type::StructTyID && name == "ocl_sampler";
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ////  Lookup interface
 ////   - only demangle once for any name encountered
@@ -283,7 +289,7 @@ bool Builtins::IsFloatSampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImagef) {
     const auto &pi = fi.getParameter(1);
-    return pi.name == "ocl_sampler";
+    return pi.isSampler();
   }
   return false;
 }
@@ -292,7 +298,7 @@ bool Builtins::IsUintSampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImageui) {
     const auto &pi = fi.getParameter(1);
-    return pi.name == "ocl_sampler";
+    return pi.isSampler();
   }
   return false;
 }
@@ -301,7 +307,7 @@ bool Builtins::IsIntSampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImagei) {
     const auto &pi = fi.getParameter(1);
-    return pi.name == "ocl_sampler";
+    return pi.isSampler();
   }
   return false;
 }
@@ -315,7 +321,7 @@ bool Builtins::IsFloatUnsampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImagef) {
     const auto &pi = fi.getParameter(1);
-    return pi.name != "ocl_sampler";
+    return !pi.isSampler();
   }
   return false;
 }
@@ -324,7 +330,7 @@ bool Builtins::IsUintUnsampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImageui) {
     const auto &pi = fi.getParameter(1);
-    return pi.name != "ocl_sampler";
+    return !pi.isSampler();
   }
   return false;
 }
@@ -333,7 +339,7 @@ bool Builtins::IsIntUnsampledImageRead(StringRef _name) {
   const auto &fi = Lookup(_name);
   if (fi.getType() == kReadImagei) {
     const auto &pi = fi.getParameter(1);
-    return pi.name != "ocl_sampler";
+    return !pi.isSampler();
   }
   return false;
 }
