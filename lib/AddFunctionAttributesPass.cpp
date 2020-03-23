@@ -31,7 +31,7 @@ public:
 
   bool runOnModule(Module &M) override;
 };
-}
+} // namespace
 
 char AddFunctionAttributesPass::ID = 0;
 INITIALIZE_PASS(AddFunctionAttributesPass, "AddFunctionAttributes",
@@ -41,7 +41,7 @@ namespace clspv {
 ModulePass *createAddFunctionAttributesPass() {
   return new AddFunctionAttributesPass();
 }
-}
+} // namespace clspv
 
 bool AddFunctionAttributesPass::runOnModule(Module &M) {
   bool changed = false;
