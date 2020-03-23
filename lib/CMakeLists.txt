@@ -24,6 +24,7 @@ add_library(clspv_core
 # defined here.  This must be loadable by LLVM opt for testing individual
 # passes.
 add_library(clspv_passes
+  ${CMAKE_CURRENT_SOURCE_DIR}/AddFunctionAttributesPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Builtins.cpp

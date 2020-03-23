@@ -397,4 +397,8 @@ llvm::ModulePass *createSpecializeImageTypesPass();
 /// * Add a block to split a continue block used a merge block.
 llvm::FunctionPass *createFixupStructuredCFGPass();
 
+/// Adds attributes to intrinsic and builtin functions to produce a better
+/// optimization outcome.
+llvm::ModulePass *createAddFunctionAttributesPass();
+
 } // namespace clspv
