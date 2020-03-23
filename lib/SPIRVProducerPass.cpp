@@ -43,7 +43,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spirv/1.0/spirv.hpp"
+#include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/DescriptorMap.h"
@@ -754,9 +754,9 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
 void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
                    sizeof(spv::MagicNumber));
-
-  const uint32_t version = spv::Version; // SPIR-V 1.0
-  binaryOut->write(reinterpret_cast<const char *>(&version), sizeof(version));
+  const uint32_t spv_version = 0x10000; // SPIR-V 1.0
+  binaryOut->write(reinterpret_cast<const char *>(&spv_version),
+                   sizeof(spv_version));
 
   // use Google's vendor ID
   const uint32_t vendor = 21 << 16;

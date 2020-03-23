@@ -80,14 +80,26 @@ def main():
     args = parser.parse_args()
 
     lines = list()
+    seen = dict()
+    enum_re = re.compile("[a-zA-Z][a-zA-Z0-9_]+ = ([0-9][0-9a-fA-Fx]*),");
     with open(args.input_file, "r") as input:
         for line in input:
+            # Special cases for 16-bit storage capabilities.
             if line.find("CapabilityStorageUniformBufferBlock16 = 4433") != -1:
                 continue
             if line.find("CapabilityStorageUniform16 = 4434") != -1:
                 continue
-            if line.find("CapabilityShaderViewportIndexLayerNV = 5254") != -1:
-                continue
+
+            # Otherwise, do not add aliases.
+            match = re.search(enum_re, line)
+            if match is not None:
+                num = match.group(1)
+                if num not in seen:
+                    seen[num] = 1
+                else:
+                    continue
+            else:
+                seen.clear()
             lines.append(line)
 
     content = list()
@@ -130,7 +142,7 @@ def main():
         header_blocker = re.sub("[^A-Z]", "_", header_blocker)
         output.write("#ifndef %s\n" % header_blocker)
         output.write("#define %s\n" % header_blocker)
-        output.write("#include \"spirv/1.0/spirv.hpp\"\n")
+        output.write("#include \"spirv/unified1/spirv.hpp\"\n")
         output.write("namespace %s{\n" % args.namespace)
         for line in content:
             output.write(line)
