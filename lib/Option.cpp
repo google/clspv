@@ -227,7 +227,7 @@ bool PodArgsInPushConstants() { return pod_pushconstant; }
 bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
-uint32_t MaxPushConstantSize() { return maximum_pushconstant_size; }
+uint32_t MaxPushConstantsSize() { return maximum_pushconstant_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
