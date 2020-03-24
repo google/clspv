@@ -20,6 +20,7 @@ class PassRegistry;
 
 // Individual pass initializers.  See the documentation for
 // initializeClspvPasses() in include/clspv/Passes.h.
+void initializeAddFunctionAttributesPassPass(PassRegistry &);
 void initializeAllocateDescriptorsPassPass(PassRegistry &);
 void initializeClusterModuleScopeConstantVarsPass(PassRegistry &);
 void initializeClusterPodKernelArgumentsPassPass(PassRegistry &);

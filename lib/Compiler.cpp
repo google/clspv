@@ -609,6 +609,7 @@ int PopulatePassManager(
   }
 
   pm->add(clspv::createZeroInitializeAllocasPass());
+  pm->add(clspv::createAddFunctionAttributesPass());
   pm->add(clspv::createDeclarePushConstantsPass());
   pm->add(clspv::createDefineOpenCLWorkItemBuiltinsPass());
 
