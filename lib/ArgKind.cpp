@@ -77,6 +77,8 @@ const char *GetArgKindName(ArgKind kind) {
     return "pod";
   case ArgKind::PodUBO:
     return "pod_ubo";
+  case ArgKind::PodPushConstant:
+    return "pod_pushconstant";
   case ArgKind::ReadOnlyImage:
     return "ro_image";
   case ArgKind::WriteOnlyImage:
@@ -100,6 +102,8 @@ ArgKind GetArgKindFromName(const std::string &name) {
     return ArgKind::Pod;
   } else if (name == "pod_ubo") {
     return ArgKind::PodUBO;
+  } else if (name == "pod_pushconstant") {
+    return ArgKind::PodPushConstant;
   } else if (name == "ro_image") {
     return ArgKind::ReadOnlyImage;
   } else if (name == "wo_image") {

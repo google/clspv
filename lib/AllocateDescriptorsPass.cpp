@@ -512,7 +512,11 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       for (Argument &Arg : f_ptr->args()) {
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          set_and_binding_list.back().first = set;
+          if (!clspv::Option::PodArgsInPushConstants() ||
+              clspv::GetArgKindForType(Arg.getType()) != clspv::ArgKind::Pod) {
+            // Don't assign a descriptor set to push constants.
+            set_and_binding_list.back().first = set;
+          }
           set_and_binding_list.back().second = binding++;
         }
         arg_index++;
@@ -535,17 +539,27 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
+          const bool is_push_constant_arg =
+              clspv::Option::PodArgsInPushConstants() &&
+              clspv::GetArgKindForType(f_ptr->getArg(arg_index)->getType()) ==
+                  clspv::ArgKind::Pod;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
-                  kernels_with_bodies.size()) {
+                  kernels_with_bodies.size() ||
+              is_push_constant_arg) {
             // Reuse the descriptor because one of the following is true:
             // - This kernel argument discriminant is consistent across all
             //   kernels.
             // - Convention is to use a single descriptor for all kernels.
-            if (all_kernels_descriptor_set == kUnallocated) {
-              all_kernels_descriptor_set = clspv::TakeDescriptorIndex(&M);
+            //
+            // Push constants args always take this path because they share a
+            // dummy descriptor, kUnallocated, that is never codegen'd.
+            if (!is_push_constant_arg) {
+              if (all_kernels_descriptor_set == kUnallocated) {
+                all_kernels_descriptor_set = clspv::TakeDescriptorIndex(&M);
+              }
+              set = all_kernels_descriptor_set;
             }
-            set = all_kernels_descriptor_set;
             auto where = all_kernels_binding_for_arg_index.find(arg_index);
             if (where == all_kernels_binding_for_arg_index.end()) {
               binding = all_kernels_binding_for_arg_index.size();
@@ -701,7 +715,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           break;
         }
         case clspv::ArgKind::Pod:
-        case clspv::ArgKind::PodUBO: {
+        case clspv::ArgKind::PodUBO:
+        case clspv::ArgKind::PodPushConstant: {
           // If original argument is:
           //   Elem %arg
           // Then make a StorageBuffer struct whose element is pod-type:
@@ -710,9 +725,12 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //
           // Use unnamed struct types so we generate less SPIR-V code.
           resource_type = StructType::get(argTy);
-          addr_space = clspv::Option::PodArgsInUniformBuffer()
-                           ? clspv::AddressSpace::Uniform
-                           : clspv::AddressSpace::Global;
+          if (clspv::Option::PodArgsInUniformBuffer())
+            addr_space = clspv::AddressSpace::Uniform;
+          else if (clspv::Option::PodArgsInPushConstants())
+            addr_space = clspv::AddressSpace::PushConstant;
+          else
+            addr_space = clspv::AddressSpace::Global;
           break;
         }
         case clspv::ArgKind::Sampler:
@@ -756,6 +774,14 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         auto *set_arg = Builder.getInt32(set);
         auto *binding_arg = Builder.getInt32(binding);
         auto *arg_kind_arg = Builder.getInt32(unsigned(arg_kind));
+        if (arg_kind == clspv::ArgKind::Pod) {
+          if (clspv::Option::PodArgsInUniformBuffer()) {
+            arg_kind_arg = Builder.getInt32(unsigned(clspv::ArgKind::PodUBO));
+          } else if (clspv::Option::PodArgsInPushConstants()) {
+            arg_kind_arg =
+                Builder.getInt32(unsigned(clspv::ArgKind::PodPushConstant));
+          }
+        }
         auto *arg_index_arg = Builder.getInt32(arg_index);
         auto *discriminant_index_arg =
             Builder.getInt32(discriminants_list[arg_index].index);
@@ -775,7 +801,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           replacement = Builder.CreateGEP(call, {zero, zero, zero});
           break;
         case clspv::ArgKind::Pod:
-        case clspv::ArgKind::PodUBO: {
+        case clspv::ArgKind::PodUBO:
+        case clspv::ArgKind::PodPushConstant: {
           // Replace with a load of the start of the (virtual) variable.
           auto *gep = Builder.CreateGEP(call, {zero, zero});
           replacement = Builder.CreateLoad(gep);

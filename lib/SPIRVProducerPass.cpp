@@ -1434,6 +1434,8 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
       }
       break;
     case clspv::ArgKind::Pod:
+    case clspv::ArgKind::PodUBO:
+    case clspv::ArgKind::PodPushConstant:
       if (auto *sty = dyn_cast<StructType>(type->getPointerElementType())) {
         StructTypesNeedingBlock.insert(sty);
       } else {
@@ -1869,9 +1871,16 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   case clspv::ArgKind::BufferUBO:
     return spv::StorageClassUniform;
   case clspv::ArgKind::Pod:
-    return clspv::Option::PodArgsInUniformBuffer()
-               ? spv::StorageClassUniform
-               : spv::StorageClassStorageBuffer;
+    if (clspv::Option::PodArgsInUniformBuffer())
+      return spv::StorageClassUniform;
+    else if (clspv::Option::PodArgsInPushConstants())
+      return spv::StorageClassPushConstant;
+    else
+      return spv::StorageClassStorageBuffer;
+  case clspv::ArgKind::PodUBO:
+    return spv::StorageClassUniform;
+  case clspv::ArgKind::PodPushConstant:
+    return spv::StorageClassPushConstant;
   case clspv::ArgKind::Local:
     return spv::StorageClassWorkgroup;
   case clspv::ArgKind::ReadOnlyImage:
@@ -2791,6 +2800,8 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
           case clspv::ArgKind::Buffer:
           case clspv::ArgKind::BufferUBO:
           case clspv::ArgKind::Pod:
+          case clspv::ArgKind::PodUBO:
+          case clspv::ArgKind::PodPushConstant:
             // The call maps to the variable directly.
             VMap[call] = info->var_id;
             break;
@@ -2821,6 +2832,10 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
 
   SPIRVOperandList Ops;
   for (auto *info : ModuleOrderedResourceVars) {
+    // Push constants don't need descriptor set or binding decorations.
+    if (info->arg_kind == clspv::ArgKind::PodPushConstant)
+      continue;
+
     // Decorate with DescriptorSet and Binding.
     Ops.clear();
     Ops << MkId(info->var_id) << MkNum(spv::DecorationDescriptorSet)
@@ -3449,7 +3464,9 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
       if (info) {
         auto arg = arguments[arg_index];
         unsigned arg_size = 0;
-        if (info->arg_kind == clspv::ArgKind::Pod) {
+        if (info->arg_kind == clspv::ArgKind::Pod ||
+            info->arg_kind == clspv::ArgKind::PodUBO ||
+            info->arg_kind == clspv::ArgKind::PodPushConstant) {
           arg_size = static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
         }
 
