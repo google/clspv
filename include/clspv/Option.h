@@ -77,6 +77,13 @@ bool ModuleConstantsInStorageBuffer();
 // Returns true if POD kernel arguments should be passed in via uniform buffers.
 bool PodArgsInUniformBuffer();
 
+// Returns true if POD kernel arguments should be passed in via the push
+// constant interface.
+bool PodArgsInPushConstants();
+
+// Returns true if POD kernel arguments should be clustered into a single interface.
+bool ClusterPodKernelArgs();
+
 // Returns true if SPIR-V IDs for functions should be emitted to stderr during
 // code generation.
 bool ShowIDs();
@@ -94,6 +101,11 @@ bool ConstantArgsInUniformBuffer();
 // calculate the size of UBO arrays for constant arguments if
 // ConstantArgsInUniformBuffer returns true.
 uint64_t MaxUniformBufferSize();
+
+// Returns the maximum push constant interface size. This size is specified in
+// bytes and is used to validate the the size of the POD kernel interface
+// passed as push constants.
+uint32_t MaxPushConstantsSize();
 
 // Returns true if clspv should allow UBOs that do not satisfy the restriction
 // that ArrayStride is a multiple of array alignment.

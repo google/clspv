@@ -152,13 +152,6 @@ static llvm::cl::opt<std::string>
     SamplerMap("samplermap", llvm::cl::desc("DEPRECATED - Literal sampler map"),
                llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
-    "cluster-pod-kernel-args", llvm::cl::init(false),
-    llvm::cl::desc("Collect plain-old-data kernel arguments into a struct in "
-                   "a single storage buffer, using a binding number after "
-                   "other arguments. Use this to reduce storage buffer "
-                   "descriptors."));
-
 static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
                                   llvm::cl::desc("Verify diagnostic outputs"));
 
@@ -619,7 +612,7 @@ int PopulatePassManager(
 
   pm->add(clspv::createUndoByvalPass());
   pm->add(clspv::createUndoSRetPass());
-  if (cluster_non_pointer_kernel_args) {
+  if (clspv::Option::ClusterPodKernelArgs()) {
     pm->add(clspv::createClusterPodKernelArgumentsPass());
   }
   pm->add(clspv::createReplaceOpenCLBuiltinPass());
@@ -775,6 +768,32 @@ int ParseOptions(const int argc, const char *const argv[]) {
   if (clspv::Option::ScalarBlockLayout()) {
     llvm::errs() << "scalar block layout support unimplemented\n";
     return -1;
+  }
+
+  // Push constant option validation.
+  if (clspv::Option::PodArgsInPushConstants()) {
+    if (clspv::Option::PodArgsInUniformBuffer()) {
+      llvm::errs() << "POD arguments can only be in either uniform buffers or "
+                      "push constants\n";
+      return -1;
+    }
+
+    if (!clspv::Option::ClusterPodKernelArgs()) {
+      llvm::errs()
+          << "POD arguments must be clustered to be passed as push constants\n";
+      return -1;
+    }
+
+    // Conservatively error if a module scope push constant could be used.
+    if (clspv::Option::WorkDim() || clspv::Option::GlobalOffset() ||
+        clspv::Option::Language() ==
+            clspv::Option::SourceLanguage::OpenCL_C_20 ||
+        clspv::Option::Language() ==
+            clspv::Option::SourceLanguage::OpenCL_CPP) {
+      llvm::errs() << "POD arguments as push constants are not compatible with "
+                      "module scope push constants\n";
+      return -1;
+    }
   }
 
   return 0;
