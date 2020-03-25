@@ -512,8 +512,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       for (Argument &Arg : f_ptr->args()) {
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (!clspv::Option::PodArgsInPushConstants() ||
-              clspv::GetArgKindForType(Arg.getType()) != clspv::ArgKind::Pod) {
+          if (clspv::GetArgKindForType(Arg.getType()) !=
+              clspv::ArgKind::PodPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }
@@ -540,9 +540,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
           const bool is_push_constant_arg =
-              clspv::Option::PodArgsInPushConstants() &&
               clspv::GetArgKindForType(f_ptr->getArg(arg_index)->getType()) ==
-                  clspv::ArgKind::Pod;
+              clspv::ArgKind::PodPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
                   kernels_with_bodies.size() ||
@@ -725,9 +724,9 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //
           // Use unnamed struct types so we generate less SPIR-V code.
           resource_type = StructType::get(argTy);
-          if (clspv::Option::PodArgsInUniformBuffer())
+          if (arg_kind == clspv::ArgKind::PodUBO)
             addr_space = clspv::AddressSpace::Uniform;
-          else if (clspv::Option::PodArgsInPushConstants())
+          else if (arg_kind == clspv::ArgKind::PodPushConstant)
             addr_space = clspv::AddressSpace::PushConstant;
           else
             addr_space = clspv::AddressSpace::Global;
@@ -774,14 +773,6 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         auto *set_arg = Builder.getInt32(set);
         auto *binding_arg = Builder.getInt32(binding);
         auto *arg_kind_arg = Builder.getInt32(unsigned(arg_kind));
-        if (arg_kind == clspv::ArgKind::Pod) {
-          if (clspv::Option::PodArgsInUniformBuffer()) {
-            arg_kind_arg = Builder.getInt32(unsigned(clspv::ArgKind::PodUBO));
-          } else if (clspv::Option::PodArgsInPushConstants()) {
-            arg_kind_arg =
-                Builder.getInt32(unsigned(clspv::ArgKind::PodPushConstant));
-          }
-        }
         auto *arg_index_arg = Builder.getInt32(arg_index);
         auto *discriminant_index_arg =
             Builder.getInt32(discriminants_list[arg_index].index);

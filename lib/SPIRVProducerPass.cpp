@@ -1871,12 +1871,7 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   case clspv::ArgKind::BufferUBO:
     return spv::StorageClassUniform;
   case clspv::ArgKind::Pod:
-    if (clspv::Option::PodArgsInUniformBuffer())
-      return spv::StorageClassUniform;
-    else if (clspv::Option::PodArgsInPushConstants())
-      return spv::StorageClassPushConstant;
-    else
-      return spv::StorageClassStorageBuffer;
+    return spv::StorageClassStorageBuffer;
   case clspv::ArgKind::PodUBO:
     return spv::StorageClassUniform;
   case clspv::ArgKind::PodPushConstant:

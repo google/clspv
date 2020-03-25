@@ -58,7 +58,12 @@ ArgKind GetArgKindForType(Type *type) {
       break;
     }
   } else {
-    return ArgKind::Pod;
+    if (clspv::Option::PodArgsInUniformBuffer())
+      return ArgKind::PodUBO;
+    else if (clspv::Option::PodArgsInPushConstants())
+      return ArgKind::PodPushConstant;
+    else
+      return ArgKind::Pod;
   }
   errs() << "Unhandled case in clspv::GetArgKindNameForType: " << *type << "\n";
   llvm_unreachable("Unhandled case in clspv::GetArgKindNameForType");

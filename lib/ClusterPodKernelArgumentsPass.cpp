@@ -297,12 +297,6 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
         auto *arg_size_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
         auto argKindName = GetArgKindName(arg_mapping.arg_kind);
-        if (arg_mapping.arg_kind == clspv::ArgKind::Pod) {
-          if (clspv::Option::PodArgsInUniformBuffer())
-            argKindName = GetArgKindName(clspv::ArgKind::PodUBO);
-          else if (clspv::Option::PodArgsInPushConstants())
-            argKindName = GetArgKindName(clspv::ArgKind::PodPushConstant);
-        }
         auto *argtype_md = MDString::get(Context, argKindName);
         auto *spec_id_md =
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.spec_id));
