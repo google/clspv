@@ -60,6 +60,7 @@ private:
     CustomDiagnosticStructContainsPointer = 17,
     CustomDiagnosticRecursiveStruct = 18,
     CustomDiagnosticPushConstantSizeExceeded = 19,
+    CustomDiagnosticPushConstantContainsArray = 20,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -73,6 +74,22 @@ private:
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
       for (auto field_decl : RT->getDecl()->fields()) {
         if (ContainsPointerType(field_decl->getType()))
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool ContainsArrayType(QualType QT) {
+    auto canonical = QT.getCanonicalType();
+    if (auto *PT = dyn_cast<PointerType>(canonical)) {
+      return ContainsArrayType(PT->getPointeeType());
+    } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
+      return true;
+    } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
+      for (auto field_decl : RT->getDecl()->fields()) {
+        if (ContainsArrayType(field_decl->getType()))
           return true;
       }
     }
@@ -471,6 +488,10 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticPushConstantSizeExceeded] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "max push constant size exceeded");
+    CustomDiagnosticsIDMap[CustomDiagnosticPushConstantContainsArray] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "arrays are not supported in push constants currently");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -551,10 +572,16 @@ public:
 
             if (is_opencl_kernel && !type->isPointerType()) {
               if (clspv::Option::PodArgsInPushConstants()) {
+                // Don't allow arrays in push constants currently.
+                if (ContainsArrayType(type)) {
+                  Report(CustomDiagnosticPushConstantContainsArray,
+                         P->getSourceRange(), P->getSourceRange());
+                  return false;
+                }
                 FieldDecl *field_decl = FieldDecl::Create(
                     FD->getASTContext(),
-                    Decl::castToDeclContext(clustered_args), SourceLocation(),
-                    SourceLocation(), P->getIdentifier(), P->getType(), nullptr,
+                    Decl::castToDeclContext(clustered_args), P->getSourceRange().getBegin(),
+                    P->getSourceRange().getEnd(), P->getIdentifier(), P->getType(), nullptr,
                     nullptr, false, ICIS_NoInit);
                 field_decl->setAccess(AS_public);
                 clustered_args->addDecl(field_decl);
