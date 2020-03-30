@@ -306,6 +306,11 @@ arguments sent as push constants.
 
 TODO(alan-baker): fix this.
 
+The descriptor map entry for kernel arguments will not contain `descriptorSet` or
+`binding` entries. For example, an integer arg `f` to kernel `foo` might look like:
+
+  kernel,foo,arg,f,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
+
 #### Sending in pointer-to-constant kernel arguments in uniform buffers
 
 Normally pointer-to-constant kernel arguments are passed into the kernel via a storage
