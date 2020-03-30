@@ -135,10 +135,11 @@ void SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
 }
 
 bool SplatArgPass::runOnModule(Module &M) {
-  std::list<Function *> func_list;
-  for (auto &F : M) {
+  std::list<std::pair<Function *, const Builtins::FunctionInfo &>> func_list;
+  // Collect candidates
+  for (auto &F : M.getFunctionList()) {
     // process only function declarations
-    if (F.empty() && !F.use_empty()) {
+    if (F.isDeclaration() && !F.use_empty()) {
       auto &func_info = Builtins::Lookup(&F);
       auto func_type = func_info.getType();
       switch (func_type) {
@@ -152,32 +153,31 @@ bool SplatArgPass::runOnModule(Module &M) {
         uint32_t vec_size = param_info.vector_size;
         bool last_is_scalar = func_info.getLastParameter().vector_size == 0;
         if (vec_size != 0 && last_is_scalar) {
-          bool has_3_params =
-              func_type == Builtins::kClamp || func_type == Builtins::kMix;
-          std::string NewFName =
-              getSplatName(func_info, param_info, has_3_params);
-          Function *NewCallee = getReplacementFunction(F, NewFName);
-          // Replace the users of the function.
-          for (User *U : F.users()) {
-            replaceCall(NewCallee, dyn_cast<CallInst>(U));
-          }
-          func_list.push_front(&F);
+          func_list.push_back({&F, func_info});
         }
         break;
       }
-      default:
-        break;
       }
     }
   }
-  if (func_list.size() != 0) {
-    // remove dead
-    for (auto *F : func_list) {
-      if (F->use_empty()) {
-        F->eraseFromParent();
-      }
+  // Replace with vectorized version
+  for (auto FI : func_list) {
+    auto *F = FI.first;
+    auto &func_info = FI.second;
+    auto func_type = func_info.getType();
+    auto &param_info = func_info.getParameter(0);
+    bool has_3_params =
+        func_type == Builtins::kClamp || func_type == Builtins::kMix;
+    std::string NewFName = getSplatName(func_info, param_info, has_3_params);
+    Function *NewCallee = getReplacementFunction(*F, NewFName);
+    // Replace the users of the function.
+    for (User *U : F->users()) {
+      replaceCall(NewCallee, dyn_cast<CallInst>(U));
     }
-    return true;
+    // Remove if dead
+    if (F->use_empty()) {
+      F->eraseFromParent();
+    }
   }
-  return false;
+  return func_list.size() != 0;
 }
