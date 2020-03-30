@@ -304,7 +304,7 @@ implementation limit for push constants. This is validated at the start of the c
 Note: Module scope push constanst are currently incompatible with plain-old-data
 arguments sent as push constants.
 
-TODO(alan-baker): fix this.
+TODO(alan-baker): See #529 for the overall plan to address this.
 
 The descriptor map entry for kernel arguments will not contain `descriptorSet` or
 `binding` entries. For example, an integer arg `f` to kernel `foo` might look like:
