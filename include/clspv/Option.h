@@ -81,7 +81,8 @@ bool PodArgsInUniformBuffer();
 // constant interface.
 bool PodArgsInPushConstants();
 
-// Returns true if POD kernel arguments should be clustered into a single interface.
+// Returns true if POD kernel arguments should be clustered into a single
+// interface.
 bool ClusterPodKernelArgs();
 
 // Returns true if SPIR-V IDs for functions should be emitted to stderr during

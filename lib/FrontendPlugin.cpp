@@ -580,9 +580,10 @@ public:
                 }
                 FieldDecl *field_decl = FieldDecl::Create(
                     FD->getASTContext(),
-                    Decl::castToDeclContext(clustered_args), P->getSourceRange().getBegin(),
-                    P->getSourceRange().getEnd(), P->getIdentifier(), P->getType(), nullptr,
-                    nullptr, false, ICIS_NoInit);
+                    Decl::castToDeclContext(clustered_args),
+                    P->getSourceRange().getBegin(),
+                    P->getSourceRange().getEnd(), P->getIdentifier(),
+                    P->getType(), nullptr, nullptr, false, ICIS_NoInit);
                 field_decl->setAccess(AS_public);
                 clustered_args->addDecl(field_decl);
               } else {
@@ -603,7 +604,8 @@ public:
           if (clustered_args) {
             clustered_args->completeDefinition();
             if (!clustered_args->field_empty()) {
-              auto record_type = FD->getASTContext().getRecordType(clustered_args);
+              auto record_type =
+                  FD->getASTContext().getRecordType(clustered_args);
               if (!IsSupportedLayout(record_type, 0, SSBO, FD->getASTContext(),
                                      FD->getSourceRange(),
                                      FD->getSourceRange())) {

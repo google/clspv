@@ -106,9 +106,9 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
           << ",arrayElemSize," << kernel_data.local_element_size
           << ",arrayNumElemSpecId," << kernel_data.local_spec_id;
     } else if (kernel_data.arg_kind == ArgKind::PodPushConstant) {
-      str << ",offset," << kernel_data.pod_offset
-          << ",argKind," << GetArgKindName(kernel_data.arg_kind)
-          << ",argSize," << kernel_data.pod_arg_size;
+      str << ",offset," << kernel_data.pod_offset << ",argKind,"
+          << GetArgKindName(kernel_data.arg_kind) << ",argSize,"
+          << kernel_data.pod_arg_size;
     } else {
       str << ",descriptorSet," << entry.descriptor_set << ",binding,"
           << entry.binding << ",offset,";
