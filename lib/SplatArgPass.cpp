@@ -171,7 +171,8 @@ bool SplatArgPass::runOnModule(Module &M) {
     std::string NewFName = getSplatName(func_info, param_info, has_3_params);
     Function *NewCallee = getReplacementFunction(*F, NewFName);
     // Replace the users of the function.
-    for (User *U : F->users()) {
+    while (!F->use_empty()) {
+      User *U = F->user_back();
       replaceCall(NewCallee, dyn_cast<CallInst>(U));
     }
     // Remove if dead
