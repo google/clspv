@@ -157,6 +157,8 @@ bool SplatArgPass::runOnModule(Module &M) {
         }
         break;
       }
+      default:
+        break;
       }
     }
   }
