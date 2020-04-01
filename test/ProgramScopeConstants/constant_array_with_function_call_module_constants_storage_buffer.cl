@@ -19,7 +19,7 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 
 
 // MAP: constant,descriptorSet,1,binding,0,kind,buffer,hexbytes,2a0000000d0000000000000005000000
-// MAP-NEXT: kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
+// MAP: kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 
 
 // CHECK:  OpDecorate [[_18:%[0-9a-zA-Z_]+]] DescriptorSet 1

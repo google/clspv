@@ -3369,6 +3369,11 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
     return;
   }
+  // Add entries for each kernel
+  version0::DescriptorMapEntry::KernelDeclData kernel_decl_data = {
+      F.getName().str()};
+  descriptorMapEntries->emplace_back(std::move(kernel_decl_data));
+
   // Gather the list of resources that are used by this function's arguments.
   auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
 

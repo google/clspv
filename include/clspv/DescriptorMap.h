@@ -50,7 +50,7 @@ const unsigned kSamplerFilterMask = 0x30;
 
 struct DescriptorMapEntry {
   // Type of the entry.
-  enum Kind { Sampler, KernelArg, Constant, PushConstant } kind;
+  enum Kind { Sampler, KernelArg, KernelDecl, Constant, PushConstant } kind;
 
   // Common data.
   uint32_t descriptor_set;
@@ -75,6 +75,10 @@ struct DescriptorMapEntry {
     uint32_t pod_arg_size;
   } kernel_arg_data;
 
+  struct KernelDeclData {
+    std::string kernel_name;
+  } kernel_decl_data;
+
   struct ConstantData {
     ArgKind constant_kind;
     std::string hex_bytes;
@@ -97,6 +101,10 @@ struct DescriptorMapEntry {
   DescriptorMapEntry(KernelArgData &&data, uint32_t ds, uint32_t b)
       : kind(KernelArg), descriptor_set(ds), binding(b),
         kernel_arg_data(std::move(data)) {}
+
+  DescriptorMapEntry(KernelDeclData &&data)
+      : kind(KernelDecl), descriptor_set(-1), binding(-1),
+        kernel_decl_data(std::move(data)) {}
 
   DescriptorMapEntry(SamplerData &&data, uint32_t ds, uint32_t b)
       : kind(Sampler), descriptor_set(ds), binding(b),

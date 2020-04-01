@@ -31,6 +31,9 @@ std::ostream &operator<<(std::ostream &str,
   case DescriptorMapEntry::Kind::KernelArg:
     str << "kernel";
     break;
+  case DescriptorMapEntry::Kind::KernelDecl:
+    str << "kernel_decl";
+    break;
   case DescriptorMapEntry::Kind::Constant:
     str << "constant";
     break;
@@ -117,6 +120,11 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
         str << ",argSize," << kernel_data.pod_arg_size;
       }
     }
+    break;
+  }
+  case DescriptorMapEntry::Kind::KernelDecl: {
+    const auto &kernel_data = entry.kernel_decl_data;
+    str << kernel_data.kernel_name;
     break;
   }
   case DescriptorMapEntry::Kind::Constant: {
