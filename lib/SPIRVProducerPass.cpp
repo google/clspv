@@ -4587,42 +4587,19 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     Ops << MkId(lookupType(I.getType())) << MkId(VMap[I.getOperand(0)])
         << MkId(VMap[I.getOperand(1)]);
 
-    uint64_t NumElements = 0;
-    if (Constant *Cst = dyn_cast<Constant>(I.getOperand(2))) {
-      NumElements = cast<VectorType>(Cst->getType())->getNumElements();
-
-      if (Cst->isNullValue()) {
-        for (unsigned i = 0; i < NumElements; i++) {
+    auto shuffle = cast<ShuffleVectorInst>(&I);
+    SmallVector<int, 4> mask;
+    shuffle->getShuffleMask(mask);
+    for (auto i : mask) {
+      if (i == UndefMaskElem) {
+        if (clspv::Option::HackUndef())
+          // Use 0 instead of undef.
           Ops << MkNum(0);
-        }
-      } else if (const ConstantDataSequential *CDS =
-                     dyn_cast<ConstantDataSequential>(Cst)) {
-        for (unsigned i = 0; i < CDS->getNumElements(); i++) {
-          std::vector<uint32_t> LiteralNum;
-          const auto value = CDS->getElementAsInteger(i);
-          assert(value <= UINT32_MAX);
-          Ops << MkNum(static_cast<uint32_t>(value));
-        }
-      } else if (const ConstantVector *CV = dyn_cast<ConstantVector>(Cst)) {
-        for (unsigned i = 0; i < CV->getNumOperands(); i++) {
-          auto Op = CV->getOperand(i);
-
-          uint32_t literal = 0;
-
-          if (auto CI = dyn_cast<ConstantInt>(Op)) {
-            literal = static_cast<uint32_t>(CI->getZExtValue());
-          } else if (auto UI = dyn_cast<UndefValue>(Op)) {
-            literal = 0xFFFFFFFFu;
-          } else {
-            Op->print(errs());
-            llvm_unreachable("Unsupported element in ConstantVector!");
-          }
-
-          Ops << MkNum(literal);
-        }
+        else
+          // Undef for shuffle in SPIR-V.
+          Ops << MkNum(0xffffffff);
       } else {
-        Cst->print(errs());
-        llvm_unreachable("Unsupported constant mask in ShuffleVector!");
+        Ops << MkNum(i);
       }
     }
 
