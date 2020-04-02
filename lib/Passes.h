@@ -53,6 +53,7 @@ void initializeUBOTypeTransformPassPass(PassRegistry &);
 void initializeUndoBoolPassPass(PassRegistry &);
 void initializeUndoByvalPassPass(PassRegistry &);
 void initializeUndoGetElementPtrConstantExprPassPass(PassRegistry &);
+void initializeUndoInstCombinePassPass(PassRegistry &);
 void initializeUndoSRetPassPass(PassRegistry &);
 void initializeUndoTranslateSamplerFoldPassPass(PassRegistry &);
 void initializeUndoTruncatedSwitchConditionPassPass(PassRegistry &);

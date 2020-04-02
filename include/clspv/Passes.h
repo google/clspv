@@ -401,4 +401,8 @@ llvm::FunctionPass *createFixupStructuredCFGPass();
 /// optimization outcome.
 llvm::ModulePass *createAddFunctionAttributesPass();
 
+/// Undo specific instcombine transformations that are harmful to generating
+/// SPIR-V.
+llvm::ModulePass *createUndoInstCombinePass();
+
 } // namespace clspv

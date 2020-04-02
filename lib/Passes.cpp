@@ -50,6 +50,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeUndoBoolPassPass(r);
   initializeUndoByvalPassPass(r);
   initializeUndoGetElementPtrConstantExprPassPass(r);
+  initializeUndoInstCombinePassPass(r);
   initializeUndoSRetPassPass(r);
   initializeUndoTranslateSamplerFoldPassPass(r);
   initializeUndoTruncatedSwitchConditionPassPass(r);
