@@ -683,6 +683,7 @@ int PopulatePassManager(
   // HideConstantLoadsPass.
   pm->add(clspv::createUnhideConstantLoadsPass());
 
+  pm->add(clspv::createUndoInstCombinePass());
   pm->add(clspv::createFunctionInternalizerPass());
   pm->add(clspv::createReplaceLLVMIntrinsicsPass());
   pm->add(clspv::createUndoBoolPass());
