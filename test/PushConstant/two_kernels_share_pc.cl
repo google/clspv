@@ -29,7 +29,7 @@
 //      MAP: kernel,foo,arg,out,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,x,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 // MAP-NEXT: kernel,foo,arg,y,argOrdinal,2,offset,4,argKind,pod_pushconstant,argSize,4
-// MAP-NEXT: kernel,bar,arg,out,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
+//      MAP: kernel,bar,arg,out,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,bar,arg,a,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 // MAP-NEXT: kernel,bar,arg,b,argOrdinal,2,offset,4,argKind,pod_pushconstant,argSize,4
 
