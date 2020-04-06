@@ -1118,8 +1118,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             for (unsigned i = 1; i < LDValues.size(); i++) {
               Value *TmpVal = Builder.CreateBitCast(LDValues[i], TmpSrcTy);
               TmpVal = Builder.CreateZExt(TmpVal, TmpDstTy);
-              TmpVal = Builder.CreateShl(TmpVal,
-                                         Builder.getInt32(i * SrcTyBitWidth));
+              TmpVal = Builder.CreateShl(
+                  TmpVal, Builder.getIntN(DstTyBitWidth, i * SrcTyBitWidth));
               DstVal = Builder.CreateOr(DstVal, TmpVal);
             }
 
