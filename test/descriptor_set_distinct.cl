@@ -5,11 +5,11 @@
 
 
 // MAP: kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0
-// MAP-NEXT: kernel,foo,arg,n,argOrdinal,1,descriptorSet,0,binding,1,offset,0
-// MAP-NEXT: kernel,foo,arg,c,argOrdinal,2,descriptorSet,0,binding,1,offset,16
+// MAP: kernel,foo,arg,n,argOrdinal,1,descriptorSet,0,binding,1,offset,0
+// MAP: kernel,foo,arg,c,argOrdinal,2,descriptorSet,0,binding,1,offset,16
 
-// MAP-NEXT: kernel,bar,arg,B,argOrdinal,0,descriptorSet,1,binding,0,offset,0
-// MAP-NEXT: kernel,bar,arg,m,argOrdinal,1,descriptorSet,1,binding,1,offset,0
+// MAP: kernel,bar,arg,B,argOrdinal,0,descriptorSet,1,binding,0,offset,0
+// MAP: kernel,bar,arg,m,argOrdinal,1,descriptorSet,1,binding,1,offset,0
 // MAP-NOT: kernel
 
 
