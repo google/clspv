@@ -35,19 +35,16 @@ foo(global Thing* a, global float *b, int n) {
 // CHECK-DAG:  [[__ptr_StorageBuffer__struct_12:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
 // CHECK-DAG:  [[__ptr_StorageBuffer__struct_5:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_5]]
 // CHECK-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG:  [[_uint_7:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 7
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_12]] StorageBuffer
 // CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpFunction
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_uint]]
 // CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_22]] [[_uint_0]] [[_27]] [[_uint_0]] [[_uint_7]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_29]]
 // CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunction
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_5]] [[_22]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_24]] [[_uint_0]]
-// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_35]]
+// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_25]] [[_33]] [[_36]]
 
 
@@ -64,11 +61,9 @@ foo(global Thing* a, global float *b, int n) {
 // NODRA-DAG:  [[__ptr_StorageBuffer__struct_12:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_12]]
 // NODRA-DAG:  [[__ptr_StorageBuffer__struct_5:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_5]]
 // NODRA-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// NODRA:  [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
 // NODRA-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // NODRA-DAG:  [[_uint_7:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 7
 // NODRA:  [[_22:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
-// NODRA:  [[_24:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_12]] StorageBuffer
 // NODRA:  [[_25:%[0-9a-zA-Z_]+]] = OpFunction
 // NODRA:  [[_26:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[__ptr_StorageBuffer__struct_5]]
 // NODRA:  [[_27:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_uint]]
@@ -77,6 +72,5 @@ foo(global Thing* a, global float *b, int n) {
 // NODRA:  [[_31:%[0-9a-zA-Z_]+]] = OpFunction
 // NODRA:  [[_32:%[0-9a-zA-Z_]+]] = OpLabel
 // NODRA:  [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_5]] [[_22]] [[_uint_0]] [[_uint_0]]
-// NODRA:  [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_24]] [[_uint_0]]
-// NODRA:  [[_36:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_35]]
+// NODRA:  [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // NODRA:  [[_37:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_25]] [[_33]] [[_36]]

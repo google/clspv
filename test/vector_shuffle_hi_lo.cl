@@ -7,7 +7,7 @@
 // CHECK-DAG: %[[FLOAT_4_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
 // CHECK-DAG: %[[FLOAT_2_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
 // CHECK: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_4_VECTOR_TYPE_ID]]
-// CHECK: %[[LOAD_ARG0_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_4_VECTOR_TYPE_ID]]
+// CHECK: %[[LOAD_ARG0_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[FLOAT_4_VECTOR_TYPE_ID]]
 // CHECK: %[[VECTOR_SHUFFLE_HI_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT_2_VECTOR_TYPE_ID]] %[[LOAD_ARG0_ID]] %[[UNDEF_ID]] 2 3 
 // CHECK: OpStore {{.*}} %[[VECTOR_SHUFFLE_HI_ID]] 
 // CHECK: %[[VECTOR_SHUFFLE_LO_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT_2_VECTOR_TYPE_ID]] %[[LOAD_ARG0_ID]] %[[UNDEF_ID]] 0 1 

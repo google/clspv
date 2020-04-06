@@ -11,7 +11,7 @@
 // CHECK:     %[[__original_id_31:[0-9]+]] = OpBitwiseAnd %[[uint]] %[[__original_id_30]] %[[uint_2147483648]]
 // CHECK:     %[[__original_id_32:[0-9]+]] = OpBitcast %[[uint]] {{.*}}
 // CHECK:     %[[__original_id_33:[0-9]+]] = OpBitwiseAnd %[[uint]] %[[__original_id_32]] %[[uint_2147483647]]
-// CHECK:     %[[__original_id_34:[0-9]+]] = OpBitwiseOr %[[uint]] %[[__original_id_31]] %[[__original_id_33]]
+// CHECK:     %[[__original_id_34:[0-9]+]] = OpBitwiseOr %[[uint]] %[[__original_id_33]] %[[__original_id_31]]
 // CHECK:     %[[__original_id_35:[0-9]+]] = OpBitcast %[[float]] %[[__original_id_34]]
 
 void kernel test(global float* a, float b, float c) {

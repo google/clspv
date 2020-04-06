@@ -12,7 +12,7 @@ void kernel foo(global float3* A, float3 x)
 // CHECK-DAG: [[_v3float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 3
 // CHECK-DAG: [[_float_0_31831:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] 0.3183
 // CHECK-DAG: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v3float]] [[_float_0_31831]] [[_float_0_31831]] [[_float_0_31831]]
-// CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpLoad [[_v3float]]
+// CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v3float]]
 // CHECK: [[_30:%[a-zA-Z0-9_]+]] = OpExtInst [[_v3float]] [[_1]] Acos [[_29]]
 // CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpFMul [[_v3float]] [[_17]] [[_30]]
 // CHECK: OpStore {{.*}} [[_31]]

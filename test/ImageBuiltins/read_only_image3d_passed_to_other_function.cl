@@ -29,6 +29,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CHECK:  = OpFunction
 // CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpLoad [[_4]]
-// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]]
+// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v4float]]
 // CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_24]] [[_35]] [[_36]] [[_38]]
 // CHECK:  OpStore {{.*}} [[_40]]

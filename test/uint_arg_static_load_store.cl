@@ -6,7 +6,7 @@
 // CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, uint b)
 {
-// CHECK: %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
+// CHECK: %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]]
 // CHECK: OpStore {{.*}} %[[LOAD_ID]]
   *a = b;
 }

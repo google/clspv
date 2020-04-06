@@ -22,7 +22,7 @@ kernel void foo(global char* in, global char* out, int idx) {
 // CHECK: [[add:%[a-zA-Z0-9_]+]] = OpIAdd [[char]] [[b]] [[a]]
 // CHECK: OpReturnValue [[add]]
 // CHECK: OpFunction
-// CHECK: [[idx:%[a-zA-Z0-9_]+]] = OpLoad [[int]]
+// CHECK: [[idx:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]]
 // CHECK-DAG: [[idx1:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[idx]] [[one]]
 // CHECK-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx]]
 // CHECK-DAG: [[gepy:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx1]]

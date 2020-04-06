@@ -7,6 +7,7 @@ kernel void foo(char c) { }
 
 // CHECK: OpCapability Int8
 // CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
-// CHECK: [[block:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]]
+// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]]
+// CHECK: [[block:%[a-zA-Z0-9_]+]] = OpTypeStruct [[struct]]
 // CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[block]]
 // CHECK: OpVariable [[ptr]] StorageBuffer

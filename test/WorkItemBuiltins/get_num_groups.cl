@@ -18,7 +18,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK:  [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
 // CHECK:  [[_gl_NumWorkGroups]] = OpVariable {{.*}} Input
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]]
+// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[_27:%[0-9a-zA-Z_]+]] [[_24]]
 // CHECK:  OpStore {{.*}} [[_uint_1]]
 // CHECK:  [[_27]] = OpFunction [[_uint]]

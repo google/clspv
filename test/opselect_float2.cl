@@ -25,7 +25,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* A,
 // CHECK-DAG: %[[float_1:[a-zA-Z0-9_]*]] = OpConstant %[[float]] 1
 // CHECK-DAG: %[[float_2:[a-zA-Z0-9_]*]] = OpConstant %[[float]] 2
 // CHECK-DAG: %[[v2_1_2:[a-zA-Z0-9_]*]] = OpConstantComposite %[[float2]] %[[float_1]] %[[float_2]]
-// CHECK: %[[n:[a-zA-Z0-9_]*]] = OpLoad %[[uint]]
+// CHECK: %[[n:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[uint]]
 // CHECK: %[[eq:[a-zA-Z0-9_]*]] = OpIEqual %[[BOOL_TYPE_ID]] %[[n]] %[[uint_0]]
 // CHECK: %[[eq_vec0:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[bool2]] %[[eq]] %[[undef]] 0
 // CHECK: %[[eq_splat:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[bool2]] %[[eq_vec0]] %[[undef]] 0 0

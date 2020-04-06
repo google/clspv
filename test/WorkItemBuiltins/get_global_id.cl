@@ -17,7 +17,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
 // CHECK:  [[_gl_GlobalInvocationID]] = OpVariable {{.*}} Input
-// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]]
+// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[_26:%[0-9a-zA-Z_]+]] [[_23]]
 // CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} {{.*}} [[_uint_0]] [[_24]]
 // Optimizer recognizes that get_global_id(3) is out-of-bounds.

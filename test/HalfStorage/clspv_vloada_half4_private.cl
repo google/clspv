@@ -17,8 +17,8 @@ kernel void foo(global float4* A, uint2 v, uint2 w, uint n) {
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
-// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpLoad [[_v2uint]]
-// CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]]
+// CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2uint]]
+// CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // CHECK: OpStore
 // CHECK: OpStore
 // CHECK: [[_48:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} {{.*}} [[_45]]
