@@ -92,8 +92,8 @@ following way:
   types, set `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
 - If the argument to the kernel is a plain-old-data type, the matching Vulkan
   descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER` by default.
-  If option `-pod-ubo` is used the `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`. If the
-  option `-pod-pushconstant` is used the arg is instead passed via push
+  If the option `-pod-ubo` is used the descriptor set type is`VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
+  If the option `-pod-pushconstant` is used the arg is instead passed via push
   constants.
 
 Note: `-pod-ubo` and `-pod-pushconstant` are exclusive options.
