@@ -29,6 +29,9 @@
 using namespace clang;
 
 namespace {
+
+static uint32_t kClusteredCount = 0;
+
 struct ExtraValidationConsumer final : public ASTConsumer {
 private:
   CompilerInstance &Instance;
@@ -56,6 +59,8 @@ private:
     CustomDiagnosticOverloadedKernel = 16,
     CustomDiagnosticStructContainsPointer = 17,
     CustomDiagnosticRecursiveStruct = 18,
+    CustomDiagnosticPushConstantSizeExceeded = 19,
+    CustomDiagnosticPushConstantContainsArray = 20,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -69,6 +74,22 @@ private:
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
       for (auto field_decl : RT->getDecl()->fields()) {
         if (ContainsPointerType(field_decl->getType()))
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool ContainsArrayType(QualType QT) {
+    auto canonical = QT.getCanonicalType();
+    if (auto *PT = dyn_cast<PointerType>(canonical)) {
+      return ContainsArrayType(PT->getPointeeType());
+    } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
+      return true;
+    } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
+      for (auto field_decl : RT->getDecl()->fields()) {
+        if (ContainsArrayType(field_decl->getType()))
           return true;
       }
     }
@@ -464,6 +485,13 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticRecursiveStruct] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "recursive structures are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticPushConstantSizeExceeded] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "max push constant size exceeded");
+    CustomDiagnosticsIDMap[CustomDiagnosticPushConstantContainsArray] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "arrays are not supported in push constants currently");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
@@ -495,6 +523,12 @@ public:
             }
           }
 
+          RecordDecl *clustered_args = nullptr;
+          if (is_opencl_kernel && clspv::Option::PodArgsInPushConstants()) {
+            clustered_args = FD->getASTContext().buildImplicitRecord(
+                "__clspv.clustered_args." + std::to_string(kClusteredCount++));
+            clustered_args->startDefinition();
+          }
           for (auto *P : FD->parameters()) {
             auto type = P->getType();
             if (!IsSupportedType(P->getOriginalType(), P->getSourceRange())) {
@@ -537,14 +571,52 @@ public:
             }
 
             if (is_opencl_kernel && !type->isPointerType()) {
-              Layout layout = SSBO;
-              if (clspv::Option::PodArgsInUniformBuffer() &&
-                  !clspv::Option::Std430UniformBufferLayout())
-                layout = UBO;
+              if (clspv::Option::PodArgsInPushConstants()) {
+                // Don't allow arrays in push constants currently.
+                if (ContainsArrayType(type)) {
+                  Report(CustomDiagnosticPushConstantContainsArray,
+                         P->getSourceRange(), P->getSourceRange());
+                  return false;
+                }
+                FieldDecl *field_decl = FieldDecl::Create(
+                    FD->getASTContext(),
+                    Decl::castToDeclContext(clustered_args),
+                    P->getSourceRange().getBegin(),
+                    P->getSourceRange().getEnd(), P->getIdentifier(),
+                    P->getType(), nullptr, nullptr, false, ICIS_NoInit);
+                field_decl->setAccess(AS_public);
+                clustered_args->addDecl(field_decl);
+              } else {
+                Layout layout = SSBO;
+                if (clspv::Option::PodArgsInUniformBuffer() &&
+                    !clspv::Option::Std430UniformBufferLayout())
+                  layout = UBO;
 
-              if (!IsSupportedLayout(type, 0, layout, FD->getASTContext(),
-                                     P->getSourceRange(),
-                                     P->getSourceRange())) {
+                if (!IsSupportedLayout(type, 0, layout, FD->getASTContext(),
+                                       P->getSourceRange(),
+                                       P->getSourceRange())) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          if (clustered_args) {
+            clustered_args->completeDefinition();
+            if (!clustered_args->field_empty()) {
+              auto record_type =
+                  FD->getASTContext().getRecordType(clustered_args);
+              if (!IsSupportedLayout(record_type, 0, SSBO, FD->getASTContext(),
+                                     FD->getSourceRange(),
+                                     FD->getSourceRange())) {
+                return false;
+              }
+
+              if (FD->getASTContext()
+                      .getTypeSizeInChars(record_type)
+                      .getQuantity() > clspv::Option::MaxPushConstantsSize()) {
+                Report(CustomDiagnosticPushConstantSizeExceeded,
+                       FD->getSourceRange(), FD->getSourceRange());
                 return false;
               }
             }

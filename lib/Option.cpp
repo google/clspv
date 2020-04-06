@@ -112,6 +112,11 @@ llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
 
+llvm::cl::opt<bool> pod_pushconstant(
+    "pod-pushconstant",
+    llvm::cl::desc("POD kernel arguments are in the push constant interface"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> module_constants_in_storage_buffer(
     "module-constants-in-storage-buffer", llvm::cl::init(false),
     llvm::cl::desc(
@@ -130,6 +135,11 @@ llvm::cl::opt<bool> constant_args_in_uniform_buffer(
 llvm::cl::opt<int> maximum_ubo_size(
     "max-ubo-size", llvm::cl::init(64 << 10),
     llvm::cl::desc("Specify the maximum UBO array size in bytes."));
+
+llvm::cl::opt<int> maximum_pushconstant_size(
+    "max-pushconstant-size", llvm::cl::init(128),
+    llvm::cl::desc(
+        "Specify the maximum push constant interface size in bytes."));
 
 llvm::cl::opt<bool> relaxed_ubo_layout(
     "relaxed-ubo-layout",
@@ -181,6 +191,14 @@ static llvm::cl::opt<bool>
                   llvm::cl::desc("Enable support for global offsets"));
 
 static bool use_sampler_map = false;
+
+static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
+    "cluster-pod-kernel-args", llvm::cl::init(false),
+    llvm::cl::desc("Collect plain-old-data kernel arguments into a struct in "
+                   "a single storage buffer, using a binding number after "
+                   "other arguments. Use this to reduce storage buffer "
+                   "descriptors."));
+
 } // namespace
 
 namespace clspv {
@@ -205,9 +223,11 @@ bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }
 bool PodArgsInUniformBuffer() { return pod_ubo; }
+bool PodArgsInPushConstants() { return pod_pushconstant; }
 bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
 uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
+uint32_t MaxPushConstantsSize() { return maximum_pushconstant_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
@@ -219,6 +239,7 @@ SourceLanguage Language() { return cl_std; }
 bool ScalarBlockLayout() { return scalar_block_layout; }
 bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
+bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
 } // namespace Option
 } // namespace clspv

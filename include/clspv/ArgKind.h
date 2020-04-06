@@ -25,6 +25,7 @@ enum class ArgKind : int {
   Local,
   Pod,
   PodUBO,
+  PodPushConstant,
   ReadOnlyImage,
   WriteOnlyImage,
   Sampler,

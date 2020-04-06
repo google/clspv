@@ -92,11 +92,17 @@ following way:
   types, set `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
 - If the argument to the kernel is a plain-old-data type, the matching Vulkan
   descriptor set type is `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER` by default.
-  If option `-pod-ubo` is used the `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
+  If the option `-pod-ubo` is used the descriptor set type is`VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER`.
+  If the option `-pod-pushconstant` is used the arg is instead passed via push
+  constants.
+
+Note: `-pod-ubo` and `-pod-pushconstant` are exclusive options.
 
 Note: If `-cluster-pod-kernel-args` is used, then all plain-old-data kernel
 arguments are collected into a single structure to be passed in to the compute
 shader as a single storage buffer resource.
+
+Note: `-pod-pushconstant` requires `-cluster-pod-kernel-args` to be specified.
 
 ## OpenCL C Modifications
 
@@ -211,6 +217,7 @@ plain-old-data types, the fields are:
   - `buffer_ubo` - OpenCL constant buffer. Sent in a uniform buffer.
   - `pod` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a storage buffer.
   - `pod_ubo` - Plain Old Data, e.g. a scalar, vector, or structure. Sent in a uniform buffer.
+  - `pod_pushconstant` - Plain Old Data, e.g. a scalar, vector or structure. Sent in push constants.
   - `ro_image` - Read-only image
   - `wo_image` - Write-only image
   - `sampler` - Sampler
@@ -279,7 +286,30 @@ be faster to read in the shader.
 When option `-pod-ubo` is used, the descriptor map list the `argKind` of a plain-old-data
 argument as `pod_ubo` rather than the default of `pod`.
 
-TODO(dneto):  A push-constant might even be faster, but space is very limited.
+#### Sending in plain-old-data kernel arguments in push constants
+
+Normally plain-old-data arguments are passed into the kernel via a storage buffer.
+Use the option `-pod-pushconstant` to pass these parameters in via push constants. The
+option `-cluster-pod-kernel-args` must also be specified. Push constants are intended
+to provide a fast read path and should be faster to access than a buffer.
+
+When the option `-pod-pushconstant` is used, the descriptor map lists the `argKind` of
+plain-old-data arguments as `pod_pushconstant` rather than the default of `pod`. There
+is no `descriptorset` or `binding` information for push constants.
+
+Note: Vulkan implementations have limited push constant storage (default is 128B).
+clspv provides the option `-max-pushconstant-size` to specify (in bytes) the
+implementation limit for push constants. This is validated at the start of the compile.
+
+Note: Module scope push constanst are currently incompatible with plain-old-data
+arguments sent as push constants.
+
+TODO(alan-baker): See #529 for the overall plan to address this.
+
+The descriptor map entry for kernel arguments will not contain `descriptorSet` or
+`binding` entries. For example, an integer arg `f` to kernel `foo` might look like:
+
+  kernel,foo,arg,f,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 
 #### Sending in pointer-to-constant kernel arguments in uniform buffers
 
@@ -425,7 +455,7 @@ Take a closer look at the hexadecimal bytes in the example. They are:
 - `0000c03f`: the float value 1.5
 - `000000000000000000000000`: 12 zero bytes representing the zero-initialized third Foo value.
 
-#### Push constants
+#### Module Scope Push constants
 
 Some features, when enabled, require values to be passed by the application via
 push constants. For each value requested by clspv, an entry will be present in

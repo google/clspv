@@ -240,7 +240,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // Then attributes for non-POD parameters
     for (auto &rinfo : RemapInfo) {
       bool argIsPod = rinfo.arg_kind == clspv::ArgKind::Pod ||
-                      rinfo.arg_kind == clspv::ArgKind::PodUBO;
+                      rinfo.arg_kind == clspv::ArgKind::PodUBO ||
+                      rinfo.arg_kind == clspv::ArgKind::PodPushConstant;
       if (!argIsPod && Attributes.hasParamAttrs(rinfo.old_index)) {
         auto idx = rinfo.new_index + AttributeList::FirstArgIndex;
         auto attrs = Attributes.getParamAttributes(rinfo.old_index);
