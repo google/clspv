@@ -74,7 +74,8 @@ private:
   // Also handles shuffles casted through a load, for example:
   //  %cast = bitcast <3 x i32>* %src to <6 x i16>
   //  %load = load <6 x i16>* %cast
-  //  %shuffle = shufflevector <6 x i16> %load, <6 x i16> undef, <2 x i32> <i32 2, i32 4>
+  //  %shuffle = shufflevector <6 x i16> %load, <6 x i16> undef,
+  //                            <2 x i32> <i32 2, i32 4>
   //
   // With:
   //  %load = load <3 x i32>, <3 x i32>* %src
