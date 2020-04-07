@@ -672,6 +672,9 @@ int PopulatePassManager(
   // Now we add any of the LLVM optimizations we wanted
   pmBuilder.populateModulePassManager(*pm);
 
+  // No point attempting to handle freeze currently so strip them from the IR.
+  pm->add(clspv::createStripFreezePass());
+
   // Unhide loads from __constant address space.  Undoes the action of
   // HideConstantLoadsPass.
   pm->add(clspv::createUnhideConstantLoadsPass());

@@ -46,6 +46,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeSplatArgPassPass(r);
   initializeSplatSelectConditionPassPass(r);
   initializeSpecializeImageTypesPassPass(r);
+  initializeStripFreezePassPass(r);
   initializeUBOTypeTransformPassPass(r);
   initializeUndoBoolPassPass(r);
   initializeUndoByvalPassPass(r);
