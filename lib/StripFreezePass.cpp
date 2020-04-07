@@ -20,7 +20,7 @@
 
 #include "Passes.h"
 
-#define DEBUG_TYPE "undoinstcombine"
+#define DEBUG_TYPE "stripfreeze"
 
 using namespace llvm;
 
