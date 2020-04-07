@@ -19,6 +19,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 
 #include "Passes.h"
@@ -45,6 +46,16 @@ private:
   // With:
   //  %extract = extractelement <4 x i32> %src, i32 1
   //  %trunc = trunc i32 %extract to i8
+  //
+  // Also handles casts that get loaded, for example:
+  //  %cast = bitcast <3 x i32>* %src to <6 x i16>*
+  //  %load = load <6 x i16>, <6 x i16>* %cast
+  //  %extract = extractelement <6 x i16> %load, i32 0
+  //
+  // With:
+  //  %load = load <3 x i32>, <3 x i32>* %src
+  //  %extract = extractelement <3 x i32> %load, i32 0
+  //  %trunc = trunc i32 %extract to i16
   bool UndoWideVectorExtractCast(Instruction *inst);
 
   // Undoes wide vector casts that are used in a shuffle, for example:
@@ -59,9 +70,23 @@ private:
   //  %extract1 = <4 x i32> %src, i32 2
   //  %trunc1 = trunc i32 %extract1 to i8
   //  %insert1 = insertelement <2 x i8> %insert0, i8 %trunc1, i32 1
+  //
+  // Also handles shuffles casted through a load, for example:
+  //  %cast = bitcast <3 x i32>* %src to <6 x i16>
+  //  %load = load <6 x i16>* %cast
+  //  %shuffle = shufflevector <6 x i16> %load, <6 x i16> undef, <2 x i32> <i32 2, i32 4>
+  //
+  // With:
+  //  %load = load <3 x i32>, <3 x i32>* %src
+  //  %ex0 = extractelement <3 x i32> %load, i32 1
+  //  %trunc0 = trunc i32 %ex0 to i16
+  //  %in0 = insertelement <2 x i16> zeroinitializer, i16 %trunc0, i32 0
+  //  %ex1 = extractelement <3 x i32> %load, i32 2
+  //  %trunc1 = trunc i32 %ex1 to i16
+  //  %in1 = insertelement <2 x i16> %in0, i16 %trunc1, i32 1
   bool UndoWideVectorShuffleCast(Instruction *inst);
 
-  UniqueVector<Instruction *> potentially_dead_;
+  UniqueVector<Value *> potentially_dead_;
   std::vector<Instruction *> dead_;
 };
 } // namespace
@@ -86,9 +111,14 @@ bool UndoInstCombinePass::runOnModule(Module &M) {
   for (auto inst : dead_)
     inst->eraseFromParent();
 
-  for (auto inst : potentially_dead_) {
-    if (inst->user_empty())
-      inst->eraseFromParent();
+  for (auto val : potentially_dead_) {
+    if (auto inst = dyn_cast<Instruction>(val)) {
+      if (inst->user_empty())
+        inst->eraseFromParent();
+    } else if (auto cast = dyn_cast<BitCastOperator>(val)) {
+      if (auto constant = dyn_cast<Constant>(cast->getOperand(0)))
+        constant->removeDeadConstantUsers();
+    }
   }
 
   return changed;
@@ -124,12 +154,24 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
   if (!const_idx)
     return false;
 
-  auto cast = dyn_cast<BitCastInst>(extract->getVectorOperand());
+  auto load = dyn_cast<LoadInst>(extract->getVectorOperand());
+  auto cast = dyn_cast<BitCastOperator>(extract->getVectorOperand());
+  if (load) {
+    // If this is a laod, check for a cast on the pointer operand
+    cast = dyn_cast<BitCastOperator>(load->getPointerOperand());
+  }
+
   if (!cast)
     return false;
 
   auto src = cast->getOperand(0);
-  auto src_vec_ty = dyn_cast<VectorType>(src->getType());
+  VectorType *src_vec_ty = nullptr;
+  if (isa<PointerType>(src->getType()))
+    // In the load cast, go through the pointer first.
+    src_vec_ty = dyn_cast<VectorType>(src->getType()->getPointerElementType());
+  else
+    src_vec_ty = dyn_cast<VectorType>(src->getType());
+
   if (!src_vec_ty)
     return false;
 
@@ -150,7 +192,13 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
 
   // Create a truncate of an extract element.
   IRBuilder<> builder(inst);
-  auto new_src = builder.CreateExtractElement(src, builder.getInt32(new_idx));
+  Value *new_src = nullptr;
+  if (load) {
+    potentially_dead_.insert(load);
+    new_src = builder.CreateLoad(src);
+    src = new_src;
+  }
+  new_src = builder.CreateExtractElement(src, builder.getInt32(new_idx));
   auto trunc = builder.CreateTrunc(new_src, extract->getType());
   extract->replaceAllUsesWith(trunc);
   dead_.push_back(extract);
@@ -174,7 +222,13 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   if (in1_vec_ty->getElementCount().Min <= 4)
     return false;
 
-  auto in1_cast = dyn_cast<BitCastInst>(in1);
+  auto in1_load = dyn_cast<LoadInst>(in1);
+  auto in1_cast = dyn_cast<BitCastOperator>(in1);
+  if (in1_load) {
+    // If this is a laod, check for a cast on the pointer operand
+    in1_cast = dyn_cast<BitCastOperator>(in1_load->getPointerOperand());
+  }
+
   if (!in1_cast)
     return false;
 
@@ -184,7 +238,13 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
     return false;
 
   auto src = in1_cast->getOperand(0);
-  auto src_vec_ty = dyn_cast<VectorType>(src->getType());
+  VectorType *src_vec_ty = nullptr;
+  if (isa<PointerType>(src->getType()))
+    // In the load cast, go through the pointer first.
+    src_vec_ty = dyn_cast<VectorType>(src->getType()->getPointerElementType());
+  else
+    src_vec_ty = dyn_cast<VectorType>(src->getType());
+
   if (!src_vec_ty)
     return false;
 
@@ -210,6 +270,11 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   // into the result vector.
   IRBuilder<> builder(inst);
   Value *insert = nullptr;
+  if (in1_load) {
+    potentially_dead_.insert(in1_load);
+    src = builder.CreateLoad(src);
+  }
+
   int i = 0;
   for (auto idx : mask) {
     if (idx == UndefMaskElem)
