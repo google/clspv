@@ -90,6 +90,28 @@ const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
 const char *kCompositeConstructFunctionPrefix = "clspv.composite_construct.";
 
+// SPIRV Module Sections (per 2.4 of the SPIRV spec)
+// These are used to collect SPIRVInstructions by type on-the-fly.
+enum SPIRVSection {
+  kCapabilities,
+  kExtensions,
+  kImports,
+  kMemoryModel,
+  kEntryPoints,
+  kExecutionModes,
+
+  kDebug,
+  kAnnotations,
+
+  kTypes,
+  kConstants,
+  kGlobalVariables,
+
+  kFunctions,
+
+  kSectionCount
+};
+
 enum SPIRVOperandType {
   NUMBERID,
   LITERAL_INTEGER,
@@ -292,8 +314,10 @@ struct SPIRVProducerPass final : public ModulePass {
         WorkgroupSizeVarID(0), max_local_spec_id_(0) {}
 
   virtual ~SPIRVProducerPass() {
-    for (auto *Inst : SPIRVInsts) {
-      delete Inst;
+    for (int i = 0; i < kSectionCount; ++i) {
+      for (auto *Inst : SPIRVSections[i]) {
+        delete Inst;
+      }
     }
   }
 
@@ -338,7 +362,9 @@ struct SPIRVProducerPass final : public ModulePass {
   ValueList &getConstantList() { return Constants; };
   ValueMapType &getValueMap() { return ValueMap; }
   ValueMapType &getAllocatedValueMap() { return AllocatedValueMap; }
-  SPIRVInstructionList &getSPIRVInstList() { return SPIRVInsts; };
+  SPIRVInstructionList &getSPIRVInstList(SPIRVSection Section) {
+    return SPIRVSections[Section];
+  };
   EntryPointVecType &getEntryPointVec() { return EntryPointVec; };
   DeferredInstVecType &getDeferredInstVec() { return DeferredInstVec; };
   ValueList &getEntryPointInterfacesVec() { return EntryPointInterfacesVec; };
@@ -432,6 +458,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void WriteWordCountAndOpcode(SPIRVInstruction *Inst);
   void WriteOperand(const std::unique_ptr<SPIRVOperand> &Op);
   void WriteSPIRVBinary();
+  void WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList);
 
   // Returns true if |type| is compatible with OpConstantNull.
   bool IsTypeNullable(const Type *type) const;
@@ -509,7 +536,7 @@ private:
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   ValueMapType ValueMap;
   ValueMapType AllocatedValueMap;
-  SPIRVInstructionList SPIRVInsts;
+  SPIRVInstructionList SPIRVSections[kSectionCount];
 
   EntryPointVecType EntryPointVec;
   DeferredInstVecType DeferredInstVec;
@@ -1898,7 +1925,7 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
 }
 
 void SPIRVProducerPass::GenerateExtInstImport() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kImports);
   uint32_t &ExtInstImportID = getOpExtInstImportID();
 
   //
@@ -1912,7 +1939,7 @@ void SPIRVProducerPass::GenerateExtInstImport() {
 
 void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
                                            Module &module) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kTypes);
   ValueMapType &VMap = getValueMap();
   ValueMapType &AllocatedVMap = getAllocatedValueMap();
   const auto &DL = module.getDataLayout();
@@ -2124,14 +2151,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       SPIRVInstList.push_back(Inst);
 
       // Generate OpMemberDecorate.
-      auto DecoInsertPoint =
-          std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                       [](SPIRVInstruction *Inst) -> bool {
-                         return Inst->getOpcode() != spv::OpDecorate &&
-                                Inst->getOpcode() != spv::OpMemberDecorate &&
-                                Inst->getOpcode() != spv::OpExtInstImport;
-                       });
-
       if (TypesNeedingLayout.idFor(STy)) {
         for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
              MemberIdx++) {
@@ -2150,7 +2169,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
           Ops << MkNum(ByteOffset);
 
           auto *DecoInst = new SPIRVInstruction(spv::OpMemberDecorate, Ops);
-          SPIRVInstList.insert(DecoInsertPoint, DecoInst);
+          getSPIRVInstList(kAnnotations).push_back(DecoInst);
         }
       }
 
@@ -2161,7 +2180,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
         Ops << MkId(STyID) << MkNum(spv::DecorationBlock);
 
         auto *DecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
-        SPIRVInstList.insert(DecoInsertPoint, DecoInst);
+        getSPIRVInstList(kAnnotations).push_back(DecoInst);
       }
       break;
     }
@@ -2245,13 +2264,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
 
           if (Hack_generate_runtime_array_stride_early) {
             // Generate OpDecorate.
-            auto DecoInsertPoint = std::find_if(
-                SPIRVInstList.begin(), SPIRVInstList.end(),
-                [](SPIRVInstruction *Inst) -> bool {
-                  return Inst->getOpcode() != spv::OpDecorate &&
-                         Inst->getOpcode() != spv::OpMemberDecorate &&
-                         Inst->getOpcode() != spv::OpExtInstImport;
-                });
 
             // Ops[0] = Target ID
             // Ops[1] = Decoration (ArrayStride)
@@ -2263,7 +2275,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
                 << MkNum(static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL)));
 
             auto *DecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
-            SPIRVInstList.insert(DecoInsertPoint, DecoInst);
+            getSPIRVInstList(kAnnotations).push_back(DecoInst);
           }
         }
 
@@ -2426,7 +2438,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
 }
 
 void SPIRVProducerPass::GenerateSPIRVConstants() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kConstants);
   ValueMapType &VMap = getValueMap();
   ValueMapType &AllocatedVMap = getAllocatedValueMap();
   ValueList &CstList = getConstantList();
@@ -2621,7 +2633,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
 }
 
 void SPIRVProducerPass::GenerateSamplers(Module &M) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
 
   auto &sampler_map = getSamplerMap();
   SamplerLiteralToIDMap.clear();
@@ -2704,20 +2716,6 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
 
-    // Find Insert Point for OpDecorate.
-    auto DecoInsertPoint =
-        std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                     [](SPIRVInstruction *Inst) -> bool {
-                       return Inst->getOpcode() != spv::OpDecorate &&
-                              Inst->getOpcode() != spv::OpMemberDecorate &&
-                              Inst->getOpcode() != spv::OpExtInstImport;
-                     });
-
-    // Ops[0] = Target ID
-    // Ops[1] = Decoration (DescriptorSet)
-    // Ops[2] = LiteralNumber according to Decoration
-    Ops.clear();
-
     unsigned descriptor_set;
     unsigned binding;
     if (SamplerLiteralToBindingMap.find(sampler_value) ==
@@ -2736,11 +2734,16 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
                                          descriptor_set, binding);
     }
 
+    // Ops[0] = Target ID
+    // Ops[1] = Decoration (DescriptorSet)
+    // Ops[2] = LiteralNumber according to Decoration
+    Ops.clear();
+
     Ops << MkId(sampler_var_id) << MkNum(spv::DecorationDescriptorSet)
         << MkNum(descriptor_set);
 
     auto *DescDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    SPIRVInstList.insert(DecoInsertPoint, DescDecoInst);
+    getSPIRVInstList(kAnnotations).push_back(DescDecoInst);
 
     // Ops[0] = Target ID
     // Ops[1] = Decoration (Binding)
@@ -2750,12 +2753,12 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
         << MkNum(binding);
 
     auto *BindDecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    SPIRVInstList.insert(DecoInsertPoint, BindDecoInst);
+    getSPIRVInstList(kAnnotations).push_back(BindDecoInst);
   }
 }
 
 void SPIRVProducerPass::GenerateResourceVars(Module &) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   ValueMapType &VMap = getValueMap();
 
   // Generate variables.  Make one for each of resource var info object.
@@ -2815,15 +2818,7 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
   }
 
   // Generate associated decorations.
-
-  // Find Insert Point for OpDecorate.
-  auto DecoInsertPoint =
-      std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                   [](SPIRVInstruction *Inst) -> bool {
-                     return Inst->getOpcode() != spv::OpDecorate &&
-                            Inst->getOpcode() != spv::OpMemberDecorate &&
-                            Inst->getOpcode() != spv::OpExtInstImport;
-                   });
+  SPIRVInstructionList &Annotations = getSPIRVInstList(kAnnotations);
 
   SPIRVOperandList Ops;
   for (auto *info : ModuleOrderedResourceVars) {
@@ -2835,21 +2830,18 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
     Ops.clear();
     Ops << MkId(info->var_id) << MkNum(spv::DecorationDescriptorSet)
         << MkNum(info->descriptor_set);
-    SPIRVInstList.insert(DecoInsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
 
     Ops.clear();
     Ops << MkId(info->var_id) << MkNum(spv::DecorationBinding)
         << MkNum(info->binding);
-    SPIRVInstList.insert(DecoInsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
 
     if (info->coherent) {
       // Decorate with Coherent if required for the variable.
       Ops.clear();
       Ops << MkId(info->var_id) << MkNum(spv::DecorationCoherent);
-      SPIRVInstList.insert(DecoInsertPoint,
-                           new SPIRVInstruction(spv::OpDecorate, Ops));
+      Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
     }
 
     // Generate NonWritable and NonReadable
@@ -2860,15 +2852,13 @@ void SPIRVProducerPass::GenerateResourceVars(Module &) {
           clspv::AddressSpace::Constant) {
         Ops.clear();
         Ops << MkId(info->var_id) << MkNum(spv::DecorationNonWritable);
-        SPIRVInstList.insert(DecoInsertPoint,
-                             new SPIRVInstruction(spv::OpDecorate, Ops));
+        Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
       }
       break;
     case clspv::ArgKind::WriteOnlyImage:
       Ops.clear();
       Ops << MkId(info->var_id) << MkNum(spv::DecorationNonReadable);
-      SPIRVInstList.insert(DecoInsertPoint,
-                           new SPIRVInstruction(spv::OpDecorate, Ops));
+      Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
       break;
     default:
       break;
@@ -3097,7 +3087,7 @@ void SPIRVProducerPass::GeneratePushConstantDescriptormapEntries(Module &M) {
 
 void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   Module &M = *GV.getParent();
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   ValueMapType &VMap = getValueMap();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
   const DataLayout &DL = GV.getParent()->getDataLayout();
@@ -3281,16 +3271,9 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   auto *Inst = new SPIRVInstruction(spv::OpVariable, var_id, Ops);
   SPIRVInstList.push_back(Inst);
 
+  SPIRVInstructionList &Annotations = getSPIRVInstList(kAnnotations);
   // If we have a builtin.
   if (spv::BuiltInMax != BuiltinType) {
-    // Find Insert Point for OpDecorate.
-    auto DecoInsertPoint =
-        std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                     [](SPIRVInstruction *Inst) -> bool {
-                       return Inst->getOpcode() != spv::OpDecorate &&
-                              Inst->getOpcode() != spv::OpMemberDecorate &&
-                              Inst->getOpcode() != spv::OpExtInstImport;
-                     });
     //
     // Generate OpDecorate.
     //
@@ -3315,7 +3298,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
          << MkNum(BuiltinType);
 
     auto *DescDecoInst = new SPIRVInstruction(spv::OpDecorate, DOps);
-    SPIRVInstList.insert(DecoInsertPoint, DescDecoInst);
+    Annotations.push_back(DescDecoInst);
   } else if (module_scope_constant_external_init) {
     // This module scope constant is initialized from a storage buffer with data
     // provided by the host at binding 0 of the next descriptor set.
@@ -3332,32 +3315,22 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set,
                                        0);
 
-    // Find Insert Point for OpDecorate.
-    auto DecoInsertPoint =
-        std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                     [](SPIRVInstruction *Inst) -> bool {
-                       return Inst->getOpcode() != spv::OpDecorate &&
-                              Inst->getOpcode() != spv::OpMemberDecorate &&
-                              Inst->getOpcode() != spv::OpExtInstImport;
-                     });
-
-    // OpDecorate %var Binding <binding>
     SPIRVOperandList DOps;
-    DOps << MkId(var_id) << MkNum(spv::DecorationBinding) << MkNum(0);
-    DecoInsertPoint = SPIRVInstList.insert(
-        DecoInsertPoint, new SPIRVInstruction(spv::OpDecorate, DOps));
 
     // OpDecorate %var DescriptorSet <descriptor_set>
-    DOps.clear();
     DOps << MkId(var_id) << MkNum(spv::DecorationDescriptorSet)
          << MkNum(descriptor_set);
-    SPIRVInstList.insert(DecoInsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, DOps));
+    Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, DOps));
+
+    // OpDecorate %var Binding <binding>
+    DOps.clear();
+    DOps << MkId(var_id) << MkNum(spv::DecorationBinding) << MkNum(0);
+    Annotations.push_back(new SPIRVInstruction(spv::OpDecorate, DOps));
   }
 }
 
 void SPIRVProducerPass::GenerateWorkgroupVars() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   for (auto spec_id = clspv::FirstLocalSpecId(); spec_id < max_local_spec_id_;
        ++spec_id) {
     LocalArgInfo &info = LocalSpecIdInfoMap[spec_id];
@@ -3506,7 +3479,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
 }
 
 void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
@@ -3581,15 +3554,6 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
 
-    // Find Insert Point for OpDecorate.
-    auto DecoInsertPoint =
-        std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                     [](SPIRVInstruction *Inst) -> bool {
-                       return Inst->getOpcode() != spv::OpDecorate &&
-                              Inst->getOpcode() != spv::OpMemberDecorate &&
-                              Inst->getOpcode() != spv::OpExtInstImport;
-                     });
-
     // Iterate Argument for name instead of param type from function type.
     unsigned ArgIdx = 0;
     for (Argument &Arg : F.args()) {
@@ -3601,9 +3565,8 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
         // parameter with Coherent too.
         SPIRVOperandList decoration_ops;
         decoration_ops << MkId(param_id) << MkNum(spv::DecorationCoherent);
-        SPIRVInstList.insert(
-            DecoInsertPoint,
-            new SPIRVInstruction(spv::OpDecorate, decoration_ops));
+        getSPIRVInstList(kAnnotations)
+            .push_back(new SPIRVInstruction(spv::OpDecorate, decoration_ops));
       }
 
       // ParamOps[0] : Result Type ID
@@ -3635,16 +3598,13 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 }
 
 void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   ValueMapType &VMap = getValueMap();
   ValueList &EntryPointInterfaces = getEntryPointInterfacesVec();
   uint32_t &ExtInstImportID = getOpExtInstImportID();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
 
-  // Set up insert point.
-  auto InsertPoint = SPIRVInstList.begin();
-
+  SPIRVInstructionList &SPIRVCapabilities = getSPIRVInstList(kCapabilities);
   //
   // Generate OpCapability
   //
@@ -3655,7 +3615,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   auto *CapInst =
       new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityShader));
-  SPIRVInstList.insert(InsertPoint, CapInst);
+  SPIRVCapabilities.push_back(CapInst);
 
   bool write_without_format = false;
   bool sampled_1d = false;
@@ -3663,29 +3623,24 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   for (Type *Ty : getTypeList()) {
     if (clspv::Option::Int8Support() && Ty->isIntegerTy(8)) {
       // Generate OpCapability for i8 type.
-      SPIRVInstList.insert(
-          InsertPoint,
+      SPIRVCapabilities.push_back(
           new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt8)));
     } else if (Ty->isIntegerTy(16)) {
       // Generate OpCapability for i16 type.
-      SPIRVInstList.insert(
-          InsertPoint,
+      SPIRVCapabilities.push_back(
           new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt16)));
     } else if (Ty->isIntegerTy(64)) {
       // Generate OpCapability for i64 type.
-      SPIRVInstList.insert(
-          InsertPoint,
+      SPIRVCapabilities.push_back(
           new SPIRVInstruction(spv::OpCapability, MkNum(spv::CapabilityInt64)));
     } else if (Ty->isHalfTy()) {
       // Generate OpCapability for half type.
-      SPIRVInstList.insert(InsertPoint,
-                           new SPIRVInstruction(spv::OpCapability,
-                                                MkNum(spv::CapabilityFloat16)));
+      SPIRVCapabilities.push_back(new SPIRVInstruction(
+          spv::OpCapability, MkNum(spv::CapabilityFloat16)));
     } else if (Ty->isDoubleTy()) {
       // Generate OpCapability for double type.
-      SPIRVInstList.insert(InsertPoint,
-                           new SPIRVInstruction(spv::OpCapability,
-                                                MkNum(spv::CapabilityFloat64)));
+      SPIRVCapabilities.push_back(new SPIRVInstruction(
+          spv::OpCapability, MkNum(spv::CapabilityFloat64)));
     } else if (auto *STy = dyn_cast<StructType>(Ty)) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_wo_t") ||
@@ -3710,22 +3665,18 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   if (write_without_format) {
     // Generate OpCapability for write only image type.
-    SPIRVInstList.insert(
-        InsertPoint,
-        new SPIRVInstruction(
-            spv::OpCapability,
-            {MkNum(spv::CapabilityStorageImageWriteWithoutFormat)}));
+    SPIRVCapabilities.push_back(new SPIRVInstruction(
+        spv::OpCapability,
+        {MkNum(spv::CapabilityStorageImageWriteWithoutFormat)}));
   }
   if (image_1d) {
     // Generate OpCapability for unsampled 1D image type.
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpCapability,
-                                              {MkNum(spv::CapabilityImage1D)}));
+    SPIRVCapabilities.push_back(new SPIRVInstruction(
+        spv::OpCapability, {MkNum(spv::CapabilityImage1D)}));
   } else if (sampled_1d) {
     // Generate OpCapability for sampled 1D image type.
-    SPIRVInstList.insert(
-        InsertPoint, new SPIRVInstruction(spv::OpCapability,
-                                          {MkNum(spv::CapabilitySampled1D)}));
+    SPIRVCapabilities.push_back(new SPIRVInstruction(
+        spv::OpCapability, {MkNum(spv::CapabilitySampled1D)}));
   }
 
   { // OpCapability ImageQuery
@@ -3740,9 +3691,8 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     }
 
     if (hasImageQuery) {
-      auto *ImageQueryCapInst = new SPIRVInstruction(
-          spv::OpCapability, {MkNum(spv::CapabilityImageQuery)});
-      SPIRVInstList.insert(InsertPoint, ImageQueryCapInst);
+      SPIRVCapabilities.push_back(new SPIRVInstruction(
+          spv::OpCapability, {MkNum(spv::CapabilityImageQuery)}));
     }
   }
 
@@ -3755,8 +3705,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     Ops.clear();
     Ops << MkNum(spv::CapabilityVariablePointers);
 
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpCapability, Ops));
+    SPIRVCapabilities.push_back(new SPIRVInstruction(spv::OpCapability, Ops));
   } else if (hasVariablePointersStorageBuffer()) {
     //
     // Generate OpCapability.
@@ -3766,10 +3715,10 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     Ops.clear();
     Ops << MkNum(spv::CapabilityVariablePointersStorageBuffer);
 
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpCapability, Ops));
+    SPIRVCapabilities.push_back(new SPIRVInstruction(spv::OpCapability, Ops));
   }
 
+  SPIRVInstructionList &SPIRVExtensions = getSPIRVInstList(kExtensions);
   // Always add the storage buffer extension
   {
     //
@@ -3779,7 +3728,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     //
     auto *ExtensionInst = new SPIRVInstruction(
         spv::OpExtension, {MkString("SPV_KHR_storage_buffer_storage_class")});
-    SPIRVInstList.insert(InsertPoint, ExtensionInst);
+    SPIRVExtensions.push_back(ExtensionInst);
   }
 
   if (hasVariablePointers() || hasVariablePointersStorageBuffer()) {
@@ -3790,11 +3739,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     //
     auto *ExtensionInst = new SPIRVInstruction(
         spv::OpExtension, {MkString("SPV_KHR_variable_pointers")});
-    SPIRVInstList.insert(InsertPoint, ExtensionInst);
-  }
-
-  if (ExtInstImportID) {
-    ++InsertPoint;
+    SPIRVExtensions.push_back(ExtensionInst);
   }
 
   //
@@ -3808,8 +3753,9 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   Ops << MkNum(spv::AddressingModelLogical) << MkNum(spv::MemoryModelGLSL450);
 
   auto *MemModelInst = new SPIRVInstruction(spv::OpMemoryModel, Ops);
-  SPIRVInstList.insert(InsertPoint, MemModelInst);
+  getSPIRVInstList(kMemoryModel).push_back(MemModelInst);
 
+  SPIRVInstructionList &SPIRVEntryPoints = getSPIRVInstList(kEntryPoints);
   //
   // Generate OpEntryPoint
   //
@@ -3830,9 +3776,10 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     }
 
     auto *EntryPointInst = new SPIRVInstruction(spv::OpEntryPoint, Ops);
-    SPIRVInstList.insert(InsertPoint, EntryPointInst);
+    SPIRVEntryPoints.push_back(EntryPointInst);
   }
 
+  SPIRVInstructionList &SPIRVExecutionModes = getSPIRVInstList(kExecutionModes);
   for (auto EntryPoint : EntryPoints) {
     if (const MDNode *MD = dyn_cast<Function>(EntryPoint.first)
                                ->getMetadata("reqd_work_group_size")) {
@@ -3862,7 +3809,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
       Ops << MkNum(XDim) << MkNum(YDim) << MkNum(ZDim);
 
       auto *ExecModeInst = new SPIRVInstruction(spv::OpExecutionMode, Ops);
-      SPIRVInstList.insert(InsertPoint, ExecModeInst);
+      SPIRVExecutionModes.push_back(ExecModeInst);
     }
   }
 
@@ -3895,9 +3842,10 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   }
 
   auto *OpenSourceInst = new SPIRVInstruction(spv::OpSource, Ops);
-  SPIRVInstList.insert(InsertPoint, OpenSourceInst);
+  getSPIRVInstList(kDebug).push_back(OpenSourceInst);
 
   if (!BuiltinDimVec.empty()) {
+    SPIRVInstructionList &SPIRVAnnotations = getSPIRVInstList(kAnnotations);
     //
     // Generate OpDecorates for x/y/z dimension.
     //
@@ -3908,20 +3856,17 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
     // X Dimension
     Ops.clear();
     Ops << MkId(BuiltinDimVec[0]) << MkNum(spv::DecorationSpecId) << MkNum(0);
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    SPIRVAnnotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
 
     // Y Dimension
     Ops.clear();
     Ops << MkId(BuiltinDimVec[1]) << MkNum(spv::DecorationSpecId) << MkNum(1);
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    SPIRVAnnotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
 
     // Z Dimension
     Ops.clear();
     Ops << MkId(BuiltinDimVec[2]) << MkNum(spv::DecorationSpecId) << MkNum(2);
-    SPIRVInstList.insert(InsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    SPIRVAnnotations.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
   }
 }
 
@@ -3940,12 +3885,12 @@ void SPIRVProducerPass::GenerateEntryPointInitialStores() {
     Ops << MkId(WorkgroupSizeVarID) << MkId(WorkgroupSizeValueID);
 
     auto *Inst = new SPIRVInstruction(spv::OpStore, Ops);
-    getSPIRVInstList().push_back(Inst);
+    getSPIRVInstList(kFunctions).push_back(Inst);
   }
 }
 
 void SPIRVProducerPass::GenerateFuncBody(Function &F) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   ValueMapType &VMap = getValueMap();
 
   const bool IsKernel = F.getCallingConv() == CallingConv::SPIR_KERNEL;
@@ -4075,7 +4020,7 @@ spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
 }
 
 void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   ValueMapType &VMap = getValueMap();
   DeferredInstVecType &DeferredInsts = getDeferredInstVec();
   LLVMContext &Context = I.getParent()->getParent()->getParent()->getContext();
@@ -5292,7 +5237,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 }
 
 void SPIRVProducerPass::GenerateFuncEpilogue() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
 
   //
   // Generate OpFunctionEnd
@@ -5319,7 +5264,7 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
 }
 
 void SPIRVProducerPass::HandleDeferredInstruction() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   ValueMapType &VMap = getValueMap();
   DeferredInstVecType &DeferredInsts = getDeferredInstVec();
 
@@ -5628,23 +5573,10 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     return;
   }
 
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kAnnotations);
 
   // Find an iterator pointing just past the last decoration.
   bool seen_decorations = false;
-  auto DecoInsertPoint =
-      std::find_if(SPIRVInstList.begin(), SPIRVInstList.end(),
-                   [&seen_decorations](SPIRVInstruction *Inst) -> bool {
-                     const bool is_decoration =
-                         Inst->getOpcode() == spv::OpDecorate ||
-                         Inst->getOpcode() == spv::OpMemberDecorate;
-                     if (is_decoration) {
-                       seen_decorations = true;
-                       return false;
-                     } else {
-                       return seen_decorations;
-                     }
-                   });
 
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
@@ -5673,7 +5605,7 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
         << MkNum(stride);
 
     auto *DecoInst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    SPIRVInstList.insert(DecoInsertPoint, DecoInst);
+    SPIRVInstList.push_back(DecoInst);
   }
 
   // Emit SpecId decorations targeting the array size value.
@@ -5683,8 +5615,7 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     SPIRVOperandList Ops;
     Ops << MkId(arg_info.array_size_id) << MkNum(spv::DecorationSpecId)
         << MkNum(arg_info.spec_id);
-    SPIRVInstList.insert(DecoInsertPoint,
-                         new SPIRVInstruction(spv::OpDecorate, Ops));
+    SPIRVInstList.push_back(new SPIRVInstruction(spv::OpDecorate, Ops));
   }
 }
 
@@ -5929,7 +5860,12 @@ void SPIRVProducerPass::WriteOperand(const std::unique_ptr<SPIRVOperand> &Op) {
 }
 
 void SPIRVProducerPass::WriteSPIRVBinary() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  for (int i = 0; i < kSectionCount; ++i) {
+    WriteSPIRVBinary(SPIRVSections[i]);
+  }
+}
+
+void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
 
   for (auto Inst : SPIRVInstList) {
     const auto &Ops = Inst->getOperands();
