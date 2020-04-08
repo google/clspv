@@ -65,6 +65,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/SpecializeImageTypes.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatSelectCondition.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/StripFreezePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Types.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UBOTypeTransformPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoBoolPass.cpp

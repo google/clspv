@@ -405,4 +405,7 @@ llvm::ModulePass *createAddFunctionAttributesPass();
 /// SPIR-V.
 llvm::ModulePass *createUndoInstCombinePass();
 
+/// Removes FreezeInsts from the IR.
+llvm::ModulePass *createStripFreezePass();
+
 } // namespace clspv
