@@ -12,7 +12,7 @@ void kernel foo(global float* A, global float* B, float x)
 // CHECK: [[_1:%[a-zA-Z0-9_]+]] = OpExtInstImport "GLSL.std.450"
 // CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
 // CHECK-DAG: [[_float_1:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] {{1|0.99999}}
-// CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpLoad [[_float]]
+// CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_float]]
 // CHECK: [[_30:%[a-zA-Z0-9_]+]] = OpExtInst [[_float]] [[_1]] Floor [[_29]]
 // CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpExtInst [[_float]] [[_1]] Fract [[_29]]
 // CHECK: [[_32:%[a-zA-Z0-9_]+]] = OpExtInst [[_float]] [[_1]] FMin [[_31]] [[_float_1]]

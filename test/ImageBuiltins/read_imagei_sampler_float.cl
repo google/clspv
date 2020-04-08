@@ -19,7 +19,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CHECK-DAG: [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_4]]
-// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_float]]
+// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]]
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpSampledImage [[_18]] [[_28]] [[_27]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] [[_30]] Lod [[_float_0]]
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]

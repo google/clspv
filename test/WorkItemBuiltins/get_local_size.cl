@@ -12,7 +12,7 @@
 // CHECK-DAG: %[[CONSTANT_3_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 3
 // CHECK-DAG: %[[BUILTIN_ID]] = OpConstantComposite %[[UINT3_TYPE_ID]] %[[CONSTANT_1_ID]] %[[CONSTANT_1_ID]] %[[CONSTANT_1_ID]]
 // CHECK: %[[BUILTIN_VAR_ID:[a-zA-Z0-9_]*]] = OpVariable {{.*}} Private %[[BUILTIN_ID]]
-// CHECK: %[[LOAD1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
+// CHECK: %[[LOAD1_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]]
 // CHECK: %[[RESULT_ID:[a-zA-Z0-9_]*]] = OpFunctionCall %[[UINT_TYPE_ID]] %[[GET_LOCAL_SIZE_ID:[a-zA-Z0-9_]*]] %[[LOAD1_ID]]
 // CHECK: OpStore {{.*}} %[[CONSTANT_1_ID]]
 

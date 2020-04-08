@@ -13,7 +13,7 @@
 // CHECK-DAG: %[[CONSTANT_16_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 16
 // CHECK-DAG: %[[CONSTANT_65535_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 65535
 // CHECK-DAG: %[[CONSTANT_64_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 64
-// CHECK: %[[N:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
+// CHECK: %[[N:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]]
 // CHECK: %[[B:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]]
 // CHECK: %[[INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[FLOAT2_TYPE_ID]] %[[B]] %[[UNDEF_ID]] 0
 // CHECK: %[[PACKED_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] {{.*}} PackHalf2x16 %[[INSERT_ID]]

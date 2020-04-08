@@ -39,7 +39,7 @@
 // CHECK:     %[[__original_id_53:[0-9]+]] = OpIMul %[[uint]] %[[__original_id_42]] %[[__original_id_36]]
 // CHECK:     %[[__original_id_54:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_53]] %[[__original_id_40]]
 // CHECK:     %[[__original_id_55:[0-9]+]] = OpBitwiseXor %[[uint]] %[[__original_id_42]] %[[uint_4294967295]]
-// CHECK:     %[[__original_id_56:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_55]] %[[__original_id_38:[0-9]+]]
+// CHECK:     %[[__original_id_56:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_38:[0-9]+]] %[[__original_id_55]]
 // CHECK:     %[[__original_id_57:[0-9]+]] = OpISub %[[uint]] %[[uint_3]] %[[__original_id_38]]
 // CHECK:     %[[__original_id_58:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_57]] %[[__original_id_40]]
 // CHECK:     %[[__original_id_59:[0-9]+]] = OpISub %[[uint]] %[[__original_id_56]] %[[__original_id_58]]

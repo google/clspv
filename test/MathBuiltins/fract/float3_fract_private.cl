@@ -16,8 +16,7 @@ void kernel foo(global float3* A, global float3* B, float3 x)
 // CHECK-DAG: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v3float]] [[_float_1]] [[_float_1]] [[_float_1]]
 // CHECK: [[_28:%[a-zA-Z0-9_]+]] = OpAccessChain
 // CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpAccessChain
-// CHECK: [[_30:%[a-zA-Z0-9_]+]] = OpAccessChain
-// CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpLoad [[_v3float]] [[_30]]
+// CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v3float]]
 // CHECK: [[_32:%[a-zA-Z0-9_]+]] = OpExtInst [[_v3float]] [[_1]] Floor [[_31]]
 // CHECK: [[_33:%[a-zA-Z0-9_]+]] = OpExtInst [[_v3float]] [[_1]] Fract [[_31]]
 // CHECK: [[_34:%[a-zA-Z0-9_]+]] = OpExtInst [[_v3float]] [[_1]] FMin [[_33]] [[_17]]

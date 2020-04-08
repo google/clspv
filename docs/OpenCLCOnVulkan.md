@@ -98,11 +98,12 @@ following way:
 
 Note: `-pod-ubo` and `-pod-pushconstant` are exclusive options.
 
-Note: If `-cluster-pod-kernel-args` is used, then all plain-old-data kernel
-arguments are collected into a single structure to be passed in to the compute
-shader as a single storage buffer resource.
+Note: By default, all plain-old-data kernel arguments are collected into a
+single structure to be passed in to the compute shader as a single resource. If
+`-cluster-pod-kernel-args=0` is specified, each plain-old-data argument will be
+passed in a via a unique resource.
 
-Note: `-pod-pushconstant` requires `-cluster-pod-kernel-args` to be specified.
+Note: `-pod-pushconstant` cannot be specified with `-cluster-pod-kernel-args=0`.
 
 ## OpenCL C Modifications
 
@@ -290,7 +291,7 @@ argument as `pod_ubo` rather than the default of `pod`.
 
 Normally plain-old-data arguments are passed into the kernel via a storage buffer.
 Use the option `-pod-pushconstant` to pass these parameters in via push constants. The
-option `-cluster-pod-kernel-args` must also be specified. Push constants are intended
+option `-cluster-pod-kernel-args=0` cannot be specified. Push constants are intended
 to provide a fast read path and should be faster to access than a buffer.
 
 When the option `-pod-pushconstant` is used, the descriptor map lists the `argKind` of
@@ -335,6 +336,8 @@ When the option is used:
   - The binding number for the struct containing the POD arguments is one more
     than the highest non-POD argument.
 
+By default this option is enabled. To disable this behavior, pass
+`-cluster-pod-kernel-args=0` to the compiler.
 
 #### Example descriptor set mapping
 
@@ -346,21 +349,21 @@ For example:
 In the default case, the bindings are:
 
 - `a` is mapped to a storage buffer with descriptor set 0, binding 0
-- `f` is mapped to a storage buffer with descriptor set 0, binding 1
-- `b` is mapped to a storage buffer with descriptor set 0, binding 2
-- `c` is mapped to a storage buffer with descriptor set 0, binding 3
-
-If `-cluster-pod-kernel-args` is used:
-
-- `a` is mapped to a storage buffer with descriptor set 0, binding 0
 - `b` is mapped to a storage buffer with descriptor set 0, binding 1
 - `f` and `c` are POD arguments, so they are mapped to the first and
   second members of a struct, and that struct is mapped to a storage
   buffer with descriptor set 0 and binding 2
 
+If `-cluster-pod-kernel-args=0` is used:
+
+- `a` is mapped to a storage buffer with descriptor set 0, binding 0
+- `f` is mapped to a storage buffer with descriptor set 0, binding 1
+- `b` is mapped to a storage buffer with descriptor set 0, binding 2
+- `c` is mapped to a storage buffer with descriptor set 0, binding 3
+
 That is, compiling as follows:
 
-    clspv foo.cl -cluster-pod-kernel-args -descriptormap=myclusteredmap
+    clspv foo.cl -descriptormap=myclusteredmap
 
 will produce the following in `myclusteredmap`:
 
@@ -377,7 +380,7 @@ use descriptor set 1.
 
 Compiling with the same sampler map from before:
 
-    clspv foo.cl -cluster-pod-kernel-args -descriptormap=myclusteredmap -samplermap=mysamplermap
+    clspv foo.cl -descriptormap=myclusteredmap -samplermap=mysamplermap
 
 produces the following descriptor map:
 

@@ -10,7 +10,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 // CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK:  OpLoad [[_uint]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]]
 // CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpBitcast [[_float]] [[_24]]
 // CHECK:  OpStore {{.*}} [[_25]]

@@ -7,7 +7,7 @@ kernel void foo(global float *A, float x, float y) {
   *A = fmod(x,y);
 }
 // CHECK-DAG: [[_float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[_26:%[a-zA-Z0-9_]+]] = OpLoad [[_float]]
-// CHECK: [[_28:%[a-zA-Z0-9_]+]] = OpLoad [[_float]]
+// CHECK: [[_26:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_float]]
+// CHECK: [[_28:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_float]]
 // CHECK: [[_29:%[a-zA-Z0-9_]+]] = OpFRem [[_float]] [[_26]] [[_28]]
 // CHECK: OpStore {{.*}} [[_29]]

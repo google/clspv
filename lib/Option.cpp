@@ -193,7 +193,7 @@ static llvm::cl::opt<bool>
 static bool use_sampler_map = false;
 
 static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
-    "cluster-pod-kernel-args", llvm::cl::init(false),
+    "cluster-pod-kernel-args", llvm::cl::init(true),
     llvm::cl::desc("Collect plain-old-data kernel arguments into a struct in "
                    "a single storage buffer, using a binding number after "
                    "other arguments. Use this to reduce storage buffer "

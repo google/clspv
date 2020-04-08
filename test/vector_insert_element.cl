@@ -5,7 +5,7 @@
 
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
-// CHECK: %[[LOAD_ARG0_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]]
+// CHECK: %[[LOAD_ARG0_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[FLOAT_TYPE_ID]]
 // CHECK: %[[LOAD_ARG1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]]
 // CHECK: %[[COMPOSITE_INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[FLOAT_VECTOR_TYPE_ID]] %[[LOAD_ARG0_ID]] %[[LOAD_ARG1_ID]] 1
 // CHECK:         OpStore  {{.*}} %[[COMPOSITE_INSERT_ID]] 

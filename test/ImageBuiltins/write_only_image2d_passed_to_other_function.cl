@@ -24,6 +24,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image2
 // CHECK:  OpImageWrite [[_26]] [[_23]] [[_24]]
 // CHECK:  = OpFunction
 // CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpLoad [[_v2uint]]
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2uint]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]]
 // CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpFunctionCall {{.*}} [[_21]] [[_29]] [[_31]] [[_33]]

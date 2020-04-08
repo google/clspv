@@ -14,7 +14,7 @@ void kernel foo(global float4* A, global float4* B, float4 x)
 // CHECK-DAG: [[_v4float:%[a-zA-Z0-9_]+]] = OpTypeVector [[_float]] 4
 // CHECK-DAG: [[_float_1:%[a-zA-Z0-9_]+]] = OpConstant [[_float]] {{1|0.99999}}
 // CHECK-DAG: [[_17:%[a-zA-Z0-9_]+]] = OpConstantComposite [[_v4float]] [[_float_1]] [[_float_1]] [[_float_1]] [[_float_1]]
-// CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpLoad [[_v4float]]
+// CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v4float]]
 // CHECK: [[_32:%[a-zA-Z0-9_]+]] = OpExtInst [[_v4float]] [[_1]] Floor [[_31]]
 // CHECK: [[_33:%[a-zA-Z0-9_]+]] = OpExtInst [[_v4float]] [[_1]] Fract [[_31]]
 // CHECK: [[_34:%[a-zA-Z0-9_]+]] = OpExtInst [[_v4float]] [[_1]] FMin [[_33]] [[_17]]

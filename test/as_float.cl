@@ -13,5 +13,5 @@ kernel void foo(global float *A, uint a) {
 
 // CHECK-DAG: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[int]]
+// CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]]
 // CHECK: OpBitcast [[float]] [[ld]]

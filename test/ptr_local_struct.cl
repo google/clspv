@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -descriptormap=%t2.map
+// RUN: clspv %s -o %t.spv -descriptormap=%t2.map -cluster-pod-kernel-args=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck %s < %t2.map -check-prefix=MAP
