@@ -231,8 +231,10 @@ private:
       if (auto struct_ty = dyn_cast<StructType>(constructed_type)) {
         for (unsigned i = 0; i != num_elements; ++i)
           elements.push_back(struct_ty->getTypeAtIndex(i));
-      } else {
+      } else if (isa<ArrayType>(constructed_type)) {
         elements.resize(num_elements, constructed_type->getArrayElementType());
+      } else if (isa<VectorType>(constructed_type)) {
+        elements.resize(num_elements, constructed_type->getVectorElementType());
       }
       FunctionType *fnTy = FunctionType::get(constructed_type, elements, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
