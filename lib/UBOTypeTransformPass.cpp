@@ -479,18 +479,26 @@ Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
     return undef_constant;
   } else if (auto *agg_constant = dyn_cast<ConstantAggregate>(constant)) {
     auto *struct_ty = dyn_cast<StructType>(constant->getType());
-    auto *seq_ty = dyn_cast<SequentialType>(constant->getType());
+    auto *arr_ty = dyn_cast<ArrayType>(constant->getType());
+    auto *vec_ty = dyn_cast<VectorType>(constant->getType());
     // CompositeType doesn't implement getNumElements().
-    unsigned num_elements =
-        struct_ty ? struct_ty->getNumElements() : seq_ty->getNumElements();
+    unsigned num_elements = 0;
+    if (struct_ty)
+      num_elements = struct_ty->getNumElements();
+    else if (arr_ty)
+      num_elements = arr_ty->getNumElements();
+    else if (vec_ty)
+      num_elements = vec_ty->getNumElements();
     SmallVector<Constant *, 8> rebuilt_constants;
     for (unsigned i = 0; i != num_elements; ++i) {
       Constant *element_constant = agg_constant->getAggregateElement(i);
       Type *remapped_ele_ty = nullptr;
       if (struct_ty) {
         remapped_ele_ty = cast<StructType>(remapped_ty)->getTypeAtIndex(i);
-      } else {
-        remapped_ele_ty = cast<SequentialType>(remapped_ty)->getElementType();
+      } else if (arr_ty) {
+        remapped_ele_ty = remapped_ty->getArrayElementType();
+      } else if (vec_ty) {
+        remapped_ele_ty = remapped_ty->getVectorElementType();
       }
       if (remapped_ele_ty != element_constant->getType()) {
         rebuilt_constants.push_back(

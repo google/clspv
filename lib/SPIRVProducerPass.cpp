@@ -3203,7 +3203,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
       SPIRVOperandList Ops;
       uint32_t result_type_id =
-          lookupType(Ty->getPointerElementType()->getSequentialElementType());
+          lookupType(Ty->getPointerElementType()->getVectorElementType());
 
       // X Dimension
       Ops << MkId(result_type_id) << MkNum(1);
@@ -5653,9 +5653,9 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
     if (auto *ptrTy = dyn_cast<PointerType>(type)) {
       elemTy = ptrTy->getElementType();
     } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
-      elemTy = arrayTy->getArrayElementType();
-    } else if (auto *seqTy = dyn_cast<SequentialType>(type)) {
-      elemTy = seqTy->getSequentialElementType();
+      elemTy = arrayTy->getElementType();
+    } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
+      elemTy = vecTy->getElementType();
     } else {
       errs() << "Unhandled strided type " << *type << "\n";
       llvm_unreachable("Unhandled strided type");
@@ -6131,7 +6131,7 @@ bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
     return true;
   }
   case Type::ArrayTyID:
-    return IsTypeNullable(cast<SequentialType>(type)->getElementType());
+    return IsTypeNullable(type->getArrayElementType());
   case Type::StructTyID: {
     const StructType *struct_type = cast<StructType>(type);
     // Images and samplers are not nullable.

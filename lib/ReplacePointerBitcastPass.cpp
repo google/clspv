@@ -351,9 +351,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     Type *SrcTy = Src->getType()->getPointerElementType();
     Type *DstTy = Inst->getType()->getPointerElementType();
     Type *SrcEleTy =
-        SrcTy->isVectorTy() ? SrcTy->getSequentialElementType() : SrcTy;
+        SrcTy->isVectorTy() ? SrcTy->getVectorElementType() : SrcTy;
     Type *DstEleTy =
-        DstTy->isVectorTy() ? DstTy->getSequentialElementType() : DstTy;
+        DstTy->isVectorTy() ? DstTy->getVectorElementType() : DstTy;
     // These are bit widths of the source and destination types, even
     // if they are vector types.  E.g. bit width of float4 is 64.
     unsigned SrcTyBitWidth = DL.getTypeStoreSizeInBits(SrcTy);

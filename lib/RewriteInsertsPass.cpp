@@ -105,8 +105,10 @@ private:
     // do.
     if (auto *struct_ty = dyn_cast<StructType>(type)) {
       return struct_ty->getNumElements();
-    } else if (auto *seq_ty = dyn_cast<SequentialType>(type)) {
-      return seq_ty->getNumElements();
+    } else if (auto *array_ty = dyn_cast<ArrayType>(type)) {
+      return array_ty->getNumElements();
+    } else if (auto *vec_ty = dyn_cast<VectorType>(type)) {
+      return vec_ty->getNumElements();
     }
     return 0;
   }
@@ -229,10 +231,10 @@ private:
       if (auto struct_ty = dyn_cast<StructType>(constructed_type)) {
         for (unsigned i = 0; i != num_elements; ++i)
           elements.push_back(struct_ty->getTypeAtIndex(i));
-      } else {
-        elements.resize(
-            num_elements,
-            cast<SequentialType>(constructed_type)->getElementType());
+      } else if (isa<ArrayType>(constructed_type)) {
+        elements.resize(num_elements, constructed_type->getArrayElementType());
+      } else if (isa<VectorType>(constructed_type)) {
+        elements.resize(num_elements, constructed_type->getVectorElementType());
       }
       FunctionType *fnTy = FunctionType::get(constructed_type, elements, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);

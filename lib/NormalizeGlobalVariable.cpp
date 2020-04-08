@@ -30,7 +30,7 @@ namespace {
 // nullptr if there is no such type.
 Type *SoleContainedType(Type *type) {
   if (auto *array_ty = dyn_cast<ArrayType>(type)) {
-    return SoleContainedType(array_ty->getSequentialElementType());
+    return SoleContainedType(array_ty->getArrayElementType());
   } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
     Type *unique_ty = nullptr;
     for (auto ele_ty : struct_ty->elements()) {
@@ -97,7 +97,7 @@ Constant *BuildConstant(Type *new_type, const std::vector<Constant *> elements,
     if (type->isStructTy()) {
       return type->getContainedType(element);
     } else if (type->isArrayTy()) {
-      return type->getSequentialElementType();
+      return type->getArrayElementType();
     }
     return type;
   };
