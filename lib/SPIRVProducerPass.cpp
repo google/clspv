@@ -104,7 +104,7 @@ enum SPIRVSection {
   kAnnotations,
 
   kTypes,
-  kConstants,
+  kConstants = kTypes,
   kGlobalVariables,
 
   kFunctions,
