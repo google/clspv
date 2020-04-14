@@ -37,4 +37,3 @@ SpecConstant GetSpecConstantFromName(const std::string &);
 } // namespace clspv
 
 #endif // CLSPV_INCLUDE_CLSPV_SPEC_CONSTANT_H_
-
