@@ -152,7 +152,8 @@ bool UndoByvalPass::runOnModule(Module &M) {
           auto Arg = CS.getArgument(i);
 
           if (CS.isByValArgument(i)) {
-            Args.push_back(new LoadInst(Arg, "", Call));
+            Args.push_back(new LoadInst(Arg->getType()->getPointerElementType(),
+                                        Arg, "", Call));
           } else {
             Args.push_back(Arg);
           }

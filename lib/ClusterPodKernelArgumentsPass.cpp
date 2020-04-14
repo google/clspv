@@ -359,7 +359,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
   // Inline the inner function.  It's cleaner to do this.
   for (CallInst *C : CallList) {
     InlineFunctionInfo info;
-    Changed |= InlineFunction(C, info).isSuccess();
+    Changed |= InlineFunction(*C, info).isSuccess();
   }
 
   return Changed;

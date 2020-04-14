@@ -72,9 +72,8 @@ bool InlineEntryPointsPass::InlineFunctions(Module &M) {
 
   for (auto call : to_inline) {
     InlineFunctionInfo IFI;
-    CallSite CS(call);
     // Disable generation of lifetime intrinsic.
-    Changed |= InlineFunction(CS, IFI, nullptr, false).isSuccess();
+    Changed |= InlineFunction(*call, IFI, nullptr, false).isSuccess();
   }
 
   return Changed;

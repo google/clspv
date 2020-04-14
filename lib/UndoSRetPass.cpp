@@ -130,7 +130,7 @@ bool UndoSRetPass::runOnModule(Module &M) {
         // %retv = load %retval;
         // ret %retv;
         for (auto Ret : RetInsts) {
-          LoadInst *LD = new LoadInst(VMap[RetVal], "", Ret);
+          LoadInst *LD = new LoadInst(RetTy, VMap[RetVal], "", Ret);
           ReturnInst *NewRet = ReturnInst::Create(Context, LD, Ret);
           Ret->replaceAllUsesWith(NewRet);
           Ret->eraseFromParent();
