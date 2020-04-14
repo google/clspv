@@ -124,9 +124,8 @@ struct DescriptorMapEntry {
         sampler_data(std::move(data)) {}
 
   DescriptorMapEntry(SpecConstantData &&data)
-    : kind(SpecConstant), descriptor_set(-1), binding(-1),
-      spec_constant_data(std::move(data)) {}
-
+      : kind(SpecConstant), descriptor_set(-1), binding(-1),
+        spec_constant_data(std::move(data)) {}
 };
 
 std::ostream &operator<<(std::ostream &str,

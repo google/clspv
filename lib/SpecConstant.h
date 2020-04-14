@@ -31,7 +31,8 @@ void AddWorkgroupSpecConstants(llvm::Module *module);
 uint32_t AllocateSpecConstant(llvm::Module *module, SpecConstant kind);
 
 // Returns the allocated specializations ids.
-std::vector<std::pair<SpecConstant, uint32_t>> GetSpecConstants(llvm::Module *module);
+std::vector<std::pair<SpecConstant, uint32_t>>
+GetSpecConstants(llvm::Module *module);
 
 } // namespace clspv
 

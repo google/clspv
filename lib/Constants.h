@@ -58,10 +58,14 @@ inline std::string PushConstantsVariableName() { return "__push_constants"; }
 inline std::string PushConstantsMetadataName() { return "push_constants"; }
 
 // Name for module level metadata storing next spec constant id.
-inline std::string NextSpecConstantMetadataName() { return "clspv.next_spec_constant_id"; }
+inline std::string NextSpecConstantMetadataName() {
+  return "clspv.next_spec_constant_id";
+}
 
 // Name for module level metadata store list of allocated spec constants.
-inline std::string SpecConstantMetadataName() { return "clspv.spec_constant_list"; }
+inline std::string SpecConstantMetadataName() {
+  return "clspv.spec_constant_list";
+}
 
 } // namespace clspv
 

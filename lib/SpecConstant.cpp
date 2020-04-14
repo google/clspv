@@ -33,7 +33,8 @@ void InitSpecConstantMetadata(Module *module) {
   auto id_md = MDTuple::get(module->getContext(), {id_const});
   next_spec_id_md->addOperand(id_md);
 
-  auto spec_constant_list_md = module->getOrInsertNamedMetadata(clspv::SpecConstantMetadataName());
+  auto spec_constant_list_md =
+      module->getOrInsertNamedMetadata(clspv::SpecConstantMetadataName());
   spec_constant_list_md->clearOperands();
 }
 
@@ -43,16 +44,17 @@ namespace clspv {
 
 const char *GetSpecConstantName(SpecConstant kind) {
   switch (kind) {
-    case SpecConstant::kWorkgroupSizeX:
-      return "workgroup_size_x";
-    case SpecConstant::kWorkgroupSizeY:
-      return "workgroup_size_y";
-    case SpecConstant::kWorkgroupSizeZ:
-      return "workgroup_size_z";
-    case SpecConstant::kLocalMemorySize:
-      return "local_memory_size";
+  case SpecConstant::kWorkgroupSizeX:
+    return "workgroup_size_x";
+  case SpecConstant::kWorkgroupSizeY:
+    return "workgroup_size_y";
+  case SpecConstant::kWorkgroupSizeZ:
+    return "workgroup_size_z";
+  case SpecConstant::kLocalMemorySize:
+    return "local_memory_size";
   }
-  llvm::errs() << "Unhandled case in clspv::GetSpecConstantName: " << int(kind) << "\n";
+  llvm::errs() << "Unhandled case in clspv::GetSpecConstantName: " << int(kind)
+               << "\n";
   return "";
 }
 
@@ -66,7 +68,8 @@ SpecConstant GetSpecConstantFromName(const std::string &name) {
   else if (name == "local_memory_size")
     return SpecConstant::kLocalMemorySize;
 
-  llvm::errs() << "Unhandled csae in clspv::GetSpecConstantFromName: " << name << "\n";
+  llvm::errs() << "Unhandled csae in clspv::GetSpecConstantFromName: " << name
+               << "\n";
   return SpecConstant::kWorkgroupSizeX;
 }
 
@@ -136,9 +139,11 @@ uint32_t AllocateSpecConstant(Module *module, SpecConstant kind) {
   return next_id;
 }
 
-std::vector<std::pair<SpecConstant, uint32_t>> GetSpecConstants(Module *module) {
+std::vector<std::pair<SpecConstant, uint32_t>>
+GetSpecConstants(Module *module) {
   std::vector<std::pair<SpecConstant, uint32_t>> spec_constants;
-  auto spec_constant_md = module->getNamedMetadata(clspv::SpecConstantMetadataName());
+  auto spec_constant_md =
+      module->getNamedMetadata(clspv::SpecConstantMetadataName());
   if (!spec_constant_md)
     return spec_constants;
 
