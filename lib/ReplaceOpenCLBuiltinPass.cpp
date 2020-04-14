@@ -1469,7 +1469,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
       auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg0, "", CI);
 
       // Load from the short* we casted to.
-      auto Load = new LoadInst(Index, "", CI);
+      auto Load = new LoadInst(ShortTy, Index, "", CI);
 
       // ZExt the short -> int.
       auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
@@ -1511,7 +1511,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
       auto Ptr = GetElementPtrInst::Create(IntTy, Cast, IndexIntoI32, "", CI);
 
       // Load from the int* we casted to.
-      auto Load = new LoadInst(Ptr, "", CI);
+      auto Load = new LoadInst(IntTy, Ptr, "", CI);
 
       // Get our float2.
       auto Call = CallInst::Create(NewF, Load, "", CI);
@@ -1546,7 +1546,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg0, "", CI);
 
     // Load from the int* we casted to.
-    auto Load = new LoadInst(Index, "", CI);
+    auto Load = new LoadInst(IntTy, Index, "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = "spirv.unpack.v2f16";
@@ -1581,7 +1581,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
 
     // Load from the int2* we casted to.
-    auto Load = new LoadInst(Index, "", CI);
+    auto Load = new LoadInst(Int2Ty, Index, "", CI);
 
     // Extract each element from the loaded int2.
     auto X =
@@ -1627,7 +1627,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     auto IndexedPtr = GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
-    auto Load = new LoadInst(IndexedPtr, "", CI);
+    auto Load = new LoadInst(IntTy, IndexedPtr, "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = "spirv.unpack.v2f16";
@@ -1660,7 +1660,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     auto IndexedPtr = GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
-    auto Load = new LoadInst(IndexedPtr, "", CI);
+    auto Load = new LoadInst(Int2Ty, IndexedPtr, "", CI);
 
     // Extract each element from the loaded int2.
     auto X =
@@ -1785,7 +1785,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
           CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
       auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32,
                                               "base_i32_ptr", CI);
-      auto CurrentValue = new LoadInst(OutPtr, "current_value", CI);
+      auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
       auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
       auto MaskBitsToWrite =
           BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);

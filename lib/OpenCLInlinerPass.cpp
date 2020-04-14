@@ -68,7 +68,7 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
 
       for (CallInst *CI : Calls) {
         InlineFunctionInfo info;
-        changed |= InlineFunction(CI, info).isSuccess();
+        changed |= InlineFunction(*CI, info).isSuccess();
       }
       func_list.push_front(&F);
     }

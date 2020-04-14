@@ -177,8 +177,7 @@ bool MultiVersionUBOFunctionsPass::AnalyzeCall(
 
 void MultiVersionUBOFunctionsPass::InlineCallSite(CallInst *call) {
   InlineFunctionInfo IFI;
-  CallSite CS(call);
-  InlineFunction(CS, IFI, nullptr, false);
+  InlineFunction(*call, IFI, nullptr, false);
 }
 
 void MultiVersionUBOFunctionsPass::SpecializeCall(
