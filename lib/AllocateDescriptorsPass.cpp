@@ -33,6 +33,7 @@
 #include "Constants.h"
 #include "DescriptorCounter.h"
 #include "Passes.h"
+#include "SpecConstant.h"
 
 using namespace llvm;
 
@@ -840,16 +841,15 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     outs() << "Allocate local kernel arg spec ids\n";
   }
 
-  int next_id = clspv::FirstLocalSpecId();
   // Maps argument type to assigned SpecIds.
-  DenseMap<Type *, SmallVector<int, 4>> spec_id_types;
+  DenseMap<Type *, SmallVector<uint32_t, 4>> spec_id_types;
   // Tracks SpecIds assigned in the current function.
   DenseSet<int> function_spec_ids;
   // Tracks newly allocated spec ids.
-  std::vector<std::pair<Type *, int>> function_allocations;
+  std::vector<std::pair<Type *, uint32_t>> function_allocations;
 
   // Allocates a SpecId for |type|.
-  auto GetSpecId = [&next_id, &spec_id_types, &function_spec_ids,
+  auto GetSpecId = [&M, &spec_id_types, &function_spec_ids,
                     &function_allocations](Type *type) {
     const bool always_distinct_sets =
         clspv::Option::DistinctKernelDescriptorSets();
@@ -866,9 +866,11 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     }
 
     // Need to allocate a new SpecId.
-    function_allocations.push_back(std::make_pair(type, next_id));
-    function_spec_ids.insert(next_id);
-    return next_id++;
+    uint32_t spec_id =
+        clspv::AllocateSpecConstant(&M, clspv::SpecConstant::kLocalMemorySize);
+    function_allocations.push_back(std::make_pair(type, spec_id));
+    function_spec_ids.insert(spec_id);
+    return spec_id;
   };
 
   IRBuilder<> Builder(M.getContext());

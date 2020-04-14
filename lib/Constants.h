@@ -46,10 +46,6 @@ inline std::string LiteralSamplerFunction() {
 // Base name for SPIR-V intrinsic functions
 inline std::string SPIRVOpIntrinsicFunction() { return "spirv.op."; }
 
-// The first useable SpecId for pointer-to-local arguments.
-// 0, 1 and 2 are reserved for workgroup size.
-inline int FirstLocalSpecId() { return 3; }
-
 // Name of the literal sampler initializer function.
 inline std::string TranslateSamplerInitializerFunction() {
   return "__translate_sampler_initializer";
@@ -60,6 +56,12 @@ inline std::string PushConstantsVariableName() { return "__push_constants"; }
 
 // Name for module level metadata storing push constant indices.
 inline std::string PushConstantsMetadataName() { return "push_constants"; }
+
+// Name for module level metadata storing next spec constant id.
+inline std::string NextSpecConstantMetadataName() { return "clspv.next_spec_constant_id"; }
+
+// Name for module level metadata store list of allocated spec constants.
+inline std::string SpecConstantMetadataName() { return "clspv.spec_constant_list"; }
 
 } // namespace clspv
 

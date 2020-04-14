@@ -40,6 +40,9 @@ std::ostream &operator<<(std::ostream &str,
   case DescriptorMapEntry::Kind::PushConstant:
     str << "pushconstant";
     break;
+  case DescriptorMapEntry::Kind::SpecConstant:
+    str << "spec_constant";
+    break;
   default:
     assert(0 && "Unhandled descriptor map entry kind.");
     break;
@@ -143,6 +146,12 @@ std::ostream &operator<<(std::ostream &str, const DescriptorMapEntry &entry) {
     const auto &data = entry.push_constant_data;
     str << "name," << GetPushConstantName(data.pc) << ",offset," << data.offset
         << ",size," << data.size;
+    break;
+  }
+  case DescriptorMapEntry::Kind::SpecConstant: {
+    const auto &data = entry.spec_constant_data;
+    str << GetSpecConstantName(data.spec_constant) << ",spec_id,"
+        << data.spec_id;
     break;
   }
   default:

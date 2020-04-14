@@ -59,6 +59,7 @@
 #include "DescriptorCounter.h"
 #include "NormalizeGlobalVariable.h"
 #include "Passes.h"
+#include "SpecConstant.h"
 #include "Types.h"
 
 #if defined(_MSC_VER)
@@ -311,7 +312,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), max_local_spec_id_(0) {}
+        WorkgroupSizeVarID(0) {}
 
   virtual ~SPIRVProducerPass() {
     for (int i = 0; i < kSectionCount; ++i) {
@@ -419,9 +420,10 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateSPIRVTypes(LLVMContext &context, Module &module);
   void GenerateSPIRVConstants();
   void GenerateModuleInfo(Module &M);
-  void GeneratePushConstantDescriptormapEntries(Module &M);
+  void GeneratePushConstantDescriptorMapEntries(Module &M);
+  void GenerateSpecConstantDescriptorMapEntries(Module &M);
   void GenerateGlobalVar(GlobalVariable &GV);
-  void GenerateWorkgroupVars();
+  void GenerateWorkgroupVars(Module &M);
   // Generate descriptor map entries for resource variables associated with
   // arguments to F.
   void GenerateDescriptorMapInfo(const DataLayout &DL, Function &F);
@@ -437,7 +439,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
-  void HandleDeferredDecorations(const DataLayout &DL);
+  void HandleDeferredDecorations(Module &module);
   bool is4xi8vec(Type *Ty) const;
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
@@ -615,8 +617,6 @@ private:
   // map it to the variable id it should load from.
   DenseMap<CallInst *, uint32_t> ResourceVarDeferredLoadCalls;
 
-  // One larger than the maximum used SpecId for pointer-to-local arguments.
-  int max_local_spec_id_;
   // An ordered list of the kernel arguments of type pointer-to-local.
   using LocalArgList = SmallVector<Argument *, 8>;
   LocalArgList LocalArgs;
@@ -720,14 +720,14 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   GenerateSamplers(module);
 
   // Generate descriptor map entries for all push constants
-  GeneratePushConstantDescriptormapEntries(module);
+  GeneratePushConstantDescriptorMapEntries(module);
 
   // Generate SPIRV variables.
   for (GlobalVariable &GV : module.globals()) {
     GenerateGlobalVar(GV);
   }
   GenerateResourceVars(module);
-  GenerateWorkgroupVars();
+  GenerateWorkgroupVars(module);
 
   // Generate SPIRV instructions for each function.
   for (Function &F : module) {
@@ -748,7 +748,10 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   HandleDeferredInstruction();
-  HandleDeferredDecorations(DL);
+  HandleDeferredDecorations(module);
+
+  // Generate descriptor map entries for module scope specialization constants.
+  GenerateSpecConstantDescriptorMapEntries(module);
 
   // Generate SPIRV module information.
   GenerateModuleInfo(module);
@@ -1563,7 +1566,6 @@ void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
     int spec_id = static_cast<int>(
         cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
 
-    max_local_spec_id_ = std::max(max_local_spec_id_, spec_id + 1);
     LocalArgSpecIds[arg] = spec_id;
     if (LocalSpecIdInfoMap.count(spec_id))
       continue;
@@ -2410,8 +2412,13 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
   }
 
   // Generate types for pointer-to-local arguments.
-  for (auto spec_id = clspv::FirstLocalSpecId(); spec_id < max_local_spec_id_;
-       ++spec_id) {
+  for (auto pair : clspv::GetSpecConstants(&module)) {
+    auto kind = pair.first;
+    auto spec_id = pair.second;
+
+    if (kind != SpecConstant::kLocalMemorySize)
+      continue;
+
     LocalArgInfo &arg_info = LocalSpecIdInfoMap[spec_id];
 
     // Generate the spec constant.
@@ -3060,7 +3067,7 @@ bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
 
 } // namespace
 
-void SPIRVProducerPass::GeneratePushConstantDescriptormapEntries(Module &M) {
+void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries(Module &M) {
 
   if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
     auto const &DL = M.getDataLayout();
@@ -3082,6 +3089,20 @@ void SPIRVProducerPass::GeneratePushConstantDescriptormapEntries(Module &M) {
       version0::DescriptorMapEntry::PushConstantData data = {pc, offset, size};
       descriptorMapEntries->emplace_back(std::move(data));
     }
+  }
+}
+
+void SPIRVProducerPass::GenerateSpecConstantDescriptorMapEntries(Module &M) {
+  for (auto pair : clspv::GetSpecConstants(&M)) {
+    auto kind = pair.first;
+    auto id = pair.second;
+
+    // Local memory size is only used for kernel arguments.
+    if (kind == SpecConstant::kLocalMemorySize)
+      continue;
+
+    version0::DescriptorMapEntry::SpecConstantData data = {kind, id};
+    descriptorMapEntries->emplace_back(std::move(data));
   }
 }
 
@@ -3190,6 +3211,9 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       uint32_t XDimCstID = 0;
       uint32_t YDimCstID = 0;
       uint32_t ZDimCstID = 0;
+
+      // Allocate spec constants for workgroup size.
+      clspv::AddWorkgroupSpecConstants(&M);
 
       SPIRVOperandList Ops;
       uint32_t result_type_id =
@@ -3329,10 +3353,19 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   }
 }
 
-void SPIRVProducerPass::GenerateWorkgroupVars() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
-  for (auto spec_id = clspv::FirstLocalSpecId(); spec_id < max_local_spec_id_;
-       ++spec_id) {
+void SPIRVProducerPass::GenerateWorkgroupVars(Module &M) {
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  auto spec_constant_md = M.getNamedMetadata(clspv::SpecConstantMetadataName());
+  if (!spec_constant_md)
+    return;
+
+  for (auto pair : clspv::GetSpecConstants(&M)) {
+    auto kind = pair.first;
+    auto spec_id = pair.second;
+
+    if (kind != SpecConstant::kLocalMemorySize)
+      continue;
+
     LocalArgInfo &info = LocalSpecIdInfoMap[spec_id];
 
     // Generate OpVariable.
@@ -5567,7 +5600,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
   }
 }
 
-void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
+void SPIRVProducerPass::HandleDeferredDecorations(Module &module) {
+  const auto &DL = module.getDataLayout();
   if (getTypesNeedingArrayStride().empty() && LocalArgSpecIds.empty()) {
     return;
   }
@@ -5605,8 +5639,13 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
   }
 
   // Emit SpecId decorations targeting the array size value.
-  for (auto spec_id = clspv::FirstLocalSpecId(); spec_id < max_local_spec_id_;
-       ++spec_id) {
+  for (auto pair : clspv::GetSpecConstants(&module)) {
+    auto kind = pair.first;
+    auto spec_id = pair.second;
+
+    if (kind != SpecConstant::kLocalMemorySize)
+      continue;
+
     LocalArgInfo &arg_info = LocalSpecIdInfoMap[spec_id];
     SPIRVOperandList Ops;
     Ops << MkId(arg_info.array_size_id) << MkNum(spv::DecorationSpecId)
