@@ -3601,7 +3601,6 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
   EntryPointVecType &EntryPoints = getEntryPointVec();
   ValueMapType &VMap = getValueMap();
   ValueList &EntryPointInterfaces = getEntryPointInterfacesVec();
-  uint32_t &ExtInstImportID = getOpExtInstImportID();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
 
   SPIRVInstructionList &SPIRVCapabilities = getSPIRVInstList(kCapabilities);
@@ -5574,9 +5573,6 @@ void SPIRVProducerPass::HandleDeferredDecorations(const DataLayout &DL) {
   }
 
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kAnnotations);
-
-  // Find an iterator pointing just past the last decoration.
-  bool seen_decorations = false;
 
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
