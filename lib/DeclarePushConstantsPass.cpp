@@ -54,12 +54,6 @@ ModulePass *createDeclarePushConstantsPass() {
 }
 } // namespace clspv
 
-bool DeclarePushConstantsPass::shouldDeclareDimensions(Module &M) {
-  bool isEnabled = clspv::Option::WorkDim();
-  bool isUsed = M.getFunction("_Z12get_work_dimv") != nullptr;
-  return isEnabled && isUsed;
-}
-
 bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
   bool isEnabled = ((clspv::Option::Language() ==
                      clspv::Option::SourceLanguage::OpenCL_C_20) ||
@@ -90,10 +84,6 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   if (shouldDeclareEnqueuedLocalSize(M)) {
     PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
-  }
-
-  if (shouldDeclareDimensions(M)) {
-    PushConstants.push_back(clspv::PushConstant::Dimensions);
   }
 
   if (PushConstants.size() > 0) {

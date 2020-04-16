@@ -1923,6 +1923,7 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
       .Case("__spirv_WorkgroupSize", spv::BuiltInWorkgroupSize)
       .Case("__spirv_NumWorkgroups", spv::BuiltInNumWorkgroups)
       .Case("__spirv_WorkgroupId", spv::BuiltInWorkgroupId)
+      .Case("__spirv_WorkDim", spv::BuiltInWorkDim)
       .Default(spv::BuiltInMax);
 }
 
@@ -3262,6 +3263,36 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
           new SPIRVInstruction(spv::OpSpecConstantComposite, nextID++, Ops);
       getSPIRVInstList(kConstants).push_back(Inst);
     }
+  } else if (BuiltinType == spv::BuiltInWorkDim) {
+    // 1. Generate a specialization constant with a default of 3.
+    // 2. Allocate and annotate a SpecId for the constant.
+    // 3. Use the spec constant as the initializer for the variable.
+    SPIRVOperandList Ops;
+
+    //
+    // Generate OpSpecConstant.
+    //
+    // Ops[0] : Result Type ID
+    // Ops[1] : Default literal value
+    InitializerID = nextID++;
+
+    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(3);
+
+    auto *Inst = new SPIRVInstruction(spv::OpSpecConstant, InitializerID, Ops);
+    getSPIRVInstList(kConstants).push_back(Inst);
+
+    //
+    // Generate SpecId decoration.
+    //
+    // Ops[0] : target
+    // Ops[1] : decoration
+    // Ops[2] : SpecId
+    auto spec_id = AllocateSpecConstant(&M, SpecConstant::kWorkDim);
+    Ops.clear();
+    Ops << MkId(InitializerID) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
+
+    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
+    getSPIRVInstList(kAnnotations).push_back(Inst);
   }
 
   VMap[&GV] = nextID;
@@ -3298,8 +3329,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   SPIRVInstList.push_back(Inst);
 
   SPIRVInstructionList &Annotations = getSPIRVInstList(kAnnotations);
-  // If we have a builtin.
-  if (spv::BuiltInMax != BuiltinType) {
+  // If we have a builtin (not WorkDim).
+  if (spv::BuiltInMax != BuiltinType && BuiltinType != spv::BuiltInWorkDim) {
     //
     // Generate OpDecorate.
     //

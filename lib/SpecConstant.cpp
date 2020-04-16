@@ -52,6 +52,8 @@ const char *GetSpecConstantName(SpecConstant kind) {
     return "workgroup_size_z";
   case SpecConstant::kLocalMemorySize:
     return "local_memory_size";
+  case SpecConstant::kWorkDim:
+    return "work_dim";
   }
   llvm::errs() << "Unhandled case in clspv::GetSpecConstantName: " << int(kind)
                << "\n";
@@ -67,6 +69,8 @@ SpecConstant GetSpecConstantFromName(const std::string &name) {
     return SpecConstant::kWorkgroupSizeZ;
   else if (name == "local_memory_size")
     return SpecConstant::kLocalMemorySize;
+  else if (name == "work_dim")
+    return SpecConstant::kWorkDim;
 
   llvm::errs() << "Unhandled csae in clspv::GetSpecConstantFromName: " << name
                << "\n";
