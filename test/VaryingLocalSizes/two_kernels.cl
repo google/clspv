@@ -23,10 +23,10 @@ void kernel bar(global uint* a)
 
 // CHECK: OpEntryPoint GLCompute [[_20:%[a-zA-Z0-9_]+]] "foo"
 // CHECK: OpEntryPoint GLCompute [[_32:%[a-zA-Z0-9_]+]] "bar"
+// CHECK: OpDecorate [[_gl_WorkGroupSize:%[a-zA-Z0-9_]+]] BuiltIn WorkgroupSize
 // CHECK: OpDecorate [[_14:%[a-zA-Z0-9_]+]] SpecId 0
 // CHECK: OpDecorate [[_15:%[a-zA-Z0-9_]+]] SpecId 1
 // CHECK: OpDecorate [[_16:%[a-zA-Z0-9_]+]] SpecId 2
-// CHECK: OpDecorate [[_gl_WorkGroupSize:%[a-zA-Z0-9_]+]] BuiltIn WorkgroupSize
 // CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
 // CHECK-DAG: [[_uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 1
