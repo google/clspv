@@ -28,6 +28,7 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK-DAG: OpDecorate [[data_var]] DescriptorSet 0
 // CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK: [[image:%[0-9a-zA-Z_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
+// CHECK: [[sampled_image:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[image]]
 // CHECK: [[image_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[image]]
 // CHECK: [[sampler:%[0-9a-zA-Z_]+]] = OpTypeSampler
 // CHECK: [[sampler_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[sampler]]
@@ -46,7 +47,6 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK: [[ptr_uniform_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v4float]]
 // CHECK: [[ptr_uniform_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v2float]]
 // CHECK: [[ptr_storagebuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v4float]]
-// CHECK: [[sampled_image:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[image]]
 // CHECK: [[float_zero:%[0-9a-zA-Z_]+]] = OpConstant [[float]] 0
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[image_var]] = OpVariable [[image_ptr]] UniformConstant
