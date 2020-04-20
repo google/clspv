@@ -68,8 +68,8 @@ uint32_t clz(uint32_t v) {
 
 Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
   Type *IntTy = Type::getIntNTy(C, Ty->getScalarSizeInBits());
-  if (Ty->isVectorTy()) {
-    IntTy = VectorType::get(IntTy, cast<VectorType>(Ty)->getNumElements());
+  if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
+    IntTy = VectorType::get(IntTy, vec_ty->getNumElements());
   }
   return IntTy;
 }
@@ -440,8 +440,8 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
     auto Ty = XValue->getType();
 
     Type *IntTy = Type::getIntNTy(F.getContext(), Ty->getScalarSizeInBits());
-    if (Ty->isVectorTy()) {
-      IntTy = VectorType::get(IntTy, cast<VectorType>(Ty)->getNumElements());
+    if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
+      IntTy = VectorType::get(IntTy, vec_ty->getNumElements());
     }
 
     // Return X with the sign of Y
@@ -744,10 +744,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
     auto FalseValue = Constant::getNullValue(CITy);
 
     Type *CorrespondingBoolTy = Type::getInt1Ty(M.getContext());
-    if (CITy->isVectorTy()) {
-      CorrespondingBoolTy =
-          VectorType::get(Type::getInt1Ty(M.getContext()),
-                          cast<VectorType>(CITy)->getNumElements());
+    if (auto CIVecTy = dyn_cast<VectorType>(CITy)) {
+      CorrespondingBoolTy = VectorType::get(Type::getInt1Ty(M.getContext()),
+                                            CIVecTy->getNumElements());
     }
 
     auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
@@ -879,8 +878,8 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Function &F) {
       return nullptr;
     }
 
-    if (HiType->isVectorTy()) {
-      unsigned NumElements = cast<VectorType>(HiType)->getNumElements();
+    if (auto HiVecType = dyn_cast<VectorType>(HiType)) {
+      unsigned NumElements = HiVecType->getNumElements();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
@@ -927,8 +926,8 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
       return nullptr;
     }
 
-    if (SrcType->isVectorTy()) {
-      unsigned NumElements = cast<VectorType>(SrcType)->getNumElements();
+    if (auto SrcVecType = dyn_cast<VectorType>(SrcType)) {
+      unsigned NumElements = SrcVecType->getNumElements();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
@@ -980,8 +979,8 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
       return V;
     }
 
-    if (SrcType->isVectorTy()) {
-      unsigned SrcNumElements = cast<VectorType>(SrcType)->getNumElements();
+    if (auto SrcVecType = dyn_cast<VectorType>(SrcType)) {
+      unsigned SrcNumElements = SrcVecType->getNumElements();
       unsigned DstNumElements = cast<VectorType>(DstType)->getNumElements();
       if (SrcNumElements != DstNumElements) {
         return V;
@@ -1057,8 +1056,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
       return V;
     }
 
-    if (AType->isVectorTy()) {
-      unsigned NumElements = cast<VectorType>(AType)->getNumElements();
+    if (auto AVecType = dyn_cast<VectorType>(AType)) {
+      unsigned NumElements = AVecType->getNumElements();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return V;
@@ -1123,8 +1122,8 @@ bool ReplaceOpenCLBuiltinPass::replaceSelect(Function &F) {
       return nullptr;
     }
 
-    if (FalseType->isVectorTy()) {
-      unsigned NumElements = cast<VectorType>(FalseType)->getNumElements();
+    if (auto FalseVecType = dyn_cast<VectorType>(FalseType)) {
+      unsigned NumElements = FalseVecType->getNumElements();
       if (NumElements != cast<VectorType>(PredicateType)->getNumElements()) {
         return nullptr;
       }
@@ -1176,12 +1175,12 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
       return V;
     }
 
-    if (TrueType->isVectorTy()) {
+    if (auto TrueVecType = dyn_cast<VectorType>(TrueType)) {
       if (!TrueType->getScalarType()->isFloatingPointTy() &&
           !TrueType->getScalarType()->isIntegerTy()) {
         return V;
       }
-      unsigned NumElements = cast<VectorType>(TrueType)->getNumElements();
+      unsigned NumElements = TrueVecType->getNumElements();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return V;

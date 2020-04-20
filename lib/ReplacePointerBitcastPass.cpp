@@ -583,8 +583,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               Value *Idxs[] = {NewAddrIdx, SubEleIdx};
               Value *DstAddr = Builder.CreateGEP(BaseAddr, Idxs);
               Type *TmpSrcTy = SrcEleTy;
-              if (TmpSrcTy->isVectorTy()) {
-                TmpSrcTy = cast<VectorType>(TmpSrcTy)->getElementType();
+              if (auto TmpSrcVecTy = dyn_cast<VectorType>(TmpSrcTy)) {
+                TmpSrcTy = TmpSrcVecTy->getElementType();
               }
               Value *TmpVal = Builder.CreateBitCast(STValues[i], TmpSrcTy);
 
