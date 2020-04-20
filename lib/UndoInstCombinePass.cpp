@@ -148,7 +148,7 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
     return false;
 
   // Instcombine only transforms TruncInst (which operates on integers).
-  if (!vec_ty->getVectorElementType()->isIntegerTy())
+  if (!vec_ty->getElementType()->isIntegerTy())
     return false;
 
   auto const_idx = dyn_cast<ConstantInt>(extract->getIndexOperand());
@@ -215,7 +215,7 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
 
   // Instcombine only transforms TruncInst (which operates on integers).
   auto vec_ty = cast<VectorType>(shuffle->getType());
-  if (!vec_ty->getVectorElementType()->isIntegerTy())
+  if (!vec_ty->getElementType()->isIntegerTy())
     return false;
 
   auto in1 = shuffle->getOperand(0);
@@ -256,7 +256,7 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
     return false;
 
   uint64_t ratio = dst_elements / src_elements;
-  auto dst_scalar_type = vec_ty->getVectorElementType();
+  auto dst_scalar_type = vec_ty->getElementType();
 
   SmallVector<int, 16> mask;
   shuffle->getShuffleMask(mask);

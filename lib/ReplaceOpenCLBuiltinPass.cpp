@@ -69,7 +69,7 @@ uint32_t clz(uint32_t v) {
 Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
   Type *IntTy = Type::getIntNTy(C, Ty->getScalarSizeInBits());
   if (Ty->isVectorTy()) {
-    IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
+    IntTy = VectorType::get(IntTy, cast<VectorType>(Ty)->getNumElements());
   }
   return IntTy;
 }
@@ -441,7 +441,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
 
     Type *IntTy = Type::getIntNTy(F.getContext(), Ty->getScalarSizeInBits());
     if (Ty->isVectorTy()) {
-      IntTy = VectorType::get(IntTy, Ty->getVectorNumElements());
+      IntTy = VectorType::get(IntTy, cast<VectorType>(Ty)->getNumElements());
     }
 
     // Return X with the sign of Y
@@ -745,8 +745,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
 
     Type *CorrespondingBoolTy = Type::getInt1Ty(M.getContext());
     if (CITy->isVectorTy()) {
-      CorrespondingBoolTy = VectorType::get(Type::getInt1Ty(M.getContext()),
-                                            CITy->getVectorNumElements());
+      CorrespondingBoolTy =
+          VectorType::get(Type::getInt1Ty(M.getContext()),
+                          cast<VectorType>(CITy)->getNumElements());
     }
 
     auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
@@ -879,11 +880,9 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Function &F) {
     }
 
     if (HiType->isVectorTy()) {
-      if ((HiType->getVectorNumElements() != 2) &&
-          (HiType->getVectorNumElements() != 3) &&
-          (HiType->getVectorNumElements() != 4) &&
-          (HiType->getVectorNumElements() != 8) &&
-          (HiType->getVectorNumElements() != 16)) {
+      unsigned NumElements = cast<VectorType>(HiType)->getNumElements();
+      if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
+          (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
       }
     }
@@ -929,11 +928,9 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
     }
 
     if (SrcType->isVectorTy()) {
-      if ((SrcType->getVectorNumElements() != 2) &&
-          (SrcType->getVectorNumElements() != 3) &&
-          (SrcType->getVectorNumElements() != 4) &&
-          (SrcType->getVectorNumElements() != 8) &&
-          (SrcType->getVectorNumElements() != 16)) {
+      unsigned NumElements = cast<VectorType>(SrcType)->getNumElements();
+      if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
+          (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
       }
     }
@@ -984,16 +981,15 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
     }
 
     if (SrcType->isVectorTy()) {
-
-      if (SrcType->getVectorNumElements() != DstType->getVectorNumElements()) {
+      unsigned SrcNumElements = cast<VectorType>(SrcType)->getNumElements();
+      unsigned DstNumElements = cast<VectorType>(DstType)->getNumElements();
+      if (SrcNumElements != DstNumElements) {
         return V;
       }
 
-      if ((SrcType->getVectorNumElements() != 2) &&
-          (SrcType->getVectorNumElements() != 3) &&
-          (SrcType->getVectorNumElements() != 4) &&
-          (SrcType->getVectorNumElements() != 8) &&
-          (SrcType->getVectorNumElements() != 16)) {
+      if ((SrcNumElements != 2) && (SrcNumElements != 3) &&
+          (SrcNumElements != 4) && (SrcNumElements != 8) &&
+          (SrcNumElements != 16)) {
         return V;
       }
     }
@@ -1062,11 +1058,9 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
     }
 
     if (AType->isVectorTy()) {
-      if ((AType->getVectorNumElements() != 2) &&
-          (AType->getVectorNumElements() != 3) &&
-          (AType->getVectorNumElements() != 4) &&
-          (AType->getVectorNumElements() != 8) &&
-          (AType->getVectorNumElements() != 16)) {
+      unsigned NumElements = cast<VectorType>(AType)->getNumElements();
+      if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
+          (NumElements != 8) && (NumElements != 16)) {
         return V;
       }
     }
@@ -1130,16 +1124,13 @@ bool ReplaceOpenCLBuiltinPass::replaceSelect(Function &F) {
     }
 
     if (FalseType->isVectorTy()) {
-      if (FalseType->getVectorNumElements() !=
-          PredicateType->getVectorNumElements()) {
+      unsigned NumElements = cast<VectorType>(FalseType)->getNumElements();
+      if (NumElements != cast<VectorType>(PredicateType)->getNumElements()) {
         return nullptr;
       }
 
-      if ((FalseType->getVectorNumElements() != 2) &&
-          (FalseType->getVectorNumElements() != 3) &&
-          (FalseType->getVectorNumElements() != 4) &&
-          (FalseType->getVectorNumElements() != 8) &&
-          (FalseType->getVectorNumElements() != 16)) {
+      if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
+          (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
       }
     }
@@ -1190,11 +1181,9 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
           !TrueType->getScalarType()->isIntegerTy()) {
         return V;
       }
-      if ((TrueType->getVectorNumElements() != 2) &&
-          (TrueType->getVectorNumElements() != 3) &&
-          (TrueType->getVectorNumElements() != 4) &&
-          (TrueType->getVectorNumElements() != 8) &&
-          (TrueType->getVectorNumElements() != 16)) {
+      unsigned NumElements = cast<VectorType>(TrueType)->getNumElements();
+      if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
+          (NumElements != 8) && (NumElements != 16)) {
         return V;
       }
     }
@@ -1276,11 +1265,11 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth,
 
     // Splat arguments that need to be
     SmallVector<Value *, 2> SplatArgs;
-    auto VecType = VectorArg->getType();
+    auto VecType = cast<VectorType>(VectorArg->getType());
 
     for (auto arg : ArgsToSplat) {
       Value *NewVectorArg = UndefValue::get(VecType);
-      for (auto i = 0; i < VecType->getVectorNumElements(); i++) {
+      for (auto i = 0; i < VecType->getNumElements(); i++) {
         auto index = ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
         NewVectorArg =
             InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
@@ -1350,7 +1339,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     if (!data_type->isVectorTy())
       return V;
 
-    auto elems = data_type->getVectorNumElements();
+    auto vec_data_type = cast<VectorType>(data_type);
+
+    auto elems = vec_data_type->getNumElements();
     if (elems != 2 && elems != 3 && elems != 4 && elems != 8 && elems != 16)
       return V;
 
@@ -1358,7 +1349,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     auto ptr = CI->getOperand(2);
     auto ptr_type = ptr->getType();
     auto pointee_type = ptr_type->getPointerElementType();
-    if (pointee_type != data_type->getVectorElementType())
+    if (pointee_type != vec_data_type->getElementType())
       return V;
 
     // Avoid pointer casts. Instead generate the correct number of stores
@@ -1385,7 +1376,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     if (!ret_type->isVectorTy())
       return V;
 
-    auto elems = ret_type->getVectorNumElements();
+    auto vec_ret_type = cast<VectorType>(ret_type);
+
+    auto elems = vec_ret_type->getNumElements();
     if (elems != 2 && elems != 3 && elems != 4 && elems != 8 && elems != 16)
       return V;
 
@@ -1393,7 +1386,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     auto ptr = CI->getOperand(1);
     auto ptr_type = ptr->getType();
     auto pointee_type = ptr_type->getPointerElementType();
-    if (pointee_type != ret_type->getVectorElementType())
+    if (pointee_type != vec_ret_type->getElementType())
       return V;
 
     // Avoid pointer casts. Instead generate the correct number of loads
@@ -1947,7 +1940,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
 
     auto NewFType = FunctionType::get(
         VectorType::get(Type::getFloatTy(M.getContext()),
-                        CI->getType()->getVectorNumElements()),
+                        cast<VectorType>(CI->getType())->getNumElements()),
         types, false);
 
     std::string NewFName = "_Z11read_imagef";
@@ -1980,7 +1973,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     // Data
     types[2] = VectorType::get(
         Type::getFloatTy(M.getContext()),
-        CI->getArgOperand(2)->getType()->getVectorNumElements());
+        cast<VectorType>(CI->getArgOperand(2)->getType())->getNumElements());
 
     auto NewFType =
         FunctionType::get(Type::getVoidTy(M.getContext()), types, false);
@@ -2020,8 +2013,9 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(
     if (components == 1) {
       float_ty = Type::getFloatTy(M.getContext());
     } else {
-      float_ty = VectorType::get(Type::getFloatTy(M.getContext()),
-                                 Arg2->getType()->getVectorNumElements());
+      float_ty =
+          VectorType::get(Type::getFloatTy(M.getContext()),
+                          cast<VectorType>(Arg2->getType())->getNumElements());
     }
 
     auto NewFType = FunctionType::get(
@@ -2230,7 +2224,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
         ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
     if (result_ty->isVectorTy()) {
       just_under_one = ConstantVector::getSplat(
-          {result_ty->getVectorNumElements(), false}, just_under_one);
+          {cast<VectorType>(result_ty)->getNumElements(), false},
+          just_under_one);
     }
 
     IRBuilder<> Builder(CI);

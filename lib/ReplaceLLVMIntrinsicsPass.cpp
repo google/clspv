@@ -149,7 +149,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
       } else if (OutType->isArrayTy()) {
         OutType = OutType->getArrayElementType();
       } else if (OutType->isVectorTy()) {
-        OutType = OutType->getVectorElementType();
+        OutType = cast<VectorType>(OutType)->getElementType();
       } else {
         assert(false && "Don't know how to descend into type");
       }
