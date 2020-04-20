@@ -8,10 +8,10 @@ kernel void copy(global int* out, global int* in) {
   *out = *in;
 }
 
+// CHECK: OpDecorate [[wgsize:%[a-zA-Z0-9_]+]] BuiltIn WorkgroupSize
 // CHECK: OpDecorate [[wgx:%[a-zA-Z0-9_]+]] SpecId 0
 // CHECK: OpDecorate [[wgy:%[a-zA-Z0-9_]+]] SpecId 1
 // CHECK: OpDecorate [[wgz:%[a-zA-Z0-9_]+]] SpecId 2
-// CHECK: OpDecorate [[wgsize:%[a-zA-Z0-9_]+]] BuiltIn WorkgroupSize
 // CHECK: [[wgsize]] = OpSpecConstantComposite {{.*}} [[wgx]] [[wgy]] [[wgz]]
 
 // MAP: spec_constant,workgroup_size_x,spec_id,0

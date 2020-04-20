@@ -3180,7 +3180,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
         auto *Inst =
             new SPIRVInstruction(spv::OpConstantComposite, nextID++, Ops);
-        SPIRVInstList.push_back(Inst);
+        getSPIRVInstList(kConstants).push_back(Inst);
 
         HasMDVec.push_back(true);
       } else {
@@ -3222,21 +3222,21 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       // X Dimension
       Ops << MkId(result_type_id) << MkNum(1);
       XDimCstID = nextID++;
-      SPIRVInstList.push_back(
+      getSPIRVInstList(kConstants).push_back(
           new SPIRVInstruction(spv::OpSpecConstant, XDimCstID, Ops));
 
       // Y Dimension
       Ops.clear();
       Ops << MkId(result_type_id) << MkNum(1);
       YDimCstID = nextID++;
-      SPIRVInstList.push_back(
+      getSPIRVInstList(kConstants).push_back(
           new SPIRVInstruction(spv::OpSpecConstant, YDimCstID, Ops));
 
       // Z Dimension
       Ops.clear();
       Ops << MkId(result_type_id) << MkNum(1);
       ZDimCstID = nextID++;
-      SPIRVInstList.push_back(
+      getSPIRVInstList(kConstants).push_back(
           new SPIRVInstruction(spv::OpSpecConstant, ZDimCstID, Ops));
 
       BuiltinDimVec.push_back(XDimCstID);
@@ -3258,7 +3258,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
       auto *Inst =
           new SPIRVInstruction(spv::OpSpecConstantComposite, nextID++, Ops);
-      SPIRVInstList.push_back(Inst);
+      getSPIRVInstList(kConstants).push_back(Inst);
     }
   }
 
@@ -3354,7 +3354,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 }
 
 void SPIRVProducerPass::GenerateWorkgroupVars(Module &M) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList();
+  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   auto spec_constant_md = M.getNamedMetadata(clspv::SpecConstantMetadataName());
   if (!spec_constant_md)
     return;
