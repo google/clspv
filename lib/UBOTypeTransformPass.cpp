@@ -498,7 +498,7 @@ Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
       } else if (arr_ty) {
         remapped_ele_ty = remapped_ty->getArrayElementType();
       } else if (vec_ty) {
-        remapped_ele_ty = remapped_ty->getVectorElementType();
+        remapped_ele_ty = cast<VectorType>(remapped_ty)->getElementType();
       }
       if (remapped_ele_ty != element_constant->getType()) {
         rebuilt_constants.push_back(

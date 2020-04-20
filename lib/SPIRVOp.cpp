@@ -29,8 +29,8 @@ using namespace llvm;
 // Its purpose is solely to ensure uniqueness of names, it is not
 // meant to convey type information.
 static std::string mangleType(Type *Ty) {
-  if (Ty->isVectorTy()) {
-    auto NumVecElems = std::to_string(Ty->getVectorNumElements());
+  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
+    auto NumVecElems = std::to_string(VecTy->getNumElements());
     return "Dv" + NumVecElems + "_" + mangleType(Ty->getScalarType());
   } else if (Ty->isIntegerTy()) {
     switch (Ty->getScalarSizeInBits()) {

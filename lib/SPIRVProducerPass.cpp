@@ -2332,11 +2332,13 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       break;
     }
     case Type::VectorTyID: {
+      auto VecTy = cast<VectorType>(Ty);
+
       // <4 x i8> is changed to i32 if i8 is not generally supported.
       if (!clspv::Option::Int8Support() &&
-          Ty->getVectorElementType() == Type::getInt8Ty(Context)) {
-        if (Ty->getVectorNumElements() == 4) {
-          TypeMap[Ty] = lookupType(Ty->getVectorElementType());
+          VecTy->getElementType() == Type::getInt8Ty(Context)) {
+        if (VecTy->getNumElements() == 4) {
+          TypeMap[Ty] = lookupType(VecTy->getElementType());
           break;
         } else {
           Ty->print(errs());
@@ -2347,8 +2349,8 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
       // Ops[0] = Component Type ID
       // Ops[1] = Component Count (Literal Number)
       SPIRVOperandList Ops;
-      Ops << MkId(lookupType(Ty->getVectorElementType()))
-          << MkNum(Ty->getVectorNumElements());
+      Ops << MkId(lookupType(VecTy->getElementType()))
+          << MkNum(VecTy->getNumElements());
 
       SPIRVInstruction *inst =
           new SPIRVInstruction(spv::OpTypeVector, nextID++, Ops);
@@ -2897,8 +2899,8 @@ uint64_t scalarAlignment(Type *type) {
 
   // A vector or matrix type has a scalar alignment equal to that of its
   // component type.
-  if (type->isVectorTy()) {
-    return scalarAlignment(type->getVectorElementType());
+  if (auto vec_type = dyn_cast<VectorType>(type)) {
+    return scalarAlignment(vec_type->getElementType());
   }
 
   // An array type has a scalar alignment equal to that of its element type.
@@ -2921,8 +2923,8 @@ uint64_t baseAlignment(Type *type) {
     return scalarAlignment(type);
   }
 
-  if (type->isVectorTy()) {
-    unsigned numElems = type->getVectorNumElements();
+  if (auto vec_type = dyn_cast<VectorType>(type)) {
+    unsigned numElems = vec_type->getNumElements();
 
     // A two-component vector has a base alignment equal to twice its scalar
     // alignment.
@@ -3216,8 +3218,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       clspv::AddWorkgroupSpecConstants(&M);
 
       SPIRVOperandList Ops;
-      uint32_t result_type_id =
-          lookupType(Ty->getPointerElementType()->getVectorElementType());
+      uint32_t result_type_id = lookupType(
+          cast<VectorType>(Ty->getPointerElementType())->getElementType());
 
       // X Dimension
       Ops << MkId(result_type_id) << MkNum(1);
@@ -5285,9 +5287,9 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
     return false;
 
   LLVMContext &Context = Ty->getContext();
-  if (Ty->isVectorTy()) {
-    if (Ty->getVectorElementType() == Type::getInt8Ty(Context) &&
-        Ty->getVectorNumElements() == 4) {
+  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
+    if (VecTy->getElementType() == Type::getInt8Ty(Context) &&
+        VecTy->getNumElements() == 4) {
       return true;
     }
   }

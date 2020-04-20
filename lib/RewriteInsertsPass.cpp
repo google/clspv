@@ -159,7 +159,7 @@ private:
     // Don't handle i8 vectors. Only <4 x i8> is supported and it is
     // translated as i32.  Only handle single-index insertions.
     if (auto vec_ty = dyn_cast<VectorType>(ie->getType())) {
-      if (vec_ty->getVectorElementType() == Type::getInt8Ty(ie->getContext())) {
+      if (vec_ty->getElementType() == Type::getInt8Ty(ie->getContext())) {
         return nullptr;
       }
     }
@@ -234,7 +234,8 @@ private:
       } else if (isa<ArrayType>(constructed_type)) {
         elements.resize(num_elements, constructed_type->getArrayElementType());
       } else if (isa<VectorType>(constructed_type)) {
-        elements.resize(num_elements, constructed_type->getVectorElementType());
+        elements.resize(num_elements,
+                        cast<VectorType>(constructed_type)->getElementType());
       }
       FunctionType *fnTy = FunctionType::get(constructed_type, elements, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);

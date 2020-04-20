@@ -350,10 +350,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     Value *Src = Inst->getOperand(0);
     Type *SrcTy = Src->getType()->getPointerElementType();
     Type *DstTy = Inst->getType()->getPointerElementType();
-    Type *SrcEleTy =
-        SrcTy->isVectorTy() ? SrcTy->getVectorElementType() : SrcTy;
-    Type *DstEleTy =
-        DstTy->isVectorTy() ? DstTy->getVectorElementType() : DstTy;
+    VectorType *SrcVecTy = dyn_cast<VectorType>(SrcTy);
+    VectorType *DstVecTy = dyn_cast<VectorType>(DstTy);
+    Type *SrcEleTy = SrcTy->isVectorTy() ? SrcVecTy->getElementType() : SrcTy;
+    Type *DstEleTy = DstTy->isVectorTy() ? DstVecTy->getElementType() : DstTy;
     // These are bit widths of the source and destination types, even
     // if they are vector types.  E.g. bit width of float4 is 64.
     unsigned SrcTyBitWidth = DL.getTypeStoreSizeInBits(SrcTy);
@@ -432,7 +432,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             if (DstTy->isVectorTy()) {
               if (SrcEleTyBitWidth == DstEleTyBitWidth) {
                 TmpValTy =
-                    VectorType::get(SrcEleTy, DstTy->getVectorNumElements());
+                    VectorType::get(SrcEleTy, DstVecTy->getNumElements());
               } else {
                 TmpValTy = VectorType::get(SrcEleTy, NumElement);
               }
@@ -445,7 +445,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 TmpSTVal = Builder.CreateBitCast(STVal, TmpValTy);
               } else {
                 unsigned DstVecTyNumElement =
-                    DstTy->getVectorNumElements() / NumVector;
+                    DstVecTy->getNumElements() / NumVector;
                 SmallVector<uint32_t, 4> Idxs;
                 for (unsigned i = 0; i < DstVecTyNumElement; i++) {
                   Idxs.push_back(i + (DstVecTyNumElement * VIdx));
@@ -465,8 +465,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 }
               } else {
                 // Handle vector type.
-                unsigned SrcNumElement = SrcTy->getVectorNumElements();
-                unsigned DstNumElement = DstTy->getVectorNumElements();
+                unsigned SrcNumElement = SrcVecTy->getNumElements();
+                unsigned DstNumElement = DstVecTy->getNumElements();
                 for (unsigned i = 0; i < NumElement; i++) {
                   SmallVector<uint32_t, 4> Idxs;
                   for (unsigned j = 0; j < SrcNumElement; j++) {
@@ -545,7 +545,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               STValues.push_back(STVal);
             } else {
               // Handle vector type.
-              DstNumElement = DstTy->getVectorNumElements();
+              DstNumElement = DstVecTy->getNumElements();
               for (unsigned i = 0; i < DstNumElement; i++) {
                 Value *Idx = Builder.getInt32(i);
                 Value *TmpVal = Builder.CreateExtractElement(STVal, Idx);
@@ -558,11 +558,11 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Value *SubEleIdx = Builder.getInt32(0);
             if (IsGEPUser) {
               // Compute SubNumElement = idxscale
-              unsigned SubNumElement = SrcTy->getVectorNumElements();
+              unsigned SubNumElement = SrcVecTy->getNumElements();
               if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
                 // Same condition under which DstNumElements > 1
-                SubNumElement = SrcTy->getVectorNumElements() /
-                                DstTy->getVectorNumElements();
+                SubNumElement =
+                    SrcVecTy->getNumElements() / DstVecTy->getNumElements();
               }
 
               // Compute SubEleIdx = idxbase * idxscale
@@ -583,8 +583,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               Value *Idxs[] = {NewAddrIdx, SubEleIdx};
               Value *DstAddr = Builder.CreateGEP(BaseAddr, Idxs);
               Type *TmpSrcTy = SrcEleTy;
-              if (TmpSrcTy->isVectorTy()) {
-                TmpSrcTy = TmpSrcTy->getVectorElementType();
+              if (auto TmpSrcVecTy = dyn_cast<VectorType>(TmpSrcTy)) {
+                TmpSrcTy = TmpSrcVecTy->getElementType();
               }
               Value *TmpVal = Builder.CreateBitCast(STValues[i], TmpSrcTy);
 
@@ -792,7 +792,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             //
             unsigned NumElement = 1;
             if (SrcTy->isVectorTy()) {
-              NumElement = SrcTy->getVectorNumElements() * 2;
+              NumElement = SrcVecTy->getNumElements() * 2;
             }
 
             // Handle scalar type.
