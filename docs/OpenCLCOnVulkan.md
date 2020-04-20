@@ -192,10 +192,18 @@ Consider this example:
 
 It generates the following descriptor map:
 
+    kernel_decl,foo
     kernel,foo,arg,a,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
     kernel,foo,arg,f,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
     kernel,foo,arg,b,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argKind,buffer
     kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod,argSize,4
+    spec_constant,workgroup_size_x,spec_id,0
+    spec_constant,workgroup_size_y,spec_id,1
+    spec_constant,workgroup_size_z,spec_id,2
+
+The kernels in the module module are declared as follows:
+- `kernel_decl`
+- kernel name
 
 For kernel arguments of types pointer-to-global, pointer-to-constant, and
 plain-old-data types, the fields are:
@@ -225,15 +233,29 @@ plain-old-data types, the fields are:
 - `argSize`
 - only present for plain-old-data kernel arguments.
 
+Module-wide specialization constants are specified as follows:
+- `spec_constant` to describe the use of a module-wide specialization constant
+- specialization constant type (e.g x dimension of WorkgroupSize)
+- `spec_id`
+- the SpecId value
+
 Consider this example, which uses pointer-to-local arguments:
 
     kernel void foo(local float* L, global float* A, local float4 *L2) {...}
 
 It generates the following descriptor map:
 
+    kernel_decl,foo
     kernel,foo,arg,L,argOrdinal,0,argKind,local,arrayElemSize,4,arrayNumElemSpecId,3
     kernel,foo,arg,A,argOrdinal,1,descriptorSet,0,binding,0,offset,0,argKind,buffer
     kernel,foo,arg,L2,argOrdinal,2,argKind,local,arrayElemSize,16,arrayNumElemSpecId,4
+    spec_constant,workgroup_size_x,spec_id,0
+    spec_constant,workgroup_size_y,spec_id,1
+    spec_constant,workgroup_size_z,spec_id,2
+
+The kernels in the module module are declared as follows:
+- `kernel_decl`
+- kernel name
 
 For kernel arguments of type pointer-to-local, the fields are:
 - `kernel` to indicate a kernel argument
@@ -252,6 +274,12 @@ For kernel arguments of type pointer-to-local, the fields are:
   `SpecId` decoration on the integer constant that specficies the array size.
   (This number is always at least 3 so that specialization IDs 0, 1, and 2 can
   be use for the workgroup size dimensions along `x`, `y`, and `z`.)
+
+Module-wide specialization constants are specified as follows:
+- `spec_constant` to describe the use of a module-wide specialization constant
+- specialization constant type (e.g x dimension of WorkgroupSize)
+- `spec_id`
+- the SpecId value
 
 Notes: Each pointer-to-local argument is assigned its own array type and
 specialization constant to size the array.  Unless you override the
@@ -393,6 +421,14 @@ produces the following descriptor map:
 
 
 TODO(dneto): Give an example using images.
+
+#### Module-wide Specialization Constants
+
+The descriptor map includes entries for specialization constants that are used
+module-wide. The following specialization constants are currently generated:
+- `workgroup\_size\_x`: The x-dimension of workgroup size.
+- `workgroup\_size\_y`: The y-dimension of workgroup size.
+- `workgroup\_size\_z`: The z-dimension of workgroup size.
 
 #### Module scope constants
 

@@ -62,6 +62,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/ShareModuleScopeVariables.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SignedCompareFixupPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SimplifyPointerBitcastPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SpecConstant.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SpecializeImageTypes.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatSelectCondition.cpp
