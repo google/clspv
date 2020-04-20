@@ -3222,22 +3222,22 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       // X Dimension
       Ops << MkId(result_type_id) << MkNum(1);
       XDimCstID = nextID++;
-      getSPIRVInstList(kConstants).push_back(
-          new SPIRVInstruction(spv::OpSpecConstant, XDimCstID, Ops));
+      getSPIRVInstList(kConstants)
+          .push_back(new SPIRVInstruction(spv::OpSpecConstant, XDimCstID, Ops));
 
       // Y Dimension
       Ops.clear();
       Ops << MkId(result_type_id) << MkNum(1);
       YDimCstID = nextID++;
-      getSPIRVInstList(kConstants).push_back(
-          new SPIRVInstruction(spv::OpSpecConstant, YDimCstID, Ops));
+      getSPIRVInstList(kConstants)
+          .push_back(new SPIRVInstruction(spv::OpSpecConstant, YDimCstID, Ops));
 
       // Z Dimension
       Ops.clear();
       Ops << MkId(result_type_id) << MkNum(1);
       ZDimCstID = nextID++;
-      getSPIRVInstList(kConstants).push_back(
-          new SPIRVInstruction(spv::OpSpecConstant, ZDimCstID, Ops));
+      getSPIRVInstList(kConstants)
+          .push_back(new SPIRVInstruction(spv::OpSpecConstant, ZDimCstID, Ops));
 
       BuiltinDimVec.push_back(XDimCstID);
       BuiltinDimVec.push_back(YDimCstID);
