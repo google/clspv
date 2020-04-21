@@ -3289,7 +3289,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[2] : SpecId
     auto spec_id = AllocateSpecConstant(&M, SpecConstant::kWorkDim);
     Ops.clear();
-    Ops << MkId(InitializerID) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
+    Ops << MkId(InitializerID) << MkNum(spv::DecorationSpecId)
+        << MkNum(spec_id);
 
     Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
     getSPIRVInstList(kAnnotations).push_back(Inst);
