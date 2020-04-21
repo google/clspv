@@ -862,8 +862,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             while (LDValues.size() != 1) {
               SmallVector<Value *, 4> TmpLDValues;
               for (unsigned i = 0; i < LDValues.size(); i = i + 2) {
-                SmallVector<uint32_t, 4> Idxs;
-                for (unsigned j = 0; j < NumElement; j++) {
+                SmallVector<int32_t, 4> Idxs;
+                for (int j = 0; j < NumElement; j++) {
                   Idxs.push_back(j);
                 }
                 Value *TmpVal = Builder.CreateShuffleVector(
