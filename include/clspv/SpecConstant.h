@@ -26,6 +26,8 @@ enum class SpecConstant : int {
   kWorkgroupSizeZ,
   // Local memory array size.
   kLocalMemorySize,
+  // Work dimensions.
+  kWorkDim,
 };
 
 // Converts an SpecConstant to its string name.

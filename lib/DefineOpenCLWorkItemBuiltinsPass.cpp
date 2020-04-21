@@ -320,11 +320,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
   IRBuilder<> Builder(BB);
 
   if (clspv::Option::WorkDim()) {
-    auto WDPtr = GetPushConstantPointer(BB, clspv::PushConstant::Dimensions);
-    auto WD = Builder.CreateLoad(WDPtr);
-    Builder.CreateRet(WD);
+    IntegerType *IT = IntegerType::get(M.getContext(), 32);
+    StringRef name = "__spirv_WorkDim";
+    auto work_dim_var =
+        createGlobalVariable(M, name, IT, AddressSpace::ModuleScopePrivate);
+    auto load = Builder.CreateLoad(work_dim_var);
+    Builder.CreateRet(load);
   } else {
-    // Get global offset is easy for us as it only returns 3.
+    // Get work dim is easy for us as it only returns 3.
     Builder.CreateRet(Builder.getInt32(3));
   }
 

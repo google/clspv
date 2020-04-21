@@ -50,18 +50,18 @@ llvm::ModulePass *createDeclarePushConstantsPass();
 /// global variables, such that:
 /// - get_global_id() is mapped to a variable named
 /// "__spirv_GlobalInvocationId".
-//    When support for the global offset is enabled, the global offset is added
-//    to "__spirv_GlobalInvocationId".
+///   When support for the global offset is enabled, the global offset is added
+///   to "__spirv_GlobalInvocationId".
 /// - get_local_size() is mapped to a variable named "__spirv_WorkgroupSize"
 /// - get_local_id() is mapped to a variable named "__spirv_LocalInvocationId"
 /// - get_num_groups() is mapped to a variable named "__spirv_NumWorkgroups"
 /// - get_group_id() is mapped to a variable named "__spirv_WorkgroupId"
 ///
 /// These OpenCL work-item builtins are also defined:
-/// - get_work_dim() returns either always 3 or a value passed as a push
-//    constant
+/// - get_work_dim() returns either always 3 or a value passed as a spec
+///   constant
 /// - get_global_offset() returns either always 0 or a value passed as a push
-//    constant
+///   constant
 /// - get_global_size() is implemented by multiplying the result from
 ///   get_local_size() by the result from get_num_groups()
 ///
