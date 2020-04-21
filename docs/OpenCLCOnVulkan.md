@@ -603,7 +603,7 @@ arithmetic.
 The OpenCL C work-item functions map to Vulkan SPIR-V as follows:
 
 - `get_work_dim()` is mapped to the `work_dim` spec constant when `-work-dim`
-   is enabled, otherwise it always returns 3.
+   is enabled (on by default), otherwise it always returns 3.
 - `get_global_size()` is implemented by multiplying the result from
   `get_local_size()` by the result from `get_num_groups()`.
 - `get_global_id()` is mapped to a SPIR-V variable decorated with
