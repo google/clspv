@@ -824,7 +824,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo() {
   // is artificial one because we need Vulkan SPIR-V output. This function is
   // executed ahead of FindType and FindConstant.
   LLVMContext &Context = module->getContext();
-  const DataLayout &DL = module->getDataLayout();
 
   FindGlobalConstVars();
 
