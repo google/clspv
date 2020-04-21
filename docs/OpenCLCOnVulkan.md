@@ -429,6 +429,7 @@ module-wide. The following specialization constants are currently generated:
 - `workgroup\_size\_x`: The x-dimension of workgroup size.
 - `workgroup\_size\_y`: The y-dimension of workgroup size.
 - `workgroup\_size\_z`: The z-dimension of workgroup size.
+- `work_dim`: The work dimensions.
 
 #### Module scope constants
 
@@ -509,8 +510,6 @@ the descriptor map. The format is:
 - the total size of the push constant that will be used.
 
 Here is a list of the push constants currently supported:
-- `dimensions`: the number of dimensions returned by `get_work_dim()`.
-  A 32-bit integer value.
 - `global_offset`: the 3D global offset used by `get_global_offset()` and in
   global ID calculations. A vector of 3 32-bit integer values. Lower
   dimensions come first in memory.
@@ -552,14 +551,16 @@ Otherwise, the Vulkan SPIR-V produced by the compiler will contain specializatio
 constants as follows:
 
 - The _x_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _0_, whose value defaults to
+  constant that is decorated with the `SpecId`, whose value defaults to
   _1_.
 - The _y_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _1_, whose value defaults to
+  constant that is decorated with the `SpecId`, whose value defaults to
   _1_.
 - The _z_ dimension of the work-group size is stored in a specialization
-  constant that is decorated with the `SpecId` of _2_, whose value defaults to
+  constant that is decorated with the `SpecId`, whose value defaults to
   _1_.
+
+The ids for the work-group size are recorded in the descriptor map.
 
 If a compilation unit contains multiple kernels, then either:
 - All kernels should have a `reqd_work_group_size` attribute, or
@@ -601,7 +602,7 @@ arithmetic.
 
 The OpenCL C work-item functions map to Vulkan SPIR-V as follows:
 
-- `get_work_dim()` is mapped to the `dimensions` push constant when `-work-dim`
+- `get_work_dim()` is mapped to the `work_dim` spec constant when `-work-dim`
    is enabled, otherwise it always returns 3.
 - `get_global_size()` is implemented by multiplying the result from
   `get_local_size()` by the result from `get_num_groups()`.
