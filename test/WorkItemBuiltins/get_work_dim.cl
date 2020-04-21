@@ -1,6 +1,6 @@
 // We use -O0 here because get_work_dim() always returns 3, and otherwise
 // the compiler is smart enough to optimize everything away!
-// RUN: clspv -O0 %s -o %t.spv
+// RUN: clspv -O0 %s -o %t.spv -work-dim=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

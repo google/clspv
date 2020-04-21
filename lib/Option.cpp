@@ -183,7 +183,7 @@ static llvm::cl::opt<bool>
                         llvm::cl::desc("Assume VK_EXT_scalar_block_layout"));
 
 static llvm::cl::opt<bool> work_dim(
-    "work-dim", llvm::cl::init(false),
+    "work-dim", llvm::cl::init(true),
     llvm::cl::desc("Enable support for get_work_dim() built-in function"));
 
 static llvm::cl::opt<bool>
