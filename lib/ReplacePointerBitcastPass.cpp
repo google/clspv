@@ -446,8 +446,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               } else {
                 unsigned DstVecTyNumElement =
                     DstVecTy->getNumElements() / NumVector;
-                SmallVector<uint32_t, 4> Idxs;
-                for (unsigned i = 0; i < DstVecTyNumElement; i++) {
+                SmallVector<int32_t, 4> Idxs;
+                for (int i = 0; i < DstVecTyNumElement; i++) {
                   Idxs.push_back(i + (DstVecTyNumElement * VIdx));
                 }
                 Value *UndefVal = UndefValue::get(DstTy);
@@ -468,8 +468,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 unsigned SrcNumElement = SrcVecTy->getNumElements();
                 unsigned DstNumElement = DstVecTy->getNumElements();
                 for (unsigned i = 0; i < NumElement; i++) {
-                  SmallVector<uint32_t, 4> Idxs;
-                  for (unsigned j = 0; j < SrcNumElement; j++) {
+                  SmallVector<int32_t, 4> Idxs;
+                  for (int j = 0; j < SrcNumElement; j++) {
                     Idxs.push_back(i * SrcNumElement + j);
                   }
 
@@ -717,8 +717,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 unsigned NumElement = DstTyBitWidth / SrcEleTyBitWidth;
                 Value *Undef = UndefValue::get(SrcTy);
 
-                SmallVector<uint32_t, 4> Idxs;
-                for (unsigned i = 0; i < NumElement; i++) {
+                SmallVector<int32_t, 4> Idxs;
+                for (int i = 0; i < NumElement; i++) {
                   Idxs.push_back(i);
                 }
                 DstVal = Builder.CreateShuffleVector(LDValues[0], Undef, Idxs);
@@ -747,7 +747,6 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 // ==> if types are same between src and dst, it will be
                 // igonored
                 //
-                unsigned NumElement = SrcTyBitWidth / DstTyBitWidth;
                 unsigned SubNumElement = SrcEleTyBitWidth / DstTyBitWidth;
                 if (SubNumElement != 2 && SubNumElement != 4) {
                   llvm_unreachable("Unsupported SubNumElement");
@@ -830,8 +829,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                   for (unsigned i = 0; i < Values.size(); i++) {
                     Values[i] = Builder.CreateBitCast(Values[i], TmpVecTy);
                   }
-                  SmallVector<uint32_t, 4> Idxs;
-                  for (unsigned i = 0; i < (NumVector * 2); i++) {
+                  SmallVector<int32_t, 4> Idxs;
+                  for (int i = 0; i < (NumVector * 2); i++) {
                     Idxs.push_back(i);
                   }
                   for (unsigned i = 0; i < Values.size(); i = i + 2) {

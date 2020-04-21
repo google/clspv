@@ -336,7 +336,6 @@ private:
     const FieldDecl *prev = nullptr;
     for (auto field_decl : RT->getDecl()->fields()) {
       const auto field_type = field_decl->getType();
-      const auto field_alignment = GetAlignment(field_type, layout, context);
       const unsigned field_no = field_decl->getFieldIndex();
       const uint64_t field_offset =
           record_layout.getFieldOffset(field_no) / context.getCharWidth();

@@ -40,10 +40,11 @@
 // CHECK:     %[[__original_id_26]] = OpFunction %[[uint]] Const %[[__original_id_9]]
 // CHECK:     %[[__original_id_27:[0-9]+]] = OpFunctionParameter %[[uint]]
 // CHECK:     %[[__original_id_28:[0-9]+]] = OpLabel
-// CHECK:     %[[__original_id_29:[0-9]+]] = OpAccessChain %[[_ptr_PushConstant_uint]] %[[__original_id_18]] %[[uint_0]] %[[__original_id_27]]
+// CHECK:     %[[less:[a-zA-Z0-9_]+]] = OpULessThan %[[bool]] %[[__original_id_27]] %[[uint_3]]
+// CHECK:     %[[select:[a-zA-Z0-9_]+]] = OpSelect %[[uint]] %[[less]] %[[__original_id_27]] %[[uint_0]]
+// CHECK:     %[[__original_id_29:[0-9]+]] = OpAccessChain %[[_ptr_PushConstant_uint]] %[[__original_id_18]] %[[uint_0]] %[[select]]
 // CHECK:     %[[__original_id_30:[0-9]+]] = OpLoad %[[uint]] %[[__original_id_29]]
-// CHECK:     %[[__original_id_31:[0-9]+]] = OpULessThan %[[bool]] %[[__original_id_27]] %[[uint_3]]
-// CHECK:     %[[__original_id_32:[0-9]+]] = OpSelect %[[uint]] %[[__original_id_31]] %[[__original_id_30]] %[[uint_0]]
+// CHECK:     %[[__original_id_32:[0-9]+]] = OpSelect %[[uint]] %[[less]] %[[__original_id_30]] %[[uint_0]]
 // CHECK:     OpReturnValue %[[__original_id_32]]
 // CHECK:     OpFunctionEnd
 

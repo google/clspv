@@ -223,7 +223,7 @@ void MultiVersionUBOFunctionsPass::SpecializeCall(
 
   IRBuilder<> builder(&*where);
   auto new_arg_iter = clone->arg_begin();
-  for (auto &arg : fn->args()) {
+  for (size_t i = 0; i < fn->arg_size(); ++i) {
     ++new_arg_iter;
   }
   for (auto info : resources) {

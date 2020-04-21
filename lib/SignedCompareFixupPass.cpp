@@ -124,8 +124,6 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
       llvm_unreachable("Unhandled constant vector type");
     }
     auto *sign_bit = ConstantInt::get(x_type, uint64_t(1) << (bit_width - 1));
-    auto *all_one_bits =
-        ConstantInt::get(x_type, APInt::getMaxValue(bit_width));
 
     Builder.SetInsertPoint(icmp);
     Value *replacement;

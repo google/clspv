@@ -148,7 +148,7 @@ set(CLANG_INCLUDE_DIRS
 
 if(NOT WIN32)
   # Disable RTTI and exceptions (to match LLVM)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions -Werror-unused-variable")
 endif()
 
 # Bring in our cmake folder
