@@ -391,20 +391,20 @@ struct SPIRVProducerPass final : public ModulePass {
   }
   TypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
 
-  void GenerateLLVMIRInfo(Module &M, const DataLayout &DL);
+  void GenerateLLVMIRInfo();
   // Populate GlobalConstFuncTypeMap. Also, if module-scope __constant will
   // *not* be converted to a storage buffer, replace each such global variable
   // with one in the storage class expecgted by SPIR-V.
-  void FindGlobalConstVars(Module &M, const DataLayout &DL);
+  void FindGlobalConstVars();
   // Populate ResourceVarInfoList, FunctionToResourceVarsMap, and
   // ModuleOrderedResourceVars.
-  void FindResourceVars(Module &M, const DataLayout &DL);
-  void FindWorkgroupVars(Module &M);
-  bool FindExtInst(Module &M);
+  void FindResourceVars();
+  void FindWorkgroupVars();
+  bool FindExtInst();
   void FindTypePerGlobalVar(GlobalVariable &GV);
   void FindTypePerFunc(Function &F);
-  void FindTypesForSamplerMap(Module &M);
-  void FindTypesForResourceVars(Module &M);
+  void FindTypesForSamplerMap();
+  void FindTypesForResourceVars();
   // Inserts |Ty| and relevant sub-types into the |Types| member, indicating
   // that |Ty| and its subtypes will need a corresponding SPIR-V type.
   void FindType(Type *Ty);
@@ -417,19 +417,19 @@ struct SPIRVProducerPass final : public ModulePass {
   // allocated sequentially starting with the current value of nextID, and
   // with a type following its subtypes.  Also updates nextID to just beyond
   // the last generated ID.
-  void GenerateSPIRVTypes(LLVMContext &context, Module &module);
+  void GenerateSPIRVTypes();
   void GenerateSPIRVConstants();
-  void GenerateModuleInfo(Module &M);
-  void GeneratePushConstantDescriptorMapEntries(Module &M);
-  void GenerateSpecConstantDescriptorMapEntries(Module &M);
+  void GenerateModuleInfo();
+  void GeneratePushConstantDescriptorMapEntries();
+  void GenerateSpecConstantDescriptorMapEntries();
   void GenerateGlobalVar(GlobalVariable &GV);
-  void GenerateWorkgroupVars(Module &M);
+  void GenerateWorkgroupVars();
   // Generate descriptor map entries for resource variables associated with
   // arguments to F.
-  void GenerateDescriptorMapInfo(const DataLayout &DL, Function &F);
-  void GenerateSamplers(Module &M);
+  void GenerateDescriptorMapInfo(Function &F);
+  void GenerateSamplers();
   // Generate OpVariables for %clspv.resource.var.* calls.
-  void GenerateResourceVars(Module &M);
+  void GenerateResourceVars();
   void GenerateFuncPrologue(Function &F);
   void GenerateFuncBody(Function &F);
   void GenerateEntryPointInitialStores();
@@ -439,7 +439,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
-  void HandleDeferredDecorations(Module &module);
+  void HandleDeferredDecorations();
   bool is4xi8vec(Type *Ty) const;
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
@@ -466,10 +466,10 @@ struct SPIRVProducerPass final : public ModulePass {
   bool IsTypeNullable(const Type *type) const;
 
   // Populate UBO remapped type maps.
-  void PopulateUBOTypeMaps(Module &module);
+  void PopulateUBOTypeMaps();
 
   // Populate the merge and continue block maps.
-  void PopulateStructuredCFGMaps(Module &module);
+  void PopulateStructuredCFGMaps();
 
   // Wrapped methods of DataLayout accessors. If |type| was remapped for UBOs,
   // uses the internal map, otherwise it falls back on the data layout.
@@ -500,6 +500,9 @@ struct SPIRVProducerPass final : public ModulePass {
 
 private:
   static char ID;
+
+  Module *module;
+
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
   raw_pwrite_stream &out;
 
@@ -666,25 +669,24 @@ ModulePass *createSPIRVProducerPass(
 }
 } // namespace clspv
 
-bool SPIRVProducerPass::runOnModule(Module &module) {
+bool SPIRVProducerPass::runOnModule(Module &M) {
+  module = &M;
   if (ShowProducerIR) {
-    llvm::outs() << module << "\n";
+    llvm::outs() << *module << "\n";
   }
   binaryOut = outputCInitList ? &binaryTempOut : &out;
 
-  PopulateUBOTypeMaps(module);
-  PopulateStructuredCFGMaps(module);
+  PopulateUBOTypeMaps();
+  PopulateStructuredCFGMaps();
 
   // SPIR-V always begins with its header information
   outputHeader();
 
-  const DataLayout &DL = module.getDataLayout();
-
   // Gather information from the LLVM IR that we require.
-  GenerateLLVMIRInfo(module, DL);
+  GenerateLLVMIRInfo();
 
   // Collect information on global variables too.
-  for (GlobalVariable &GV : module.globals()) {
+  for (GlobalVariable &GV : module->globals()) {
     // If the GV is one of our special __spirv_* variables, remove the
     // initializer as it was only placed there to force LLVM to not throw the
     // value away.
@@ -706,36 +708,36 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   // If there are extended instructions, generate OpExtInstImport.
-  if (FindExtInst(module)) {
+  if (FindExtInst()) {
     GenerateExtInstImport();
   }
 
   // Generate SPIRV instructions for types.
-  GenerateSPIRVTypes(module.getContext(), module);
+  GenerateSPIRVTypes();
 
   // Generate SPIRV constants.
   GenerateSPIRVConstants();
 
   // Generate literal samplers if necessary.
-  GenerateSamplers(module);
+  GenerateSamplers();
 
   // Generate descriptor map entries for all push constants
-  GeneratePushConstantDescriptorMapEntries(module);
+  GeneratePushConstantDescriptorMapEntries();
 
   // Generate SPIRV variables.
-  for (GlobalVariable &GV : module.globals()) {
+  for (GlobalVariable &GV : module->globals()) {
     GenerateGlobalVar(GV);
   }
-  GenerateResourceVars(module);
-  GenerateWorkgroupVars(module);
+  GenerateResourceVars();
+  GenerateWorkgroupVars();
 
   // Generate SPIRV instructions for each function.
-  for (Function &F : module) {
+  for (Function &F : *module) {
     if (F.isDeclaration()) {
       continue;
     }
 
-    GenerateDescriptorMapInfo(DL, F);
+    GenerateDescriptorMapInfo(F);
 
     // Generate Function Prologue.
     GenerateFuncPrologue(F);
@@ -748,13 +750,13 @@ bool SPIRVProducerPass::runOnModule(Module &module) {
   }
 
   HandleDeferredInstruction();
-  HandleDeferredDecorations(module);
+  HandleDeferredDecorations();
 
   // Generate descriptor map entries for module scope specialization constants.
-  GenerateSpecConstantDescriptorMapEntries(module);
+  GenerateSpecConstantDescriptorMapEntries();
 
   // Generate SPIRV module information.
-  GenerateModuleInfo(module);
+  GenerateModuleInfo();
 
   WriteSPIRVBinary();
 
@@ -816,30 +818,30 @@ void SPIRVProducerPass::patchHeader() {
                     patchBoundOffset);
 }
 
-void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
+void SPIRVProducerPass::GenerateLLVMIRInfo() {
   // This function generates LLVM IR for function such as global variable for
   // argument, constant and pointer type for argument access. These information
   // is artificial one because we need Vulkan SPIR-V output. This function is
   // executed ahead of FindType and FindConstant.
-  LLVMContext &Context = M.getContext();
+  LLVMContext &Context = module->getContext();
 
-  FindGlobalConstVars(M, DL);
+  FindGlobalConstVars();
 
-  FindResourceVars(M, DL);
+  FindResourceVars();
 
   bool HasWorkGroupBuiltin = false;
-  for (GlobalVariable &GV : M.globals()) {
+  for (GlobalVariable &GV : module->globals()) {
     const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
     if (spv::BuiltInWorkgroupSize == BuiltinType) {
       HasWorkGroupBuiltin = true;
     }
   }
 
-  FindTypesForSamplerMap(M);
-  FindTypesForResourceVars(M);
-  FindWorkgroupVars(M);
+  FindTypesForSamplerMap();
+  FindTypesForResourceVars();
+  FindWorkgroupVars();
 
-  for (Function &F : M) {
+  for (Function &F : *module) {
     if (F.isDeclaration()) {
       continue;
     }
@@ -924,53 +926,55 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
     }
 
     // TODO(alan-baker): make this better.
-    if (M.getTypeByName("opencl.image1d_ro_t.float") ||
-        M.getTypeByName("opencl.image1d_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image1d_wo_t.float") ||
-        M.getTypeByName("opencl.image2d_ro_t.float") ||
-        M.getTypeByName("opencl.image2d_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image2d_wo_t.float") ||
-        M.getTypeByName("opencl.image3d_ro_t.float") ||
-        M.getTypeByName("opencl.image3d_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image3d_wo_t.float") ||
-        M.getTypeByName("opencl.image1d_array_ro_t.float") ||
-        M.getTypeByName("opencl.image1d_array_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image1d_array_wo_t.float") ||
-        M.getTypeByName("opencl.image2d_array_ro_t.float") ||
-        M.getTypeByName("opencl.image2d_array_ro_t.float.sampled") ||
-        M.getTypeByName("opencl.image2d_array_wo_t.float")) {
+    if (module->getTypeByName("opencl.image1d_ro_t.float") ||
+        module->getTypeByName("opencl.image1d_ro_t.float.sampled") ||
+        module->getTypeByName("opencl.image1d_wo_t.float") ||
+        module->getTypeByName("opencl.image2d_ro_t.float") ||
+        module->getTypeByName("opencl.image2d_ro_t.float.sampled") ||
+        module->getTypeByName("opencl.image2d_wo_t.float") ||
+        module->getTypeByName("opencl.image3d_ro_t.float") ||
+        module->getTypeByName("opencl.image3d_ro_t.float.sampled") ||
+        module->getTypeByName("opencl.image3d_wo_t.float") ||
+        module->getTypeByName("opencl.image1d_array_ro_t.float") ||
+        module->getTypeByName("opencl.image1d_array_ro_t.float.sampled") ||
+        module->getTypeByName("opencl.image1d_array_wo_t.float") ||
+        module->getTypeByName("opencl.image2d_array_ro_t.float") ||
+        module->getTypeByName("opencl.image2d_array_ro_t.float.sampled") ||
+        module->getTypeByName("opencl.image2d_array_wo_t.float")) {
       FindType(Type::getFloatTy(Context));
-    } else if (M.getTypeByName("opencl.image1d_ro_t.uint") ||
-               M.getTypeByName("opencl.image1d_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image1d_wo_t.uint") ||
-               M.getTypeByName("opencl.image2d_ro_t.uint") ||
-               M.getTypeByName("opencl.image2d_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image2d_wo_t.uint") ||
-               M.getTypeByName("opencl.image3d_ro_t.uint") ||
-               M.getTypeByName("opencl.image3d_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image3d_wo_t.uint") ||
-               M.getTypeByName("opencl.image1d_array_ro_t.uint") ||
-               M.getTypeByName("opencl.image1d_array_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image1d_array_wo_t.uint") ||
-               M.getTypeByName("opencl.image2d_array_ro_t.uint") ||
-               M.getTypeByName("opencl.image2d_array_ro_t.uint.sampled") ||
-               M.getTypeByName("opencl.image2d_array_wo_t.uint")) {
+    } else if (module->getTypeByName("opencl.image1d_ro_t.uint") ||
+               module->getTypeByName("opencl.image1d_ro_t.uint.sampled") ||
+               module->getTypeByName("opencl.image1d_wo_t.uint") ||
+               module->getTypeByName("opencl.image2d_ro_t.uint") ||
+               module->getTypeByName("opencl.image2d_ro_t.uint.sampled") ||
+               module->getTypeByName("opencl.image2d_wo_t.uint") ||
+               module->getTypeByName("opencl.image3d_ro_t.uint") ||
+               module->getTypeByName("opencl.image3d_ro_t.uint.sampled") ||
+               module->getTypeByName("opencl.image3d_wo_t.uint") ||
+               module->getTypeByName("opencl.image1d_array_ro_t.uint") ||
+               module->getTypeByName(
+                   "opencl.image1d_array_ro_t.uint.sampled") ||
+               module->getTypeByName("opencl.image1d_array_wo_t.uint") ||
+               module->getTypeByName("opencl.image2d_array_ro_t.uint") ||
+               module->getTypeByName(
+                   "opencl.image2d_array_ro_t.uint.sampled") ||
+               module->getTypeByName("opencl.image2d_array_wo_t.uint")) {
       FindType(Type::getInt32Ty(Context));
-    } else if (M.getTypeByName("opencl.image1d_ro_t.int") ||
-               M.getTypeByName("opencl.image1d_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image1d_wo_t.int") ||
-               M.getTypeByName("opencl.image2d_ro_t.int") ||
-               M.getTypeByName("opencl.image2d_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image2d_wo_t.int") ||
-               M.getTypeByName("opencl.image3d_ro_t.int") ||
-               M.getTypeByName("opencl.image3d_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image3d_wo_t.int") ||
-               M.getTypeByName("opencl.image1d_array_ro_t.int") ||
-               M.getTypeByName("opencl.image1d_array_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image1d_array_wo_t.int") ||
-               M.getTypeByName("opencl.image2d_array_ro_t.int") ||
-               M.getTypeByName("opencl.image2d_array_ro_t.int.sampled") ||
-               M.getTypeByName("opencl.image2d_array_wo_t.int")) {
+    } else if (module->getTypeByName("opencl.image1d_ro_t.int") ||
+               module->getTypeByName("opencl.image1d_ro_t.int.sampled") ||
+               module->getTypeByName("opencl.image1d_wo_t.int") ||
+               module->getTypeByName("opencl.image2d_ro_t.int") ||
+               module->getTypeByName("opencl.image2d_ro_t.int.sampled") ||
+               module->getTypeByName("opencl.image2d_wo_t.int") ||
+               module->getTypeByName("opencl.image3d_ro_t.int") ||
+               module->getTypeByName("opencl.image3d_ro_t.int.sampled") ||
+               module->getTypeByName("opencl.image3d_wo_t.int") ||
+               module->getTypeByName("opencl.image1d_array_ro_t.int") ||
+               module->getTypeByName("opencl.image1d_array_ro_t.int.sampled") ||
+               module->getTypeByName("opencl.image1d_array_wo_t.int") ||
+               module->getTypeByName("opencl.image2d_array_ro_t.int") ||
+               module->getTypeByName("opencl.image2d_array_ro_t.int.sampled") ||
+               module->getTypeByName("opencl.image2d_array_wo_t.int")) {
       // Nothing for now...
     } else {
       // This was likely an UndefValue.
@@ -985,12 +989,13 @@ void SPIRVProducerPass::GenerateLLVMIRInfo(Module &M, const DataLayout &DL) {
   }
 }
 
-void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
-  clspv::NormalizeGlobalVariables(M);
+void SPIRVProducerPass::FindGlobalConstVars() {
+  clspv::NormalizeGlobalVariables(*module);
+  const DataLayout &DL = module->getDataLayout();
 
   SmallVector<GlobalVariable *, 8> GVList;
   SmallVector<GlobalVariable *, 8> DeadGVList;
-  for (GlobalVariable &GV : M.globals()) {
+  for (GlobalVariable &GV : module->globals()) {
     if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
       if (GV.use_empty()) {
         DeadGVList.push_back(&GV);
@@ -1027,7 +1032,7 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
       // Create new gv with ModuleScopePrivate address space.
       Type *NewGVTy = GV->getType()->getPointerElementType();
       GlobalVariable *NewGV = new GlobalVariable(
-          M, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
+          *module, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
           nullptr, GV->getThreadLocalMode(), AddressSpace::ModuleScopePrivate);
       NewGV->takeName(GV);
 
@@ -1080,7 +1085,7 @@ void SPIRVProducerPass::FindGlobalConstVars(Module &M, const DataLayout &DL) {
   }
 }
 
-void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
+void SPIRVProducerPass::FindResourceVars() {
   ResourceVarInfoList.clear();
   FunctionToResourceVarsMap.clear();
   ModuleOrderedResourceVars.reset();
@@ -1098,7 +1103,7 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
   // (set,binding) values.
   const bool always_distinct_sets =
       clspv::Option::DistinctKernelDescriptorSets();
-  for (Function &F : M) {
+  for (Function &F : *module) {
     // Rely on the fact the resource var functions have a stable ordering
     // in the module.
     if (F.getName().startswith(clspv::ResourceAccessorFunction())) {
@@ -1165,7 +1170,7 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
   }
 
   // Populate ModuleOrderedResourceVars.
-  for (Function &F : M) {
+  for (Function &F : *module) {
     auto where = FunctionToResourceVarsMap.find(&F);
     if (where != FunctionToResourceVarsMap.end()) {
       for (auto &rv : where->second) {
@@ -1184,11 +1189,11 @@ void SPIRVProducerPass::FindResourceVars(Module &M, const DataLayout &) {
   }
 }
 
-bool SPIRVProducerPass::FindExtInst(Module &M) {
-  LLVMContext &Context = M.getContext();
+bool SPIRVProducerPass::FindExtInst() {
+  LLVMContext &Context = module->getContext();
   bool HasExtInst = false;
 
-  for (Function &F : M) {
+  for (Function &F : *module) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
@@ -1414,13 +1419,14 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
   }
 }
 
-void SPIRVProducerPass::FindTypesForSamplerMap(Module &M) {
+void SPIRVProducerPass::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
-  if (M.getFunction(clspv::LiteralSamplerFunction()) ||
+  if (module->getFunction(clspv::LiteralSamplerFunction()) ||
       0 < getSamplerMap().size()) {
-    auto SamplerStructTy = M.getTypeByName("opencl.sampler_t");
+    auto SamplerStructTy = module->getTypeByName("opencl.sampler_t");
     if (!SamplerStructTy) {
-      SamplerStructTy = StructType::create(M.getContext(), "opencl.sampler_t");
+      SamplerStructTy =
+          StructType::create(module->getContext(), "opencl.sampler_t");
     }
 
     SamplerTy = SamplerStructTy->getPointerTo(AddressSpace::UniformConstant);
@@ -1429,7 +1435,7 @@ void SPIRVProducerPass::FindTypesForSamplerMap(Module &M) {
   }
 }
 
-void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
+void SPIRVProducerPass::FindTypesForResourceVars() {
   // Record types so they are generated.
   TypesNeedingLayout.reset();
   StructTypesNeedingBlock.reset();
@@ -1442,11 +1448,11 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
       if (IsIntImageType(info->var_fn->getReturnType())) {
         // Nothing for now...
       } else if (IsUintImageType(info->var_fn->getReturnType())) {
-        FindType(Type::getInt32Ty(M.getContext()));
+        FindType(Type::getInt32Ty(module->getContext()));
       }
 
       // We need "float" either for the sampled type or for the Lod operand.
-      FindType(Type::getFloatTy(M.getContext()));
+      FindType(Type::getFloatTy(module->getContext()));
     }
   }
 
@@ -1494,7 +1500,7 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
   // If module constants are clustered in a storage buffer then that struct
   // needs layout decorations.
   if (clspv::Option::ModuleConstantsInStorageBuffer()) {
-    for (GlobalVariable &GV : M.globals()) {
+    for (GlobalVariable &GV : module->globals()) {
       PointerType *PTy = cast<PointerType>(GV.getType());
       const auto AS = PTy->getAddressSpace();
       const bool module_scope_constant_external_init =
@@ -1508,7 +1514,7 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
     }
   }
 
-  for (const GlobalVariable &GV : M.globals()) {
+  for (const GlobalVariable &GV : module->globals()) {
     if (GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
       auto Ty = cast<PointerType>(GV.getType())->getPointerElementType();
       assert(Ty->isStructTy() && "Push constants have to be structures.");
@@ -1544,11 +1550,11 @@ void SPIRVProducerPass::FindTypesForResourceVars(Module &M) {
   }
 }
 
-void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
+void SPIRVProducerPass::FindWorkgroupVars() {
   // The SpecId assignment for pointer-to-local arguments is recorded in
   // module-level metadata. Translate that information into local argument
   // information.
-  NamedMDNode *nmd = M.getNamedMetadata(clspv::LocalSpecIdMetadataName());
+  NamedMDNode *nmd = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
   if (!nmd)
     return;
   for (auto operand : nmd->operands()) {
@@ -1578,7 +1584,7 @@ void SPIRVProducerPass::FindWorkgroupVars(Module &M) {
     nextID += 4;
 
     // Ensure the types necessary for this argument get generated.
-    Type *IdxTy = Type::getInt32Ty(M.getContext());
+    Type *IdxTy = Type::getInt32Ty(module->getContext());
     FindConstant(ConstantInt::get(IdxTy, 0));
     FindType(IdxTy);
     FindType(arg->getType());
@@ -1940,12 +1946,12 @@ void SPIRVProducerPass::GenerateExtInstImport() {
                                                MkString("GLSL.std.450")));
 }
 
-void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
-                                           Module &module) {
+void SPIRVProducerPass::GenerateSPIRVTypes() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kTypes);
   ValueMapType &VMap = getValueMap();
   ValueMapType &AllocatedVMap = getAllocatedValueMap();
-  const auto &DL = module.getDataLayout();
+  const auto &DL = module->getDataLayout();
+  LLVMContext &Context = module->getContext();
 
   // Map for OpTypeRuntimeArray. If argument has pointer type, 2 spirv type
   // instructions are generated. They are OpTypePointer and OpTypeRuntimeArray.
@@ -2334,7 +2340,6 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
     }
     case Type::VectorTyID: {
       auto VecTy = cast<VectorType>(Ty);
-
       // <4 x i8> is changed to i32 if i8 is not generally supported.
       if (!clspv::Option::Int8Support() &&
           VecTy->getElementType() == Type::getInt8Ty(Context)) {
@@ -2415,7 +2420,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes(LLVMContext &Context,
   }
 
   // Generate types for pointer-to-local arguments.
-  for (auto pair : clspv::GetSpecConstants(&module)) {
+  for (auto pair : clspv::GetSpecConstants(module)) {
     auto kind = pair.first;
     auto spec_id = pair.second;
 
@@ -2642,7 +2647,7 @@ void SPIRVProducerPass::GenerateSPIRVConstants() {
   }
 }
 
-void SPIRVProducerPass::GenerateSamplers(Module &M) {
+void SPIRVProducerPass::GenerateSamplers() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
 
   auto &sampler_map = getSamplerMap();
@@ -2655,7 +2660,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   // for them and bindings too.
   DenseSet<unsigned> used_bindings;
 
-  auto *var_fn = M.getFunction(clspv::LiteralSamplerFunction());
+  auto *var_fn = module->getFunction(clspv::LiteralSamplerFunction());
   // Return if there are no literal samplers.
   if (!var_fn)
     return;
@@ -2767,7 +2772,7 @@ void SPIRVProducerPass::GenerateSamplers(Module &M) {
   }
 }
 
-void SPIRVProducerPass::GenerateResourceVars(Module &) {
+void SPIRVProducerPass::GenerateResourceVars() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   ValueMapType &VMap = getValueMap();
 
@@ -3070,10 +3075,10 @@ bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
 
 } // namespace
 
-void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries(Module &M) {
+void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries() {
 
-  if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
-    auto const &DL = M.getDataLayout();
+  if (auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName())) {
+    auto const &DL = module->getDataLayout();
     auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
     auto STy = cast<StructType>(GV->getValueType());
 
@@ -3087,16 +3092,17 @@ void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries(Module &M) {
         previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
       }
       auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
-      assert(isValidExplicitLayout(M, STy, i, spv::StorageClassPushConstant,
-                                   offset, previousOffset));
+      assert(isValidExplicitLayout(*module, STy, i,
+                                   spv::StorageClassPushConstant, offset,
+                                   previousOffset));
       version0::DescriptorMapEntry::PushConstantData data = {pc, offset, size};
       descriptorMapEntries->emplace_back(std::move(data));
     }
   }
 }
 
-void SPIRVProducerPass::GenerateSpecConstantDescriptorMapEntries(Module &M) {
-  for (auto pair : clspv::GetSpecConstants(&M)) {
+void SPIRVProducerPass::GenerateSpecConstantDescriptorMapEntries() {
+  for (auto pair : clspv::GetSpecConstants(module)) {
     auto kind = pair.first;
     auto id = pair.second;
 
@@ -3110,7 +3116,6 @@ void SPIRVProducerPass::GenerateSpecConstantDescriptorMapEntries(Module &M) {
 }
 
 void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
-  Module &M = *GV.getParent();
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
   ValueMapType &VMap = getValueMap();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
@@ -3216,7 +3221,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       uint32_t ZDimCstID = 0;
 
       // Allocate spec constants for workgroup size.
-      clspv::AddWorkgroupSpecConstants(&M);
+      clspv::AddWorkgroupSpecConstants(module);
 
       SPIRVOperandList Ops;
       uint32_t result_type_id = lookupType(
@@ -3360,7 +3365,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   } else if (module_scope_constant_external_init) {
     // This module scope constant is initialized from a storage buffer with data
     // provided by the host at binding 0 of the next descriptor set.
-    const uint32_t descriptor_set = TakeDescriptorIndex(&M);
+    const uint32_t descriptor_set = TakeDescriptorIndex(module);
 
     // Emit the intializer to the descriptor map file.
     // Use "kind,buffer" to indicate storage buffer. We might want to expand
@@ -3387,13 +3392,14 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   }
 }
 
-void SPIRVProducerPass::GenerateWorkgroupVars(Module &M) {
+void SPIRVProducerPass::GenerateWorkgroupVars() {
   SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kGlobalVariables);
-  auto spec_constant_md = M.getNamedMetadata(clspv::SpecConstantMetadataName());
+  auto spec_constant_md =
+      module->getNamedMetadata(clspv::SpecConstantMetadataName());
   if (!spec_constant_md)
     return;
 
-  for (auto pair : clspv::GetSpecConstants(&M)) {
+  for (auto pair : clspv::GetSpecConstants(module)) {
     auto kind = pair.first;
     auto spec_id = pair.second;
 
@@ -3414,8 +3420,8 @@ void SPIRVProducerPass::GenerateWorkgroupVars(Module &M) {
   }
 }
 
-void SPIRVProducerPass::GenerateDescriptorMapInfo(const DataLayout &DL,
-                                                  Function &F) {
+void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
+  const auto &DL = module->getDataLayout();
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
     return;
   }
@@ -3664,7 +3670,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   }
 }
 
-void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
+void SPIRVProducerPass::GenerateModuleInfo() {
   EntryPointVecType &EntryPoints = getEntryPointVec();
   ValueMapType &VMap = getValueMap();
   ValueList &EntryPointInterfaces = getEntryPointInterfacesVec();
@@ -3747,7 +3753,7 @@ void SPIRVProducerPass::GenerateModuleInfo(Module &module) {
 
   { // OpCapability ImageQuery
     bool hasImageQuery = false;
-    for (const auto &SymVal : module.getValueSymbolTable()) {
+    for (const auto &SymVal : module->getValueSymbolTable()) {
       if (auto F = dyn_cast<Function>(SymVal.getValue())) {
         if (IsImageQuery(F)) {
           hasImageQuery = true;
@@ -5634,8 +5640,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
   }
 }
 
-void SPIRVProducerPass::HandleDeferredDecorations(Module &module) {
-  const auto &DL = module.getDataLayout();
+void SPIRVProducerPass::HandleDeferredDecorations() {
+  const auto &DL = module->getDataLayout();
   if (getTypesNeedingArrayStride().empty() && LocalArgSpecIds.empty()) {
     return;
   }
@@ -5673,7 +5679,7 @@ void SPIRVProducerPass::HandleDeferredDecorations(Module &module) {
   }
 
   // Emit SpecId decorations targeting the array size value.
-  for (auto pair : clspv::GetSpecConstants(&module)) {
+  for (auto pair : clspv::GetSpecConstants(module)) {
     auto kind = pair.first;
     auto spec_id = pair.second;
 
@@ -6153,9 +6159,9 @@ bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
   }
 }
 
-void SPIRVProducerPass::PopulateUBOTypeMaps(Module &module) {
+void SPIRVProducerPass::PopulateUBOTypeMaps() {
   if (auto *offsets_md =
-          module.getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
+          module->getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
     // Metdata is stored as key-value pair operands. The first element of each
     // operand is the type and the second is a vector of offsets.
     for (const auto *operand : offsets_md->operands()) {
@@ -6174,7 +6180,7 @@ void SPIRVProducerPass::PopulateUBOTypeMaps(Module &module) {
   }
 
   if (auto *sizes_md =
-          module.getNamedMetadata(clspv::RemappedTypeSizesMetadataName())) {
+          module->getNamedMetadata(clspv::RemappedTypeSizesMetadataName())) {
     // Metadata is stored as key-value pair operands. The first element of each
     // operand is the type and the second is a triple of sizes: type size in
     // bits, store size and alloc size.
@@ -6411,10 +6417,10 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
   return false;
 }
 
-void SPIRVProducerPass::PopulateStructuredCFGMaps(Module &module) {
+void SPIRVProducerPass::PopulateStructuredCFGMaps() {
   // First, track loop merges and continues.
   DenseSet<BasicBlock *> LoopMergesAndContinues;
-  for (auto &F : module) {
+  for (auto &F : *module) {
     if (F.isDeclaration())
       continue;
 
