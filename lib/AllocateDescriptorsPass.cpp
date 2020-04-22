@@ -79,11 +79,11 @@ private:
   // 0.
   unsigned StartNewDescriptorSet(Module &M) {
     // Allocate the descriptor set we used.
-    unsigned result = descriptor_set_++;
     binding_ = 0;
     const auto set = clspv::TakeDescriptorIndex(&M);
-    assert(set == result);
-    return result;
+    assert(set == descriptor_set_);
+    descriptor_set_++;
+    return set;
   }
 
   // Returns true if |F| or call function |F| calls contains a global barrier.
@@ -851,9 +851,6 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   // Allocates a SpecId for |type|.
   auto GetSpecId = [&M, &spec_id_types, &function_spec_ids,
                     &function_allocations](Type *type) {
-    const bool always_distinct_sets =
-        clspv::Option::DistinctKernelDescriptorSets();
-
     // Attempt to reuse a SpecId. If the SpecId is associated with the same type
     // in another kernel and not yet assigned to this kernel it can be reused.
     auto where = spec_id_types.find(type);

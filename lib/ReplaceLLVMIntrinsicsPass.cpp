@@ -157,8 +157,6 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
       return OutType;
     };
 
-    unsigned *numSrcUnpackings = 0;
-    unsigned *numDstUnpackings = 0;
     while (*SrcElemTy != *DstElemTy) {
       auto SrcElemSize = Layout.getTypeSizeInBits(*SrcElemTy);
       auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy);
@@ -226,12 +224,15 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           assert(DstElemTy == SrcElemTy);
 
           auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
+          (void)DstElemSize;
 
           // Check that the size is a multiple of the size of the pointee type.
           assert(Size % DstElemSize == 0);
 
           auto Alignment = cast<MemIntrinsic>(CI)->getDestAlignment();
           auto TypeAlignment = Layout.getABITypeAlignment(DstElemTy);
+          (void)Alignment;
+          (void)TypeAlignment;
 
           // Check that the alignment is at least the alignment of the pointee
           // type.

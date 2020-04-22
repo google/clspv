@@ -293,7 +293,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   if (isSupportEnabled) {
     auto Dim = &*F->arg_begin();
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
-    Value *Indices[] = {Builder.getInt32(0), Dim};
+    Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
     auto GoffPtr =
         GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
     auto GoffDimPtr = Builder.CreateInBoundsGEP(GoffPtr, Indices);

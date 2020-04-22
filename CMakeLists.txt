@@ -51,10 +51,10 @@ if(NOT ${SKIP_CLSPV_TOOLS_INSTALL})
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-	# GCC 7.3 complains about LLVM code: RetryAfterSignal in lib/Support/Process.cpp
-	# Silence that warning for now.
-	# TODO(dneto): Upgrade to newer LLVM to avoid this issue.
-	add_compile_options("-Wno-noexcept-type")
+  # GCC 7.3 complains about LLVM code: RetryAfterSignal in lib/Support/Process.cpp
+  # Silence that warning for now.
+  # TODO(dneto): Upgrade to newer LLVM to avoid this issue.
+  add_compile_options("-Wno-noexcept-type")
 endif()
 
 if (NOT DEFINED SPIRV_HEADERS_SOURCE_DIR)
@@ -149,6 +149,12 @@ set(CLANG_INCLUDE_DIRS
 if(NOT WIN32)
   # Disable RTTI and exceptions (to match LLVM)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
+endif()
+
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=unused-variable")
+elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable")
 endif()
 
 # Bring in our cmake folder

@@ -73,7 +73,8 @@ private:
                                        InsertionVector *chain) {
     auto *structTy = dyn_cast<StructType>(iv->getType());
     assert(structTy);
-    const auto numElems = structTy->getNumElements();
+    if (!structTy)
+      return nullptr;
 
     // Walk backward from the tail to an instruction we don't want to
     // replace.
@@ -85,7 +86,7 @@ private:
         // Try to replace this one.
 
         unsigned index = insertion->getIndices()[0];
-        assert(index < numElems);
+        assert(index < structTy->getNumElements());
         if ((*values)[index] != nullptr) {
           // We already have a value for this slot.  Stop now.
           break;

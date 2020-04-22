@@ -86,7 +86,6 @@ SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
 Function *SplatArgPass::getReplacementFunction(Function &F,
                                                const std::string &NewCallName) {
   Module *M = F.getParent();
-  FunctionType *CalleeTy = F.getFunctionType();
 
   // Create new callee function type with vector type.
   Type *VectorType = F.getArg(0)->getType();

@@ -1293,7 +1293,6 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth,
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
-  Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     auto Arg = CI->getOperand(0);
     auto Op = is_vec ? Instruction::AShr : Instruction::LShr;
@@ -1307,7 +1306,6 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
 
 bool ReplaceOpenCLBuiltinPass::replaceMul(Function &F, bool is_float,
                                           bool is_mad) {
-  Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     // The multiply instruction to use.
     auto MulInst = is_float ? Instruction::FMul : Instruction::Mul;
@@ -1329,7 +1327,6 @@ bool ReplaceOpenCLBuiltinPass::replaceMul(Function &F, bool is_float,
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
-  Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     Value *V = nullptr;
     auto data = CI->getOperand(0);
@@ -1368,7 +1365,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
-  Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     Value *V = nullptr;
     auto ret_type = F.getReturnType();
@@ -2147,8 +2143,6 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
-    auto &Context = M.getContext();
-
     std::string floor_name = "_Z5floor";
     std::string fmin_name = "_Z4fmin";
     std::string clspv_fract_name = "clspv.fract.";

@@ -24,8 +24,6 @@ void clspv::ComputeStructuredOrder(BasicBlock *block, DominatorTree *DT,
   if (!visited->insert(block).second)
     return;
 
-  auto F = block->getParent();
-
   // Identify the merge and continue blocks for special treatment.
   const auto *terminator = block->getTerminator();
   BasicBlock *continue_block = nullptr;
