@@ -419,7 +419,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKindForType(argTy);
+      const auto arg_kind = clspv::GetArgKind(Arg);
 
       int separation_token = 0;
       switch (arg_kind) {
@@ -513,7 +513,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       for (Argument &Arg : f_ptr->args()) {
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKindForType(Arg.getType()) !=
+          if (clspv::GetArgKind(Arg) !=
               clspv::ArgKind::PodPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
@@ -541,7 +541,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
           const bool is_push_constant_arg =
-              clspv::GetArgKindForType(f_ptr->getArg(arg_index)->getType()) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
               clspv::ArgKind::PodPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
@@ -640,7 +640,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
                  << " type " << *argTy << "\n";
         }
 
-        const auto arg_kind = clspv::GetArgKindForType(argTy);
+        const auto arg_kind = clspv::GetArgKind(Arg);
 
         Type *resource_type = nullptr;
         unsigned addr_space = kUnallocated;
@@ -886,7 +886,7 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKindForType(argTy);
+      const auto arg_kind = clspv::GetArgKind(Arg);
       if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
         int spec_id = GetSpecId(Arg.getType());

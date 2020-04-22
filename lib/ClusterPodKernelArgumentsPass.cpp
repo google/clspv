@@ -43,6 +43,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Constants.h"
 #include "Passes.h"
 
 using namespace llvm;
@@ -96,6 +97,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
   for (Function *F : WorkList) {
     Changed = true;
 
+    auto pod_arg_impl = clspv::GetPodArgsImpl(*F);
+    auto pod_arg_kind = clspv::GetArgKindForPodArgs(*F);
     // An ArgMapping describes how a kernel argument is remapped.
     struct ArgMapping {
       std::string name;
@@ -131,7 +134,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
-        const auto kind = clspv::GetArgKindForType(ArgTy);
+        const auto kind = clspv::GetArgKind(Arg);
         int spec_id = -1;
         if (kind == clspv::ArgKind::Local) {
           spec_id = arg_spec_id_map[&Arg];
@@ -151,7 +154,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     auto PodArgsStructTy = StructType::get(Context, PodArgTys);
     SmallVector<Type *, 8> NewFuncParamTys(PtrArgTys);
 
-    if (clspv::Option::PodArgsInUniformBuffer() &&
+    if (pod_arg_impl == clspv::PodArgImpl::kUBO &&
         !clspv::Option::Std430UniformBufferLayout()) {
       SmallVector<Type *, 16> PaddedPodArgTys;
       const DataLayout DL(&M);
@@ -206,7 +209,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
                unsigned(StructLayout->getElementOffset(PodIndexMap[&Arg])),
-               arg_size, clspv::GetArgKindForType(ArgTy), -1});
+               arg_size, pod_arg_kind, -1});
         }
         arg_index++;
       }
@@ -261,10 +264,12 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // Move OpenCL kernel named attributes.
     // TODO(dneto): Attributes starting with kernel_arg_* should be rewritten
     // to reflect change in the argument shape.
+    auto pod_md_name = clspv::PodArgsImplMetadataName();
     std::vector<const char *> Metadatas{
         "reqd_work_group_size",   "kernel_arg_addr_space",
         "kernel_arg_access_qual", "kernel_arg_type",
-        "kernel_arg_base_type",   "kernel_arg_type_qual"};
+        "kernel_arg_base_type",   "kernel_arg_type_qual",
+        pod_md_name.c_str()};
     for (auto name : Metadatas) {
       NewFunc->setMetadata(name, F->getMetadata(name));
       F->setMetadata(name, nullptr);

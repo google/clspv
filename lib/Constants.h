@@ -67,6 +67,10 @@ inline std::string SpecConstantMetadataName() {
   return "clspv.spec_constant_list";
 }
 
+inline std::string PodArgsImplMetadataName() {
+  return "clspv.pod_args_impl";
+}
+
 } // namespace clspv
 
 #endif

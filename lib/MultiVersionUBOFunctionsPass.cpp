@@ -133,7 +133,7 @@ bool MultiVersionUBOFunctionsPass::runOnModule(Module &M) {
 bool MultiVersionUBOFunctionsPass::AnalyzeCall(
     Function *fn, CallInst *user, std::vector<ResourceInfo> *resources) {
   for (auto &arg : fn->args()) {
-    if (clspv::GetArgKindForType(arg.getType()) != clspv::ArgKind::BufferUBO)
+    if (clspv::GetArgKind(arg) != clspv::ArgKind::BufferUBO)
       continue;
 
     Value *arg_operand = user->getOperand(arg.getArgNo());

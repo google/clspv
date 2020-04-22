@@ -6,7 +6,7 @@
 ; RUN: FileCheck %s < %t.ll
 ; CHECK: @__spirv_WorkgroupSize =
 
-define spir_kernel void @foo() local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !3 !kernel_arg_type !3 !kernel_arg_base_type !3 !kernel_arg_type_qual !3 {
+define spir_kernel void @foo() local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !3 !kernel_arg_type !3 !kernel_arg_base_type !3 !kernel_arg_type_qual !3 !clspv.pod_args_impl !4 {
 entry:
   ret void
 }
@@ -20,3 +20,4 @@ attributes #0 = { norecurse nounwind readnone "correctly-rounded-divide-sqrt-fp-
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 1, i32 2}
 !3 = !{}
+!4 = !{i32 0}

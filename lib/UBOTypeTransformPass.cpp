@@ -135,12 +135,12 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
       continue;
 
+    auto pod_arg_impl = clspv::GetPodArgsImpl(F);
     for (auto &Arg : F.args()) {
       if ((clspv::Option::ConstantArgsInUniformBuffer() &&
-           clspv::GetArgKindForType(Arg.getType()) ==
-               clspv::ArgKind::BufferUBO) ||
+           clspv::GetArgKind(Arg) == clspv::ArgKind::BufferUBO) ||
           (!Arg.getType()->isPointerTy() &&
-           clspv::Option::PodArgsInUniformBuffer())) {
+           pod_arg_impl == clspv::PodArgImpl::kUBO)) {
         // Pre-populate the type mapping for types that must change. This
         // necessary to prevent caching what would appear to be a no-op too
         // early.

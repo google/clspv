@@ -408,4 +408,8 @@ llvm::ModulePass *createUndoInstCombinePass();
 /// Removes FreezeInsts from the IR.
 llvm::ModulePass *createStripFreezePass();
 
+/// Annotates kernels with the metadata indicating how the POD args should be
+/// handled.
+llvm::ModulePass *createAutoPodArgsPass();
+
 } // namespace clspv

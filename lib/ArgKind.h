@@ -24,22 +24,24 @@
 
 namespace clspv {
 
-// Maps an LLVM type for a kernel argument to an argument kind.
-ArgKind GetArgKindForType(llvm::Type *type);
+// Enum for how pod args are implemented. Gets added as metadata to each
+// kernel.
+enum PodArgImpl {
+  kSSBO,
+  kUBO,
+  kPushConstant,
+  // Shared interface across all shaders.
+  kGlobalPushConstant,
+};
 
-// Maps an LLVM type for a kernel argument to an argument
-// kind suitable for a descriptor map.  The result is one of:
-//   buffer     - storage buffer
-//   buffer_ubo - uniform buffer
-//   local      - array in Workgroup storage, number of elements given by
-//                a specialization constant
-//   pod        - plain-old-data
-//   ro_image   - read-only image
-//   wo_image   - write-only image
-//   sampler    - sampler
-inline const char *GetArgKindNameForType(llvm::Type *type) {
-  return GetArgKindName(GetArgKindForType(type));
-}
+// Returns the style of pod args used by |F|. Note that |F| must be a kernel.
+PodArgImpl GetPodArgsImpl(llvm::Function &F);
+
+// Returns the ArgKind for pod args in kernel |F|.
+ArgKind GetArgKindForPodArgs(llvm::Function &F);
+
+// Returns the ArgKind for |Arg|.
+ArgKind GetArgKind(llvm::Argument &Arg);
 
 // Returns true if the given type is a pointer-to-local type.
 bool IsLocalPtr(llvm::Type *type);
