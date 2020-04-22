@@ -29,7 +29,7 @@ BUILD_TYPE="Debug"
 # We need a newer libstdc++ for clvk
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo apt update -qq
-sudo apt install -y g++-7
+sudo aptitude install -y g++-7
 
 CMAKE_C_CXX_COMPILER=""
 if [ $COMPILER = "clang" ]; then
@@ -39,7 +39,7 @@ else
   # Specify we want to build with GCC 7 (which supports C++14)
   sudo add-apt-repository ppa:ubuntu-toolchain-r/test
   sudo apt-get update
-  sudo apt-get install -y gcc-7 g++-7
+  sudo aptitude install -y gcc-7 g++-7
   sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
   sudo update-alternatives --set gcc "/usr/bin/gcc-7"
   CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/gcc-7 -DCMAKE_CXX_COMPILER=/usr/bin/g++-7"
