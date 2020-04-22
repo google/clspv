@@ -85,7 +85,7 @@ private:
     auto canonical = QT.getCanonicalType();
     if (auto *PT = dyn_cast<PointerType>(canonical)) {
       return ContainsArrayType(PT->getPointeeType());
-    } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
+    } else if (isa<ArrayType>(canonical)) {
       return true;
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
       for (auto field_decl : RT->getDecl()->fields()) {
@@ -105,7 +105,7 @@ private:
     }
 
     if (auto *PT = dyn_cast<PointerType>(canonical)) {
-      return IsRecursiveType(canonical->getPointeeType(), seen);
+      return IsRecursiveType(PT->getPointeeType(), seen);
     } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
       return IsRecursiveType(AT->getElementType(), seen);
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
