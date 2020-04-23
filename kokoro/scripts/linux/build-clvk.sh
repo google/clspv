@@ -38,7 +38,7 @@ if [ $COMPILER = "clang" ]; then
 else
   # Specify we want to build with GCC 7 (which supports C++14)
   sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-  sudo apt-get update
+  sudo apt-get update -qq
   sudo aptitude install -y gcc-7 g++-7
   sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
   sudo update-alternatives --set gcc "/usr/bin/gcc-7"
@@ -75,6 +75,9 @@ fi
 wget -q https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip
 unzip -q ninja-linux.zip
 export PATH="$PWD:$PATH"
+
+# removing the old version
+sudo apt-get purge -y --auto-remove cmake
 
 # Get newer version of CMake
 wget -q https://github.com/Kitware/CMake/releases/download/v3.16.0/cmake-3.16.0-Linux-x86_64.tar.gz
