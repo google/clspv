@@ -33,7 +33,7 @@ if [ $COMPILER = "clang" ]; then
 else
   # Specify we want to build with GCC 7 (which supports C++14)
   sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-  sudo apt-get update
+  sudo apt-get update -qq
   sudo aptitude install -y gcc-7 g++-7
   sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
   sudo update-alternatives --set gcc "/usr/bin/gcc-7"
@@ -67,15 +67,12 @@ then
 fi
 
 # removing the old version
-echo y | sudo apt-get purge --auto-remove cmake
+sudo apt-get purge -y --auto-remove cmake
 
-# Installing the 3.10.2 version
-wget http://www.cmake.org/files/v3.10/cmake-3.10.2.tar.gz
-tar -xvzf cmake-3.10.2.tar.gz
-cd cmake-3.10.2/
-./configure
-make
-sudo make install
+# Get newer version of CMake
+wget -q https://github.com/Kitware/CMake/releases/download/v3.16.0/cmake-3.16.0-Linux-x86_64.tar.gz
+tar xf cmake-3.16.0-Linux-x86_64.tar.gz
+export PATH="$PWD/cmake-3.16.0-Linux-x86_64/bin:$PATH"
 
 echo $(date): $(cmake --version)
 
