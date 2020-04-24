@@ -2338,7 +2338,7 @@ void SPIRVProducerPass::GenerateSPIRVTypes() {
       }
       break;
     }
-    case Type::VectorTyID: {
+    case Type::FixedVectorTyID: {
       auto VecTy = cast<VectorType>(Ty);
       // <4 x i8> is changed to i32 if i8 is not generally supported.
       if (!clspv::Option::Int8Support() &&
@@ -6126,7 +6126,7 @@ bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
   case Type::FloatTyID:
   case Type::DoubleTyID:
   case Type::IntegerTyID:
-  case Type::VectorTyID:
+  case Type::FixedVectorTyID:
     return true;
   case Type::PointerTyID: {
     const PointerType *pointer_type = cast<PointerType>(type);
