@@ -25,5 +25,9 @@ bool isValidExplicitLayout(llvm::Module &M, llvm::StructType *STy,
                            unsigned Member, spv::StorageClass SClass,
                            unsigned offset, unsigned PreviousMemberOffset);
 
+// Returns true if |STy| is a valid layout for storage class.
+bool isValidExplicitLayout(llvm::Module &M, llvm::StructType *STy,
+                           spv::StorageClass SClass);
+
 } // namespace clspv
 

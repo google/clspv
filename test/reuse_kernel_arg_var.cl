@@ -59,15 +59,15 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 // CHECK:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_uint]]
 // CHECK:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
 // CHECK:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]]
-// CHECK:  [[__ptr_StorageBuffer__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_9]]
+// CHECK:  [[__ptr_Uniform__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_9]]
 // CHECK:  [[A_R]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CHECK:  [[B_S]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CHECK:  [[C]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
 // CHECK:  [[D]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
-// CHECK:  [[f_y]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
-// CHECK:  [[g]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
+// CHECK:  [[f_y]] = OpVariable [[__ptr_Uniform__struct_9]] Uniform
+// CHECK:  [[g]] = OpVariable [[__ptr_Uniform__struct_9]] Uniform
 // CHECK:  [[T]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
-// CHECK:  [[x]] = OpVariable [[__ptr_StorageBuffer__struct_9]] StorageBuffer
+// CHECK:  [[x]] = OpVariable [[__ptr_Uniform__struct_9]] Uniform
 // CHECK:  [[foo]] = OpFunction
 // CHECK:  OpAccessChain {{.*}} [[A_R]]
 // CHECK:  OpAccessChain {{.*}} [[B_S]]
@@ -88,9 +88,7 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 // CLUSTER:  OpDecorate [[B_S:%[0-9a-zA-Z_]+]] Binding 1
 // CLUSTER:  OpDecorate [[C:%[0-9a-zA-Z_]+]] Binding 2
 // CLUSTER:  OpDecorate [[D:%[0-9a-zA-Z_]+]] Binding 3
-// CLUSTER:  OpDecorate [[fg:%[0-9a-zA-Z_]+]] Binding 4
 // CLUSTER:  OpDecorate [[T:%[0-9a-zA-Z_]+]] Binding 2
-// CLUSTER:  OpDecorate [[xy:%[0-9a-zA-Z_]+]] Binding 3
 // CLUSTER:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CLUSTER:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
 // CLUSTER:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
@@ -101,14 +99,14 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 // CLUSTER:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
 // CLUSTER:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]] [[_float]]
 // CLUSTER:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__struct_9]]
-// CLUSTER:  [[__ptr_StorageBuffer__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_10]]
+// CLUSTER:  [[__ptr_PushConstant__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer PushConstant [[__struct_10]]
 // CLUSTER:  [[A_R]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CLUSTER:  [[B_S]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CLUSTER:  [[C]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
 // CLUSTER:  [[D]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
-// CLUSTER:  [[fg]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
+// CLUSTER:  [[fg:%[a-zA-Z0-9_.]+]] = OpVariable [[__ptr_PushConstant__struct_10]] PushConstant
 // CLUSTER:  [[T]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
-// CLUSTER:  [[xy]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
+// CLUSTER:  [[xy:%[a-zA-Z0-9_.]+]] = OpVariable [[__ptr_PushConstant__struct_10]] PushConstant
 // CLUSTER:  [[foo]] = OpFunction
 // CLUSTER:  OpAccessChain {{.*}} [[A_R]]
 // CLUSTER:  OpAccessChain {{.*}} [[B_S]]

@@ -28,16 +28,17 @@ kernel void foo(global int* A, int n) {
 // CHECK: OpDecorate [[_19]] Binding 1
 // CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[__ptr_StorageBuffer_uint:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_uint]]
+// CHECK-DAG: [[__ptr_Uniform_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[_uint]]
 // CHECK-DAG: [[__runtimearr_uint]] = OpTypeRuntimeArray [[_uint]]
 // CHECK-DAG: [[__struct_4]] = OpTypeStruct [[__runtimearr_uint]]
 // CHECK-DAG: [[__ptr_StorageBuffer__struct_4:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_4]]
 // CHECK-DAG: [[__struct_6]] = OpTypeStruct [[_uint]]
-// CHECK-DAG: [[__ptr_StorageBuffer__struct_6:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_6]]
+// CHECK-DAG: [[__ptr_Uniform__struct_6:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_6]]
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK: [[_18]] = OpVariable [[__ptr_StorageBuffer__struct_4]] StorageBuffer
-// CHECK: [[_19]] = OpVariable [[__ptr_StorageBuffer__struct_6]] StorageBuffer
+// CHECK: [[_19]] = OpVariable [[__ptr_Uniform__struct_6]] Uniform
 // CHECK: [[_21:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK: [[_22:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_18]] [[_uint_0]] [[_uint_0]]
-// CHECK: [[_23:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_uint]] [[_19]] [[_uint_0]]
+// CHECK: [[_23:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Uniform_uint]] [[_19]] [[_uint_0]]
 // CHECK: [[_24:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_23]]
 // CHECK: OpStore [[_22]] [[_24]]

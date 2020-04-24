@@ -211,4 +211,20 @@ bool isValidExplicitLayout(Module &M, StructType *STy, unsigned Member,
 
   return true;
 }
+
+bool isValidExplicitLayout(llvm::Module &M, llvm::StructType *STy,
+                           spv::StorageClass SClass) {
+  auto const &DL = M.getDataLayout();
+  const auto StructLayout = DL.getStructLayout(STy);
+  bool ok = true;
+  auto previous_offset = 0;
+  for (unsigned i = 0; ok && i < STy->getNumElements(); i++) {
+    auto offset = StructLayout->getElementOffset(i);
+    ok &=
+        isValidExplicitLayout(M, STy, i, SClass, offset, previous_offset);
+    previous_offset = offset;
+  }
+
+  return ok;
+}
 } // namespace clspv

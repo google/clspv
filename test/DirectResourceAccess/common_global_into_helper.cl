@@ -5,9 +5,9 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 //      MAP: kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
-//      MAP: kernel,foo,arg,n,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
+//      MAP: kernel,foo,arg,n,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 //      MAP: kernel,bar,arg,B,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
-//      MAP: kernel,bar,arg,m,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,pod,argSize,4
+//      MAP: kernel,bar,arg,m,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 // MAP-NONE: kernel
 
 float core(global float *arr, int n) {

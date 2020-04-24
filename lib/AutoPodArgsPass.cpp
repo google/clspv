@@ -18,10 +18,13 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
+#include "spirv/unified1/spirv.hpp"
+
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
 #include "Constants.h"
+#include "Layout.h"
 #include "Passes.h"
 
 #define DEBUG_TYPE "autopodargs"
@@ -36,7 +39,16 @@ public:
 
   bool runOnModule(Module &M) override;
 private:
+  // Decides the pod args implementation for each kernel individually.
+  void runOnFunction(Function &F);
+
+  // Returns true if |M| uses any global push constants.
+  bool UsesGlobalPushConstant(Module &M);
+
+  // Makes all kernels use |impl| for pod args.
   void AnnotateAllKernels(Module &M, clspv::PodArgImpl impl);
+
+  // Makes kernel |F| use |impl| as the pod arg implementation.
   void AddMetadata(Function &F, clspv::PodArgImpl impl);
 };
 } // namespace
@@ -54,13 +66,84 @@ ModulePass *createAutoPodArgsPass() {
 bool AutoPodArgsPass::runOnModule(Module &M) {
   if (clspv::Option::PodArgsInUniformBuffer()) {
     AnnotateAllKernels(M, clspv::PodArgImpl::kUBO);
+    return true;
   } else if (clspv::Option::PodArgsInPushConstants()) {
     AnnotateAllKernels(M, clspv::PodArgImpl::kPushConstant);
-  } else {
-    AnnotateAllKernels(M, clspv::PodArgImpl::kSSBO);
+    return true;
+  }
+
+  for (auto &F : M) {
+    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
+      continue;
+
+    runOnFunction(F);
   }
 
   return true;
+}
+
+void AutoPodArgsPass::runOnFunction(Function &F) {
+  auto &M = *F.getParent();
+  const auto &DL = M.getDataLayout();
+  SmallVector<Type *, 8> pod_types;
+  bool satisfies_ubo = true;
+  for (auto &Arg : F) {
+    auto arg_type = Arg.getType();
+    if (isa<PointerType>(arg_type))
+      continue;
+
+    pod_types.push_back(arg_type);
+
+    if (auto struct_ty = dyn_cast<StructType>(arg_type)) {
+      // Only check individual arguments as clustering will fix the layout with
+      // padding if necessary.
+      satisfies_ubo &=
+          clspv::isValidExplicitLayout(M, struct_ty, spv::StorageClassUniform);
+    }
+  }
+
+  auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
+  // Per-kernel push constant interface requires:
+  // 1. Clustered pod args.
+  // 2. No global push constants.
+  // 3. Args must fit in push constant size limit.
+  const bool satisfies_push_constant =
+      !(!clspv::Option::ClusterPodKernelArgs() || UsesGlobalPushConstant(M) ||
+        (DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8) >
+            clspv::Option::MaxPushConstantsSize());
+
+  // Priority:
+  // 1. Per-kernel push constant interface.
+  // 2. NYI: global type mangled push constant interface.
+  // 3. UBO
+  // 4. SSBO
+  if (satisfies_push_constant) {
+    AddMetadata(F, clspv::PodArgImpl::kPushConstant);
+  } else if (satisfies_ubo) {
+    AddMetadata(F, clspv::PodArgImpl::kUBO);
+  } else {
+    AddMetadata(F, clspv::PodArgImpl::kSSBO);
+  }
+}
+
+bool AutoPodArgsPass::UsesGlobalPushConstant(Module &M) {
+  // TODO: this should probably be refactored to reduce duplication with
+  // DeclarePushConstantsPass.
+  if ((clspv::Option::Language() ==
+       clspv::Option::SourceLanguage::OpenCL_C_20) ||
+      (clspv::Option::Language() ==
+       clspv::Option::SourceLanguage::OpenCL_CPP)) {
+    if (M.getFunction("_Z23get_enqueued_local_sizej"))
+      return true;
+  }
+
+  if (clspv::Option::GlobalOffset()) {
+    if (M.getFunction("_Z17get_global_offsetj") ||
+        M.getFunction("_Z13get_global_idj"))
+      return true;
+  }
+
+  return false;
 }
 
 void AutoPodArgsPass::AnnotateAllKernels(Module &M, clspv::PodArgImpl impl) {
