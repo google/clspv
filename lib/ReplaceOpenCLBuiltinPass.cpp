@@ -125,6 +125,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
                     int byte_len);
   bool replaceBarrier(Function &F);
   bool replaceMemFence(Function &F, uint32_t semantics);
+  bool replacePrefetch(Function &F);
   bool replaceRelational(Function &F, CmpInst::Predicate P, int32_t C);
   bool replaceIsInfAndIsNan(Function &F, spv::Op SPIRVOp, int32_t isvec);
   bool replaceIsFinite(Function &F);
@@ -399,6 +400,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kWriteImageh:
     return replaceHalfWriteImage(F);
+
+  case Builtins::kPrefetch:
+    return replacePrefetch(F);
 
   default:
     break;
@@ -705,6 +709,28 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
     return clspv::InsertSPIRVOp(CI, spv::OpMemoryBarrier, {}, CI->getType(),
                                 {MemoryScope, MemorySemantics});
   });
+}
+
+bool ReplaceOpenCLBuiltinPass::replacePrefetch(Function &F) {
+  bool Changed = false;
+
+  SmallVector<Instruction *, 4> ToRemoves;
+
+  // Find all calls to the function
+  for (auto &U : F.uses()) {
+    if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+      ToRemoves.push_back(CI);
+    }
+  }
+
+  Changed = !ToRemoves.empty();
+
+  // Delete them
+  for (auto V : ToRemoves) {
+    V->eraseFromParent();
+  }
+
+  return Changed;
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceRelational(Function &F,
