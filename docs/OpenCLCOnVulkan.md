@@ -516,6 +516,18 @@ Here is a list of the push constants currently supported:
 - `enqueued_local_size`: the 3D local work size returned by
   `get_enqueued_local_size()`. A vector of 3 32-bit integer values. Lower
   dimensions come first in memory.
+- `global_size`: the 3D global size of the NDRange as returned by
+  `get_global_size()`. A vector of 3 32-bit integer values. Lower dimensions
+  come first in memory. Only required when non-uniform NDRanges are supported.
+- `num_workgroups`: the 3D number of work groups in the NDRange as returned by
+  `get_num_groups()`. A vector of 3 32-bit integer values. Lower dimensions come
+  first in memory. Only required when non-uniform NDRanges are supported.
+- `region_offset`: the 3D global ID offset into the NDRange for this uniform
+  region. A vector of 3 32-bit integer values. Lower dimensions come first in
+  memory. Only required when non-uniform NDRanges are supported.
+- `region_group_offset`: the 3D group ID offset into the NDRange for this
+  region. A vector of 3 32-bit integer values. Lower dimensions come first in
+  memory. Only required when non-uniform NDRanges are supported.
 
 ### Attributes
 
