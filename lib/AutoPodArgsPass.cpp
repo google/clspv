@@ -102,11 +102,11 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
     }
   }
 
-  auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
   // Per-kernel push constant interface requires:
   // 1. Clustered pod args.
   // 2. No global push constants.
   // 3. Args must fit in push constant size limit.
+  const auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
   const bool satisfies_push_constant =
       !(!clspv::Option::ClusterPodKernelArgs() || UsesGlobalPushConstant(M) ||
         (DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8) >
@@ -117,13 +117,13 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   // 2. NYI: global type mangled push constant interface.
   // 3. UBO
   // 4. SSBO
+  clspv::PodArgImpl impl = clspv::PodArgImpl::kSSBO;
   if (satisfies_push_constant) {
-    AddMetadata(F, clspv::PodArgImpl::kPushConstant);
+    impl = clspv::PodArgImpl::kPushConstant;
   } else if (satisfies_ubo) {
-    AddMetadata(F, clspv::PodArgImpl::kUBO);
-  } else {
-    AddMetadata(F, clspv::PodArgImpl::kSSBO);
+    impl = clspv::PodArgImpl::kUBO;
   }
+  AddMetadata(F, impl);
 }
 
 bool AutoPodArgsPass::UsesGlobalPushConstant(Module &M) {
