@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
@@ -145,18 +144,19 @@ bool UndoByvalPass::runOnModule(Module &M) {
       for (auto User : Users) {
         // Create new call instruction for new function without byval.
         CallInst *Call = cast<CallInst>(User);
-        CallSite CS(Call);
+        auto Callee = Call->getCalledFunction();
 
         SmallVector<Value *, 8> Args;
 
-        for (unsigned i = 0; i < CS.arg_size(); i++) {
-          auto Arg = CS.getArgument(i);
+        for (unsigned i = 0; i < Callee->arg_size(); i++) {
+          auto Arg = Callee->getArg(i);
+          auto param = Call->getArgOperand(i);
 
-          if (CS.isByValArgument(i)) {
+          if (Arg->hasByValAttr()) {
             Args.push_back(new LoadInst(Arg->getType()->getPointerElementType(),
-                                        Arg, "", Call));
+                                        param, "", Call));
           } else {
-            Args.push_back(Arg);
+            Args.push_back(param);
           }
         }
 
