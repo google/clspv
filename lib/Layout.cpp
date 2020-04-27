@@ -220,8 +220,7 @@ bool isValidExplicitLayout(llvm::Module &M, llvm::StructType *STy,
   auto previous_offset = 0;
   for (unsigned i = 0; ok && i < STy->getNumElements(); i++) {
     auto offset = StructLayout->getElementOffset(i);
-    ok &=
-        isValidExplicitLayout(M, STy, i, SClass, offset, previous_offset);
+    ok &= isValidExplicitLayout(M, STy, i, SClass, offset, previous_offset);
     previous_offset = offset;
   }
 

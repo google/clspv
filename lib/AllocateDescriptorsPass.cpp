@@ -513,8 +513,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       for (Argument &Arg : f_ptr->args()) {
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg) !=
-              clspv::ArgKind::PodPushConstant) {
+          if (clspv::GetArgKind(Arg) != clspv::ArgKind::PodPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }

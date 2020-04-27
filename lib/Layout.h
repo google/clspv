@@ -30,4 +30,3 @@ bool isValidExplicitLayout(llvm::Module &M, llvm::StructType *STy,
                            spv::StorageClass SClass);
 
 } // namespace clspv
-

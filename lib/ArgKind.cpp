@@ -106,13 +106,13 @@ PodArgImpl GetPodArgsImpl(Function &F) {
 ArgKind GetArgKindForPodArgs(Function &F) {
   auto impl = GetPodArgsImpl(F);
   switch (impl) {
-    case kUBO:
-      return ArgKind::PodUBO;
-    case kPushConstant:
-    case kGlobalPushConstant:
-      return ArgKind::PodPushConstant;
-    case kSSBO:
-      return ArgKind::Pod;
+  case kUBO:
+    return ArgKind::PodUBO;
+  case kPushConstant:
+  case kGlobalPushConstant:
+    return ArgKind::PodPushConstant;
+  case kSSBO:
+    return ArgKind::Pod;
   }
 }
 

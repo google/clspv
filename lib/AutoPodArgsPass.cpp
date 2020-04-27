@@ -39,6 +39,7 @@ public:
   AutoPodArgsPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
+
 private:
   // Decides the pod args implementation for each kernel individually.
   void runOnFunction(Function &F);
@@ -53,12 +54,11 @@ private:
 
 char AutoPodArgsPass::ID = 0;
 INITIALIZE_PASS(AutoPodArgsPass, "AutoPodArgs",
-                "Mark pod arg implementation as metadata on kernels", false, false)
+                "Mark pod arg implementation as metadata on kernels", false,
+                false)
 
 namespace clspv {
-ModulePass *createAutoPodArgsPass() {
-  return new AutoPodArgsPass();
-}
+ModulePass *createAutoPodArgsPass() { return new AutoPodArgsPass(); }
 } // namespace clspv
 
 bool AutoPodArgsPass::runOnModule(Module &M) {
@@ -129,7 +129,7 @@ void AutoPodArgsPass::AnnotateAllKernels(Module &M, clspv::PodArgImpl impl) {
   for (auto &F : M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
       continue;
-  
+
     AddMetadata(F, impl);
   }
 }
