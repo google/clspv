@@ -87,7 +87,7 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   const auto &DL = M.getDataLayout();
   SmallVector<Type *, 8> pod_types;
   bool satisfies_ubo = true;
-  for (auto &Arg : F) {
+  for (auto &Arg : F.args()) {
     auto arg_type = Arg.getType();
     if (isa<PointerType>(arg_type))
       continue;
