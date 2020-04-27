@@ -26,6 +26,7 @@
 #include "Constants.h"
 #include "Layout.h"
 #include "Passes.h"
+#include "PushConstants.h"
 
 #define DEBUG_TYPE "autopodargs"
 
@@ -41,9 +42,6 @@ public:
 private:
   // Decides the pod args implementation for each kernel individually.
   void runOnFunction(Function &F);
-
-  // Returns true if |M| uses any global push constants.
-  bool UsesGlobalPushConstant(Module &M);
 
   // Makes all kernels use |impl| for pod args.
   void AnnotateAllKernels(Module &M, clspv::PodArgImpl impl);
@@ -108,7 +106,8 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   // 3. Args must fit in push constant size limit.
   const auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
   const bool satisfies_push_constant =
-      !(!clspv::Option::ClusterPodKernelArgs() || UsesGlobalPushConstant(M) ||
+      !(!clspv::Option::ClusterPodKernelArgs() ||
+        clspv::UsesGlobalPushConstants(M) ||
         (DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8) >
             clspv::Option::MaxPushConstantsSize());
 
@@ -124,26 +123,6 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
     impl = clspv::PodArgImpl::kUBO;
   }
   AddMetadata(F, impl);
-}
-
-bool AutoPodArgsPass::UsesGlobalPushConstant(Module &M) {
-  // TODO: this should probably be refactored to reduce duplication with
-  // DeclarePushConstantsPass.
-  if ((clspv::Option::Language() ==
-       clspv::Option::SourceLanguage::OpenCL_C_20) ||
-      (clspv::Option::Language() ==
-       clspv::Option::SourceLanguage::OpenCL_CPP)) {
-    if (M.getFunction("_Z23get_enqueued_local_sizej"))
-      return true;
-  }
-
-  if (clspv::Option::GlobalOffset()) {
-    if (M.getFunction("_Z17get_global_offsetj") ||
-        M.getFunction("_Z13get_global_idj"))
-      return true;
-  }
-
-  return false;
 }
 
 void AutoPodArgsPass::AnnotateAllKernels(Module &M, clspv::PodArgImpl impl) {

@@ -101,4 +101,25 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
   return Builder.CreateInBoundsGEP(GV, Indices);
 }
 
+bool UsesGlobalPushConstants(Module &M) {
+  return clspv::Option::NonUniformNDRangeSupported() ||
+         ShouldDeclareEnqueuedLocalSize(M) || ShouldDeclareGlobalOffset(M);
+}
+
+bool ShouldDeclareEnqueuedLocalSize(Module &M) {
+  bool isEnabled = ((clspv::Option::Language() ==
+                     clspv::Option::SourceLanguage::OpenCL_C_20) ||
+                    (clspv::Option::Language() ==
+                     clspv::Option::SourceLanguage::OpenCL_CPP));
+  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool ShouldDeclareGlobalOffset(Module &M) {
+  bool isEnabled = clspv::Option::GlobalOffset();
+  bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
+                (M.getFunction("_Z13get_global_idj") != nullptr);
+  return isEnabled && isUsed;
+}
+
 } // namespace clspv

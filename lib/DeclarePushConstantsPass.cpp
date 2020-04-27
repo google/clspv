@@ -57,22 +57,6 @@ ModulePass *createDeclarePushConstantsPass() {
 }
 } // namespace clspv
 
-bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
-  bool isEnabled = ((clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_C_20) ||
-                    (clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_CPP));
-  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareGlobalOffset(Module &M) {
-  bool isEnabled = clspv::Option::GlobalOffset();
-  bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
-                (M.getFunction("_Z13get_global_idj") != nullptr);
-  return isEnabled && isUsed;
-}
-
 bool DeclarePushConstantsPass::shouldDeclareGlobalSize(Module &M) {
   bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
   bool isUsed = M.getFunction("_Z15get_global_sizej") != nullptr;
@@ -105,11 +89,11 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   auto &C = M.getContext();
 
-  if (shouldDeclareGlobalOffset(M)) {
+  if (clspv::ShouldDeclareGlobalOffset(M)) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
-  if (shouldDeclareEnqueuedLocalSize(M)) {
+  if (clspv::ShouldDeclareEnqueuedLocalSize(M)) {
     PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
   }
 
