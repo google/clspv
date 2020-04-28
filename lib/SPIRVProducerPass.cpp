@@ -2863,10 +2863,10 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
       // Allocate spec constants for workgroup size.
       clspv::AddWorkgroupSpecConstants(module);
-      
+
       SPIRVOperandVec Ops;
-      uint32_t result_type_id =
-          getSPIRVType(dyn_cast<VectorType>(Ty->getPointerElementType())->getElementType());
+      uint32_t result_type_id = getSPIRVType(
+          dyn_cast<VectorType>(Ty->getPointerElementType())->getElementType());
 
       // X Dimension
       Ops << MkId(result_type_id) << MkNum(1);
@@ -2913,7 +2913,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[1] : Default literal value
     InitializerID = nextID++;
 
-    Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32))) << MkNum(3);
+    Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32)))
+        << MkNum(3);
 
     auto *Inst = new SPIRVInstruction(spv::OpSpecConstant, InitializerID, Ops);
     getSPIRVInstList(kConstants).push_back(Inst);
