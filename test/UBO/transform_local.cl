@@ -38,6 +38,9 @@ __kernel void foo(__global data_type* data, __constant data_type* c_arg, __local
 // CHECK: [[l_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[int]]
 // CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+// CHECK: [[size1:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK: [[size2:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK: [[size3:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
 // CHECK: [[size:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
 // CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[size]]
 // CHECK: [[l_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[array]]

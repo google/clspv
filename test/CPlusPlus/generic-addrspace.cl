@@ -11,6 +11,9 @@
 // CHECK-DAG: %[[void:[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: %[[__original_id_11:[0-9]+]] = OpTypeFunction %[[void]]
 // CHECK-DAG: %[[_ptr_StorageBuffer_uint:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[uint]]
+// CHECK-DAG: %[[__spc_1:[0-9]+]] = OpSpecConstant %[[uint]] 1
+// CHECK-DAG: %[[__spc_2:[0-9]+]] = OpSpecConstant %[[uint]] 1
+// CHECK-DAG: %[[__spc_3:[0-9]+]] = OpSpecConstant %[[uint]] 1
 // CHECK-DAG: %[[__original_id_2:[0-9]+]] = OpSpecConstant %[[uint]] 1
 // CHECK-DAG: %[[_arr_uint_2:[0-9a-zA-Z_]+]] = OpTypeArray %[[uint]] %[[__original_id_2]]
 // CHECK-DAG: %[[_ptr_Workgroup__arr_uint_2:[0-9a-zA-Z_]+]] = OpTypePointer Workgroup %[[_arr_uint_2]]
