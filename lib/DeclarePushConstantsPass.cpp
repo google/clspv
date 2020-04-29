@@ -37,7 +37,6 @@ struct DeclarePushConstantsPass : public ModulePass {
   DeclarePushConstantsPass() : ModulePass(ID) {}
 
   bool shouldDeclareEnqueuedLocalSize(Module &M);
-  bool shouldDeclareGlobalOffset(Module &M);
   bool shouldDeclareGlobalSize(Module &M);
   bool shouldDeclareRegionOffset(Module &M);
   bool shouldDeclareNumWorkgroups(Module &M);
@@ -56,6 +55,12 @@ ModulePass *createDeclarePushConstantsPass() {
   return new DeclarePushConstantsPass();
 }
 } // namespace clspv
+
+bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
+  return isEnabled && isUsed;
+}
 
 bool DeclarePushConstantsPass::shouldDeclareGlobalSize(Module &M) {
   bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
@@ -93,7 +98,7 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
-  if (clspv::ShouldDeclareEnqueuedLocalSize(M)) {
+  if (shouldDeclareEnqueuedLocalSize(M)) {
     PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
   }
 

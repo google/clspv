@@ -35,9 +35,6 @@ llvm::Value *GetPushConstantPointer(llvm::BasicBlock *, PushConstant);
 // Returns true if any global push constant is used.
 bool UsesGlobalPushConstants(llvm::Module &);
 
-// Returns true if an implememtation of get_enqueued_local_size() is needed.
-bool ShouldDeclareEnqueuedLocalSize(llvm::Module &);
-
 // Returns true if an implementation of get_global_offset() is needed.
 bool ShouldDeclareGlobalOffset(llvm::Module &);
 } // namespace clspv

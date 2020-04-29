@@ -22,6 +22,8 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "clspv/Option.h"
+
 #include "Constants.h"
 
 using namespace llvm;
@@ -103,16 +105,7 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
 
 bool UsesGlobalPushConstants(Module &M) {
   return clspv::Option::NonUniformNDRangeSupported() ||
-         ShouldDeclareEnqueuedLocalSize(M) || ShouldDeclareGlobalOffset(M);
-}
-
-bool ShouldDeclareEnqueuedLocalSize(Module &M) {
-  bool isEnabled = ((clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_C_20) ||
-                    (clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_CPP));
-  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
-  return isEnabled && isUsed;
+         ShouldDeclareGlobalOffset(M);
 }
 
 bool ShouldDeclareGlobalOffset(Module &M) {
