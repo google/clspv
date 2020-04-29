@@ -45,13 +45,11 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
                            AddressSpace::Type AddrSpace = AddressSpace::Input);
 
   bool defineGlobalIDBuiltin(Module &M);
-
+  bool defineNumGroupsBuiltin(Module &M);
+  bool defineGroupIDBuiltin(Module &M);
   bool defineGlobalSizeBuiltin(Module &M);
-
   bool defineGlobalOffsetBuiltin(Module &M);
-
   bool defineWorkDimBuiltin(Module &M);
-
   bool defineEnqueuedLocalSizeBuiltin(Module &M);
 
   bool addWorkgroupSizeIfRequired(Module &M);
@@ -80,10 +78,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
                           AddressSpace::ModuleScopePrivate);
   changed |= defineMappedBuiltin(M, "_Z12get_local_idj",
                                  "__spirv_LocalInvocationId", 0);
-  changed |=
-      defineMappedBuiltin(M, "_Z14get_num_groupsj", "__spirv_NumWorkgroups", 1);
-  changed |=
-      defineMappedBuiltin(M, "_Z12get_group_idj", "__spirv_WorkgroupId", 0);
+  changed |= defineNumGroupsBuiltin(M);
+  changed |= defineGroupIDBuiltin(M);
   changed |= defineGlobalSizeBuiltin(M);
   changed |= defineWorkDimBuiltin(M);
   changed |= defineEnqueuedLocalSizeBuiltin(M);
@@ -175,14 +171,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
     return false;
   }
 
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
   VectorType *VT = VectorType::get(IT, 3);
 
   GlobalVariable *GV = createGlobalVariable(M, "__spirv_GlobalInvocationId", VT,
                                             AddressSpace::Input);
-
-  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
-  IRBuilder<> Builder(BB);
 
   auto Dim = &*F->arg_begin();
   auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
@@ -194,13 +190,21 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
   auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
 
-  // If we have a global offset we need to add it
   Value *Ret = GidBase;
-  if (clspv::Option::GlobalOffset()) {
-    auto Goff =
-        Builder.CreateCall(M.getFunction("_Z17get_global_offsetj"), Dim);
-    Goff->setCallingConv(CallingConv::SPIR_FUNC);
-    Ret = Builder.CreateAdd(GidBase, Goff);
+  if (clspv::Option::NonUniformNDRangeSupported()) {
+    auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::RegionOffset);
+    auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
+    auto Size = Builder.CreateLoad(DimPtr);
+    auto RegOff = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 0);
+    Ret = Builder.CreateAdd(Ret, RegOff);
+  } else {
+    // If we have a global offset we need to add it
+    if (clspv::Option::GlobalOffset()) {
+      auto Goff =
+          Builder.CreateCall(M.getFunction("_Z17get_global_offsetj"), Dim);
+      Goff->setCallingConv(CallingConv::SPIR_FUNC);
+      Ret = Builder.CreateAdd(Ret, Goff);
+    }
   }
 
   Builder.CreateRet(Ret);
@@ -216,27 +220,101 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
     return false;
   }
 
-  IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  VectorType *VT = VectorType::get(IT, 3);
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
 
-  // Global size uses two builtin variables that might already have been
-  // created.
-  StringRef WorkgroupSize = "__spirv_WorkgroupSize";
-  StringRef NumWorkgroups = "__spirv_NumWorkgroups";
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+  Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
 
-  GlobalVariable *WGS = M.getGlobalVariable(WorkgroupSize);
+  Value *GlobalSize;
+  if (clspv::Option::NonUniformNDRangeSupported()) {
+    auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::GlobalSize);
+    auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
+    GlobalSize = Builder.CreateLoad(DimPtr);
+  } else {
+    IntegerType *IT = IntegerType::get(M.getContext(), 32);
+    VectorType *VT = VectorType::get(IT, 3);
 
-  // If the module does not already have workgroup size.
-  if (nullptr == WGS) {
-    WGS = createGlobalVariable(M, WorkgroupSize, VT,
-                               AddressSpace::ModuleScopePrivate);
+    // Global size uses two builtin variables that might already have been
+    // created.
+    StringRef WorkgroupSize = "__spirv_WorkgroupSize";
+    StringRef NumWorkgroups = "__spirv_NumWorkgroups";
+
+    GlobalVariable *WGS = M.getGlobalVariable(WorkgroupSize);
+
+    // If the module does not already have workgroup size.
+    if (nullptr == WGS) {
+      WGS = createGlobalVariable(M, WorkgroupSize, VT,
+                                 AddressSpace::ModuleScopePrivate);
+    }
+
+    GlobalVariable *NWG = M.getGlobalVariable(NumWorkgroups);
+
+    // If the module does not already have num workgroups.
+    if (nullptr == NWG) {
+      NWG = createGlobalVariable(M, NumWorkgroups, VT, AddressSpace::Input);
+    }
+
+    // Load the workgroup size.
+    Value *LoadWGS = Builder.CreateLoad(Builder.CreateGEP(WGS, Indices));
+
+    // And the number of workgroups.
+    Value *LoadNWG = Builder.CreateLoad(Builder.CreateGEP(NWG, Indices));
+
+    // We multiply the workgroup size by the number of workgroups to calculate
+    // the global size.
+    GlobalSize = Builder.CreateMul(LoadWGS, LoadNWG);
   }
 
-  GlobalVariable *NWG = M.getGlobalVariable(NumWorkgroups);
+  GlobalSize = inBoundsDimensionOrDefaultValue(Builder, Dim, GlobalSize, 1);
+  Builder.CreateRet(GlobalSize);
 
-  // If the module does not already have num workgroups.
-  if (nullptr == NWG) {
-    NWG = createGlobalVariable(M, NumWorkgroups, VT, AddressSpace::Input);
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
+
+  Function *F = M.getFunction("_Z14get_num_groupsj");
+
+  // If the builtin was not used in the module, don't create it!
+  if (nullptr == F) {
+    return false;
+  }
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  Value *NumGroupsVarPtr;
+  auto Dim = &*F->arg_begin();
+  auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+  Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
+
+  if (clspv::Option::NonUniformNDRangeSupported()) {
+    NumGroupsVarPtr =
+        GetPushConstantPointer(BB, clspv::PushConstant::NumWorkgroups);
+  } else {
+    IntegerType *IT = IntegerType::get(M.getContext(), 32);
+    VectorType *VT = VectorType::get(IT, 3);
+    NumGroupsVarPtr = createGlobalVariable(M, "__spirv_NumWorkgroups", VT,
+                                           AddressSpace::Input);
+  }
+
+  auto NumGroupsPtr = Builder.CreateInBoundsGEP(NumGroupsVarPtr, Indices);
+  auto NumGroups = Builder.CreateLoad(NumGroupsPtr);
+  auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, NumGroups, 1);
+  Builder.CreateRet(Ret);
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
+
+  Function *F = M.getFunction("_Z12get_group_idj");
+
+  // If the builtin was not used in the module, don't create it!
+  if (nullptr == F) {
+    return false;
   }
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
@@ -244,21 +322,31 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
 
   auto Dim = &*F->arg_begin();
   auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
-
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
 
-  // Load the workgroup size.
-  Value *LoadWGS = Builder.CreateLoad(Builder.CreateGEP(WGS, Indices));
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  VectorType *VT = VectorType::get(IT, 3);
+  auto RegionGroupIDVarPtr =
+      createGlobalVariable(M, "__spirv_WorkgroupId", VT, AddressSpace::Input);
 
-  // And the number of workgroups.
-  Value *LoadNWG = Builder.CreateLoad(Builder.CreateGEP(NWG, Indices));
+  auto RegionGroupIDPtr =
+      Builder.CreateInBoundsGEP(RegionGroupIDVarPtr, Indices);
+  auto RegionGroupID = Builder.CreateLoad(RegionGroupIDPtr);
+  auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupID, 0);
 
-  // We multiply the workgroup size by the number of workgroups to calculate the
-  // global size.
-  Value *Mul = Builder.CreateMul(LoadWGS, LoadNWG);
+  if (clspv::Option::NonUniformNDRangeSupported()) {
+    auto RegionGroupOffsetVarPtr =
+        GetPushConstantPointer(BB, clspv::PushConstant::RegionGroupOffset);
+    auto RegionGroupOffsetPtr =
+        Builder.CreateInBoundsGEP(RegionGroupOffsetVarPtr, Indices);
+    auto RegionGroupOffsetVal = Builder.CreateLoad(RegionGroupOffsetPtr);
+    auto RegionGroupOffset =
+        inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupOffsetVal, 0);
 
-  auto Select2 = inBoundsDimensionOrDefaultValue(Builder, Dim, Mul, 1);
-  Builder.CreateRet(Select2);
+    Ret = Builder.CreateAdd(Ret, RegionGroupOffset);
+  }
+
+  Builder.CreateRet(Ret);
 
   return true;
 }
@@ -362,7 +450,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
 bool DefineOpenCLWorkItemBuiltinsPass::addWorkgroupSizeIfRequired(Module &M) {
   StringRef WorkgroupSize = "__spirv_WorkgroupSize";
 
-  // If the module already has workgroup size.
+  // If the module doesn't already have workgroup size.
   if (nullptr == M.getGlobalVariable(WorkgroupSize)) {
     for (auto &F : M) {
       if (F.getCallingConv() != llvm::CallingConv::SPIR_KERNEL) {
@@ -371,7 +459,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::addWorkgroupSizeIfRequired(Module &M) {
 
       // If this kernel does not have the reqd_work_group_size metadata, we need
       // to output the workgroup size variable.
-      if (nullptr == F.getMetadata("reqd_work_group_size")) {
+      if (nullptr == F.getMetadata("reqd_work_group_size") ||
+          clspv::Option::NonUniformNDRangeSupported()) {
         IntegerType *IT = IntegerType::get(M.getContext(), 32);
         VectorType *VT = VectorType::get(IT, 3);
         createGlobalVariable(M, WorkgroupSize, VT,

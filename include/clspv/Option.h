@@ -159,6 +159,12 @@ bool WorkDim();
 // Returns true when support for global offset is enabled.
 bool GlobalOffset();
 
+// Returns true when support for non uniform NDRanges is enabled.
+static bool NonUniformNDRangeSupported() {
+  return (Language() == SourceLanguage::OpenCL_CPP) ||
+         ((Language() == SourceLanguage::OpenCL_C_20));
+}
+
 } // namespace Option
 } // namespace clspv
 

@@ -3210,7 +3210,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
     // If all kernels do not have metadata for reqd_work_group_size, generate
     // OpSpecConstants for x/y/z dimension.
-    if (!HasMD) {
+    if (!HasMD || clspv::Option::NonUniformNDRangeSupported()) {
       //
       // Generate OpSpecConstants for x/y/z dimension.
       //
@@ -3853,8 +3853,9 @@ void SPIRVProducerPass::GenerateModuleInfo() {
 
   SPIRVInstructionList &SPIRVExecutionModes = getSPIRVInstList(kExecutionModes);
   for (auto EntryPoint : EntryPoints) {
-    if (const MDNode *MD = dyn_cast<Function>(EntryPoint.first)
-                               ->getMetadata("reqd_work_group_size")) {
+    const MDNode *MD = dyn_cast<Function>(EntryPoint.first)
+                           ->getMetadata("reqd_work_group_size");
+    if ((MD != nullptr) && !clspv::Option::NonUniformNDRangeSupported()) {
 
       if (!BuiltinDimVec.empty()) {
         llvm_unreachable(
