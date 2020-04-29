@@ -19,8 +19,12 @@ endif()
 add_executable(clspv-opt ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
 set(CLSPV_LLVM_COMPONENTS
+  LLVMAnalysis
   LLVMCore
+  LLVMIRReader
   LLVMPasses
+  LLVMScalarOpts
+  LLVMSupport
 )
 
 add_dependencies(clspv-opt intrinsics_gen)
