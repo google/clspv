@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -descriptormap=%t2.map
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -descriptormap=%t2.map -pod-ubo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck %s < %t2.map -check-prefix=MAP
@@ -16,8 +16,8 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // MAP-NEXT: kernel,foo,arg,A,argOrdinal,1,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,LS,argOrdinal,2,argKind,local,arrayElemSize,8,arrayNumElemSpecId,4
 // MAP-NEXT: kernel,foo,arg,C,argOrdinal,3,descriptorSet,0,binding,1,offset,0,argKind,buffer
-// MAP-NEXT: kernel,foo,arg,f,argOrdinal,4,descriptorSet,0,binding,2,offset,0,argKind,pod,argSize,4
-// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,2,offset,4,argKind,pod,argSize,4
+// MAP-NEXT: kernel,foo,arg,f,argOrdinal,4,descriptorSet,0,binding,2,offset,0,argKind,pod_ubo,argSize,4
+// MAP-NEXT: kernel,foo,arg,g,argOrdinal,5,descriptorSet,0,binding,2,offset,4,argKind,pod_ubo,argSize,4
 // MAP-NOT: kernel
 
 // CHECK:      OpDecorate [[_37:%[0-9a-zA-Z_]+]] Binding 2
@@ -26,11 +26,11 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK-DAG:  [[__struct_15:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]] [[_float]]
 // CHECK-DAG:  [[__struct_16:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__struct_15]]
-// CHECK-DAG:  [[__ptr_StorageBuffer__struct_16:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_16]]
+// CHECK-DAG:  [[__ptr_Uniform__struct_16:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_16]]
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[__ptr_Workgroup_float:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_float]]
 // CHECK-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK-DAG:  [[__ptr_StorageBuffer__struct_15:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_15]]
+// CHECK-DAG:  [[__ptr_Uniform__struct_15:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_15]]
 // CHECK-DAG:  [[__ptr_Workgroup_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_uint]]
 // CHECK-DAG:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
 // CHECK-DAG:  [[__struct_24:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_uint]] [[_uint]]
@@ -42,11 +42,11 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK-DAG:  [[__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypeArray [[__struct_24]] [[_7]]
 // CHECK-DAG:  [[__ptr_Workgroup__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr__struct_24_7]]
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK:      [[_37]] = OpVariable [[__ptr_StorageBuffer__struct_16]] StorageBuffer
+// CHECK:      [[_37]] = OpVariable [[__ptr_Uniform__struct_16]] Uniform
 // CHECK:      [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
 // CHECK:      [[_6:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr__struct_24_7]] Workgroup
 // CHECK:      [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_uint_0]]
-// CHECK:      [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_15]] [[_37]] [[_uint_0]]
+// CHECK:      [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Uniform__struct_15]] [[_37]] [[_uint_0]]
 // CHECK:      [[_43:%[0-9a-zA-Z_]+]] = OpLoad [[__struct_15]] [[_42]]
 // CHECK:      [[_44:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 0
 // CHECK:      [[_45:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 1

@@ -9,5 +9,5 @@ kernel void foo(char c) { }
 // CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
 // CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]]
 // CHECK: [[block:%[a-zA-Z0-9_]+]] = OpTypeStruct [[struct]]
-// CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[block]]
-// CHECK: OpVariable [[ptr]] StorageBuffer
+// CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer PushConstant [[block]]
+// CHECK: OpVariable [[ptr]] PushConstant

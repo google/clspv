@@ -37,7 +37,6 @@ struct DeclarePushConstantsPass : public ModulePass {
   DeclarePushConstantsPass() : ModulePass(ID) {}
 
   bool shouldDeclareEnqueuedLocalSize(Module &M);
-  bool shouldDeclareGlobalOffset(Module &M);
   bool shouldDeclareGlobalSize(Module &M);
   bool shouldDeclareRegionOffset(Module &M);
   bool shouldDeclareNumWorkgroups(Module &M);
@@ -58,18 +57,8 @@ ModulePass *createDeclarePushConstantsPass() {
 } // namespace clspv
 
 bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
-  bool isEnabled = ((clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_C_20) ||
-                    (clspv::Option::Language() ==
-                     clspv::Option::SourceLanguage::OpenCL_CPP));
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
   bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareGlobalOffset(Module &M) {
-  bool isEnabled = clspv::Option::GlobalOffset();
-  bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
-                (M.getFunction("_Z13get_global_idj") != nullptr);
   return isEnabled && isUsed;
 }
 
@@ -105,7 +94,7 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   auto &C = M.getContext();
 
-  if (shouldDeclareGlobalOffset(M)) {
+  if (clspv::ShouldDeclareGlobalOffset(M)) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 

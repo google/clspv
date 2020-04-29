@@ -1,4 +1,4 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -descriptormap=%t2.map -cluster-pod-kernel-args=0
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -descriptormap=%t2.map -cluster-pod-kernel-args=0 -pod-ubo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
@@ -11,7 +11,7 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 //      MAP: kernel,foo,arg,i,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,ro_image
 // MAP-NEXT: kernel,foo,arg,s,argOrdinal,1,descriptorSet,0,binding,1,offset,0,argKind,sampler
 // MAP-NEXT: kernel,foo,arg,offset,argOrdinal,2,descriptorSet,0,binding,2,offset,0,argKind,buffer_ubo
-// MAP-NEXT: kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod,argSize,8
+// MAP-NEXT: kernel,foo,arg,c,argOrdinal,3,descriptorSet,0,binding,3,offset,0,argKind,pod_ubo,argSize,8
 // MAP-NEXT: kernel,foo,arg,data,argOrdinal,4,descriptorSet,0,binding,4,offset,0,argKind,buffer
 
 // CHECK-DAG: OpDecorate [[runtime:%[0-9a-zA-Z_]+]] ArrayStride 16
@@ -39,12 +39,12 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK: [[offset_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
 // CHECK: [[v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 2
 // CHECK: [[struct_v2float:%[0-9a-zA-Z_]+]] = OpTypeStruct [[v2float]]
-// CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct_v2float]]
+// CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct_v2float]]
 // CHECK: [[runtime]] = OpTypeRuntimeArray [[v4float]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
 // CHECK: [[ptr_uniform_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v4float]]
-// CHECK: [[ptr_storagebuffer_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v2float]]
+// CHECK: [[ptr_uniform_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v2float]]
 // CHECK: [[ptr_storagebuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v4float]]
 // CHECK: [[sampled_image:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[image]]
 // CHECK: [[float_zero:%[0-9a-zA-Z_]+]] = OpConstant [[float]] 0
@@ -52,12 +52,12 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK: [[image_var]] = OpVariable [[image_ptr]] UniformConstant
 // CHECK: [[sampler_var]] = OpVariable [[sampler_ptr]] UniformConstant
 // CHECK: [[offset_var]] = OpVariable [[offset_ptr]] Uniform
-// CHECK: [[c_var]] = OpVariable [[c_ptr]] StorageBuffer
+// CHECK: [[c_var]] = OpVariable [[c_ptr]] Uniform
 // CHECK: [[data_var]] = OpVariable [[data_ptr]] StorageBuffer
 // CHECK: [[load_image:%[0-9a-zA-Z_]+]] = OpLoad [[image]] [[image_var]]
 // CHECK: [[load_sampler:%[0-9a-zA-Z_]+]] = OpLoad [[sampler]] [[sampler_var]]
 // CHECK: [[offset_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_uniform_v4float]] [[offset_var]] [[zero]] [[zero]]
-// CHECK: [[c_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_storagebuffer_v2float]] [[c_var]] [[zero]]
+// CHECK: [[c_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_uniform_v2float]] [[c_var]] [[zero]]
 // CHECK: [[load_c:%[0-9a-zA-Z_]+]] = OpLoad [[v2float]] [[c_gep]]
 // CHECK: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_storagebuffer_v4float]] [[data_var]] [[zero]] [[zero]]
 // CHECK: [[sampled:%[0-9a-zA-Z_]+]] = OpSampledImage [[sampled_image]] [[load_image]] [[load_sampler]]

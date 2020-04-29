@@ -22,6 +22,8 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "clspv/Option.h"
+
 #include "Constants.h"
 
 using namespace llvm;
@@ -99,6 +101,18 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
   IRBuilder<> Builder(BB);
   Value *Indices[] = {Builder.getInt32(0), Builder.getInt32(idx)};
   return Builder.CreateInBoundsGEP(GV, Indices);
+}
+
+bool UsesGlobalPushConstants(Module &M) {
+  return clspv::Option::NonUniformNDRangeSupported() ||
+         ShouldDeclareGlobalOffset(M);
+}
+
+bool ShouldDeclareGlobalOffset(Module &M) {
+  bool isEnabled = clspv::Option::GlobalOffset();
+  bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
+                (M.getFunction("_Z13get_global_idj") != nullptr);
+  return isEnabled && isUsed;
 }
 
 } // namespace clspv

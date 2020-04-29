@@ -18,6 +18,7 @@ namespace llvm {
 
 void initializeClspvPasses(PassRegistry &r) {
   initializeAddFunctionAttributesPassPass(r);
+  initializeAutoPodArgsPassPass(r);
   initializeAllocateDescriptorsPassPass(r);
   initializeClusterModuleScopeConstantVarsPass(r);
   initializeClusterPodKernelArgumentsPassPass(r);

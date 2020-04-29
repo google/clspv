@@ -27,6 +27,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/AddFunctionAttributesPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/AutoPodArgsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Builtins.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CallGraphOrderedFunctions.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
@@ -44,6 +45,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerToFunctionArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Layout.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NormalizeGlobalVariable.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp

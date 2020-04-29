@@ -105,7 +105,7 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   bool Changed = false;
   int arg_index = 0;
   for (Argument &arg : fn->args()) {
-    switch (clspv::GetArgKindForType(arg.getType())) {
+    switch (clspv::GetArgKind(arg)) {
     case clspv::ArgKind::Buffer:
     case clspv::ArgKind::BufferUBO:
     case clspv::ArgKind::ReadOnlyImage:
