@@ -188,7 +188,7 @@ struct SPIRVInstruction {
   // Primary constructor must have Opcode, initializes WordCount based on ResID.
   SPIRVInstruction(spv::Op Opc, SPIRVID ResID = 0)
       : Opcode(static_cast<uint16_t>(Opc)) {
-    setResult(Opc, ResID);
+    setResult(ResID);
   }
 
   // Creates an instruction with an opcode and no result ID, and with the given
@@ -213,7 +213,7 @@ struct SPIRVInstruction {
   }
 
 private:
-  void setResult(spv::Op Opc, uint32_t ResID = 0) {
+  void setResult(uint32_t ResID = 0) {
     WordCount = 1 + (ResID != 0 ? 1 : 0);
     ResultID = ResID;
   }
