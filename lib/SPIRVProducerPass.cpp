@@ -2485,7 +2485,6 @@ SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
   } else {
     llvm_unreachable("Variable not found");
   }
-  return 0;
 }
 
 void SPIRVProducerPass::GenerateSPIRVConstants() {
