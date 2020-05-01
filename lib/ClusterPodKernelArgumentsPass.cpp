@@ -128,8 +128,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
         const auto kind = clspv::GetArgKind(Arg);
-        RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
-                             0u, 0u, kind});
+        RemapInfo.push_back(
+            {std::string(Arg.getName()), arg_index, new_index++, 0u, 0u, kind});
       } else {
         PodIndexMap[&Arg] = pod_index++;
         PodArgTys.push_back(ArgTy);
@@ -291,9 +291,9 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
         auto argKindName = GetArgKindName(arg_mapping.arg_kind);
         auto *argtype_md = MDString::get(Context, argKindName);
-        auto *arg_md = MDNode::get(
-            Context, {name_md, old_index_md, new_index_md, offset_md,
-                      arg_size_md, argtype_md});
+        auto *arg_md =
+            MDNode::get(Context, {name_md, old_index_md, new_index_md,
+                                  offset_md, arg_size_md, argtype_md});
         mappings.push_back(arg_md);
       }
 

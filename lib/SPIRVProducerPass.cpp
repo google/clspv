@@ -3243,12 +3243,12 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
   auto *fty = F.getType()->getPointerElementType();
   auto *func_ty = dyn_cast<FunctionType>(fty);
 
-
   // If we've clustered POD arguments, then argument details are in metadata.
   // If an argument maps to a resource variable, then get descriptor set and
   // binding from the resoure variable.  Other info comes from the metadata.
   const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
-  auto local_spec_id_md = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+  auto local_spec_id_md =
+      module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
   if (arg_map) {
     for (const auto &arg : arg_map->operands()) {
       const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
@@ -3267,12 +3267,14 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
       const auto argKind = clspv::GetArgKindFromName(
           dyn_cast<MDString>(arg_node->getOperand(5))->getString().str());
 
-      // If this is a local memory argument, find the right spec id for this argument.
+      // If this is a local memory argument, find the right spec id for this
+      // argument.
       int64_t spec_id = -1;
       if (argKind == clspv::ArgKind::Local) {
         for (auto spec_id_arg : local_spec_id_md->operands()) {
-          if ((&F == dyn_cast<Function>(dyn_cast<ValueAsMetadata>(
-                         spec_id_arg->getOperand(0))->getValue())) &&
+          if ((&F == dyn_cast<Function>(
+                         dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
+                             ->getValue())) &&
               (new_index ==
                mdconst::extract<ConstantInt>(spec_id_arg->getOperand(1))
                    ->getZExtValue())) {
