@@ -36,7 +36,7 @@ llvm::Value *GetPushConstantPointer(llvm::BasicBlock *, PushConstant);
 bool UsesGlobalPushConstants(llvm::Module &);
 
 // Returns true if an implementation of get_global_offset() is needed.
-bool ShouldDeclareGlobalOffset(llvm::Module &);
+bool ShouldDeclareGlobalOffsetPushConstant(llvm::Module &);
 } // namespace clspv
 
 #endif // #ifndef CLSPV_LIB_PUSH_CONSTANT_H_

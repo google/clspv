@@ -385,7 +385,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
     Value *gep = nullptr;
-    const bool uses_push_constant = clspv::ShouldDeclareGlobalOffset(M);
+    const bool uses_push_constant =
+        clspv::ShouldDeclareGlobalOffsetPushConstant(M);
     if (uses_push_constant) {
       auto GoffPtr =
           GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);

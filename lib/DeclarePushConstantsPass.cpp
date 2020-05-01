@@ -94,7 +94,7 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   auto &C = M.getContext();
 
-  if (clspv::ShouldDeclareGlobalOffset(M)) {
+  if (clspv::ShouldDeclareGlobalOffsetPushConstant(M)) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
