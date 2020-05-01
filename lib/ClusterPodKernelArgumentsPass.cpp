@@ -90,10 +90,6 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
   SmallVector<CallInst *, 8> CallList;
 
-  // Note: The transformation done in this pass preserves the pointer-to-local
-  // arg to spec-id mapping.
-  clspv::ArgIdMapType arg_spec_id_map = clspv::AllocateArgSpecIds(M);
-
   for (Function *F : WorkList) {
     Changed = true;
 
@@ -114,9 +110,6 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       unsigned arg_size;
       // Argument type.
       clspv::ArgKind arg_kind;
-      // If non-negative, this argument is a pointer-to-local, and the value
-      // here is the specialization constant id for the array size.
-      int spec_id;
     };
 
     // In OpenCL, kernel arguments are either pointers or POD. A composite with
@@ -135,13 +128,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
         const auto kind = clspv::GetArgKind(Arg);
-        int spec_id = -1;
-        if (kind == clspv::ArgKind::Local) {
-          spec_id = arg_spec_id_map[&Arg];
-          assert(spec_id > 0);
-        }
         RemapInfo.push_back({std::string(Arg.getName()), arg_index, new_index++,
-                             0u, 0u, kind, spec_id});
+                             0u, 0u, kind});
       } else {
         PodIndexMap[&Arg] = pod_index++;
         PodArgTys.push_back(ArgTy);
@@ -209,7 +197,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
           RemapInfo.push_back(
               {std::string(Arg.getName()), arg_index, new_index,
                unsigned(StructLayout->getElementOffset(PodIndexMap[&Arg])),
-               arg_size, pod_arg_kind, -1});
+               arg_size, pod_arg_kind});
         }
         arg_index++;
       }
@@ -303,15 +291,14 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
             ConstantAsMetadata::get(Builder.getInt32(arg_mapping.arg_size));
         auto argKindName = GetArgKindName(arg_mapping.arg_kind);
         auto *argtype_md = MDString::get(Context, argKindName);
-        auto *spec_id_md =
-            ConstantAsMetadata::get(Builder.getInt32(arg_mapping.spec_id));
         auto *arg_md = MDNode::get(
             Context, {name_md, old_index_md, new_index_md, offset_md,
-                      arg_size_md, argtype_md, spec_id_md});
+                      arg_size_md, argtype_md});
         mappings.push_back(arg_md);
       }
 
-      NewFunc->setMetadata("kernel_arg_map", MDNode::get(Context, mappings));
+      NewFunc->setMetadata(clspv::KernelArgMapMetadataName(),
+                           MDNode::get(Context, mappings));
     }
 
     // Insert the function after the original, to preserve ordering
