@@ -28,6 +28,10 @@ enum class SpecConstant : int {
   kLocalMemorySize,
   // Work dimensions.
   kWorkDim,
+  // Global offset per dimension.
+  kGlobalOffsetX,
+  kGlobalOffsetY,
+  kGlobalOffsetZ,
 };
 
 // Converts an SpecConstant to its string name.

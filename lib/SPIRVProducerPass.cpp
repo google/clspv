@@ -1931,6 +1931,7 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
       .Case("__spirv_NumWorkgroups", spv::BuiltInNumWorkgroups)
       .Case("__spirv_WorkgroupId", spv::BuiltInWorkgroupId)
       .Case("__spirv_WorkDim", spv::BuiltInWorkDim)
+      .Case("__spirv_GlobalOffset", spv::BuiltInGlobalOffset)
       .Default(spv::BuiltInMax);
 }
 
@@ -3106,6 +3107,73 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
     Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
     getSPIRVInstList(kAnnotations).push_back(Inst);
+  } else if (BuiltinType == spv::BuiltInGlobalOffset) {
+    // 1. Generate a spec constant with a default of {0, 0, 0}.
+    // 2. Allocate and annotate SpecIds for the constants.
+    // 3. Use the spec constant as the initializer for the variable.
+    SPIRVOperandList Ops;
+
+    //
+    // Generate OpSpecConstant for each dimension.
+    //
+    // Ops[0] : Result Type ID
+    // Ops[1] : Default literal value
+    //
+    uint32_t x_id = nextID++;
+    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
+    auto *Inst = new SPIRVInstruction(spv::OpSpecConstant, x_id, Ops);
+    getSPIRVInstList(kConstants).push_back(Inst);
+
+    uint32_t y_id = nextID++;
+    Ops.clear();
+    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
+    Inst = new SPIRVInstruction(spv::OpSpecConstant, y_id, Ops);
+    getSPIRVInstList(kConstants).push_back(Inst);
+
+    uint32_t z_id = nextID++;
+    Ops.clear();
+    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
+    Inst = new SPIRVInstruction(spv::OpSpecConstant, z_id, Ops);
+    getSPIRVInstList(kConstants).push_back(Inst);
+
+    //
+    // Generate SpecId decoration for each dimension.
+    //
+    // Ops[0] : target
+    // Ops[1] : decoration
+    // Ops[2] : SpecId
+    //
+    auto spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetX);
+    Ops.clear();
+    Ops << MkId(x_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
+    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
+    getSPIRVInstList(kAnnotations).push_back(Inst);
+
+    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetY);
+    Ops.clear();
+    Ops << MkId(y_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
+    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
+    getSPIRVInstList(kAnnotations).push_back(Inst);
+
+    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetZ);
+    Ops.clear();
+    Ops << MkId(z_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
+    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
+    getSPIRVInstList(kAnnotations).push_back(Inst);
+
+    //
+    // Generate OpSpecConstantComposite.
+    //
+    // Ops[0] : type id
+    // Ops[1..n-1] : elements
+    //
+    InitializerID = nextID++;
+    Ops.clear();
+    Ops << MkId(lookupType(GV.getType()->getPointerElementType())) << MkId(x_id)
+        << MkId(y_id) << MkId(z_id);
+    Inst =
+        new SPIRVInstruction(spv::OpSpecConstantComposite, InitializerID, Ops);
+    getSPIRVInstList(kConstants).push_back(Inst);
   }
 
   VMap[&GV] = nextID;
@@ -3141,9 +3209,14 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   auto *Inst = new SPIRVInstruction(spv::OpVariable, var_id, Ops);
   SPIRVInstList.push_back(Inst);
 
+  auto IsOpenCLBuiltin = [](spv::BuiltIn builtin) {
+    return builtin == spv::BuiltInWorkDim ||
+           builtin == spv::BuiltInGlobalOffset;
+  };
+
   SPIRVInstructionList &Annotations = getSPIRVInstList(kAnnotations);
-  // If we have a builtin (not WorkDim).
-  if (spv::BuiltInMax != BuiltinType && BuiltinType != spv::BuiltInWorkDim) {
+  // If we have a builtin (not an OpenCL builtin).
+  if (spv::BuiltInMax != BuiltinType && !IsOpenCLBuiltin(BuiltinType)) {
     //
     // Generate OpDecorate.
     //

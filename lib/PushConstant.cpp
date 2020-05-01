@@ -109,7 +109,9 @@ bool UsesGlobalPushConstants(Module &M) {
 }
 
 bool ShouldDeclareGlobalOffset(Module &M) {
-  bool isEnabled = clspv::Option::GlobalOffset();
+  bool isEnabled = (clspv::Option::GlobalOffset() &&
+                    clspv::Option::NonUniformNDRangeSupported()) ||
+                   clspv::Option::GlobalOffsetPushConstant();
   bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
                 (M.getFunction("_Z13get_global_idj") != nullptr);
   return isEnabled && isUsed;

@@ -1,4 +1,4 @@
-// RUN: clspv -global-offset -descriptormap=%t.dmap %s -o %t.spv
+// RUN: clspv -global-offset-push-constant -descriptormap=%t.dmap %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: FileCheck --check-prefix=DMAP %s < %t.dmap
