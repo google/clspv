@@ -3252,7 +3252,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
   if (arg_map) {
     for (const auto &arg : arg_map->operands()) {
       const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
-      assert(arg_node->getNumOperands() == 7);
+      assert(arg_node->getNumOperands() == 6);
       const auto name =
           dyn_cast<MDString>(arg_node->getOperand(0))->getString();
       const auto old_index =
