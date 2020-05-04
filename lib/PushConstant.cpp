@@ -105,11 +105,13 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
 
 bool UsesGlobalPushConstants(Module &M) {
   return clspv::Option::NonUniformNDRangeSupported() ||
-         ShouldDeclareGlobalOffset(M);
+         ShouldDeclareGlobalOffsetPushConstant(M);
 }
 
-bool ShouldDeclareGlobalOffset(Module &M) {
-  bool isEnabled = clspv::Option::GlobalOffset();
+bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
+  bool isEnabled = (clspv::Option::GlobalOffset() &&
+                    clspv::Option::NonUniformNDRangeSupported()) ||
+                   clspv::Option::GlobalOffsetPushConstant();
   bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
                 (M.getFunction("_Z13get_global_idj") != nullptr);
   return isEnabled && isUsed;

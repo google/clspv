@@ -159,6 +159,9 @@ bool WorkDim();
 // Returns true when support for global offset is enabled.
 bool GlobalOffset();
 
+// Returns true when support for global offset is enabled using push constants.
+bool GlobalOffsetPushConstant();
+
 // Returns true when support for non uniform NDRanges is enabled.
 static bool NonUniformNDRangeSupported() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||

@@ -199,7 +199,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
     Ret = Builder.CreateAdd(Ret, RegOff);
   } else {
     // If we have a global offset we need to add it
-    if (clspv::Option::GlobalOffset()) {
+    if (clspv::Option::GlobalOffset() ||
+        clspv::Option::GlobalOffsetPushConstant()) {
       auto Goff =
           Builder.CreateCall(M.getFunction("_Z17get_global_offsetj"), Dim);
       Goff->setCallingConv(CallingConv::SPIR_FUNC);
@@ -353,7 +354,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   Function *F = M.getFunction("_Z17get_global_offsetj");
-  bool isSupportEnabled = clspv::Option::GlobalOffset();
+  bool isSupportEnabled = clspv::Option::GlobalOffset() ||
+                          clspv::Option::GlobalOffsetPushConstant();
   bool isUsedDirectly = F != nullptr;
   bool isUsedIndirectly =
       isSupportEnabled && M.getFunction("_Z13get_global_idj") != nullptr;
@@ -367,9 +369,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
 
   // If get_global_offset isn't used but get_global_id is then we need to
   // declare it ourselves.
+  auto &C = M.getContext();
+  auto Int32Ty = IntegerType::get(C, 32);
   if (isUsedIndirectly && !isUsedDirectly) {
-    auto &C = M.getContext();
-    auto Int32Ty = IntegerType::get(C, 32);
     auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
     F = cast<Function>(
         M.getOrInsertFunction("_Z17get_global_offsetj", FType).getCallee());
@@ -382,11 +384,22 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
     auto Dim = &*F->arg_begin();
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-    auto GoffPtr =
-        GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
-    auto GoffDimPtr = Builder.CreateInBoundsGEP(GoffPtr, Indices);
-    auto GoffDim = Builder.CreateLoad(GoffDimPtr);
-    auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, GoffDim, 0);
+    Value *gep = nullptr;
+    const bool uses_push_constant =
+        clspv::ShouldDeclareGlobalOffsetPushConstant(M);
+    if (uses_push_constant) {
+      auto GoffPtr =
+          GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
+      gep = Builder.CreateInBoundsGEP(GoffPtr, Indices);
+    } else {
+      auto VecTy = VectorType::get(Int32Ty, 3);
+      StringRef name = "__spirv_GlobalOffset";
+      auto offset_var = createGlobalVariable(M, name, VecTy,
+                                             AddressSpace::ModuleScopePrivate);
+      gep = Builder.CreateInBoundsGEP(offset_var, Indices);
+    }
+    auto load = Builder.CreateLoad(gep);
+    auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
     Builder.CreateRet(Ret);
   } else {
     // Get global offset is easy for us as it only returns 0.

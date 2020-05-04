@@ -190,6 +190,10 @@ static llvm::cl::opt<bool>
     global_offset("global-offset", llvm::cl::init(false),
                   llvm::cl::desc("Enable support for global offsets"));
 
+static llvm::cl::opt<bool> global_offset_push_constant(
+    "global-offset-push-constant", llvm::cl::init(false),
+    llvm::cl::desc("Enable support for global offsets in push constants"));
+
 static bool use_sampler_map = false;
 
 static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
@@ -239,6 +243,7 @@ SourceLanguage Language() { return cl_std; }
 bool ScalarBlockLayout() { return scalar_block_layout; }
 bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
+bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
 } // namespace Option

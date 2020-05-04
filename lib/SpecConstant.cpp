@@ -54,6 +54,12 @@ const char *GetSpecConstantName(SpecConstant kind) {
     return "local_memory_size";
   case SpecConstant::kWorkDim:
     return "work_dim";
+  case SpecConstant::kGlobalOffsetX:
+    return "global_offset_x";
+  case SpecConstant::kGlobalOffsetY:
+    return "global_offset_y";
+  case SpecConstant::kGlobalOffsetZ:
+    return "global_offset_z";
   }
   llvm::errs() << "Unhandled case in clspv::GetSpecConstantName: " << int(kind)
                << "\n";
@@ -71,6 +77,12 @@ SpecConstant GetSpecConstantFromName(const std::string &name) {
     return SpecConstant::kLocalMemorySize;
   else if (name == "work_dim")
     return SpecConstant::kWorkDim;
+  else if (name == "global_offset_x")
+    return SpecConstant::kGlobalOffsetX;
+  else if (name == "global_offset_y")
+    return SpecConstant::kGlobalOffsetY;
+  else if (name == "global_offset_z")
+    return SpecConstant::kGlobalOffsetZ;
 
   llvm::errs() << "Unhandled csae in clspv::GetSpecConstantFromName: " << name
                << "\n";
