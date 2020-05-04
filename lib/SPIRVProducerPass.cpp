@@ -3246,11 +3246,13 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
   // If we've clustered POD arguments, then argument details are in metadata.
   // If an argument maps to a resource variable, then get descriptor set and
   // binding from the resoure variable.  Other info comes from the metadata.
-  const auto *arg_map = F.getMetadata("kernel_arg_map");
+  const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
+  auto local_spec_id_md =
+      module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
   if (arg_map) {
     for (const auto &arg : arg_map->operands()) {
       const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
-      assert(arg_node->getNumOperands() == 7);
+      assert(arg_node->getNumOperands() == 6);
       const auto name =
           dyn_cast<MDString>(arg_node->getOperand(0))->getString();
       const auto old_index =
@@ -3264,9 +3266,24 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
           dyn_extract<ConstantInt>(arg_node->getOperand(4))->getZExtValue();
       const auto argKind = clspv::GetArgKindFromName(
           dyn_cast<MDString>(arg_node->getOperand(5))->getString().str());
-      const auto spec_id =
-          dyn_extract<ConstantInt>(arg_node->getOperand(6))->getSExtValue();
 
+      // If this is a local memory argument, find the right spec id for this
+      // argument.
+      int64_t spec_id = -1;
+      if (argKind == clspv::ArgKind::Local) {
+        for (auto spec_id_arg : local_spec_id_md->operands()) {
+          if ((&F == dyn_cast<Function>(
+                         dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
+                             ->getValue())) &&
+              (new_index ==
+               mdconst::extract<ConstantInt>(spec_id_arg->getOperand(1))
+                   ->getZExtValue())) {
+            spec_id = mdconst::extract<ConstantInt>(spec_id_arg->getOperand(2))
+                          ->getSExtValue();
+            break;
+          }
+        }
+      }
       uint32_t descriptor_set = 0;
       uint32_t binding = 0;
       version0::DescriptorMapEntry::KernelArgData kernel_data = {

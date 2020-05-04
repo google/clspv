@@ -856,6 +856,10 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     if (where != spec_id_types.end()) {
       for (auto id : where->second) {
         if (!function_spec_ids.count(id)) {
+          // Reuse |id| for |type| in this kernel. Record the use of |id| in
+          // this kernel.
+          function_allocations.emplace_back(type, id);
+          function_spec_ids.insert(id);
           return id;
         }
       }

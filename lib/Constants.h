@@ -70,6 +70,9 @@ inline std::string SpecConstantMetadataName() {
 // Pod args implementation metadata name.
 inline std::string PodArgsImplMetadataName() { return "clspv.pod_args_impl"; }
 
+// Clustered arguments mapping metadata name.
+inline std::string KernelArgMapMetadataName() { return "kernel_arg_map"; }
+
 } // namespace clspv
 
 #endif
