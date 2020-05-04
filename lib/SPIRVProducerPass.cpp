@@ -2910,13 +2910,11 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     //
     // Ops[0] : Result Type ID
     // Ops[1] : Default literal value
-    InitializerID = nextID++;
 
     Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32)))
         << MkNum(3);
 
-    auto *Inst = new SPIRVInstruction(spv::OpSpecConstant, InitializerID, Ops);
-    getSPIRVInstList(kConstants).push_back(Inst);
+    InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
     //
     // Generate SpecId decoration.
@@ -2929,13 +2927,12 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     Ops << MkId(InitializerID) << MkNum(spv::DecorationSpecId)
         << MkNum(spec_id);
 
-    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    getSPIRVInstList(kAnnotations).push_back(Inst);
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   } else if (BuiltinType == spv::BuiltInGlobalOffset) {
     // 1. Generate a spec constant with a default of {0, 0, 0}.
     // 2. Allocate and annotate SpecIds for the constants.
     // 3. Use the spec constant as the initializer for the variable.
-    SPIRVOperandList Ops;
+    SPIRVOperandVec Ops;
 
     //
     // Generate OpSpecConstant for each dimension.
@@ -2943,22 +2940,19 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : Result Type ID
     // Ops[1] : Default literal value
     //
-    uint32_t x_id = nextID++;
-    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
-    auto *Inst = new SPIRVInstruction(spv::OpSpecConstant, x_id, Ops);
-    getSPIRVInstList(kConstants).push_back(Inst);
+    Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32)))
+        << MkNum(0);
+    uint32_t x_id = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
-    uint32_t y_id = nextID++;
     Ops.clear();
-    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
-    Inst = new SPIRVInstruction(spv::OpSpecConstant, y_id, Ops);
-    getSPIRVInstList(kConstants).push_back(Inst);
+    Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32)))
+        << MkNum(0);
+    uint32_t y_id = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
-    uint32_t z_id = nextID++;
     Ops.clear();
-    Ops << MkId(lookupType(IntegerType::get(GV.getContext(), 32))) << MkNum(0);
-    Inst = new SPIRVInstruction(spv::OpSpecConstant, z_id, Ops);
-    getSPIRVInstList(kConstants).push_back(Inst);
+    Ops << MkId(getSPIRVType(IntegerType::get(GV.getContext(), 32)))
+        << MkNum(0);
+    uint32_t z_id = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
     //
     // Generate SpecId decoration for each dimension.
@@ -2970,20 +2964,17 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     auto spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetX);
     Ops.clear();
     Ops << MkId(x_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
-    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    getSPIRVInstList(kAnnotations).push_back(Inst);
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
     spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetY);
     Ops.clear();
     Ops << MkId(y_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
-    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    getSPIRVInstList(kAnnotations).push_back(Inst);
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
     spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetZ);
     Ops.clear();
     Ops << MkId(z_id) << MkNum(spv::DecorationSpecId) << MkNum(spec_id);
-    Inst = new SPIRVInstruction(spv::OpDecorate, Ops);
-    getSPIRVInstList(kAnnotations).push_back(Inst);
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
     //
     // Generate OpSpecConstantComposite.
@@ -2991,13 +2982,10 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : type id
     // Ops[1..n-1] : elements
     //
-    InitializerID = nextID++;
     Ops.clear();
-    Ops << MkId(lookupType(GV.getType()->getPointerElementType())) << MkId(x_id)
-        << MkId(y_id) << MkId(z_id);
-    Inst =
-        new SPIRVInstruction(spv::OpSpecConstantComposite, InitializerID, Ops);
-    getSPIRVInstList(kConstants).push_back(Inst);
+    Ops << MkId(getSPIRVType(GV.getType()->getPointerElementType()))
+        << MkId(x_id) << MkId(y_id) << MkId(z_id);
+    InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstantComposite, Ops);
   }
 
   //
