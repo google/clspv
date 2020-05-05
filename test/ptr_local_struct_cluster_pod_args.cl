@@ -34,7 +34,6 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK-DAG:  [[__ptr_Workgroup_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[_uint]]
 // CHECK-DAG:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
 // CHECK-DAG:  [[__struct_24:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_uint]] [[_uint]]
-// CHECK-DAG:  [[__ptr_Workgroup__struct_24:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__struct_24]]
 // CHECK-DAG:  [[_2]] = OpSpecConstant [[_uint]] 1
 // CHECK-DAG:  [[__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_2]]
 // CHECK-DAG:  [[__ptr_Workgroup__arr_float_2:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr_float_2]]
