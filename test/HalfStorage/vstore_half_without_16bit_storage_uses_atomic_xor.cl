@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -33,6 +33,5 @@
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int* a, global float* b, int n)
 {
-  global half* a_half = (global half*) a;
   vstore_half(*b, n, (global half *)a);
 }

@@ -20,7 +20,7 @@ using namespace llvm;
 
 namespace {
 bool isScalarType(Type *type) {
-  return type->isIntegerTy() || type->isFloatTy();
+  return type->isIntegerTy() || type->isFloatingPointTy();
 }
 
 uint64_t structAlignment(StructType *type,
