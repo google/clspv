@@ -1471,7 +1471,27 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
 
     Value *V = nullptr;
 
-    if (clspv::Option::F16BitStorage()) {
+    bool supports_16bit_storage = true;
+    switch (Arg1->getType()->getPointerAddressSpace()) {
+    case clspv::AddressSpace::Global:
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kSSBO);
+      break;
+    case clspv::AddressSpace::Constant:
+      if (clspv::Option::ConstantArgsInUniformBuffer())
+        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+            clspv::Option::StorageClass::kUBO);
+      else
+        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+            clspv::Option::StorageClass::kSSBO);
+      break;
+    default:
+      // Clspv will emit the Float16 capability if the half type is
+      // encountered. That capability covers private and local addressspaces.
+      break;
+    }
+
+    if (supports_16bit_storage) {
       auto ShortTy = Type::getInt16Ty(M.getContext());
       auto ShortPointerTy =
           PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
@@ -1747,8 +1767,28 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     // Pack the float2 -> half2 (in an int).
     auto X = CallInst::Create(NewF, TempVec, "", CI);
 
+    bool supports_16bit_storage = true;
+    switch (Arg2->getType()->getPointerAddressSpace()) {
+    case clspv::AddressSpace::Global:
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kSSBO);
+      break;
+    case clspv::AddressSpace::Constant:
+      if (clspv::Option::ConstantArgsInUniformBuffer())
+        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+            clspv::Option::StorageClass::kUBO);
+      else
+        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+            clspv::Option::StorageClass::kSSBO);
+      break;
+    default:
+      // Clspv will emit the Float16 capability if the half type is
+      // encountered. That capability covers private and local addressspaces.
+      break;
+    }
+
     Value *V = nullptr;
-    if (clspv::Option::F16BitStorage()) {
+    if (supports_16bit_storage) {
       auto ShortTy = Type::getInt16Ty(M.getContext());
       auto ShortPointerTy =
           PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());

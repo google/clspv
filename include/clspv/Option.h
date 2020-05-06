@@ -20,9 +20,6 @@
 namespace clspv {
 namespace Option {
 
-// Returns true if code generation can use SPV_KHR_16bit_storage.
-bool F16BitStorage();
-
 // Returns true if each kernel must use its own descriptor set for all
 // arguments.
 bool DistinctKernelDescriptorSets();
@@ -167,6 +164,18 @@ static bool NonUniformNDRangeSupported() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
          ((Language() == SourceLanguage::OpenCL_C_20));
 }
+
+enum class StorageClass : int {
+  kSSBO = 0,
+  kUBO,
+  kPushConstant
+};
+
+// Returns true if |sc| supports 16-bit storage.
+bool Supports16BitStorageClass(StorageClass sc);
+
+// Returns true if |sc| supports 8-bit storage.
+bool Supports8BitStorageClass(StorageClass sc);
 
 } // namespace Option
 } // namespace clspv

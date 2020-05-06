@@ -49,6 +49,14 @@ private:
 
   // Makes kernel |F| use |impl| as the pod arg implementation.
   void AddMetadata(Function &F, clspv::PodArgImpl impl);
+
+  // Returns true if |type| contains an array. Does not consider pointers since
+  // we are dealing with pod args.
+  bool ContainsArrayType(Type *type) const;
+
+  // Returns true if |type| contains a 16-bit integer or floating-point type.
+  // Does not consider pointer since we are dealing with pod args.
+  bool ContainsSizedType(Type *type, uint32_t width) const;
 };
 } // namespace
 
@@ -92,6 +100,13 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
 
     pod_types.push_back(arg_type);
 
+    // If the type contains an 8- or 16-bit type UBO storage must be supported.
+    satisfies_ubo &= !ContainsSizedType(arg_type, 16) ||
+                     clspv::Option::Supports16BitStorageClass(
+                         clspv::Option::StorageClass::kUBO);
+    satisfies_ubo &= !ContainsSizedType(arg_type, 8) ||
+                     clspv::Option::Supports8BitStorageClass(
+                         clspv::Option::StorageClass::kUBO);
     if (auto struct_ty = dyn_cast<StructType>(arg_type)) {
       // Only check individual arguments as clustering will fix the layout with
       // padding if necessary.
@@ -104,12 +119,24 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   // 1. Clustered pod args.
   // 2. No global push constants.
   // 3. Args must fit in push constant size limit.
+  // 4. No arrays.
+  // 5. If 16-bit types are used, 16-bit push constants are supported.
+  // 6. If 8-bit types are used, 8-bit push constants are supported.
   const auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
+  const bool contains_array = ContainsArrayType(pod_struct_ty);
+  const bool support_16bit_pc = !ContainsSizedType(pod_struct_ty, 16) ||
+                                clspv::Option::Supports16BitStorageClass(
+                                    clspv::Option::StorageClass::kPushConstant);
+  const bool support_8bit_pc = !ContainsSizedType(pod_struct_ty, 8) ||
+                               clspv::Option::Supports8BitStorageClass(
+                                   clspv::Option::StorageClass::kPushConstant);
   const bool satisfies_push_constant =
-      !(!clspv::Option::ClusterPodKernelArgs() ||
-        clspv::UsesGlobalPushConstants(M) ||
+      clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
+      support_8bit_pc &&
+      !(clspv::UsesGlobalPushConstants(M) ||
         (DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8) >
-            clspv::Option::MaxPushConstantsSize());
+            clspv::Option::MaxPushConstantsSize() ||
+        contains_array);
 
   // Priority:
   // 1. Per-kernel push constant interface.
@@ -140,4 +167,36 @@ void AutoPodArgsPass::AddMetadata(Function &F, clspv::PodArgImpl impl) {
       ConstantAsMetadata::get(ConstantInt::get(
           IntegerType::get(F.getContext(), 32), static_cast<uint32_t>(impl))));
   F.setMetadata(clspv::PodArgsImplMetadataName(), md);
+}
+
+bool AutoPodArgsPass::ContainsArrayType(Type *type) const {
+  if (isa<ArrayType>(type)) {
+    return true;
+  } else if (auto struct_ty = dyn_cast<StructType>(type)) {
+    for (auto sub_type : struct_ty->elements()) {
+      if (ContainsArrayType(sub_type))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+bool AutoPodArgsPass::ContainsSizedType(Type *type, uint32_t width) const {
+  if (auto int_ty = dyn_cast<IntegerType>(type)) {
+    return int_ty->getBitWidth() == width;
+  } else if (type->isHalfTy()) {
+    return true;
+  } else if (auto array_ty = dyn_cast<ArrayType>(type)) {
+    return ContainsSizedType(array_ty->getElementType(), width);
+  } else if (auto vec_ty = dyn_cast<VectorType>(type)) {
+    return ContainsSizedType(vec_ty->getElementType(), width);
+  } else if (auto struct_ty = dyn_cast<StructType>(type)) {
+    for (auto sub_type : struct_ty->elements()) {
+      if (ContainsSizedType(sub_type, width))
+        return true;
+    }
+  }
+
+  return false;
 }
