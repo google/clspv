@@ -118,35 +118,38 @@ enum SPIRVSection {
 
 typedef uint32_t SPIRVID;
 
-enum SPIRVOperandType {
-  NUMBERID,
-  LITERAL_INTEGER,
-  LITERAL_STRING,
-  LITERAL_FLOAT
-};
+enum SPIRVOperandType { NUMBERID, LITERAL_WORD, LITERAL_DWORD, LITERAL_STRING };
 
 struct SPIRVOperand {
-  explicit SPIRVOperand(SPIRVOperandType Ty, uint32_t Num)
-      : Type(Ty), LiteralNum(1, Num) {}
+  explicit SPIRVOperand(SPIRVOperandType Ty, uint32_t Num) : Type(Ty) {
+    LiteralNum[0] = Num;
+  }
   explicit SPIRVOperand(SPIRVOperandType Ty, const char *Str)
       : Type(Ty), LiteralStr(Str) {}
   explicit SPIRVOperand(SPIRVOperandType Ty, StringRef Str)
       : Type(Ty), LiteralStr(Str) {}
-  explicit SPIRVOperand(SPIRVOperandType Ty, ArrayRef<uint32_t> NumVec)
-      : Type(Ty), LiteralNum(NumVec.begin(), NumVec.end()) {}
+  explicit SPIRVOperand(ArrayRef<uint32_t> NumVec) {
+    auto sz = NumVec.size();
+    assert(sz >= 1 && sz <= 2);
+    Type = sz == 1 ? LITERAL_WORD : LITERAL_DWORD;
+    LiteralNum[0] = NumVec[0];
+    if (sz == 2) {
+      LiteralNum[1] = NumVec[1];
+    }
+  }
 
   SPIRVOperandType getType() const { return Type; };
   uint32_t getNumID() const { return LiteralNum[0]; };
   std::string getLiteralStr() const { return LiteralStr; };
-  ArrayRef<uint32_t> getLiteralNum() const { return LiteralNum; };
+  const uint32_t *getLiteralNum() const { return LiteralNum; };
 
   uint32_t GetNumWords() const {
     switch (Type) {
     case NUMBERID:
+    case LITERAL_WORD:
       return 1;
-    case LITERAL_INTEGER:
-    case LITERAL_FLOAT:
-      return uint32_t(LiteralNum.size());
+    case LITERAL_DWORD:
+      return 2;
     case LITERAL_STRING:
       // Account for the terminating null character.
       return uint32_t((LiteralStr.size() + 4) / 4);
@@ -157,31 +160,26 @@ struct SPIRVOperand {
 private:
   SPIRVOperandType Type;
   std::string LiteralStr;
-  SmallVector<uint32_t, 4> LiteralNum;
+  uint32_t LiteralNum[2];
 };
 
-typedef SmallVector<std::unique_ptr<SPIRVOperand>, 4> SPIRVOperandVec;
+typedef SmallVector<SPIRVOperand, 4> SPIRVOperandVec;
 
-SPIRVOperandVec &operator<<(SPIRVOperandVec &list,
-                            std::unique_ptr<SPIRVOperand> elem) {
+SPIRVOperandVec &operator<<(SPIRVOperandVec &list, SPIRVOperand elem) {
   list.push_back(std::move(elem));
   return list;
 }
 
-std::unique_ptr<SPIRVOperand> MkNum(uint32_t num) {
-  return std::make_unique<SPIRVOperand>(LITERAL_INTEGER, num);
+SPIRVOperand MkNum(uint32_t num) { return SPIRVOperand(LITERAL_WORD, num); }
+SPIRVOperand MkInteger(ArrayRef<uint32_t> num_vec) {
+  return SPIRVOperand(num_vec);
 }
-std::unique_ptr<SPIRVOperand> MkInteger(ArrayRef<uint32_t> num_vec) {
-  return std::make_unique<SPIRVOperand>(LITERAL_INTEGER, num_vec);
+SPIRVOperand MkFloat(ArrayRef<uint32_t> num_vec) {
+  return SPIRVOperand(num_vec);
 }
-std::unique_ptr<SPIRVOperand> MkFloat(ArrayRef<uint32_t> num_vec) {
-  return std::make_unique<SPIRVOperand>(LITERAL_FLOAT, num_vec);
-}
-std::unique_ptr<SPIRVOperand> MkId(uint32_t id) {
-  return std::make_unique<SPIRVOperand>(NUMBERID, id);
-}
-std::unique_ptr<SPIRVOperand> MkString(StringRef str) {
-  return std::make_unique<SPIRVOperand>(LITERAL_STRING, str);
+SPIRVOperand MkId(uint32_t id) { return SPIRVOperand(NUMBERID, id); }
+SPIRVOperand MkString(StringRef str) {
+  return SPIRVOperand(LITERAL_STRING, str);
 }
 
 struct SPIRVInstruction {
@@ -207,10 +205,8 @@ struct SPIRVInstruction {
 
   uint32_t getWordCount() const { return WordCount; }
   uint16_t getOpcode() const { return Opcode; }
-  uint32_t getResultID() const { return ResultID; }
-  ArrayRef<std::unique_ptr<SPIRVOperand>> getOperands() const {
-    return Operands;
-  }
+  SPIRVID getResultID() const { return ResultID; }
+  const SPIRVOperandVec &getOperands() const { return Operands; }
 
 private:
   void setResult(uint32_t ResID = 0) {
@@ -222,30 +218,29 @@ private:
     assert(Operands.empty());
     Operands = std::move(Ops);
     for (auto &opd : Operands) {
-      WordCount += uint16_t(opd->GetNumWords());
+      WordCount += uint16_t(opd.GetNumWords());
     }
   }
 
 private:
   uint32_t WordCount; // Check the 16-bit bound at code generation time.
   uint16_t Opcode;
-  uint32_t ResultID;
+  SPIRVID ResultID;
   SPIRVOperandVec Operands;
 };
 
 struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<Type *, uint32_t> TypeMapType;
   typedef UniqueVector<Type *> TypeList;
-  typedef DenseMap<Value *, uint32_t> ValueMapType;
+  typedef DenseMap<Value *, SPIRVID> ValueMapType;
   typedef UniqueVector<Value *> ValueList;
   typedef std::vector<std::pair<Value *, uint32_t>> EntryPointVecType;
-  typedef std::list<SPIRVInstruction *> SPIRVInstructionList;
+  typedef std::list<SPIRVInstruction> SPIRVInstructionList;
   // A vector of tuples, each of which is:
   // - the LLVM instruction that we will later generate SPIR-V code for
   // - where the SPIR-V instruction should be inserted
   // - the result ID of the SPIR-V instruction
-  typedef std::vector<
-      std::tuple<Value *, SPIRVInstructionList::iterator, uint32_t>>
+  typedef std::vector<std::pair<Value *, SPIRVInstruction *>>
       DeferredInstVecType;
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
@@ -264,11 +259,6 @@ struct SPIRVProducerPass final : public ModulePass {
         WorkgroupSizeVarID(0) {}
 
   virtual ~SPIRVProducerPass() {
-    for (int i = 0; i < kSectionCount; ++i) {
-      for (auto *Inst : SPIRVSections[i]) {
-        delete Inst;
-      }
-    }
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
@@ -388,9 +378,9 @@ struct SPIRVProducerPass final : public ModulePass {
   // indirectly by the given function call.
   glsl::ExtInst getDirectOrIndirectExtInstEnum(StringRef Name);
   void WriteOneWord(uint32_t Word);
-  void WriteResultID(SPIRVInstruction *Inst);
-  void WriteWordCountAndOpcode(SPIRVInstruction *Inst);
-  void WriteOperand(const std::unique_ptr<SPIRVOperand> &Op);
+  void WriteResultID(const SPIRVInstruction &Inst);
+  void WriteWordCountAndOpcode(const SPIRVInstruction &Inst);
+  void WriteOperand(const SPIRVOperand &Op);
   void WriteSPIRVBinary();
   void WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList);
 
@@ -437,8 +427,7 @@ struct SPIRVProducerPass final : public ModulePass {
     bool has_result, has_result_type;
     spv::HasResultAndType(Opcode, &has_result, &has_result_type);
     SPIRVID RID = has_result ? incrNextID() : 0;
-    SPIRVInstruction *I = new SPIRVInstruction(Opcode, RID, Operands);
-    SPIRVSections[TSection].push_back(I);
+    SPIRVSections[TSection].emplace_back(Opcode, RID, Operands);
     return RID;
   }
   template <enum SPIRVSection TSection = kFunctions>
@@ -457,6 +446,27 @@ struct SPIRVProducerPass final : public ModulePass {
     SPIRVOperandVec Ops;
     Ops << MkString(V);
     return addSPIRVInst<TSection>(Op, Ops);
+  }
+
+  //
+  // Add placeholder for llvm::Value that references future values.
+  // Must have result ID just in case final SPIRVInstruction requires.
+  SPIRVID addSPIRVPlaceholder(Value *I) {
+    SPIRVID RID = incrNextID();
+    SPIRVOperandVec Ops;
+    SPIRVSections[kFunctions].emplace_back(spv::OpExtInst, RID, Ops);
+    DeferredInstVec.push_back({I, &SPIRVSections[kFunctions].back()});
+    return RID;
+  }
+  // Replace placeholder with actual SPIRVInstruction on the final pass
+  // (HandleDeferredInstruction).
+  SPIRVID replaceSPIRVInst(SPIRVInstruction *I, spv::Op Opcode,
+                           SPIRVOperandVec &Operands) {
+    bool has_result, has_result_type;
+    spv::HasResultAndType(Opcode, &has_result, &has_result_type);
+    SPIRVID RID = has_result ? I->getResultID() : 0;
+    *I = SPIRVInstruction(Opcode, RID, Operands);
+    return RID;
   }
 
 private:
@@ -3718,9 +3728,7 @@ spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
 }
 
 void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   ValueMapType &VMap = getValueMap();
-  DeferredInstVecType &DeferredInsts = getDeferredInstVec();
   LLVMContext &Context = I.getParent()->getParent()->getParent()->getContext();
 
   SPIRVID RID = 0;
@@ -4259,10 +4267,13 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     break;
   }
   case Instruction::Br: {
-    // Branch instrucion is deferred because it needs label's ID. Record slot's
-    // location on SPIRVInstructionList.
-    DeferredInsts.push_back(
-        std::make_tuple(&I, --SPIRVInstList.end(), 0 /* No id */));
+    // Branch instruction is deferred because it needs label's ID.
+    BasicBlock *BrBB = I.getParent();
+    if (ContinueBlocks.count(BrBB) || MergeBlocks.count(BrBB)) {
+      // Placeholder for Merge operation
+      RID = addSPIRVPlaceholder(&I);
+    }
+    RID = addSPIRVPlaceholder(&I);
     break;
   }
   case Instruction::Switch: {
@@ -4276,10 +4287,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     break;
   }
   case Instruction::PHI: {
-    // Branch instrucion is deferred because it needs label's ID. Record slot's
-    // location on SPIRVInstructionList.
-    RID = incrNextID();
-    DeferredInsts.push_back(std::make_tuple(&I, --SPIRVInstList.end(), RID));
+    // PHI instruction is deferred because it needs label's ID.
+    RID = addSPIRVPlaceholder(&I);
     break;
   }
   case Instruction::Alloca: {
@@ -4785,10 +4794,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // Call instrucion is deferred because it needs function's ID. Record
-    // slot's location on SPIRVInstructionList.
-    RID = incrNextID();
-    DeferredInsts.push_back(std::make_tuple(&I, --SPIRVInstList.end(), RID));
+    // Call instruction is deferred because it needs function's ID.
+    RID = addSPIRVPlaceholder(&I);
 
     // Check whether the implementation of this call uses an extended
     // instruction plus one more value-producing instruction.  If so, then
@@ -4796,8 +4803,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     glsl::ExtInst EInst = getIndirectExtInstEnum(Callee->getName());
     if (EInst != kGlslExtInstBad) {
       // Reserve a spot for the extra value.
-      // Increase nextID.
-      RID = incrNextID();
+      RID = addSPIRVPlaceholder(&I);
     }
     break;
   }
@@ -4856,18 +4862,19 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
 }
 
 void SPIRVProducerPass::HandleDeferredInstruction() {
-  SPIRVInstructionList &SPIRVInstList = getSPIRVInstList(kFunctions);
   DeferredInstVecType &DeferredInsts = getDeferredInstVec();
 
-  for (auto DeferredInst = DeferredInsts.rbegin();
-       DeferredInst != DeferredInsts.rend(); ++DeferredInst) {
-    Value *Inst = std::get<0>(*DeferredInst);
-    SPIRVInstructionList::iterator InsertPoint = ++std::get<1>(*DeferredInst);
-    if (InsertPoint != SPIRVInstList.end()) {
-      while ((*InsertPoint)->getOpcode() == spv::OpPhi) {
-        ++InsertPoint;
-      }
-    }
+  for (size_t i = 0; i < DeferredInsts.size(); ++i) {
+    Value *Inst = DeferredInsts[i].first;
+    SPIRVInstruction *Placeholder = DeferredInsts[i].second;
+    SPIRVOperandVec Operands;
+
+    auto nextDeferred = [&]() {
+      ++i;
+      assert(DeferredInsts.size() > i);
+      assert(Inst == DeferredInsts[i].first);
+      Placeholder = DeferredInsts[i].second;
+    };
 
     if (BranchInst *Br = dyn_cast<BranchInst>(Inst)) {
       // Check whether this branch needs to be preceeded by merge instruction.
@@ -4888,8 +4895,10 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops << MkId(MergeBBID) << MkId(ContinueBBID)
             << MkNum(spv::LoopControlMaskNone);
 
-        auto *MergeInst = new SPIRVInstruction(spv::OpLoopMerge, Ops);
-        SPIRVInstList.insert(InsertPoint, MergeInst);
+        replaceSPIRVInst(Placeholder, spv::OpLoopMerge, Ops);
+
+        nextDeferred();
+
       } else if (MergeBlocks.count(BrBB)) {
         //
         // Generate OpSelectionMerge.
@@ -4902,8 +4911,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         uint32_t MergeBBID = getSPIRVValue(MergeBB);
         Ops << MkId(MergeBBID) << MkNum(spv::SelectionControlMaskNone);
 
-        auto *MergeInst = new SPIRVInstruction(spv::OpSelectionMerge, Ops);
-        SPIRVInstList.insert(InsertPoint, MergeInst);
+        replaceSPIRVInst(Placeholder, spv::OpSelectionMerge, Ops);
+
+        nextDeferred();
       }
 
       if (Br->isConditional()) {
@@ -4922,8 +4932,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
         Ops << MkId(CondID) << MkId(TrueBBID) << MkId(FalseBBID);
 
-        auto *BrInst = new SPIRVInstruction(spv::OpBranchConditional, Ops);
-        SPIRVInstList.insert(InsertPoint, BrInst);
+        replaceSPIRVInst(Placeholder, spv::OpBranchConditional, Ops);
+
       } else {
         //
         // Generate OpBranch.
@@ -4934,8 +4944,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         uint32_t TargetID = getSPIRVValue(Br->getSuccessor(0));
         Ops << MkId(TargetID);
 
-        SPIRVInstList.insert(InsertPoint,
-                             new SPIRVInstruction(spv::OpBranch, Ops));
+        replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
       if (PHI->getType()->isPointerTy() && !IsSamplerType(PHI->getType()) &&
@@ -4957,15 +4966,14 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
       Ops << MkId(getSPIRVType(PHI->getType()));
 
-      for (unsigned i = 0; i < PHI->getNumIncomingValues(); i++) {
-        uint32_t VarID = getSPIRVValue(PHI->getIncomingValue(i));
-        uint32_t ParentID = getSPIRVValue(PHI->getIncomingBlock(i));
+      for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
+        uint32_t VarID = getSPIRVValue(PHI->getIncomingValue(j));
+        uint32_t ParentID = getSPIRVValue(PHI->getIncomingBlock(j));
         Ops << MkId(VarID) << MkId(ParentID);
       }
 
-      SPIRVInstList.insert(
-          InsertPoint,
-          new SPIRVInstruction(spv::OpPhi, std::get<2>(*DeferredInst), Ops));
+      replaceSPIRVInst(Placeholder, spv::OpPhi, Ops);
+
     } else if (CallInst *Call = dyn_cast<CallInst>(Inst)) {
       Function *Callee = Call->getCalledFunction();
       LLVMContext &Context = Callee->getContext();
@@ -4991,22 +4999,22 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             << MkNum(EInst);
 
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
-        for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
-          Ops << MkId(getSPIRVValue(Call->getOperand(i)));
+        for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
+          Ops << MkId(getSPIRVValue(Call->getOperand(j)));
         }
 
-        auto *ExtInst = new SPIRVInstruction(spv::OpExtInst,
-                                             std::get<2>(*DeferredInst), Ops);
-        SPIRVInstList.insert(InsertPoint, ExtInst);
+        SPIRVID RID = replaceSPIRVInst(Placeholder, spv::OpExtInst, Ops);
 
         const auto IndirectExtInst = getIndirectExtInstEnum(callee_name);
         if (IndirectExtInst != kGlslExtInstBad) {
+
+          nextDeferred();
+
           // Generate one more instruction that uses the result of the extended
           // instruction.  Its result id is one more than the id of the
           // extended instruction.
-          auto generate_extra_inst = [this, &Context, &Call, &DeferredInst,
-                                      &SPIRVInstList, &InsertPoint](
-                                         spv::Op opcode, Constant *constant) {
+          auto generate_extra_inst = [this, &Context, &Call, &Placeholder,
+                                      RID](spv::Op opcode, Constant *constant) {
             //
             // Generate instruction like:
             //   result = opcode constant <extinst-result>
@@ -5024,12 +5032,10 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
                   {static_cast<unsigned>(vectorTy->getNumElements()), false},
                   constant);
             }
-            Ops << MkId(getSPIRVValue(constant))
-                << MkId(std::get<2>(*DeferredInst));
+            Ops << MkId(getSPIRVValue(constant)) << MkId(RID);
 
-            SPIRVInstList.insert(
-                InsertPoint, new SPIRVInstruction(
-                                 opcode, std::get<2>(*DeferredInst) + 1, Ops));
+            replaceSPIRVInst(Placeholder, opcode, Ops);
+
           };
 
           switch (IndirectExtInst) {
@@ -5060,9 +5066,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops << MkId(getSPIRVType(Call->getType()))
             << MkId(getSPIRVValue(Call->getOperand(0)));
 
-        SPIRVInstList.insert(
-            InsertPoint, new SPIRVInstruction(spv::OpBitCount,
-                                              std::get<2>(*DeferredInst), Ops));
+        replaceSPIRVInst(Placeholder, spv::OpBitCount, Ops);
 
       } else if (callee_name.startswith(kCompositeConstructFunctionPrefix)) {
 
@@ -5076,9 +5080,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           Ops << MkId(getSPIRVValue(use.get()));
         }
 
-        SPIRVInstList.insert(
-            InsertPoint, new SPIRVInstruction(spv::OpCompositeConstruct,
-                                              std::get<2>(*DeferredInst), Ops));
+        replaceSPIRVInst(Placeholder, spv::OpCompositeConstruct, Ops);
 
       } else if (callee_name.startswith(clspv::ResourceAccessorFunction())) {
 
@@ -5121,8 +5123,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops << MkId(CalleeID);
 
         FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
-        for (unsigned i = 0; i < CalleeFTy->getNumParams(); i++) {
-          auto *operand = Call->getOperand(i);
+        for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
+          auto *operand = Call->getOperand(j);
           auto *operand_type = operand->getType();
           // Images and samplers can be passed as function parameters without
           // variable pointers.
@@ -5152,9 +5154,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
           Ops << MkId(getSPIRVValue(operand));
         }
 
-        auto *CallInst = new SPIRVInstruction(spv::OpFunctionCall,
-                                              std::get<2>(*DeferredInst), Ops);
-        SPIRVInstList.insert(InsertPoint, CallInst);
+        replaceSPIRVInst(Placeholder, spv::OpFunctionCall, Ops);
       }
     }
   }
@@ -5377,36 +5377,36 @@ void SPIRVProducerPass::WriteOneWord(uint32_t Word) {
   binaryOut->write(reinterpret_cast<const char *>(&Word), sizeof(uint32_t));
 }
 
-void SPIRVProducerPass::WriteResultID(SPIRVInstruction *Inst) {
-  WriteOneWord(Inst->getResultID());
+void SPIRVProducerPass::WriteResultID(const SPIRVInstruction &Inst) {
+  WriteOneWord(Inst.getResultID());
 }
 
-void SPIRVProducerPass::WriteWordCountAndOpcode(SPIRVInstruction *Inst) {
+void SPIRVProducerPass::WriteWordCountAndOpcode(const SPIRVInstruction &Inst) {
   // High 16 bit : Word Count
   // Low 16 bit  : Opcode
-  uint32_t Word = Inst->getOpcode();
-  const uint32_t count = Inst->getWordCount();
+  uint32_t Word = Inst.getOpcode();
+  const uint32_t count = Inst.getWordCount();
   if (count > 65535) {
     errs() << "Word count limit of 65535 exceeded: " << count << "\n";
     llvm_unreachable("Word count too high");
   }
-  Word |= Inst->getWordCount() << 16;
+  Word |= Inst.getWordCount() << 16;
   WriteOneWord(Word);
 }
 
-void SPIRVProducerPass::WriteOperand(const std::unique_ptr<SPIRVOperand> &Op) {
-  SPIRVOperandType OpTy = Op->getType();
+void SPIRVProducerPass::WriteOperand(const SPIRVOperand &Op) {
+  SPIRVOperandType OpTy = Op.getType();
   switch (OpTy) {
   default: {
     llvm_unreachable("Unsupported SPIRV Operand Type???");
     break;
   }
   case SPIRVOperandType::NUMBERID: {
-    WriteOneWord(Op->getNumID());
+    WriteOneWord(Op.getNumID());
     break;
   }
   case SPIRVOperandType::LITERAL_STRING: {
-    std::string Str = Op->getLiteralStr();
+    std::string Str = Op.getLiteralStr();
     const char *Data = Str.c_str();
     size_t WordSize = Str.size() / 4;
     for (unsigned Idx = 0; Idx < WordSize; Idx++) {
@@ -5424,13 +5424,13 @@ void SPIRVProducerPass::WriteOperand(const std::unique_ptr<SPIRVOperand> &Op) {
     WriteOneWord(LastWord);
     break;
   }
-  case SPIRVOperandType::LITERAL_INTEGER:
-  case SPIRVOperandType::LITERAL_FLOAT: {
-    auto LiteralNum = Op->getLiteralNum();
-    // TODO: Handle LiteranNum carefully.
-    for (auto Word : LiteralNum) {
-      WriteOneWord(Word);
-    }
+  case SPIRVOperandType::LITERAL_WORD: {
+    WriteOneWord(Op.getLiteralNum()[0]);
+    break;
+  }
+  case SPIRVOperandType::LITERAL_DWORD: {
+    WriteOneWord(Op.getLiteralNum()[0]);
+    WriteOneWord(Op.getLiteralNum()[1]);
     break;
   }
   }
@@ -5444,9 +5444,9 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
 
 void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
 
-  for (auto Inst : SPIRVInstList) {
-    const auto &Ops = Inst->getOperands();
-    spv::Op Opcode = static_cast<spv::Op>(Inst->getOpcode());
+  for (const auto &Inst : SPIRVInstList) {
+    const auto &Ops = Inst.getOperands();
+    spv::Op Opcode = static_cast<spv::Op>(Inst.getOpcode());
 
     switch (Opcode) {
     default: {
