@@ -50,12 +50,12 @@ private:
   // Makes kernel |F| use |impl| as the pod arg implementation.
   void AddMetadata(Function &F, clspv::PodArgImpl impl);
 
-  // Returns true if |type| contains an array. Does not consider pointers since
-  // we are dealing with pod args.
+  // Returns true if |type| contains an array. Does not look through pointers
+  // since we are dealing with pod args.
   bool ContainsArrayType(Type *type) const;
 
   // Returns true if |type| contains a 16-bit integer or floating-point type.
-  // Does not consider pointer since we are dealing with pod args.
+  // Does not look through pointer since we are dealing with pod args.
   bool ContainsSizedType(Type *type, uint32_t width) const;
 };
 } // namespace
@@ -130,13 +130,13 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   const bool support_8bit_pc = !ContainsSizedType(pod_struct_ty, 8) ||
                                clspv::Option::Supports8BitStorageClass(
                                    clspv::Option::StorageClass::kPushConstant);
+  const bool fits_push_constant =
+      DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8 <=
+      clspv::Option::MaxPushConstantSize();
   const bool satisfies_push_constant =
       clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
-      support_8bit_pc &&
-      !(clspv::UsesGlobalPushConstants(M) ||
-        (DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8) >
-            clspv::Option::MaxPushConstantsSize() ||
-        contains_array);
+      support_8bit_pc && fits_push_constant &&
+      !clspv::UsesGlobalPushConstants(M) && !contains_array;
 
   // Priority:
   // 1. Per-kernel push constant interface.
@@ -186,7 +186,7 @@ bool AutoPodArgsPass::ContainsSizedType(Type *type, uint32_t width) const {
   if (auto int_ty = dyn_cast<IntegerType>(type)) {
     return int_ty->getBitWidth() == width;
   } else if (type->isHalfTy()) {
-    return true;
+    return width == 16;
   } else if (auto array_ty = dyn_cast<ArrayType>(type)) {
     return ContainsSizedType(array_ty->getElementType(), width);
   } else if (auto vec_ty = dyn_cast<VectorType>(type)) {
