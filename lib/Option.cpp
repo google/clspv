@@ -195,25 +195,27 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
 
 static llvm::cl::list<clspv::Option::StorageClass> no_16bit_storage(
     "no-16bit-storage",
-    llvm::cl::desc("Specify fine-grained 16-bit storage capabilities. SSBO "
-                   "support is assumed."),
+    llvm::cl::desc("Disable fine-grained 16-bit storage capabilities."),
     llvm::cl::Prefix, llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
     llvm::cl::values(
-        clEnumValN(clspv::Option::StorageClass::kSSBO, "ssbo", "ssbo"),
-        clEnumValN(clspv::Option::StorageClass::kUBO, "ubo", "ubo"),
+        clEnumValN(clspv::Option::StorageClass::kSSBO, "ssbo",
+                   "Disallow 16-bit types in SSBO interfaces"),
+        clEnumValN(clspv::Option::StorageClass::kUBO, "ubo",
+                   "Disallow 16-bit types in UBO interfaces"),
         clEnumValN(clspv::Option::StorageClass::kPushConstant, "pushconstant",
-                   "push constant")));
+                   "Disallow 16-bit types in push constant interfaces")));
 
 static llvm::cl::list<clspv::Option::StorageClass> no_8bit_storage(
     "no-8bit-storage",
-    llvm::cl::desc("Specify fine-grained 8-bit storage capabilities. SSBO "
-                   "support is assumed."),
+    llvm::cl::desc("Disable fine-grained 8-bit storage capabilities."),
     llvm::cl::Prefix, llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
     llvm::cl::values(
-        clEnumValN(clspv::Option::StorageClass::kSSBO, "ssbo", "ssbo"),
-        clEnumValN(clspv::Option::StorageClass::kUBO, "ubo", "ubo"),
+        clEnumValN(clspv::Option::StorageClass::kSSBO, "ssbo",
+                   "Disallow 8-bit types in SSBO interfaces"),
+        clEnumValN(clspv::Option::StorageClass::kUBO, "ubo",
+                   "Disallow 8-bit types in UBO interfaces"),
         clEnumValN(clspv::Option::StorageClass::kPushConstant, "pushconstant",
-                   "push constant")));
+                   "Disallow 8-bit types in push constant interfaces")));
 
 } // namespace
 

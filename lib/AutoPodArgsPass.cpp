@@ -54,8 +54,8 @@ private:
   // since we are dealing with pod args.
   bool ContainsArrayType(Type *type) const;
 
-  // Returns true if |type| contains a 16-bit integer or floating-point type.
-  // Does not look through pointer since we are dealing with pod args.
+  // Returns true if |type| contains a |width|-bit integer or floating-point
+  // type. Does not look through pointer since we are dealing with pod args.
   bool ContainsSizedType(Type *type, uint32_t width) const;
 };
 } // namespace
