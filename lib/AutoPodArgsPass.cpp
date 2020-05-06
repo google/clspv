@@ -132,7 +132,7 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
                                    clspv::Option::StorageClass::kPushConstant);
   const bool fits_push_constant =
       DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8 <=
-      clspv::Option::MaxPushConstantSize();
+      clspv::Option::MaxPushConstantsSize();
   const bool satisfies_push_constant =
       clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
       support_8bit_pc && fits_push_constant &&

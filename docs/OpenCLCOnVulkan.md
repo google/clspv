@@ -75,6 +75,27 @@ language must conform to the following the rules:
     _"VK\_KHR\_storage\_buffer\_storage\_class"_ and
     _"VK\_KHR\_variable\_pointers"_ **must** succeed.
 
+### Storage Capabilities
+
+In order to pass 8- or 16-bit types in the shader interface, Vulkan requires
+the appropriate bits are set in VkPhysicalDevice8BitStorageFeaturesKHR for
+8-bit types or VkPhysicalDevice16BitStorageFeaturesKHR (or the appropriate
+Vulkan 1.1 or 1.2 feature structs). By default clspv assumes all feature bits
+are enabled, but provides options to disallow 8- or 16-bit interfaces.
+-no-8bit-storage reflects 8-bit storage features and -no-16bit-storage reflects
+16-bit storage features. Each option can take the following values (can be
+specified in a comma-separated list or multiple times):
+
+- `ssbo`: Represents the storage buffer feature bit.
+- `ubo`: Represents the uniform and storage buffer feature bit.
+- `pushconstant`: Represents the push constant feature bit.
+
+For example, if your device only supports storageBuffer16BitAccess (and no
+8-bit interfaces), pass the following on the command line:
+```
+-no-16bit-storage=ubo,pushconstant -no-8bit-storage=ssbo,ubo,pushconstant
+```
+
 ### Descriptor Type Mappings
 
 OpenCL C kernel argument types are mapped to Vulkan descriptor types in the
