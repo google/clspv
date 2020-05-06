@@ -168,7 +168,7 @@ static bool NonUniformNDRangeSupported() {
 enum class StorageClass : int {
   kSSBO = 0,
   kUBO,
-  kPushConstant
+  kPushConstant,
 };
 
 // Returns true if |sc| supports 16-bit storage.

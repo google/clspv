@@ -69,15 +69,15 @@ private:
 
   clspv::Option::StorageClass ConvertToStorageClass(clang::LangAS aspace) {
     switch (aspace) {
-      case LangAS::opencl_constant:
-        if (clspv::Option::ConstantArgsInUniformBuffer()) {
-          return clspv::Option::StorageClass::kUBO;
-        } else {
-          return clspv::Option::StorageClass::kSSBO;
-        }
-      case LangAS::opencl_global:
-      default:
+    case LangAS::opencl_constant:
+      if (clspv::Option::ConstantArgsInUniformBuffer()) {
+        return clspv::Option::StorageClass::kUBO;
+      } else {
         return clspv::Option::StorageClass::kSSBO;
+      }
+    case LangAS::opencl_global:
+    default:
+      return clspv::Option::StorageClass::kSSBO;
     }
   }
 
@@ -85,18 +85,18 @@ private:
     auto canonical = QT.getCanonicalType();
     if (auto *BT = dyn_cast<BuiltinType>(canonical)) {
       switch (BT->getKind()) {
-        case BuiltinType::UShort:
-        case BuiltinType::Short:
-        case BuiltinType::Half:
-        case BuiltinType::Float16:
-          return width == 16;
-        case BuiltinType::UChar:
-        case BuiltinType::Char_U:
-        case BuiltinType::SChar:
-        case BuiltinType::Char_S:
-          return width == 8;
-        default:
-          return false;
+      case BuiltinType::UShort:
+      case BuiltinType::Short:
+      case BuiltinType::Half:
+      case BuiltinType::Float16:
+        return width == 16;
+      case BuiltinType::UChar:
+      case BuiltinType::Char_U:
+      case BuiltinType::SChar:
+      case BuiltinType::Char_S:
+        return width == 8;
+      default:
+        return false;
       }
     } else if (auto *PT = dyn_cast<PointerType>(canonical)) {
       return ContainsSizedType(PT->getPointeeType(), width);
