@@ -789,7 +789,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
     }
 
     // Conservatively error if a module scope push constant could be used.
-    if (clspv::Option::GlobalOffset() ||
+    if (clspv::Option::GlobalOffsetPushConstant() ||
         clspv::Option::Language() ==
             clspv::Option::SourceLanguage::OpenCL_C_20 ||
         clspv::Option::Language() ==
