@@ -18,18 +18,13 @@ set -e
 # Display commands being run.
 set -x
 
-BUILD_ROOT=$PWD
-SRC=$PWD/github/clspv
+ROOT_DIR=`pwd`
+SCRIPT_DIR=`dirname "$BASH_SOURCE"`
 
-# Get clang-format-5.0.0.
-# Once kokoro upgrades the Ubuntu VMs, we can use 'apt-get install clang-format'
-curl -L http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-linux-x86_64-ubuntu14.04.tar.xz -o clang-llvm.tar.xz
-tar xf clang-llvm.tar.xz
-export PATH=$PWD/clang+llvm-5.0.0-linux-x86_64-ubuntu14.04/bin:$PATH
-
-cd $SRC
-curl -L http://llvm.org/svn/llvm-project/cfe/trunk/tools/clang-format/clang-format-diff.py -o utils/clang-format-diff.py;
-
-echo $(date): Check formatting...
-./utils/check_code_format.sh $1
-echo $(date): check completed.
+docker run --rm -i \
+  --volume "${ROOT_DIR}:${ROOT_DIR}" \
+  --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
+  --workdir "${ROOT_DIR}" \
+  --env BUILD_TOOLCHAIN="clang" \
+  --entrypoint "${SCRIPT_DIR}/build-docker.sh" \
+  "gcr.io/shaderc-build/radial-build:latest"

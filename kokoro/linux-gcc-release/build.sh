@@ -18,5 +18,14 @@ set -e
 # Display commands being run.
 set -x
 
+ROOT_DIR=`pwd`
 SCRIPT_DIR=`dirname "$BASH_SOURCE"`
-source $SCRIPT_DIR/../scripts/linux/build.sh RELEASE gcc
+
+docker run --rm -i \
+  --volume "${ROOT_DIR}:${ROOT_DIR}" \
+  --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
+  --workdir "${ROOT_DIR}" \
+  --env BUILD_TOOLCHAIN="gcc" \
+  --env BUILD_TYPE="RelWithDebInfo" \
+  --entrypoint "${SCRIPT_DIR}/../scripts/linux/build.sh" \
+  "gcr.io/shaderc-build/radial-build:latest"

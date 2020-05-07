@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019 The Clspv Authors. All rights reserved.
+# Copyright 2020 The Clspv Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,19 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Fail on any error.
-set -e
-# Display commands being run.
-set -x
+BUILD_ROOT=$PWD
+SRC=$PWD/github/clspv
 
-ROOT_DIR=`pwd`
-SCRIPT_DIR=`dirname "$BASH_SOURCE"`
+using clang-8.0.0
 
-docker run --rm -i \
-  --volume "${ROOT_DIR}:${ROOT_DIR}" \
-  --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
-  --workdir "${ROOT_DIR}" \
-  --env BUILD_TOOLCHAIN="clang" \
-  --env BUILD_TYPE="RelWithDebInfo" \
-  --entrypoint "${SCRIPT_DIR}/../scripts/linux/build-clvk.sh" \
-  "gcr.io/shaderc-build/radial-build:latest"
+cd $SRC
+cp /bin/clang-8.0.0/clang-format-diff.py utils/clang-format-diff.py
+
+echo $(date): Check formatting...
+./utils/check_code_format.sh $1
+echo $(date): check completed.
