@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+. /bin/using.sh # Declare the bash 'using' function
+
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 

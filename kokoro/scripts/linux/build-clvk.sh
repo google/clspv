@@ -35,7 +35,7 @@ fi
 
 # Get Clspv dependencies.
 cd $SRC
-python utils/fetch_sources.py
+/usr/bin/python3 utils/fetch_sources.py
 
 # Get and build Vulkan-Headers
 echo $(date): Starting Vulkan-Headers build...

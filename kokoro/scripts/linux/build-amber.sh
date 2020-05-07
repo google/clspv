@@ -31,7 +31,7 @@ SRC=$PWD/github/clspv
 AMBER_SRC=$PWD/github/amber
 
 cd $SRC
-python utils/fetch_sources.py
+/usr/bin/python3 utils/fetch_sources.py
 
 cd $BUILD_ROOT/github
 git clone https://github.com/google/amber.git amber
