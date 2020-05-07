@@ -26,5 +26,5 @@ docker run --rm -i \
   --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
   --workdir "${ROOT_DIR}" \
   --env BUILD_TOOLCHAIN="clang" \
-  --entrypoint "${SCRIPT_DIR}/build-docker.sh" \
+  --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/build-docker.sh" \
   "gcr.io/shaderc-build/radial-build:latest"

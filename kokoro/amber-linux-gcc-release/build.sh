@@ -27,5 +27,5 @@ docker run --rm -i \
   --workdir "${ROOT_DIR}" \
   --env BUILD_TOOLCHAIN="gcc" \
   --env BUILD_TYPE="RelWithDebInfo" \
-  --entrypoint "${SCRIPT_DIR}/../scripts/linux/build-amber.sh" \
+  --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build-amber.sh" \
   "gcr.io/shaderc-build/radial-build:latest"
