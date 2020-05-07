@@ -1,7 +1,7 @@
 // Valid combinations
-// RUN: clspv %s -pod-pushconstant -global-offset 2>&1
-// RUN: clspv %s -pod-ubo -global-offset-push-constant 2>&1
-// RUN: clspv %s -pod-ubo -cl-std=CL2.0 -inline-entry-points 2>&1
+// RUN: clspv %s -o %t.spv -pod-pushconstant -global-offset 2>&1
+// RUN: clspv %s -o %t.spv -pod-ubo -global-offset-push-constant 2>&1
+// RUN: clspv %s -o %t.spv -pod-ubo -cl-std=CL2.0 -inline-entry-points 2>&1
 
 // POD args cannot be push constants if there are module scope push constants
 // RUN: not clspv %s -pod-pushconstant -global-offset-push-constant 2>&1 | FileCheck %s
