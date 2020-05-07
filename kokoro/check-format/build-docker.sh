@@ -25,5 +25,5 @@ cd $SRC
 cp third_party/llvm/clang/tools/clang-format/clang-format-diff.py utils/clang-format-diff.py
 
 echo $(date): Check formatting...
-./utils/check_code_format.sh $1
+./utils/check_code_format.sh
 echo $(date): check completed.

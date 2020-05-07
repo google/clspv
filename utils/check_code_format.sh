@@ -30,9 +30,9 @@ if [ -z "${FILES_TO_CHECK}" ]; then
 fi
 
 if [ "$1" = "FULL" ]; then
-  FORMAT_DIFF=$(git diff -U0 HEAD~ -- ${FILES_TO_CHECK} | python ./utils/clang-format-diff.py -p1 -style=file)
+  FORMAT_DIFF=$(git diff -U0 HEAD~ -- ${FILES_TO_CHECK} | python3 ./utils/clang-format-diff.py -p1 -style=file)
 else
-  FORMAT_DIFF=$(git diff -U0 master -- ${FILES_TO_CHECK} | python ./utils/clang-format-diff.py -p1 -style=file)
+  FORMAT_DIFF=$(git diff -U0 master -- ${FILES_TO_CHECK} | python3 ./utils/clang-format-diff.py -p1 -style=file)
 fi
 
 if [ -z "${FORMAT_DIFF}" ]; then
