@@ -5035,7 +5035,6 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             Ops << MkId(getSPIRVValue(constant)) << MkId(RID);
 
             replaceSPIRVInst(Placeholder, opcode, Ops);
-
           };
 
           switch (IndirectExtInst) {
