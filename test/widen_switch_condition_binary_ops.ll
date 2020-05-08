@@ -7,9 +7,9 @@ target triple = "spir-unknown-unknown"
 define spir_kernel void @subf(i32 %x, i32 %y) {
 entry:
   ; CHECK-LABEL subf
-  ; CHECK: [[sub:%[a-zA-Z0-9_]+]] = sub i32 4, %mul
-  ; CHECK-NEXT: [[and:%[a-zA-Z0-9_]+]] = and i32 [[sub]], 7
-  ; CHECK-NEXT: switch i32 [[and]], label %default [
+  ; CHECK: [[and:%[a-zA-Z0-9_]+]] = and i32 %mul, 7
+  ; CHECK-NEXT: [[sub:%[a-zA-Z0-9_]+]] = sub i32 4, [[and]]
+  ; CHECK-NEXT: switch i32 [[sub]], label %default [
   ; CHECK-NEXT:   i32 1, label %one_label
   ; CHECK-NEXT:   i32 2, label %two_label
   ; CHECK-NEXT:   i32 3, label %three_label
@@ -46,9 +46,9 @@ exit:
 define spir_kernel void @addf(i32 %x, i32 %y) {
 entry:
   ; CHECK-LABEL addf
-  ; CHECK: [[add:%[a-zA-Z0-9_]+]] = add i32 16, %mul
-  ; CHECK-NEXT: [[and:%[a-zA-Z0-9_]+]] = and i32 [[sub]], 31
-  ; CHECK-NEXT: switch i32 [[and]], label %default [
+  ; CHECK: [[and:%[a-zA-Z0-9_]+]] = and i32 %mul, 31
+  ; CHECK-NEXT: [[add:%[a-zA-Z0-9_]+]] = add i32 16, [[and]]
+  ; CHECK-NEXT: switch i32 [[add]], label %default [
   ; CHECK-NEXT:   i32 1, label %one_label
   ; CHECK-NEXT:   i32 2, label %two_label
   ; CHECK-NEXT:   i32 3, label %three_label

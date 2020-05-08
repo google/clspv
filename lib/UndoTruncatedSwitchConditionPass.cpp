@@ -65,8 +65,15 @@ private:
       zombies_.insert(inst);
     }
     if (auto *trunc = dyn_cast<TruncInst>(v)) {
-      auto *operand = trunc->getOperand(0);
-      result = ZeroExtend(operand);
+      auto *operand = ZeroExtend(trunc->getOperand(0));
+
+      // Now, and the extended version to keep the range of the output
+      // restricted to the original bit width.
+      result = BinaryOperator::Create(
+          Instruction::And, operand,
+          ConstantInt::get(
+              i32_, (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+          "", trunc);
     } else if (auto *zext = dyn_cast<ZExtInst>(v)) {
       result = new ZExtInst(zext->getOperand(0), i32_, "", zext);
     } else if (auto *phi = dyn_cast<PHINode>(v)) {
@@ -92,16 +99,8 @@ private:
           binop->getOpcode() == Instruction::Xor) {
         auto *op1 = ZeroExtend(binop->getOperand(0));
         auto *op2 = ZeroExtend(binop->getOperand(1));
-        auto new_binop =
+        result =
             BinaryOperator::Create(binop->getOpcode(), op1, op2, "", binop);
-        // Now, and the extended version to keep the range of the output
-        // restricted to the original bit width.
-        result = BinaryOperator::Create(
-            Instruction::And, new_binop,
-            ConstantInt::get(
-                i32_,
-                (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
-            "", binop);
       } else {
         errs() << "Unhandled instruction feeding switch " << *v << "\n";
         llvm_unreachable("Unhandled instruction feeding switch!");
