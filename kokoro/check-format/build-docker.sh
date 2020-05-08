@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019 The Clspv Authors. All rights reserved.
+# Copyright 2020 The Clspv Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,16 +15,22 @@
 
 # Fail on any error.
 set -e
+
+. /bin/using.sh # Declare the bash 'using' function
+
 # Display commands being run.
 set -x
 
-ROOT_DIR=`pwd`
-SCRIPT_DIR=`dirname "$BASH_SOURCE"`
+BUILD_ROOT=$PWD
+SRC=$PWD/github/clspv
 
-docker run --rm -i \
-  --volume "${ROOT_DIR}:${ROOT_DIR}" \
-  --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
-  --workdir "${ROOT_DIR}" \
-  --env BUILD_TOOLCHAIN="clang" \
-  --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/build-docker.sh" \
-  "gcr.io/shaderc-build/radial-build:latest"
+using clang-8.0.0
+which clang-format
+
+cd $SRC
+/usr/bin/python3 utils/fetch_sources.py
+cp third_party/llvm/clang/tools/clang-format/clang-format-diff.py utils/clang-format-diff.py
+
+echo $(date): Check formatting...
+./utils/check_code_format.sh
+echo $(date): check completed.

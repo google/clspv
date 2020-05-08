@@ -65,7 +65,7 @@ Show help:
 You will need:
 
 * CMake
-* Python
+* Python3
 * A C++ compiler
 * git
 
@@ -75,7 +75,7 @@ Clspv depends on the sources for other projects, at specific commits.
 Run the following command to download those dependencies, and place them
 in the `third_party` directory:
 
-    python utils/fetch_sources.py
+    python3 utils/fetch_sources.py
 
 ### Building
 

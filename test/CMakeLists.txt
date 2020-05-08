@@ -41,7 +41,7 @@ get_filename_component(LIT_PATH ${LLVM_SOURCE_DIR}/utils/lit/lit.py ABSOLUTE)
 get_filename_component(FILECHECK_PATH ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR} ABSOLUTE)
 
 add_custom_target(check-spirv
-  COMMAND python ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND ${PYTHON_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
     --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"

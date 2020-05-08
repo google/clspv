@@ -15,87 +15,36 @@
 
 # Fail on any error.
 set -e
+
+. /bin/using.sh # Declare the bash 'using' function.
+
 # Display commands being run.
 set -x
 
+# Common tools.
+using cmake-3.17.2
+using gcc-7
+using ninja-1.10.0
+
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
-CONFIG=$1
-COMPILER=$2
 
-SKIP_TESTS="False"
-BUILD_TYPE="Debug"
-
-CMAKE_C_CXX_COMPILER=""
-if [ $COMPILER = "clang" ]; then
-  # Use newer clang than default.
-  CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/clang-5.0 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-5.0"
-else
-  # Specify we want to build with GCC 7 (which supports C++14)
-  sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-  sudo apt-get update
-  sudo aptitude install -y gcc-7 g++-7
-  sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 100 --slave /usr/bin/g++ g++ /usr/bin/g++-7
-  sudo update-alternatives --set gcc "/usr/bin/gcc-7"
-  CMAKE_C_CXX_COMPILER="-DCMAKE_C_COMPILER=/usr/bin/gcc-7 -DCMAKE_CXX_COMPILER=/usr/bin/g++-7"
-fi
-
-# Possible configurations are:
-# ASAN, COVERAGE, RELEASE, DEBUG, DEBUG_EXCEPTION, RELEASE_MINGW
-
-if [ $CONFIG = "RELEASE" ] || [ $CONFIG = "RELEASE_MINGW" ]
-then
-  BUILD_TYPE="RelWithDebInfo"
-fi
-
-ADDITIONAL_CMAKE_FLAGS=""
-if [ $CONFIG = "ASAN" ]
-then
-  ADDITIONAL_CMAKE_FLAGS="-DCMAKE_CXX_FLAGS=-fsanitize=address -DCMAKE_C_FLAGS=-fsanitize=address"
-  export ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.4
-elif [ $CONFIG = "COVERAGE" ]
-then
-  ADDITIONAL_CMAKE_FLAGS="-DENABLE_CODE_COVERAGE=ON"
-  SKIP_TESTS="True"
-elif [ $CONFIG = "DEBUG_EXCEPTION" ]
-then
-  ADDITIONAL_CMAKE_FLAGS="-DDISABLE_EXCEPTIONS=ON -DDISABLE_RTTI=ON"
-elif [ $CONFIG = "RELEASE_MINGW" ]
-then
-  ADDITIONAL_CMAKE_FLAGS="-Dgtest_disable_pthreads=ON -DCMAKE_TOOLCHAIN_FILE=$SRC/cmake/linux-mingw-toolchain.cmake"
-  SKIP_TESTS="True"
-fi
-
-# Get NINJA.
-wget -q https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip
-unzip -q ninja-linux.zip
-export PATH="$PWD:$PATH"
-
-# Get dependencies.
 cd $SRC
-python utils/fetch_sources.py
+/usr/bin/python3 utils/fetch_sources.py
 
 mkdir build && cd $SRC/build
 
-# Invoke the build.
-BUILD_SHA=${KOKORO_GITHUB_COMMIT:-$KOKORO_GITHUB_PULL_REQUEST_COMMIT}
+if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
+  using clang-8.0.0
+fi
+
 echo $(date): Starting build...
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE $ADDITIONAL_CMAKE_FLAGS $CMAKE_C_CXX_COMPILER ..
+cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
 
 echo $(date): Build everything...
 ninja
 echo $(date): Build completed.
 
-if [ $CONFIG = "COVERAGE" ]
-then
-  echo $(date): Check coverage...
-  ninja report-coverage
-  echo $(date): Check coverage completed.
-fi
-
 echo $(date): Starting unit tests...
-if [ $SKIP_TESTS = "False" ]
-then
-  ninja check-spirv
-fi
+ninja check-spirv
 echo $(date): Unit tests completed.

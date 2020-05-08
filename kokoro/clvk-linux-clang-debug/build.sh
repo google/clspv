@@ -18,5 +18,14 @@ set -e
 # Display commands being run.
 set -x
 
+ROOT_DIR=`pwd`
 SCRIPT_DIR=`dirname "$BASH_SOURCE"`
-source $SCRIPT_DIR/../scripts/linux/build-clvk.sh DEBUG clang
+
+docker run --rm -i \
+  --volume "${ROOT_DIR}:${ROOT_DIR}" \
+  --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
+  --workdir "${ROOT_DIR}" \
+  --env BUILD_TOOLCHAIN="clang" \
+  --env BUILD_TYPE="Debug" \
+  --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build-clvk.sh" \
+  "gcr.io/shaderc-build/radial-build:latest"
