@@ -13,12 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Fail on any error.
+set -e
+
 . /bin/using.sh # Declare the bash 'using' function
+
+# Display commands being run.
+set -x
 
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
 using clang-8.0.0
+which clang-format
 
 cd $SRC
 /usr/bin/python3 utils/fetch_sources.py

@@ -77,7 +77,6 @@ using namespace mdconst;
 namespace {
 
 cl::opt<bool> ShowResourceVars("show-rv", cl::init(false), cl::Hidden,
-
                                cl::desc("Show resource variable creation"));
 
 cl::opt<bool>
