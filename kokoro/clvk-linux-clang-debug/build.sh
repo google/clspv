@@ -26,6 +26,6 @@ docker run --rm -i \
   --volume "${KOKORO_ARTIFACTS_DIR}:/mnt/artifacts" \
   --workdir "${ROOT_DIR}" \
   --env BUILD_TOOLCHAIN="clang" \
-  --env BUILD_TYPE="RelWithDebInfo" \
+  --env BUILD_TYPE="Debug" \
   --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build-clvk.sh" \
   "gcr.io/shaderc-build/radial-build:latest"
