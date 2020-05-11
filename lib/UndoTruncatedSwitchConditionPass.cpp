@@ -42,14 +42,12 @@ private:
   // values are created.
   // TODO(dneto): Handle 64 bit case as well, but separately.
   Value *ZeroExtend(Value *v) {
-    const auto bit_width = v->getType()->getIntegerBitWidth();
+    auto bit_width = 0;
+    if (v->getType()->isIntegerTy())
+      bit_width = v->getType()->getIntegerBitWidth();
     if (bit_width > 32) {
       errs() << "Unhandled bit width for " << *v << "\n";
       llvm_unreachable("Unhandled bit width");
-    }
-    // This base case makes for easier recursion.
-    if (bit_width == 32) {
-      return v;
     }
 
     auto where = extended_value_.find(v);
@@ -57,13 +55,22 @@ private:
       return where->second;
     }
 
+    // This base case makes for easier recursion.
+    switch (bit_width) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+      if (!isa<ZExtInst>(v))
+        return v;
+    default:
+      break;
+    }
+
     if (auto *ci = dyn_cast<ConstantInt>(v)) {
       return ConstantInt::get(i32_, uint32_t(ci->getZExtValue()));
     }
     Value *result = nullptr;
-    if (auto *inst = dyn_cast<Instruction>(v)) {
-      zombies_.insert(inst);
-    }
     if (auto *trunc = dyn_cast<TruncInst>(v)) {
       auto *operand = ZeroExtend(trunc->getOperand(0));
 
@@ -101,16 +108,55 @@ private:
         auto *op2 = ZeroExtend(binop->getOperand(1));
         result =
             BinaryOperator::Create(binop->getOpcode(), op1, op2, "", binop);
+        if (binop->getOpcode() == Instruction::Add ||
+            binop->getOpcode() == Instruction::Sub ||
+            binop->getOpcode() == Instruction::Mul) {
+          // Add an extra masking for add and sub in case of integer wrapping.
+          result = BinaryOperator::Create(
+              Instruction::And, result,
+              ConstantInt::get(
+                  i32_,
+                  (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+              "", binop);
+        }
       } else {
         errs() << "Unhandled instruction feeding switch " << *v << "\n";
         llvm_unreachable("Unhandled instruction feeding switch!");
       }
+    } else if (auto SI = dyn_cast<SwitchInst>(v)) {
+      auto extended_cond = ZeroExtend(SI->getCondition());
+      if (extended_cond && extended_cond != SI->getCondition()) {
+        SI->setCondition(extended_cond);
+        for (auto Cases : SI->cases()) {
+          // The original value of the case.
+          auto V = Cases.getCaseValue()->getZExtValue();
+
+          // A new value for the case with the correct type.
+          auto CI = dyn_cast<ConstantInt>(ConstantInt::get(i32_, V));
+
+          // And we replace the old value.
+          Cases.setValue(CI);
+        }
+      }
+    } else if (auto inst = dyn_cast<Instruction>(v)) {
+      for (unsigned i = 0; i < inst->getNumOperands(); ++i) {
+        auto extended_op = ZeroExtend(inst->getOperand(i));
+        if (extended_op && extended_op != inst->getOperand(i))
+          inst->setOperand(i, extended_op);
+      }
     } else {
-      errs() << "Unhandled instruction feeding switch " << *v << "\n";
-      llvm_unreachable("Unhandled instruction feeding switch!");
+      errs() << "Unhandled instruction " << *v << "\n";
+      llvm_unreachable("Unhandled instruction!");
     }
 
-    extended_value_[v] = result;
+    // If the instruction was replaced, mark it as a zombie.
+    if (auto *inst = dyn_cast<Instruction>(v)) {
+      if (result && result != inst)
+        zombies_.insert(inst);
+    }
+
+    if (result)
+      extended_value_[v] = result;
     return result;
   }
 
@@ -135,16 +181,16 @@ ModulePass *createUndoTruncatedSwitchConditionPass() {
 bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  SmallVector<SwitchInst *, 8> WorkList;
+  SmallVector<Instruction *, 8> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
-        // If we have a switch instruction.
-        if (auto SI = dyn_cast<SwitchInst>(&I)) {
-          // Whose condition is a strangely sized integer type.
-          switch (SI->getCondition()->getType()->getIntegerBitWidth()) {
+        if (auto trunc = dyn_cast<TruncInst>(&I)) {
+          if (trunc->getType()->isVectorTy())
+            continue;
+          switch (trunc->getType()->getIntegerBitWidth()) {
           default:
-            WorkList.push_back(SI);
+            WorkList.push_back(trunc);
             break;
           case 8:
           case 16:
@@ -160,31 +206,49 @@ bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
   zombies_.reset();
   i32_ = Type::getInt32Ty(M.getContext());
 
-  for (auto SI : WorkList) {
-    auto Cond = SI->getCondition();
+  while (!WorkList.empty()) {
+    auto inst = WorkList.back();
+    WorkList.pop_back();
 
-    auto *widened = ZeroExtend(Cond);
-    SI->setCondition(widened);
-    Changed = true;
+    auto extended = ZeroExtend(inst);
+    if (extended && extended != inst) {
+      Changed = true;
 
-    for (auto Cases : SI->cases()) {
-      // The original value of the case.
-      auto V = Cases.getCaseValue()->getZExtValue();
-
-      // A new value for the case with the correct type.
-      auto CI = dyn_cast<ConstantInt>(ConstantInt::get(i32_, V));
-
-      // And we replace the old value.
-      Cases.setValue(CI);
+      for (auto user : inst->users()) {
+        if (auto user_inst = dyn_cast<Instruction>(user)) {
+          WorkList.push_back(user_inst);
+        }
+      }
     }
   }
 
-  // Remove the zombies if we can.  We expect to.  They are ordered from
-  // combinations down to their supporting values.
+  // Remove the zombies if we can.  We expect to. Generally this can be done in
+  // 1 or 2 passes.
+  SmallVector<Instruction *, 8> extra;
   for (auto *zombie : zombies_) {
     if (!zombie->hasNUsesOrMore(1)) {
       zombie->eraseFromParent();
+    } else {
+      extra.push_back(zombie);
     }
+  }
+
+  // This is not ideal, but the way we identify instructions doesn't lend
+  // itself to a single pass well.
+  bool updated = true;
+  while (updated) {
+    updated = false;
+    SmallVector<Instruction *, 8> new_extra;
+    for (auto *zombie : extra) {
+      if (!zombie->hasNUsesOrMore(1)) {
+        updated = true;
+        zombie->eraseFromParent();
+      } else {
+        new_extra.push_back(zombie);
+      }
+    }
+
+    extra.swap(new_extra);
   }
 
   return Changed;
