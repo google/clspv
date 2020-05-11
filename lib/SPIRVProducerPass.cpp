@@ -235,6 +235,7 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
   typedef UniqueVector<Value *> ValueList;
   typedef std::vector<std::pair<Value *, uint32_t>> EntryPointVecType;
+  typedef std::set<uint32_t> CapabilitySetType;
   typedef std::list<SPIRVInstruction> SPIRVInstructionList;
   // A vector of pairs, each of which is:
   // - the LLVM instruction that we will later generate SPIR-V code for
@@ -249,13 +250,15 @@ struct SPIRVProducerPass final : public ModulePass {
       std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
       ArrayRef<std::pair<unsigned, std::string>> samplerMap,
       bool outputCInitList)
-      : ModulePass(ID), samplerMap(samplerMap), out(out),
+      : ModulePass(ID), module(nullptr), samplerMap(samplerMap), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
         descriptorMapEntries(descriptor_map_entries),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0) {}
+        WorkgroupSizeVarID(0) {
+    addCapability(spv::CapabilityShader);
+  }
 
   virtual ~SPIRVProducerPass() {
   }
@@ -273,9 +276,9 @@ struct SPIRVProducerPass final : public ModulePass {
   // patch the SPIR-V header block
   void patchHeader();
 
+  CapabilitySetType &getCapabilitySet() { return CapabilitySet; }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
   TypeList &getTypeList() { return Types; };
-  ValueList &getConstantList() { return Constants; };
   ValueMapType &getValueMap() { return ValueMap; }
   SPIRVInstructionList &getSPIRVInstList(SPIRVSection Section) {
     return SPIRVSections[Section];
@@ -283,17 +286,25 @@ struct SPIRVProducerPass final : public ModulePass {
   EntryPointVecType &getEntryPointVec() { return EntryPointVec; };
   DeferredInstVecType &getDeferredInstVec() { return DeferredInstVec; };
   ValueList &getEntryPointInterfacesVec() { return EntryPointInterfacesVec; };
-  uint32_t &getOpExtInstImportID() { return OpExtInstImportID; };
+  SPIRVID getOpExtInstImportID();
   std::vector<uint32_t> &getBuiltinDimVec() { return BuiltinDimensionVec; };
 
   bool hasVariablePointersStorageBuffer() {
     return HasVariablePointersStorageBuffer;
   }
-  void setVariablePointersStorageBuffer(bool Val) {
-    HasVariablePointersStorageBuffer = Val;
+  void setVariablePointersStorageBuffer() {
+    if (!HasVariablePointersStorageBuffer) {
+      addCapability(spv::CapabilityVariablePointersStorageBuffer);
+      HasVariablePointersStorageBuffer = true;
+    }
   }
   bool hasVariablePointers() { return HasVariablePointers; };
-  void setVariablePointers(bool Val) { HasVariablePointers = Val; };
+  void setVariablePointers() {
+    if (!HasVariablePointers) {
+      addCapability(spv::CapabilityVariablePointers);
+      HasVariablePointers = true;
+    }
+  };
   ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() {
     return samplerMap;
   }
@@ -313,7 +324,6 @@ struct SPIRVProducerPass final : public ModulePass {
   // Populate ResourceVarInfoList, FunctionToResourceVarsMap, and
   // ModuleOrderedResourceVars.
   void FindResourceVars();
-  bool FindExtInst();
   void FindTypePerGlobalVar(GlobalVariable &GV);
   void FindTypePerFunc(Function &F);
   void FindTypesForSamplerMap();
@@ -321,9 +331,6 @@ struct SPIRVProducerPass final : public ModulePass {
   // Inserts |Ty| and relevant sub-types into the |Types| member, indicating
   // that |Ty| and its subtypes will need a corresponding SPIR-V type.
   void FindType(Type *Ty);
-  void FindConstantPerGlobalVar(GlobalVariable &GV);
-  void FindConstantPerFunc(Function &F);
-  void FindConstant(Value *V);
 
   // Lookup or create Types, Constants.
   // Returns SPIRVID once it has been created.
@@ -332,14 +339,12 @@ struct SPIRVProducerPass final : public ModulePass {
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V);
 
-  void GenerateExtInstImport();
   // Generates instructions for SPIR-V types corresponding to the LLVM types
   // saved in the |Types| member.  A type follows its subtypes.  IDs are
   // allocated sequentially starting with the current value of nextID, and
   // with a type following its subtypes.  Also updates nextID to just beyond
   // the last generated ID.
   void GenerateSPIRVTypes();
-  void GenerateSPIRVConstants();
   void GenerateModuleInfo();
   void GeneratePushConstantDescriptorMapEntries();
   void GenerateSpecConstantDescriptorMapEntries();
@@ -403,6 +408,9 @@ struct SPIRVProducerPass final : public ModulePass {
 
   // Returns the base pointer of |v|.
   Value *GetBasePointer(Value *v);
+
+  // Add Capability if not already (e.g. CapabilityGroupNonUniformBroadcast)
+  void addCapability(uint32_t c) { CapabilitySet.emplace(c); }
 
   // Sets |HasVariablePointersStorageBuffer| or |HasVariablePointers| base on
   // |address_space|.
@@ -473,6 +481,9 @@ private:
 
   Module *module;
 
+  // Set of Capabilities required
+  CapabilitySetType CapabilitySet;
+
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
   raw_pwrite_stream &out;
 
@@ -506,7 +517,6 @@ private:
   TypeMapType ImageTypeMap;
   // A unique-vector of LLVM types that map to a SPIR-V type.
   TypeList Types;
-  ValueList Constants;
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   ValueMapType ValueMap;
   SPIRVInstructionList SPIRVSections[kSectionCount];
@@ -638,6 +648,10 @@ ModulePass *createSPIRVProducerPass(
 } // namespace clspv
 
 bool SPIRVProducerPass::runOnModule(Module &M) {
+  // TODO(sjw): Need to reset all data members for each Module, or better
+  // yet create a new SPIRVProducer for every module.. For now only
+  // allow 1 call.
+  assert(module == nullptr);
   module = &M;
   if (ShowProducerIR) {
     llvm::outs() << *module << "\n";
@@ -666,25 +680,14 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
     // Collect types' information from global variable.
     FindTypePerGlobalVar(GV);
 
-    // Collect constant information from global variable.
-    FindConstantPerGlobalVar(GV);
-
     // If the variable is an input, entry points need to know about it.
     if (AddressSpace::Input == GV.getType()->getPointerAddressSpace()) {
       getEntryPointInterfacesVec().insert(&GV);
     }
   }
 
-  // If there are extended instructions, generate OpExtInstImport.
-  if (FindExtInst()) {
-    GenerateExtInstImport();
-  }
-
   // Generate SPIRV instructions for types.
   GenerateSPIRVTypes();
-
-  // Generate SPIRV constants.
-  GenerateSPIRVConstants();
 
   // Generate literal samplers if necessary.
   GenerateSamplers();
@@ -791,7 +794,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo() {
   // argument, constant and pointer type for argument access. These information
   // is artificial one because we need Vulkan SPIR-V output. This function is
   // executed ahead of FindType and FindConstant.
-  LLVMContext &Context = module->getContext();
 
   FindGlobalConstVars();
 
@@ -807,144 +809,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo() {
 
   FindTypesForSamplerMap();
   FindTypesForResourceVars();
-
-  for (Function &F : *module) {
-    if (F.isDeclaration()) {
-      continue;
-    }
-
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        if (I.getOpcode() == Instruction::ZExt ||
-            I.getOpcode() == Instruction::SExt ||
-            I.getOpcode() == Instruction::UIToFP) {
-          // If there is zext with i1 type, it will be changed to OpSelect. The
-          // OpSelect needs constant 0 and 1 so the constants are added here.
-
-          auto OpTy = I.getOperand(0)->getType();
-
-          if (OpTy->isIntOrIntVectorTy(1)) {
-            if (I.getOpcode() == Instruction::ZExt) {
-              FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(ConstantInt::get(I.getType(), 1));
-            } else if (I.getOpcode() == Instruction::SExt) {
-              FindConstant(Constant::getNullValue(I.getType()));
-              FindConstant(ConstantInt::getSigned(I.getType(), -1));
-            } else {
-              FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
-              FindConstant(ConstantFP::get(Context, APFloat(1.0f)));
-            }
-          }
-        } else if (CallInst *Call = dyn_cast<CallInst>(&I)) {
-          StringRef callee_name = Call->getCalledFunction()->getName();
-
-          if (IsSampledImageRead(callee_name)) {
-            // All sampled reads need a floating point 0 for the Lod operand.
-            FindConstant(ConstantFP::get(Context, APFloat(0.0f)));
-          } else if (IsUnsampledImageRead(callee_name)) {
-            // All unsampled reads need an integer 0 for the Lod operand.
-            FindConstant(ConstantInt::get(Context, APInt(32, 0)));
-          } else if (IsImageQuery(callee_name)) {
-            Type *ImageTy = Call->getOperand(0)->getType();
-            const uint32_t dim = ImageDimensionality(ImageTy);
-            uint32_t components =
-                dim + (clspv::IsArrayImageType(ImageTy) ? 1 : 0);
-            if (components > 1) {
-              // OpImageQuerySize* return |components| components.
-              FindType(VectorType::get(Type::getInt32Ty(Context), components));
-              if (dim == 3 && IsGetImageDim(callee_name)) {
-                // get_image_dim for 3D images returns an int4.
-                FindType(
-                    VectorType::get(Type::getInt32Ty(Context), components + 1));
-              }
-            }
-
-            if (IsSampledImageType(ImageTy)) {
-              // All sampled image queries need a integer 0 for the Lod
-              // operand.
-              FindConstant(ConstantInt::get(Context, APInt(32, 0)));
-            }
-          }
-        }
-      }
-    }
-
-    // More things to do on kernel functions
-    if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-      if (const MDNode *MD =
-              dyn_cast<Function>(&F)->getMetadata("reqd_work_group_size")) {
-        // We generate constants if the WorkgroupSize builtin is being used.
-        if (HasWorkGroupBuiltin) {
-          // Collect constant information for work group size.
-          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(0)));
-          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(1)));
-          FindConstant(mdconst::extract<ConstantInt>(MD->getOperand(2)));
-        }
-      }
-    }
-
-    // TODO(alan-baker): make this better.
-    if (module->getTypeByName("opencl.image1d_ro_t.float") ||
-        module->getTypeByName("opencl.image1d_ro_t.float.sampled") ||
-        module->getTypeByName("opencl.image1d_wo_t.float") ||
-        module->getTypeByName("opencl.image2d_ro_t.float") ||
-        module->getTypeByName("opencl.image2d_ro_t.float.sampled") ||
-        module->getTypeByName("opencl.image2d_wo_t.float") ||
-        module->getTypeByName("opencl.image3d_ro_t.float") ||
-        module->getTypeByName("opencl.image3d_ro_t.float.sampled") ||
-        module->getTypeByName("opencl.image3d_wo_t.float") ||
-        module->getTypeByName("opencl.image1d_array_ro_t.float") ||
-        module->getTypeByName("opencl.image1d_array_ro_t.float.sampled") ||
-        module->getTypeByName("opencl.image1d_array_wo_t.float") ||
-        module->getTypeByName("opencl.image2d_array_ro_t.float") ||
-        module->getTypeByName("opencl.image2d_array_ro_t.float.sampled") ||
-        module->getTypeByName("opencl.image2d_array_wo_t.float")) {
-      FindType(Type::getFloatTy(Context));
-    } else if (module->getTypeByName("opencl.image1d_ro_t.uint") ||
-               module->getTypeByName("opencl.image1d_ro_t.uint.sampled") ||
-               module->getTypeByName("opencl.image1d_wo_t.uint") ||
-               module->getTypeByName("opencl.image2d_ro_t.uint") ||
-               module->getTypeByName("opencl.image2d_ro_t.uint.sampled") ||
-               module->getTypeByName("opencl.image2d_wo_t.uint") ||
-               module->getTypeByName("opencl.image3d_ro_t.uint") ||
-               module->getTypeByName("opencl.image3d_ro_t.uint.sampled") ||
-               module->getTypeByName("opencl.image3d_wo_t.uint") ||
-               module->getTypeByName("opencl.image1d_array_ro_t.uint") ||
-               module->getTypeByName(
-                   "opencl.image1d_array_ro_t.uint.sampled") ||
-               module->getTypeByName("opencl.image1d_array_wo_t.uint") ||
-               module->getTypeByName("opencl.image2d_array_ro_t.uint") ||
-               module->getTypeByName(
-                   "opencl.image2d_array_ro_t.uint.sampled") ||
-               module->getTypeByName("opencl.image2d_array_wo_t.uint")) {
-      FindType(Type::getInt32Ty(Context));
-    } else if (module->getTypeByName("opencl.image1d_ro_t.int") ||
-               module->getTypeByName("opencl.image1d_ro_t.int.sampled") ||
-               module->getTypeByName("opencl.image1d_wo_t.int") ||
-               module->getTypeByName("opencl.image2d_ro_t.int") ||
-               module->getTypeByName("opencl.image2d_ro_t.int.sampled") ||
-               module->getTypeByName("opencl.image2d_wo_t.int") ||
-               module->getTypeByName("opencl.image3d_ro_t.int") ||
-               module->getTypeByName("opencl.image3d_ro_t.int.sampled") ||
-               module->getTypeByName("opencl.image3d_wo_t.int") ||
-               module->getTypeByName("opencl.image1d_array_ro_t.int") ||
-               module->getTypeByName("opencl.image1d_array_ro_t.int.sampled") ||
-               module->getTypeByName("opencl.image1d_array_wo_t.int") ||
-               module->getTypeByName("opencl.image2d_array_ro_t.int") ||
-               module->getTypeByName("opencl.image2d_array_ro_t.int.sampled") ||
-               module->getTypeByName("opencl.image2d_array_wo_t.int")) {
-      // Nothing for now...
-    } else {
-      // This was likely an UndefValue.
-      FindType(Type::getFloatTy(Context));
-    }
-
-    // Collect types' information from function.
-    FindTypePerFunc(F);
-
-    // Collect constant information from function.
-    FindConstantPerFunc(F);
-  }
 }
 
 void SPIRVProducerPass::FindGlobalConstVars() {
@@ -1145,71 +1009,6 @@ void SPIRVProducerPass::FindResourceVars() {
              << "\n";
     }
   }
-}
-
-bool SPIRVProducerPass::FindExtInst() {
-  LLVMContext &Context = module->getContext();
-  bool HasExtInst = false;
-
-  for (Function &F : *module) {
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        if (CallInst *Call = dyn_cast<CallInst>(&I)) {
-          Function *Callee = Call->getCalledFunction();
-          // Check whether this call is for extend instructions.
-          auto callee_name = Callee->getName();
-          const glsl::ExtInst EInst = getExtInstEnum(callee_name);
-          const glsl::ExtInst IndirectEInst =
-              getIndirectExtInstEnum(callee_name);
-
-          HasExtInst |=
-              (EInst != kGlslExtInstBad) || (IndirectEInst != kGlslExtInstBad);
-
-          if (IndirectEInst) {
-            // Register extra constants if needed.
-
-            // Registers a type and constant for computing the result of the
-            // given instruction.  If the result of the instruction is a vector,
-            // then make a splat vector constant with the same number of
-            // elements.
-            auto register_constant = [this, &I](Constant *constant) {
-              FindType(constant->getType());
-              FindConstant(constant);
-              if (auto *vectorTy = dyn_cast<VectorType>(I.getType())) {
-                // Register the splat vector of the value with the same
-                // width as the result of the instruction.
-                auto *vec_constant = ConstantVector::getSplat(
-                    {static_cast<unsigned>(vectorTy->getNumElements()), false},
-                    constant);
-                FindConstant(vec_constant);
-                FindType(vec_constant->getType());
-              }
-            };
-            switch (IndirectEInst) {
-            case glsl::ExtInstFindUMsb:
-              // clz needs OpExtInst and OpISub with constant 31, or splat
-              // vector of 31.  Add it to the constant list here.
-              register_constant(
-                  ConstantInt::get(Type::getInt32Ty(Context), 31));
-              break;
-            case glsl::ExtInstAcos:
-            case glsl::ExtInstAsin:
-            case glsl::ExtInstAtan:
-            case glsl::ExtInstAtan2:
-              // We need 1/pi for acospi, asinpi, atan2pi.
-              register_constant(
-                  ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
-              break;
-            default:
-              assert(false && "internally inconsistent");
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return HasExtInst;
 }
 
 void SPIRVProducerPass::FindTypePerGlobalVar(GlobalVariable &GV) {
@@ -1614,244 +1413,6 @@ void SPIRVProducerPass::FindType(Type *Ty) {
   TyList.insert(Ty);
 }
 
-void SPIRVProducerPass::FindConstantPerGlobalVar(GlobalVariable &GV) {
-  // If the global variable has a (non undef) initializer.
-  if (GV.hasInitializer() && !isa<UndefValue>(GV.getInitializer())) {
-    // Generate the constant if it's not the initializer to a module scope
-    // constant that we will expect in a storage buffer.
-    const bool module_scope_constant_external_init =
-        (GV.getType()->getPointerAddressSpace() == AddressSpace::Constant) &&
-        clspv::Option::ModuleConstantsInStorageBuffer();
-    if (!module_scope_constant_external_init) {
-      FindConstant(GV.getInitializer());
-    }
-  }
-}
-
-void SPIRVProducerPass::FindConstantPerFunc(Function &F) {
-  // Investigate constants in function body.
-  for (BasicBlock &BB : F) {
-    for (Instruction &I : BB) {
-      if (auto *call = dyn_cast<CallInst>(&I)) {
-        auto name = call->getCalledFunction()->getName();
-        if (name == clspv::LiteralSamplerFunction()) {
-          // We've handled these constants elsewhere, so skip it.
-          continue;
-        }
-        if (name.startswith(clspv::ResourceAccessorFunction())) {
-          continue;
-        }
-        if (name.startswith(clspv::WorkgroupAccessorFunction())) {
-          continue;
-        }
-        if (name.startswith(clspv::SPIRVOpIntrinsicFunction())) {
-          // Skip the first operand that has the SPIR-V Opcode
-          for (unsigned i = 1; i < I.getNumOperands(); i++) {
-            if (isa<Constant>(I.getOperand(i)) &&
-                !isa<GlobalValue>(I.getOperand(i))) {
-              FindConstant(I.getOperand(i));
-            }
-          }
-          continue;
-        }
-      }
-
-      if (isa<AllocaInst>(I)) {
-        // Alloca instruction has constant for the number of element. Ignore it.
-        continue;
-      } else if (isa<ShuffleVectorInst>(I)) {
-        for (unsigned i = 0; i < I.getNumOperands(); i++) {
-          // Ignore constant for mask of shuffle vector instruction.
-          if (i == 2) {
-            continue;
-          }
-
-          if (isa<Constant>(I.getOperand(i)) &&
-              !isa<GlobalValue>(I.getOperand(i))) {
-            FindConstant(I.getOperand(i));
-          }
-        }
-
-        continue;
-      } else if (isa<InsertElementInst>(I)) {
-        // Handle InsertElement with <4 x i8> specially.
-        Type *CompositeTy = I.getOperand(0)->getType();
-        if (is4xi8vec(CompositeTy)) {
-          LLVMContext &Context = CompositeTy->getContext();
-          if (isa<Constant>(I.getOperand(0))) {
-            FindConstant(I.getOperand(0));
-          }
-
-          if (isa<Constant>(I.getOperand(1))) {
-            FindConstant(I.getOperand(1));
-          }
-
-          // Add mask constant 0xFF.
-          Constant *CstFF = ConstantInt::get(Type::getInt32Ty(Context), 0xFF);
-          FindConstant(CstFF);
-
-          // Add shift amount constant.
-          if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2))) {
-            uint64_t Idx = CI->getZExtValue();
-            Constant *CstShiftAmount =
-                ConstantInt::get(Type::getInt32Ty(Context), Idx * 8);
-            FindConstant(CstShiftAmount);
-          }
-
-          continue;
-        }
-
-        for (unsigned i = 0; i < I.getNumOperands(); i++) {
-          // Ignore constant for index of InsertElement instruction.
-          if (i == 2) {
-            continue;
-          }
-
-          if (isa<Constant>(I.getOperand(i)) &&
-              !isa<GlobalValue>(I.getOperand(i))) {
-            FindConstant(I.getOperand(i));
-          }
-        }
-
-        continue;
-      } else if (isa<ExtractElementInst>(I)) {
-        // Handle ExtractElement with <4 x i8> specially.
-        Type *CompositeTy = I.getOperand(0)->getType();
-        if (is4xi8vec(CompositeTy)) {
-          LLVMContext &Context = CompositeTy->getContext();
-          if (isa<Constant>(I.getOperand(0))) {
-            FindConstant(I.getOperand(0));
-          }
-
-          // Add mask constant 0xFF.
-          Constant *CstFF = ConstantInt::get(Type::getInt32Ty(Context), 0xFF);
-          FindConstant(CstFF);
-
-          // Add shift amount constant.
-          if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1))) {
-            uint64_t Idx = CI->getZExtValue();
-            Constant *CstShiftAmount =
-                ConstantInt::get(Type::getInt32Ty(Context), Idx * 8);
-            FindConstant(CstShiftAmount);
-          } else {
-            ConstantInt *Cst8 = ConstantInt::get(Type::getInt32Ty(Context), 8);
-            FindConstant(Cst8);
-          }
-
-          continue;
-        }
-
-        for (unsigned i = 0; i < I.getNumOperands(); i++) {
-          // Ignore constant for index of ExtractElement instruction.
-          if (i == 1) {
-            continue;
-          }
-
-          if (isa<Constant>(I.getOperand(i)) &&
-              !isa<GlobalValue>(I.getOperand(i))) {
-            FindConstant(I.getOperand(i));
-          }
-        }
-
-        continue;
-      } else if ((Instruction::Xor == I.getOpcode()) &&
-                 I.getType()->isIntegerTy(1)) {
-        // We special case for Xor where the type is i1 and one of the arguments
-        // is a constant 1 (true), this is an OpLogicalNot in SPIR-V, and we
-        // don't need the constant
-        bool foundConstantTrue = false;
-        for (Use &Op : I.operands()) {
-          if (isa<Constant>(Op) && !isa<GlobalValue>(Op)) {
-            auto CI = cast<ConstantInt>(Op);
-
-            if (CI->isZero() || foundConstantTrue) {
-              // If we already found the true constant, we might (probably only
-              // on -O0) have an OpLogicalNot which is taking a constant
-              // argument, so discover it anyway.
-              FindConstant(Op);
-            } else {
-              foundConstantTrue = true;
-            }
-          }
-        }
-
-        continue;
-      } else if (isa<TruncInst>(I)) {
-        // Special case if i8 is not generally handled.
-        if (!clspv::Option::Int8Support()) {
-          // For truncation to i8 we mask against 255.
-          Type *ToTy = I.getType();
-          if (8u == ToTy->getPrimitiveSizeInBits()) {
-            LLVMContext &Context = ToTy->getContext();
-            Constant *Cst255 =
-                ConstantInt::get(Type::getInt32Ty(Context), 0xff);
-            FindConstant(Cst255);
-          }
-        }
-      } else if (isa<AtomicRMWInst>(I)) {
-        LLVMContext &Context = I.getContext();
-
-        FindConstant(
-            ConstantInt::get(Type::getInt32Ty(Context), spv::ScopeDevice));
-        FindConstant(ConstantInt::get(
-            Type::getInt32Ty(Context),
-            spv::MemorySemanticsUniformMemoryMask |
-                spv::MemorySemanticsSequentiallyConsistentMask));
-      }
-
-      for (Use &Op : I.operands()) {
-        if (isa<Constant>(Op) && !isa<GlobalValue>(Op)) {
-          FindConstant(Op);
-        }
-      }
-    }
-  }
-}
-
-void SPIRVProducerPass::FindConstant(Value *V) {
-  ValueList &CstList = getConstantList();
-
-  // If V is already tracked, ignore it.
-  if (0 != CstList.idFor(V)) {
-    return;
-  }
-
-  if (isa<GlobalValue>(V) && clspv::Option::ModuleConstantsInStorageBuffer()) {
-    return;
-  }
-
-  Constant *Cst = cast<Constant>(V);
-  Type *CstTy = Cst->getType();
-
-  // Handle constant with <4 x i8> type specially.
-  if (is4xi8vec(CstTy)) {
-    if (!isa<GlobalValue>(V)) {
-      CstList.insert(V);
-    }
-  }
-
-  if (Cst->getNumOperands()) {
-    for (User::const_op_iterator I = Cst->op_begin(), E = Cst->op_end(); I != E;
-         ++I) {
-      FindConstant(*I);
-    }
-
-    CstList.insert(Cst);
-    return;
-  } else if (const ConstantDataSequential *CDS =
-                 dyn_cast<ConstantDataSequential>(Cst)) {
-    // Add constants for each element to constant list.
-    for (unsigned i = 0; i < CDS->getNumElements(); i++) {
-      Constant *EleCst = CDS->getElementAsConstant(i);
-      FindConstant(EleCst);
-    }
-  }
-
-  if (!isa<GlobalValue>(V)) {
-    CstList.insert(V);
-  }
-}
-
 spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
   switch (AddrSpace) {
   default:
@@ -1915,16 +1476,17 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
       .Default(spv::BuiltInMax);
 }
 
-void SPIRVProducerPass::GenerateExtInstImport() {
-  uint32_t &ExtInstImportID = getOpExtInstImportID();
+SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
+  if (OpExtInstImportID == 0) {
+    //
+    // Generate OpExtInstImport.
+    //
+    // Ops[0] ... Ops[n] = Name (Literal String)
 
-  //
-  // Generate OpExtInstImport.
-  //
-  // Ops[0] ... Ops[n] = Name (Literal String)
-
-  ExtInstImportID =
-      addSPIRVInst<kImports>(spv::OpExtInstImport, "GLSL.std.450");
+    OpExtInstImportID =
+        addSPIRVInst<kImports>(spv::OpExtInstImport, "GLSL.std.450");
+  }
+  return OpExtInstImportID;
 }
 
 uint32_t SPIRVProducerPass::getSPIRVType(Type *Ty) {
@@ -2030,6 +1592,17 @@ uint32_t SPIRVProducerPass::getSPIRVType(Type *Ty) {
                  STy->getName().startswith("opencl.image2d_array_wo_t") ||
                  STy->getName().startswith("opencl.image3d_ro_t") ||
                  STy->getName().startswith("opencl.image3d_wo_t")) {
+
+        if (STy->getName().contains("_wo_t")) {
+          addCapability(spv::CapabilityStorageImageWriteWithoutFormat);
+        }
+        if (STy->getName().startswith("opencl.image1d_")) {
+          if (STy->getName().contains(".sampled"))
+            addCapability(spv::CapabilitySampled1D);
+          else
+            addCapability(spv::CapabilityImage1D);
+        }
+
         //
         // Generate OpTypeImage
         //
@@ -2165,6 +1738,14 @@ uint32_t SPIRVProducerPass::getSPIRVType(Type *Ty) {
   case Type::IntegerTyID: {
     uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
 
+    if (clspv::Option::Int8Support() && BitWidth == 8) {
+      addCapability(spv::CapabilityInt8);
+    } else if (BitWidth == 16) {
+      addCapability(spv::CapabilityInt16);
+    } else if (BitWidth == 64) {
+      addCapability(spv::CapabilityInt64);
+    }
+
     if (BitWidth == 1) {
       RID = addSPIRVInst<kTypes>(spv::OpTypeBool);
     } else {
@@ -2183,6 +1764,12 @@ uint32_t SPIRVProducerPass::getSPIRVType(Type *Ty) {
   case Type::FloatTyID:
   case Type::DoubleTyID: {
     uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
+    if (BitWidth == 16) {
+      addCapability(spv::CapabilityFloat16);
+    } else if (BitWidth == 64) {
+      addCapability(spv::CapabilityFloat64);
+    }
+
     SPIRVOperandVec Ops;
     Ops << MkNum(BitWidth);
 
@@ -2493,16 +2080,6 @@ SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
     return getSPIRVConstant(Cst);
   } else {
     llvm_unreachable("Variable not found");
-  }
-}
-
-void SPIRVProducerPass::GenerateSPIRVConstants() {
-  ValueList &CstList = getConstantList();
-
-  for (uint32_t i = 0; i < CstList.size(); i++) {
-    // UniqueVector ids are 1-based.
-    Constant *Cst = cast<Constant>(CstList[i + 1]);
-    getSPIRVValue(Cst);
   }
 }
 
@@ -3342,102 +2919,14 @@ void SPIRVProducerPass::GenerateModuleInfo() {
   ValueList &EntryPointInterfaces = getEntryPointInterfacesVec();
   std::vector<uint32_t> &BuiltinDimVec = getBuiltinDimVec();
 
-  //
-  // Generate OpCapability
-  //
-  // TODO: Which llvm information is mapped to SPIRV Capapbility?
-
-  // Ops[0] = Capability
   SPIRVOperandVec Ops;
 
-  addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityShader);
-
-  bool write_without_format = false;
-  bool sampled_1d = false;
-  bool image_1d = false;
-  for (Type *Ty : getTypeList()) {
-    if (clspv::Option::Int8Support() && Ty->isIntegerTy(8)) {
-      // Generate OpCapability for i8 type.
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityInt8);
-    } else if (Ty->isIntegerTy(16)) {
-      // Generate OpCapability for i16 type.
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityInt16);
-    } else if (Ty->isIntegerTy(64)) {
-      // Generate OpCapability for i64 type.
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityInt64);
-    } else if (Ty->isHalfTy()) {
-      // Generate OpCapability for half type.
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityFloat16);
-    } else if (Ty->isDoubleTy()) {
-      // Generate OpCapability for double type.
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityFloat64);
-    } else if (auto *STy = dyn_cast<StructType>(Ty)) {
-      if (STy->isOpaque()) {
-        if (STy->getName().startswith("opencl.image1d_wo_t") ||
-            STy->getName().startswith("opencl.image1d_array_wo_t") ||
-            STy->getName().startswith("opencl.image2d_wo_t") ||
-            STy->getName().startswith("opencl.image2d_array_wo_t") ||
-            STy->getName().startswith("opencl.image3d_wo_t")) {
-          write_without_format = true;
-        }
-        if (STy->getName().startswith("opencl.image1d_ro_t") ||
-            STy->getName().startswith("opencl.image1d_wo_t") ||
-            STy->getName().startswith("opencl.image1d_array_ro_t") ||
-            STy->getName().startswith("opencl.image1d_array_wo_t")) {
-          if (STy->getName().contains(".sampled"))
-            sampled_1d = true;
-          else
-            image_1d = true;
-        }
-      }
-    }
-  }
-
-  if (write_without_format) {
-    // Generate OpCapability for write only image type.
-    addSPIRVInst<kCapabilities>(spv::OpCapability,
-                                spv::CapabilityStorageImageWriteWithoutFormat);
-  }
-  if (image_1d) {
-    // Generate OpCapability for unsampled 1D image type.
-    addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityImage1D);
-  } else if (sampled_1d) {
-    // Generate OpCapability for sampled 1D image type.
-    addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilitySampled1D);
-  }
-
-  { // OpCapability ImageQuery
-    bool hasImageQuery = false;
-    for (const auto &SymVal : module->getValueSymbolTable()) {
-      if (auto F = dyn_cast<Function>(SymVal.getValue())) {
-        if (IsImageQuery(F)) {
-          hasImageQuery = true;
-          break;
-        }
-      }
-    }
-
-    if (hasImageQuery) {
-      addSPIRVInst<kCapabilities>(spv::OpCapability, spv::CapabilityImageQuery);
-    }
-  }
-
-  if (hasVariablePointers()) {
+  for (auto Capability : CapabilitySet) {
     //
-    // Generate OpCapability.
+    // Generate OpCapability
     //
     // Ops[0] = Capability
-    //
-    addSPIRVInst<kCapabilities>(spv::OpCapability,
-                                spv::CapabilityVariablePointers);
-  } else if (hasVariablePointersStorageBuffer()) {
-    //
-    // Generate OpCapability.
-    //
-    // Ops[0] = Capability
-    //
-    addSPIRVInst<kCapabilities>(spv::OpCapability,
-                                spv::CapabilityVariablePointersStorageBuffer);
+    addSPIRVInst<kCapabilities>(spv::OpCapability, Capability);
   }
 
   // Always add the storage buffer extension
@@ -4016,7 +3505,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Selecting between pointers requires variable pointers.
         setVariablePointersCapabilities(Ty->getPointerAddressSpace());
         if (!hasVariablePointers() && !selectFromSameObject(&I)) {
-          setVariablePointers(true);
+          setVariablePointers();
         }
       }
     }
@@ -4705,6 +4194,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
     if (IsImageQuery(Callee)) {
+
+      addCapability(spv::CapabilityImageQuery);
+
       //
       // Generate OpImageQuerySize[Lod]
       //
@@ -4952,7 +4444,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         setVariablePointersCapabilities(
             PHI->getType()->getPointerAddressSpace());
         if (!hasVariablePointers() && !selectFromSameObject(PHI)) {
-          setVariablePointers(true);
+          setVariablePointers();
         }
       }
 
@@ -4982,7 +4474,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
       glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(callee_name);
 
       if (EInst) {
-        uint32_t &ExtInstImportID = getOpExtInstImportID();
+        SPIRVID ExtInstImportID = getOpExtInstImportID();
 
         //
         // Generate OpExtInst.
@@ -5133,7 +4625,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
             if (sc == spv::StorageClassStorageBuffer) {
               // Passing SSBO by reference requires variable pointers storage
               // buffer.
-              setVariablePointersStorageBuffer(true);
+              setVariablePointersStorageBuffer();
             } else if (sc == spv::StorageClassWorkgroup) {
               // Workgroup references require variable pointers if they are not
               // memory object declarations.
@@ -5141,11 +4633,11 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
                 // Workgroup accessor represents a variable reference.
                 if (!operand_call->getCalledFunction()->getName().startswith(
                         clspv::WorkgroupAccessorFunction()))
-                  setVariablePointers(true);
+                  setVariablePointers();
               } else {
                 // Arguments are function parameters.
                 if (!isa<Argument>(operand))
-                  setVariablePointers(true);
+                  setVariablePointers();
               }
             }
           }
@@ -5757,9 +5249,9 @@ uint32_t SPIRVProducerPass::GetExplicitLayoutStructMemberOffset(
 void SPIRVProducerPass::setVariablePointersCapabilities(
     unsigned address_space) {
   if (GetStorageClass(address_space) == spv::StorageClassStorageBuffer) {
-    setVariablePointersStorageBuffer(true);
+    setVariablePointersStorageBuffer();
   } else {
-    setVariablePointers(true);
+    setVariablePointers();
   }
 }
 

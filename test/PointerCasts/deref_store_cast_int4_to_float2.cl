@@ -11,8 +11,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int4* a, g
 // CHECK:  [[_v4uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 4
 // CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
-// CHECK:  [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK:  [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2uint]] [[_23]]

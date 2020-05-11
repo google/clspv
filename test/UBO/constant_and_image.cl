@@ -45,10 +45,10 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
 // CHECK: [[ptr_uniform_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v4float]]
+// CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[ptr_uniform_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v2float]]
 // CHECK: [[ptr_storagebuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v4float]]
 // CHECK: [[float_zero:%[0-9a-zA-Z_]+]] = OpConstant [[float]] 0
-// CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK: [[image_var]] = OpVariable [[image_ptr]] UniformConstant
 // CHECK: [[sampler_var]] = OpVariable [[sampler_ptr]] UniformConstant
 // CHECK: [[offset_var]] = OpVariable [[offset_ptr]] Uniform

@@ -35,8 +35,8 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg) {
 //     CHECK: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
 //     CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
 //     CHECK: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
-//     CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 //     CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+//     CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 //     CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 //     CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
 //     CHECK: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[zero]] [[zero]]

@@ -23,8 +23,8 @@ kernel void foo(global int* A, int n) {
 // CHECK:  [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
 // CHECK:  [[__arr_uint_uint_2:%[0-9a-zA-Z_]+]] = OpTypeArray [[_uint]] [[_uint_2]]
 // CHECK:  [[__ptr_Function__arr_uint_uint_2:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[__arr_uint_uint_2]]
-// CHECK:  [[__ptr_Function_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[_uint]]
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK:  [[__ptr_Function_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[_uint]]
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Function__arr_uint_uint_2]] Function
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]

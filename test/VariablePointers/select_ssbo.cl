@@ -11,8 +11,8 @@ kernel void foo(global int* in1, global int* in2, global int* out, int a) {
 }
 
 // CHECK-NOT: OpCapability VariablePointersStorageBuffer
-// CHECK: OpCapability VariablePointers
 // CHECK-NOT: StorageBuffer
+// CHECK: OpCapability VariablePointers
 // CHECK: OpExtension "SPV_KHR_variable_pointers"
 // CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[uint]]

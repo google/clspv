@@ -20,8 +20,8 @@ __kernel void foo(__global int4* data, __constant int4* c) {
 // CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[int4]] [[int_4096]]
 // CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
 // CHECK: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct]]
-// CHECK: [[ptr_int4:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int4]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+// CHECK: [[ptr_int4:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int4]]
 // CHECK: [[var]] = OpVariable [[ptr]] Uniform
 // CHECK: [[gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[ptr_int4]] [[var]] [[zero]] [[zero]]
 // CHECK: OpLoad [[int4]] [[gep]]
