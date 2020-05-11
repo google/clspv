@@ -58,7 +58,7 @@ void initializeUndoGetElementPtrConstantExprPassPass(PassRegistry &);
 void initializeUndoInstCombinePassPass(PassRegistry &);
 void initializeUndoSRetPassPass(PassRegistry &);
 void initializeUndoTranslateSamplerFoldPassPass(PassRegistry &);
-void initializeUndoTruncatedSwitchConditionPassPass(PassRegistry &);
+void initializeUndoTruncateToOddIntegerPassPass(PassRegistry &);
 void initializeZeroInitializeAllocasPassPass(PassRegistry &);
 } // namespace llvm
 

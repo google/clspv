@@ -23,12 +23,12 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "UndoTruncatedSwitchCondition"
+#define DEBUG_TYPE "UndoTruncateToOddInteger"
 
 namespace {
-struct UndoTruncatedSwitchConditionPass : public ModulePass {
+struct UndoTruncateToOddIntegerPass : public ModulePass {
   static char ID;
-  UndoTruncatedSwitchConditionPass() : ModulePass(ID) {}
+  UndoTruncateToOddIntegerPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
 
@@ -167,18 +167,17 @@ private:
 };
 } // namespace
 
-char UndoTruncatedSwitchConditionPass::ID = 0;
-INITIALIZE_PASS(UndoTruncatedSwitchConditionPass,
-                "UndoTruncatedSwitchCondition",
+char UndoTruncateToOddIntegerPass::ID = 0;
+INITIALIZE_PASS(UndoTruncateToOddIntegerPass, "UndoTruncateToOddInteger",
                 "Undo Truncated Switch Condition Pass", false, false)
 
 namespace clspv {
-ModulePass *createUndoTruncatedSwitchConditionPass() {
-  return new UndoTruncatedSwitchConditionPass();
+ModulePass *createUndoTruncateToOddIntegerPass() {
+  return new UndoTruncateToOddIntegerPass();
 }
 } // namespace clspv
 
-bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
+bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
   bool Changed = false;
 
   SmallVector<Instruction *, 8> WorkList;
@@ -192,6 +191,7 @@ bool UndoTruncatedSwitchConditionPass::runOnModule(Module &M) {
           default:
             WorkList.push_back(trunc);
             break;
+          case 1: // i1 is a bool.
           case 8:
           case 16:
           case 32:

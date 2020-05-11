@@ -77,7 +77,7 @@ add_library(clspv_passes
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoInstCombinePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoSRetPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoTranslateSamplerFoldPass.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/UndoTruncatedSwitchConditionPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/UndoTruncateToOddIntegerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
