@@ -222,33 +222,12 @@ bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
     }
   }
 
-  // Remove the zombies if we can.  We expect to. Generally this can be done in
-  // 1 or 2 passes.
-  SmallVector<Instruction *, 8> extra;
-  for (auto *zombie : zombies_) {
-    if (!zombie->hasNUsesOrMore(1)) {
+  // Remove the zombies if we can.  We expect to. We've ordered zombies in
+  // reverse.
+  for (int i = zombies_.size(); i >= 1; --i) {
+    auto zombie = zombies_[i];
+    if (!zombie->hasNUsesOrMore(1))
       zombie->eraseFromParent();
-    } else {
-      extra.push_back(zombie);
-    }
-  }
-
-  // This is not ideal, but the way we identify instructions doesn't lend
-  // itself to a single pass well.
-  bool updated = true;
-  while (updated) {
-    updated = false;
-    SmallVector<Instruction *, 8> new_extra;
-    for (auto *zombie : extra) {
-      if (!zombie->hasNUsesOrMore(1)) {
-        updated = true;
-        zombie->eraseFromParent();
-      } else {
-        new_extra.push_back(zombie);
-      }
-    }
-
-    extra.swap(new_extra);
   }
 
   return Changed;
