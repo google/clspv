@@ -236,10 +236,9 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef UniqueVector<Value *> ValueList;
   typedef std::vector<std::pair<Value *, uint32_t>> EntryPointVecType;
   typedef std::list<SPIRVInstruction> SPIRVInstructionList;
-  // A vector of tuples, each of which is:
+  // A vector of pairs, each of which is:
   // - the LLVM instruction that we will later generate SPIR-V code for
-  // - where the SPIR-V instruction should be inserted
-  // - the result ID of the SPIR-V instruction
+  // - the SPIR-V instruction placeholder that will be replaced
   typedef std::vector<std::pair<Value *, SPIRVInstruction *>>
       DeferredInstVecType;
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
@@ -4869,7 +4868,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
     SPIRVInstruction *Placeholder = DeferredInsts[i].second;
     SPIRVOperandVec Operands;
 
-    auto nextDeferred = [&]() {
+    auto nextDeferred = [&i, &Inst, &DeferredInsts, &Placeholder]() {
       ++i;
       assert(DeferredInsts.size() > i);
       assert(Inst == DeferredInsts[i].first);
