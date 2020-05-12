@@ -17,6 +17,7 @@
 
 #include "clspv/PushConstant.h"
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Value.h"
 
@@ -30,13 +31,32 @@ llvm::Type *GetPushConstantType(llvm::Module &, PushConstant);
 
 // Returns a pointer to the push constant passed. Instructions to create the
 // pointer are appended to the basic block provided.
-llvm::Value *GetPushConstantPointer(llvm::BasicBlock *, PushConstant);
+llvm::Value *GetPushConstantPointer(llvm::BasicBlock *, PushConstant,
+                                    const llvm::ArrayRef<llvm::Value *> & = {});
 
 // Returns true if any global push constant is used.
 bool UsesGlobalPushConstants(llvm::Module &);
 
 // Returns true if an implementation of get_global_offset() is needed.
 bool ShouldDeclareGlobalOffsetPushConstant(llvm::Module &);
+
+// Returns true if an implementation of get_enqueued_local_size() is needed.
+bool ShouldDeclareEnqueuedLocalSizePushConstant(llvm::Module &);
+
+// Returns true if non-uniform NDRange get_global_size() is needed.
+bool ShouldDeclareGlobalSizePushConstant(llvm::Module &);
+
+// Returns true if non-uniform NDRange region offset is needed.
+bool ShouldDeclareRegionOffsetPushConstant(llvm::Module &);
+
+// Returns true if non-uniform NDRange get_num_groups() is needed.
+bool ShouldDeclareNumWorkgroupsPushConstant(llvm::Module &);
+
+// Returns true if non-uniform NDRange region group offset is needed.
+bool ShouldDeclareRegionGroupOffsetPushConstant(llvm::Module &);
+
+// Returns the size of global push constants.
+uint64_t GlobalPushConstantsSize(llvm::Module &);
 } // namespace clspv
 
 #endif // #ifndef CLSPV_LIB_PUSH_CONSTANT_H_

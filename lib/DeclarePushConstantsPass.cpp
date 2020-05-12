@@ -36,12 +36,6 @@ struct DeclarePushConstantsPass : public ModulePass {
   static char ID;
   DeclarePushConstantsPass() : ModulePass(ID) {}
 
-  bool shouldDeclareEnqueuedLocalSize(Module &M);
-  bool shouldDeclareGlobalSize(Module &M);
-  bool shouldDeclareRegionOffset(Module &M);
-  bool shouldDeclareNumWorkgroups(Module &M);
-  bool shouldDeclareRegionGroupOffset(Module &M);
-
   bool runOnModule(Module &M) override;
 };
 } // namespace
@@ -56,36 +50,6 @@ ModulePass *createDeclarePushConstantsPass() {
 }
 } // namespace clspv
 
-bool DeclarePushConstantsPass::shouldDeclareEnqueuedLocalSize(Module &M) {
-  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareGlobalSize(Module &M) {
-  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z15get_global_sizej") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareRegionOffset(Module &M) {
-  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z13get_global_idj") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareNumWorkgroups(Module &M) {
-  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z14get_num_groupsj") != nullptr;
-  return isEnabled && isUsed;
-}
-
-bool DeclarePushConstantsPass::shouldDeclareRegionGroupOffset(Module &M) {
-  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z12get_group_idj") != nullptr;
-  return isEnabled && isUsed;
-}
-
 bool DeclarePushConstantsPass::runOnModule(Module &M) {
 
   bool changed = false;
@@ -98,23 +62,23 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
     PushConstants.emplace_back(clspv::PushConstant::GlobalOffset);
   }
 
-  if (shouldDeclareEnqueuedLocalSize(M)) {
+  if (clspv::ShouldDeclareEnqueuedLocalSizePushConstant(M)) {
     PushConstants.push_back(clspv::PushConstant::EnqueuedLocalSize);
   }
 
-  if (shouldDeclareGlobalSize(M)) {
+  if (clspv::ShouldDeclareGlobalSizePushConstant(M)) {
     PushConstants.push_back(clspv::PushConstant::GlobalSize);
   }
 
-  if (shouldDeclareRegionOffset(M)) {
+  if (clspv::ShouldDeclareRegionOffsetPushConstant(M)) {
     PushConstants.push_back(clspv::PushConstant::RegionOffset);
   }
 
-  if (shouldDeclareNumWorkgroups(M)) {
+  if (clspv::ShouldDeclareNumWorkgroupsPushConstant(M)) {
     PushConstants.push_back(clspv::PushConstant::NumWorkgroups);
   }
 
-  if (shouldDeclareRegionGroupOffset(M)) {
+  if (clspv::ShouldDeclareRegionGroupOffsetPushConstant(M)) {
     PushConstants.push_back(clspv::PushConstant::RegionGroupOffset);
   }
 

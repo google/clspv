@@ -17,6 +17,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/MathExtras.h"
 
 #include "spirv/unified1/spirv.hpp"
 
@@ -130,22 +131,41 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   const bool support_8bit_pc = !ContainsSizedType(pod_struct_ty, 8) ||
                                clspv::Option::Supports8BitStorageClass(
                                    clspv::Option::StorageClass::kPushConstant);
+  // Align to 16 to use <4 x i32> storage.
+  const uint64_t pod_struct_size =
+      alignTo(DL.getTypeStoreSize(pod_struct_ty).getKnownMinSize(), 16);
   const bool fits_push_constant =
-      DL.getTypeSizeInBits(pod_struct_ty).getFixedSize() / 8 <=
-      clspv::Option::MaxPushConstantsSize();
+      pod_struct_size <= clspv::Option::MaxPushConstantsSize();
   const bool satisfies_push_constant =
       clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
       support_8bit_pc && fits_push_constant &&
       !clspv::UsesGlobalPushConstants(M) && !contains_array;
 
+  // Global type-mangled push constants require:
+  // 1. Clustered pod args.
+  // 2. Args and global push constants must fit size limit.
+  // 3. Size / 4 must be less than max struct members.
+  //    (In order to satisfy SPIR-V limit).
+  const auto global_size = clspv::GlobalPushConstantsSize(M) + pod_struct_size;
+  const auto fits_global_size =
+      global_size <= clspv::Option::MaxPushConstantsSize();
+  // Leave some extra room.
+  const uint64_t max_struct_members = 0x3fff - 64;
+  const auto enough_members = (global_size / 4) < max_struct_members;
+  const bool satisfies_global_push_constant =
+      clspv::Option::ClusterPodKernelArgs() && fits_global_size &&
+      enough_members;
+
   // Priority:
   // 1. Per-kernel push constant interface.
-  // 2. NYI: global type mangled push constant interface.
+  // 2. Global type mangled push constant interface.
   // 3. UBO
   // 4. SSBO
   clspv::PodArgImpl impl = clspv::PodArgImpl::kSSBO;
   if (satisfies_push_constant) {
     impl = clspv::PodArgImpl::kPushConstant;
+  } else if (satisfies_global_push_constant) {
+    impl = clspv::PodArgImpl::kGlobalPushConstant;
   } else if (satisfies_ubo) {
     impl = clspv::PodArgImpl::kUBO;
   }

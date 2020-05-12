@@ -46,6 +46,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "num_workgroups";
   case PushConstant::RegionGroupOffset:
     return "region_group_offset";
+  case PushConstant::KernelArgument:
+    return "kernel_argument";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -68,12 +70,15 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
     return VectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::RegionGroupOffset:
     return VectorType::get(IntegerType::get(C, 32), 3);
+  default:
+    break;
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantType");
   return nullptr;
 }
 
-Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
+Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
+                              const ArrayRef<Value *> &extra_indices) {
   auto M = BB->getParent()->getParent();
 
   // Get variable
@@ -99,7 +104,11 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc) {
 
   // Construct pointer
   IRBuilder<> Builder(BB);
-  Value *Indices[] = {Builder.getInt32(0), Builder.getInt32(idx)};
+  SmallVector<Value *, 4> Indices(2);
+  Indices[0] = Builder.getInt32(0);
+  Indices[1] = Builder.getInt32(idx);
+  for (auto idx : extra_indices)
+    Indices.push_back(idx);
   return Builder.CreateInBoundsGEP(GV, Indices);
 }
 
@@ -115,6 +124,74 @@ bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
   bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
                 (M.getFunction("_Z13get_global_idj") != nullptr);
   return isEnabled && isUsed;
+}
+
+bool ShouldDeclareEnqueuedLocalSizePushConstant(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool ShouldDeclareGlobalSizePushConstant(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z15get_global_sizej") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool ShouldDeclareRegionOffsetPushConstant(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z13get_global_idj") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool ShouldDeclareNumWorkgroupsPushConstant(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z14get_num_groupsj") != nullptr;
+  return isEnabled && isUsed;
+}
+
+bool ShouldDeclareRegionGroupOffsetPushConstant(Module &M) {
+  bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
+  bool isUsed = M.getFunction("_Z12get_group_idj") != nullptr;
+  return isEnabled && isUsed;
+}
+
+uint64_t GlobalPushConstantsSize(Module &M) {
+  const auto &DL = M.getDataLayout();
+  if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
+    auto ptr_ty = GV->getType();
+    auto block_ty = ptr_ty->getPointerElementType();
+    return DL.getTypeStoreSize(block_ty).getKnownMinSize();
+  } else {
+    SmallVector<Type *, 8> types;
+    if (ShouldDeclareGlobalOffsetPushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::GlobalOffset);
+      types.push_back(type);
+    }
+    if (ShouldDeclareEnqueuedLocalSizePushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::EnqueuedLocalSize);
+      types.push_back(type);
+    }
+    if (ShouldDeclareGlobalSizePushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::GlobalSize);
+      types.push_back(type);
+    }
+    if (ShouldDeclareRegionOffsetPushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::RegionOffset);
+      types.push_back(type);
+    }
+    if (ShouldDeclareNumWorkgroupsPushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::NumWorkgroups);
+      types.push_back(type);
+    }
+    if (ShouldDeclareRegionGroupOffsetPushConstant(M)) {
+      auto type = GetPushConstantType(M, PushConstant::RegionGroupOffset);
+      types.push_back(type);
+    }
+
+    auto block_ty = StructType::get(M.getContext(), types, false);
+    return DL.getTypeStoreSize(block_ty).getKnownMinSize();
+  }
 }
 
 } // namespace clspv
