@@ -149,7 +149,7 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   const auto global_size = clspv::GlobalPushConstantsSize(M) + pod_struct_size;
   const auto fits_global_size =
       global_size <= clspv::Option::MaxPushConstantsSize();
-  // Leave some extra room.
+  // Leave some extra room for other push constants.
   const uint64_t max_struct_members = 0x3fff - 64;
   const auto enough_members = (global_size / 4) < max_struct_members;
   const bool satisfies_global_push_constant =
