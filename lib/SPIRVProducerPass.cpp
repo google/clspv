@@ -2665,7 +2665,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       ResultID = getSPIRVValue(&GV);
     }
 
-    SPIRVOperandVec Ops;
+    Ops.clear();
     Ops << MkId(ResultID);
     Ops << MkNum(spv::DecorationBuiltIn);
     Ops << MkNum(BuiltinType);
@@ -2687,9 +2687,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set,
                                        0);
 
-    SPIRVOperandVec Ops;
-
     // OpDecorate %var DescriptorSet <descriptor_set>
+    Ops.clear();
     Ops << MkId(var_id);
     Ops << MkNum(spv::DecorationDescriptorSet);
     Ops << MkNum(descriptor_set);
@@ -2944,7 +2943,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
       if (CalledWithCoherentResource(Arg)) {
         // If the arg is passed a coherent resource ever, then decorate this
         // parameter with Coherent too.
-        SPIRVOperandVec Ops;
+        Ops.clear();
         Ops << MkId(param_id);
         Ops << MkNum(spv::DecorationCoherent);
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
