@@ -146,6 +146,19 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   // 2. Args and global push constants must fit size limit.
   // 3. Size / 4 must be less than max struct members.
   //    (In order to satisfy SPIR-V limit).
+  //
+  // Note: There is a potential tradeoff in representations. We could use
+  // either a packed or unpacked struct. A packed struct would allow more
+  // arguments to fit in the size limit, but potentially results in more
+  // instructions to undo the type-mangling. Currently we opt for an unpacked
+  // struct for two reasons:
+  // 1. The offsets of individual members make more sense at a higher level and
+  //    are consistent with other clustered implementations.
+  // 2. The type demangling code is simpler (but may result in wasted space).
+  //
+  // TODO: We should generate a better pod struct by default (e.g. { i32, i8 }
+  // is preferable to { i8, i32 }). Also we could support packed structs as
+  // fallback to fit arguments depending on the performance cost.
   const auto global_size = clspv::GlobalPushConstantsSize(M) + pod_struct_size;
   const auto fits_global_size =
       global_size <= clspv::Option::MaxPushConstantsSize();

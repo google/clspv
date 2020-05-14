@@ -24,6 +24,7 @@
 // We also attach a "kernel_arg_map" metadata node to the function to
 // encode the mapping from old kernel argument to new kernel argument.
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 
@@ -54,6 +55,8 @@ using namespace llvm;
 #define DEBUG_TYPE "clusterpodkernelargs"
 
 namespace {
+const uint64_t kIntBytes = 4;
+
 struct ClusterPodKernelArgumentsPass : public ModulePass {
   static char ID;
   ClusterPodKernelArgumentsPass() : ModulePass(ID) {}
@@ -61,10 +64,19 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
   bool runOnModule(Module &M) override;
 
 private:
+  // Returns the type-mangled struct for global pod args.
   StructType *GetTypeMangledPodArgsStruct(Module &M);
+
+  // (Re-)Declares the global push constant variable with |mangled_struct_ty|
+  // as the last member.
   void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty);
+
+  // Converts the corresponding elements of the global push constants for pod
+  // args in member |index| of |pod_struct|.
   Value *ConvertToType(Module &M, StructType *pod_struct, unsigned index,
                        IRBuilder<> &builder);
+
+  // Builds |dst_type| from |elements|, where |elements| is a vector i32 loads.
   Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
                            uint64_t base_offset, uint64_t base_index,
                            const std::vector<Value *> &elements);
@@ -414,16 +426,17 @@ StructType *ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M
       }
     }
 
+    // TODO: The type-mangling code will need updated if we want to support
+    // packed structs.
     auto struct_ty = StructType::get(M.getContext(), PodArgTys);
-    // Align to 4 bytes to store ints.
-    uint64_t size = alignTo(DL.getTypeStoreSize(struct_ty), 4);
+    uint64_t size = alignTo(DL.getTypeStoreSize(struct_ty), kIntBytes);
     if (size > max_pod_args_size)
       max_pod_args_size = size;
   }
 
   if (max_pod_args_size > 0) {
     auto int_ty = IntegerType::get(M.getContext(), 32);
-    std::vector<Type *> global_pod_arg_tys(max_pod_args_size / 4, int_ty);
+    std::vector<Type *> global_pod_arg_tys(max_pod_args_size / kIntBytes, int_ty);
     return StructType::create(M.getContext(), global_pod_arg_tys);
   }
 
@@ -510,8 +523,8 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
   auto ele_ty = pod_struct->getElementType(index);
   const auto ele_size = DL.getTypeStoreSize(ele_ty).getKnownMinSize();
   auto ele_offset = struct_layout->getElementOffset(index);
-  const auto ele_start_index = ele_offset / 4;
-  const auto ele_end_index = (ele_offset + ele_size) / 4;
+  const auto ele_start_index = ele_offset / kIntBytes; // round down
+  const auto ele_end_index = (ele_offset + ele_size + kIntBytes - 1) / kIntBytes; // round up
 
   // Load the right number of ints. We'll load at least one, but may load
   // ele_size / 4 + 1 integers depending on the offset.
@@ -526,7 +539,7 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
     i++;
   } while (i < ele_end_index);
 
-  return BuildFromElements(M, builder, ele_ty, ele_offset % 4, 0, int_elements);
+  return BuildFromElements(M, builder, ele_ty, ele_offset % kIntBytes, 0, int_elements);
 }
 
 Value *ClusterPodKernelArgumentsPass::BuildFromElements(
@@ -535,14 +548,73 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
   auto int32_ty = IntegerType::get(M.getContext(), 32);
   const auto &DL = M.getDataLayout();
   const auto dst_size = DL.getTypeStoreSize(dst_type).getKnownMinSize();
+  auto dst_array_ty = dyn_cast<ArrayType>(dst_type);
+  auto dst_vec_ty = dyn_cast<VectorType>(dst_type);
 
   Value *dst = nullptr;
-  if (auto dst_array_ty = dyn_cast<ArrayType>(dst_type)) {
-    //auto *ele_ty = dst_array_ty->getElementType();
-  } else if (auto dst_struct_ty = dyn_cast<StructType>(dst_type)) {
-  } else if (auto dst_vec_ty = dyn_cast<VectorType>(dst_type)) {
+  if (auto dst_struct_ty = dyn_cast<StructType>(dst_type)) {
+  } else if (dst_array_ty || dst_vec_ty) {
+    if (dst_vec_ty && dst_vec_ty->getPrimitiveSizeInBits() ==
+                          int32_ty->getPrimitiveSizeInBits()) {
+      // Easy case is just a bitcast.
+      dst = builder.CreateBitCast(elements[base_index], dst_type);
+    } else if (dst_vec_ty &&
+               dst_vec_ty->getElementType()->getPrimitiveSizeInBits() <
+                   int32_ty->getPrimitiveSizeInBits()) {
+      // Bitcast integers to a vector of the primitive type and then shuffle
+      // elements into the final vector.
+      //
+      // We need at most two integers to handle any case here.
+      auto ele_ty = dst_vec_ty->getElementType();
+      uint32_t num_elements = dst_vec_ty->getElementCount().Min;
+      uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
+                        ele_ty->getPrimitiveSizeInBits())
+                           .getKnownMinSize();
+      auto scaled_vec_ty = VectorType::get(ele_ty, ratio);
+      Value *casts[2] = {UndefValue::get(scaled_vec_ty), UndefValue::get(scaled_vec_ty)};
+      uint32_t num_ints = (num_elements + ratio - 1) / ratio; // round up
+      num_ints = std::max(num_ints, 1u);
+      for (uint32_t i = 0; i < num_ints; ++i) {
+        casts[i] = builder.CreateBitCast(elements[base_index + i], scaled_vec_ty);
+      }
+      SmallVector<int, 4> indices(num_elements);
+      uint32_t i = 0;
+      std::generate_n(indices.data(), num_elements, [&i]() { return i++; });
+      dst = builder.CreateShuffleVector(casts[0], casts[1], indices);
+    } else {
+      // General case, break into elements and construct the composite type.
+      assert((ele_size < kIntBytes || base_offset == 0) &&
+             "Unexpected packed data format");
+      auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
+                               : dst_array_ty->getElementType();
+      uint64_t ele_size = DL.getTypeStoreSize(ele_ty);
+      uint32_t num_elements = dst_vec_ty ? dst_vec_ty->getElementCount().Min
+                                         : dst_array_ty->getNumElements();
+
+      uint64_t bytes_consumed = 0;
+      assert(((ele_size >= kIntBytes) ||
+              (base_offset + num_elements * ele_size) <= kIntBytes) &&
+             "Unexpected packed data format");
+      for (uint32_t i = 0; i < num_elements; ++i) {
+        uint64_t ele_offset = (base_offset + bytes_consumed) % kIntBytes;
+        uint64_t ele_index = base_index + (bytes_consumed / kIntBytes);
+        // Convert the element.
+        auto tmp = BuildFromElements(M, builder, ele_ty, ele_offset, ele_index,
+                                     elements);
+        if (dst_vec_ty) {
+          dst = builder.CreateInsertElement(
+              dst ? dst : UndefValue::get(dst_type), tmp, i);
+        } else {
+          dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type),
+                                          tmp, {i});
+        }
+
+        // Track consumed bytes.
+        bytes_consumed += ele_size;
+      }
+    }
   } else {
-    // Scalar conversion.
+    // Base case is scalar conversion.
     if (dst_size < 4) {
       dst = elements[base_index];
       if (base_offset != 0) {
@@ -557,7 +629,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       // If dst is not the right type, bit cast to the right type.
       if (dst->getType() != dst_type)
         dst = builder.CreateBitCast(dst, dst_type);
-    } else if (dst_size == 4) {
+    } else if (dst_size == kIntBytes) {
       assert(base_offset == 0 && "Unexpected packed data format");
       // Create a bit cast if necessary.
       dst = elements[base_index];
@@ -566,7 +638,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
     } else {
       assert(base_offset == 0 && "Unexpected packed data format");
       // Round up to number of integers.
-      const auto num_ints = (dst_size + 3) / 4;
+      const auto num_ints = (dst_size + kIntBytes - 1) / kIntBytes;
       auto dst_int = IntegerType::get(M.getContext(), dst_size * 8);
       dst = builder.CreateZExt(elements[base_index], dst_int);
       for (uint32_t i = 1; i < num_ints; ++i) {
