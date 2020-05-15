@@ -64,7 +64,10 @@ struct ClusterPodKernelArgumentsPass : public ModulePass {
   bool runOnModule(Module &M) override;
 
 private:
-  // Returns the type-mangled struct for global pod args.
+  // Returns the type-mangled struct for global pod args. Only generates
+  // unpacked structs currently. The type conversion code does not handle
+  // packed structs propoerly. AutoPodArgsPass would also need updates to
+  // support packed structs.
   StructType *GetTypeMangledPodArgsStruct(Module &M);
 
   // (Re-)Declares the global push constant variable with |mangled_struct_ty|
@@ -114,6 +117,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
 
   SmallVector<CallInst *, 8> CallList;
 
+  // If any of the kernels call for type-mangled push constants, we need to
+  // know the right type and base offset.
   const uint64_t global_push_constant_size = clspv::GlobalPushConstantsSize(M);
   assert(global_push_constant_size % 16 == 0 &&
          "Global push constants size changed");
@@ -553,6 +558,17 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
 
   Value *dst = nullptr;
   if (auto dst_struct_ty = dyn_cast<StructType>(dst_type)) {
+    // Create an insertvalue chain for each converted element.
+    auto struct_layout = DL.getStructLayout(dst_struct_ty);
+    for (uint32_t i = 0; i < dst_struct_ty->getNumElements(); ++i) {
+      auto ele_ty = dst_struct_ty->getTypeAtIndex(i);
+      const auto ele_offset = struct_layout->getElementOffset(i);
+      const auto index = base_index + (ele_offset / kIntBytes);
+      const auto offset = (base_offset + ele_offset) % 4;
+
+      auto tmp = BuildFromElements(M, builder, ele_ty, offset, index, elements);
+      dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type), tmp, {i});
+    }
   } else if (dst_array_ty || dst_vec_ty) {
     if (dst_vec_ty && dst_vec_ty->getPrimitiveSizeInBits() ==
                           int32_ty->getPrimitiveSizeInBits()) {

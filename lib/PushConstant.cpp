@@ -113,8 +113,12 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
 }
 
 bool UsesGlobalPushConstants(Module &M) {
-  return clspv::Option::NonUniformNDRangeSupported() ||
-         ShouldDeclareGlobalOffsetPushConstant(M);
+  return ShouldDeclareGlobalOffsetPushConstant(M) ||
+         ShouldDeclareEnqueuedLocalSizePushConstant(M) ||
+         ShouldDeclareGlobalSizePushConstant(M) ||
+         ShouldDeclareRegionOffsetPushConstant(M) ||
+         ShouldDeclareNumWorkgroupsPushConstant(M) ||
+         ShouldDeclareRegionGroupOffsetPushConstant(M);
 }
 
 bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {

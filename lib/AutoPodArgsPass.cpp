@@ -96,6 +96,11 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   bool satisfies_ubo = true;
   for (auto &Arg : F.args()) {
     auto arg_type = Arg.getType();
+    if (Arg.hasByValAttr()) {
+      // Byval arguments end up as POD arguments.
+      arg_type = arg_type->getPointerElementType();
+    }
+
     if (isa<PointerType>(arg_type))
       continue;
 

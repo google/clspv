@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -descriptormap=%t.map -inline-entry-points -cl-std=CL2.0
+// RUN: clspv %s -o %t.spv -descriptormap=%t.map -inline-entry-points -cl-std=CL2.0 -no-16bit-storage=pushconstant
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: FileCheck --check-prefix=MAP %s < %t.map
