@@ -531,6 +531,14 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
   const auto ele_start_index = ele_offset / kIntBytes; // round down
   const auto ele_end_index = (ele_offset + ele_size + kIntBytes - 1) / kIntBytes; // round up
 
+  //outs() << "Pod struct: " << *pod_struct << "\n";
+  //outs() << " index: " << index << "\n";
+  //outs() << " ele: " << *ele_ty << "\n";
+  //outs() << " size: " << ele_size << "\n";
+  //outs() << " offset: " << ele_offset << "\n";
+  //outs() << " start: " << ele_start_index << "\n";
+  //outs() << " end: " << ele_end_index << "\n";
+
   // Load the right number of ints. We'll load at least one, but may load
   // ele_size / 4 + 1 integers depending on the offset.
   std::vector<Value *> int_elements;
