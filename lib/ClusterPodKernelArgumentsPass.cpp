@@ -615,20 +615,22 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
     }
   } else {
     // Base case is scalar conversion.
-    if (dst_size < 4) {
+    if (dst_size < kIntBytes) {
       dst = elements[base_index];
-      if (base_offset != 0) {
-        // Base offset is the number of bytes into this integer.
-        dst = builder.CreateLShr(dst, base_offset * 8);
+      if (dst_type->isIntegerTy() && base_offset == 0) {
+        // Can generate a single truncate instruction in this case.
+        dst = builder.CreateTrunc(
+            dst, IntegerType::get(M.getContext(), dst_size * 8));
+      } else {
+        // Bitcast to a vector of |dst_type| and extract the right element. This
+        // avoids introducing i16 when converting to half.
+        uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
+                          dst_type->getPrimitiveSizeInBits())
+                             .getKnownMinSize();
+        auto vec_ty = VectorType::get(dst_type, ratio);
+        dst = builder.CreateBitCast(dst, vec_ty);
+        dst = builder.CreateExtractElement(dst, base_offset / dst_size);
       }
-
-      // Truncate to the right size.
-      dst = builder.CreateTrunc(dst,
-                                IntegerType::get(M.getContext(), dst_size * 8));
-
-      // If dst is not the right type, bit cast to the right type.
-      if (dst->getType() != dst_type)
-        dst = builder.CreateBitCast(dst, dst_type);
     } else if (dst_size == kIntBytes) {
       assert(base_offset == 0 && "Unexpected packed data format");
       // Create a bit cast if necessary.

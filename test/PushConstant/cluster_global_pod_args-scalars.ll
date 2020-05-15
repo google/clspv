@@ -10,8 +10,8 @@
 ; CHECK: trunc i32 [[ld]] to i8
 
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 0), align 4
-; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i32 [[ld]], 16
-; CHECK: trunc i32 [[shr]] to i16
+; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <2 x i16>
+; CHECK: extractelement <2 x i16> [[cast]], i64 1
 
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 1), align 4
 
@@ -26,8 +26,8 @@
 ; CHECK: bitcast i32 [[ld]] to float
 
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 5), align 4
-; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld]] to i16
-; CHECK: bitcast i16 [[trunc]] to half
+; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <2 x half>
+; CHECK: extractelement <2 x half> [[cast]], i64 0
 
 ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 6), align 4
 ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 7), align 4
