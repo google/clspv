@@ -136,9 +136,9 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   const bool support_8bit_pc = !ContainsSizedType(pod_struct_ty, 8) ||
                                clspv::Option::Supports8BitStorageClass(
                                    clspv::Option::StorageClass::kPushConstant);
-  // Align to 16 to use <4 x i32> storage.
+  // Align to 4 to use i32s.
   const uint64_t pod_struct_size =
-      alignTo(DL.getTypeStoreSize(pod_struct_ty).getKnownMinSize(), 16);
+      alignTo(DL.getTypeStoreSize(pod_struct_ty).getKnownMinSize(), 4);
   const bool fits_push_constant =
       pod_struct_size <= clspv::Option::MaxPushConstantsSize();
   const bool satisfies_push_constant =
