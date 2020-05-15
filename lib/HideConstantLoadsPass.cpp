@@ -65,7 +65,8 @@ private:
 
 char HideConstantLoadsPass::ID = 0;
 INITIALIZE_PASS(HideConstantLoadsPass, "HideConstantLoads",
-                "Hide loads from __constant memory", false, false)
+                "Hide loads from __constant and push constant memory", false,
+                false)
 
 namespace clspv {
 llvm::ModulePass *createHideConstantLoadsPass() {
@@ -81,7 +82,9 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (LoadInst *load = dyn_cast<LoadInst>(&I)) {
-          if (clspv::AddressSpace::Constant == load->getPointerAddressSpace()) {
+          if (clspv::AddressSpace::Constant == load->getPointerAddressSpace() ||
+              clspv::AddressSpace::PushConstant ==
+                  load->getPointerAddressSpace()) {
             WorkList.push_back(load);
           }
         }
@@ -148,7 +151,8 @@ private:
 
 char UnhideConstantLoadsPass::ID = 0;
 INITIALIZE_PASS(UnhideConstantLoadsPass, "UnhideConstantLoads",
-                "Unhide loads from __constant memory", false, false)
+                "Unhide loads from __constant and push constant memory", false,
+                false)
 
 namespace clspv {
 llvm::ModulePass *createUnhideConstantLoadsPass() {
