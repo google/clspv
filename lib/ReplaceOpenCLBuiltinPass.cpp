@@ -2163,7 +2163,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
   //    OpStore %ptr %floor_result
   //    %fract_intermediate = OpExtInst %float %glsl_ext Fract %x
   //    %fract_result = OpExtInst %float
-  //       %glsl_ext Fmin %fract_intermediate %just_under_1
+  //       %glsl_ext Nmin %fract_intermediate %just_under_1
 
   using std::string;
 

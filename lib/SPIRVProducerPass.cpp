@@ -4869,9 +4869,9 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   case Builtins::kAbs:
     return glsl::ExtInst::ExtInstSAbs;
   case Builtins::kFmax:
-    return glsl::ExtInst::ExtInstFMax;
+    return glsl::ExtInst::ExtInstNMax;
   case Builtins::kFmin:
-    return glsl::ExtInst::ExtInstFMin;
+    return glsl::ExtInst::ExtInstNMin;
   case Builtins::kDegrees:
     return glsl::ExtInst::ExtInstDegrees;
   case Builtins::kRadians:

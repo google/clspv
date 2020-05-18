@@ -17,6 +17,6 @@ void kernel foo(global float2* A, global float2* B, float2 x)
 // CHECK: [[_31:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v2float]]
 // CHECK: [[_32:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] [[_1]] Floor [[_31]]
 // CHECK: [[_33:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] [[_1]] Fract [[_31]]
-// CHECK: [[_34:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] [[_1]] FMin [[_33]] [[_17]]
+// CHECK: [[_34:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] [[_1]] NMin [[_33]] [[_17]]
 // CHECK: OpStore {{.*}} [[_34]]
 // CHECK: OpStore {{.*}} [[_32]]

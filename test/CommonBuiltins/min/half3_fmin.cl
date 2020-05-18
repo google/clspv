@@ -8,7 +8,7 @@
 // CHECK-DAG: [[half3:%[a-zA-Z0-9_]+]] = OpTypeVector [[half]] 3
 // CHECK-DAG: [[ld0:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
 // CHECK-DAG: [[ld1:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
-// CHECK: OpExtInst [[half3]] [[EXT]] FMin [[ld0]] [[ld1]]
+// CHECK: OpExtInst [[half3]] [[EXT]] NMin [[ld0]] [[ld1]]
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 
