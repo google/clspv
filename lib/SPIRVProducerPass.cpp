@@ -1524,7 +1524,7 @@ SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
-    assert(TI->second);
+    assert(TI->second.isSet());
     return TI->second;
   }
 
@@ -2092,7 +2092,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
 SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
   auto II = ValueMap.find(V);
   if (II != ValueMap.end()) {
-    assert(II->second);
+    assert(II->second.isSet());
     return II->second;
   }
   if (Constant *Cst = dyn_cast<Constant>(V)) {
