@@ -51,5 +51,4 @@ kernel void foo(global half *out, half s, half2 v2, half3 v3, half4 v4) {
 // CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[int]] [[gep]]
 // CHECK: [[cast_v4:%[a-zA-Z0-9_]+]] = OpBitcast [[half2]] [[ld]]
 
-// CHECK: [[ex:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[half]] [[cast_v3]] 1
-// CHECK: [[ex:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[half]] [[cast_v4]] 0
+// Uses of the casts aren't checked because LLVM optimizes them to vector additions.

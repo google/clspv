@@ -607,11 +607,11 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       dst = builder.CreateShuffleVector(casts[0], casts[1], indices);
     } else {
       // General case, break into elements and construct the composite type.
+      auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
+                               : dst_array_ty->getElementType();
       assert((DL.getTypeStoreSize(ele_ty).getKnonwnMinSize()() < kIntBytes ||
               base_offset == 0) &&
              "Unexpected packed data format");
-      auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
-                               : dst_array_ty->getElementType();
       uint64_t ele_size = DL.getTypeStoreSize(ele_ty);
       uint32_t num_elements = dst_vec_ty ? dst_vec_ty->getElementCount().Min
                                          : dst_array_ty->getNumElements();
