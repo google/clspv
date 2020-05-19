@@ -381,7 +381,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
         podCount++;
         unsigned podIndex = PodIndexMap[&Arg];
         if (pod_arg_impl == clspv::PodArgImpl::kGlobalPushConstant) {
-          auto reconstructed = ConvertToType(M, PodArgsStructTy, podIndex, Builder);
+          auto reconstructed =
+              ConvertToType(M, PodArgsStructTy, podIndex, Builder);
           CalleeArgs.push_back(reconstructed);
         } else {
           CalleeArgs.push_back(Builder.CreateExtractValue(PodArg, {podIndex}));
@@ -410,7 +411,8 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
   return Changed;
 }
 
-StructType *ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
+StructType *
+ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
   // If we are using global type-mangled push constants for any kernel we need
   // to figure out what the shared representation will be. Calculate the max
   // number of integers needed to satisfy all kernels.
@@ -441,7 +443,8 @@ StructType *ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M
 
   if (max_pod_args_size > 0) {
     auto int_ty = IntegerType::get(M.getContext(), 32);
-    std::vector<Type *> global_pod_arg_tys(max_pod_args_size / kIntBytes, int_ty);
+    std::vector<Type *> global_pod_arg_tys(max_pod_args_size / kIntBytes,
+                                           int_ty);
     return StructType::create(M.getContext(), global_pod_arg_tys);
   }
 
@@ -529,7 +532,8 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
   const auto ele_size = DL.getTypeStoreSize(ele_ty).getKnownMinSize();
   auto ele_offset = struct_layout->getElementOffset(index);
   const auto ele_start_index = ele_offset / kIntBytes; // round down
-  const auto ele_end_index = (ele_offset + ele_size + kIntBytes - 1) / kIntBytes; // round up
+  const auto ele_end_index =
+      (ele_offset + ele_size + kIntBytes - 1) / kIntBytes; // round up
 
   // Load the right number of ints. We'll load at least one, but may load
   // ele_size / 4 + 1 integers depending on the offset.
@@ -544,7 +548,8 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
     i++;
   } while (i < ele_end_index);
 
-  return BuildFromElements(M, builder, ele_ty, ele_offset % kIntBytes, 0, int_elements);
+  return BuildFromElements(M, builder, ele_ty, ele_offset % kIntBytes, 0,
+                           int_elements);
 }
 
 Value *ClusterPodKernelArgumentsPass::BuildFromElements(
@@ -567,7 +572,8 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       const auto offset = (base_offset + ele_offset) % 4;
 
       auto tmp = BuildFromElements(M, builder, ele_ty, offset, index, elements);
-      dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type), tmp, {i});
+      dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type),
+                                      tmp, {i});
     }
   } else if (dst_array_ty || dst_vec_ty) {
     if (dst_vec_ty && dst_vec_ty->getPrimitiveSizeInBits() ==
@@ -587,11 +593,13 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
                         ele_ty->getPrimitiveSizeInBits())
                            .getKnownMinSize();
       auto scaled_vec_ty = VectorType::get(ele_ty, ratio);
-      Value *casts[2] = {UndefValue::get(scaled_vec_ty), UndefValue::get(scaled_vec_ty)};
+      Value *casts[2] = {UndefValue::get(scaled_vec_ty),
+                         UndefValue::get(scaled_vec_ty)};
       uint32_t num_ints = (num_elements + ratio - 1) / ratio; // round up
       num_ints = std::max(num_ints, 1u);
       for (uint32_t i = 0; i < num_ints; ++i) {
-        casts[i] = builder.CreateBitCast(elements[base_index + i], scaled_vec_ty);
+        casts[i] =
+            builder.CreateBitCast(elements[base_index + i], scaled_vec_ty);
       }
       SmallVector<int, 4> indices(num_elements);
       uint32_t i = 0;
@@ -599,7 +607,8 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       dst = builder.CreateShuffleVector(casts[0], casts[1], indices);
     } else {
       // General case, break into elements and construct the composite type.
-      assert((ele_size < kIntBytes || base_offset == 0) &&
+      assert((DL.getTypeStoreSize(ele_ty).getKnonwnMinSize()() < kIntBytes ||
+              base_offset == 0) &&
              "Unexpected packed data format");
       auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
                                : dst_array_ty->getElementType();
