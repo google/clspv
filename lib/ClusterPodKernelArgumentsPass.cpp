@@ -620,7 +620,8 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       uint64_t bytes_consumed = 0;
       for (uint32_t i = 0; i < num_elements; ++i) {
         uint64_t ele_offset = (base_offset + bytes_consumed) % kIntBytes;
-        uint64_t ele_index = base_index + (base_offset + bytes_consumed) / kIntBytes;
+        uint64_t ele_index =
+            base_index + (base_offset + bytes_consumed) / kIntBytes;
         // Convert the element.
         auto tmp = BuildFromElements(M, builder, ele_ty, ele_offset, ele_index,
                                      elements);
