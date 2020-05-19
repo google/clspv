@@ -616,13 +616,11 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       uint32_t num_elements = dst_vec_ty ? dst_vec_ty->getElementCount().Min
                                          : dst_array_ty->getNumElements();
 
+      // Arrays of shorts/halfs could be offset from the start of an int.
       uint64_t bytes_consumed = 0;
-      assert(((ele_size >= kIntBytes) ||
-              (base_offset + num_elements * ele_size) <= kIntBytes) &&
-             "Unexpected packed data format");
       for (uint32_t i = 0; i < num_elements; ++i) {
         uint64_t ele_offset = (base_offset + bytes_consumed) % kIntBytes;
-        uint64_t ele_index = base_index + (bytes_consumed / kIntBytes);
+        uint64_t ele_index = base_index + (base_offset + bytes_consumed) / kIntBytes;
         // Convert the element.
         auto tmp = BuildFromElements(M, builder, ele_ty, ele_offset, ele_index,
                                      elements);
