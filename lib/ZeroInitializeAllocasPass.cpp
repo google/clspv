@@ -71,7 +71,8 @@ bool ZeroInitializeAllocasPass::runOnModule(Module &M) {
 
   for (AllocaInst *alloca : WorkList) {
     auto *valueTy = alloca->getType()->getPointerElementType();
-    auto *store = new StoreInst(Constant::getNullValue(valueTy), alloca);
+    auto *store = new StoreInst(Constant::getNullValue(valueTy), alloca, false,
+                                Align(alloca->getAlignment()));
     store->insertAfter(alloca);
   }
 

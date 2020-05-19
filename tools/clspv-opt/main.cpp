@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
   llvm::LLVMContext context;
   context.setDiscardValueNames(false);
   std::unique_ptr<llvm::Module> module =
-      llvm::parseIRFile(InputFile, err, context, true, "");
+      llvm::parseIRFile(InputFile, err, context);
 
   if (!module) {
     err.print(argv[0], errs());
