@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <utility>
+
 #include "llvm/ADT/UniqueVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -41,7 +43,7 @@ private:
   // Candidates for erasure are added to |zombies_|, before their feeding
   // values are created.
   // TODO(dneto): Handle 64 bit case as well, but separately.
-  Value *ZeroExtend(Value *v) {
+  Value *ZeroExtend(Value *v, uint32_t desired_bit_width) {
     auto bit_width = 0;
     if (v->getType()->isIntegerTy())
       bit_width = v->getType()->getIntegerBitWidth();
@@ -56,44 +58,45 @@ private:
     }
 
     // This base case makes for easier recursion.
-    switch (bit_width) {
-    case 8:
-    case 16:
-    case 32:
-    case 64:
-      if (!isa<ZExtInst>(v))
-        return v;
-    default:
-      break;
-    }
+    if (bit_width == desired_bit_width && !isa<ZExtInst>(v))
+      return v;
 
+    auto desired_int_ty = IntegerType::get(v->getContext(), desired_bit_width);
     if (auto *ci = dyn_cast<ConstantInt>(v)) {
-      return ConstantInt::get(i32_, uint32_t(ci->getZExtValue()));
+      return ConstantInt::get(desired_int_ty, uint32_t(ci->getZExtValue()));
     }
     Value *result = nullptr;
     if (auto *trunc = dyn_cast<TruncInst>(v)) {
-      auto *operand = ZeroExtend(trunc->getOperand(0));
+      auto *operand = ZeroExtend(trunc->getOperand(0), desired_bit_width);
 
       // Now, and the extended version to keep the range of the output
       // restricted to the original bit width.
       result = BinaryOperator::Create(
           Instruction::And, operand,
           ConstantInt::get(
-              i32_, (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+              desired_int_ty,
+              (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
           "", trunc);
     } else if (auto *zext = dyn_cast<ZExtInst>(v)) {
-      result = new ZExtInst(zext->getOperand(0), i32_, "", zext);
+      auto tmp = ZeroExtend(zext->getOperand(0), desired_bit_width);
+      auto operand_bit_width = tmp->getType()->getIntegerBitWidth();
+      if (isPowerOf2_32(operand_bit_width)) {
+        result = tmp;
+      } else {
+        result = new ZExtInst(zext->getOperand(0), desired_int_ty, "", zext);
+      }
     } else if (auto *phi = dyn_cast<PHINode>(v)) {
       const auto num_branches = phi->getNumIncomingValues();
-      PHINode *new_phi = PHINode::Create(i32_, num_branches, "", phi);
+      PHINode *new_phi = PHINode::Create(desired_int_ty, num_branches, "", phi);
       for (unsigned i = 0; i < num_branches; i++) {
-        new_phi->addIncoming(ZeroExtend(phi->getIncomingValue(i)),
-                             phi->getIncomingBlock(i));
+        new_phi->addIncoming(
+            ZeroExtend(phi->getIncomingValue(i), desired_bit_width),
+            phi->getIncomingBlock(i));
       }
       result = new_phi;
     } else if (auto *sel = dyn_cast<SelectInst>(v)) {
-      auto *ext_true = ZeroExtend(sel->getTrueValue());
-      auto *ext_false = ZeroExtend(sel->getFalseValue());
+      auto *ext_true = ZeroExtend(sel->getTrueValue(), desired_bit_width);
+      auto *ext_false = ZeroExtend(sel->getFalseValue(), desired_bit_width);
       result =
           SelectInst::Create(sel->getCondition(), ext_true, ext_false, "", sel);
     } else if (auto *binop = dyn_cast<BinaryOperator>(v)) {
@@ -104,8 +107,8 @@ private:
           binop->getOpcode() == Instruction::And ||
           binop->getOpcode() == Instruction::Or ||
           binop->getOpcode() == Instruction::Xor) {
-        auto *op1 = ZeroExtend(binop->getOperand(0));
-        auto *op2 = ZeroExtend(binop->getOperand(1));
+        auto *op1 = ZeroExtend(binop->getOperand(0), desired_bit_width);
+        auto *op2 = ZeroExtend(binop->getOperand(1), desired_bit_width);
         result =
             BinaryOperator::Create(binop->getOpcode(), op1, op2, "", binop);
         if (binop->getOpcode() == Instruction::Add ||
@@ -115,7 +118,7 @@ private:
           result = BinaryOperator::Create(
               Instruction::And, result,
               ConstantInt::get(
-                  i32_,
+                  desired_int_ty,
                   (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
               "", binop);
         }
@@ -124,7 +127,7 @@ private:
         llvm_unreachable("Unhandled instruction feeding switch!");
       }
     } else if (auto SI = dyn_cast<SwitchInst>(v)) {
-      auto extended_cond = ZeroExtend(SI->getCondition());
+      auto extended_cond = ZeroExtend(SI->getCondition(), desired_bit_width);
       if (extended_cond && extended_cond != SI->getCondition()) {
         SI->setCondition(extended_cond);
         for (auto Cases : SI->cases()) {
@@ -132,7 +135,7 @@ private:
           auto V = Cases.getCaseValue()->getZExtValue();
 
           // A new value for the case with the correct type.
-          auto CI = dyn_cast<ConstantInt>(ConstantInt::get(i32_, V));
+          auto CI = dyn_cast<ConstantInt>(ConstantInt::get(desired_int_ty, V));
 
           // And we replace the old value.
           Cases.setValue(CI);
@@ -140,7 +143,7 @@ private:
       }
     } else if (auto inst = dyn_cast<Instruction>(v)) {
       for (unsigned i = 0; i < inst->getNumOperands(); ++i) {
-        auto extended_op = ZeroExtend(inst->getOperand(i));
+        auto extended_op = ZeroExtend(inst->getOperand(i), desired_bit_width);
         if (extended_op && extended_op != inst->getOperand(i))
           inst->setOperand(i, extended_op);
       }
@@ -160,8 +163,6 @@ private:
     return result;
   }
 
-  // The 32-bit int type.
-  Type *i32_;
   // The list of things that might be dead.
   UniqueVector<Instruction *> zombies_;
 };
@@ -180,16 +181,19 @@ ModulePass *createUndoTruncateToOddIntegerPass() {
 bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  SmallVector<Instruction *, 8> WorkList;
+  SmallVector<std::pair<Instruction *, uint32_t>, 8> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (auto trunc = dyn_cast<TruncInst>(&I)) {
           if (trunc->getType()->isVectorTy())
             continue;
+          auto desired_bit_width =
+              trunc->getOperand(0)->getType()->getIntegerBitWidth();
           switch (trunc->getType()->getIntegerBitWidth()) {
           default:
-            WorkList.push_back(trunc);
+            WorkList.push_back(std::make_pair(
+                trunc, static_cast<uint32_t>(PowerOf2Ceil(desired_bit_width))));
             break;
           case 1: // i1 is a bool.
           case 8:
@@ -204,19 +208,19 @@ bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
   }
 
   zombies_.reset();
-  i32_ = Type::getInt32Ty(M.getContext());
 
   while (!WorkList.empty()) {
-    auto inst = WorkList.back();
+    auto inst = WorkList.back().first;
+    auto desired_bit_width = WorkList.back().second;
     WorkList.pop_back();
 
-    auto extended = ZeroExtend(inst);
+    auto extended = ZeroExtend(inst, desired_bit_width);
     if (extended && extended != inst) {
       Changed = true;
 
       for (auto user : inst->users()) {
         if (auto user_inst = dyn_cast<Instruction>(user)) {
-          WorkList.push_back(user_inst);
+          WorkList.push_back(std::make_pair(user_inst, desired_bit_width));
         }
       }
     }
