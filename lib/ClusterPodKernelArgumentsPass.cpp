@@ -609,7 +609,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       // General case, break into elements and construct the composite type.
       auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
                                : dst_array_ty->getElementType();
-      assert((DL.getTypeStoreSize(ele_ty).getKnonwnMinSize()() < kIntBytes ||
+      assert((DL.getTypeStoreSize(ele_ty).getKnownMinSize() < kIntBytes ||
               base_offset == 0) &&
              "Unexpected packed data format");
       uint64_t ele_size = DL.getTypeStoreSize(ele_ty);
