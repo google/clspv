@@ -1,4 +1,4 @@
-; RUN: clspv-opt -UndoTruncatedSwitchCondition %s -o %t
+; RUN: clspv-opt -UndoTruncateToOddInteger %s -o %t
 ; RUN: FileCheck %s < %t
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
@@ -9,7 +9,8 @@ entry:
   ; CHECK-LABEL subf
   ; CHECK: [[and:%[a-zA-Z0-9_]+]] = and i32 %mul, 7
   ; CHECK-NEXT: [[sub:%[a-zA-Z0-9_]+]] = sub i32 4, [[and]]
-  ; CHECK-NEXT: switch i32 [[sub]], label %default [
+  ; CHECK-NEXT: [[sub_mask:%[a-zA-Z0-9_]+]] = and i32 [[sub]], 7
+  ; CHECK-NEXT: switch i32 [[sub_mask]], label %default [
   ; CHECK-NEXT:   i32 1, label %one_label
   ; CHECK-NEXT:   i32 2, label %two_label
   ; CHECK-NEXT:   i32 3, label %three_label
@@ -48,7 +49,8 @@ entry:
   ; CHECK-LABEL addf
   ; CHECK: [[and:%[a-zA-Z0-9_]+]] = and i32 %mul, 31
   ; CHECK-NEXT: [[add:%[a-zA-Z0-9_]+]] = add i32 16, [[and]]
-  ; CHECK-NEXT: switch i32 [[add]], label %default [
+  ; CHECK-NEXT: [[add_mask:%[a-zA-Z0-9_]+]] = and i32 [[add]], 31
+  ; CHECK-NEXT: switch i32 [[add_mask]], label %default [
   ; CHECK-NEXT:   i32 1, label %one_label
   ; CHECK-NEXT:   i32 2, label %two_label
   ; CHECK-NEXT:   i32 3, label %three_label

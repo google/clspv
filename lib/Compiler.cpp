@@ -684,7 +684,7 @@ int PopulatePassManager(
   pm->add(clspv::createFunctionInternalizerPass());
   pm->add(clspv::createReplaceLLVMIntrinsicsPass());
   pm->add(clspv::createUndoBoolPass());
-  pm->add(clspv::createUndoTruncatedSwitchConditionPass());
+  pm->add(clspv::createUndoTruncateToOddIntegerPass());
   pm->add(llvm::createStructurizeCFGPass(false));
   // Must be run after structurize cfg.
   pm->add(clspv::createFixupStructuredCFGPass());

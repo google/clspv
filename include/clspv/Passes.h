@@ -259,17 +259,17 @@ llvm::ModulePass *createUndoSRetPass();
 /// optimizations on a function that would help here.
 llvm::ModulePass *createUndoTranslateSamplerFoldPass();
 
-/// Undo LLVM optimizing switch instruction conditions by truncating them.
+/// Undo LLVM optimizing a mask to a small integer size.
 /// @return An LLVM module pass.
 ///
-/// LLVM will optimize switch instructions conditions such that it will
-/// sometimes produce invalid integer types. LLVM backends can handle this, but
-/// since this backend does not conform to the normal process, we undo this
-/// optimization here instead.
+/// LLVM will optimize masks to smaller integers that get used in switches and
+/// comparisons. These integer sizes may be invalid types. LLVM backends can
+/// handle this, but since this backend does not conform to the normal process,
+/// we undo this optimization here instead.
 ///
 /// If we could add a flag to our LLVM target to indiciate "please do not create
 /// malformed types" that would make this pass redundant.
-llvm::ModulePass *createUndoTruncatedSwitchConditionPass();
+llvm::ModulePass *createUndoTruncateToOddIntegerPass();
 
 /// Cluster module-scope __constant variables.
 /// @return An LLVM module pass.
