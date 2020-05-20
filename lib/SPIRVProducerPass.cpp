@@ -122,7 +122,7 @@ class SPIRVID {
 public:
   SPIRVID(uint32_t _id = 0) : id(_id) {}
   uint32_t get() const { return id; }
-  bool isSet() const { return id != 0; }
+  bool isValid() const { return id != 0; }
   bool operator==(const SPIRVID &that) const { return id == that.id; }
 };
 
@@ -201,7 +201,7 @@ struct SPIRVInstruction {
 
 private:
   void setResult(SPIRVID ResID = 0) {
-    WordCount = 1 + (ResID.isSet() ? 1 : 0);
+    WordCount = 1 + (ResID.isValid() ? 1 : 0);
     ResultID = ResID;
   }
 
@@ -1524,7 +1524,7 @@ SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
-    assert(TI->second.isSet());
+    assert(TI->second.isValid());
     return TI->second;
   }
 
@@ -1920,7 +1920,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   }
   }
 
-  if (RID.isSet()) {
+  if (RID.isValid()) {
     TypeMap[Ty] = RID;
   }
   return RID;
@@ -2092,7 +2092,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
 SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
   auto II = ValueMap.find(V);
   if (II != ValueMap.end()) {
-    assert(II->second.isSet());
+    assert(II->second.isValid());
     return II->second;
   }
   if (Constant *Cst = dyn_cast<Constant>(V)) {
@@ -2569,7 +2569,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     //
     // Generate OpSpecConstantComposite.
     //
-    // Ops[q0] : type id
+    // Ops[0] : type id
     // Ops[1..n-1] : elements
     //
     Ops.clear();
@@ -2598,7 +2598,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     }
   }
 
-  if (InitializerID.isSet()) {
+  if (InitializerID.isValid()) {
     // Emit the ID of the initializer as part of the variable definition.
     Ops << InitializerID;
   }
@@ -3085,8 +3085,8 @@ void SPIRVProducerPass::GenerateEntryPointInitialStores() {
   // of complexity vs. runtime, for a broken driver.
   // TODO(dneto): Remove this at some point once fixed drivers are widely
   // available.
-  if (WorkgroupSizeVarID.isSet()) {
-    assert(WorkgroupSizeValueID.isSet());
+  if (WorkgroupSizeVarID.isValid()) {
+    assert(WorkgroupSizeValueID.isValid());
 
     SPIRVOperandVec Ops;
     Ops << WorkgroupSizeVarID << WorkgroupSizeValueID;
@@ -4261,7 +4261,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   }
 
   // Register Instruction to ValueMap.
-  if (RID.isSet()) {
+  if (RID.isValid()) {
     VMap[&I] = RID;
   }
 }
