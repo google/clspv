@@ -44,7 +44,6 @@ private:
   // values are created.
   // TODO(dneto): Handle 64 bit case as well, but separately.
   Value *ZeroExtend(Value *v, uint32_t desired_bit_width) {
-    //outs() << "Zero extend to " << desired_bit_width << " bits: " << *v << "\n";
     auto bit_width = 0;
     if (v->getType()->isIntegerTy())
       bit_width = v->getType()->getIntegerBitWidth();
@@ -249,8 +248,6 @@ bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
     if (!zombie->hasNUsesOrMore(1))
       zombie->eraseFromParent();
   }
-
-  //outs() << M << "\n";
 
   return Changed;
 }
