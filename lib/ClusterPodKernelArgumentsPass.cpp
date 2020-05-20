@@ -569,7 +569,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       auto ele_ty = dst_struct_ty->getTypeAtIndex(i);
       const auto ele_offset = struct_layout->getElementOffset(i);
       const auto index = base_index + (ele_offset / kIntBytes);
-      const auto offset = (base_offset + ele_offset) % 4;
+      const auto offset = (base_offset + ele_offset) % kIntBytes;
 
       auto tmp = BuildFromElements(M, builder, ele_ty, offset, index, elements);
       dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type),
@@ -589,6 +589,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       // We need at most two integers to handle any case here.
       auto ele_ty = dst_vec_ty->getElementType();
       uint32_t num_elements = dst_vec_ty->getElementCount().Min;
+      assert(num_elements <= 4 && "Unhandled large vectors");
       uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
                         ele_ty->getPrimitiveSizeInBits())
                            .getKnownMinSize();
@@ -663,15 +664,13 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
         dst = builder.CreateBitCast(dst, dst_type);
     } else {
       assert(base_offset == 0 && "Unexpected packed data format");
+      assert(dst_size == kIntBytes * 2 && "Expected 64-bit scalar");
       // Round up to number of integers.
-      const auto num_ints = (dst_size + kIntBytes - 1) / kIntBytes;
       auto dst_int = IntegerType::get(M.getContext(), dst_size * 8);
-      dst = builder.CreateZExt(elements[base_index], dst_int);
-      for (uint32_t i = 1; i < num_ints; ++i) {
-        auto tmp = builder.CreateZExt(elements[base_index + i], dst_int);
-        tmp = builder.CreateShl(tmp, 32);
-        dst = builder.CreateOr({dst, tmp});
-      }
+      auto zext0 = builder.CreateZExt(elements[base_index], dst_int);
+      auto zext1 = builder.CreateZExt(elements[base_index + 1], dst_int);
+      auto shl = builder.CreateShl(zext1, 32);
+      dst = builder.CreateOr({zext0, shl});
       if (dst_type != dst->getType())
         dst = builder.CreateBitCast(dst, dst_type);
     }
