@@ -44,6 +44,7 @@ private:
   // values are created.
   // TODO(dneto): Handle 64 bit case as well, but separately.
   Value *ZeroExtend(Value *v, uint32_t desired_bit_width) {
+    //outs() << "Zero extend to " << desired_bit_width << " bits: " << *v << "\n";
     auto bit_width = 0;
     if (v->getType()->isIntegerTy())
       bit_width = v->getType()->getIntegerBitWidth();
@@ -67,23 +68,38 @@ private:
     }
     Value *result = nullptr;
     if (auto *trunc = dyn_cast<TruncInst>(v)) {
-      auto *operand = ZeroExtend(trunc->getOperand(0), desired_bit_width);
+      Value *tmp = nullptr;
+      auto input = trunc->getOperand(0);
+      uint32_t input_bit_width = input->getType()->getIntegerBitWidth();
+      if (input_bit_width > desired_bit_width) {
+        tmp = new TruncInst(input, desired_int_ty, "", trunc);
+      } else if (input_bit_width == desired_bit_width) {
+        tmp = input;
+      } else if (input_bit_width > bit_width) {
+        tmp = new ZExtInst(input, desired_int_ty, "", trunc);
+      } else {
+        tmp = ZeroExtend(input, desired_bit_width);
+      }
 
       // Now, and the extended version to keep the range of the output
       // restricted to the original bit width.
       result = BinaryOperator::Create(
-          Instruction::And, operand,
+          Instruction::And, tmp,
           ConstantInt::get(
               desired_int_ty,
               (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
           "", trunc);
     } else if (auto *zext = dyn_cast<ZExtInst>(v)) {
       auto tmp = ZeroExtend(zext->getOperand(0), desired_bit_width);
-      auto operand_bit_width = tmp->getType()->getIntegerBitWidth();
-      if (isPowerOf2_32(operand_bit_width)) {
-        result = tmp;
+      uint32_t zext_width = zext->getType()->getIntegerBitWidth();
+      //
+      if (zext_width < desired_bit_width) {
+        result = new TruncInst(tmp, zext->getType(), "", zext);
+      } else if (zext_width > desired_bit_width) {
+        zext->setOperand(0, tmp);
+        result = zext;
       } else {
-        result = new ZExtInst(zext->getOperand(0), desired_int_ty, "", zext);
+        result = tmp;
       }
     } else if (auto *phi = dyn_cast<PHINode>(v)) {
       const auto num_branches = phi->getNumIncomingValues();
@@ -233,6 +249,8 @@ bool UndoTruncateToOddIntegerPass::runOnModule(Module &M) {
     if (!zombie->hasNUsesOrMore(1))
       zombie->eraseFromParent();
   }
+
+  //outs() << M << "\n";
 
   return Changed;
 }
