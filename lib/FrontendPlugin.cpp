@@ -634,7 +634,8 @@ public:
               if (type->isPointerType() ||
                   sc != clspv::Option::StorageClass::kSSBO ||
                   !clspv::Option::ClusterPodKernelArgs()) {
-                // For clustered pod args, assume we can fall back on type-mangling.
+                // For clustered pod args, assume we can fall back on
+                // type-mangling.
                 if (contains_16bit &&
                     !clspv::Option::Supports16BitStorageClass(sc)) {
                   Instance.getDiagnostics().Report(
