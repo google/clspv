@@ -34,6 +34,6 @@ entry:
   ret void
 }
 
-; CHECK: [[MD]] = !{i32 1}
+; CHECK: [[MD]] = !{i32 {{[[013]}}}
 
 

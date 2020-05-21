@@ -29,6 +29,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+// Necessary to initialize options and passes.
+#include "clspv/Option.h"
 #include "clspv/Passes.h"
 
 using namespace llvm;

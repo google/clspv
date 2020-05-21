@@ -2328,18 +2328,22 @@ void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries() {
     for (unsigned i = 0; i < STy->getNumElements(); i++) {
       auto pc = static_cast<clspv::PushConstant>(
           mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
-      auto memberType = STy->getElementType(i);
-      auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
-      unsigned previousOffset = 0;
-      if (i > 0) {
-        previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
+      if (pc != clspv::PushConstant::KernelArgument) {
+        auto memberType = STy->getElementType(i);
+        auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
+        unsigned previousOffset = 0;
+        if (i > 0) {
+          previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
+        }
+        auto size =
+            static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
+        assert(isValidExplicitLayout(*module, STy, i,
+                                     spv::StorageClassPushConstant, offset,
+                                     previousOffset));
+        version0::DescriptorMapEntry::PushConstantData data = {pc, offset,
+                                                               size};
+        descriptorMapEntries->emplace_back(std::move(data));
       }
-      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
-      assert(isValidExplicitLayout(*module, STy, i,
-                                   spv::StorageClassPushConstant, offset,
-                                   previousOffset));
-      version0::DescriptorMapEntry::PushConstantData data = {pc, offset, size};
-      descriptorMapEntries->emplace_back(std::move(data));
     }
   }
 }
@@ -2695,8 +2699,8 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
       const auto old_index =
           dyn_extract<ConstantInt>(arg_node->getOperand(1))->getZExtValue();
       // Remapped argument index
-      const size_t new_index = static_cast<size_t>(
-          dyn_extract<ConstantInt>(arg_node->getOperand(2))->getZExtValue());
+      const int new_index = static_cast<int>(
+          dyn_extract<ConstantInt>(arg_node->getOperand(2))->getSExtValue());
       const auto offset =
           dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
       const auto arg_size =
@@ -2712,7 +2716,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
           if ((&F == dyn_cast<Function>(
                          dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
                              ->getValue())) &&
-              (new_index ==
+              (static_cast<uint64_t>(new_index) ==
                mdconst::extract<ConstantInt>(spec_id_arg->getOperand(1))
                    ->getZExtValue())) {
             spec_id = mdconst::extract<ConstantInt>(spec_id_arg->getOperand(2))
@@ -2732,7 +2736,7 @@ void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
         kernel_data.local_element_size = static_cast<uint32_t>(GetTypeAllocSize(
             func_ty->getParamType(unsigned(new_index))->getPointerElementType(),
             DL));
-      } else {
+      } else if (new_index >= 0) {
         auto *info = resource_var_at_index[new_index];
         assert(info);
         descriptor_set = info->descriptor_set;

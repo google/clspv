@@ -25,6 +25,7 @@ enum class PushConstant : int {
   RegionOffset,
   NumWorkgroups,
   RegionGroupOffset,
+  KernelArgument,
 };
 
 } // namespace clspv

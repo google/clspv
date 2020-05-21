@@ -7,7 +7,7 @@ target triple = "spir-unknown-unknown"
 ; get_enqueued_local_size prevents using push constants.
 
 ; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, i32 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
-; CHECK: [[MD]] = !{i32 1}
+; CHECK: [[MD]] = !{i32 {{[013]}}}
 define spir_kernel void @foo(i32 addrspace(1)* %out, i32 %pod) {
 entry:
   %gep0 = getelementptr i32, i32 addrspace(1)* %out, i32 0
