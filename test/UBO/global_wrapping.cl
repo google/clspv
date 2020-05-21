@@ -44,8 +44,8 @@ __kernel void foo(__global outer* data, __constant inner* c) {
 // CHECK: [[c_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner_array]]
 // CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[c_struct]]
 // CHECK: [[c_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
-// CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+// CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 // CHECK: [[c]] = OpVariable [[c_ptr]] Uniform
 // CHECK: [[c_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_ele_ptr]] [[c]] [[zero]] [[zero]] [[zero]]

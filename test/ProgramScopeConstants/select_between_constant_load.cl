@@ -23,9 +23,6 @@ kernel void foo(global float *A, int c, int i) {
 // CHECK-DAG: [[__arr_float_uint_3:%[a-zA-Z0-9_]+]] = OpTypeArray [[_float:%[a-zA-Z0-9_]+]] [[_uint_3:%[a-zA-Z0-9_]+]]
 // CHECK-DAG: [[__ptr_Private__arr_float_uint_3:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[__arr_float_uint_3:%[a-zA-Z0-9_]+]]
 // CHECK-DAG: [[__ptr_Private_float:%[a-zA-Z0-9_]+]] = OpTypePointer Private [[_float:%[a-zA-Z0-9_]+]]
-// CHECK: [[_20:%[a-zA-Z0-9_]+]] = OpUndef [[_float:%[a-zA-Z0-9_]+]]
-// CHECK-DAG: [[_false:%[a-zA-Z0-9_]+]] = OpConstantFalse [[_bool:%[a-zA-Z0-9_]+]]
-// CHECK-DAG: [[_true:%[a-zA-Z0-9_]+]] = OpConstantTrue [[_bool:%[a-zA-Z0-9_]+]]
 // CHECK-DAG: [[_float_1:%[a-zA-Z0-9_]+]] = OpConstant [[_float:%[a-zA-Z0-9_]+]] 1
 // CHECK-DAG: [[_float_2:%[a-zA-Z0-9_]+]] = OpConstant [[_float:%[a-zA-Z0-9_]+]] 2
 // CHECK-DAG: [[_float_3:%[a-zA-Z0-9_]+]] = OpConstant [[_float:%[a-zA-Z0-9_]+]] 3
@@ -34,6 +31,9 @@ kernel void foo(global float *A, int c, int i) {
 // CHECK-DAG: [[_float_11:%[a-zA-Z0-9_]+]] = OpConstant [[_float:%[a-zA-Z0-9_]+]] 11
 // CHECK-DAG: [[_float_12:%[a-zA-Z0-9_]+]] = OpConstant [[_float:%[a-zA-Z0-9_]+]] 12
 // CHECK-DAG: [[_30:%[a-zA-Z0-9_]+]] = OpConstantComposite [[__arr_float_uint_3:%[a-zA-Z0-9_]+]] [[_float_10:%[a-zA-Z0-9_]+]] [[_float_11:%[a-zA-Z0-9_]+]] [[_float_12:%[a-zA-Z0-9_]+]]
+// CHECK: [[_20:%[a-zA-Z0-9_]+]] = OpUndef [[_float:%[a-zA-Z0-9_]+]]
+// CHECK-DAG: [[_false:%[a-zA-Z0-9_]+]] = OpConstantFalse [[_bool:%[a-zA-Z0-9_]+]]
+// CHECK-DAG: [[_true:%[a-zA-Z0-9_]+]] = OpConstantTrue [[_bool:%[a-zA-Z0-9_]+]]
 // CHECK: [[_35:%[a-zA-Z0-9_]+]] = OpVariable [[__ptr_Private_v3uint:%[a-zA-Z0-9_]+]] Private [[_gl_WorkGroupSize:%[a-zA-Z0-9_]+]]
 // CHECK: [[_36:%[a-zA-Z0-9_]+]] = OpVariable [[__ptr_Private__arr_float_uint_3:%[a-zA-Z0-9_]+]] Private [[_26:%[a-zA-Z0-9_]+]]
 // CHECK: [[_37:%[a-zA-Z0-9_]+]] = OpVariable [[__ptr_Private__arr_float_uint_3:%[a-zA-Z0-9_]+]] Private [[_30:%[a-zA-Z0-9_]+]]

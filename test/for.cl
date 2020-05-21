@@ -12,8 +12,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 }
 
 // CHECK: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[zero:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 0
+// CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[one:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 1
 // CHECK: [[entry:%[a-zA-Z0-9_]+]] = OpLabel
 // CHECK: OpBranchConditional {{.*}} [[loop:%[a-zA-Z0-9_]+]] [[ret:%[a-zA-Z0-9_]+]]
