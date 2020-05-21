@@ -630,21 +630,27 @@ public:
               } else if (clspv::Option::PodArgsInPushConstants()) {
                 sc = clspv::Option::StorageClass::kPushConstant;
               }
-              if (contains_16bit &&
-                  !clspv::Option::Supports16BitStorageClass(sc)) {
-                Instance.getDiagnostics().Report(
-                    P->getSourceRange().getBegin(),
-                    CustomDiagnosticsIDMap
-                        [CustomDiagnosticUnsupported16BitStorage])
-                    << static_cast<int>(sc);
-              }
-              if (contains_8bit &&
-                  !clspv::Option::Supports8BitStorageClass(sc)) {
-                Instance.getDiagnostics().Report(
-                    P->getSourceRange().getBegin(),
-                    CustomDiagnosticsIDMap
-                        [CustomDiagnosticUnsupported8BitStorage])
-                    << static_cast<int>(sc);
+
+              if (type->isPointerType() ||
+                  sc != clspv::Option::StorageClass::kSSBO ||
+                  !clspv::Option::ClusterPodKernelArgs()) {
+                // For clustered pod args, assume we can fall back on type-mangling.
+                if (contains_16bit &&
+                    !clspv::Option::Supports16BitStorageClass(sc)) {
+                  Instance.getDiagnostics().Report(
+                      P->getSourceRange().getBegin(),
+                      CustomDiagnosticsIDMap
+                          [CustomDiagnosticUnsupported16BitStorage])
+                      << static_cast<int>(sc);
+                }
+                if (contains_8bit &&
+                    !clspv::Option::Supports8BitStorageClass(sc)) {
+                  Instance.getDiagnostics().Report(
+                      P->getSourceRange().getBegin(),
+                      CustomDiagnosticsIDMap
+                          [CustomDiagnosticUnsupported8BitStorage])
+                      << static_cast<int>(sc);
+                }
               }
             }
 

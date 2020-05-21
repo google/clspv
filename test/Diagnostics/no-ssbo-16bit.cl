@@ -13,5 +13,3 @@ struct B {
 kernel void foo(global short* a) { } //expected-error{{16-bit storage is not supported for SSBOs}}
 
 kernel void bar(constant struct B* a) { } //expected-error{{16-bit storage is not supported for SSBOs}}
-
-kernel void baz(ushort a) { } //expected-error{{16-bit storage is not supported for SSBOs}}

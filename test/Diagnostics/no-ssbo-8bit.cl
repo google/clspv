@@ -4,5 +4,3 @@ kernel void foo(global char* a) { } //expected-error{{8-bit storage is not suppo
 
 kernel void bar(constant char* a) { } //expected-error{{8-bit storage is not supported for SSBOs}}
 
-kernel void baz(uchar a) { } //expected-error{{8-bit storage is not supported for SSBOs}}
-
