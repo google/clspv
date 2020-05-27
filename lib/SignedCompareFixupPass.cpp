@@ -244,7 +244,7 @@ void SignedCompareFixupPass::ReplaceBuiltin(
   builder.SetInsertPoint(call);
   Value *out = nullptr;
   if (type == Builtins::kClamp) {
-    // clamp(a,b,c) is min(max(x, b), c). Results are undefined if b > c, so
+    // clamp(x,b,c) is min(max(x, b), c). Results are undefined if b > c, so
     // both comparisons can be made against x.
     auto x = call->getOperand(0);
     auto min = call->getOperand(1);
