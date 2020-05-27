@@ -757,10 +757,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
   const std::string pre = "-enable-pre";
   const std::string load_pre = "-enable-load-pre";
   for (int i = 1; i < argc; ++i) {
-    if (strncmp(argv[i], load_pre.c_str(), load_pre.size()) == 0) {
-      has_load_pre = true;
-    } else if (strncmp(argv[i], pre.c_str(), pre.size()) == 0) {
+    std::string option(argv[i]);
+    auto pre_pos = option.find(pre);
+    auto load_pos = option.find(load_pre);
+    if (pre_pos == 0 || (pre_pos == 1 && option[0] == '-')) {
       has_pre = true;
+    } else if (load_pos == 0 || (load_pos == 1 && option[0] == '-')) {
+      has_load_pre = true;
     }
   }
 
