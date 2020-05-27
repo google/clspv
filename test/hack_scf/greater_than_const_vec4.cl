@@ -45,9 +45,7 @@
 // CHECK:     %[[__original_id_60:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_57:[0-9]+]] %[[__original_id_55:[0-9]+]]
 // CHECK:     %[[__original_id_61:[0-9]+]] = OpCompositeInsert %[[v4uint]] %[[__original_id_60]] %[[__original_id_21]] 0
 // CHECK:     %[[__original_id_62:[0-9]+]] = OpVectorShuffle %[[v4uint]] %[[__original_id_61]] %[[__original_id_21]] 0 0 0 0
-// CHECK:     %[[__original_id_63:[0-9]+]] = OpIMul %[[uint]] %[[__original_id_59:[0-9]+]] %[[__original_id_53:[0-9]+]]
-// CHECK:     %[[__original_id_64:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_63]] %[[__original_id_57]]
-// CHECK:     %[[__original_id_65:[0-9]+]] = OpISub %[[uint]] %[[uint_4]] %[[__original_id_59]]
+// CHECK:     %[[__original_id_65:[0-9]+]] = OpISub %[[uint]] %[[uint_4]] %[[__original_id_59:[0-9]+]]
 // CHECK:     %[[__original_id_66:[0-9]+]] = OpISub %[[uint]] %[[__original_id_65]] %[[uint_1]]
 // CHECK:     %[[__original_id_67:[0-9]+]] = OpBitwiseAnd %[[uint]] %[[__original_id_66]] %[[uint_2147483648]]
 // CHECK:     %[[__original_id_68:[0-9]+]] = OpIEqual %[[bool]] %[[__original_id_67]] %[[uint_0]]
@@ -71,6 +69,8 @@
 // CHECK:     %[[__original_id_86:[0-9]+]] = OpCompositeExtract %[[uint]] %[[__original_id_83]] 1
 // CHECK:     %[[__original_id_87:[0-9]+]] = OpCompositeExtract %[[uint]] %[[__original_id_83]] 0
 // CHECK:     %[[__original_id_88:[0-9]+]] = OpSelect %[[uint]] %[[__original_id_85]] %[[__original_id_87]] %[[__original_id_86]]
+// CHECK:     %[[__original_id_63:[0-9]+]] = OpIMul %[[uint]] %[[__original_id_59]] %[[__original_id_53:[0-9]+]]
+// CHECK:     %[[__original_id_64:[0-9]+]] = OpIAdd %[[uint]] %[[__original_id_63]] %[[__original_id_57]]
 // CHECK:     OpReturn
 // CHECK:     OpFunctionEnd
 
