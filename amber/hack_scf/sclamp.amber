@@ -1,0 +1,49 @@
+#!amber
+
+SHADER compute sclamp_shader OPENCL-C
+kernel void foo(global int* out, global int* a, global int* b, global int* c) {
+  int gid = get_global_id(0);
+  out[gid] = clamp(a[gid], b[gid], c[gid]);
+}
+END
+
+BUFFER a DATA_TYPE int32 DATA
+-10 42 0 -1 5
+END
+BUFFER b DATA_TYPE int32 DATA
+42 -10 0 -3 3
+END
+BUFFER c DATA_TYPE int32 DATA
+48 -1 1 1 6
+END
+BUFFER expect DATA_TYPE int32 DATA
+42 -1 0 -1 5
+END
+BUFFER out1 DATA_TYPE int32 SIZE 5 FILL 13
+BUFFER out2 DATA_TYPE int32 SIZE 5 FILL 13
+
+PIPELINE compute sclamp_pipeline
+  ATTACH sclamp_shader ENTRY_POINT foo \
+    SPECIALIZE 0 AS uint32 5 \
+    SPECIALIZE 1 AS uint32 1 \
+    SPECIALIZE 2 AS uint32 1
+
+  BIND BUFFER out1 AS storage DESCRIPTOR_SET 0 BINDING 0
+  BIND BUFFER a AS storage DESCRIPTOR_SET 0 BINDING 1
+  BIND BUFFER b AS storage DESCRIPTOR_SET 0 BINDING 2
+  BIND BUFFER c AS storage DESCRIPTOR_SET 0 BINDING 3
+END
+
+DERIVE_PIPELINE scf_pipeline FROM sclamp_pipeline
+  BIND BUFFER out2 AS storage DESCRIPTOR_SET 0 BINDING 0
+  COMPILE_OPTIONS sclamp_shader
+    -hack-scf
+  END
+END
+
+RUN sclamp_pipeline 1 1 1
+RUN scf_pipeline 1 1 1
+
+EXPECT out1 EQ_BUFFER expect
+EXPECT out2 EQ_BUFFER expect
+
