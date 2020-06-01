@@ -26,10 +26,13 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "spirv/unified1/spirv.hpp"
+
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
 #include "Passes.h"
@@ -747,8 +750,9 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         assert(resource_type);
 
-        auto fn_name = std::string(clspv::ResourceAccessorFunction()) +
+        auto fn_name = clspv::ResourceAccessorFunction() + "." +
                        std::to_string(discriminants_list[arg_index].index);
+
         Function *var_fn = M.getFunction(fn_name);
 
         if (!var_fn) {
@@ -903,8 +907,8 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         // addrspace(3)*. The zero-sized array is used to match the correct
         // indexing required by gep's, but the zero size will eventually be
         // codegen'd as an OpSpecConstant.
-        auto fn_name = std::string(clspv::WorkgroupAccessorFunction()) +
-                       std::to_string(spec_id);
+        auto fn_name =
+            clspv::WorkgroupAccessorFunction() + "." + std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
         auto *array_ty = ArrayType::get(argTy->getPointerElementType(), 0);
@@ -970,18 +974,23 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
         // and StorageBuffer storage classes) semantics are checked because
         // Workgroup variables are inherently coherent (and do not require the
         // decoration).
-        if (call->getCalledFunction()->getName().startswith("spirv.op.224.")) {
-          // barrier()
-          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
-            uses_barrier =
-                semantics->getZExtValue() & kMemorySemanticsUniformMemory;
-          }
-        } else if (call->getCalledFunction()->getName().startswith(
-                       "spirv.op.225.")) {
-          // mem_fence()
-          if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
-            uses_barrier =
-                semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+        auto &func_info = clspv::Builtins::Lookup(call->getCalledFunction());
+        if (func_info.getType() == clspv::Builtins::kSpirvOp) {
+          auto *arg0 = dyn_cast<ConstantInt>(call->getArgOperand(0));
+          spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
+          if (opcode == spv::OpControlBarrier) {
+            // barrier()
+            if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
+              uses_barrier =
+                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+            }
+
+          } else if (opcode == spv::OpMemoryBarrier) {
+            // mem_fence()
+            if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
+              uses_barrier =
+                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+            }
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
           // Continue searching in the subfunction.

@@ -212,13 +212,6 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
     return false;
   }
 
-  if (!name_.compare(0, 8, "convert_")) {
-    // deduce return type from name, only for convert
-    char tok = name_[8];
-    return_type_.is_signed = tok != 'u'; // unsigned
-    return_type_.type_id = tok == 'f' ? Type::FloatTyID : Type::IntegerTyID;
-  }
-
   auto mangled_name_len = mangled_name.size();
   while (pos < mangled_name_len) {
     ParamTypeInfo type_info;
@@ -247,6 +240,12 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
 Builtins::FunctionInfo::FunctionInfo(const std::string &mangled_name) {
   is_valid_ = GetFromMangledNameCheck(mangled_name);
   type_ = LookupBuiltinType(name_);
+  if (type_ == kConvert) {
+    // deduce return type from name, only for convert
+    char tok = name_[8];
+    return_type_.is_signed = tok != 'u'; // unsigned
+    return_type_.type_id = tok == 'f' ? Type::FloatTyID : Type::IntegerTyID;
+  }
 }
 
 // get const ParamTypeInfo for nth parameter
@@ -258,7 +257,8 @@ Builtins::FunctionInfo::getParameter(size_t _arg) const {
 
 // Test for OCL Sampler parameter type
 bool Builtins::ParamTypeInfo::isSampler() const {
-  return type_id == Type::StructTyID && name == "ocl_sampler";
+  return type_id == Type::StructTyID &&
+         (name == "ocl_sampler" || name == "opencl.sampler_t");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,114 +272,119 @@ Builtins::Lookup(const std::string &mangled_name) {
   return (*fi.first).second;
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////
-////  Legacy interface
-////////////////////////////////////////////////////////////////////////////////
-bool Builtins::IsImageBuiltin(StringRef name) {
-  auto func_type = Lookup(name).getType();
-  return func_type > kType_Image_Start && func_type < kType_Image_End;
-}
-
-bool Builtins::IsSampledImageRead(StringRef name) {
-  return IsFloatSampledImageRead(name) || IsUintSampledImageRead(name) ||
-         IsIntSampledImageRead(name);
-}
-
-bool Builtins::IsFloatSampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImagef) {
-    const auto &pi = fi.getParameter(1);
-    return pi.isSampler();
+// Generate a mangled name loosely based on Itanium mangling
+std::string Builtins::GetMangledFunctionName(const char *name, Type *type) {
+  assert(name);
+  std::string mangled_name =
+      std::string("_Z") + std::to_string(strlen(name)) + name;
+  if (auto *func_type = dyn_cast<FunctionType>(type)) {
+    Type *last_arg_type = nullptr;
+    for (auto *arg_type : func_type->params()) {
+      if (arg_type == last_arg_type) {
+        mangled_name += "S_";
+      } else {
+        mangled_name += GetMangledTypeName(arg_type);
+        last_arg_type = arg_type;
+      }
+    }
+  } else {
+    mangled_name += GetMangledTypeName(type);
   }
-  return false;
+  return mangled_name;
 }
 
-bool Builtins::IsUintSampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImageui) {
-    const auto &pi = fi.getParameter(1);
-    return pi.isSampler();
+// The mangling follows the Itanium convention.
+std::string Builtins::GetMangledFunctionName(const char *name) {
+  assert(name);
+  return std::string("_Z") + std::to_string(strlen(name)) + name;
+}
+
+// The mangling loosely follows the Itanium convention.
+// Its purpose is solely to ensure uniqueness of names, it is not
+// meant to convey type information.
+std::string Builtins::GetMangledTypeName(Type *Ty) {
+  std::string mangled_type_str;
+
+  switch (Ty->getTypeID()) {
+  case Type::VoidTyID:
+    return "v";
+  case Type::HalfTyID:
+  case Type::FloatTyID:
+  case Type::DoubleTyID:
+    switch (Ty->getScalarSizeInBits()) {
+    case 16:
+      return "Dh";
+    case 32:
+      return "f";
+    case 64:
+      return "d";
+    default:
+      assert(0);
+      break;
+    }
+    break;
+
+  case Type::IntegerTyID:
+    switch (Ty->getIntegerBitWidth()) {
+    case 1:
+      return "b";
+    case 8:
+      return "h";
+    case 16:
+      return "t";
+    case 32:
+      return "j";
+    case 64:
+      return "m";
+    default:
+      assert(0);
+      break;
+    }
+    break;
+
+  case Type::StructTyID: {
+    auto *StrTy = cast<StructType>(Ty);
+    if (StrTy->isLiteral()) {
+      assert(StrTy->getNumElements() == 1);
+      return GetMangledTypeName(StrTy->getElementType(0));
+    }
+    mangled_type_str =
+        std::to_string(Ty->getStructName().size()) + Ty->getStructName().str();
+    break;
   }
-  return false;
-}
-
-bool Builtins::IsIntSampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImagei) {
-    const auto &pi = fi.getParameter(1);
-    return pi.isSampler();
+  case Type::ArrayTyID:
+    mangled_type_str = "P" + GetMangledTypeName(Ty->getArrayElementType());
+    break;
+  case Type::PointerTyID: {
+    mangled_type_str = "P";
+    auto AS = Ty->getPointerAddressSpace();
+    if (AS != 0) {
+      std::string AS_name = "AS" + std::to_string(AS);
+      mangled_type_str += "U" + std::to_string(AS_name.size()) + AS_name;
+    }
+    mangled_type_str += GetMangledTypeName(Ty->getPointerElementType());
+    break;
   }
-  return false;
-}
-
-bool Builtins::IsUnsampledImageRead(StringRef name) {
-  return IsFloatUnsampledImageRead(name) || IsUintUnsampledImageRead(name) ||
-         IsIntUnsampledImageRead(name);
-}
-
-bool Builtins::IsFloatUnsampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImagef) {
-    const auto &pi = fi.getParameter(1);
-    return !pi.isSampler();
+  case Type::FixedVectorTyID: {
+    auto VecTy = cast<VectorType>(Ty);
+    mangled_type_str = "Dv" + std::to_string(VecTy->getNumElements()) + "_" +
+                       GetMangledTypeName(VecTy->getElementType());
+    break;
   }
-  return false;
-}
 
-bool Builtins::IsUintUnsampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImageui) {
-    const auto &pi = fi.getParameter(1);
-    return !pi.isSampler();
+  case Type::FunctionTyID:
+  case Type::X86_FP80TyID:
+  case Type::FP128TyID:
+  case Type::PPC_FP128TyID:
+  case Type::LabelTyID:
+  case Type::MetadataTyID:
+  case Type::X86_MMXTyID:
+  case Type::TokenTyID:
+  default:
+    assert(0);
+    break;
   }
-  return false;
-}
-
-bool Builtins::IsIntUnsampledImageRead(StringRef _name) {
-  const auto &fi = Lookup(_name);
-  if (fi.getType() == kReadImagei) {
-    const auto &pi = fi.getParameter(1);
-    return !pi.isSampler();
-  }
-  return false;
-}
-
-bool Builtins::IsImageWrite(StringRef name) {
-  auto func_code = Lookup(name).getType();
-  return func_code == kWriteImagef || func_code == kWriteImageui ||
-         func_code == kWriteImagei || func_code == kWriteImageh;
-}
-
-bool Builtins::IsFloatImageWrite(StringRef name) {
-  return Lookup(name) == kWriteImagef;
-}
-
-bool Builtins::IsUintImageWrite(StringRef name) {
-  return Lookup(name) == kWriteImageui;
-}
-
-bool Builtins::IsIntImageWrite(StringRef name) {
-  return Lookup(name) == kWriteImagei;
-}
-
-bool Builtins::IsGetImageHeight(StringRef name) {
-  return Lookup(name) == kGetImageHeight;
-}
-
-bool Builtins::IsGetImageWidth(StringRef name) {
-  return Lookup(name) == kGetImageWidth;
-}
-
-bool Builtins::IsGetImageDepth(StringRef name) {
-  return Lookup(name) == kGetImageDepth;
-}
-
-bool Builtins::IsGetImageDim(StringRef name) {
-  return Lookup(name) == kGetImageDim;
-}
-
-bool Builtins::IsImageQuery(StringRef name) {
-  auto func_code = Lookup(name).getType();
-  return func_code == kGetImageHeight || func_code == kGetImageWidth ||
-         func_code == kGetImageDepth || func_code == kGetImageDim;
+  return mangled_type_str;
 }

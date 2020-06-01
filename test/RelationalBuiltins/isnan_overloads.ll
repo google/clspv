@@ -28,7 +28,7 @@ declare spir_func <3 x i32> @_Z5isnanDv3_f(<3 x float>) local_unnamed_addr #2
 ; Function Attrs: convergent nounwind readnone
 declare spir_func <4 x i32> @_Z5isnanDv4_f(<4 x float>) local_unnamed_addr #2
 
-; CHECK: call i1 @spirv.op.156.f(i32 156, float 0x40035C2900000000)
-; CHECK: call <2 x i1> @spirv.op.156.Dv2_f(i32 156, <2 x float> <float 0x40035C2900000000, float 0x40035C2900000000>)
-; CHECK: call <3 x i1> @spirv.op.156.Dv3_f(i32 156, <3 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)
-; CHECK: call <4 x i1> @spirv.op.156.Dv4_f(i32 156, <4 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)
+; CHECK: call i1 @_Z8spirv.op.156.f(i32 156, float 0x40035C2900000000)
+; CHECK: call <2 x i1> @_Z8spirv.op.156.Dv2_f(i32 156, <2 x float> <float 0x40035C2900000000, float 0x40035C2900000000>)
+; CHECK: call <3 x i1> @_Z8spirv.op.156.Dv3_f(i32 156, <3 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)
+; CHECK: call <4 x i1> @_Z8spirv.op.156.Dv4_f(i32 156, <4 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)

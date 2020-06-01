@@ -92,8 +92,6 @@ const bool Hack_generate_runtime_array_stride_early = true;
 const double kOneOverPi = 0.318309886183790671538;
 const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
-const char *kCompositeConstructFunctionPrefix = "clspv.composite_construct.";
-
 // SPIRV Module Sections (per 2.4 of the SPIRV spec)
 // These are used to collect SPIRVInstructions by type on-the-fly.
 enum SPIRVSection {
@@ -364,15 +362,16 @@ struct SPIRVProducerPass final : public ModulePass {
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
   // Returns the GLSL extended instruction enum that the given function
   // call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
-  glsl::ExtInst getExtInstEnum(StringRef Name);
+  glsl::ExtInst getExtInstEnum(const Builtins::FunctionInfo &func_info);
   // Returns the GLSL extended instruction enum indirectly used by the given
   // function.  That is, to implement the given function, we use an extended
   // instruction plus one more instruction. If none, then returns the 0 value,
   // i.e. GLSLstd4580Bad.
-  glsl::ExtInst getIndirectExtInstEnum(StringRef Name);
+  glsl::ExtInst getIndirectExtInstEnum(const Builtins::FunctionInfo &func_info);
   // Returns the single GLSL extended instruction used directly or
   // indirectly by the given function call.
-  glsl::ExtInst getDirectOrIndirectExtInstEnum(StringRef Name);
+  glsl::ExtInst
+  getDirectOrIndirectExtInstEnum(const Builtins::FunctionInfo &func_info);
   void WriteOneWord(uint32_t Word);
   void WriteResultID(const SPIRVInstruction &Inst);
   void WriteWordCountAndOpcode(const SPIRVInstruction &Inst);
@@ -961,7 +960,7 @@ void SPIRVProducerPass::FindResourceVars() {
   for (Function &F : *module) {
     // Rely on the fact the resource var functions have a stable ordering
     // in the module.
-    if (F.getName().startswith(clspv::ResourceAccessorFunction())) {
+    if (Builtins::Lookup(&F) == Builtins::kClspvResource) {
       // Find all calls to this function with distinct set and binding pairs.
       // Save them in ResourceVarInfoList.
 
@@ -1107,18 +1106,14 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 
       CallInst *Call = dyn_cast<CallInst>(&I);
 
-      if (Call && Call->getCalledFunction()->getName().startswith(
-                      clspv::ResourceAccessorFunction())) {
-        // This is a fake call representing access to a resource variable.
-        // We handle that elsewhere.
-        continue;
-      }
-
-      if (Call && Call->getCalledFunction()->getName().startswith(
-                      clspv::WorkgroupAccessorFunction())) {
-        // This is a fake call representing access to a workgroup variable.
-        // We handle that elsewhere.
-        continue;
+      if (Call) {
+        auto &func_info = Builtins::Lookup(Call->getCalledFunction());
+        if (func_info.getType() == Builtins::kClspvResource ||
+            func_info.getType() == Builtins::kClspvLocal) {
+          // This is a fake call representing access to a resource/workgroup
+          // variable. We handle that elsewhere.
+          continue;
+        }
       }
 
       // #497: InsertValue and ExtractValue map to OpCompositeInsert and
@@ -1169,8 +1164,8 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
           break;
         }
         if (CallInst *OpCall = dyn_cast<CallInst>(Op)) {
-          if (OpCall && OpCall->getCalledFunction()->getName().startswith(
-                            clspv::WorkgroupAccessorFunction())) {
+          if (Builtins::Lookup(OpCall->getCalledFunction()) ==
+              Builtins::kClspvLocal) {
             // This is a fake call representing access to a workgroup variable.
             // We handle that elsewhere.
             continue;
@@ -1184,8 +1179,8 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 
       // We don't want to track the type of this call as we are going to replace
       // it.
-      if (Call && (clspv::LiteralSamplerFunction() ==
-                   Call->getCalledFunction()->getName())) {
+      if (Call && Builtins::Lookup(Call->getCalledFunction()) ==
+                      Builtins::kClspvSamplerVarLiteral) {
         continue;
       }
 
@@ -3897,8 +3892,84 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   case Instruction::Call: {
     CallInst *Call = dyn_cast<CallInst>(&I);
     Function *Callee = Call->getCalledFunction();
+    auto &func_info = Builtins::Lookup(Callee);
 
-    if (Callee->getName().startswith(clspv::ResourceAccessorFunction())) {
+    glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(func_info);
+
+    if (EInst) {
+      SPIRVID ExtInstImportID = getOpExtInstImportID();
+
+      //
+      // Generate OpExtInst.
+      //
+
+      // Ops[0] = Result Type ID
+      // Ops[1] = Set ID (OpExtInstImport ID)
+      // Ops[2] = Instruction Number (Literal Number)
+      // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
+      SPIRVOperandVec Ops;
+
+      Ops << Call->getType() << ExtInstImportID << EInst;
+
+      FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
+      for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
+        Ops << Call->getOperand(j);
+      }
+
+      RID = addSPIRVInst(spv::OpExtInst, Ops);
+
+      const auto IndirectExtInst = getIndirectExtInstEnum(func_info);
+      if (IndirectExtInst != kGlslExtInstBad) {
+
+        // Generate one more instruction that uses the result of the extended
+        // instruction.  Its result id is one more than the id of the
+        // extended instruction.
+        auto generate_extra_inst = [this, &Context, &Call,
+                                    &RID](spv::Op opcode, Constant *constant) {
+          //
+          // Generate instruction like:
+          //   result = opcode constant <extinst-result>
+          //
+          // Ops[0] = Result Type ID
+          // Ops[1] = Operand 0 ;; the constant, suitably splatted
+          // Ops[2] = Operand 1 ;; the result of the extended instruction
+          SPIRVOperandVec Ops;
+
+          Type *resultTy = Call->getType();
+
+          if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
+            constant = ConstantVector::getSplat(
+                {static_cast<unsigned>(vectorTy->getNumElements()), false},
+                constant);
+          }
+          Ops << resultTy << constant << RID;
+
+          RID = addSPIRVInst(opcode, Ops);
+        };
+
+        auto IntTy = Type::getInt32Ty(Context);
+        switch (IndirectExtInst) {
+        case glsl::ExtInstFindUMsb: // Implementing clz
+          generate_extra_inst(spv::OpISub, ConstantInt::get(IntTy, 31));
+          break;
+        case glsl::ExtInstAcos:  // Implementing acospi
+        case glsl::ExtInstAsin:  // Implementing asinpi
+        case glsl::ExtInstAtan:  // Implementing atanpi
+        case glsl::ExtInstAtan2: // Implementing atan2pi
+          generate_extra_inst(
+              spv::OpFMul,
+              ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
+          break;
+
+        default:
+          assert(false && "internally inconsistent");
+        }
+      }
+      break;
+    }
+
+    switch (func_info.getType()) {
+    case Builtins::kClspvResource: {
       if (ResourceVarDeferredLoadCalls.count(Call) && Call->hasNUsesOrMore(1)) {
         // Generate an OpLoad
         SPIRVOperandVec Ops;
@@ -3907,15 +3978,14 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
             << ResourceVarDeferredLoadCalls[Call];
 
         RID = addSPIRVInst(spv::OpLoad, Ops);
-        break;
 
       } else {
         // This maps to an OpVariable we've already generated.
         // No code is generated for the call.
       }
       break;
-    } else if (Callee->getName().startswith(
-                   clspv::WorkgroupAccessorFunction())) {
+    }
+    case Builtins::kClspvLocal: {
       // Don't codegen an instruction here, but instead map this call directly
       // to the workgroup variable id.
       int spec_id = static_cast<int>(
@@ -3924,10 +3994,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       RID = info.variable_id;
       break;
     }
-
-    // Sampler initializers become a load of the corresponding sampler.
-
-    if (Callee->getName().equals(clspv::LiteralSamplerFunction())) {
+    case Builtins::kClspvSamplerVarLiteral: {
+      // Sampler initializers become a load of the corresponding sampler.
       // Map this to a load from the variable.
       const auto third_param = static_cast<unsigned>(
           dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
@@ -3945,42 +4013,53 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       RID = addSPIRVInst(spv::OpLoad, Ops);
       break;
     }
-
-    // Handle SPIR-V intrinsics
-    spv::Op opcode = StringSwitch<spv::Op>(Callee->getName())
-                         .Case("spirv.atomic_xor", spv::OpAtomicXor)
-                         .Default(spv::OpNop);
-
-    // If the switch above didn't have an entry maybe the intrinsic
-    // is using the name mangling logic.
-    bool usesMangler = false;
-    if (opcode == spv::OpNop) {
-      if (Callee->getName().startswith(clspv::SPIRVOpIntrinsicFunction())) {
-        auto OpCst = cast<ConstantInt>(Call->getOperand(0));
-        opcode = static_cast<spv::Op>(OpCst->getZExtValue());
-        usesMangler = true;
-      }
-    }
-
-    if (opcode != spv::OpNop) {
-
+    case Builtins::kSpirvAtomicXor: {
+      // Handle SPIR-V intrinsics
       SPIRVOperandVec Ops;
 
       if (!I.getType()->isVoidTy()) {
         Ops << I.getType();
       }
 
-      unsigned firstOperand = usesMangler ? 1 : 0;
-      for (unsigned i = firstOperand; i < Call->getNumArgOperands(); i++) {
+      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
         Ops << Call->getArgOperand(i);
       }
 
-      RID = addSPIRVInst(opcode, Ops);
+      RID = addSPIRVInst(spv::OpAtomicXor, Ops);
       break;
     }
+    case Builtins::kSpirvOp: {
+      // Handle SPIR-V intrinsics
+      auto *arg0 = dyn_cast<ConstantInt>(Call->getArgOperand(0));
+      spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
+      if (opcode != spv::OpNop) {
+        SPIRVOperandVec Ops;
 
-    // spirv.copy_memory.* intrinsics become OpMemoryMemory's.
-    if (Callee->getName().startswith("spirv.copy_memory")) {
+        if (!I.getType()->isVoidTy()) {
+          Ops << I.getType();
+        }
+
+        for (unsigned i = 1; i < Call->getNumArgOperands(); i++) {
+          Ops << Call->getArgOperand(i);
+        }
+
+        RID = addSPIRVInst(opcode, Ops);
+      }
+      break;
+    }
+    case Builtins::kPopcount: {
+      //
+      // Generate OpBitCount
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Base ID
+      SPIRVOperandVec Ops;
+      Ops << Call->getType() << Call->getOperand(0);
+
+      RID = addSPIRVInst(spv::OpBitCount, Ops);
+      break;
+    }
+    case Builtins::kSpirvCopyMemory: {
       //
       // Generate OpCopyMemory.
       //
@@ -4008,106 +4087,112 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       RID = addSPIRVInst(spv::OpCopyMemory, Ops);
       break;
     }
+    case Builtins::kReadImagef:
+    case Builtins::kReadImageh:
+    case Builtins::kReadImagei:
+    case Builtins::kReadImageui: {
+      // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
+      // Additionally, OpTypeSampledImage is generated.
+      const auto &pi = func_info.getParameter(1);
+      if (pi.isSampler()) {
+        //
+        // Generate OpSampledImage.
+        //
+        // Ops[0] = Result Type ID
+        // Ops[1] = Image ID
+        // Ops[2] = Sampler ID
+        //
+        SPIRVOperandVec Ops;
 
-    // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
-    // Additionally, OpTypeSampledImage is generated.
-    if (IsSampledImageRead(Callee)) {
-      //
-      // Generate OpSampledImage.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Image ID
-      // Ops[2] = Sampler ID
-      //
-      SPIRVOperandVec Ops;
+        Value *Image = Call->getArgOperand(0);
+        Value *Sampler = Call->getArgOperand(1);
+        Value *Coordinate = Call->getArgOperand(2);
 
-      Value *Image = Call->getArgOperand(0);
-      Value *Sampler = Call->getArgOperand(1);
-      Value *Coordinate = Call->getArgOperand(2);
+        TypeMapType &OpImageTypeMap = getImageTypeMap();
+        Type *ImageTy = Image->getType()->getPointerElementType();
+        SPIRVID ImageTyID = OpImageTypeMap[ImageTy];
 
-      TypeMapType &OpImageTypeMap = getImageTypeMap();
-      Type *ImageTy = Image->getType()->getPointerElementType();
-      SPIRVID ImageTyID = OpImageTypeMap[ImageTy];
+        Ops << ImageTyID << Image << Sampler;
 
-      Ops << ImageTyID << Image << Sampler;
+        SPIRVID SampledImageID = addSPIRVInst(spv::OpSampledImage, Ops);
 
-      SPIRVID SampledImageID = addSPIRVInst(spv::OpSampledImage, Ops);
-
-      //
-      // Generate OpImageSampleExplicitLod.
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Sampled Image ID
-      // Ops[2] = Coordinate ID
-      // Ops[3] = Image Operands Type ID
-      // Ops[4] ... Ops[n] = Operands ID
-      //
-      Ops.clear();
-
-      const bool is_int_image = IsIntImageType(Image->getType());
-      SPIRVID result_type;
-      if (is_int_image) {
-        result_type = v4int32ID;
-      } else {
-        result_type = getSPIRVType(Call->getType());
-      }
-
-      Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
-      Ops << result_type << SampledImageID << Coordinate
-          << spv::ImageOperandsLodMask << CstFP0;
-
-      RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
-
-      if (is_int_image) {
-        // Generate the bitcast.
+        //
+        // Generate OpImageSampleExplicitLod.
+        //
+        // Ops[0] = Result Type ID
+        // Ops[1] = Sampled Image ID
+        // Ops[2] = Coordinate ID
+        // Ops[3] = Image Operands Type ID
+        // Ops[4] ... Ops[n] = Operands ID
+        //
         Ops.clear();
-        Ops << Call->getType() << RID;
-        RID = addSPIRVInst(spv::OpBitcast, Ops);
+
+        const bool is_int_image = IsIntImageType(Image->getType());
+        SPIRVID result_type;
+        if (is_int_image) {
+          result_type = v4int32ID;
+        } else {
+          result_type = getSPIRVType(Call->getType());
+        }
+
+        Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
+        Ops << result_type << SampledImageID << Coordinate
+            << spv::ImageOperandsLodMask << CstFP0;
+
+        RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
+
+        if (is_int_image) {
+          // Generate the bitcast.
+          Ops.clear();
+          Ops << Call->getType() << RID;
+          RID = addSPIRVInst(spv::OpBitcast, Ops);
+        }
+      } else {
+
+        // read_image (without a sampler) is mapped to OpImageFetch.
+        Value *Image = Call->getArgOperand(0);
+        Value *Coordinate = Call->getArgOperand(1);
+
+        //
+        // Generate OpImageFetch
+        //
+        // Ops[0] = Result Type ID
+        // Ops[1] = Image ID
+        // Ops[2] = Coordinate ID
+        // Ops[3] = Lod
+        // Ops[4] = 0
+        //
+        SPIRVOperandVec Ops;
+
+        const bool is_int_image = IsIntImageType(Image->getType());
+        SPIRVID result_type;
+        if (is_int_image) {
+          result_type = v4int32ID;
+        } else {
+          result_type = getSPIRVType(Call->getType());
+        }
+        Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
+
+        Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
+            << CstInt0;
+
+        RID = addSPIRVInst(spv::OpImageFetch, Ops);
+
+        if (is_int_image) {
+          // Generate the bitcast.
+          Ops.clear();
+          Ops << Call->getType() << RID;
+          RID = addSPIRVInst(spv::OpBitcast, Ops);
+        }
       }
       break;
     }
 
-    // read_image (without a sampler) is mapped to OpImageFetch.
-    if (IsUnsampledImageRead(Callee)) {
-      Value *Image = Call->getArgOperand(0);
-      Value *Coordinate = Call->getArgOperand(1);
-
-      //
-      // Generate OpImageFetch
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Image ID
-      // Ops[2] = Coordinate ID
-      // Ops[3] = Lod
-      // Ops[4] = 0
-      //
-      SPIRVOperandVec Ops;
-
-      const bool is_int_image = IsIntImageType(Image->getType());
-      SPIRVID result_type;
-      if (is_int_image) {
-        result_type = v4int32ID;
-      } else {
-        result_type = getSPIRVType(Call->getType());
-      }
-      Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
-
-      Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
-          << CstInt0;
-
-      RID = addSPIRVInst(spv::OpImageFetch, Ops);
-
-      if (is_int_image) {
-        // Generate the bitcast.
-        Ops.clear();
-        Ops << Call->getType() << RID;
-        RID = addSPIRVInst(spv::OpBitcast, Ops);
-      }
-      break;
-    }
-
-    // write_image is mapped to OpImageWrite.
-    if (IsImageWrite(Callee)) {
+    case Builtins::kWriteImagef:
+    case Builtins::kWriteImageh:
+    case Builtins::kWriteImagei:
+    case Builtins::kWriteImageui: {
+      // write_image is mapped to OpImageWrite.
       //
       // Generate OpImageWrite.
       //
@@ -4138,9 +4223,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
-    if (IsImageQuery(Callee)) {
-
+    case Builtins::kGetImageHeight:
+    case Builtins::kGetImageWidth:
+    case Builtins::kGetImageDepth:
+    case Builtins::kGetImageDim: {
+      // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
       addCapability(spv::CapabilityImageQuery);
 
       //
@@ -4181,7 +4268,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       // May require an extra instruction to create the appropriate result of
       // the builtin function.
-      if (IsGetImageDim(Callee)) {
+      if (func_info.getType() == Builtins::kGetImageDim) {
         if (dim == 3) {
           // get_image_dim returns an int4 for 3D images.
           //
@@ -4216,9 +4303,9 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Ops << I.getType() << RID;
 
         uint32_t component = 0;
-        if (IsGetImageHeight(Callee))
+        if (func_info.getType() == Builtins::kGetImageHeight)
           component = 1;
-        else if (IsGetImageDepth(Callee))
+        else if (func_info.getType() == Builtins::kGetImageDepth)
           component = 2;
         Ops << component;
 
@@ -4227,17 +4314,14 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // Call instruction is deferred because it needs function's ID.
-    RID = addSPIRVPlaceholder(&I);
-
-    // Check whether the implementation of this call uses an extended
-    // instruction plus one more value-producing instruction.  If so, then
-    // reserve the id for the extra value-producing slot.
-    glsl::ExtInst EInst = getIndirectExtInstEnum(Callee->getName());
-    if (EInst != kGlslExtInstBad) {
-      // Reserve a spot for the extra value.
+    default: {
+      // Call instruction is deferred because it needs function's ID.
       RID = addSPIRVPlaceholder(&I);
+
+      break;
     }
+    }
+
     break;
   }
   case Instruction::Ret: {
@@ -4397,96 +4481,9 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
     } else if (CallInst *Call = dyn_cast<CallInst>(Inst)) {
       Function *Callee = Call->getCalledFunction();
-      LLVMContext &Context = Callee->getContext();
-      auto IntTy = Type::getInt32Ty(Context);
-      auto callee_code = Builtins::Lookup(Callee);
       auto callee_name = Callee->getName();
-      glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(callee_name);
 
-      if (EInst) {
-        SPIRVID ExtInstImportID = getOpExtInstImportID();
-
-        //
-        // Generate OpExtInst.
-        //
-
-        // Ops[0] = Result Type ID
-        // Ops[1] = Set ID (OpExtInstImport ID)
-        // Ops[2] = Instruction Number (Literal Number)
-        // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
-        SPIRVOperandVec Ops;
-
-        Ops << Call->getType() << ExtInstImportID << EInst;
-
-        FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
-        for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
-          Ops << Call->getOperand(j);
-        }
-
-        SPIRVID RID = replaceSPIRVInst(Placeholder, spv::OpExtInst, Ops);
-
-        const auto IndirectExtInst = getIndirectExtInstEnum(callee_name);
-        if (IndirectExtInst != kGlslExtInstBad) {
-
-          nextDeferred();
-
-          // Generate one more instruction that uses the result of the extended
-          // instruction.  Its result id is one more than the id of the
-          // extended instruction.
-          auto generate_extra_inst = [this, &Context, &Call, &Placeholder,
-                                      &RID](spv::Op opcode,
-                                            Constant *constant) {
-            //
-            // Generate instruction like:
-            //   result = opcode constant <extinst-result>
-            //
-            // Ops[0] = Result Type ID
-            // Ops[1] = Operand 0 ;; the constant, suitably splatted
-            // Ops[2] = Operand 1 ;; the result of the extended instruction
-            SPIRVOperandVec Ops;
-
-            Type *resultTy = Call->getType();
-
-            if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
-              constant = ConstantVector::getSplat(
-                  {static_cast<unsigned>(vectorTy->getNumElements()), false},
-                  constant);
-            }
-            Ops << resultTy << constant << RID;
-
-            replaceSPIRVInst(Placeholder, opcode, Ops);
-          };
-
-          switch (IndirectExtInst) {
-          case glsl::ExtInstFindUMsb: // Implementing clz
-            generate_extra_inst(spv::OpISub, ConstantInt::get(IntTy, 31));
-            break;
-          case glsl::ExtInstAcos:  // Implementing acospi
-          case glsl::ExtInstAsin:  // Implementing asinpi
-          case glsl::ExtInstAtan:  // Implementing atanpi
-          case glsl::ExtInstAtan2: // Implementing atan2pi
-            generate_extra_inst(
-                spv::OpFMul,
-                ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
-            break;
-
-          default:
-            assert(false && "internally inconsistent");
-          }
-        }
-
-      } else if (callee_code == Builtins::kPopcount) {
-        //
-        // Generate OpBitCount
-        //
-        // Ops[0] = Result Type ID
-        // Ops[1] = Base ID
-        SPIRVOperandVec Ops;
-        Ops << Call->getType() << Call->getOperand(0);
-
-        replaceSPIRVInst(Placeholder, spv::OpBitCount, Ops);
-
-      } else if (callee_name.startswith(kCompositeConstructFunctionPrefix)) {
+      if (Builtins::Lookup(Callee) == Builtins::kClspvCompositeConstruct) {
 
         // Generate an OpCompositeConstruct
         SPIRVOperandVec Ops;
@@ -4499,16 +4496,6 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         }
 
         replaceSPIRVInst(Placeholder, spv::OpCompositeConstruct, Ops);
-
-      } else if (callee_name.startswith(clspv::ResourceAccessorFunction())) {
-
-        // We have already mapped the call's result value to an ID.
-        // Don't generate any code now.
-
-      } else if (callee_name.startswith(clspv::WorkgroupAccessorFunction())) {
-
-        // We have already mapped the call's result value to an ID.
-        // Don't generate any code now.
 
       } else {
         if (Call->getType()->isPointerTy()) {
@@ -4559,8 +4546,8 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
               // memory object declarations.
               if (auto *operand_call = dyn_cast<CallInst>(operand)) {
                 // Workgroup accessor represents a variable reference.
-                if (!operand_call->getCalledFunction()->getName().startswith(
-                        clspv::WorkgroupAccessorFunction()))
+                if (Builtins::Lookup(operand_call->getCalledFunction()) !=
+                    Builtins::kClspvLocal)
                   setVariablePointers();
               } else {
                 // Arguments are function parameters.
@@ -4613,12 +4600,12 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
   }
 }
 
-glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
+glsl::ExtInst
+SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
 
-  const auto &fi = Builtins::Lookup(Name);
-  switch (fi) {
+  switch (func_info.getType()) {
   case Builtins::kClamp: {
-    auto param_type = fi.getParameter(0);
+    auto param_type = func_info.getParameter(0);
     if (param_type.type_id == Type::FloatTyID) {
       return glsl::ExtInst::ExtInstFClamp;
     }
@@ -4626,7 +4613,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
                                 : glsl::ExtInst::ExtInstUClamp;
   }
   case Builtins::kMax: {
-    auto param_type = fi.getParameter(0);
+    auto param_type = func_info.getParameter(0);
     if (param_type.type_id == Type::FloatTyID) {
       return glsl::ExtInst::ExtInstFMax;
     }
@@ -4634,7 +4621,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
                                 : glsl::ExtInst::ExtInstUMax;
   }
   case Builtins::kMin: {
-    auto param_type = fi.getParameter(0);
+    auto param_type = func_info.getParameter(0);
     if (param_type.type_id == Type::FloatTyID) {
       return glsl::ExtInst::ExtInstFMin;
     }
@@ -4734,6 +4721,7 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
     return glsl::ExtInst::ExtInstTrunc;
   case Builtins::kFrexp:
     return glsl::ExtInst::ExtInstFrexp;
+  case Builtins::kClspvFract:
   case Builtins::kFract:
     return glsl::ExtInst::ExtInstFract;
   case Builtins::kSign:
@@ -4753,19 +4741,23 @@ glsl::ExtInst SPIRVProducerPass::getExtInstEnum(StringRef Name) {
   case Builtins::kNormalize:
   case Builtins::kFastNormalize:
     return glsl::ExtInst::ExtInstNormalize;
+  case Builtins::kSpirvPack:
+    return glsl::ExtInst::ExtInstPackHalf2x16;
+  case Builtins::kSpirvUnpack:
+    return glsl::ExtInst::ExtInstUnpackHalf2x16;
   default:
     break;
   }
 
-  return StringSwitch<glsl::ExtInst>(Name)
-      .StartsWith("llvm.fmuladd.", glsl::ExtInst::ExtInstFma)
-      .Case("spirv.unpack.v2f16", glsl::ExtInst::ExtInstUnpackHalf2x16)
-      .Case("spirv.pack.v2f16", glsl::ExtInst::ExtInstPackHalf2x16)
-      .Default(kGlslExtInstBad);
+  if (func_info.getName().find("llvm.fmuladd.") == 0) {
+    return glsl::ExtInst::ExtInstFma;
+  }
+  return kGlslExtInstBad;
 }
 
-glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(StringRef Name) {
-  switch (Builtins::Lookup(Name)) {
+glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(
+    const Builtins::FunctionInfo &func_info) {
+  switch (func_info.getType()) {
   case Builtins::kClz:
     return glsl::ExtInst::ExtInstFindUMsb;
   case Builtins::kAcospi:
@@ -4782,12 +4774,12 @@ glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(StringRef Name) {
   return kGlslExtInstBad;
 }
 
-glsl::ExtInst
-SPIRVProducerPass::getDirectOrIndirectExtInstEnum(StringRef Name) {
-  auto direct = getExtInstEnum(Name);
+glsl::ExtInst SPIRVProducerPass::getDirectOrIndirectExtInstEnum(
+    const Builtins::FunctionInfo &func_info) {
+  auto direct = getExtInstEnum(func_info);
   if (direct != kGlslExtInstBad)
     return direct;
-  return getIndirectExtInstEnum(Name);
+  return getIndirectExtInstEnum(func_info);
 }
 
 void SPIRVProducerPass::WriteOneWord(uint32_t Word) {
@@ -5194,18 +5186,16 @@ Value *SPIRVProducerPass::GetBasePointer(Value *v) {
 bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
   if (auto *lhs_call = dyn_cast<CallInst>(lhs)) {
     if (auto *rhs_call = dyn_cast<CallInst>(rhs)) {
-      if (lhs_call->getCalledFunction()->getName().startswith(
-              clspv::ResourceAccessorFunction()) &&
-          rhs_call->getCalledFunction()->getName().startswith(
-              clspv::ResourceAccessorFunction())) {
+      auto lhs_func_info = Builtins::Lookup(lhs_call->getCalledFunction());
+      auto rhs_func_info = Builtins::Lookup(rhs_call->getCalledFunction());
+      if (lhs_func_info.getType() == Builtins::kClspvResource &&
+          rhs_func_info.getType() == Builtins::kClspvResource) {
         // For resource accessors, match descriptor set and binding.
         if (lhs_call->getOperand(0) == rhs_call->getOperand(0) &&
             lhs_call->getOperand(1) == rhs_call->getOperand(1))
           return true;
-      } else if (lhs_call->getCalledFunction()->getName().startswith(
-                     clspv::WorkgroupAccessorFunction()) &&
-                 rhs_call->getCalledFunction()->getName().startswith(
-                     clspv::WorkgroupAccessorFunction())) {
+      } else if (lhs_func_info.getType() == Builtins::kClspvLocal &&
+                 rhs_func_info.getType() == Builtins::kClspvLocal) {
         // For workgroup resources, match spec id.
         if (lhs_call->getOperand(0) == rhs_call->getOperand(0))
           return true;
@@ -5302,8 +5292,8 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
 
     auto *resource_call = dyn_cast<CallInst>(v);
     if (resource_call &&
-        resource_call->getCalledFunction()->getName().startswith(
-            clspv::ResourceAccessorFunction())) {
+        Builtins::Lookup(resource_call->getCalledFunction()).getType() ==
+            Builtins::kClspvResource) {
       // If this is a resource accessor function, check if the coherent operand
       // is set.
       const auto coherent =

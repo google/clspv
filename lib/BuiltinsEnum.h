@@ -21,6 +21,19 @@ namespace Builtins {
 enum BuiltinType {
   kBuiltinNone = 0,
 
+  kType_Clspv_Start,
+  kClspvResource,
+  kClspvLocal,
+  kSpirvOp,
+  kClspvFract,
+  kSpirvAtomicXor,
+  kSpirvPack,
+  kSpirvUnpack,
+  kSpirvCopyMemory,
+  kClspvSamplerVarLiteral,
+  kClspvCompositeConstruct,
+  kType_Clspv_End,
+
   kType_Async_Start,
   kAsyncWorkGroupCopy,
   kAsyncWorkGroupStridedCopy,

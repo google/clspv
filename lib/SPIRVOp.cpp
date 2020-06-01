@@ -19,49 +19,12 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
+#include "Builtins.h"
 #include "Constants.h"
 
 namespace clspv {
 
 using namespace llvm;
-
-// The mangling loosely follows the Itanium convention.
-// Its purpose is solely to ensure uniqueness of names, it is not
-// meant to convey type information.
-static std::string mangleType(Type *Ty) {
-  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
-    auto NumVecElems = std::to_string(VecTy->getNumElements());
-    return "Dv" + NumVecElems + "_" + mangleType(Ty->getScalarType());
-  } else if (Ty->isIntegerTy()) {
-    switch (Ty->getScalarSizeInBits()) {
-    case 1:
-      return "b";
-    case 8:
-      return "h";
-    case 16:
-      return "t";
-    case 32:
-      return "j";
-    case 64:
-      return "m";
-    }
-  } else if (Ty->isFloatingPointTy()) {
-    switch (Ty->getScalarSizeInBits()) {
-    case 16:
-      return "Dh";
-    case 32:
-      return "f";
-    case 64:
-      return "d";
-    }
-  } else if (Ty->isPointerTy()) {
-    auto PtrTy = cast<PointerType>(Ty);
-    auto AS = std::to_string(PtrTy->getAddressSpace());
-    return "P" + AS + mangleType(PtrTy->getElementType());
-  }
-
-  llvm_unreachable("Unhandled type in SPIR-V intrinsic name mangler");
-}
 
 Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
@@ -69,10 +32,11 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
 
   // Prepare mangled name
   std::string MangledName = clspv::SPIRVOpIntrinsicFunction();
+  MangledName += ".";
   MangledName += std::to_string(Opcode);
   MangledName += ".";
   for (auto Arg : Args) {
-    MangledName += mangleType(Arg->getType());
+    MangledName += Builtins::GetMangledTypeName(Arg->getType());
   }
 
   // Create a function in the module
