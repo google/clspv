@@ -750,13 +750,33 @@ int PopulatePassManager(
 }
 
 int ParseOptions(const int argc, const char *const argv[]) {
-  // We need to change how one of the called passes works by spoofing
-  // ParseCommandLineOptions with the specific option.
-  const int llvmArgc = 2;
-  const char *llvmArgv[llvmArgc] = {
-      argv[0],
-      "-simplifycfg-sink-common=false",
-  };
+  // We need to change how some of the called passes works by spoofing
+  // ParseCommandLineOptions with the specific options.
+  bool has_pre = false;
+  bool has_load_pre = false;
+  const std::string pre = "-enable-pre";
+  const std::string load_pre = "-enable-load-pre";
+  for (int i = 1; i < argc; ++i) {
+    std::string option(argv[i]);
+    auto pre_pos = option.find(pre);
+    auto load_pos = option.find(load_pre);
+    if (pre_pos == 0 || (pre_pos == 1 && option[0] == '-')) {
+      has_pre = true;
+    } else if (load_pos == 0 || (load_pos == 1 && option[0] == '-')) {
+      has_load_pre = true;
+    }
+  }
+
+  int llvmArgc = 2;
+  const char *llvmArgv[4];
+  llvmArgv[0] = argv[0];
+  llvmArgv[1] = "-simplifycfg-sink-common=false";
+  if (!has_pre) {
+    llvmArgv[llvmArgc++] = "-enable-pre=0";
+  }
+  if (!has_load_pre) {
+    llvmArgv[llvmArgc++] = "-enable-load-pre=0";
+  }
 
   llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
