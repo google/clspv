@@ -432,7 +432,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getCodeGenOpts().LessPreciseFPMAD =
       cl_mad_enable || cl_unsafe_math_optimizations;
   // cl_no_signed_zeros ignored for now!
-  instance.getCodeGenOpts().UnsafeFPMath =
+  instance.getLangOpts().UnsafeFPMath =
       cl_unsafe_math_optimizations || cl_fast_relaxed_math;
   instance.getLangOpts().FiniteMathOnly =
       cl_finite_math_only || cl_fast_relaxed_math;
