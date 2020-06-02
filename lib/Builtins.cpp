@@ -272,7 +272,6 @@ Builtins::Lookup(const std::string &mangled_name) {
   return (*fi.first).second;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Generate a mangled name loosely based on Itanium mangling
 std::string Builtins::GetMangledFunctionName(const char *name, Type *type) {
