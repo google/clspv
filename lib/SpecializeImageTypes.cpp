@@ -144,7 +144,6 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
     auto func_info = Builtins::Lookup(called);
-    // TODO(sjw): should this handle half types also?
     switch (func_info.getType()) {
     case Builtins::kReadImagef:
     case Builtins::kReadImagei:

@@ -310,20 +310,11 @@ std::string Builtins::GetMangledTypeName(Type *Ty) {
   case Type::VoidTyID:
     return "v";
   case Type::HalfTyID:
+    return "Dh";
   case Type::FloatTyID:
+    return "f";
   case Type::DoubleTyID:
-    switch (Ty->getScalarSizeInBits()) {
-    case 16:
-      return "Dh";
-    case 32:
-      return "f";
-    case 64:
-      return "d";
-    default:
-      assert(0);
-      break;
-    }
-    break;
+    return "d";
 
   case Type::IntegerTyID:
     switch (Ty->getIntegerBitWidth()) {
