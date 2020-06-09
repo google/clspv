@@ -20,31 +20,37 @@
 namespace clspv {
 
 // Name for module level metadata storing workgroup argument spec ids.
-inline std::string LocalSpecIdMetadataName() { return "clspv.local_spec_ids"; }
+const std::string &LocalSpecIdMetadataName();
 
 // Base name for workgroup variable accessor function.
-inline std::string WorkgroupAccessorFunction() { return "clspv.local.var."; }
+const std::string &WorkgroupAccessorFunction();
 
 // Base name for resource variable accessor function.
-inline std::string ResourceAccessorFunction() { return "clspv.resource.var."; }
+const std::string &ResourceAccessorFunction();
 
 // Name for module level metadata storing UBO remapped type offsets.
-inline std::string RemappedTypeOffsetMetadataName() {
-  return "clspv.remapped.offsets";
-}
+const std::string &RemappedTypeOffsetMetadataName();
 
 // Name for module level metadata storing UBO remapped type sizes.
-inline std::string RemappedTypeSizesMetadataName() {
-  return "clspv.remapped.type.sizes";
-}
+const std::string &RemappedTypeSizesMetadataName();
 
 // Name of the function used to encode literal samplers
-inline std::string LiteralSamplerFunction() {
-  return "clspv.sampler.var.literal";
-}
+const std::string &LiteralSamplerFunction();
+
+// Name of the function used for composite construct
+const std::string &CompositeConstructFunction();
+
+// Name of the clspv builtin used for register packing (specifically v2f16)
+const std::string &PackFunction();
+
+// Name of the clspv builtin used for register unpacking (specifically v2f16)
+const std::string &UnpackFunction();
+
+// Name of the clspv builtin for copy_memory
+const std::string &CopyMemoryFunction();
 
 // Base name for SPIR-V intrinsic functions
-inline std::string SPIRVOpIntrinsicFunction() { return "spirv.op."; }
+const std::string &SPIRVOpIntrinsicFunction();
 
 // Name of the literal sampler initializer function.
 inline std::string TranslateSamplerInitializerFunction() {

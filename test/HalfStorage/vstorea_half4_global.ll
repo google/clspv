@@ -11,8 +11,8 @@ entry:
   %add.ptr = getelementptr inbounds half, half addrspace(1)* %cast, i32 4
   ; CHECK: [[shuffle0:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 0, i32 1>
   ; CHECK: [[shuffle1:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 2, i32 3>
-  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle0]])
-  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle1]])
+  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle0]])
+  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle1]])
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> undef, i32 [[pack0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> [[in0]], i32 [[pack1]], i32 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast half addrspace(1)* %add.ptr to <2 x i32> addrspace(1)*
@@ -24,8 +24,8 @@ entry:
   %add.ptr1 = getelementptr inbounds half, half addrspace(1)* %cast, i32 8
   ; CHECK: [[shuffle0:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 0, i32 1>
   ; CHECK: [[shuffle1:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 2, i32 3>
-  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle0]])
-  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle1]])
+  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle0]])
+  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle1]])
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> undef, i32 [[pack0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> [[in0]], i32 [[pack1]], i32 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast half addrspace(1)* %add.ptr1 to <2 x i32> addrspace(1)*
@@ -37,8 +37,8 @@ entry:
   %add.ptr2 = getelementptr inbounds half, half addrspace(1)* %cast, i32 12
   ; CHECK: [[shuffle0:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 0, i32 1>
   ; CHECK: [[shuffle1:%[a-zA-Z0-9_.]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 2, i32 3>
-  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle0]])
-  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @spirv.pack.v2f16(<2 x float> [[shuffle1]])
+  ; CHECK: [[pack0:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle0]])
+  ; CHECK: [[pack1:%[a-zA-Z0-9_.]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[shuffle1]])
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> undef, i32 [[pack0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> [[in0]], i32 [[pack1]], i32 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast half addrspace(1)* %add.ptr2 to <2 x i32> addrspace(1)*

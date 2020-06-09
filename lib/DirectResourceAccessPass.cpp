@@ -34,6 +34,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
 #include "Passes.h"
@@ -190,21 +191,19 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       if (auto *call = dyn_cast<CallInst>(value)) {
         // If the call is a call to a @clspv.resource.var.* function, then try
         // to merge it, assuming the given number of GEP zero-indices so far.
-        if (call->getCalledFunction()->getName().startswith(
-                clspv::ResourceAccessorFunction())) {
+        auto *callee = call->getCalledFunction();
+        auto &func_info = clspv::Builtins::Lookup(callee);
+        if (func_info.getType() == clspv::Builtins::kClspvResource) {
           const auto set = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
           const auto binding = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          if (!merge_param_info({call->getCalledFunction(), set, binding,
-                                 num_gep_zeroes, call}))
+          if (!merge_param_info({callee, set, binding, num_gep_zeroes, call}))
             return false;
-        } else if (call->getCalledFunction()->getName().startswith(
-                       clspv::WorkgroupAccessorFunction())) {
+        } else if (func_info.getType() == clspv::Builtins::kClspvLocal) {
           const uint32_t spec_id = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          if (!merge_param_info({call->getCalledFunction(), spec_id, 0,
-                                 num_gep_zeroes, call}))
+          if (!merge_param_info({callee, spec_id, 0, num_gep_zeroes, call}))
             return false;
         } else {
           // A call but not to a resource access builtin function.

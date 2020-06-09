@@ -1133,13 +1133,20 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
          Builtins::kGetKernelMaxSubGroupSizeForNdrange},
 
         // Internal
-        {"clspv.fract.f", Builtins::kFract},
-        {"clspv.fract.v2f", Builtins::kFract},
-        {"clspv.fract.v3f", Builtins::kFract},
-        {"clspv.fract.v4f", Builtins::kFract},
+        {"clspv.fract", Builtins::kClspvFract},
+        {"spirv.atomic_xor", Builtins::kSpirvAtomicXor},
+        {"spirv.pack.v2f16", Builtins::kSpirvPack},
+        {"spirv.unpack.v2f16", Builtins::kSpirvUnpack},
 
         {"__clspv_vloada_half2", Builtins::kVloadaHalf},
         {"__clspv_vloada_half4", Builtins::kVloadaHalf},
+
+        {"clspv.resource", Builtins::kClspvResource},
+        {"clspv.local", Builtins::kClspvLocal},
+        {"spirv.op", Builtins::kSpirvOp},
+        {"spirv.copy_memory", Builtins::kSpirvCopyMemory},
+        {"clspv.sampler_var_literal", Builtins::kClspvSamplerVarLiteral},
+        {"clspv.composite_construct", Builtins::kClspvCompositeConstruct},
 
 };
 

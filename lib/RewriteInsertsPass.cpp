@@ -29,6 +29,7 @@
 
 #include "clspv/Option.h"
 
+#include "Constants.h"
 #include "Passes.h"
 
 using namespace llvm;
@@ -37,8 +38,6 @@ using std::string;
 #define DEBUG_TYPE "rewriteinserts"
 
 namespace {
-
-const char *kCompositeConstructFunctionPrefix = "clspv.composite_construct.";
 
 class RewriteInsertsPass : public ModulePass {
 public:
@@ -212,7 +211,7 @@ private:
     if (where == function_for_type_.end()) {
       // Insert it.
       auto &result = function_for_type_[type] =
-          string(kCompositeConstructFunctionPrefix) +
+          clspv::CompositeConstructFunction() + "." +
           std::to_string(function_for_type_.size());
       return result;
     } else {

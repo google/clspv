@@ -13,8 +13,8 @@ entry:
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load <2 x i32>, <2 x i32> addrspace(3)* [[gep]]
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[ld]], i32 0
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[ld]], i32 1
-  ; CHECK: [[unpack0:%[a-zA-Z0-9_.]+]] = call <2 x float> @spirv.unpack.v2f16(i32 [[ex0]])
-  ; CHECK: [[unpack1:%[a-zA-Z0-9_.]+]] = call <2 x float> @spirv.unpack.v2f16(i32 [[ex1]])
+  ; CHECK: [[unpack0:%[a-zA-Z0-9_.]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[ex0]])
+  ; CHECK: [[unpack1:%[a-zA-Z0-9_.]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[ex1]])
   ; CHECK: shufflevector <2 x float> [[unpack0]], <2 x float> [[unpack1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
   %call1 = call spir_func <4 x float> @_Z20__clspv_vloada_half4jPU3AS3KDv2_j(i32 %n, <2 x i32> addrspace(3)* %cast)
   
@@ -22,8 +22,8 @@ entry:
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load <2 x i32>, <2 x i32> addrspace(3)* [[gep]]
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[ld]], i32 0
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[ld]], i32 1
-  ; CHECK: [[unpack0:%[a-zA-Z0-9_.]+]] = call <2 x float> @spirv.unpack.v2f16(i32 [[ex0]])
-  ; CHECK: [[unpack1:%[a-zA-Z0-9_.]+]] = call <2 x float> @spirv.unpack.v2f16(i32 [[ex1]])
+  ; CHECK: [[unpack0:%[a-zA-Z0-9_.]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[ex0]])
+  ; CHECK: [[unpack1:%[a-zA-Z0-9_.]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[ex1]])
   ; CHECK: shufflevector <2 x float> [[unpack0]], <2 x float> [[unpack1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
   %call2 = call spir_func <4 x float> @_Z20__clspv_vloada_half4jPU3AS3KDv2_j(i32 0, <2 x i32> addrspace(3)* %cast)
   ret void

@@ -22,6 +22,10 @@
 
 #include "BuiltinsEnum.h"
 
+#define BUILTIN_IN_GROUP(BUILTIN, GROUP)                                       \
+  (BUILTIN > Builtins::kType_##GROUP##_Start &&                                \
+   BUILTIN < Builtins::kType_##GROUP##_End)
+
 namespace clspv {
 
 namespace Builtins {
@@ -71,114 +75,13 @@ inline const FunctionInfo &Lookup(llvm::Function *func) {
   return Lookup(func->getName());
 }
 
-/// Legacy
-// Returns true if the function is an OpenCL image builtin.
-bool IsImageBuiltin(llvm::StringRef name);
-inline bool IsImageBuiltin(llvm::Function *f) {
-  return IsImageBuiltin(f->getName());
-}
+// Generate a mangled name loosely based on Itanium mangled naming but
+// reversible by GetFromMangledName
+std::string GetMangledFunctionName(const char *name, llvm::Type *type);
 
-// Returns true if the function is an OpenCL sampled image read.
-bool IsSampledImageRead(llvm::StringRef name);
-inline bool IsSampledImageRead(llvm::Function *f) {
-  return IsSampledImageRead(f->getName());
-}
+std::string GetMangledFunctionName(const char *name);
 
-// Returns true if the function is an OpenCL sampled image read of float type.
-bool IsFloatSampledImageRead(llvm::StringRef name);
-inline bool IsFloatSampledImageRead(llvm::Function *f) {
-  return IsFloatSampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL sampled image read of uint type.
-bool IsUintSampledImageRead(llvm::StringRef name);
-inline bool IsUintSampledImageRead(llvm::Function *f) {
-  return IsUintSampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL sampled image read of int type.
-bool IsIntSampledImageRead(llvm::StringRef name);
-inline bool IsIntSampledImageRead(llvm::Function *f) {
-  return IsIntSampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL image read.
-bool IsUnsampledImageRead(llvm::StringRef name);
-inline bool IsUnsampledImageRead(llvm::Function *f) {
-  return IsUnsampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL image read of float type.
-bool IsFloatUnsampledImageRead(llvm::StringRef name);
-inline bool IsFloatUnsampledImageRead(llvm::Function *f) {
-  return IsFloatUnsampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL image read of uint type.
-bool IsUintUnsampledImageRead(llvm::StringRef name);
-inline bool IsUintUnsampledImageRead(llvm::Function *f) {
-  return IsUintUnsampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL image read of int type.
-bool IsIntUnsampledImageRead(llvm::StringRef name);
-inline bool IsIntUnsampledImageRead(llvm::Function *f) {
-  return IsIntUnsampledImageRead(f->getName());
-}
-
-// Returns true if the function is an OpenCL image write.
-bool IsImageWrite(llvm::StringRef name);
-inline bool IsImageWrite(llvm::Function *f) {
-  return IsImageWrite(f->getName());
-}
-
-// Returns true if the function is an OpenCL image write of float type.
-bool IsFloatImageWrite(llvm::StringRef name);
-inline bool IsFloatImageWrite(llvm::Function *f) {
-  return IsFloatImageWrite(f->getName());
-}
-
-// Returns true if the function is an OpenCL image write of uint type.
-bool IsUintImageWrite(llvm::StringRef name);
-inline bool IsUintImageWrite(llvm::Function *f) {
-  return IsUintImageWrite(f->getName());
-}
-
-// Returns true if the function is an OpenCL image write of int type.
-bool IsIntImageWrite(llvm::StringRef name);
-inline bool IsIntImageWrite(llvm::Function *f) {
-  return IsIntImageWrite(f->getName());
-}
-
-// Returns true if the function is an OpenCL image height query.
-bool IsGetImageHeight(llvm::StringRef name);
-inline bool IsGetImageHeight(llvm::Function *f) {
-  return IsGetImageHeight(f->getName());
-}
-
-// Returns true if the function is an OpenCL image width query.
-bool IsGetImageWidth(llvm::StringRef name);
-inline bool IsGetImageWidth(llvm::Function *f) {
-  return IsGetImageWidth(f->getName());
-}
-
-// Returns true if the function is an OpenCL image depth query.
-bool IsGetImageDepth(llvm::StringRef name);
-inline bool IsGetImageDepth(llvm::Function *f) {
-  return IsGetImageDepth(f->getName());
-}
-
-// Returns true if the function is an OpenCL image dim query.
-bool IsGetImageDim(llvm::StringRef name);
-inline bool IsGetImageDim(llvm::Function *f) {
-  return IsGetImageDim(f->getName());
-}
-
-// Returns true if the function is an OpenCL image query.
-bool IsImageQuery(llvm::StringRef name);
-inline bool IsImageQuery(llvm::Function *f) {
-  return IsImageQuery(f->getName());
-}
+std::string GetMangledTypeName(llvm::Type *T);
 
 } // namespace Builtins
 

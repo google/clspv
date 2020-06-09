@@ -33,6 +33,7 @@
 #include "clspv/Passes.h"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
 
@@ -152,8 +153,8 @@ bool MultiVersionUBOFunctionsPass::AnalyzeCall(
         continue;
 
       if (CallInst *call = dyn_cast<CallInst>(value)) {
-        if (call->getCalledFunction()->getName().startswith(
-                clspv::ResourceAccessorFunction())) {
+        auto &func_info = clspv::Builtins::Lookup(call->getCalledFunction());
+        if (func_info.getType() == clspv::Builtins::kClspvResource) {
           info.base = call;
         } else {
           // Unknown function call returning a constant pointer requires

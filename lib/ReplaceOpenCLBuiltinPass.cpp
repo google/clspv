@@ -119,10 +119,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceDivide(Function &F);
   bool replaceDot(Function &F);
   bool replaceFmod(Function &F);
-  bool replaceExp10(Function &F, const std::string &basename, int vec_size,
-                    int byte_len);
-  bool replaceLog10(Function &F, const std::string &basename, int vec_size,
-                    int byte_len);
+  bool replaceExp10(Function &F, const std::string &basename);
+  bool replaceLog10(Function &F, const std::string &basename);
   bool replaceBarrier(Function &F);
   bool replaceMemFence(Function &F, uint32_t semantics);
   bool replacePrefetch(Function &F);
@@ -136,7 +134,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceMulHi(Function &F, bool is_signed, bool is_mad = false);
   bool replaceSelect(Function &F);
   bool replaceBitSelect(Function &F);
-  bool replaceStep(Function &F, bool is_smooth, int vec_size);
+  bool replaceStep(Function &F, bool is_smooth);
   bool replaceSignbit(Function &F, bool is_vec);
   bool replaceMul(Function &F, bool is_float, bool is_mad);
   bool replaceVloadHalf(Function &F, const std::string &name, int vec_size);
@@ -219,17 +217,13 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kExp10:
   case Builtins::kHalfExp10:
-  case Builtins::kNativeExp10: {
-    auto &P0 = FI.getParameter(0);
-    return replaceExp10(F, FI.getName(), P0.vector_size, P0.byte_len);
-  }
+  case Builtins::kNativeExp10:
+    return replaceExp10(F, FI.getName());
 
   case Builtins::kLog10:
   case Builtins::kHalfLog10:
-  case Builtins::kNativeLog10: {
-    auto &P0 = FI.getParameter(0);
-    return replaceLog10(F, FI.getName(), P0.vector_size, P0.byte_len);
-  }
+  case Builtins::kNativeLog10:
+    return replaceLog10(F, FI.getName());
 
   case Builtins::kFmod:
     return replaceFmod(F);
@@ -371,14 +365,14 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kSmoothstep: {
     int vec_size = FI.getLastParameter().vector_size;
     if (FI.getParameter(0).vector_size == 0 && vec_size != 0) {
-      return replaceStep(F, true, vec_size);
+      return replaceStep(F, true);
     }
     break;
   }
   case Builtins::kStep: {
     int vec_size = FI.getLastParameter().vector_size;
     if (FI.getParameter(0).vector_size == 0 && vec_size != 0) {
-      return replaceStep(F, false, vec_size);
+      return replaceStep(F, false);
     }
     break;
   }
@@ -509,25 +503,12 @@ bool ReplaceOpenCLBuiltinPass::replaceDot(Function &F) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceExp10(Function &F,
-                                            const std::string &basename,
-                                            int vec_size, int byte_len) {
+                                            const std::string &basename) {
   // convert to natural
   auto slen = basename.length() - 2;
-  std::string NewFName = "_Z" + std::to_string(slen) + basename.substr(0, slen);
-  if (vec_size) {
-    NewFName += "Dv" + std::to_string(vec_size) + "_";
-  }
-  switch (byte_len) {
-  case 4:
-    NewFName += "f";
-    break;
-  case 8:
-    NewFName += "d";
-    break;
-  default:
-    llvm_unreachable("Unsupported exp10 byte length");
-    break;
-  }
+  std::string NewFName = basename.substr(0, slen);
+  NewFName =
+      Builtins::GetMangledFunctionName(NewFName.c_str(), F.getFunctionType());
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -559,25 +540,12 @@ bool ReplaceOpenCLBuiltinPass::replaceFmod(Function &F) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
-                                            const std::string &basename,
-                                            int vec_size, int byte_len) {
+                                            const std::string &basename) {
   // convert to natural
   auto slen = basename.length() - 2;
-  std::string NewFName = "_Z" + std::to_string(slen) + basename.substr(0, slen);
-  if (vec_size) {
-    NewFName += "Dv" + std::to_string(vec_size) + "_";
-  }
-  switch (byte_len) {
-  case 4:
-    NewFName += "f";
-    break;
-  case 8:
-    NewFName += "d";
-    break;
-  default:
-    llvm_unreachable("Unsupported log10 byte length");
-    break;
-  }
+  std::string NewFName = basename.substr(0, slen);
+  NewFName =
+      Builtins::GetMangledFunctionName(NewFName.c_str(), F.getFunctionType());
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -1263,22 +1231,12 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth,
-                                           int vec_size) {
+bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
   // convert to vector versions
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     SmallVector<Value *, 2> ArgsToSplat = {CI->getOperand(0)};
     Value *VectorArg = nullptr;
-
-    std::string NewFName = "_Z";
-    if (is_smooth) {
-      NewFName += std::to_string(10) + "smoothstepDv" +
-                  std::to_string(vec_size) + "_fS_S_";
-    } else {
-      NewFName +=
-          std::to_string(4) + "stepDv" + std::to_string(vec_size) + "_fS_";
-    }
 
     // First figure out which function we're dealing with
     if (is_smooth) {
@@ -1305,6 +1263,9 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth,
     // Replace the call with the vector/vector flavour
     SmallVector<Type *, 3> NewArgTypes(ArgsToSplat.size() + 1, VecType);
     const auto NewFType = FunctionType::get(CI->getType(), NewArgTypes, false);
+
+    std::string NewFName = Builtins::GetMangledFunctionName(
+        is_smooth ? "smoothstep" : "step", NewFType);
 
     const auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
@@ -1465,7 +1426,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1583,7 +1544,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto Load = new LoadInst(IntTy, Index, "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1624,7 +1585,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
         ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1664,7 +1625,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
     auto Load = new LoadInst(IntTy, IndexedPtr, "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1703,7 +1664,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
         ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
 
     // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = "spirv.unpack.v2f16";
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1756,7 +1717,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     auto One = ConstantInt::get(IntTy, 1);
 
     // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto SPIRVIntrinsic = clspv::PackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1910,7 +1871,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto SPIRVIntrinsic = clspv::PackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -1962,7 +1923,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
                                     ConstantVector::get(HiShuffleMask), "", CI);
 
     // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = "spirv.pack.v2f16";
+    auto SPIRVIntrinsic = clspv::PackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
@@ -2004,8 +1965,8 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
                         cast<VectorType>(CI->getType())->getNumElements()),
         types, false);
 
-    std::string NewFName = "_Z11read_imagef";
-    NewFName += F.getName().str().substr(15);
+    std::string NewFName =
+        Builtins::GetMangledFunctionName("read_imagef", NewFType);
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
@@ -2039,9 +2000,8 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     auto NewFType =
         FunctionType::get(Type::getVoidTy(M.getContext()), types, false);
 
-    int slen = F.getName().size();
-    std::string NewFName = "_Z12write_imagef";
-    NewFName += F.getName().str().substr(16, slen - 16 - 2) + "f";
+    std::string NewFName =
+        Builtins::GetMangledFunctionName("write_imagef", NewFType);
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
@@ -2169,8 +2129,9 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
     auto Vec3Ty = Arg0->getType();
 
     auto NewFType = FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
+    auto NewFName = Builtins::GetMangledFunctionName("cross", NewFType);
 
-    auto Cross3Func = M.getOrInsertFunction("_Z5crossDv3_fS_", NewFType);
+    auto Cross3Func = M.getOrInsertFunction(NewFName, NewFType);
 
     auto DownResult = CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI);
 
@@ -2209,23 +2170,12 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
-    std::string floor_name = "_Z5floor";
-    std::string fmin_name = "_Z4fmin";
-    std::string clspv_fract_name = "clspv.fract.";
-    if (vec_size) {
-      floor_name += "Dv" + std::to_string(vec_size) + "_f";
-      fmin_name += "Dv" + std::to_string(vec_size) + "_f";
-      clspv_fract_name += "v" + std::to_string(vec_size) + "f";
-    } else {
-      floor_name += "ff";
-      fmin_name += "ff";
-      clspv_fract_name += "f";
-    }
 
     // This is either float or a float vector.  All the float-like
     // types are this type.
     auto result_ty = F.getReturnType();
 
+    std::string fmin_name = Builtins::GetMangledFunctionName("fmin", result_ty);
     Function *fmin_fn = M.getFunction(fmin_name);
     if (!fmin_fn) {
       // Make the fmin function.
@@ -2237,6 +2187,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
       fmin_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
+    std::string floor_name =
+        Builtins::GetMangledFunctionName("floor", result_ty);
     Function *floor_fn = M.getFunction(floor_name);
     if (!floor_fn) {
       // Make the floor function.
@@ -2247,6 +2199,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
       floor_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
+    std::string clspv_fract_name =
+        Builtins::GetMangledFunctionName("clspv.fract", result_ty);
     Function *clspv_fract_fn = M.getFunction(clspv_fract_name);
     if (!clspv_fract_fn) {
       // Make the clspv_fract function.

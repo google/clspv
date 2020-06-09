@@ -143,8 +143,14 @@ Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
 Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto called = call->getCalledFunction();
-    if (IsSampledImageRead(called) || IsUnsampledImageRead(called) ||
-        IsImageWrite(called)) {
+    auto func_info = Builtins::Lookup(called);
+    switch (func_info.getType()) {
+    case Builtins::kReadImagef:
+    case Builtins::kReadImagei:
+    case Builtins::kReadImageui:
+    case Builtins::kWriteImagef:
+    case Builtins::kWriteImagei:
+    case Builtins::kWriteImageui: {
       // Specialize the image type based on it's usage in the builtin.
       Value *image = call->getOperand(0);
       Type *imageTy = image->getType();
@@ -155,23 +161,29 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
       std::string name =
           cast<StructType>(imageTy->getPointerElementType())->getName().str();
-      if (IsFloatSampledImageRead(called) ||
-          IsFloatUnsampledImageRead(called) || IsFloatImageWrite(called)) {
+      switch (func_info.getType()) {
+      case Builtins::kReadImagef:
+      case Builtins::kWriteImagef:
         name += ".float";
-      } else if (IsUintSampledImageRead(called) ||
-                 IsUintUnsampledImageRead(called) || IsUintImageWrite(called)) {
-        name += ".uint";
-      } else if (IsIntSampledImageRead(called) ||
-                 IsIntUnsampledImageRead(called) || IsIntImageWrite(called)) {
+        break;
+      case Builtins::kReadImagei:
+      case Builtins::kWriteImagei:
         name += ".int";
-      } else {
-        assert(false && "Unhandled image builtin");
+        break;
+      case Builtins::kReadImageui:
+      case Builtins::kWriteImageui:
+        name += ".uint";
+        break;
       }
 
       // Both sampled and unsampled reads generate an OpTypeImage with Sampled
       // operand of 1.
-      if (IsSampledImageRead(called) || IsUnsampledImageRead(called)) {
+      switch (func_info.getType()) {
+      case Builtins::kReadImagef:
+      case Builtins::kReadImagei:
+      case Builtins::kReadImageui:
         name += ".sampled";
+        break;
       }
 
       StructType *new_struct =
@@ -182,12 +194,16 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       PointerType *new_pointer =
           PointerType::get(new_struct, imageTy->getPointerAddressSpace());
       return new_pointer;
-    } else if (!called->isDeclaration()) {
-      for (auto &U : called->getArg(operand_no)->uses()) {
-        if (auto new_type = RemapUse(U.getUser(), U.getOperandNo())) {
-          return new_type;
+    }
+    default:
+      if (!called->isDeclaration()) {
+        for (auto &U : called->getArg(operand_no)->uses()) {
+          if (auto new_type = RemapUse(U.getUser(), U.getOperandNo())) {
+            return new_type;
+          }
         }
       }
+      break;
     }
   } else if (IsImageType(value->getType())) {
     for (auto &U : value->uses()) {
@@ -224,7 +240,8 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
     for (auto &u : value->uses()) {
       if (auto call = dyn_cast<CallInst>(u.getUser())) {
         auto called = call->getCalledFunction();
-        if (IsImageBuiltin(called)) {
+        auto &func_info = Builtins::Lookup(called);
+        if (BUILTIN_IN_GROUP(func_info.getType(), Image)) {
           auto new_func = ReplaceImageBuiltin(called, new_type);
           call->setCalledFunction(new_func);
           if (called->getNumUses() == 0)

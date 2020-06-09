@@ -11,7 +11,7 @@ entry:
   ;CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast half addrspace(1)* %cast to i32 addrspace(1)*
   ;CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i32, i32 addrspace(1)* [[cast]], i32 0
   ;CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(1)* [[gep]]
-  ;CHECK: [[unpack:%[a-zA-Z0-9_.]+]] = call <2 x float> @spirv.unpack.v2f16(i32 [[ld]])
+  ;CHECK: [[unpack:%[a-zA-Z0-9_.]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[ld]])
   %call = call spir_func <2 x float> @_Z11vload_half2jPU3AS1KDh(i32 0, half addrspace(1)* %cast) #2
   ret void
 }

@@ -23,6 +23,7 @@
 
 #include "spirv/unified1/spirv.hpp"
 
+#include "Constants.h"
 #include "Passes.h"
 
 using namespace llvm;
@@ -269,7 +270,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
         match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
                     &NumSrcUnpackings);
-        auto SPIRVIntrinsic = "spirv.copy_memory";
+        auto SPIRVIntrinsic = clspv::CopyMemoryFunction();
 
         auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
 
