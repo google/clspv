@@ -174,6 +174,8 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       case Builtins::kWriteImageui:
         name += ".uint";
         break;
+      default:
+        break;
       }
 
       // Both sampled and unsampled reads generate an OpTypeImage with Sampled
@@ -183,6 +185,8 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       case Builtins::kReadImagei:
       case Builtins::kReadImageui:
         name += ".sampled";
+        break;
+      default:
         break;
       }
 
