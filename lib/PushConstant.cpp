@@ -59,17 +59,17 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
   case PushConstant::Dimensions:
     return IntegerType::get(C, 32);
   case PushConstant::GlobalOffset:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::EnqueuedLocalSize:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::GlobalSize:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::RegionOffset:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::NumWorkgroups:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::RegionGroupOffset:
-    return VectorType::get(IntegerType::get(C, 32), 3);
+    return FixedVectorType::get(IntegerType::get(C, 32), 3);
   default:
     break;
   }

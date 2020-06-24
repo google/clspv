@@ -432,9 +432,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             if (DstTy->isVectorTy()) {
               if (SrcEleTyBitWidth == DstEleTyBitWidth) {
                 TmpValTy =
-                    VectorType::get(SrcEleTy, DstVecTy->getNumElements());
+                    FixedVectorType::get(SrcEleTy, DstVecTy->getNumElements());
               } else {
-                TmpValTy = VectorType::get(SrcEleTy, NumElement);
+                TmpValTy = FixedVectorType::get(SrcEleTy, NumElement);
               }
             }
 
@@ -474,7 +474,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                   }
 
                   VectorType *TmpVecTy =
-                      VectorType::get(SrcEleTy, DstNumElement);
+                      FixedVectorType::get(SrcEleTy, DstNumElement);
                   Value *UndefVal = UndefValue::get(TmpVecTy);
                   Value *TmpVal =
                       Builder.CreateShuffleVector(TmpSTVal, UndefVal, Idxs);
@@ -532,8 +532,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Value *STVal = ST->getValueOperand();
 
             if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
-              VectorType *TmpVecTy =
-                  VectorType::get(SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
+              VectorType *TmpVecTy = FixedVectorType::get(
+                  SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
               STVal = Builder.CreateBitCast(STVal, TmpVecTy);
             }
 
@@ -679,8 +679,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 // ==> if types are same between src and dst, it will be
                 // igonored
                 //
-                VectorType *TmpVecTy =
-                    VectorType::get(SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
+                VectorType *TmpVecTy = FixedVectorType::get(
+                    SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
                 DstVal = UndefValue::get(TmpVecTy);
                 Value *EleIdx = Builder.CreateAnd(
                     OrgGEPIdx, Builder.getInt32(NumElement - 1));
@@ -758,7 +758,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                     LDValues[0], TmpOrgGEPIdx, "tmp_val");
                 TmpVal = Builder.CreateBitCast(
                     TmpVal,
-                    VectorType::get(
+                    FixedVectorType::get(
                         IntegerType::get(DstTy->getContext(), DstTyBitWidth),
                         SubNumElement));
                 TmpOrgGEPIdx = Builder.CreateAnd(
@@ -808,7 +808,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 for (unsigned VIdx = 0; VIdx < NumVector; VIdx++) {
                   // In this case, generate only insert element. It generates
                   // less instructions than using shuffle vector.
-                  VectorType *TmpVecTy = VectorType::get(SrcTy, NumVecElement);
+                  VectorType *TmpVecTy =
+                      FixedVectorType::get(SrcTy, NumVecElement);
                   Value *TmpVal = UndefValue::get(TmpVecTy);
                   for (unsigned i = 0; i < NumVecElement; i++) {
                     TmpVal = Builder.CreateInsertElement(
@@ -825,7 +826,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 if (Values.size() > 1) {
                   Type *TmpEleTy =
                       Type::getIntNTy(M.getContext(), SrcEleTyBitWidth * 2);
-                  VectorType *TmpVecTy = VectorType::get(TmpEleTy, NumVector);
+                  VectorType *TmpVecTy =
+                      FixedVectorType::get(TmpEleTy, NumVector);
                   for (unsigned i = 0; i < Values.size(); i++) {
                     Values[i] = Builder.CreateBitCast(Values[i], TmpVecTy);
                   }
@@ -844,7 +846,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               } else {
                 SmallVector<Value *, 4> TmpLDValues;
                 for (unsigned i = 0; i < LDValues.size(); i = i + 2) {
-                  VectorType *TmpVecTy = VectorType::get(SrcTy, 2);
+                  VectorType *TmpVecTy = FixedVectorType::get(SrcTy, 2);
                   Value *TmpVal = UndefValue::get(TmpVecTy);
                   TmpVal = Builder.CreateInsertElement(TmpVal, LDValues[i],
                                                        Builder.getInt32(0));
