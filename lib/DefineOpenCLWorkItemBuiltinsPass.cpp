@@ -133,7 +133,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
   }
 
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  VectorType *VT = VectorType::get(IT, 3);
+  VectorType *VT = FixedVectorType::get(IT, 3);
 
   GlobalVariable *GV = createGlobalVariable(M, GlobalVarName, VT, AddrSpace);
 
@@ -175,7 +175,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
   IRBuilder<> Builder(BB);
 
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  VectorType *VT = VectorType::get(IT, 3);
+  VectorType *VT = FixedVectorType::get(IT, 3);
 
   GlobalVariable *GV = createGlobalVariable(M, "__spirv_GlobalInvocationId", VT,
                                             AddressSpace::Input);
@@ -235,7 +235,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
     GlobalSize = Builder.CreateLoad(DimPtr);
   } else {
     IntegerType *IT = IntegerType::get(M.getContext(), 32);
-    VectorType *VT = VectorType::get(IT, 3);
+    VectorType *VT = FixedVectorType::get(IT, 3);
 
     // Global size uses two builtin variables that might already have been
     // created.
@@ -296,7 +296,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
         GetPushConstantPointer(BB, clspv::PushConstant::NumWorkgroups);
   } else {
     IntegerType *IT = IntegerType::get(M.getContext(), 32);
-    VectorType *VT = VectorType::get(IT, 3);
+    VectorType *VT = FixedVectorType::get(IT, 3);
     NumGroupsVarPtr = createGlobalVariable(M, "__spirv_NumWorkgroups", VT,
                                            AddressSpace::Input);
   }
@@ -326,7 +326,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
 
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  VectorType *VT = VectorType::get(IT, 3);
+  VectorType *VT = FixedVectorType::get(IT, 3);
   auto RegionGroupIDVarPtr =
       createGlobalVariable(M, "__spirv_WorkgroupId", VT, AddressSpace::Input);
 
@@ -392,7 +392,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
           GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
       gep = Builder.CreateInBoundsGEP(GoffPtr, Indices);
     } else {
-      auto VecTy = VectorType::get(Int32Ty, 3);
+      auto VecTy = FixedVectorType::get(Int32Ty, 3);
       StringRef name = "__spirv_GlobalOffset";
       auto offset_var = createGlobalVariable(M, name, VecTy,
                                              AddressSpace::ModuleScopePrivate);
@@ -475,7 +475,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::addWorkgroupSizeIfRequired(Module &M) {
       if (nullptr == F.getMetadata("reqd_work_group_size") ||
           clspv::Option::NonUniformNDRangeSupported()) {
         IntegerType *IT = IntegerType::get(M.getContext(), 32);
-        VectorType *VT = VectorType::get(IT, 3);
+        VectorType *VT = FixedVectorType::get(IT, 3);
         createGlobalVariable(M, WorkgroupSize, VT,
                              AddressSpace::ModuleScopePrivate);
         return true;

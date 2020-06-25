@@ -4253,7 +4253,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
       } else {
         SizesTypeID = getSPIRVType(
-            VectorType::get(Type::getInt32Ty(Context), components));
+            FixedVectorType::get(Type::getInt32Ty(Context), components));
       }
       Ops << SizesTypeID << Image;
       spv::Op query_opcode = spv::OpImageQuerySize;
@@ -4278,7 +4278,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
           Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
 
           Ops.clear();
-          Ops << VectorType::get(Type::getInt32Ty(Context), 4) << RID
+          Ops << FixedVectorType::get(Type::getInt32Ty(Context), 4) << RID
               << CstInt0;
 
           RID = addSPIRVInst(spv::OpCompositeConstruct, Ops);
@@ -4291,8 +4291,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
           // Implement:
           //   %result = OpVectorShuffle %uint2 %sizes %sizes 0 1
           Ops.clear();
-          Ops << VectorType::get(Type::getInt32Ty(Context), 2) << RID << RID
-              << 0 << 1;
+          Ops << FixedVectorType::get(Type::getInt32Ty(Context), 2) << RID
+              << RID << 0 << 1;
 
           RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
         }

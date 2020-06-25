@@ -69,7 +69,7 @@ uint32_t clz(uint32_t v) {
 Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
   Type *IntTy = Type::getIntNTy(C, Ty->getScalarSizeInBits());
   if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
-    IntTy = VectorType::get(IntTy, vec_ty->getNumElements());
+    IntTy = FixedVectorType::get(IntTy, vec_ty->getNumElements());
   }
   return IntTy;
 }
@@ -439,7 +439,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
 
     Type *IntTy = Type::getIntNTy(F.getContext(), Ty->getScalarSizeInBits());
     if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
-      IntTy = VectorType::get(IntTy, vec_ty->getNumElements());
+      IntTy = FixedVectorType::get(IntTy, vec_ty->getNumElements());
     }
 
     // Return X with the sign of Y
@@ -739,8 +739,8 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
 
     Type *CorrespondingBoolTy = Type::getInt1Ty(M.getContext());
     if (auto CIVecTy = dyn_cast<VectorType>(CITy)) {
-      CorrespondingBoolTy = VectorType::get(Type::getInt1Ty(M.getContext()),
-                                            CIVecTy->getNumElements());
+      CorrespondingBoolTy = FixedVectorType::get(
+          Type::getInt1Ty(M.getContext()), CIVecTy->getNumElements());
     }
 
     auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
@@ -1422,7 +1422,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Our intrinsic to unpack a float2 from an int.
@@ -1529,7 +1529,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
         PointerType::get(IntTy, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
@@ -1563,8 +1563,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Int2Ty = VectorType::get(IntTy, 2);
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Int2Ty = FixedVectorType::get(IntTy, 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
         PointerType::get(Int2Ty, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
@@ -1618,7 +1618,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
     auto Ptr = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     auto IndexedPtr = GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
@@ -1650,8 +1650,8 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
     auto Ptr = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Int2Ty = VectorType::get(IntTy, 2);
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Int2Ty = FixedVectorType::get(IntTy, 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     auto IndexedPtr = GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
@@ -1712,7 +1712,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
     auto One = ConstantInt::get(IntTy, 1);
 
@@ -1865,7 +1865,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
         PointerType::get(IntTy, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
@@ -1902,8 +1902,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Int2Ty = VectorType::get(IntTy, 2);
-    auto Float2Ty = VectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto Int2Ty = FixedVectorType::get(IntTy, 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
         PointerType::get(Int2Ty, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
@@ -1961,8 +1961,8 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
     }
 
     auto NewFType = FunctionType::get(
-        VectorType::get(Type::getFloatTy(M.getContext()),
-                        cast<VectorType>(CI->getType())->getNumElements()),
+        FixedVectorType::get(Type::getFloatTy(M.getContext()),
+                             cast<VectorType>(CI->getType())->getNumElements()),
         types, false);
 
     std::string NewFName =
@@ -1993,7 +1993,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     args[1] = CI->getArgOperand(1);
 
     // Data
-    types[2] = VectorType::get(
+    types[2] = FixedVectorType::get(
         Type::getFloatTy(M.getContext()),
         cast<VectorType>(CI->getArgOperand(2)->getType())->getNumElements());
 
@@ -2034,9 +2034,9 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(
     if (components == 1) {
       float_ty = Type::getFloatTy(M.getContext());
     } else {
-      float_ty =
-          VectorType::get(Type::getFloatTy(M.getContext()),
-                          cast<VectorType>(Arg2->getType())->getNumElements());
+      float_ty = FixedVectorType::get(
+          Type::getFloatTy(M.getContext()),
+          cast<VectorType>(Arg2->getType())->getNumElements());
     }
 
     auto NewFType = FunctionType::get(

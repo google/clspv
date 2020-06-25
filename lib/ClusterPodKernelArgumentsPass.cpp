@@ -593,7 +593,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
                         ele_ty->getPrimitiveSizeInBits())
                            .getKnownMinSize();
-      auto scaled_vec_ty = VectorType::get(ele_ty, ratio);
+      auto scaled_vec_ty = FixedVectorType::get(ele_ty, ratio);
       Value *casts[2] = {UndefValue::get(scaled_vec_ty),
                          UndefValue::get(scaled_vec_ty)};
       uint32_t num_ints = (num_elements + ratio - 1) / ratio; // round up
@@ -652,7 +652,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
         uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
                           dst_type->getPrimitiveSizeInBits())
                              .getKnownMinSize();
-        auto vec_ty = VectorType::get(dst_type, ratio);
+        auto vec_ty = FixedVectorType::get(dst_type, ratio);
         dst = builder.CreateBitCast(dst, vec_ty);
         dst = builder.CreateExtractElement(dst, base_offset / dst_size);
       }
