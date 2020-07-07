@@ -2095,8 +2095,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F,
                                               llvm::AtomicRMWInst::BinOp Op) {
   return replaceCallsWithValue(F, [&](CallInst *CI) {
+    auto align = F.getParent()->getDataLayout().getABITypeAlign(
+        CI->getArgOperand(1)->getType());
     return new AtomicRMWInst(Op, CI->getArgOperand(0), CI->getArgOperand(1),
-                             AtomicOrdering::SequentiallyConsistent,
+                             align, AtomicOrdering::SequentiallyConsistent,
                              SyncScope::System, CI);
   });
 }
