@@ -19,12 +19,6 @@ set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
 
-choco install cmake --pre --yes --no-progress
-choco upgrade cmake --pre --yes --no-progress
-
-:: Force usage of python 3.6 and add cmake to the path.
-set PATH=C:\python36;"C:\Program Files\CMake\bin";%PATH%
-
 cd %SRC%
 python utils/fetch_sources.py
 
