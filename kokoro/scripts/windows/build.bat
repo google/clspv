@@ -25,7 +25,10 @@ python utils/fetch_sources.py
 :: #########################################
 :: set up msvc build env
 :: #########################################
-if %VS_VERSION% == 2017 (
+if %VS_VERSION% == 2019 (
+  set GENERATOR="Visual Studio 16 2019"
+  echo "Using VS 2019..."
+) else if %VS_VERSION% == 2017 (
   set GENERATOR="Visual Studio 15 2017 Win64"
   echo "Using VS 2017..."
 ) else if %VS_VERSION% == 2015 (
