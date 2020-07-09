@@ -19,6 +19,9 @@ set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
 
+:: Force usage of python 3.6.
+set PATH=C:\python36;%PATH%
+
 cd %SRC%
 python utils/fetch_sources.py
 
