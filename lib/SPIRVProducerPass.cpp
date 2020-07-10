@@ -3833,6 +3833,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
       Ops << I.getType() << I.getOperand(0);
       RID = addSPIRVInst(spv::OpFNegate, Ops);
+    } else if (I.getOpcode() == Instruction::Unreachable) {
+      RID = addSPIRVInst(spv::OpUnreachable);
     } else {
       I.print(errs());
       llvm_unreachable("Unsupported instruction???");
@@ -4919,6 +4921,7 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
       llvm_unreachable("Unsupported SPIRV instruction");
       break;
     }
+    case spv::OpUnreachable:
     case spv::OpCapability:
     case spv::OpExtension:
     case spv::OpMemoryModel:
