@@ -121,7 +121,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceFmod(Function &F);
   bool replaceExp10(Function &F, const std::string &basename);
   bool replaceLog10(Function &F, const std::string &basename);
-  bool replaceBarrier(Function &F, bool subgroup = false);
+  bool replaceBarrier(Function &F);
   bool replaceMemFence(Function &F, uint32_t semantics);
   bool replacePrefetch(Function &F);
   bool replaceRelational(Function &F, CmpInst::Predicate P, int32_t C);
@@ -231,8 +231,6 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kBarrier:
   case Builtins::kWorkGroupBarrier:
     return replaceBarrier(F);
-  case Builtins::kSubGroupBarrier:
-    return replaceBarrier(F, true);
 
   case Builtins::kMemFence:
     return replaceMemFence(F, spv::MemorySemanticsSequentiallyConsistentMask);
@@ -567,11 +565,11 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
+bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F) {
 
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
-  return replaceCallsWithValue(F, [&subgroup](CallInst *CI) {
+  return replaceCallsWithValue(F, [](CallInst *CI) {
     auto Arg = CI->getOperand(0);
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
@@ -585,8 +583,6 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         ConstantInt::get(Arg->getType(), spv::ScopeDevice);
     const auto ConstantScopeWorkgroup =
         ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
-    const auto ConstantScopeSubgroup =
-        ConstantInt::get(Arg->getType(), spv::ScopeSubgroup);
 
     // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
     const auto LocalMemFenceMask =
@@ -623,8 +619,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
                                                 ConstantScopeWorkgroup, "", CI);
 
     // Lastly, the Execution Scope is always Workgroup Scope.
-    const auto ExecutionScope =
-        subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
+    const auto ExecutionScope = ConstantScopeWorkgroup;
 
     return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
                                 {Attribute::NoDuplicate}, CI->getType(),

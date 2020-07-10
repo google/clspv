@@ -812,3 +812,49 @@ The `printf()` built-in function **must not** be used.
 
 The `get_image_channel_data_type()` and `get_image_channel_order()`
 built-in functions **must not** be used.
+
+#### SubGroup extension
+
+The OpenCL extension `cl_khr_subgroups` requires SPIR-V 1.3 or greater and
+translates the built-in functions to GroupNonUniform operations and Builtin
+constants as follows:
+
+- `get_sub_group_size()` is mapped to `BuiltInSubgroupSize` constant.
+- `get_num_sub_groups()` is mapped to `BuiltInNumSubgroups` constant.
+- `get_sub_group_id()` is mapped to `BuiltInSubgroupId` constant.
+- `get_sub_group_local_id()` is mapped to `BuiltInSubgroupLocalInvocationId` constant.
+- `get_enqueued_num_sub_groups()` is mapped to `BuiltInNumEnqueuedSubgroups` constant.
+- `sub_group_broadcast()` is mapped to `OpGroupNonUniformBroadcast` operation. Requires
+  `CapabilityGroupNonUniformBallot` capability.
+- `sub_group_all()` is mapped to `OpGroupNonUniformAll` operation. Requires
+  `CapabilityGroupNonUniformVote` capability.
+- `sub_group_any()` is mapped to `OpGroupNonUniformAny` operation. Requires
+  `CapabilityGroupNonUniformVote` capability.
+- `sub_group_<group_op>_add()` is mapped to `OpGroupNonUniformIAdd` operation
+  for Integer types and `OpGroupNonUniformFAdd` operation for Float types.
+  Requires `CapabilityGroupNonUniformArithmetic` capability.
+- `sub_group_<group_op>_min()` is mapped to `OpGroupNonUniformSMin` operation
+  for Signed-Integer types, `OpGroupNonUniformUMin` operation for 
+  Unsigned-Integer types and `OpGroupNonUniformFMin` operation for Float types.
+  Requires `CapabilityGroupNonUniformArithmetic` capability.
+- `sub_group_<group_op>_max()` is mapped to `OpGroupNonUniformSMax` operation
+  for Signed-Integer types, `OpGroupNonUniformUMax` operation for 
+  Unsigned-Integer types and `OpGroupNonUniformFMax` operation for Float types.
+  Requires `CapabilityGroupNonUniformArithmetic` capability.
+
+The `group_op` qualifier translates as follows:
+
+- `reduce` maps to `GroupOperationReduce`.
+- `scan_exclusive` maps to `GroupOperationExclusiveScan`.
+- `scan_inclusive` maps to `GroupOperationInclusiveScan`.
+
+These extension built-in functions are not supported:
+
+- `get_max_sub_group_size()`
+- `sub_group_barrier()`
+- `sub_group_reserve_read_pipe()`
+- `sub_group_reserve_write_pipe()`
+- `sub_group_commit_read_pipe()`
+- `sub_group_commit_write_pipe()`
+- `get_kernel_sub_group_count_for_ndrange()`
+- `get_kernel_max_sub_group_size_for_ndrange()`
