@@ -1952,7 +1952,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
       Opcode = spv::OpConstantNull;
     }
   } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(Cst)) {
-    unsigned bit_width = CI->getbit_width();
+    unsigned bit_width = CI->getBitWidth();
     if (bit_width == 1) {
       // If the bitwidth of constant is 1, generate OpConstantTrue or
       // OpConstantFalse.
