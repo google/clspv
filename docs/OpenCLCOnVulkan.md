@@ -392,7 +392,7 @@ By default this option is enabled. To disable this behavior, pass
 
 For example:
 
-    // First kernel in the translation unit, and no sampler map is used.
+    // First kernel in the translation unit.
     void kernel foo(global int* a, float f, global float* b, uint c);
 
 In the default case, the bindings are:
@@ -693,11 +693,6 @@ The `double`, `double2`, `double3` and `double4` types **must not** be used.
 #### Images
 
 The `image1d_buffer_t` type **must not** be used.
-
-#### Samplers
-
-Any `sampler_t`'s **must** be passed in via a kernel argument, or the sampler
-**must** be in the sampler map (see the -samplemap command line argument).
 
 #### Events
 
