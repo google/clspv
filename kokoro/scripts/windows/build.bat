@@ -19,11 +19,8 @@ set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
 
-choco install cmake --pre --yes --no-progress
-choco upgrade cmake --pre --yes --no-progress
-
-:: Force usage of python 3.6 and add cmake to the path.
-set PATH=C:\python36;"C:\Program Files\CMake\bin";%PATH%
+:: Force usage of python 3.6.
+set PATH=C:\python36;%PATH%
 
 cd %SRC%
 python utils/fetch_sources.py
@@ -31,7 +28,10 @@ python utils/fetch_sources.py
 :: #########################################
 :: set up msvc build env
 :: #########################################
-if %VS_VERSION% == 2017 (
+if %VS_VERSION% == 2019 (
+  set GENERATOR="Visual Studio 16 2019"
+  echo "Using VS 2019..."
+) else if %VS_VERSION% == 2017 (
   set GENERATOR="Visual Studio 15 2017 Win64"
   echo "Using VS 2017..."
 ) else if %VS_VERSION% == 2015 (

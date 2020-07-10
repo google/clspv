@@ -1757,25 +1757,25 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::IntegerTyID: {
-    uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
+    uint32_t bit_width = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
 
-    if (clspv::Option::Int8Support() && BitWidth == 8) {
+    if (clspv::Option::Int8Support() && bit_width == 8) {
       addCapability(spv::CapabilityInt8);
-    } else if (BitWidth == 16) {
+    } else if (bit_width == 16) {
       addCapability(spv::CapabilityInt16);
-    } else if (BitWidth == 64) {
+    } else if (bit_width == 64) {
       addCapability(spv::CapabilityInt64);
     }
 
-    if (BitWidth == 1) {
+    if (bit_width == 1) {
       RID = addSPIRVInst<kTypes>(spv::OpTypeBool);
     } else {
-      if (!clspv::Option::Int8Support() && BitWidth == 8) {
+      if (!clspv::Option::Int8Support() && bit_width == 8) {
         // i8 is added to TypeMap as i32.
         RID = getSPIRVType(Type::getIntNTy(Ty->getContext(), 32));
       } else {
         SPIRVOperandVec Ops;
-        Ops << BitWidth << 0 /* not signed */;
+        Ops << bit_width << 0 /* not signed */;
         RID = addSPIRVInst<kTypes>(spv::OpTypeInt, Ops);
       }
     }
@@ -1784,15 +1784,15 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   case Type::HalfTyID:
   case Type::FloatTyID:
   case Type::DoubleTyID: {
-    uint32_t BitWidth = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
-    if (BitWidth == 16) {
+    uint32_t bit_width = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
+    if (bit_width == 16) {
       addCapability(spv::CapabilityFloat16);
-    } else if (BitWidth == 64) {
+    } else if (bit_width == 64) {
       addCapability(spv::CapabilityFloat64);
     }
 
     SPIRVOperandVec Ops;
-    Ops << BitWidth;
+    Ops << bit_width;
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeFloat, Ops);
     break;
@@ -1952,8 +1952,8 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
       Opcode = spv::OpConstantNull;
     }
   } else if (const ConstantInt *CI = dyn_cast<ConstantInt>(Cst)) {
-    unsigned BitWidth = CI->getBitWidth();
-    if (BitWidth == 1) {
+    unsigned bit_width = CI->getBitWidth();
+    if (bit_width == 1) {
       // If the bitwidth of constant is 1, generate OpConstantTrue or
       // OpConstantFalse.
       if (CI->getZExtValue()) {
@@ -1967,7 +1967,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
       auto V = CI->getZExtValue();
       LiteralNum.push_back(V & 0xFFFFFFFF);
 
-      if (BitWidth > 32) {
+      if (bit_width > 32) {
         LiteralNum.push_back(V >> 32);
       }
 
