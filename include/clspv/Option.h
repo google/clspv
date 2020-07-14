@@ -147,6 +147,15 @@ static bool LanguageUsesGenericAddressSpace() {
          ((Language() == SourceLanguage::OpenCL_C_20));
 }
 
+// Return the SPIR-V binary version
+enum class SPIRVVersion {
+  SPIRV_1_0,
+  SPIRV_1_3,
+  SPIRV_1_5, // note that lack of command line option to specify it
+};
+
+SPIRVVersion SpvVersion();
+
 // Returns true when SPV_EXT_scalar_block_layout can be used.
 bool ScalarBlockLayout();
 

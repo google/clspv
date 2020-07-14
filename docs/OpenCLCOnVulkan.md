@@ -54,6 +54,11 @@ capabilities:
 - `ImageQuery` if any image query is used.
 - `Image1D` if a _write\_only_ image is used.
 - `Sampled1D` if a _read\_only_ image is used.
+- `GroupNonUniform` (see cl_khr_subgroups below)
+
+The command-line switch '-spv-version' can be used to specify the SPIR-V output version.
+Only '1.0' and '1.3' are currently supported, corresponding with vk versions '1.0' and '1.1'
+respectively.
 
 ## Vulkan Interaction
 
@@ -813,19 +818,23 @@ The `printf()` built-in function **must not** be used.
 The `get_image_channel_data_type()` and `get_image_channel_order()`
 built-in functions **must not** be used.
 
-#### SubGroup extension
+#### cl_khr_subgroups extension
 
 The OpenCL extension `cl_khr_subgroups` requires SPIR-V 1.3 or greater and
 translates the built-in functions to GroupNonUniform operations and Builtin
 constants as follows:
 
 - `get_sub_group_size()` is mapped to `BuiltInSubgroupSize` constant.
+  Requires `CapabilityGroupNonUniform` capability.
 - `get_num_sub_groups()` is mapped to `BuiltInNumSubgroups` constant.
+  Requires `CapabilityGroupNonUniform` capability.
 - `get_sub_group_id()` is mapped to `BuiltInSubgroupId` constant.
-- `get_sub_group_local_id()` is mapped to `BuiltInSubgroupLocalInvocationId` constant.
-- `get_enqueued_num_sub_groups()` is mapped to `BuiltInNumEnqueuedSubgroups` constant.
-- `sub_group_broadcast()` is mapped to `OpGroupNonUniformBroadcast` operation. Requires
-  `CapabilityGroupNonUniformBallot` capability.
+  Requires `CapabilityGroupNonUniform` capability.
+- `get_sub_group_local_id()` is mapped to `BuiltInSubgroupLocalInvocationId`
+  constant.  Requires `CapabilityGroupNonUniform` capability.
+- `sub_group_broadcast()` is mapped to `OpGroupNonUniformBroadcast` operation.
+  Requires `CapabilityGroupNonUniformBallot` capability. For SPIR-V version < 1.5
+  a constant laneId is required.
 - `sub_group_all()` is mapped to `OpGroupNonUniformAll` operation. Requires
   `CapabilityGroupNonUniformVote` capability.
 - `sub_group_any()` is mapped to `OpGroupNonUniformAny` operation. Requires
@@ -850,7 +859,8 @@ The `group_op` qualifier translates as follows:
 
 These extension built-in functions are not supported:
 
-- `get_max_sub_group_size()`
+- `get_max_sub_group_size()` requires CapabiliryKernel (incompatible with Shader)
+- `get_enqueued_num_sub_groups()` requires CapabilityKernel (incompatible with Shader)
 - `sub_group_barrier()`
 - `sub_group_reserve_read_pipe()`
 - `sub_group_reserve_write_pipe()`

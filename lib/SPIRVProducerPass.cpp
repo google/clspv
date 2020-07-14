@@ -72,6 +72,7 @@
 using namespace llvm;
 using namespace clspv;
 using namespace clspv::Builtins;
+using namespace clspv::Option;
 using namespace mdconst;
 
 namespace {
@@ -83,9 +84,6 @@ cl::opt<bool>
     ShowProducerIR("show-producer-ir", cl::init(false), cl::ReallyHidden,
                    cl::desc("Dump the IR at the start of SPIRVProducer"));
 
-cl::opt<std::string> SPIRVVersionOpt("spv-version", cl::init("1.0"), cl::Hidden,
-                                     cl::desc("Specify output SPIR-V version"));
-
 // These hacks exist to help transition code generation algorithms
 // without making huge noise in detailed test output.
 const bool Hack_generate_runtime_array_stride_early = true;
@@ -94,43 +92,6 @@ const bool Hack_generate_runtime_array_stride_early = true;
 // https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
 const double kOneOverPi = 0.318309886183790671538;
 const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
-
-// Manage major.minor version requirements.
-// Generate appropriate bit-field representation.
-class Version {
-  uint32_t Major;
-  uint32_t Minor;
-
-public:
-  Version(uint32_t _major, uint32_t _minor) : Major(_major), Minor(_minor) {}
-  Version(const std::string &_version_str) : Major(0), Minor(0) {
-    parse(_version_str);
-  }
-
-  uint32_t getMinor() const { return Minor; }
-  void setMinor(uint32_t _minor) { Minor = _minor; }
-
-  bool operator<(const Version &that) const {
-    return Major < that.Major || (Major == that.Major && Minor < that.Minor);
-  }
-
-  template <uint32_t TMajorOffset = 16, uint32_t TMinorOffset = 8>
-  uint32_t get() const {
-    return (Major << TMajorOffset) | (Minor << TMinorOffset);
-  }
-
-  void parse(const std::string &_version) {
-    size_t pos;
-    Major = std::stol(_version, &pos);
-    if (Major != 1)
-      llvm_unreachable("SPIRV major version must be 1");
-    if (_version[pos++] != '.')
-      llvm_unreachable("SPIRV version malformed");
-    Minor = std::atol(&_version[pos]);
-    if (Minor > 3)
-      llvm_unreachable("SPIRV minor version must be <= 3");
-  }
-};
 
 // SPIRV Module Sections (per 2.4 of the SPIRV spec)
 // These are used to collect SPIRVInstructions by type on-the-fly.
@@ -276,11 +237,6 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
 
-  // Target SPIR-V version (major << 16 || minor << 8).
-  // - version specific formatting (i.e. EntryPointInterfaces)
-  // - supported features (i.e. NonUniformGroup)
-  Version SPIRVVersion;
-
   explicit SPIRVProducerPass(
       raw_pwrite_stream &out,
       std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
@@ -292,7 +248,7 @@ struct SPIRVProducerPass final : public ModulePass {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), SPIRVVersion(SPIRVVersionOpt) {
+        WorkgroupSizeVarID(0) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -528,7 +484,6 @@ struct SPIRVProducerPass final : public ModulePass {
 
   //
   // Add global variable and capture entry point interface
-  // TODO(sjw): make entry point interfaces unique per entry point?
   SPIRVID addSPIRVGlobalVariable(const SPIRVID &TypeID, spv::StorageClass SC,
                                  const SPIRVID &InitID = SPIRVID());
 
@@ -859,9 +814,12 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
 void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
                    sizeof(spv::MagicNumber));
-  uint32_t spvVersion = SPIRVVersion.get();
-  binaryOut->write(reinterpret_cast<const char *>(&spvVersion),
-                   sizeof(spvVersion));
+  uint32_t minor = 0;
+  if (SpvVersion() == SPIRVVersion::SPIRV_1_3) {
+    minor = 3;
+  }
+  uint32_t version = (1 << 16) | (minor << 8);
+  binaryOut->write(reinterpret_cast<const char *>(&version), sizeof(version));
 
   // use Google's vendor ID
   const uint32_t vendor = 21 << 16;
@@ -3530,10 +3488,9 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
       } else {
         result_type = getSPIRVType(Call->getType());
       }
-      SPIRVID CstInt0 = getSPIRVInt32Constant(0);
 
       Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
-          << CstInt0;
+          << getSPIRVInt32Constant(0);
 
       RID = addSPIRVInst(spv::OpImageFetch, Ops);
 
@@ -3619,8 +3576,7 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
     if (IsSampledImageType(Image->getType())) {
       query_opcode = spv::OpImageQuerySizeLod;
       // Need explicit 0 for Lod operand.
-      SPIRVID CstInt0 = getSPIRVInt32Constant(0);
-      Ops << CstInt0;
+      Ops << getSPIRVInt32Constant(0);
     }
 
     RID = addSPIRVInst(query_opcode, Ops);
@@ -3634,11 +3590,9 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
 
         // Implement:
         //   %result = OpCompositeConstruct %uint4 %sizes %uint_0
-        SPIRVID CstInt0 = getSPIRVInt32Constant(0);
-
         Ops.clear();
         Ops << FixedVectorType::get(Type::getInt32Ty(Context), 4) << RID
-            << CstInt0;
+            << getSPIRVInt32Constant(0);
 
         RID = addSPIRVInst(spv::OpCompositeConstruct, Ops);
       } else if (dim != components) {
@@ -3685,10 +3639,9 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
   SPIRVID RID;
 
   // requires SPIRV version 1.3 or greater
-  if (SPIRVVersion < Version(1, 3)) {
+  if (SpvVersion() != SPIRVVersion::SPIRV_1_3) {
     // llvm_unreachable("SubGroups extension requires SPIRV 1.3 or greater");
-    // for now just upgrade the version
-    SPIRVVersion.setMinor(3);
+    // TODO(sjw): error out gracefully
   }
 
   auto loadBuiltin = [this, Call](spv::BuiltIn spvBI,
@@ -3710,11 +3663,9 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
     return loadBuiltin(spv::BuiltInSubgroupId);
   case Builtins::kGetSubGroupLocalId:
     return loadBuiltin(spv::BuiltInSubgroupLocalInvocationId);
-  case Builtins::kGetEnqueuedNumSubGroups:
-    return loadBuiltin(spv::BuiltInNumEnqueuedSubgroups, spv::CapabilityKernel);
 
   case Builtins::kSubGroupBroadcast:
-    if (SPIRVVersion < Version(1, 5) &&
+    if (SpvVersion() < SPIRVVersion::SPIRV_1_5 &&
         !dyn_cast<ConstantInt>(Call->getOperand(1))) {
       llvm_unreachable("sub_group_broadcast requires constant lane Id for "
                        "SPIRV version < 1.5");
@@ -3769,8 +3720,10 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
     break;
   }
 
+  case Builtins::kGetEnqueuedNumSubGroups:
+    // TODO(sjw): requires CapabilityKernel (incompatible with Shader)
   case Builtins::kGetMaxSubGroupSize:
-    // TODO(sjw): use SpecConstant, capability Kernel
+    // TODO(sjw): use SpecConstant, capability Kernel (incompatible with Shader)
   case Builtins::kSubGroupBarrier:
   case Builtins::kSubGroupReserveReadPipe:
   case Builtins::kSubGroupReserveWritePipe:
@@ -4250,8 +4203,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Handle variable index.
         SPIRVOperandVec TmpOps;
 
-        auto Cst8 = getSPIRVInt32Constant(8);
-        TmpOps << Type::getInt32Ty(Context) << I.getOperand(1) << Cst8;
+        TmpOps << Type::getInt32Ty(Context) << I.getOperand(1)
+               << getSPIRVInt32Constant(8);
 
         Op1ID = addSPIRVInst(spv::OpIMul, TmpOps);
       }
@@ -4268,8 +4221,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      auto CstFF = getSPIRVInt32Constant(0xFF);
-      Ops << CompositeTy << ShiftID << CstFF;
+      Ops << CompositeTy << ShiftID << getSPIRVInt32Constant(0xFF);
 
       RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
       break;
@@ -4308,8 +4260,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Handle variable index.
         SPIRVOperandVec TmpOps;
 
-        auto Cst8 = getSPIRVInt32Constant(8);
-        TmpOps << Type::getInt32Ty(Context) << I.getOperand(2) << Cst8;
+        TmpOps << Type::getInt32Ty(Context) << I.getOperand(2)
+               << getSPIRVInt32Constant(8);
 
         ShiftAmountID = addSPIRVInst(spv::OpIMul, TmpOps);
       }
