@@ -859,7 +859,7 @@ The `group_op` qualifier translates as follows:
 
 These extension built-in functions are not supported:
 
-- `get_max_sub_group_size()` requires CapabiliryKernel (incompatible with Shader)
+- `get_max_sub_group_size()` requires CapabilityKernel (incompatible with Shader)
 - `get_enqueued_num_sub_groups()` requires CapabilityKernel (incompatible with Shader)
 - `sub_group_barrier()`
 - `sub_group_reserve_read_pipe()`

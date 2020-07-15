@@ -4197,7 +4197,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       SPIRVID Op1ID = 0;
       if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1))) {
         // Handle constant index.
-        uint64_t Idx = CI->getZExtValue();
+        uint32_t Idx = static_cast<uint32_t>(CI->getZExtValue());
         Op1ID = getSPIRVInt32Constant(Idx * 8);
       } else {
         // Handle variable index.
@@ -4254,7 +4254,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       SPIRVID ShiftAmountID = 0;
       if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2))) {
         // Handle constant index.
-        uint64_t Idx = CI->getZExtValue();
+        uint32_t Idx = static_cast<uint32_t>(CI->getZExtValue());
         ShiftAmountID = getSPIRVInt32Constant(Idx * 8);
       } else {
         // Handle variable index.
