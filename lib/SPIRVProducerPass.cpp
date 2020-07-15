@@ -72,6 +72,7 @@
 using namespace llvm;
 using namespace clspv;
 using namespace clspv::Builtins;
+using namespace clspv::Option;
 using namespace mdconst;
 
 namespace {
@@ -122,6 +123,7 @@ public:
   uint32_t get() const { return id; }
   bool isValid() const { return id != 0; }
   bool operator==(const SPIRVID &that) const { return id == that.id; }
+  bool operator<(const SPIRVID &that) const { return id < that.id; }
 };
 
 enum SPIRVOperandType { NUMBERID, LITERAL_WORD, LITERAL_DWORD, LITERAL_STRING };
@@ -222,10 +224,11 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
   typedef UniqueVector<Type *> TypeList;
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
-  typedef UniqueVector<Value *> ValueList;
+  typedef std::list<SPIRVID> SPIRVIDListType;
   typedef std::vector<std::pair<Value *, SPIRVID>> EntryPointVecType;
   typedef std::set<uint32_t> CapabilitySetType;
   typedef std::list<SPIRVInstruction> SPIRVInstructionList;
+  typedef std::map<spv::BuiltIn, SPIRVID> BuiltinConstantMapType;
   // A vector of pairs, each of which is:
   // - the LLVM instruction that we will later generate SPIR-V code for
   // - the SPIR-V instruction placeholder that will be replaced
@@ -275,7 +278,9 @@ struct SPIRVProducerPass final : public ModulePass {
   };
   EntryPointVecType &getEntryPointVec() { return EntryPointVec; };
   DeferredInstVecType &getDeferredInstVec() { return DeferredInstVec; };
-  ValueList &getEntryPointInterfacesVec() { return EntryPointInterfacesVec; };
+  SPIRVIDListType &getEntryPointInterfacesList() {
+    return EntryPointInterfacesList;
+  };
   SPIRVID getOpExtInstImportID();
   std::vector<SPIRVID> &getBuiltinDimVec() { return BuiltinDimensionVec; };
 
@@ -326,8 +331,11 @@ struct SPIRVProducerPass final : public ModulePass {
   // Returns SPIRVID once it has been created.
   SPIRVID getSPIRVType(Type *Ty);
   SPIRVID getSPIRVConstant(Constant *Cst);
+  SPIRVID getSPIRVInt32Constant(uint32_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V);
+
+  SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
 
   // Generates instructions for SPIR-V types corresponding to the LLVM types
   // saved in the |Types| member.  A type follows its subtypes.  IDs are
@@ -352,6 +360,13 @@ struct SPIRVProducerPass final : public ModulePass {
   spv::Op GetSPIRVCmpOpcode(CmpInst *CmpI);
   spv::Op GetSPIRVCastOpcode(Instruction &I);
   spv::Op GetSPIRVBinaryOpcode(Instruction &I);
+  SPIRVID GenerateClspvInstruction(CallInst *Call,
+                                   const FunctionInfo &FuncInfo);
+  SPIRVID GenerateImageInstruction(CallInst *Call,
+                                   const FunctionInfo &FuncInfo);
+  SPIRVID GenerateSubgroupInstruction(CallInst *Call,
+                                      const FunctionInfo &FuncInfo);
+  SPIRVID GenerateInstructionFromCall(CallInst *Call);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -467,6 +482,11 @@ struct SPIRVProducerPass final : public ModulePass {
     return RID;
   }
 
+  //
+  // Add global variable and capture entry point interface
+  SPIRVID addSPIRVGlobalVariable(const SPIRVID &TypeID, spv::StorageClass SC,
+                                 const SPIRVID &InitID = SPIRVID());
+
 private:
   static char ID;
 
@@ -474,6 +494,9 @@ private:
 
   // Set of Capabilities required
   CapabilitySetType CapabilitySet;
+
+  // Map from clspv::BuiltinType to SPIRV Global Variable
+  BuiltinConstantMapType BuiltinConstantMap;
 
   ArrayRef<std::pair<unsigned, std::string>> samplerMap;
   raw_pwrite_stream &out;
@@ -514,7 +537,7 @@ private:
 
   EntryPointVecType EntryPointVec;
   DeferredInstVecType DeferredInstVec;
-  ValueList EntryPointInterfacesVec;
+  SPIRVIDListType EntryPointInterfacesList;
   SPIRVID OpExtInstImportID;
   std::vector<SPIRVID> BuiltinDimensionVec;
   bool HasVariablePointersStorageBuffer;
@@ -673,7 +696,7 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Value *v) {
   return list;
 }
 
-SPIRVOperandVec &operator<<(SPIRVOperandVec &list, SPIRVID &v) {
+SPIRVOperandVec &operator<<(SPIRVOperandVec &list, const SPIRVID &v) {
   list.emplace_back(NUMBERID, v.get());
   return list;
 }
@@ -711,11 +734,6 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
 
     // Collect types' information from global variable.
     FindTypePerGlobalVar(GV);
-
-    // If the variable is an input, entry points need to know about it.
-    if (AddressSpace::Input == GV.getType()->getPointerAddressSpace()) {
-      getEntryPointInterfacesVec().insert(&GV);
-    }
   }
 
   // Generate SPIRV instructions for types.
@@ -796,9 +814,12 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
 void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
                    sizeof(spv::MagicNumber));
-  const uint32_t spv_version = 0x10000; // SPIR-V 1.0
-  binaryOut->write(reinterpret_cast<const char *>(&spv_version),
-                   sizeof(spv_version));
+  uint32_t minor = 0;
+  if (SpvVersion() == SPIRVVersion::SPIRV_1_3) {
+    minor = 3;
+  }
+  uint32_t version = (1 << 16) | (minor << 8);
+  binaryOut->write(reinterpret_cast<const char *>(&version), sizeof(version));
 
   // use Google's vendor ID
   const uint32_t vendor = 21 << 16;
@@ -1383,10 +1404,8 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
     //
     // Ops[0] : Result Type ID
     // Ops[1] : Storage Class
-    Ops.clear();
-    Ops << PtrArrayTypeID << spv::StorageClassWorkgroup;
-
-    SPIRVID VariableID = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+    SPIRVID VariableID =
+        addSPIRVGlobalVariable(PtrArrayTypeID, spv::StorageClassWorkgroup);
 
     Ops.clear();
     Ops << ArraySizeID << spv::DecorationSpecId << spec_id;
@@ -1514,6 +1533,30 @@ SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
         addSPIRVInst<kImports>(spv::OpExtInstImport, "GLSL.std.450");
   }
   return OpExtInstImportID;
+}
+
+SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
+                                                  spv::StorageClass SC,
+                                                  const SPIRVID &InitID) {
+  // Generate OpVariable.
+  //
+  // Ops[0] : Result Type ID
+  // Ops[1] : Storage Class
+  // Ops[2] : Initialization Value ID (optional)
+
+  SPIRVOperandVec Ops;
+  Ops << TypeID << SC;
+  if (InitID.isValid()) {
+    Ops << InitID;
+  }
+
+  SPIRVID VID = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+
+  if (SC == spv::StorageClassInput) {
+    getEntryPointInterfacesList().push_back(VID);
+  }
+
+  return VID;
 }
 
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
@@ -1927,6 +1970,12 @@ void SPIRVProducerPass::GenerateSPIRVTypes() {
   }
 }
 
+SPIRVID SPIRVProducerPass::getSPIRVInt32Constant(uint32_t CstVal) {
+  Type *i32 = Type::getInt32Ty(module->getContext());
+  Constant *Cst = ConstantInt::get(i32, CstVal);
+  return getSPIRVValue(Cst);
+}
+
 SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
   ValueMapType &VMap = getValueMap();
   const bool hack_undef = clspv::Option::HackUndef();
@@ -2005,8 +2054,6 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
     // ints.
     Type *CstTy = Cst->getType();
     if (is4xi8vec(CstTy)) {
-      LLVMContext &Context = CstTy->getContext();
-
       //
       // Generate OpConstant with OpTypeInt 32 0.
       //
@@ -2016,9 +2063,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
         IntValue = (IntValue << 8) | (Val & 0xffu);
       }
 
-      Type *i32 = Type::getInt32Ty(Context);
-      Constant *CstInt = ConstantInt::get(i32, IntValue);
-      RID = getSPIRVValue(CstInt);
+      RID = getSPIRVInt32Constant(IntValue);
     } else {
 
       // A normal constant-data-sequential case.
@@ -2033,8 +2078,6 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
     // This case occurs when at least one of the values is an undef.
     Type *CstTy = Cst->getType();
     if (is4xi8vec(CstTy)) {
-      LLVMContext &Context = CstTy->getContext();
-
       //
       // Generate OpConstant with OpTypeInt 32 0.
       //
@@ -2049,9 +2092,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
         IntValue = (IntValue << 8) | (Val & 0xffu);
       }
 
-      Type *i32 = Type::getInt32Ty(Context);
-      Constant *CstInt = ConstantInt::get(i32, IntValue);
-      RID = getSPIRVValue(CstInt);
+      RID = getSPIRVInt32Constant(IntValue);
     } else {
 
       // We use a constant composite in SPIR-V for our constant aggregate in
@@ -2164,15 +2205,8 @@ void SPIRVProducerPass::GenerateSamplers() {
       sampler_value = sampler_map[third_param].first;
     }
 
-    // Generate OpVariable.
-    //
-    // GIDOps[0] : Result Type ID
-    // GIDOps[1] : Storage Class
-    SPIRVOperandVec Ops;
-
-    Ops << SamplerTy << spv::StorageClassUniformConstant;
-
-    auto sampler_var_id = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+    auto sampler_var_id = addSPIRVGlobalVariable(
+        getSPIRVType(SamplerTy), spv::StorageClassUniformConstant);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
 
@@ -2197,8 +2231,7 @@ void SPIRVProducerPass::GenerateSamplers() {
     // Ops[0] = Target ID
     // Ops[1] = Decoration (DescriptorSet)
     // Ops[2] = LiteralNumber according to Decoration
-    Ops.clear();
-
+    SPIRVOperandVec Ops;
     Ops << sampler_var_id << spv::DecorationDescriptorSet << descriptor_set;
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -2232,10 +2265,8 @@ void SPIRVProducerPass::GenerateResourceVars() {
     }
 
     const auto sc = GetStorageClassForArgKind(info->arg_kind);
-    SPIRVOperandVec Ops;
-    Ops << type << sc;
 
-    info->var_id = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+    info->var_id = addSPIRVGlobalVariable(getSPIRVType(type), sc);
 
     // Map calls to the variable-builtin-function.
     for (auto &U : info->var_fn->uses()) {
@@ -2576,15 +2607,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstantComposite, Ops);
   }
 
-  //
-  // Generate OpVariable.
-  //
-  // GIDOps[0] : Result Type ID
-  // GIDOps[1] : Storage Class
-  SPIRVOperandVec Ops;
-
   const auto AS = PTy->getAddressSpace();
-  Ops << Ty << GetStorageClass(AS);
+  const auto spvSC = GetStorageClass(AS);
 
   const bool module_scope_constant_external_init =
       (AS == AddressSpace::Constant) && GV.hasInitializer() &&
@@ -2597,11 +2621,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     }
   }
 
-  if (InitializerID.isValid()) {
-    // Emit the ID of the initializer as part of the variable definition.
-    Ops << InitializerID;
-  }
-  SPIRVID var_id = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+  SPIRVID var_id =
+      addSPIRVGlobalVariable(getSPIRVType(Ty), spvSC, InitializerID);
 
   VMap[&GV] = var_id;
 
@@ -2631,7 +2652,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       ResultID = getSPIRVValue(&GV);
     }
 
-    Ops.clear();
+    SPIRVOperandVec Ops;
     Ops << ResultID << spv::DecorationBuiltIn << BuiltinType;
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -2652,7 +2673,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
                                        0);
 
     // OpDecorate %var DescriptorSet <descriptor_set>
-    Ops.clear();
+    SPIRVOperandVec Ops;
     Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
@@ -2915,7 +2936,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
 
 void SPIRVProducerPass::GenerateModuleInfo() {
   EntryPointVecType &EntryPoints = getEntryPointVec();
-  ValueList &EntryPointInterfaces = getEntryPointInterfacesVec();
+  auto &EntryPointInterfaces = getEntryPointInterfacesList();
   std::vector<SPIRVID> &BuiltinDimVec = getBuiltinDimVec();
 
   SPIRVOperandVec Ops;
@@ -2974,7 +2995,7 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     const StringRef &name = EntryPoint.first->getName();
     Ops << spv::ExecutionModelGLCompute << EntryPoint.second << name;
 
-    for (Value *Interface : EntryPointInterfaces) {
+    for (auto &Interface : EntryPointInterfaces) {
       Ops << Interface;
     }
 
@@ -3220,11 +3241,666 @@ spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
   return Map.at(I.getOpcode());
 }
 
+SPIRVID SPIRVProducerPass::getSPIRVBuiltin(spv::BuiltIn BID,
+                                           spv::Capability Cap) {
+  SPIRVID RID;
+
+  auto ii = BuiltinConstantMap.find(BID);
+
+  if (ii != BuiltinConstantMap.end()) {
+    return ii->second;
+  } else {
+
+    addCapability(Cap);
+
+    Type *type = PointerType::get(IntegerType::get(module->getContext(), 32),
+                                  AddressSpace::Input);
+
+    RID = addSPIRVGlobalVariable(getSPIRVType(type), spv::StorageClassInput);
+
+    BuiltinConstantMap[BID] = RID;
+
+    //
+    // Generate OpDecorate.
+    //
+    // Ops[0] : target
+    // Ops[1] : decoration
+    // Ops[2] : SpecId
+    SPIRVOperandVec Ops;
+    Ops << RID << spv::DecorationBuiltIn << static_cast<int>(BID);
+
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+  }
+
+  return RID;
+}
+
+SPIRVID
+SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
+                                            const FunctionInfo &FuncInfo) {
+  SPIRVID RID;
+
+  switch (FuncInfo.getType()) {
+  case Builtins::kClspvCompositeConstruct:
+    RID = addSPIRVPlaceholder(Call);
+    break;
+  case Builtins::kClspvResource: {
+    if (ResourceVarDeferredLoadCalls.count(Call) && Call->hasNUsesOrMore(1)) {
+      // Generate an OpLoad
+      SPIRVOperandVec Ops;
+
+      Ops << Call->getType()->getPointerElementType()
+          << ResourceVarDeferredLoadCalls[Call];
+
+      RID = addSPIRVInst(spv::OpLoad, Ops);
+
+    } else {
+      // This maps to an OpVariable we've already generated.
+      // No code is generated for the call.
+    }
+    break;
+  }
+  case Builtins::kClspvLocal: {
+    // Don't codegen an instruction here, but instead map this call directly
+    // to the workgroup variable id.
+    int spec_id = static_cast<int>(
+        cast<ConstantInt>(Call->getOperand(0))->getSExtValue());
+    const auto &info = LocalSpecIdInfoMap[spec_id];
+    RID = info.variable_id;
+    break;
+  }
+  case Builtins::kClspvSamplerVarLiteral: {
+    // Sampler initializers become a load of the corresponding sampler.
+    // Map this to a load from the variable.
+    const auto third_param = static_cast<unsigned>(
+        dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
+    auto sampler_value = third_param;
+    if (clspv::Option::UseSamplerMap()) {
+      sampler_value = getSamplerMap()[third_param].first;
+    }
+
+    // Generate an OpLoad
+    SPIRVOperandVec Ops;
+
+    Ops << SamplerTy->getPointerElementType()
+        << SamplerLiteralToIDMap[sampler_value];
+
+    RID = addSPIRVInst(spv::OpLoad, Ops);
+    break;
+  }
+  case Builtins::kSpirvAtomicXor: {
+    // Handle SPIR-V intrinsics
+    SPIRVOperandVec Ops;
+
+    if (!Call->getType()->isVoidTy()) {
+      Ops << Call->getType();
+    }
+
+    for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
+      Ops << Call->getArgOperand(i);
+    }
+
+    RID = addSPIRVInst(spv::OpAtomicXor, Ops);
+    break;
+  }
+  case Builtins::kSpirvOp: {
+    // Handle SPIR-V intrinsics
+    auto *arg0 = dyn_cast<ConstantInt>(Call->getArgOperand(0));
+    spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
+    if (opcode != spv::OpNop) {
+      SPIRVOperandVec Ops;
+
+      if (!Call->getType()->isVoidTy()) {
+        Ops << Call->getType();
+      }
+
+      for (unsigned i = 1; i < Call->getNumArgOperands(); i++) {
+        Ops << Call->getArgOperand(i);
+      }
+
+      RID = addSPIRVInst(opcode, Ops);
+    }
+    break;
+  }
+  case Builtins::kSpirvCopyMemory: {
+    //
+    // Generate OpCopyMemory.
+    //
+
+    // Ops[0] = Dst ID
+    // Ops[1] = Src ID
+    // Ops[2] = Memory Access
+    // Ops[3] = Alignment
+
+    auto IsVolatile =
+        dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue() != 0;
+
+    auto VolatileMemoryAccess = (IsVolatile) ? spv::MemoryAccessVolatileMask
+                                             : spv::MemoryAccessMaskNone;
+
+    auto MemoryAccess = VolatileMemoryAccess | spv::MemoryAccessAlignedMask;
+
+    auto Alignment =
+        dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
+
+    SPIRVOperandVec Ops;
+    Ops << Call->getArgOperand(0) << Call->getArgOperand(1) << MemoryAccess
+        << static_cast<uint32_t>(Alignment);
+
+    RID = addSPIRVInst(spv::OpCopyMemory, Ops);
+    break;
+  }
+  default:
+    llvm_unreachable("Unknown CLSPV Instruction");
+    break;
+  }
+  return RID;
+}
+
+SPIRVID
+SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
+                                            const FunctionInfo &FuncInfo) {
+  SPIRVID RID;
+
+  LLVMContext &Context = module->getContext();
+  switch (FuncInfo.getType()) {
+  case Builtins::kReadImagef:
+  case Builtins::kReadImageh:
+  case Builtins::kReadImagei:
+  case Builtins::kReadImageui: {
+    // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
+    // Additionally, OpTypeSampledImage is generated.
+    const auto &pi = FuncInfo.getParameter(1);
+    if (pi.isSampler()) {
+      //
+      // Generate OpSampledImage.
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Image ID
+      // Ops[2] = Sampler ID
+      //
+      SPIRVOperandVec Ops;
+
+      Value *Image = Call->getArgOperand(0);
+      Value *Sampler = Call->getArgOperand(1);
+      Value *Coordinate = Call->getArgOperand(2);
+
+      TypeMapType &OpImageTypeMap = getImageTypeMap();
+      Type *ImageTy = Image->getType()->getPointerElementType();
+      SPIRVID ImageTyID = OpImageTypeMap[ImageTy];
+
+      Ops << ImageTyID << Image << Sampler;
+
+      SPIRVID SampledImageID = addSPIRVInst(spv::OpSampledImage, Ops);
+
+      //
+      // Generate OpImageSampleExplicitLod.
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Sampled Image ID
+      // Ops[2] = Coordinate ID
+      // Ops[3] = Image Operands Type ID
+      // Ops[4] ... Ops[n] = Operands ID
+      //
+      Ops.clear();
+
+      const bool is_int_image = IsIntImageType(Image->getType());
+      SPIRVID result_type;
+      if (is_int_image) {
+        result_type = v4int32ID;
+      } else {
+        result_type = getSPIRVType(Call->getType());
+      }
+
+      Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
+      Ops << result_type << SampledImageID << Coordinate
+          << spv::ImageOperandsLodMask << CstFP0;
+
+      RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << Call->getType() << RID;
+        RID = addSPIRVInst(spv::OpBitcast, Ops);
+      }
+    } else {
+
+      // read_image (without a sampler) is mapped to OpImageFetch.
+      Value *Image = Call->getArgOperand(0);
+      Value *Coordinate = Call->getArgOperand(1);
+
+      //
+      // Generate OpImageFetch
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Image ID
+      // Ops[2] = Coordinate ID
+      // Ops[3] = Lod
+      // Ops[4] = 0
+      //
+      SPIRVOperandVec Ops;
+
+      const bool is_int_image = IsIntImageType(Image->getType());
+      SPIRVID result_type;
+      if (is_int_image) {
+        result_type = v4int32ID;
+      } else {
+        result_type = getSPIRVType(Call->getType());
+      }
+
+      Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
+          << getSPIRVInt32Constant(0);
+
+      RID = addSPIRVInst(spv::OpImageFetch, Ops);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << Call->getType() << RID;
+        RID = addSPIRVInst(spv::OpBitcast, Ops);
+      }
+    }
+    break;
+  }
+
+  case Builtins::kWriteImagef:
+  case Builtins::kWriteImageh:
+  case Builtins::kWriteImagei:
+  case Builtins::kWriteImageui: {
+    // write_image is mapped to OpImageWrite.
+    //
+    // Generate OpImageWrite.
+    //
+    // Ops[0] = Image ID
+    // Ops[1] = Coordinate ID
+    // Ops[2] = Texel ID
+    // Ops[3] = (Optional) Image Operands Type (Literal Number)
+    // Ops[4] ... Ops[n] = (Optional) Operands ID
+    //
+    SPIRVOperandVec Ops;
+
+    Value *Image = Call->getArgOperand(0);
+    Value *Coordinate = Call->getArgOperand(1);
+    Value *Texel = Call->getArgOperand(2);
+
+    SPIRVID TexelID = getSPIRVValue(Texel);
+
+    const bool is_int_image = IsIntImageType(Image->getType());
+    if (is_int_image) {
+      // Generate a bitcast to v4int and use it as the texel value.
+      Ops << v4int32ID << TexelID;
+      TexelID = addSPIRVInst(spv::OpBitcast, Ops);
+      Ops.clear();
+    }
+    Ops << Image << Coordinate << TexelID;
+
+    RID = addSPIRVInst(spv::OpImageWrite, Ops);
+    break;
+  }
+
+  case Builtins::kGetImageHeight:
+  case Builtins::kGetImageWidth:
+  case Builtins::kGetImageDepth:
+  case Builtins::kGetImageDim: {
+    // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
+    addCapability(spv::CapabilityImageQuery);
+
+    //
+    // Generate OpImageQuerySize[Lod]
+    //
+    // Ops[0] = Image ID
+    //
+    // Result type has components equal to the dimensionality of the image,
+    // plus 1 if the image is arrayed.
+    //
+    // %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%uint_0]
+    SPIRVOperandVec Ops;
+
+    // Implement:
+    //     %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%uint_0]
+    SPIRVID SizesTypeID;
+
+    Value *Image = Call->getArgOperand(0);
+    const uint32_t dim = ImageDimensionality(Image->getType());
+    const uint32_t components =
+        dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
+    if (components == 1) {
+      SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
+    } else {
+      SizesTypeID = getSPIRVType(
+          FixedVectorType::get(Type::getInt32Ty(Context), components));
+    }
+    Ops << SizesTypeID << Image;
+    spv::Op query_opcode = spv::OpImageQuerySize;
+    if (IsSampledImageType(Image->getType())) {
+      query_opcode = spv::OpImageQuerySizeLod;
+      // Need explicit 0 for Lod operand.
+      Ops << getSPIRVInt32Constant(0);
+    }
+
+    RID = addSPIRVInst(query_opcode, Ops);
+
+    // May require an extra instruction to create the appropriate result of
+    // the builtin function.
+    if (FuncInfo.getType() == Builtins::kGetImageDim) {
+      if (dim == 3) {
+        // get_image_dim returns an int4 for 3D images.
+        //
+
+        // Implement:
+        //   %result = OpCompositeConstruct %uint4 %sizes %uint_0
+        Ops.clear();
+        Ops << FixedVectorType::get(Type::getInt32Ty(Context), 4) << RID
+            << getSPIRVInt32Constant(0);
+
+        RID = addSPIRVInst(spv::OpCompositeConstruct, Ops);
+      } else if (dim != components) {
+        // get_image_dim return an int2 regardless of the arrayedness of the
+        // image. If the image is arrayed an element must be dropped from the
+        // query result.
+        //
+
+        // Implement:
+        //   %result = OpVectorShuffle %uint2 %sizes %sizes 0 1
+        Ops.clear();
+        Ops << FixedVectorType::get(Type::getInt32Ty(Context), 2) << RID << RID
+            << 0 << 1;
+
+        RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+      }
+    } else if (components > 1) {
+      // Implement:
+      //     %result = OpCompositeExtract %uint %sizes <component number>
+      Ops.clear();
+      Ops << Call->getType() << RID;
+
+      uint32_t component = 0;
+      if (FuncInfo.getType() == Builtins::kGetImageHeight)
+        component = 1;
+      else if (FuncInfo.getType() == Builtins::kGetImageDepth)
+        component = 2;
+      Ops << component;
+
+      RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
+    }
+    break;
+  }
+  default:
+    llvm_unreachable("Unsupported Image builtin");
+  }
+
+  return RID;
+}
+
+SPIRVID
+SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
+                                               const FunctionInfo &FuncInfo) {
+  SPIRVID RID;
+
+  // requires SPIRV version 1.3 or greater
+  if (SpvVersion() != SPIRVVersion::SPIRV_1_3) {
+    // llvm_unreachable("SubGroups extension requires SPIRV 1.3 or greater");
+    // TODO(sjw): error out gracefully
+  }
+
+  auto loadBuiltin = [this, Call](spv::BuiltIn spvBI,
+                                  spv::Capability spvCap =
+                                      spv::CapabilityGroupNonUniform) {
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << this->getSPIRVBuiltin(spvBI, spvCap);
+
+    return addSPIRVInst(spv::OpLoad, Ops);
+  };
+
+  spv::Op op = spv::OpNop;
+  switch (FuncInfo.getType()) {
+  case Builtins::kGetSubGroupSize:
+    return loadBuiltin(spv::BuiltInSubgroupSize);
+  case Builtins::kGetNumSubGroups:
+    return loadBuiltin(spv::BuiltInNumSubgroups);
+  case Builtins::kGetSubGroupId:
+    return loadBuiltin(spv::BuiltInSubgroupId);
+  case Builtins::kGetSubGroupLocalId:
+    return loadBuiltin(spv::BuiltInSubgroupLocalInvocationId);
+
+  case Builtins::kSubGroupBroadcast:
+    if (SpvVersion() < SPIRVVersion::SPIRV_1_5 &&
+        !dyn_cast<ConstantInt>(Call->getOperand(1))) {
+      llvm_unreachable("sub_group_broadcast requires constant lane Id for "
+                       "SPIRV version < 1.5");
+    }
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBroadcast;
+    break;
+
+  case Builtins::kSubGroupAll:
+    addCapability(spv::CapabilityGroupNonUniformVote);
+    op = spv::OpGroupNonUniformAll;
+    break;
+  case Builtins::kSubGroupAny:
+    addCapability(spv::CapabilityGroupNonUniformVote);
+    op = spv::OpGroupNonUniformAny;
+    break;
+  case Builtins::kSubGroupReduceAdd:
+  case Builtins::kSubGroupScanExclusiveAdd:
+  case Builtins::kSubGroupScanInclusiveAdd: {
+    addCapability(spv::CapabilityGroupNonUniformArithmetic);
+    if (FuncInfo.getParameter(0).type_id == Type::IntegerTyID) {
+      op = spv::OpGroupNonUniformIAdd;
+    } else {
+      op = spv::OpGroupNonUniformFAdd;
+    }
+    break;
+  }
+  case Builtins::kSubGroupReduceMin:
+  case Builtins::kSubGroupScanExclusiveMin:
+  case Builtins::kSubGroupScanInclusiveMin: {
+    addCapability(spv::CapabilityGroupNonUniformArithmetic);
+    auto &param = FuncInfo.getParameter(0);
+    if (param.type_id == Type::IntegerTyID) {
+      op = param.is_signed ? spv::OpGroupNonUniformSMin
+                           : spv::OpGroupNonUniformUMin;
+    } else {
+      op = spv::OpGroupNonUniformFMin;
+    }
+    break;
+  }
+  case Builtins::kSubGroupReduceMax:
+  case Builtins::kSubGroupScanExclusiveMax:
+  case Builtins::kSubGroupScanInclusiveMax: {
+    addCapability(spv::CapabilityGroupNonUniformArithmetic);
+    auto &param = FuncInfo.getParameter(0);
+    if (param.type_id == Type::IntegerTyID) {
+      op = param.is_signed ? spv::OpGroupNonUniformSMax
+                           : spv::OpGroupNonUniformUMax;
+    } else {
+      op = spv::OpGroupNonUniformFMax;
+    }
+    break;
+  }
+
+  case Builtins::kGetEnqueuedNumSubGroups:
+    // TODO(sjw): requires CapabilityKernel (incompatible with Shader)
+  case Builtins::kGetMaxSubGroupSize:
+    // TODO(sjw): use SpecConstant, capability Kernel (incompatible with Shader)
+  case Builtins::kSubGroupBarrier:
+  case Builtins::kSubGroupReserveReadPipe:
+  case Builtins::kSubGroupReserveWritePipe:
+  case Builtins::kSubGroupCommitReadPipe:
+  case Builtins::kSubGroupCommitWritePipe:
+  case Builtins::kGetKernelSubGroupCountForNdrange:
+  case Builtins::kGetKernelMaxSubGroupSizeForNdrange:
+  default:
+    Call->print(errs());
+    llvm_unreachable("Unsupported sub_group operation");
+    break;
+  }
+
+  assert(op != spv::OpNop);
+
+  SPIRVOperandVec Operands;
+
+  //
+  // Generate OpGroupNonUniform*
+  //
+  // Ops[0] = Result Type ID
+  // Ops[1] = ScopeSubgroup
+  // Ops[2] = Value ID
+  // Ops[3] = Local ID
+
+  // The result type.
+  Operands << Call->getType();
+
+  // Subgroup Scope
+  Operands << getSPIRVInt32Constant(spv::ScopeSubgroup);
+
+  switch (FuncInfo.getType()) {
+  case Builtins::kSubGroupReduceAdd:
+  case Builtins::kSubGroupReduceMin:
+  case Builtins::kSubGroupReduceMax:
+    Operands << spv::GroupOperationReduce;
+    break;
+  case Builtins::kSubGroupScanExclusiveAdd:
+  case Builtins::kSubGroupScanExclusiveMin:
+  case Builtins::kSubGroupScanExclusiveMax:
+    Operands << spv::GroupOperationExclusiveScan;
+    break;
+  case Builtins::kSubGroupScanInclusiveAdd:
+  case Builtins::kSubGroupScanInclusiveMin:
+  case Builtins::kSubGroupScanInclusiveMax:
+    Operands << spv::GroupOperationInclusiveScan;
+    break;
+  default:
+    break;
+  }
+
+  for (Use &use : Call->arg_operands()) {
+    Operands << use.get();
+  }
+
+  return addSPIRVInst(op, Operands);
+}
+
+SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
+  LLVMContext &Context = module->getContext();
+
+  auto &func_info = Builtins::Lookup(Call->getCalledFunction());
+  auto func_type = func_info.getType();
+
+  if (BUILTIN_IN_GROUP(func_type, Clspv)) {
+    return GenerateClspvInstruction(Call, func_info);
+  } else if (BUILTIN_IN_GROUP(func_type, Image)) {
+    return GenerateImageInstruction(Call, func_info);
+  } else if (BUILTIN_IN_GROUP(func_type, SubgroupsKHR)) {
+    return GenerateSubgroupInstruction(Call, func_info);
+  }
+
+  SPIRVID RID;
+
+  switch (func_type) {
+  case Builtins::kPopcount: {
+    //
+    // Generate OpBitCount
+    //
+    // Ops[0] = Result Type ID
+    // Ops[1] = Base ID
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << Call->getOperand(0);
+
+    RID = addSPIRVInst(spv::OpBitCount, Ops);
+    break;
+  }
+  default: {
+    glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(func_info);
+
+    if (EInst) {
+      SPIRVID ExtInstImportID = getOpExtInstImportID();
+
+      //
+      // Generate OpExtInst.
+      //
+
+      // Ops[0] = Result Type ID
+      // Ops[1] = Set ID (OpExtInstImport ID)
+      // Ops[2] = Instruction Number (Literal Number)
+      // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
+      SPIRVOperandVec Ops;
+
+      Ops << Call->getType() << ExtInstImportID << EInst;
+
+      for (auto &use : Call->arg_operands()) {
+        Ops << use.get();
+      }
+
+      RID = addSPIRVInst(spv::OpExtInst, Ops);
+
+      const auto IndirectExtInst = getIndirectExtInstEnum(func_info);
+      if (IndirectExtInst != kGlslExtInstBad) {
+
+        // Generate one more instruction that uses the result of the extended
+        // instruction.  Its result id is one more than the id of the
+        // extended instruction.
+        auto generate_extra_inst = [this, &Context, &Call,
+                                    &RID](spv::Op opcode, Constant *constant) {
+          //
+          // Generate instruction like:
+          //   result = opcode constant <extinst-result>
+          //
+          // Ops[0] = Result Type ID
+          // Ops[1] = Operand 0 ;; the constant, suitably splatted
+          // Ops[2] = Operand 1 ;; the result of the extended instruction
+          SPIRVOperandVec Ops;
+
+          Type *resultTy = Call->getType();
+
+          if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
+            constant = ConstantVector::getSplat(
+                {static_cast<unsigned>(vectorTy->getNumElements()), false},
+                constant);
+          }
+          Ops << resultTy << constant << RID;
+
+          RID = addSPIRVInst(opcode, Ops);
+        };
+
+        auto IntTy = Type::getInt32Ty(Context);
+        switch (IndirectExtInst) {
+        case glsl::ExtInstFindUMsb: // Implementing clz
+          generate_extra_inst(spv::OpISub, ConstantInt::get(IntTy, 31));
+          break;
+        case glsl::ExtInstAcos:  // Implementing acospi
+        case glsl::ExtInstAsin:  // Implementing asinpi
+        case glsl::ExtInstAtan:  // Implementing atanpi
+        case glsl::ExtInstAtan2: // Implementing atan2pi
+          generate_extra_inst(
+              spv::OpFMul,
+              ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
+          break;
+
+        default:
+          assert(false && "internally inconsistent");
+        }
+      }
+    } else {
+
+      // A real function call (not builtin)
+      // Call instruction is deferred because it needs function's ID.
+      RID = addSPIRVPlaceholder(Call);
+    }
+
+    break;
+  }
+  }
+
+  return RID;
+}
+
 void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   ValueMapType &VMap = getValueMap();
-  LLVMContext &Context = I.getParent()->getParent()->getParent()->getContext();
+  LLVMContext &Context = module->getContext();
 
-  SPIRVID RID = 0;
+  SPIRVID RID;
 
   switch (I.getOpcode()) {
   default: {
@@ -3282,8 +3958,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
         SPIRVOperandVec Ops;
 
-        Type *UintTy = Type::getInt32Ty(Context);
-        Ops << OpTy << I.getOperand(0) << ConstantInt::get(UintTy, 255);
+        Ops << OpTy << I.getOperand(0) << getSPIRVInt32Constant(255);
 
         RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
       } else {
@@ -3522,16 +4197,14 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       SPIRVID Op1ID = 0;
       if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1))) {
         // Handle constant index.
-        uint64_t Idx = CI->getZExtValue();
-        Value *ShiftAmount =
-            ConstantInt::get(Type::getInt32Ty(Context), Idx * 8);
-        Op1ID = getSPIRVValue(ShiftAmount);
+        uint32_t Idx = static_cast<uint32_t>(CI->getZExtValue());
+        Op1ID = getSPIRVInt32Constant(Idx * 8);
       } else {
         // Handle variable index.
         SPIRVOperandVec TmpOps;
 
-        ConstantInt *Cst8 = ConstantInt::get(Type::getInt32Ty(Context), 8);
-        TmpOps << Type::getInt32Ty(Context) << I.getOperand(1) << Cst8;
+        TmpOps << Type::getInt32Ty(Context) << I.getOperand(1)
+               << getSPIRVInt32Constant(8);
 
         Op1ID = addSPIRVInst(spv::OpIMul, TmpOps);
       }
@@ -3548,8 +4221,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       //
       Ops.clear();
 
-      Constant *CstFF = ConstantInt::get(Type::getInt32Ty(Context), 0xFF);
-      Ops << CompositeTy << ShiftID << CstFF;
+      Ops << CompositeTy << ShiftID << getSPIRVInt32Constant(0xFF);
 
       RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
       break;
@@ -3577,22 +4249,19 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     // Handle <4 x i8> type manually.
     Type *CompositeTy = I.getOperand(0)->getType();
     if (is4xi8vec(CompositeTy)) {
-      Constant *CstFF = ConstantInt::get(Type::getInt32Ty(Context), 0xFF);
-      SPIRVID CstFFID = getSPIRVValue(CstFF);
+      SPIRVID CstFFID = getSPIRVInt32Constant(0xFF);
 
       SPIRVID ShiftAmountID = 0;
       if (ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2))) {
         // Handle constant index.
-        uint64_t Idx = CI->getZExtValue();
-        Value *ShiftAmount =
-            ConstantInt::get(Type::getInt32Ty(Context), Idx * 8);
-        ShiftAmountID = getSPIRVValue(ShiftAmount);
+        uint32_t Idx = static_cast<uint32_t>(CI->getZExtValue());
+        ShiftAmountID = getSPIRVInt32Constant(Idx * 8);
       } else {
         // Handle variable index.
         SPIRVOperandVec TmpOps;
 
-        ConstantInt *Cst8 = ConstantInt::get(Type::getInt32Ty(Context), 8);
-        TmpOps << Type::getInt32Ty(Context) << I.getOperand(2) << Cst8;
+        TmpOps << Type::getInt32Ty(Context) << I.getOperand(2)
+               << getSPIRVInt32Constant(8);
 
         ShiftAmountID = addSPIRVInst(spv::OpIMul, TmpOps);
       }
@@ -3872,13 +4541,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 
     Ops << I.getType() << AtomicRMW->getPointerOperand();
 
-    auto IntTy = Type::getInt32Ty(I.getContext());
-    const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
+    const auto ConstantScopeDevice = getSPIRVInt32Constant(spv::ScopeDevice);
     Ops << ConstantScopeDevice;
 
-    const auto ConstantMemorySemantics = ConstantInt::get(
-        IntTy, spv::MemorySemanticsUniformMemoryMask |
-                   spv::MemorySemanticsSequentiallyConsistentMask);
+    const auto ConstantMemorySemantics =
+        getSPIRVInt32Constant(spv::MemorySemanticsUniformMemoryMask |
+                              spv::MemorySemanticsSequentiallyConsistentMask);
     Ops << ConstantMemorySemantics << AtomicRMW->getValOperand();
 
     RID = addSPIRVInst(opcode, Ops);
@@ -3891,437 +4559,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   }
   case Instruction::Call: {
     CallInst *Call = dyn_cast<CallInst>(&I);
-    Function *Callee = Call->getCalledFunction();
-    auto &func_info = Builtins::Lookup(Callee);
-
-    glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(func_info);
-
-    if (EInst) {
-      SPIRVID ExtInstImportID = getOpExtInstImportID();
-
-      //
-      // Generate OpExtInst.
-      //
-
-      // Ops[0] = Result Type ID
-      // Ops[1] = Set ID (OpExtInstImport ID)
-      // Ops[2] = Instruction Number (Literal Number)
-      // Ops[3] ... Ops[n] = Operand 1, ... , Operand n
-      SPIRVOperandVec Ops;
-
-      Ops << Call->getType() << ExtInstImportID << EInst;
-
-      FunctionType *CalleeFTy = cast<FunctionType>(Call->getFunctionType());
-      for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
-        Ops << Call->getOperand(j);
-      }
-
-      RID = addSPIRVInst(spv::OpExtInst, Ops);
-
-      const auto IndirectExtInst = getIndirectExtInstEnum(func_info);
-      if (IndirectExtInst != kGlslExtInstBad) {
-
-        // Generate one more instruction that uses the result of the extended
-        // instruction.  Its result id is one more than the id of the
-        // extended instruction.
-        auto generate_extra_inst = [this, &Context, &Call,
-                                    &RID](spv::Op opcode, Constant *constant) {
-          //
-          // Generate instruction like:
-          //   result = opcode constant <extinst-result>
-          //
-          // Ops[0] = Result Type ID
-          // Ops[1] = Operand 0 ;; the constant, suitably splatted
-          // Ops[2] = Operand 1 ;; the result of the extended instruction
-          SPIRVOperandVec Ops;
-
-          Type *resultTy = Call->getType();
-
-          if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
-            constant = ConstantVector::getSplat(
-                {static_cast<unsigned>(vectorTy->getNumElements()), false},
-                constant);
-          }
-          Ops << resultTy << constant << RID;
-
-          RID = addSPIRVInst(opcode, Ops);
-        };
-
-        auto IntTy = Type::getInt32Ty(Context);
-        switch (IndirectExtInst) {
-        case glsl::ExtInstFindUMsb: // Implementing clz
-          generate_extra_inst(spv::OpISub, ConstantInt::get(IntTy, 31));
-          break;
-        case glsl::ExtInstAcos:  // Implementing acospi
-        case glsl::ExtInstAsin:  // Implementing asinpi
-        case glsl::ExtInstAtan:  // Implementing atanpi
-        case glsl::ExtInstAtan2: // Implementing atan2pi
-          generate_extra_inst(
-              spv::OpFMul,
-              ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
-          break;
-
-        default:
-          assert(false && "internally inconsistent");
-        }
-      }
-      break;
-    }
-
-    switch (func_info.getType()) {
-    case Builtins::kClspvResource: {
-      if (ResourceVarDeferredLoadCalls.count(Call) && Call->hasNUsesOrMore(1)) {
-        // Generate an OpLoad
-        SPIRVOperandVec Ops;
-
-        Ops << Call->getType()->getPointerElementType()
-            << ResourceVarDeferredLoadCalls[Call];
-
-        RID = addSPIRVInst(spv::OpLoad, Ops);
-
-      } else {
-        // This maps to an OpVariable we've already generated.
-        // No code is generated for the call.
-      }
-      break;
-    }
-    case Builtins::kClspvLocal: {
-      // Don't codegen an instruction here, but instead map this call directly
-      // to the workgroup variable id.
-      int spec_id = static_cast<int>(
-          cast<ConstantInt>(Call->getOperand(0))->getSExtValue());
-      const auto &info = LocalSpecIdInfoMap[spec_id];
-      RID = info.variable_id;
-      break;
-    }
-    case Builtins::kClspvSamplerVarLiteral: {
-      // Sampler initializers become a load of the corresponding sampler.
-      // Map this to a load from the variable.
-      const auto third_param = static_cast<unsigned>(
-          dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
-      auto sampler_value = third_param;
-      if (clspv::Option::UseSamplerMap()) {
-        sampler_value = getSamplerMap()[third_param].first;
-      }
-
-      // Generate an OpLoad
-      SPIRVOperandVec Ops;
-
-      Ops << SamplerTy->getPointerElementType()
-          << SamplerLiteralToIDMap[sampler_value];
-
-      RID = addSPIRVInst(spv::OpLoad, Ops);
-      break;
-    }
-    case Builtins::kSpirvAtomicXor: {
-      // Handle SPIR-V intrinsics
-      SPIRVOperandVec Ops;
-
-      if (!I.getType()->isVoidTy()) {
-        Ops << I.getType();
-      }
-
-      for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
-        Ops << Call->getArgOperand(i);
-      }
-
-      RID = addSPIRVInst(spv::OpAtomicXor, Ops);
-      break;
-    }
-    case Builtins::kSpirvOp: {
-      // Handle SPIR-V intrinsics
-      auto *arg0 = dyn_cast<ConstantInt>(Call->getArgOperand(0));
-      spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
-      if (opcode != spv::OpNop) {
-        SPIRVOperandVec Ops;
-
-        if (!I.getType()->isVoidTy()) {
-          Ops << I.getType();
-        }
-
-        for (unsigned i = 1; i < Call->getNumArgOperands(); i++) {
-          Ops << Call->getArgOperand(i);
-        }
-
-        RID = addSPIRVInst(opcode, Ops);
-      }
-      break;
-    }
-    case Builtins::kPopcount: {
-      //
-      // Generate OpBitCount
-      //
-      // Ops[0] = Result Type ID
-      // Ops[1] = Base ID
-      SPIRVOperandVec Ops;
-      Ops << Call->getType() << Call->getOperand(0);
-
-      RID = addSPIRVInst(spv::OpBitCount, Ops);
-      break;
-    }
-    case Builtins::kSpirvCopyMemory: {
-      //
-      // Generate OpCopyMemory.
-      //
-
-      // Ops[0] = Dst ID
-      // Ops[1] = Src ID
-      // Ops[2] = Memory Access
-      // Ops[3] = Alignment
-
-      auto IsVolatile =
-          dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue() != 0;
-
-      auto VolatileMemoryAccess = (IsVolatile) ? spv::MemoryAccessVolatileMask
-                                               : spv::MemoryAccessMaskNone;
-
-      auto MemoryAccess = VolatileMemoryAccess | spv::MemoryAccessAlignedMask;
-
-      auto Alignment =
-          dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
-
-      SPIRVOperandVec Ops;
-      Ops << Call->getArgOperand(0) << Call->getArgOperand(1) << MemoryAccess
-          << static_cast<uint32_t>(Alignment);
-
-      RID = addSPIRVInst(spv::OpCopyMemory, Ops);
-      break;
-    }
-    case Builtins::kReadImagef:
-    case Builtins::kReadImageh:
-    case Builtins::kReadImagei:
-    case Builtins::kReadImageui: {
-      // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
-      // Additionally, OpTypeSampledImage is generated.
-      const auto &pi = func_info.getParameter(1);
-      if (pi.isSampler()) {
-        //
-        // Generate OpSampledImage.
-        //
-        // Ops[0] = Result Type ID
-        // Ops[1] = Image ID
-        // Ops[2] = Sampler ID
-        //
-        SPIRVOperandVec Ops;
-
-        Value *Image = Call->getArgOperand(0);
-        Value *Sampler = Call->getArgOperand(1);
-        Value *Coordinate = Call->getArgOperand(2);
-
-        TypeMapType &OpImageTypeMap = getImageTypeMap();
-        Type *ImageTy = Image->getType()->getPointerElementType();
-        SPIRVID ImageTyID = OpImageTypeMap[ImageTy];
-
-        Ops << ImageTyID << Image << Sampler;
-
-        SPIRVID SampledImageID = addSPIRVInst(spv::OpSampledImage, Ops);
-
-        //
-        // Generate OpImageSampleExplicitLod.
-        //
-        // Ops[0] = Result Type ID
-        // Ops[1] = Sampled Image ID
-        // Ops[2] = Coordinate ID
-        // Ops[3] = Image Operands Type ID
-        // Ops[4] ... Ops[n] = Operands ID
-        //
-        Ops.clear();
-
-        const bool is_int_image = IsIntImageType(Image->getType());
-        SPIRVID result_type;
-        if (is_int_image) {
-          result_type = v4int32ID;
-        } else {
-          result_type = getSPIRVType(Call->getType());
-        }
-
-        Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
-        Ops << result_type << SampledImageID << Coordinate
-            << spv::ImageOperandsLodMask << CstFP0;
-
-        RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
-
-        if (is_int_image) {
-          // Generate the bitcast.
-          Ops.clear();
-          Ops << Call->getType() << RID;
-          RID = addSPIRVInst(spv::OpBitcast, Ops);
-        }
-      } else {
-
-        // read_image (without a sampler) is mapped to OpImageFetch.
-        Value *Image = Call->getArgOperand(0);
-        Value *Coordinate = Call->getArgOperand(1);
-
-        //
-        // Generate OpImageFetch
-        //
-        // Ops[0] = Result Type ID
-        // Ops[1] = Image ID
-        // Ops[2] = Coordinate ID
-        // Ops[3] = Lod
-        // Ops[4] = 0
-        //
-        SPIRVOperandVec Ops;
-
-        const bool is_int_image = IsIntImageType(Image->getType());
-        SPIRVID result_type;
-        if (is_int_image) {
-          result_type = v4int32ID;
-        } else {
-          result_type = getSPIRVType(Call->getType());
-        }
-        Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
-
-        Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
-            << CstInt0;
-
-        RID = addSPIRVInst(spv::OpImageFetch, Ops);
-
-        if (is_int_image) {
-          // Generate the bitcast.
-          Ops.clear();
-          Ops << Call->getType() << RID;
-          RID = addSPIRVInst(spv::OpBitcast, Ops);
-        }
-      }
-      break;
-    }
-
-    case Builtins::kWriteImagef:
-    case Builtins::kWriteImageh:
-    case Builtins::kWriteImagei:
-    case Builtins::kWriteImageui: {
-      // write_image is mapped to OpImageWrite.
-      //
-      // Generate OpImageWrite.
-      //
-      // Ops[0] = Image ID
-      // Ops[1] = Coordinate ID
-      // Ops[2] = Texel ID
-      // Ops[3] = (Optional) Image Operands Type (Literal Number)
-      // Ops[4] ... Ops[n] = (Optional) Operands ID
-      //
-      SPIRVOperandVec Ops;
-
-      Value *Image = Call->getArgOperand(0);
-      Value *Coordinate = Call->getArgOperand(1);
-      Value *Texel = Call->getArgOperand(2);
-
-      SPIRVID TexelID = getSPIRVValue(Texel);
-
-      const bool is_int_image = IsIntImageType(Image->getType());
-      if (is_int_image) {
-        // Generate a bitcast to v4int and use it as the texel value.
-        Ops << v4int32ID << TexelID;
-        TexelID = addSPIRVInst(spv::OpBitcast, Ops);
-        Ops.clear();
-      }
-      Ops << Image << Coordinate << TexelID;
-
-      RID = addSPIRVInst(spv::OpImageWrite, Ops);
-      break;
-    }
-
-    case Builtins::kGetImageHeight:
-    case Builtins::kGetImageWidth:
-    case Builtins::kGetImageDepth:
-    case Builtins::kGetImageDim: {
-      // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
-      addCapability(spv::CapabilityImageQuery);
-
-      //
-      // Generate OpImageQuerySize[Lod]
-      //
-      // Ops[0] = Image ID
-      //
-      // Result type has components equal to the dimensionality of the image,
-      // plus 1 if the image is arrayed.
-      //
-      // %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%uint_0]
-      SPIRVOperandVec Ops;
-
-      // Implement:
-      //     %sizes = OpImageQuerySize[Lod] %uint[2|3|4] %im [%uint_0]
-      SPIRVID SizesTypeID;
-
-      Value *Image = Call->getArgOperand(0);
-      const uint32_t dim = ImageDimensionality(Image->getType());
-      const uint32_t components =
-          dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
-      if (components == 1) {
-        SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
-      } else {
-        SizesTypeID = getSPIRVType(
-            FixedVectorType::get(Type::getInt32Ty(Context), components));
-      }
-      Ops << SizesTypeID << Image;
-      spv::Op query_opcode = spv::OpImageQuerySize;
-      if (IsSampledImageType(Image->getType())) {
-        query_opcode = spv::OpImageQuerySizeLod;
-        // Need explicit 0 for Lod operand.
-        Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
-        Ops << CstInt0;
-      }
-
-      RID = addSPIRVInst(query_opcode, Ops);
-
-      // May require an extra instruction to create the appropriate result of
-      // the builtin function.
-      if (func_info.getType() == Builtins::kGetImageDim) {
-        if (dim == 3) {
-          // get_image_dim returns an int4 for 3D images.
-          //
-
-          // Implement:
-          //   %result = OpCompositeConstruct %uint4 %sizes %uint_0
-          Constant *CstInt0 = ConstantInt::get(Context, APInt(32, 0));
-
-          Ops.clear();
-          Ops << FixedVectorType::get(Type::getInt32Ty(Context), 4) << RID
-              << CstInt0;
-
-          RID = addSPIRVInst(spv::OpCompositeConstruct, Ops);
-        } else if (dim != components) {
-          // get_image_dim return an int2 regardless of the arrayedness of the
-          // image. If the image is arrayed an element must be dropped from the
-          // query result.
-          //
-
-          // Implement:
-          //   %result = OpVectorShuffle %uint2 %sizes %sizes 0 1
-          Ops.clear();
-          Ops << FixedVectorType::get(Type::getInt32Ty(Context), 2) << RID
-              << RID << 0 << 1;
-
-          RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
-        }
-      } else if (components > 1) {
-        // Implement:
-        //     %result = OpCompositeExtract %uint %sizes <component number>
-        Ops.clear();
-        Ops << I.getType() << RID;
-
-        uint32_t component = 0;
-        if (func_info.getType() == Builtins::kGetImageHeight)
-          component = 1;
-        else if (func_info.getType() == Builtins::kGetImageDepth)
-          component = 2;
-        Ops << component;
-
-        RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
-      }
-      break;
-    }
-
-    default: {
-      // Call instruction is deferred because it needs function's ID.
-      RID = addSPIRVPlaceholder(&I);
-
-      break;
-    }
-    }
-
+    RID = GenerateInstructionFromCall(Call);
     break;
   }
   case Instruction::Ret: {
@@ -4516,7 +4754,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         Ops << Call->getType();
 
         SPIRVID CalleeID = getSPIRVValue(Callee);
-        if (CalleeID == 0) {
+        if (!CalleeID.isValid()) {
           errs() << "Can't translate function call.  Missing builtin? "
                  << callee_name << " in: " << *Call << "\n";
           // TODO(dneto): Can we error out?  Enabling this llvm_unreachable
@@ -5018,7 +5256,18 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpAtomicAnd:
     case spv::OpAtomicOr:
     case spv::OpAtomicXor:
-    case spv::OpDot: {
+    case spv::OpDot:
+    case spv::OpGroupNonUniformAll:
+    case spv::OpGroupNonUniformAny:
+    case spv::OpGroupNonUniformBroadcast:
+    case spv::OpGroupNonUniformIAdd:
+    case spv::OpGroupNonUniformFAdd:
+    case spv::OpGroupNonUniformSMin:
+    case spv::OpGroupNonUniformUMin:
+    case spv::OpGroupNonUniformFMin:
+    case spv::OpGroupNonUniformSMax:
+    case spv::OpGroupNonUniformUMax:
+    case spv::OpGroupNonUniformFMax: {
       WriteWordCountAndOpcode(Inst);
       WriteOperand(Ops[0]);
       WriteResultID(Inst);

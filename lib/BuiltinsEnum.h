@@ -25,10 +25,7 @@ enum BuiltinType {
   kClspvResource,
   kClspvLocal,
   kSpirvOp,
-  kClspvFract,
   kSpirvAtomicXor,
-  kSpirvPack,
-  kSpirvUnpack,
   kSpirvCopyMemory,
   kClspvSamplerVarLiteral,
   kClspvCompositeConstruct,
@@ -84,6 +81,8 @@ enum BuiltinType {
 
   kType_Convert_Start,
   kConvert,
+  kSpirvPack,
+  kSpirvUnpack,
   kType_Convert_End,
 
   kType_Event_Start,
@@ -193,6 +192,7 @@ enum BuiltinType {
   kFmax,
   kFmin,
   kFmod,
+  kClspvFract,
   kFract,
   kFrexp,
   kHypot,

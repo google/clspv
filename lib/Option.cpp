@@ -165,6 +165,15 @@ llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP,
                                 "CLC++", "C++ for OpenCL")));
 
+llvm::cl::opt<clspv::Option::SPIRVVersion> spv_version(
+    "spv-version", llvm::cl::desc("Specify the SPIR-V binary version"),
+    llvm::cl::init(clspv::Option::SPIRVVersion::SPIRV_1_0),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_0, "1.0",
+                   "SPIR-V version 1.0 (Vulkan 1.0)"),
+        clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_3, "1.3",
+                   "SPIR-V version 1.3 (Vulkan 1.1). Experimental")));
+
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));
 
@@ -253,6 +262,7 @@ bool ImageSupport() { return images; }
 bool UseSamplerMap() { return use_sampler_map; }
 void SetUseSamplerMap(bool use) { use_sampler_map = use; }
 SourceLanguage Language() { return cl_std; }
+SPIRVVersion SpvVersion() { return spv_version; }
 bool ScalarBlockLayout() { return scalar_block_layout; }
 bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
