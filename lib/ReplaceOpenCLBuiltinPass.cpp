@@ -233,7 +233,7 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceBarrier(F);
 
   case Builtins::kSubGroupBarrier:
-    return replaceBarrier(F,true);
+    return replaceBarrier(F, true);
 
   case Builtins::kMemFence:
     return replaceMemFence(F, spv::MemorySemanticsAcquireReleaseMask);
@@ -642,8 +642,10 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
           SelectInst::Create(Cmp, ConstantScopeDevice, MemoryScope, "", CI);
     }
 
-    // Lastly, the Execution Scope is either Workgroup or Subgroup depending on the type of barrier;
-    const auto ExecutionScope = subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
+    // Lastly, the Execution Scope is either Workgroup or Subgroup depending on
+    // the type of barrier;
+    const auto ExecutionScope =
+        subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
 
     return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
                                 {Attribute::NoDuplicate}, CI->getType(),
