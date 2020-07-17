@@ -8,10 +8,10 @@
 // Workgroup
 // CHECK-DAG: %[[CONSTANT_2_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 2
 
-// SequentiallyConsistent | WorkgroupMemory
-// CHECK-DAG: %[[CONSTANT_0x110_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 272
+// AcquireRelease | WorkgroupMemory
+// CHECK-DAG: %[[CONSTANT_264_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 264
 
-// CHECK: OpControlBarrier %[[CONSTANT_2_ID]] %[[CONSTANT_2_ID]] %[[CONSTANT_0x110_ID]]
+// CHECK: OpControlBarrier %[[CONSTANT_2_ID]] %[[CONSTANT_2_ID]] %[[CONSTANT_264_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo()
 {

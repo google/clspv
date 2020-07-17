@@ -121,7 +121,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceFmod(Function &F);
   bool replaceExp10(Function &F, const std::string &basename);
   bool replaceLog10(Function &F, const std::string &basename);
-  bool replaceBarrier(Function &F);
+  bool replaceBarrier(Function &F, bool subgroup = false);
   bool replaceMemFence(Function &F, uint32_t semantics);
   bool replacePrefetch(Function &F);
   bool replaceRelational(Function &F, CmpInst::Predicate P, int32_t C);
@@ -232,8 +232,11 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kWorkGroupBarrier:
     return replaceBarrier(F);
 
+  case Builtins::kSubGroupBarrier:
+    return replaceBarrier(F,true);
+
   case Builtins::kMemFence:
-    return replaceMemFence(F, spv::MemorySemanticsSequentiallyConsistentMask);
+    return replaceMemFence(F, spv::MemorySemanticsAcquireReleaseMask);
   case Builtins::kReadMemFence:
     return replaceMemFence(F, spv::MemorySemanticsAcquireMask);
   case Builtins::kWriteMemFence:
@@ -565,11 +568,11 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F) {
+bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 
   enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
 
-  return replaceCallsWithValue(F, [](CallInst *CI) {
+  return replaceCallsWithValue(F, [subgroup](CallInst *CI) {
     auto Arg = CI->getOperand(0);
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
@@ -577,12 +580,14 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F) {
         ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
     const auto GlobalMemFence =
         ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
-    const auto ConstantSequentiallyConsistent = ConstantInt::get(
-        Arg->getType(), spv::MemorySemanticsSequentiallyConsistentMask);
+    const auto ConstantAcquireRelease = ConstantInt::get(
+        Arg->getType(), spv::MemorySemanticsAcquireReleaseMask);
     const auto ConstantScopeDevice =
         ConstantInt::get(Arg->getType(), spv::ScopeDevice);
     const auto ConstantScopeWorkgroup =
         ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
+    const auto ConstantScopeSubgroup =
+        ConstantInt::get(Arg->getType(), spv::ScopeSubgroup);
 
     // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
     const auto LocalMemFenceMask =
@@ -606,20 +611,39 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F) {
     // MemorySemanticsSequentiallyConsistentMask.
     auto MemorySemantics =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
-                               ConstantSequentiallyConsistent, "", CI);
+                               ConstantAcquireRelease, "", CI);
     MemorySemantics = BinaryOperator::Create(Instruction::Or, MemorySemantics,
                                              MemorySemanticsUniform, "", CI);
 
-    // For Memory Scope if we used CLK_GLOBAL_MEM_FENCE, we need to use
-    // Device Scope, otherwise Workgroup Scope.
-    const auto Cmp =
-        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ, GlobalMemFenceMask,
-                        GlobalMemFence, "", CI);
-    const auto MemoryScope = SelectInst::Create(Cmp, ConstantScopeDevice,
-                                                ConstantScopeWorkgroup, "", CI);
+    // If the memory scope is not specified explicitly, it is either Subgroup
+    // or Workgroup depending on the type of barrier.
+    Value *MemoryScope =
+        subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
+    if (CI->data_operands_size() > 1) {
+      enum {
+        CL_MEMORY_SCOPE_WORKGROUP = 0x1,
+        CL_MEMORY_SCOPE_DEVICE = 0x2,
+        CL_MEMORY_SCOPE_SUBGROUP = 0x4
+      };
+      // The call was given an explicit memory scope.
+      const auto MemoryScopeSubgroup =
+          ConstantInt::get(Arg->getType(), CL_MEMORY_SCOPE_SUBGROUP);
+      const auto MemoryScopeDevice =
+          ConstantInt::get(Arg->getType(), CL_MEMORY_SCOPE_DEVICE);
 
-    // Lastly, the Execution Scope is always Workgroup Scope.
-    const auto ExecutionScope = ConstantScopeWorkgroup;
+      auto Cmp =
+          CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                          MemoryScopeSubgroup, CI->getOperand(1), "", CI);
+      MemoryScope = SelectInst::Create(Cmp, ConstantScopeSubgroup,
+                                       ConstantScopeWorkgroup, "", CI);
+      Cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                            MemoryScopeDevice, CI->getOperand(1), "", CI);
+      MemoryScope =
+          SelectInst::Create(Cmp, ConstantScopeDevice, MemoryScope, "", CI);
+    }
+
+    // Lastly, the Execution Scope is either Workgroup or Subgroup depending on the type of barrier;
+    const auto ExecutionScope = subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
 
     return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
                                 {Attribute::NoDuplicate}, CI->getType(),
@@ -642,8 +666,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
         ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
     const auto ConstantMemorySemantics =
         ConstantInt::get(Arg->getType(), semantics);
-    const auto ConstantScopeDevice =
-        ConstantInt::get(Arg->getType(), spv::ScopeDevice);
+    const auto ConstantScopeWorkgroup =
+        ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
 
     // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
     const auto LocalMemFenceMask =
@@ -671,8 +695,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
     MemorySemantics = BinaryOperator::Create(Instruction::Or, MemorySemantics,
                                              MemorySemanticsUniform, "", CI);
 
-    // Memory Scope is always device.
-    const auto MemoryScope = ConstantScopeDevice;
+    // Memory Scope is always workgroup.
+    const auto MemoryScope = ConstantScopeWorkgroup;
 
     return clspv::InsertSPIRVOp(CI, spv::OpMemoryBarrier, {}, CI->getType(),
                                 {MemoryScope, MemorySemantics});

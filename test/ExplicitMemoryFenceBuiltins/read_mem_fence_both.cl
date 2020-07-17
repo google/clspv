@@ -7,14 +7,14 @@
 
 // CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 
-// Device
-// CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
+// Workgroup
+// CHECK-DAG: %[[CONSTANT_2_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 2
 
 // Acquire | StorageBufferMemory | WorkgroupMemory
 // CHECK-DAG: %[[CONSTANT_0x142_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 322
 
 // CHECK: %[[FOO_ID]] = OpFunction
-// CHECK: OpMemoryBarrier %[[CONSTANT_1_ID]] %[[CONSTANT_0x142_ID]]
+// CHECK: OpMemoryBarrier %[[CONSTANT_2_ID]] %[[CONSTANT_0x142_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo()
 {
