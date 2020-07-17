@@ -608,7 +608,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
 
     // And combine the above together, also adding in
-    // MemorySemanticsSequentiallyConsistentMask.
+    // MemorySemanticsAcquireReleaseMask.
     auto MemorySemantics =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
                                ConstantAcquireRelease, "", CI);
