@@ -26,6 +26,11 @@ samplers in descriptor map. The -samplermap option is still accepted, but
 support will be removed at later date. A single sampler binding is generated
 for each unique literal sampler in the program.
 
+The descriptor map and it's C++ API are deprecated. Clspv is transitioning to
+embedding equivalent information directly into the SPIR-V binary via a
+[non-semantic instruction
+set](http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/KHR/SPV_KHR_non_semantic_info.html).
+
 ## SPIR-V Features
 
 The SPIR-V as produced from the OpenCL C language can make use of the following
