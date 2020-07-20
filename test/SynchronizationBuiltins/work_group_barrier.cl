@@ -13,5 +13,5 @@ kernel void foo(global int* in, global int* out) {
 
 //     CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint_2:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 2
-// CHECK-DAG: [[uint_272:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 272
-//     CHECK: OpControlBarrier [[uint_2]] [[uint_2]] [[uint_272]]
+// CHECK-DAG: [[uint_264:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 264
+//     CHECK: OpControlBarrier [[uint_2]] [[uint_2]] [[uint_264]]
