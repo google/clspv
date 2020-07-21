@@ -5900,7 +5900,7 @@ void SPIRVProducerPass::AddArgumentReflection(
     ext_inst = reflection::ExtInstArgumentSampler;
     break;
   }
-  Ops << ext_inst << getSPIRVInt32Constant(ordinal);
+  Ops << ext_inst << kernel_decl << getSPIRVInt32Constant(ordinal);
 
   // Add descriptor set and binding for applicable arguments.
   switch (arg_kind) {
