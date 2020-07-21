@@ -87,7 +87,7 @@ add_custom_command(
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   DEPENDS ${SPIRV_GLSL_INPUT_FILE} ${SSPIRV_GLSL_CMAKE_FILE})
 
-set(SPIRV_REFLECTION_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/unified1/extinst.nonsemantic.clspvreflection1.grammar.json)
+set(SPIRV_REFLECTION_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/unified1/extinst.nonsemantic.clspvreflection.grammar.json)
 set(SPIRV_REFLECTION_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/spirv_reflection.hpp)
 set(SPIRV_REFLECTION_PYTHON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/spirv_ext_inst.py)
 
