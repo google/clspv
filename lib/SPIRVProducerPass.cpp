@@ -495,6 +495,8 @@ struct SPIRVProducerPass final : public ModulePass {
   SPIRVID getReflectionImport();
   void GenerateReflection();
   void GenerateKernelReflection();
+  void GeneratePushConstantReflection();
+  void GenerateSpecConstantReflection();
   void AddArgumentReflection(SPIRVID kernel_decl, const std::string &name,
                              clspv::ArgKind arg_kind, uint32_t ordinal,
                              uint32_t descriptor_set, uint32_t binding,
@@ -2246,6 +2248,15 @@ void SPIRVProducerPass::GenerateSamplers() {
       version0::DescriptorMapEntry::SamplerData sampler_data = {sampler_value};
       descriptorMapEntries->emplace_back(std::move(sampler_data),
                                          descriptor_set, binding);
+
+      auto import_id = getReflectionImport();
+      SPIRVOperandVec Ops;
+      Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+          << reflection::ExtInstLiteralSampler
+          << getSPIRVInt32Constant(descriptor_set)
+          << getSPIRVInt32Constant(binding)
+          << getSPIRVInt32Constant(sampler_value);
+      addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
     }
 
     // Ops[0] = Target ID
@@ -2692,8 +2703,17 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set,
                                        0);
 
-    // OpDecorate %var DescriptorSet <descriptor_set>
+    // Reflection instruction for constant data.
     SPIRVOperandVec Ops;
+    auto data_id = addSPIRVInst<kDebug>(spv::OpString, str.str().c_str());
+    Ops << getSPIRVType(Type::getVoidTy(module->getContext()))
+        << getReflectionImport() << reflection::ExtInstConstantDataStorageBuffer
+        << getSPIRVInt32Constant(descriptor_set) << getSPIRVInt32Constant(0)
+        << data_id;
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+
+    // OpDecorate %var DescriptorSet <descriptor_set>
+    Ops.clear();
     Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
@@ -5694,6 +5714,137 @@ SPIRVID SPIRVProducerPass::getReflectionImport() {
 
 void SPIRVProducerPass::GenerateReflection() {
   GenerateKernelReflection();
+  GeneratePushConstantReflection();
+  GenerateSpecConstantReflection();
+}
+
+void SPIRVProducerPass::GeneratePushConstantReflection() {
+  if (auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName())) {
+    auto const &DL = module->getDataLayout();
+    auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
+    auto STy = cast<StructType>(GV->getValueType());
+
+    for (unsigned i = 0; i < STy->getNumElements(); i++) {
+      auto pc = static_cast<clspv::PushConstant>(
+          mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
+      if (pc == PushConstant::KernelArgument)
+        continue;
+
+      auto memberType = STy->getElementType(i);
+      auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
+      unsigned previousOffset = 0;
+      if (i > 0) {
+        previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
+      }
+      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
+      assert(isValidExplicitLayout(*module, STy, i,
+                                   spv::StorageClassPushConstant, offset,
+                                   previousOffset));
+
+      reflection::ExtInst pc_inst = reflection::ExtInstMax;
+      switch (pc) {
+      case PushConstant::GlobalOffset:
+        pc_inst = reflection::ExtInstPushConstantGlobalOffset;
+        break;
+      case PushConstant::EnqueuedLocalSize:
+        pc_inst = reflection::ExtInstPushConstantEnqueuedLocalSize;
+        break;
+      case PushConstant::GlobalSize:
+        pc_inst = reflection::ExtInstPushConstantGlobalSize;
+        break;
+      case PushConstant::RegionOffset:
+        pc_inst = reflection::ExtInstPushConstantRegionOffset;
+        break;
+      case PushConstant::NumWorkgroups:
+        pc_inst = reflection::ExtInstPushConstantNumWorkgroups;
+        break;
+      case PushConstant::RegionGroupOffset:
+        pc_inst = reflection::ExtInstPushConstantRegionGroupOffset;
+        break;
+      default:
+        llvm_unreachable("Unhandled push constant");
+        break;
+      }
+
+      auto import_id = getReflectionImport();
+      SPIRVOperandVec Ops;
+      Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+          << pc_inst << getSPIRVInt32Constant(offset)
+          << getSPIRVInt32Constant(size);
+      addSPIRVInst(spv::OpExtInst, Ops);
+    }
+  }
+}
+
+void SPIRVProducerPass::GenerateSpecConstantReflection() {
+  const uint32_t kMax = std::numeric_limits<uint32_t>::max();
+  uint32_t wgsize_id[3] = {kMax, kMax, kMax};
+  uint32_t global_offset_id[3] = {kMax, kMax, kMax};
+  uint32_t work_dim_id = kMax;
+  for (auto pair : clspv::GetSpecConstants(module)) {
+    auto kind = pair.first;
+    auto id = pair.second;
+
+    // Local memory size is only used for kernel arguments.
+    if (kind == SpecConstant::kLocalMemorySize)
+      continue;
+
+    switch (kind) {
+      case SpecConstant::kWorkgroupSizeX:
+        wgsize_id[0] = id;
+        break;
+      case SpecConstant::kWorkgroupSizeY:
+        wgsize_id[1] = id;
+        break;
+      case SpecConstant::kWorkgroupSizeZ:
+        wgsize_id[2] = id;
+        break;
+      case SpecConstant::kGlobalOffsetX:
+        global_offset_id[0] = id;
+        break;
+      case SpecConstant::kGlobalOffsetY:
+        global_offset_id[1] = id;
+        break;
+      case SpecConstant::kGlobalOffsetZ:
+        global_offset_id[2] = id;
+        break;
+      case SpecConstant::kWorkDim:
+        work_dim_id = id;
+        break;
+      default:
+        llvm_unreachable("Unhandled spec constant");
+    }
+  }
+
+  auto import_id = getReflectionImport();
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+  SPIRVOperandVec Ops;
+  if (wgsize_id[0] != kMax) {
+    assert(wgsize_id[1] != kMax);
+    assert(wgsize_id[2] != kMax);
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantWorkgroupSize
+        << getSPIRVInt32Constant(wgsize_id[0])
+        << getSPIRVInt32Constant(wgsize_id[1])
+        << getSPIRVInt32Constant(wgsize_id[2]);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+  if (global_offset_id[0] != kMax) {
+    assert(global_offset_id[1] != kMax);
+    assert(global_offset_id[2] != kMax);
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantGlobalOffset
+        << getSPIRVInt32Constant(global_offset_id[0])
+        << getSPIRVInt32Constant(global_offset_id[1])
+        << getSPIRVInt32Constant(global_offset_id[2]);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+  if (work_dim_id != kMax) {
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantWorkDim
+        << getSPIRVInt32Constant(work_dim_id);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
 }
 
 void SPIRVProducerPass::GenerateKernelReflection() {
@@ -5898,6 +6049,9 @@ void SPIRVProducerPass::AddArgumentReflection(
     break;
   case clspv::ArgKind::Sampler:
     ext_inst = reflection::ExtInstArgumentSampler;
+    break;
+  default:
+    llvm_unreachable("Unhandled argument reflection");
     break;
   }
   Ops << ext_inst << kernel_decl << getSPIRVInt32Constant(ordinal);
