@@ -33,17 +33,31 @@ public:
     str(ostr)
   { }
 
+  // Parses |inst| and emits descriptor map entries as necessary.
   spv_result_t ParseInstruction(const spv_parsed_instruction_t *inst);
+
+  // Converts the extended instruction to ArgKind.
   clspv::ArgKind GetArgKindFromExtInst(uint32_t value);
+
+  // Converts the extended instruction to PushConstant.
   clspv::PushConstant GetPushConstantFromExtInst(uint32_t value);
 
 private:
   std::ostream* str;
+
+  // Tracks OpTypeInt 32 0 result id.
   uint32_t int_id = 0;
-  std::unordered_set<uint32_t> import_ids;
+
+  // Maps OpString result ids to their strings.
   std::unordered_map<uint32_t, std::string> id_to_string;
+
+  // Maps u32 constant result ids to their values.
   std::unordered_map<uint32_t, uint32_t> constants;
+
+  // Maps Kernel extended instruction result ids to their name strings.
   std::unordered_map<uint32_t, std::string> kernel_names;
+
+  // Maps ArgumentInfo extended instruction result ids to their name strings.
   std::unordered_map<uint32_t, std::string> arg_names;
 };
 

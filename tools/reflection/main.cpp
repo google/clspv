@@ -25,7 +25,11 @@ void PrintUsage() {
 
 Options:
 --target-env <env>  Specify the SPIR-V environment. Must be one of:
-                    spv1.0, spv1.3, spv1.5, vulkan1.0 or vulkan1.1.
+                     * spv1.0
+                     * spv1.3
+                     * spv1.5
+                     * vulkan1.0
+                     * vulkan1.1
                     Default is spv1.0.
 -o <outfile>        Specify the output filename.
                     If not output file is specified, output goes to
@@ -78,6 +82,7 @@ int main(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  // Read the binary.
   std::ifstream str(filename.c_str(), std::ifstream::in |
                                           std::ifstream::binary |
                                           std::ifstream::ate);
@@ -91,6 +96,7 @@ int main(const int argc, const char *const argv[]) {
   str.read(reinterpret_cast<char*>(binary.data()), size);
   str.close();
 
+  // The parser assumes valid SPIR-V, so verify that assumption now.
   spvtools::SpirvTools tools(env);
   if (!tools.Validate(binary)) {
     std::cerr << "Error: invalid binary\n";
@@ -100,6 +106,11 @@ int main(const int argc, const char *const argv[]) {
   std::ostream* ostr = &std::cout;
   if (!outfile.empty()) {
     ostr = new std::ofstream(outfile.c_str());
+    if (!ostr) {
+      std::cerr << "Error: failed to open '" << outfile << "'\n";
+      delete ostr;
+      return -1;
+    }
   }
   bool ok = clspv::ParseReflection(binary, env, ostr);
   if (!outfile.empty()) {
