@@ -24,16 +24,17 @@ void PrintUsage() {
   const std::string help = R"(Usage: clspv-reflection [--target-env <env>] [-o <outfile>] <infile>
 
 Options:
---target-env <env>  Specify the SPIR-V environment. Must be one of:
-                     * spv1.0
-                     * spv1.3
-                     * spv1.5
-                     * vulkan1.0
-                     * vulkan1.1
-                    Default is spv1.0.
--o <outfile>        Specify the output filename.
-                    If not output file is specified, output goes to
-                    stdout.
+--target-env <env>              Specify the SPIR-V environment. Must be one of:
+                                 * spv1.0
+                                 * spv1.3
+                                 * spv1.5
+                                 * vulkan1.0
+                                 * vulkan1.1
+                                Default is spv1.0.
+-o <outfile>                    Specify the output filename.
+                                If not output file is specified, output goes to
+                                stdout.
+-d                              Disable validation
 )";
 
   std::cout << help;
@@ -42,6 +43,7 @@ Options:
 int main(const int argc, const char *const argv[]) {
   std::string filename;
   std::string outfile;
+  bool validate = true;
   spv_target_env env(SPV_ENV_UNIVERSAL_1_0);
   for (int i = 1; i < argc; ++i) {
     const std::string option(argv[i]);
@@ -68,6 +70,11 @@ int main(const int argc, const char *const argv[]) {
     } else if (option == "-o") {
       ++i;
       outfile = std::string(argv[i]);
+    } else if (option == "-d") {
+      validate = false;
+    } else if (option[0] == '-') {
+      std::cerr << "Error: unrecognized option '" << argv[i] << "'\n";
+      return -1;
     } else { 
       if (!filename.empty()) {
         std::cerr << "Error: too many positional arguments specified\n";
@@ -96,11 +103,14 @@ int main(const int argc, const char *const argv[]) {
   str.read(reinterpret_cast<char*>(binary.data()), size);
   str.close();
 
-  // The parser assumes valid SPIR-V, so verify that assumption now.
-  spvtools::SpirvTools tools(env);
-  if (!tools.Validate(binary)) {
-    std::cerr << "Error: invalid binary\n";
-    return -1;
+  // TODO: worth forwarding some validator options?
+  if (validate) {
+    // The parser assumes valid SPIR-V, so verify that assumption now.
+    spvtools::SpirvTools tools(env);
+    if (!tools.Validate(binary)) {
+      std::cerr << "Error: invalid binary\n";
+      return -1;
+    }
   }
 
   std::ostream* ostr = &std::cout;

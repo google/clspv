@@ -1,7 +1,9 @@
-// RUN: clspv %s -o %t.spv -samplermap=%s.map -descriptormap=%t.map
+// RUN: clspv %s -o %t.spv -samplermap=%s.map
+// RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck %s < %t.map
 
-// RUN: clspv %s -o %t2.spv -samplermap=%s.map -descriptormap=%t2.map
+// RUN: clspv %s -o %t2.spv -samplermap=%s.map
+// RUN: clspv-reflection %t2.spv -o %t2.map
 // RUN: FileCheck %s < %t2.map
 //
 // CHECK: samplerExpr

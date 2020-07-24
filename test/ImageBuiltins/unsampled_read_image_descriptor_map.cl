@@ -1,4 +1,5 @@
-// RUN: clspv %s -o %t.spv -descriptormap=%t.map
+// RUN: clspv %s -o %t.spv
+// RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

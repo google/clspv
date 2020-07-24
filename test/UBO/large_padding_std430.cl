@@ -1,6 +1,7 @@
-// RUN: clspv -int8 -constant-args-ubo -inline-entry-points -std430-ubo-layout %s -o %t.spv -descriptormap=%t.map
+// RUN: clspv -int8 -constant-args-ubo -inline-entry-points -std430-ubo-layout %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
+// RUN: clspv-reflection -d %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 
 // With std430 layouts in UBO, the padding array ([16 x i8]) can be generated

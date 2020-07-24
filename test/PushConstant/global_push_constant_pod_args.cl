@@ -1,6 +1,7 @@
-// RUN: clspv %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points -descriptormap=%t.map
+// RUN: clspv %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
+// RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck --check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

@@ -16,8 +16,8 @@
 # the pass pipeline.
 add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Sampler.cpp
 )
 
 # Pass library.  Transformation passes and pass-specific support are

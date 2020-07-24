@@ -16,8 +16,6 @@
 #include <utility>
 #include <vector>
 
-#include "clspv/DescriptorMap.h"
-
 namespace llvm {
 // This is against Google C++ style guide.
 class FunctionPass;
@@ -152,7 +150,6 @@ llvm::ModulePass *createReplaceOpenCLBuiltinPass();
 /// @return An LLVM module pass.
 llvm::ModulePass *createSPIRVProducerPass(
     llvm::raw_pwrite_stream &out,
-    std::vector<version0::DescriptorMapEntry> *descriptor_map_entries,
     llvm::ArrayRef<std::pair<unsigned, std::string>> samplerMap,
     bool outputCInitList);
 

@@ -35,9 +35,9 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "clspv/AddressSpace.h"
-#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
+#include "clspv/Sampler.h"
 #include "clspv/opencl_builtins_header.h"
 
 #include "FrontendPlugin.h"
@@ -131,11 +131,6 @@ static llvm::cl::opt<clang::Language> InputLanguage(
 static llvm::cl::opt<std::string>
     OutputFilename("o", llvm::cl::desc("Override output filename"),
                    llvm::cl::value_desc("filename"));
-
-static llvm::cl::opt<std::string>
-    DescriptorMapFilename("descriptormap",
-                          llvm::cl::desc("Output file for descriptor map"),
-                          llvm::cl::value_desc("filename"));
 
 static llvm::cl::opt<char>
     OptimizationLevel(llvm::cl::Prefix, "O", llvm::cl::init('2'),
@@ -234,79 +229,75 @@ int ParseSamplerMap(const std::string &sampler_map,
     // If we have a separator between declarations within a single sampler.
     if ((*i == ',') || (i == e)) {
 
-      clspv::version0::SamplerNormalizedCoords NormalizedCoord =
-          clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET;
-      clspv::version0::SamplerAddressingMode AddressingMode =
-          clspv::version0::CLK_ADDRESS_NOT_SET;
-      clspv::version0::SamplerFilterMode FilterMode =
-          clspv::version0::CLK_FILTER_NOT_SET;
+      clspv::SamplerNormalizedCoords NormalizedCoord =
+          clspv::CLK_NORMALIZED_COORDS_NOT_SET;
+      clspv::SamplerAddressingMode AddressingMode = clspv::CLK_ADDRESS_NOT_SET;
+      clspv::SamplerFilterMode FilterMode = clspv::CLK_FILTER_NOT_SET;
 
       for (auto str : samplerStrings) {
         if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
-          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
-              NormalizedCoord) {
+          if (clspv::CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_FALSE;
+          NormalizedCoord = clspv::CLK_NORMALIZED_COORDS_FALSE;
         } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
-          if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET !=
-              NormalizedCoord) {
+          if (clspv::CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
             llvm::errs() << "Error: Sampler map normalized coordinates was "
                             "previously set!\n";
             return -1;
           }
-          NormalizedCoord = clspv::version0::CLK_NORMALIZED_COORDS_TRUE;
+          NormalizedCoord = clspv::CLK_NORMALIZED_COORDS_TRUE;
         } else if ("CLK_ADDRESS_NONE" == str) {
-          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = clspv::version0::CLK_ADDRESS_NONE;
+          AddressingMode = clspv::CLK_ADDRESS_NONE;
         } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
-          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP_TO_EDGE;
+          AddressingMode = clspv::CLK_ADDRESS_CLAMP_TO_EDGE;
         } else if ("CLK_ADDRESS_CLAMP" == str) {
-          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = clspv::version0::CLK_ADDRESS_CLAMP;
+          AddressingMode = clspv::CLK_ADDRESS_CLAMP;
         } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
-          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = clspv::version0::CLK_ADDRESS_MIRRORED_REPEAT;
+          AddressingMode = clspv::CLK_ADDRESS_MIRRORED_REPEAT;
         } else if ("CLK_ADDRESS_REPEAT" == str) {
-          if (clspv::version0::CLK_ADDRESS_NOT_SET != AddressingMode) {
+          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
             llvm::errs()
                 << "Error: Sampler map addressing mode was previously set!\n";
             return -1;
           }
-          AddressingMode = clspv::version0::CLK_ADDRESS_REPEAT;
+          AddressingMode = clspv::CLK_ADDRESS_REPEAT;
         } else if ("CLK_FILTER_NEAREST" == str) {
-          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = clspv::version0::CLK_FILTER_NEAREST;
+          FilterMode = clspv::CLK_FILTER_NEAREST;
         } else if ("CLK_FILTER_LINEAR" == str) {
-          if (clspv::version0::CLK_FILTER_NOT_SET != FilterMode) {
+          if (clspv::CLK_FILTER_NOT_SET != FilterMode) {
             llvm::errs()
                 << "Error: Sampler map filtering mode was previously set!\n";
             return -1;
           }
-          FilterMode = clspv::version0::CLK_FILTER_LINEAR;
+          FilterMode = clspv::CLK_FILTER_LINEAR;
         } else {
           llvm::errs() << "Error: Unknown sampler string '" << str
                        << "' found!\n";
@@ -314,19 +305,19 @@ int ParseSamplerMap(const std::string &sampler_map,
         }
       }
 
-      if (clspv::version0::CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
+      if (clspv::CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
         llvm::errs() << "Error: Sampler map entry did not contain normalized "
                         "coordinates entry!\n";
         return -1;
       }
 
-      if (clspv::version0::CLK_ADDRESS_NOT_SET == AddressingMode) {
+      if (clspv::CLK_ADDRESS_NOT_SET == AddressingMode) {
         llvm::errs() << "Error: Sampler map entry did not contain addressing "
                         "mode entry!\n";
         return -1;
       }
 
-      if (clspv::version0::CLK_FILTER_NOT_SET == FilterMode) {
+      if (clspv::CLK_FILTER_NOT_SET == FilterMode) {
         llvm::errs()
             << "Error: Sampler map entry did not contain filer mode entry!\n";
         return -1;
@@ -559,7 +550,6 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 // Populates |pm| with necessary passes to optimize and legalize the IR.
 int PopulatePassManager(
     llvm::legacy::PassManager *pm, llvm::raw_svector_ostream *binaryStream,
-    std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
     llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
         *SamplerMapEntries) {
   llvm::PassManagerBuilder pmBuilder;
@@ -742,8 +732,7 @@ int PopulatePassManager(
   // This pass mucks with types to point where you shouldn't rely on DataLayout
   // anymore so leave this right before SPIR-V generation.
   pm->add(clspv::createUBOTypeTransformPass());
-  pm->add(clspv::createSPIRVProducerPass(*binaryStream, descriptor_map_entries,
-                                         *SamplerMapEntries,
+  pm->add(clspv::createSPIRVProducerPass(*binaryStream, *SamplerMapEntries,
                                          OutputFormat == "c"));
 
   return 0;
@@ -922,9 +911,7 @@ int Compile(const int argc, const char *const argv[]) {
   // Create a memory buffer for temporarily writing the result.
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
-  std::string descriptor_map;
   llvm::legacy::PassManager pm;
-  std::vector<version0::DescriptorMapEntry> descriptor_map_entries;
 
   // If --emit-ir was requested, emit the initial LLVM IR and stop compilation.
   if (!IROutputFile.empty()) {
@@ -933,7 +920,7 @@ int Compile(const int argc, const char *const argv[]) {
 
   // Otherwise, populate the pass manager and run the regular passes.
   if (auto error = PopulatePassManager(
-          &pm, &binaryStream, &descriptor_map_entries, &SamplerMapEntries))
+          &pm, &binaryStream, &SamplerMapEntries))
     return error;
   pm.run(*module);
 
@@ -941,23 +928,6 @@ int Compile(const int argc, const char *const argv[]) {
 
   // Write the descriptor map, if requested.
   std::error_code error;
-  if (!DescriptorMapFilename.empty()) {
-    llvm::raw_fd_ostream descriptor_map_out_fd(
-        DescriptorMapFilename, error, llvm::sys::fs::CD_CreateAlways,
-        llvm::sys::fs::FA_Write, llvm::sys::fs::F_Text);
-    if (error) {
-      llvm::errs() << "Unable to open descriptor map file '"
-                   << DescriptorMapFilename << "': " << error.message() << '\n';
-      return -1;
-    }
-    std::string descriptor_map_string;
-    std::ostringstream str(descriptor_map_string);
-    for (const auto &entry : descriptor_map_entries) {
-      str << entry << "\n";
-    }
-    descriptor_map_out_fd << str.str();
-    descriptor_map_out_fd.close();
-  }
 
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on
@@ -982,10 +952,10 @@ int Compile(const int argc, const char *const argv[]) {
   return 0;
 }
 
-int CompileFromSourceString(
-    const std::string &program, const std::string &sampler_map,
-    const std::string &options, std::vector<uint32_t> *output_binary,
-    std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries) {
+int CompileFromSourceString(const std::string &program,
+                            const std::string &sampler_map,
+                            const std::string &options,
+                            std::vector<uint32_t> *output_binary) {
 
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
@@ -1048,22 +1018,10 @@ int CompileFromSourceString(
   // Create a memory buffer for temporarily writing the result.
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
-  std::string descriptor_map;
   llvm::legacy::PassManager pm;
-  if (auto error = PopulatePassManager(
-          &pm, &binaryStream, descriptor_map_entries, &SamplerMapEntries))
+  if (auto error = PopulatePassManager(&pm, &binaryStream, &SamplerMapEntries))
     return error;
   pm.run(*module);
-
-  // Write outputs
-
-  // Write the descriptor map. This is required.
-  assert(descriptor_map_entries &&
-         "Valid descriptor map container is required.");
-  if (!DescriptorMapFilename.empty()) {
-    llvm::errs() << "Warning: -descriptormap is ignored descriptor map "
-                    "container is provided.\n";
-  }
 
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on

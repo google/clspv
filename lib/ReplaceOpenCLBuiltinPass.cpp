@@ -30,7 +30,6 @@
 #include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
-#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
 
 #include "Builtins.h"

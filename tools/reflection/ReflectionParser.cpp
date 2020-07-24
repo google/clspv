@@ -21,6 +21,7 @@
 
 #include "clspv/ArgKind.h"
 #include "clspv/PushConstant.h"
+#include "clspv/Sampler.h"
 #include "clspv/SpecConstant.h"
 #include "clspv/spirv_reflection.hpp"
 
@@ -259,32 +260,41 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         break;
       }
       case clspv::reflection::ExtInstSpecConstantWorkgroupSize: {
+        // WorkgroupSize is emitted as three separate entries.
         auto x_id = inst->words[inst->operands[4].offset];
         auto y_id = inst->words[inst->operands[5].offset];
         auto z_id = inst->words[inst->operands[6].offset];
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeX)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeX)
              << ",spec_id," << constants[x_id] << "\n";
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeY)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeY)
              << ",spec_id," << constants[y_id] << "\n";
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeZ)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkgroupSizeZ)
              << ",spec_id," << constants[z_id] << "\n";
         break;
       }
       case clspv::reflection::ExtInstSpecConstantGlobalOffset: {
+        // GlobalOffset is emitted as three separate entries.
         auto x_id = inst->words[inst->operands[4].offset];
         auto y_id = inst->words[inst->operands[5].offset];
         auto z_id = inst->words[inst->operands[6].offset];
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetX)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetX)
              << ",spec_id," << constants[x_id] << "\n";
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetY)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetY)
              << ",spec_id," << constants[y_id] << "\n";
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetZ)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kGlobalOffsetZ)
              << ",spec_id," << constants[z_id] << "\n";
         break;
       }
       case clspv::reflection::ExtInstSpecConstantWorkDim: {
         auto dim_id = inst->words[inst->operands[4].offset];
-        *str << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkDim)
+        *str << "spec_constant,"
+             << clspv::GetSpecConstantName(clspv::SpecConstant::kWorkDim)
              << ",spec_id," << constants[dim_id] << "\n";
         break;
       }
@@ -300,6 +310,19 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         *str << "pushconstant,name," << clspv::GetPushConstantName(kind)
              << ",offset," << constants[offset_id] << ",size,"
              << constants[size_id] << "\n";
+        break;
+      }
+      case clspv::reflection::ExtInstLiteralSampler: {
+        auto ds_id = inst->words[inst->operands[4].offset];
+        auto binding_id = inst->words[inst->operands[5].offset];
+        auto mask_id = inst->words[inst->operands[6].offset];
+        auto mask = constants[mask_id];
+        *str << "sampler," << mask << ",samplerExpr,\""
+             << clspv::GetSamplerCoordsName(mask) << "|"
+             << clspv::GetSamplerAddressingModeName(mask) << "|"
+             << clspv::GetSamplerFilteringModeName(mask) << "\",descriptorSet,"
+             << constants[ds_id] << ",binding," << constants[binding_id]
+             << "\n";
         break;
       }
       default:
