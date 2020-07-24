@@ -81,6 +81,8 @@ clspv::ArgKind ReflectionParser::GetArgKindFromExtInst(uint32_t value) {
       return clspv::ArgKind::WriteOnlyImage;
     case clspv::reflection::ExtInstArgumentSampler:
       return clspv::ArgKind::Sampler;
+    case clspv::reflection::ExtInstArgumentWorkgroup:
+      return clspv::ArgKind::Local;
     default:
       assert(false && "Unexpected extended instruction");
       return clspv::ArgKind::Buffer;
