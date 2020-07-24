@@ -93,6 +93,7 @@ foreach(clspv_lib clspv_core clspv_passes)
   target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
 
   target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
+
 endforeach(clspv_lib)
 
 set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)

@@ -12,25 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef CLSPV_INCLUDE_CLSPV_PUSH_CONSTANT_H_
-#define CLSPV_INCLUDE_CLSPV_PUSH_CONSTANT_H_
+#include <iosfwd>
+#include <vector>
+
+#include "spirv-tools/libspirv.h"
 
 namespace clspv {
 
-enum class PushConstant : int {
-  Dimensions,
-  GlobalOffset,
-  EnqueuedLocalSize,
-  GlobalSize,
-  RegionOffset,
-  NumWorkgroups,
-  RegionGroupOffset,
-  KernelArgument,
-};
-
-// Returns the name of the push constant from its enum.
-const char *GetPushConstantName(PushConstant pc);
+bool ParseReflection(const std::vector<uint32_t> &binary, spv_target_env env,
+                     std::ostream *str);
 
 } // namespace clspv
-
-#endif // #ifndef CLSPV_INCLUDE_CLSPV_PUSH_CONSTANT_H_
