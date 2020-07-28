@@ -49,23 +49,13 @@ private:
   // Tracks OpTypeInt 32 0 result id.
   uint32_t int_id = 0;
 
-  // Maps OpString result ids to their strings.
-  std::unordered_map<uint32_t, std::string> id_to_string;
+  // String mappings. Includes OpString value to result id, Kernel name to
+  // result id and argument name to result id.
+  std::unordered_map<uint32_t, std::string> strings;
 
   // Maps u32 constant result ids to their values.
   std::unordered_map<uint32_t, uint32_t> constants;
-
-  // Maps Kernel extended instruction result ids to their name strings.
-  std::unordered_map<uint32_t, std::string> kernel_names;
-
-  // Maps ArgumentInfo extended instruction result ids to their name strings.
-  std::unordered_map<uint32_t, std::string> arg_names;
 };
-
-spv_result_t ParseHeader(void *, spv_endianness_t, uint32_t, uint32_t, uint32_t,
-                         uint32_t, uint32_t) {
-  return SPV_SUCCESS;
-}
 
 spv_result_t
 ParseInstruction(void *user_data,
@@ -145,7 +135,7 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
   case spv::OpString: {
     std::string value =
         reinterpret_cast<const char *>(inst->words + inst->operands[1].offset);
-    id_to_string[inst->result_id] = value;
+    strings[inst->result_id] = value;
     break;
   }
   case spv::OpExtInst:
@@ -155,15 +145,15 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
       switch (ext_inst) {
       case clspv::reflection::ExtInstKernel: {
         // Record the name and emit a kernel_decl entry.
-        const auto &name = id_to_string[inst->words[inst->operands[5].offset]];
-        kernel_names[inst->result_id] = name;
+        const auto &name = strings[inst->words[inst->operands[5].offset]];
+        strings[inst->result_id] = name;
         *str << "kernel_decl," << name << "\n";
         break;
       }
       case clspv::reflection::ExtInstArgumentInfo: {
         // Record the argument name.
-        const auto &name = id_to_string[inst->words[inst->operands[4].offset]];
-        arg_names[inst->result_id] = name;
+        const auto &name = strings[inst->words[inst->operands[4].offset]];
+        strings[inst->result_id] = name;
         break;
       }
       case clspv::reflection::ExtInstArgumentStorageBuffer:
@@ -178,10 +168,10 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         auto binding_id = inst->words[inst->operands[7].offset];
         std::string arg_name;
         if (inst->num_operands == 9) {
-          arg_name = arg_names[inst->words[inst->operands[8].offset]];
+          arg_name = strings[inst->words[inst->operands[8].offset]];
         }
         auto kind = GetArgKindFromExtInst(ext_inst);
-        *str << "kernel," << kernel_names[kernel_id] << ",arg," << arg_name
+        *str << "kernel," << strings[kernel_id] << ",arg," << arg_name
              << ",argOrdinal," << constants[ordinal_id] << ",descriptorSet,"
              << constants[ds_id] << ",binding," << constants[binding_id]
              << ",offset,0,argKind," << clspv::GetArgKindName(kind) << "\n";
@@ -198,10 +188,10 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         auto size_id = inst->words[inst->operands[9].offset];
         std::string arg_name;
         if (inst->num_operands == 11) {
-          arg_name = arg_names[inst->words[inst->operands[10].offset]];
+          arg_name = strings[inst->words[inst->operands[10].offset]];
         }
         auto kind = GetArgKindFromExtInst(ext_inst);
-        *str << "kernel," << kernel_names[kernel_id] << ",arg," << arg_name
+        *str << "kernel," << strings[kernel_id] << ",arg," << arg_name
              << ",argOrdinal," << constants[ordinal_id] << ",descriptorSet,"
              << constants[ds_id] << ",binding," << constants[binding_id]
              << ",offset," << constants[offset_id] << ",argKind,"
@@ -218,10 +208,10 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         auto size_id = inst->words[inst->operands[7].offset];
         std::string arg_name;
         if (inst->num_operands == 9) {
-          arg_name = arg_names[inst->words[inst->operands[8].offset]];
+          arg_name = strings[inst->words[inst->operands[8].offset]];
         }
         auto kind = GetArgKindFromExtInst(ext_inst);
-        *str << "kernel," << kernel_names[kernel_id] << ",arg," << arg_name
+        *str << "kernel," << strings[kernel_id] << ",arg," << arg_name
              << ",argOrdinal," << constants[ordinal_id] << ",offset,"
              << constants[offset_id] << ",argKind,"
              << clspv::GetArgKindName(kind) << ",argSize," << constants[size_id]
@@ -237,10 +227,10 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         auto size_id = inst->words[inst->operands[7].offset];
         std::string arg_name;
         if (inst->num_operands == 9) {
-          arg_name = arg_names[inst->words[inst->operands[8].offset]];
+          arg_name = strings[inst->words[inst->operands[8].offset]];
         }
         auto kind = GetArgKindFromExtInst(ext_inst);
-        *str << "kernel," << kernel_names[kernel_id] << ",arg," << arg_name
+        *str << "kernel," << strings[kernel_id] << ",arg," << arg_name
              << ",argOrdinal," << constants[ordinal_id] << ",argKind,"
              << clspv::GetArgKindName(kind) << ",arrayElemSize,"
              << constants[size_id] << ",arrayNumElemSpecId,"
@@ -256,7 +246,7 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
         auto kind = GetArgKindFromExtInst(ext_inst);
         *str << "constant,descriptorSet," << constants[ds_id] << ",binding,"
              << constants[binding_id] << ",kind," << clspv::GetArgKindName(kind)
-             << ",hexbytes," << id_to_string[data_id] << "\n";
+             << ",hexbytes," << strings[data_id] << "\n";
         break;
       }
       case clspv::reflection::ExtInstSpecConstantWorkgroupSize: {
@@ -349,7 +339,7 @@ bool ParseReflection(const std::vector<uint32_t>& binary, spv_target_env env, st
 
   spv_result_t result =
       spvBinaryParse(context.CContext(), &parser, binary.data(), binary.size(),
-                     ParseHeader, ParseInstruction, nullptr);
+                     nullptr, ParseInstruction, nullptr);
 
   return result == SPV_SUCCESS;
 }
