@@ -37,13 +37,14 @@ public:
   // Parses |inst| and emits descriptor map entries as necessary.
   spv_result_t ParseInstruction(const spv_parsed_instruction_t *inst);
 
+private:
   // Converts the extended instruction to ArgKind.
   clspv::ArgKind GetArgKindFromExtInst(uint32_t value);
 
   // Converts the extended instruction to PushConstant.
   clspv::PushConstant GetPushConstantFromExtInst(uint32_t value);
 
-private:
+  // Descriptor map output stream.
   std::ostream* str;
 
   // Tracks OpTypeInt 32 0 result id.

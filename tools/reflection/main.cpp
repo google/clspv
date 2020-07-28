@@ -30,11 +30,14 @@ Options:
                                  * spv1.5
                                  * vulkan1.0
                                  * vulkan1.1
+                                 * vulkan1.2
                                 Default is spv1.0.
+
 -o <outfile>                    Specify the output filename.
                                 If not output file is specified, output goes to
                                 stdout.
--d                              Disable validation
+
+-d                              Disable validation.
 )";
 
   std::cout << help;
@@ -62,6 +65,7 @@ int main(const int argc, const char *const argv[]) {
         case SPV_ENV_UNIVERSAL_1_5:
         case SPV_ENV_VULKAN_1_0:
         case SPV_ENV_VULKAN_1_1:
+        case SPV_ENV_VULKAN_1_2:
           break;
         default:
           std::cerr << "Error: invalid target env: " << argv[i] << "\n";
@@ -103,7 +107,7 @@ int main(const int argc, const char *const argv[]) {
   str.read(reinterpret_cast<char*>(binary.data()), size);
   str.close();
 
-  // TODO: worth forwarding some validator options?
+  // TODO: worth forwarding some validator options (e.g. layout options)?
   if (validate) {
     // The parser assumes valid SPIR-V, so verify that assumption now.
     spvtools::SpirvTools tools(env);
