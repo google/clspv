@@ -214,13 +214,16 @@ currently. Users should be aware of this and ensure they are not relying on alia
 #### Embedded Reflection Instructions
 
 Clspv embeds reflection information via use of a non-semantic extended
-instruction set. The instruction set is defined here (TODO: ADD LINK). It
-requires SPV\_KHR\_non\_semantic\_info. If your Vulkan implementation does not
-support VK\_KHR\_shader\_non\_semantic\_info, the reflection instruction should
-be stripped before loading the module.
+instruction set. The instruction set is defined
+[here](http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html).
+It requires SPV\_KHR\_non\_semantic\_info. If your Vulkan implementation does
+not support VK\_KHR\_shader\_non\_semantic\_info, the reflection instructions
+should be stripped before loading the module.
 [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools)'s optimizer has a
 transformation to strip non-semantic instructions (use the `--strip-reflect`
 option).
+
+The reflection instructions replace the descriptor map.
 
 #### Descriptor map (DEPRECATED)
 
