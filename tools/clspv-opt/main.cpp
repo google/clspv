@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
   PassRegistry &registry = *llvm::PassRegistry::getPassRegistry();
   llvm::initializeCore(registry);
   llvm::initializeScalarOpts(registry);
+  llvm::initializeInstCombine(registry);
 
   // Initialize clspv passes.
   llvm::initializeClspvPasses(registry);
