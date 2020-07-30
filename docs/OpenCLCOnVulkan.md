@@ -213,12 +213,12 @@ currently. Users should be aware of this and ensure they are not relying on alia
 
 #### Embedded Reflection Instructions
 
-Clspv embeds reflection information via use of a non-semantic extended
-instruction set. The instruction set is defined
-[here](http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html).
-It requires SPV\_KHR\_non\_semantic\_info. If your Vulkan implementation does
-not support VK\_KHR\_shader\_non\_semantic\_info, the reflection instructions
-should be stripped before loading the module.
+Clspv embeds reflection information via use of the [NonSemantic.ClspvReflection](
+(http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html)
+non-semantic extended instruction set.  It requires
+SPV\_KHR\_non\_semantic\_info. If your Vulkan implementation does not support
+VK\_KHR\_shader\_non\_semantic\_info, the reflection instructions should be
+stripped before loading the module.
 [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools)'s optimizer has a
 transformation to strip non-semantic instructions (use the `--strip-reflect`
 option).
@@ -231,10 +231,6 @@ The compiler can report the descriptor set and bindings used for samplers
 in the sampler map and for the kernel arguments, and also array sizing information for
 pointer-to-local arguments.
 Run `clspv-reflection <spirv> -o <descriptor map>` to produce the descriptor map.
-
-Example:
-
-    clspv foo.spv -descriptormap=foomap.csv
 
 The descriptor map is a text file with comma-separated values.
 
