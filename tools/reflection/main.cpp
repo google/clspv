@@ -21,7 +21,8 @@
 #include "ReflectionParser.h"
 
 void PrintUsage() {
-  const std::string help = R"(Usage: clspv-reflection [--target-env <env>] [-o <outfile>] <infile>
+  const std::string help =
+      R"(Usage: clspv-reflection [--target-env <env>] [-o <outfile>] <infile>
 
 Options:
 --target-env <env>              Specify the SPIR-V environment. Must be one of:
@@ -60,16 +61,16 @@ int main(const int argc, const char *const argv[]) {
         return -1;
       }
       switch (env) {
-        case SPV_ENV_UNIVERSAL_1_0:
-        case SPV_ENV_UNIVERSAL_1_3:
-        case SPV_ENV_UNIVERSAL_1_5:
-        case SPV_ENV_VULKAN_1_0:
-        case SPV_ENV_VULKAN_1_1:
-        case SPV_ENV_VULKAN_1_2:
-          break;
-        default:
-          std::cerr << "Error: invalid target env: " << argv[i] << "\n";
-          return -1;
+      case SPV_ENV_UNIVERSAL_1_0:
+      case SPV_ENV_UNIVERSAL_1_3:
+      case SPV_ENV_UNIVERSAL_1_5:
+      case SPV_ENV_VULKAN_1_0:
+      case SPV_ENV_VULKAN_1_1:
+      case SPV_ENV_VULKAN_1_2:
+        break;
+      default:
+        std::cerr << "Error: invalid target env: " << argv[i] << "\n";
+        return -1;
       }
     } else if (option == "-o") {
       ++i;
@@ -79,7 +80,7 @@ int main(const int argc, const char *const argv[]) {
     } else if (option[0] == '-') {
       std::cerr << "Error: unrecognized option '" << argv[i] << "'\n";
       return -1;
-    } else { 
+    } else {
       if (!filename.empty()) {
         std::cerr << "Error: too many positional arguments specified\n";
         return -1;
@@ -104,7 +105,7 @@ int main(const int argc, const char *const argv[]) {
   std::streampos size = str.tellg();
   std::vector<uint32_t> binary(size / 4, 0);
   str.seekg(std::ios::beg);
-  str.read(reinterpret_cast<char*>(binary.data()), size);
+  str.read(reinterpret_cast<char *>(binary.data()), size);
   str.close();
 
   // TODO: worth forwarding some validator options (e.g. layout options)?
@@ -117,7 +118,7 @@ int main(const int argc, const char *const argv[]) {
     }
   }
 
-  std::ostream* ostr = &std::cout;
+  std::ostream *ostr = &std::cout;
   if (!outfile.empty()) {
     ostr = new std::ofstream(outfile.c_str());
     if (!ostr) {
@@ -128,7 +129,7 @@ int main(const int argc, const char *const argv[]) {
   }
   bool ok = clspv::ParseReflection(binary, env, ostr);
   if (!outfile.empty()) {
-    auto fstr = reinterpret_cast<std::ofstream*>(ostr);
+    auto fstr = reinterpret_cast<std::ofstream *>(ostr);
     fstr->close();
     delete fstr;
   }
@@ -139,4 +140,3 @@ int main(const int argc, const char *const argv[]) {
 
   return 0;
 }
-

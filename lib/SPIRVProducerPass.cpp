@@ -5501,7 +5501,8 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps() {
 SPIRVID SPIRVProducerPass::getReflectionImport() {
   if (!ReflectionID.isValid()) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
-    ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport, "NonSemantic.ClspvReflection.1");
+    ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport,
+                                          "NonSemantic.ClspvReflection.1");
   }
   return ReflectionID;
 }
@@ -5584,29 +5585,29 @@ void SPIRVProducerPass::GenerateSpecConstantReflection() {
       continue;
 
     switch (kind) {
-      case SpecConstant::kWorkgroupSizeX:
-        wgsize_id[0] = id;
-        break;
-      case SpecConstant::kWorkgroupSizeY:
-        wgsize_id[1] = id;
-        break;
-      case SpecConstant::kWorkgroupSizeZ:
-        wgsize_id[2] = id;
-        break;
-      case SpecConstant::kGlobalOffsetX:
-        global_offset_id[0] = id;
-        break;
-      case SpecConstant::kGlobalOffsetY:
-        global_offset_id[1] = id;
-        break;
-      case SpecConstant::kGlobalOffsetZ:
-        global_offset_id[2] = id;
-        break;
-      case SpecConstant::kWorkDim:
-        work_dim_id = id;
-        break;
-      default:
-        llvm_unreachable("Unhandled spec constant");
+    case SpecConstant::kWorkgroupSizeX:
+      wgsize_id[0] = id;
+      break;
+    case SpecConstant::kWorkgroupSizeY:
+      wgsize_id[1] = id;
+      break;
+    case SpecConstant::kWorkgroupSizeZ:
+      wgsize_id[2] = id;
+      break;
+    case SpecConstant::kGlobalOffsetX:
+      global_offset_id[0] = id;
+      break;
+    case SpecConstant::kGlobalOffsetY:
+      global_offset_id[1] = id;
+      break;
+    case SpecConstant::kGlobalOffsetZ:
+      global_offset_id[2] = id;
+      break;
+    case SpecConstant::kWorkDim:
+      work_dim_id = id;
+      break;
+    default:
+      llvm_unreachable("Unhandled spec constant");
     }
   }
 
@@ -5652,7 +5653,8 @@ void SPIRVProducerPass::GenerateKernelReflection() {
     }
 
     // OpString for the kernel name.
-    auto kernel_name = addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
+    auto kernel_name =
+        addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
 
     // Kernel declaration
     // Ops[0] = void type

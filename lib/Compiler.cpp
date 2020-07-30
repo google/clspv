@@ -919,8 +919,7 @@ int Compile(const int argc, const char *const argv[]) {
   }
 
   // Otherwise, populate the pass manager and run the regular passes.
-  if (auto error = PopulatePassManager(
-          &pm, &binaryStream, &SamplerMapEntries))
+  if (auto error = PopulatePassManager(&pm, &binaryStream, &SamplerMapEntries))
     return error;
   pm.run(*module);
 

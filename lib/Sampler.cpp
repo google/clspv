@@ -18,31 +18,31 @@
 
 namespace clspv {
 
-const char* GetSamplerCoordsName(uint32_t mask) {
+const char *GetSamplerCoordsName(uint32_t mask) {
   if (mask & kSamplerNormalizedCoordsMask)
     return "CLK_NORMALIZED_COORDS_TRUE";
   else
     return "CLK_NORMALIZED_COORDS_FALSE";
 }
 
-const char* GetSamplerAddressingModeName(uint32_t mask) {
+const char *GetSamplerAddressingModeName(uint32_t mask) {
   const auto addressing_mode = mask & kSamplerAddressMask;
   switch (addressing_mode) {
-    case CLK_ADDRESS_NONE:
-    default:
-      return "CLK_ADDRESS_NONE";
-    case CLK_ADDRESS_CLAMP_TO_EDGE:
-      return "CLK_CLAMP_TO_EDGE";
-    case CLK_ADDRESS_CLAMP:
-      return "CLK_ADDRESS_CLAMP";
-    case CLK_ADDRESS_REPEAT:
-      return "CLK_ADDRESS_REPEAT";
-    case CLK_ADDRESS_MIRRORED_REPEAT:
-      return "CLK_ADDRESS_MIRRORED_REPEAT";
+  case CLK_ADDRESS_NONE:
+  default:
+    return "CLK_ADDRESS_NONE";
+  case CLK_ADDRESS_CLAMP_TO_EDGE:
+    return "CLK_CLAMP_TO_EDGE";
+  case CLK_ADDRESS_CLAMP:
+    return "CLK_ADDRESS_CLAMP";
+  case CLK_ADDRESS_REPEAT:
+    return "CLK_ADDRESS_REPEAT";
+  case CLK_ADDRESS_MIRRORED_REPEAT:
+    return "CLK_ADDRESS_MIRRORED_REPEAT";
   }
 }
 
-const char* GetSamplerFilteringModeName(uint32_t mask) {
+const char *GetSamplerFilteringModeName(uint32_t mask) {
   const auto filtering_mode = mask & kSamplerFilterMask;
   if (filtering_mode == CLK_FILTER_NEAREST) {
     return "CLK_FILTER_NEAREST";
@@ -53,6 +53,5 @@ const char* GetSamplerFilteringModeName(uint32_t mask) {
   }
   return "";
 }
-
 
 } // namespace clspv

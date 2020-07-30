@@ -43,9 +43,14 @@ enum SamplerFilterMode {
 };
 const unsigned kSamplerFilterMask = 0x30;
 
-const char* GetSamplerCoordsName(uint32_t mask);
-const char* GetSamplerAddressingModeName(uint32_t mask);
-const char* GetSamplerFilteringModeName(uint32_t mask);
+// Returns the name of the coordinate normalization in |mask|.
+const char *GetSamplerCoordsName(uint32_t mask);
+
+// Returns the name of the addressing mode in |mask|.
+const char *GetSamplerAddressingModeName(uint32_t mask);
+
+// Returns the name of the filter mode in |mask|.
+const char *GetSamplerFilteringModeName(uint32_t mask);
 
 } // namespace clspv
 

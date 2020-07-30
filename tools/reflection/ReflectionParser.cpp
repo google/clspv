@@ -16,8 +16,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "spirv/unified1/spirv.hpp"
 #include "spirv-tools/libspirv.hpp"
+#include "spirv/unified1/spirv.hpp"
 
 #include "clspv/ArgKind.h"
 #include "clspv/PushConstant.h"
@@ -30,9 +30,7 @@
 namespace {
 class ReflectionParser {
 public:
-  ReflectionParser(std::ostream* ostr) :
-    str(ostr)
-  { }
+  ReflectionParser(std::ostream *ostr) : str(ostr) {}
 
   // Parses |inst| and emits descriptor map entries as necessary.
   spv_result_t ParseInstruction(const spv_parsed_instruction_t *inst);
@@ -45,7 +43,7 @@ private:
   clspv::PushConstant GetPushConstantFromExtInst(uint32_t value);
 
   // Descriptor map output stream.
-  std::ostream* str;
+  std::ostream *str;
 
   // Tracks OpTypeInt 32 0 result id.
   uint32_t int_id = 0;
@@ -69,29 +67,29 @@ clspv::ArgKind ReflectionParser::GetArgKindFromExtInst(uint32_t value) {
   clspv::reflection::ExtInst ext_inst =
       static_cast<clspv::reflection::ExtInst>(value);
   switch (ext_inst) {
-    case clspv::reflection::ExtInstArgumentStorageBuffer:
-    case clspv::reflection::ExtInstConstantDataStorageBuffer:
-      return clspv::ArgKind::Buffer;
-    case clspv::reflection::ExtInstArgumentUniform:
-    case clspv::reflection::ExtInstConstantDataUniform:
-      return clspv::ArgKind::BufferUBO;
-    case clspv::reflection::ExtInstArgumentPodStorageBuffer:
-      return clspv::ArgKind::Pod;
-    case clspv::reflection::ExtInstArgumentPodUniform:
-      return clspv::ArgKind::PodUBO;
-    case clspv::reflection::ExtInstArgumentPodPushConstant:
-      return clspv::ArgKind::PodPushConstant;
-    case clspv::reflection::ExtInstArgumentSampledImage:
-      return clspv::ArgKind::ReadOnlyImage;
-    case clspv::reflection::ExtInstArgumentStorageImage:
-      return clspv::ArgKind::WriteOnlyImage;
-    case clspv::reflection::ExtInstArgumentSampler:
-      return clspv::ArgKind::Sampler;
-    case clspv::reflection::ExtInstArgumentWorkgroup:
-      return clspv::ArgKind::Local;
-    default:
-      assert(false && "Unexpected extended instruction");
-      return clspv::ArgKind::Buffer;
+  case clspv::reflection::ExtInstArgumentStorageBuffer:
+  case clspv::reflection::ExtInstConstantDataStorageBuffer:
+    return clspv::ArgKind::Buffer;
+  case clspv::reflection::ExtInstArgumentUniform:
+  case clspv::reflection::ExtInstConstantDataUniform:
+    return clspv::ArgKind::BufferUBO;
+  case clspv::reflection::ExtInstArgumentPodStorageBuffer:
+    return clspv::ArgKind::Pod;
+  case clspv::reflection::ExtInstArgumentPodUniform:
+    return clspv::ArgKind::PodUBO;
+  case clspv::reflection::ExtInstArgumentPodPushConstant:
+    return clspv::ArgKind::PodPushConstant;
+  case clspv::reflection::ExtInstArgumentSampledImage:
+    return clspv::ArgKind::ReadOnlyImage;
+  case clspv::reflection::ExtInstArgumentStorageImage:
+    return clspv::ArgKind::WriteOnlyImage;
+  case clspv::reflection::ExtInstArgumentSampler:
+    return clspv::ArgKind::Sampler;
+  case clspv::reflection::ExtInstArgumentWorkgroup:
+    return clspv::ArgKind::Local;
+  default:
+    assert(false && "Unexpected extended instruction");
+    return clspv::ArgKind::Buffer;
   }
 }
 
@@ -331,7 +329,8 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
 
 namespace clspv {
 
-bool ParseReflection(const std::vector<uint32_t>& binary, spv_target_env env, std::ostream* str) {
+bool ParseReflection(const std::vector<uint32_t> &binary, spv_target_env env,
+                     std::ostream *str) {
   ReflectionParser parser(str);
   auto MessageConsumer = [](spv_message_level_t, const char *,
                             const spv_position_t, const char *) {};
@@ -344,5 +343,4 @@ bool ParseReflection(const std::vector<uint32_t>& binary, spv_target_env env, st
 
   return result == SPV_SUCCESS;
 }
-
-}
+} // namespace clspv
