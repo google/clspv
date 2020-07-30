@@ -56,9 +56,8 @@ private:
   std::unordered_map<uint32_t, uint32_t> constants;
 };
 
-spv_result_t
-ParseInstruction(void *user_data,
-                 const spv_parsed_instruction_t *inst) {
+spv_result_t ParseInstruction(void *user_data,
+                              const spv_parsed_instruction_t *inst) {
   ReflectionParser *parser = reinterpret_cast<ReflectionParser *>(user_data);
   return parser->ParseInstruction(inst);
 }
