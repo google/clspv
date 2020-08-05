@@ -350,7 +350,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateModuleInfo();
   void GenerateGlobalVar(GlobalVariable &GV);
   void GenerateWorkgroupVars();
-  // Generate descriptor map entries for resource variables associated with
+  // Generate reflection instructions for resource variables associated with
   // arguments to F.
   void GenerateSamplers();
   // Generate OpVariables for %clspv.resource.var.* calls.
@@ -2629,7 +2629,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // provided by the host at binding 0 of the next descriptor set.
     const uint32_t descriptor_set = TakeDescriptorIndex(module);
 
-    // Emit the intializer to the descriptor map file.
+    // Emit the intializer as a reflection instruction.
     // Use "kind,buffer" to indicate storage buffer. We might want to expand
     // that later to other types, like uniform buffer.
     std::string hexbytes;
@@ -5689,7 +5689,7 @@ void SPIRVProducerPass::GenerateKernelReflection() {
 
     // If we've clustered POD arguments, then argument details are in metadata.
     // If an argument maps to a resource variable, then get descriptor set and
-    // binding from the resoure variable.  Other info comes from the metadata.
+    // binding from the resource variable.  Other info comes from the metadata.
     const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
     auto local_spec_id_md =
         module->getNamedMetadata(clspv::LocalSpecIdMetadataName());

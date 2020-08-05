@@ -924,8 +924,6 @@ int Compile(const int argc, const char *const argv[]) {
   pm.run(*module);
 
   // Write outputs
-
-  // Write the descriptor map, if requested.
   std::error_code error;
 
   // Write the resulting binary.

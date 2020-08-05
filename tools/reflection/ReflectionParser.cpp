@@ -15,7 +15,6 @@
 #include <cassert>
 #include <ostream>
 #include <unordered_map>
-#include <unordered_set>
 
 #include "spirv-tools/libspirv.hpp"
 #include "spirv/unified1/spirv.hpp"
@@ -139,7 +138,7 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
   }
   case spv::OpExtInst:
     if (inst->ext_inst_type == SPV_EXT_INST_TYPE_NONSEMANTIC_CLSPVREFLECTION) {
-      // Reflection sepcific instruction.
+      // Reflection specific instruction.
       auto ext_inst = inst->words[inst->operands[3].offset];
       switch (ext_inst) {
       case clspv::reflection::ExtInstKernel: {
@@ -178,7 +177,7 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
       }
       case clspv::reflection::ExtInstArgumentPodStorageBuffer:
       case clspv::reflection::ExtInstArgumentPodUniform: {
-        // Emit an argument entry. Descriptor set, binding and bize.
+        // Emit an argument entry. Descriptor set, binding and size.
         auto kernel_id = inst->words[inst->operands[4].offset];
         auto ordinal_id = inst->words[inst->operands[5].offset];
         auto ds_id = inst->words[inst->operands[6].offset];

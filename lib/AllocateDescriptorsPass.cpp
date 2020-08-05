@@ -228,7 +228,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
   //       sampler-literal-value)
   //
   // We need to preserve the index into the sampler map so that later we can
-  // generate the sampler lines in the descriptor map. That needs both the
+  // generate the sampler lines in the embedded reflection. That needs both the
   // literal value and the string expression for the literal.
 
   // Generate the function type for clspv::LiteralSamplerFunction()

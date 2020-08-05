@@ -35,7 +35,7 @@ Options:
                                 Default is spv1.0.
 
 -o <outfile>                    Specify the output filename.
-                                If not output file is specified, output goes to
+                                If no output file is specified, output goes to
                                 stdout.
 
 -d                              Disable validation.

@@ -32,7 +32,7 @@ const char *GetSamplerAddressingModeName(uint32_t mask) {
   default:
     return "CLK_ADDRESS_NONE";
   case CLK_ADDRESS_CLAMP_TO_EDGE:
-    return "CLK_CLAMP_TO_EDGE";
+    return "CLK_ADDRESS_CLAMP_TO_EDGE";
   case CLK_ADDRESS_CLAMP:
     return "CLK_ADDRESS_CLAMP";
   case CLK_ADDRESS_REPEAT:
