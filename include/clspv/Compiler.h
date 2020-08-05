@@ -27,7 +27,7 @@ int Compile(const int argc, const char *const argv[]);
 // For use with clBuildProgram. The input program is passed as |program|. If
 // |sampler_map| is non-empty, it will be used as the sampler map, otherwise
 // the sampler map source falls back on command line options. Command line
-// options to clspv are passed as |options|. |output_binary| and
+// options to clspv are passed as |options|. |output_binary| must be non-null.
 int CompileFromSourceString(const std::string &program,
                             const std::string &sampler_map,
                             const std::string &options,

@@ -106,7 +106,7 @@ if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/clang/ClangConfig.cmake)
 endif()
 
-# clspv_c_strings, clspv_glsl and clspv_reflection are used by SPIRVProducerPass.cpp.
+# clspv_c_strings, clspv_glsl, and clspv_reflection are used by SPIRVProducerPass.cpp.
 add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection ${CLSPV_LLVM_COMPONENTS})
 
 # clspv_baked_opencl_header is used by Compiler.cpp.
