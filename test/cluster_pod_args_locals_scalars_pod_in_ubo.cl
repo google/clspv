@@ -1,6 +1,7 @@
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -pod-ubo -descriptormap=%t2.map
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -pod-ubo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
+// RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck %s < %t2.map -check-prefix=MAP
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

@@ -1,6 +1,7 @@
-// RUN: clspv -work-dim -descriptormap=%t.dmap %s -o %t.spv
+// RUN: clspv -work-dim %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
+// RUN: clspv-reflection %t.spv -o %t.dmap
 // RUN: FileCheck --check-prefix=DMAP %s < %t.dmap
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

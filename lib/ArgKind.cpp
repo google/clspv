@@ -39,7 +39,7 @@ namespace {
 clspv::ArgKind GetArgKindForType(Type *type);
 
 // Maps an LLVM type for a kernel argument to an argument
-// kind suitable for a descriptor map.  The result is one of:
+// kind suitable for embedded reflection. The result is one of:
 //   buffer     - storage buffer
 //   buffer_ubo - uniform buffer
 //   local      - array in Workgroup storage, number of elements given by

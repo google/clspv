@@ -16,8 +16,8 @@
 # the pass pipeline.
 add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorMap.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Sampler.cpp
 )
 
 # Pass library.  Transformation passes and pass-specific support are
@@ -93,6 +93,7 @@ foreach(clspv_lib clspv_core clspv_passes)
   target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
 
   target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
+
 endforeach(clspv_lib)
 
 set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
@@ -105,8 +106,8 @@ if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/clang/ClangConfig.cmake)
 endif()
 
-# clspv_c_strings and clspv_glsl are used by SPIRVProducerPass.cpp.
-add_dependencies(clspv_passes clspv_c_strings clspv_glsl ${CLSPV_LLVM_COMPONENTS})
+# clspv_c_strings, clspv_glsl, and clspv_reflection are used by SPIRVProducerPass.cpp.
+add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection ${CLSPV_LLVM_COMPONENTS})
 
 # clspv_baked_opencl_header is used by Compiler.cpp.
 add_dependencies(clspv_core clspv_baked_opencl_header)

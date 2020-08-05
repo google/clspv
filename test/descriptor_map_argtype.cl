@@ -1,9 +1,11 @@
 // Generating the descriptor map goes through two different flows in the compiler.
 // Check both.
 
-// RUN: clspv %s -o %t.spv -descriptormap=%t.map -cluster-pod-kernel-args=0
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args=0
+// RUN: clspv-reflection -d %t.spv -o %t.map
 // RUN: FileCheck %s < %t.map
-// RUN: clspv %s -o %t.spv -descriptormap=%t.cluster.map -cluster-pod-kernel-args 
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args 
+// RUN: clspv-reflection -d %t.spv -o %t.cluster.map
 // RUN: FileCheck -check-prefix=CLUSTER %s < %t.cluster.map
 
 // CHECK: kernel,foo,arg,A,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer

@@ -28,6 +28,9 @@ enum class PushConstant : int {
   KernelArgument,
 };
 
+// Returns the name of the push constant from its enum.
+const char *GetPushConstantName(PushConstant pc);
+
 } // namespace clspv
 
 #endif // #ifndef CLSPV_INCLUDE_CLSPV_PUSH_CONSTANT_H_

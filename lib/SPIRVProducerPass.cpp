@@ -48,10 +48,12 @@
 #include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
-#include "clspv/DescriptorMap.h"
 #include "clspv/Option.h"
+#include "clspv/PushConstant.h"
+#include "clspv/SpecConstant.h"
 #include "clspv/spirv_c_strings.hpp"
 #include "clspv/spirv_glsl.hpp"
+#include "clspv/spirv_reflection.hpp"
 
 #include "ArgKind.h"
 #include "Builtins.h"
@@ -93,7 +95,7 @@ const bool Hack_generate_runtime_array_stride_early = true;
 const double kOneOverPi = 0.318309886183790671538;
 const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
-// SPIRV Module Sections (per 2.4 of the SPIRV spec)
+// SPIRV Module Sections (per 2.4 of the SPIR-V spec)
 // These are used to collect SPIRVInstructions by type on-the-fly.
 enum SPIRVSection {
   kCapabilities,
@@ -112,6 +114,10 @@ enum SPIRVSection {
 
   kFunctions,
 
+  // This is not a section of the SPIR-V spec and should always immediately
+  // precede kSectionCount. It is a convenient place for the embedded
+  // reflection data.
+  kReflection,
   kSectionCount
 };
 
@@ -239,12 +245,10 @@ struct SPIRVProducerPass final : public ModulePass {
 
   explicit SPIRVProducerPass(
       raw_pwrite_stream &out,
-      std::vector<clspv::version0::DescriptorMapEntry> *descriptor_map_entries,
       ArrayRef<std::pair<unsigned, std::string>> samplerMap,
       bool outputCInitList)
       : ModulePass(ID), module(nullptr), samplerMap(samplerMap), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
-        descriptorMapEntries(descriptor_map_entries),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
@@ -344,13 +348,10 @@ struct SPIRVProducerPass final : public ModulePass {
   // the last generated ID.
   void GenerateSPIRVTypes();
   void GenerateModuleInfo();
-  void GeneratePushConstantDescriptorMapEntries();
-  void GenerateSpecConstantDescriptorMapEntries();
   void GenerateGlobalVar(GlobalVariable &GV);
   void GenerateWorkgroupVars();
-  // Generate descriptor map entries for resource variables associated with
+  // Generate reflection instructions for resource variables associated with
   // arguments to F.
-  void GenerateDescriptorMapInfo(Function &F);
   void GenerateSamplers();
   // Generate OpVariables for %clspv.resource.var.* calls.
   void GenerateResourceVars();
@@ -487,6 +488,17 @@ struct SPIRVProducerPass final : public ModulePass {
   SPIRVID addSPIRVGlobalVariable(const SPIRVID &TypeID, spv::StorageClass SC,
                                  const SPIRVID &InitID = SPIRVID());
 
+  SPIRVID getReflectionImport();
+  void GenerateReflection();
+  void GenerateKernelReflection();
+  void GeneratePushConstantReflection();
+  void GenerateSpecConstantReflection();
+  void AddArgumentReflection(SPIRVID kernel_decl, const std::string &name,
+                             clspv::ArgKind arg_kind, uint32_t ordinal,
+                             uint32_t descriptor_set, uint32_t binding,
+                             uint32_t offset, uint32_t size, uint32_t spec_id,
+                             uint32_t elem_size);
+
 private:
   static char ID;
 
@@ -513,7 +525,6 @@ private:
   // |binaryTempOut|.  It's the latter when we really want to write a C
   // initializer list.
   raw_pwrite_stream *binaryOut;
-  std::vector<version0::DescriptorMapEntry> *descriptorMapEntries;
   const bool outputCInitList; // If true, output look like {0x7023, ... , 5}
   uint64_t patchBoundOffset;
   uint32_t nextID;
@@ -645,6 +656,9 @@ private:
   // Maps basic block to its continue block.
   DenseMap<BasicBlock *, BasicBlock *> ContinueBlocks;
 
+  SPIRVID ReflectionID;
+  DenseMap<Function *, SPIRVID> KernelDeclarations;
+
 public:
   static SPIRVProducerPass *Ptr;
 };
@@ -655,13 +669,11 @@ SPIRVProducerPass *SPIRVProducerPass::Ptr = nullptr;
 } // namespace
 
 namespace clspv {
-ModulePass *createSPIRVProducerPass(
-    raw_pwrite_stream &out,
-    std::vector<version0::DescriptorMapEntry> *descriptor_map_entries,
-    ArrayRef<std::pair<unsigned, std::string>> samplerMap,
-    bool outputCInitList) {
-  return new SPIRVProducerPass(out, descriptor_map_entries, samplerMap,
-                               outputCInitList);
+ModulePass *
+createSPIRVProducerPass(raw_pwrite_stream &out,
+                        ArrayRef<std::pair<unsigned, std::string>> samplerMap,
+                        bool outputCInitList) {
+  return new SPIRVProducerPass(out, samplerMap, outputCInitList);
 }
 } // namespace clspv
 
@@ -742,9 +754,6 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
   // Generate literal samplers if necessary.
   GenerateSamplers();
 
-  // Generate descriptor map entries for all push constants
-  GeneratePushConstantDescriptorMapEntries();
-
   // Generate SPIRV variables.
   for (GlobalVariable &GV : module->globals()) {
     GenerateGlobalVar(GV);
@@ -757,8 +766,6 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
     if (F.isDeclaration()) {
       continue;
     }
-
-    GenerateDescriptorMapInfo(F);
 
     // Generate Function Prologue.
     GenerateFuncPrologue(F);
@@ -773,11 +780,11 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
   HandleDeferredInstruction();
   HandleDeferredDecorations();
 
-  // Generate descriptor map entries for module scope specialization constants.
-  GenerateSpecConstantDescriptorMapEntries();
-
   // Generate SPIRV module information.
   GenerateModuleInfo();
+
+  // Generate embedded reflection information.
+  GenerateReflection();
 
   WriteSPIRVBinary();
 
@@ -2223,9 +2230,14 @@ void SPIRVProducerPass::GenerateSamplers() {
       descriptor_set = SamplerLiteralToDescriptorSetMap[sampler_value];
       binding = SamplerLiteralToBindingMap[sampler_value];
 
-      version0::DescriptorMapEntry::SamplerData sampler_data = {sampler_value};
-      descriptorMapEntries->emplace_back(std::move(sampler_data),
-                                         descriptor_set, binding);
+      auto import_id = getReflectionImport();
+      SPIRVOperandVec Ops;
+      Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+          << reflection::ExtInstLiteralSampler
+          << getSPIRVInt32Constant(descriptor_set)
+          << getSPIRVInt32Constant(binding)
+          << getSPIRVInt32Constant(sampler_value);
+      addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
     }
 
     // Ops[0] = Target ID
@@ -2341,50 +2353,6 @@ void SPIRVProducerPass::GenerateResourceVars() {
     default:
       break;
     }
-  }
-}
-
-void SPIRVProducerPass::GeneratePushConstantDescriptorMapEntries() {
-
-  if (auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName())) {
-    auto const &DL = module->getDataLayout();
-    auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
-    auto STy = cast<StructType>(GV->getValueType());
-
-    for (unsigned i = 0; i < STy->getNumElements(); i++) {
-      auto pc = static_cast<clspv::PushConstant>(
-          mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
-      if (pc != clspv::PushConstant::KernelArgument) {
-        auto memberType = STy->getElementType(i);
-        auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
-        unsigned previousOffset = 0;
-        if (i > 0) {
-          previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
-        }
-        auto size =
-            static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
-        assert(isValidExplicitLayout(*module, STy, i,
-                                     spv::StorageClassPushConstant, offset,
-                                     previousOffset));
-        version0::DescriptorMapEntry::PushConstantData data = {pc, offset,
-                                                               size};
-        descriptorMapEntries->emplace_back(std::move(data));
-      }
-    }
-  }
-}
-
-void SPIRVProducerPass::GenerateSpecConstantDescriptorMapEntries() {
-  for (auto pair : clspv::GetSpecConstants(module)) {
-    auto kind = pair.first;
-    auto id = pair.second;
-
-    // Local memory size is only used for kernel arguments.
-    if (kind == SpecConstant::kLocalMemorySize)
-      continue;
-
-    version0::DescriptorMapEntry::SpecConstantData data = {kind, id};
-    descriptorMapEntries->emplace_back(std::move(data));
   }
 }
 
@@ -2661,19 +2629,24 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     // provided by the host at binding 0 of the next descriptor set.
     const uint32_t descriptor_set = TakeDescriptorIndex(module);
 
-    // Emit the intializer to the descriptor map file.
+    // Emit the intializer as a reflection instruction.
     // Use "kind,buffer" to indicate storage buffer. We might want to expand
     // that later to other types, like uniform buffer.
     std::string hexbytes;
     llvm::raw_string_ostream str(hexbytes);
     clspv::ConstantEmitter(DL, str).Emit(GV.getInitializer());
-    version0::DescriptorMapEntry::ConstantData constant_data = {ArgKind::Buffer,
-                                                                str.str()};
-    descriptorMapEntries->emplace_back(std::move(constant_data), descriptor_set,
-                                       0);
+
+    // Reflection instruction for constant data.
+    SPIRVOperandVec Ops;
+    auto data_id = addSPIRVInst<kDebug>(spv::OpString, str.str().c_str());
+    Ops << getSPIRVType(Type::getVoidTy(module->getContext()))
+        << getReflectionImport() << reflection::ExtInstConstantDataStorageBuffer
+        << getSPIRVInt32Constant(descriptor_set) << getSPIRVInt32Constant(0)
+        << data_id;
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
     // OpDecorate %var DescriptorSet <descriptor_set>
-    SPIRVOperandVec Ops;
+    Ops.clear();
     Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
@@ -2681,144 +2654,6 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     Ops.clear();
     Ops << var_id << spv::DecorationBinding << 0;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
-  }
-}
-
-void SPIRVProducerPass::GenerateDescriptorMapInfo(Function &F) {
-  const auto &DL = module->getDataLayout();
-  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
-    return;
-  }
-  // Add entries for each kernel
-  version0::DescriptorMapEntry::KernelDeclData kernel_decl_data = {
-      F.getName().str()};
-  descriptorMapEntries->emplace_back(std::move(kernel_decl_data));
-
-  // Gather the list of resources that are used by this function's arguments.
-  auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
-
-  auto *fty = F.getType()->getPointerElementType();
-  auto *func_ty = dyn_cast<FunctionType>(fty);
-
-  // If we've clustered POD arguments, then argument details are in metadata.
-  // If an argument maps to a resource variable, then get descriptor set and
-  // binding from the resoure variable.  Other info comes from the metadata.
-  const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
-  auto local_spec_id_md =
-      module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
-  if (arg_map) {
-    for (const auto &arg : arg_map->operands()) {
-      const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
-      assert(arg_node->getNumOperands() == 6);
-      const auto name =
-          dyn_cast<MDString>(arg_node->getOperand(0))->getString();
-      const auto old_index =
-          dyn_extract<ConstantInt>(arg_node->getOperand(1))->getZExtValue();
-      // Remapped argument index
-      const int new_index = static_cast<int>(
-          dyn_extract<ConstantInt>(arg_node->getOperand(2))->getSExtValue());
-      const auto offset =
-          dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
-      const auto arg_size =
-          dyn_extract<ConstantInt>(arg_node->getOperand(4))->getZExtValue();
-      const auto argKind = clspv::GetArgKindFromName(
-          dyn_cast<MDString>(arg_node->getOperand(5))->getString().str());
-
-      // If this is a local memory argument, find the right spec id for this
-      // argument.
-      int64_t spec_id = -1;
-      if (argKind == clspv::ArgKind::Local) {
-        for (auto spec_id_arg : local_spec_id_md->operands()) {
-          if ((&F == dyn_cast<Function>(
-                         dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
-                             ->getValue())) &&
-              (static_cast<uint64_t>(new_index) ==
-               mdconst::extract<ConstantInt>(spec_id_arg->getOperand(1))
-                   ->getZExtValue())) {
-            spec_id = mdconst::extract<ConstantInt>(spec_id_arg->getOperand(2))
-                          ->getSExtValue();
-            break;
-          }
-        }
-      }
-      uint32_t descriptor_set = 0;
-      uint32_t binding = 0;
-      version0::DescriptorMapEntry::KernelArgData kernel_data = {
-          F.getName().str(), name.str(), static_cast<uint32_t>(old_index),
-          argKind, static_cast<uint32_t>(spec_id),
-          // This will be set below for pointer-to-local args.
-          0, static_cast<uint32_t>(offset), static_cast<uint32_t>(arg_size)};
-      if (spec_id > 0) {
-        kernel_data.local_element_size = static_cast<uint32_t>(GetTypeAllocSize(
-            func_ty->getParamType(unsigned(new_index))->getPointerElementType(),
-            DL));
-      } else if (new_index >= 0) {
-        auto *info = resource_var_at_index[new_index];
-        assert(info);
-        descriptor_set = info->descriptor_set;
-        binding = info->binding;
-      }
-      descriptorMapEntries->emplace_back(std::move(kernel_data), descriptor_set,
-                                         binding);
-    }
-  } else {
-    // There is no argument map.
-    // Take descriptor info from the resource variable calls.
-    // Take argument name and size from the arguments list.
-
-    SmallVector<Argument *, 4> arguments;
-    for (auto &arg : F.args()) {
-      arguments.push_back(&arg);
-    }
-
-    unsigned arg_index = 0;
-    for (auto *info : resource_var_at_index) {
-      if (info) {
-        auto arg = arguments[arg_index];
-        unsigned arg_size = 0;
-        if (info->arg_kind == clspv::ArgKind::Pod ||
-            info->arg_kind == clspv::ArgKind::PodUBO ||
-            info->arg_kind == clspv::ArgKind::PodPushConstant) {
-          arg_size = static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
-        }
-
-        // Local pointer arguments are unused in this case. Offset is always
-        // zero.
-        version0::DescriptorMapEntry::KernelArgData kernel_data = {
-            F.getName().str(),
-            arg->getName().str(),
-            arg_index,
-            info->arg_kind,
-            0,
-            0,
-            0,
-            arg_size};
-        descriptorMapEntries->emplace_back(std::move(kernel_data),
-                                           info->descriptor_set, info->binding);
-      }
-      arg_index++;
-    }
-    // Generate mappings for pointer-to-local arguments.
-    for (arg_index = 0; arg_index < arguments.size(); ++arg_index) {
-      Argument *arg = arguments[arg_index];
-      auto where = LocalArgSpecIds.find(arg);
-      if (where != LocalArgSpecIds.end()) {
-        auto &local_arg_info = LocalSpecIdInfoMap[where->second];
-        // Pod arguments members are unused in this case.
-        version0::DescriptorMapEntry::KernelArgData kernel_data = {
-            F.getName().str(),
-            arg->getName().str(),
-            arg_index,
-            ArgKind::Local,
-            static_cast<uint32_t>(local_arg_info.spec_id),
-            static_cast<uint32_t>(
-                GetTypeAllocSize(local_arg_info.elem_type, DL)),
-            0,
-            0};
-        // Pointer-to-local arguments do not utilize descriptor set and binding.
-        descriptorMapEntries->emplace_back(std::move(kernel_data), 0, 0);
-      }
-    }
   }
 }
 
@@ -5141,7 +4976,8 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpTypeFloat:
     case spv::OpTypeArray:
     case spv::OpTypeVector:
-    case spv::OpTypeFunction: {
+    case spv::OpTypeFunction:
+    case spv::OpString: {
       WriteWordCountAndOpcode(Inst);
       WriteResultID(Inst);
       for (uint32_t i = 0; i < Ops.size(); i++) {
@@ -5660,4 +5496,391 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps() {
       }
     }
   }
+}
+
+SPIRVID SPIRVProducerPass::getReflectionImport() {
+  if (!ReflectionID.isValid()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
+    ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport,
+                                          "NonSemantic.ClspvReflection.1");
+  }
+  return ReflectionID;
+}
+
+void SPIRVProducerPass::GenerateReflection() {
+  GenerateKernelReflection();
+  GeneratePushConstantReflection();
+  GenerateSpecConstantReflection();
+}
+
+void SPIRVProducerPass::GeneratePushConstantReflection() {
+  if (auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName())) {
+    auto const &DL = module->getDataLayout();
+    auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
+    auto STy = cast<StructType>(GV->getValueType());
+
+    for (unsigned i = 0; i < STy->getNumElements(); i++) {
+      auto pc = static_cast<clspv::PushConstant>(
+          mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
+      if (pc == PushConstant::KernelArgument)
+        continue;
+
+      auto memberType = STy->getElementType(i);
+      auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
+      unsigned previousOffset = 0;
+      if (i > 0) {
+        previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
+      }
+      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
+      assert(isValidExplicitLayout(*module, STy, i,
+                                   spv::StorageClassPushConstant, offset,
+                                   previousOffset));
+
+      reflection::ExtInst pc_inst = reflection::ExtInstMax;
+      switch (pc) {
+      case PushConstant::GlobalOffset:
+        pc_inst = reflection::ExtInstPushConstantGlobalOffset;
+        break;
+      case PushConstant::EnqueuedLocalSize:
+        pc_inst = reflection::ExtInstPushConstantEnqueuedLocalSize;
+        break;
+      case PushConstant::GlobalSize:
+        pc_inst = reflection::ExtInstPushConstantGlobalSize;
+        break;
+      case PushConstant::RegionOffset:
+        pc_inst = reflection::ExtInstPushConstantRegionOffset;
+        break;
+      case PushConstant::NumWorkgroups:
+        pc_inst = reflection::ExtInstPushConstantNumWorkgroups;
+        break;
+      case PushConstant::RegionGroupOffset:
+        pc_inst = reflection::ExtInstPushConstantRegionGroupOffset;
+        break;
+      default:
+        llvm_unreachable("Unhandled push constant");
+        break;
+      }
+
+      auto import_id = getReflectionImport();
+      SPIRVOperandVec Ops;
+      Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+          << pc_inst << getSPIRVInt32Constant(offset)
+          << getSPIRVInt32Constant(size);
+      addSPIRVInst(spv::OpExtInst, Ops);
+    }
+  }
+}
+
+void SPIRVProducerPass::GenerateSpecConstantReflection() {
+  const uint32_t kMax = std::numeric_limits<uint32_t>::max();
+  uint32_t wgsize_id[3] = {kMax, kMax, kMax};
+  uint32_t global_offset_id[3] = {kMax, kMax, kMax};
+  uint32_t work_dim_id = kMax;
+  for (auto pair : clspv::GetSpecConstants(module)) {
+    auto kind = pair.first;
+    auto id = pair.second;
+
+    // Local memory size is only used for kernel arguments.
+    if (kind == SpecConstant::kLocalMemorySize)
+      continue;
+
+    switch (kind) {
+    case SpecConstant::kWorkgroupSizeX:
+      wgsize_id[0] = id;
+      break;
+    case SpecConstant::kWorkgroupSizeY:
+      wgsize_id[1] = id;
+      break;
+    case SpecConstant::kWorkgroupSizeZ:
+      wgsize_id[2] = id;
+      break;
+    case SpecConstant::kGlobalOffsetX:
+      global_offset_id[0] = id;
+      break;
+    case SpecConstant::kGlobalOffsetY:
+      global_offset_id[1] = id;
+      break;
+    case SpecConstant::kGlobalOffsetZ:
+      global_offset_id[2] = id;
+      break;
+    case SpecConstant::kWorkDim:
+      work_dim_id = id;
+      break;
+    default:
+      llvm_unreachable("Unhandled spec constant");
+    }
+  }
+
+  auto import_id = getReflectionImport();
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+  SPIRVOperandVec Ops;
+  if (wgsize_id[0] != kMax) {
+    assert(wgsize_id[1] != kMax);
+    assert(wgsize_id[2] != kMax);
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantWorkgroupSize
+        << getSPIRVInt32Constant(wgsize_id[0])
+        << getSPIRVInt32Constant(wgsize_id[1])
+        << getSPIRVInt32Constant(wgsize_id[2]);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+  if (global_offset_id[0] != kMax) {
+    assert(global_offset_id[1] != kMax);
+    assert(global_offset_id[2] != kMax);
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantGlobalOffset
+        << getSPIRVInt32Constant(global_offset_id[0])
+        << getSPIRVInt32Constant(global_offset_id[1])
+        << getSPIRVInt32Constant(global_offset_id[2]);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+  if (work_dim_id != kMax) {
+    Ops.clear();
+    Ops << void_id << import_id << reflection::ExtInstSpecConstantWorkDim
+        << getSPIRVInt32Constant(work_dim_id);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+}
+
+void SPIRVProducerPass::GenerateKernelReflection() {
+  const auto &DL = module->getDataLayout();
+  auto import_id = getReflectionImport();
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+
+  for (auto &F : *module) {
+    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+      continue;
+    }
+
+    // OpString for the kernel name.
+    auto kernel_name =
+        addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
+
+    // Kernel declaration
+    // Ops[0] = void type
+    // Ops[1] = reflection ext import
+    // Ops[2] = function id
+    // Ops[3] = kernel name
+    SPIRVOperandVec Ops;
+    Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
+        << kernel_name;
+    auto kernel_decl = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+
+    // Generate the required workgroup size property if it was specified.
+    if (const MDNode *MD = F.getMetadata("reqd_work_group_size")) {
+      uint32_t CurXDimCst = static_cast<uint32_t>(
+          mdconst::extract<ConstantInt>(MD->getOperand(0))->getZExtValue());
+      uint32_t CurYDimCst = static_cast<uint32_t>(
+          mdconst::extract<ConstantInt>(MD->getOperand(1))->getZExtValue());
+      uint32_t CurZDimCst = static_cast<uint32_t>(
+          mdconst::extract<ConstantInt>(MD->getOperand(2))->getZExtValue());
+
+      Ops.clear();
+      Ops << void_id << import_id
+          << reflection::ExtInstPropertyRequiredWorkgroupSize << kernel_decl
+          << getSPIRVInt32Constant(CurXDimCst)
+          << getSPIRVInt32Constant(CurYDimCst)
+          << getSPIRVInt32Constant(CurZDimCst);
+      addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+    }
+
+    auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
+    auto *func_ty = F.getFunctionType();
+
+    // If we've clustered POD arguments, then argument details are in metadata.
+    // If an argument maps to a resource variable, then get descriptor set and
+    // binding from the resource variable.  Other info comes from the metadata.
+    const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
+    auto local_spec_id_md =
+        module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+    if (arg_map) {
+      for (const auto &arg : arg_map->operands()) {
+        const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
+        assert(arg_node->getNumOperands() == 6);
+        const auto name =
+            dyn_cast<MDString>(arg_node->getOperand(0))->getString();
+        const auto old_index =
+            dyn_extract<ConstantInt>(arg_node->getOperand(1))->getZExtValue();
+        // Remapped argument index
+        const int new_index = static_cast<int>(
+            dyn_extract<ConstantInt>(arg_node->getOperand(2))->getSExtValue());
+        const auto offset =
+            dyn_extract<ConstantInt>(arg_node->getOperand(3))->getZExtValue();
+        const auto size =
+            dyn_extract<ConstantInt>(arg_node->getOperand(4))->getZExtValue();
+        const auto argKind = clspv::GetArgKindFromName(
+            dyn_cast<MDString>(arg_node->getOperand(5))->getString().str());
+
+        // If this is a local memory argument, find the right spec id for this
+        // argument.
+        int64_t spec_id = -1;
+        if (argKind == clspv::ArgKind::Local) {
+          for (auto spec_id_arg : local_spec_id_md->operands()) {
+            if ((&F == dyn_cast<Function>(
+                           dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
+                               ->getValue())) &&
+                (static_cast<uint64_t>(new_index) ==
+                 mdconst::extract<ConstantInt>(spec_id_arg->getOperand(1))
+                     ->getZExtValue())) {
+              spec_id =
+                  mdconst::extract<ConstantInt>(spec_id_arg->getOperand(2))
+                      ->getSExtValue();
+              break;
+            }
+          }
+        }
+
+        // Generate the specific argument instruction.
+        const uint32_t ordinal = static_cast<uint32_t>(old_index);
+        const uint32_t arg_offset = static_cast<uint32_t>(offset);
+        const uint32_t arg_size = static_cast<uint32_t>(size);
+        uint32_t elem_size = 0;
+        uint32_t descriptor_set = 0;
+        uint32_t binding = 0;
+        if (spec_id > 0) {
+          elem_size = static_cast<uint32_t>(
+              GetTypeAllocSize(func_ty->getParamType(unsigned(new_index))
+                                   ->getPointerElementType(),
+                               DL));
+        } else if (new_index >= 0) {
+          auto *info = resource_var_at_index[new_index];
+          assert(info);
+          descriptor_set = info->descriptor_set;
+          binding = info->binding;
+        }
+        AddArgumentReflection(kernel_decl, name.str(), argKind, ordinal,
+                              descriptor_set, binding, arg_offset, arg_size,
+                              static_cast<uint32_t>(spec_id), elem_size);
+      }
+    } else {
+      // There is no argument map.
+      // Take descriptor info from the resource variable calls.
+      // Take argument name and size from the arguments list.
+
+      SmallVector<Argument *, 4> arguments;
+      for (auto &arg : F.args()) {
+        arguments.push_back(&arg);
+      }
+
+      unsigned arg_index = 0;
+      for (auto *info : resource_var_at_index) {
+        if (info) {
+          auto arg = arguments[arg_index];
+          unsigned arg_size = 0;
+          if (info->arg_kind == clspv::ArgKind::Pod ||
+              info->arg_kind == clspv::ArgKind::PodUBO ||
+              info->arg_kind == clspv::ArgKind::PodPushConstant) {
+            arg_size =
+                static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
+          }
+
+          // Local pointer arguments are unused in this case.
+          // offset, spec_id and elem_size always 0.
+          AddArgumentReflection(kernel_decl, arg->getName().str(),
+                                info->arg_kind, arg_index, info->descriptor_set,
+                                info->binding, 0, arg_size, 0, 0);
+        }
+        arg_index++;
+      }
+      // Generate mappings for pointer-to-local arguments.
+      for (arg_index = 0; arg_index < arguments.size(); ++arg_index) {
+        Argument *arg = arguments[arg_index];
+        auto where = LocalArgSpecIds.find(arg);
+        if (where != LocalArgSpecIds.end()) {
+          auto &local_arg_info = LocalSpecIdInfoMap[where->second];
+
+          // descriptor_set, binding, offset and size are always 0.
+          AddArgumentReflection(kernel_decl, arg->getName().str(),
+                                ArgKind::Local, arg_index, 0, 0, 0, 0,
+                                static_cast<uint32_t>(local_arg_info.spec_id),
+                                static_cast<uint32_t>(GetTypeAllocSize(
+                                    local_arg_info.elem_type, DL)));
+        }
+      }
+    }
+  }
+}
+
+void SPIRVProducerPass::AddArgumentReflection(
+    SPIRVID kernel_decl, const std::string &name, clspv::ArgKind arg_kind,
+    uint32_t ordinal, uint32_t descriptor_set, uint32_t binding,
+    uint32_t offset, uint32_t size, uint32_t spec_id, uint32_t elem_size) {
+  // Generate ArgumentInfo for this argument.
+  // TODO: generate remaining optional operands.
+  auto import_id = getReflectionImport();
+  auto arg_name = addSPIRVInst<kDebug>(spv::OpString, name.c_str());
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+  SPIRVOperandVec Ops;
+  Ops << void_id << import_id << reflection::ExtInstArgumentInfo << arg_name;
+  auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+
+  Ops.clear();
+  Ops << void_id << import_id;
+  reflection::ExtInst ext_inst = reflection::ExtInstMax;
+  // Determine the extended instruction.
+  switch (arg_kind) {
+  case clspv::ArgKind::Buffer:
+    ext_inst = reflection::ExtInstArgumentStorageBuffer;
+    break;
+  case clspv::ArgKind::BufferUBO:
+    ext_inst = reflection::ExtInstArgumentUniform;
+    break;
+  case clspv::ArgKind::Local:
+    ext_inst = reflection::ExtInstArgumentWorkgroup;
+    break;
+  case clspv::ArgKind::Pod:
+    ext_inst = reflection::ExtInstArgumentPodStorageBuffer;
+    break;
+  case clspv::ArgKind::PodUBO:
+    ext_inst = reflection::ExtInstArgumentPodUniform;
+    break;
+  case clspv::ArgKind::PodPushConstant:
+    ext_inst = reflection::ExtInstArgumentPodPushConstant;
+    break;
+  case clspv::ArgKind::ReadOnlyImage:
+    ext_inst = reflection::ExtInstArgumentSampledImage;
+    break;
+  case clspv::ArgKind::WriteOnlyImage:
+    ext_inst = reflection::ExtInstArgumentStorageImage;
+    break;
+  case clspv::ArgKind::Sampler:
+    ext_inst = reflection::ExtInstArgumentSampler;
+    break;
+  default:
+    llvm_unreachable("Unhandled argument reflection");
+    break;
+  }
+  Ops << ext_inst << kernel_decl << getSPIRVInt32Constant(ordinal);
+
+  // Add descriptor set and binding for applicable arguments.
+  switch (arg_kind) {
+  case clspv::ArgKind::Buffer:
+  case clspv::ArgKind::BufferUBO:
+  case clspv::ArgKind::Pod:
+  case clspv::ArgKind::PodUBO:
+  case clspv::ArgKind::ReadOnlyImage:
+  case clspv::ArgKind::WriteOnlyImage:
+  case clspv::ArgKind::Sampler:
+    Ops << getSPIRVInt32Constant(descriptor_set)
+        << getSPIRVInt32Constant(binding);
+    break;
+  default:
+    break;
+  }
+
+  // Add remaining operands for arguments.
+  switch (arg_kind) {
+  case clspv::ArgKind::Local:
+    Ops << getSPIRVInt32Constant(spec_id) << getSPIRVInt32Constant(elem_size);
+    break;
+  case clspv::ArgKind::Pod:
+  case clspv::ArgKind::PodUBO:
+  case clspv::ArgKind::PodPushConstant:
+    Ops << getSPIRVInt32Constant(offset) << getSPIRVInt32Constant(size);
+    break;
+  default:
+    break;
+  }
+  Ops << arg_info;
+  addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 }

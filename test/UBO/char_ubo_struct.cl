@@ -1,6 +1,7 @@
-// RUN: clspv -int8 -constant-args-ubo -inline-entry-points %s -o %t.spv -descriptormap=%t.map
+// RUN: clspv -int8 -constant-args-ubo -inline-entry-points %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
+// RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

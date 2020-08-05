@@ -45,6 +45,8 @@ def main():
             help='Input json grammar')
     parser.add_argument('--output-file', metavar='<path>',
             type=str, required=True, help='Output file')
+    parser.add_argument('--namespace', metavar='<name>',
+            type=str, required=True, help='Header namespace')
 
     args = parser.parse_args()
 
@@ -69,13 +71,13 @@ def main():
         output.write("#ifndef %s\n" % header_blocker)
         output.write("#define %s\n" % header_blocker)
         output.write("namespace clspv {\n")
-        output.write("namespace glsl {\n")
+        output.write("namespace %s {\n" % args.namespace)
 
         grammar = json.loads(input.read())
         write_enum(grammar, output)
         write_name_func(grammar, output)
 
-        output.write("} // namespace glsl\n")
+        output.write("} // namespace %s\n" % args.namespace)
         output.write("} // namespace clspv\n")
         output.write("#endif//%s\n\n" % header_blocker)
 
