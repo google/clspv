@@ -216,8 +216,9 @@ bool SimplifyPointerBitcastPass::runOnBitcastFromBitcast(Module &M) const {
       Bitcast->replaceAllUsesWith(OtherBitcast);
     } else {
       // Create a new bitcast from the other bitcasts argument to our type.
-      auto NewBitcast = CastInst::CreatePointerCast(
-          OtherBitcast->getOperand(0), Bitcast->getType(), "", Bitcast);
+      auto NewBitcast =
+          CastInst::Create(Instruction::BitCast, OtherBitcast->getOperand(0),
+                           Bitcast->getType(), "", Bitcast);
 
       // And replace the original bitcast with our replacement bitcast.
       Bitcast->replaceAllUsesWith(NewBitcast);
