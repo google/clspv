@@ -318,6 +318,7 @@ ReflectionParser::ParseInstruction(const spv_parsed_instruction_t *inst) {
       }
       break;
     }
+    break;
   default:
     break;
   }
