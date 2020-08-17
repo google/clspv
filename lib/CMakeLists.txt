@@ -96,7 +96,7 @@ foreach(clspv_lib clspv_core clspv_passes)
 
 endforeach(clspv_lib)
 
-set(CLSPV_LLVM_COMPONENTS clangCodeGen LLVMAnalysis LLVMScalarOpts LLVMCore)
+set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore)
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
@@ -107,11 +107,13 @@ if(${EXTERNAL_LLVM} EQUAL 1)
 endif()
 
 # clspv_c_strings, clspv_glsl, and clspv_reflection are used by SPIRVProducerPass.cpp.
-add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection ${CLSPV_LLVM_COMPONENTS})
+add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection)
+target_link_libraries(clspv_passes PRIVATE ${CLSPV_LLVM_COMPONENTS})
 
 # clspv_baked_opencl_header is used by Compiler.cpp.
 add_dependencies(clspv_core clspv_baked_opencl_header)
-target_link_libraries(clspv_core PRIVATE clspv_passes ${CLSPV_LLVM_COMPONENTS})
+target_link_libraries(clspv_core PUBLIC clspv_passes)
+target_link_libraries(clspv_core PRIVATE clangCodeGen)
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
