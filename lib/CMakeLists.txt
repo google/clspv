@@ -23,7 +23,7 @@ add_library(clspv_core
 # Pass library.  Transformation passes and pass-specific support are
 # defined here.  This must be loadable by LLVM opt for testing individual
 # passes.
-add_library(clspv_passes
+add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/AddFunctionAttributesPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
@@ -96,7 +96,7 @@ foreach(clspv_lib clspv_core clspv_passes)
 
 endforeach(clspv_lib)
 
-set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore)
+set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore LLVMTransformUtils)
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)

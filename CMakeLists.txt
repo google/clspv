@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-cmake_minimum_required(VERSION 3.4.3)
+cmake_minimum_required(VERSION 3.13.4)
 
 if(NOT COMMAND find_host_package)
   macro(find_host_package)
