@@ -3690,9 +3690,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
           Type *resultTy = Call->getType();
 
           if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
-            constant = ConstantVector::getSplat(
-                {static_cast<unsigned>(vectorTy->getNumElements()), false},
-                constant);
+            constant =
+                ConstantVector::getSplat(vectorTy->getElementCount(), constant);
           }
           Ops << resultTy << constant << RID;
 

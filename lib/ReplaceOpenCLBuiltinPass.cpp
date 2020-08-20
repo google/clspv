@@ -2264,8 +2264,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
         ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
     if (result_ty->isVectorTy()) {
       just_under_one = ConstantVector::getSplat(
-          {cast<VectorType>(result_ty)->getNumElements(), false},
-          just_under_one);
+          cast<VectorType>(result_ty)->getElementCount(), just_under_one);
     }
 
     IRBuilder<> Builder(CI);
