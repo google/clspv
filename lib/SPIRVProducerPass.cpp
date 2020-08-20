@@ -3691,7 +3691,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
 
           if (auto *vectorTy = dyn_cast<VectorType>(resultTy)) {
             constant = ConstantVector::getSplat(
-                {static_cast<unsigned>(vectorTy->getNumElements()), false},
+                ElementCount::getFixed(
+                    static_cast<unsigned>(vectorTy->getNumElements())),
                 constant);
           }
           Ops << resultTy << constant << RID;
