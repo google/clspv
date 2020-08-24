@@ -335,10 +335,15 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             // the first element away as the following addresses are all
             // equivalent:
             // * %in = alloca [4 x [4 x float]]
-            // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]* %in
-            // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]* %in, i32 0
-            // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]* %in, i32 0, i32 0
-            // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]* %in, i32 0, i32 0, i32 0
+            // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in
+            // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0
+            // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0, i32 0
+            // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0, i32 0, i32 0
+            //
             // Note: count initialized to 1 to account for the first gep index.
             uint32_t count = 1;
             while (auto ArrayTy = dyn_cast<ArrayType>(SrcEleTy)) {
@@ -352,7 +357,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               SmallVector<Value *, 4> indices(
                   count,
                   ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
-              auto gep = GetElementPtrInst::CreateInBounds(inst->getOperand(0), indices, "", inst);
+              auto gep = GetElementPtrInst::CreateInBounds(inst->getOperand(0),
+                                                           indices, "", inst);
               ToBeDeleted.push_back(&I);
               auto cast = new BitCastInst(gep, inst->getType(), "", inst);
               inst->replaceAllUsesWith(cast);
