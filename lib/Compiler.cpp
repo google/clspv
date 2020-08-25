@@ -673,6 +673,8 @@ int PopulatePassManager(
   pm->add(clspv::createUndoInstCombinePass());
   pm->add(clspv::createFunctionInternalizerPass());
   pm->add(clspv::createReplaceLLVMIntrinsicsPass());
+  // Replace LLVM intrinsics can leave dead code around.
+  pm->add(llvm::createDeadCodeEliminationPass());
   pm->add(clspv::createUndoBoolPass());
   pm->add(clspv::createUndoTruncateToOddIntegerPass());
   pm->add(llvm::createStructurizeCFGPass(false));

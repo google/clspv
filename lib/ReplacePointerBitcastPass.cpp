@@ -287,6 +287,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
   const DataLayout &DL = M.getDataLayout();
 
+  SmallVector<Instruction *, 16> ToBeDeleted;
   SmallVector<Instruction *, 16> VectorWorkList;
   SmallVector<Instruction *, 16> ScalarWorkList;
   SmallVector<User *, 16> UserWorkList;
@@ -325,15 +326,52 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               continue;
             }
 
+            auto inst = &I;
             Type *SrcEleTy =
-                I.getOperand(0)->getType()->getPointerElementType();
-            Type *DstEleTy = I.getType()->getPointerElementType();
+                inst->getOperand(0)->getType()->getPointerElementType();
+
+            // De-"canonicalize" the input pointer.
+            // If Src is an array, LLVM has likely canonicalized all GEPs to
+            // the first element away as the following addresses are all
+            // equivalent:
+            // * %in = alloca [4 x [4 x float]]
+            // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in
+            // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0
+            // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0, i32 0
+            // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+            //   %in, i32 0, i32 0, i32 0
+            //
+            // Note: count initialized to 1 to account for the first gep index.
+            uint32_t count = 1;
+            while (auto ArrayTy = dyn_cast<ArrayType>(SrcEleTy)) {
+              ++count;
+              SrcEleTy = ArrayTy->getElementType();
+            }
+
+            if (count > 1) {
+              // Create a cast of the pointer. Replace the original cast with
+              // it and mark the original cast for deletion.
+              SmallVector<Value *, 4> indices(
+                  count,
+                  ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
+              auto gep = GetElementPtrInst::CreateInBounds(inst->getOperand(0),
+                                                           indices, "", inst);
+              ToBeDeleted.push_back(&I);
+              auto cast = new BitCastInst(gep, inst->getType(), "", inst);
+              inst->replaceAllUsesWith(cast);
+              inst = cast;
+            }
+
+            Type *DstEleTy = inst->getType()->getPointerElementType();
             if (SrcEleTy->isVectorTy() || DstEleTy->isVectorTy()) {
               // Handle case either operand is vector type like char4* -> int4*.
-              VectorWorkList.push_back(&I);
+              VectorWorkList.push_back(inst);
             } else {
               // Handle case all operands are scalar type like char* -> int*.
-              ScalarWorkList.push_back(&I);
+              ScalarWorkList.push_back(inst);
             }
 
             Changed = true;
@@ -345,7 +383,6 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     }
   }
 
-  SmallVector<Instruction *, 16> ToBeDeleted;
   for (Instruction *Inst : VectorWorkList) {
     Value *Src = Inst->getOperand(0);
     Type *SrcTy = Src->getType()->getPointerElementType();
@@ -355,7 +392,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     Type *SrcEleTy = SrcTy->isVectorTy() ? SrcVecTy->getElementType() : SrcTy;
     Type *DstEleTy = DstTy->isVectorTy() ? DstVecTy->getElementType() : DstTy;
     // These are bit widths of the source and destination types, even
-    // if they are vector types.  E.g. bit width of float4 is 64.
+    // if they are vector types.  E.g. bit width of float4 is 128.
     unsigned SrcTyBitWidth = DL.getTypeStoreSizeInBits(SrcTy);
     unsigned DstTyBitWidth = DL.getTypeStoreSizeInBits(DstTy);
     unsigned SrcEleTyBitWidth = DL.getTypeStoreSizeInBits(SrcEleTy);
