@@ -120,6 +120,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceFmod(Function &F);
   bool replaceExp10(Function &F, const std::string &basename);
   bool replaceLog10(Function &F, const std::string &basename);
+  bool replaceLog1p(Function &F);
   bool replaceBarrier(Function &F, bool subgroup = false);
   bool replaceMemFence(Function &F, uint32_t semantics);
   bool replacePrefetch(Function &F);
@@ -223,6 +224,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kHalfLog10:
   case Builtins::kNativeLog10:
     return replaceLog10(F, FI.getName());
+
+  case Builtins::kLog1p:
+    return replaceLog1p(F);
 
   case Builtins::kFmod:
     return replaceFmod(F);
@@ -564,6 +568,22 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
     return BinaryOperator::Create(Instruction::FMul,
                                   ConstantFP::get(Arg->getType(), Ln10), NewCI,
                                   "", CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
+  // convert to natural
+  std::string NewFName = Builtins::GetMangledFunctionName("log", F.getFunctionType());
+
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    auto NewF = M.getOrInsertFunction(NewFName, F.getFunctionType());
+
+    auto Arg = CI->getOperand(0);
+
+    auto ArgP1 = BinaryOperator::Create(Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
+
+    return CallInst::Create(NewF, ArgP1, "", CI);
   });
 }
 
