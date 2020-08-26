@@ -2,7 +2,7 @@
 ; check any specific transformation.  It just makes sure that the options
 ; are accepted.
 
-; RUN: clspv-opt %s -o %t.ll -AllocateDescriptorsPass -ClusterModuleScopeConstantVars -ClusterPodKernelArgumentsPass -DefineOpenCLWorkItemBuiltins -DirectResourceAccessPass -FunctionInternalizer -HideConstantLoads -InlineEntryPointsPass -InlineFuncWithPointerBitCastArg -InlineFuncWithPointerToFunctionArgPass -InlineFuncWithSingleCallSite -OpenCLInliner -RemoveUnusedArguments -ReorderBasicBlocks -ReplaceLLVMIntrinsics -ReplaceOpenCLBuiltin -ReplacePointerBitcast -RewriteInserts -Scalarize -ShareModuleScopeVariablesPass -SignedCompareFixupPass -SimplifyPointerBitcast -SplatArg -SplatSelectCond -UBOTypeTransformPass -UndoBool -UndoByval -UndoGetElementPtrConstantExpr -UndoSRet -UndoTranslateSamplerFold -UndoTruncateToOddInteger -UnhideConstantLoads -ZeroInitializeAllocasPass
+; RUN: clspv-opt %s -o %t.ll -AllocateDescriptorsPass -ClusterModuleScopeConstantVars -ClusterPodKernelArgumentsPass -DefineOpenCLWorkItemBuiltins -DirectResourceAccessPass -FunctionInternalizer -HideConstantLoads -InlineEntryPointsPass -InlineFuncWithPointerBitCastArg -InlineFuncWithPointerToFunctionArgPass -InlineFuncWithSingleCallSite -MultiVersionUBOFunctionsPass -OpenCLInliner -RemoveUnusedArguments -ReorderBasicBlocks -ReplaceLLVMIntrinsics -ReplaceOpenCLBuiltin -ReplacePointerBitcast -RewriteInserts -Scalarize -ShareModuleScopeVariablesPass -SignedCompareFixupPass -SimplifyPointerBitcast -SplatArg -SplatSelectCond -UBOTypeTransformPass -UndoBool -UndoByval -UndoGetElementPtrConstantExpr -UndoSRet -UndoTranslateSamplerFold -UndoTruncateToOddInteger -UnhideConstantLoads -ZeroInitializeAllocasPass
 ; RUN: FileCheck %s < %t.ll
 ; CHECK: @__spirv_WorkgroupSize =
 

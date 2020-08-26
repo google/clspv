@@ -25,7 +25,7 @@ target_include_directories(clspv-reflection PRIVATE
   ${SPIRV_HEADERS_INCLUDE_DIRS}
   ${SPIRV_TOOLS_SOURCE_DIR}/include)
 
-target_link_libraries(clspv-reflection PRIVATE clspv_core SPIRV-Tools)
+target_link_libraries(clspv-reflection PRIVATE clspv_core SPIRV-Tools-static)
 
 set_target_properties(clspv-reflection PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
 
