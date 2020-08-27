@@ -33,6 +33,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeInlineFuncWithPointerBitCastArgPassPass(r);
   initializeInlineFuncWithPointerToFunctionArgPassPass(r);
   initializeInlineFuncWithSingleCallSitePassPass(r);
+  initializeMultiVersionUBOFunctionsPassPass(r);
   initializeOpenCLInlinerPassPass(r);
   initializeRemoveUnusedArgumentsPass(r);
   initializeReorderBasicBlocksPassPass(r);
