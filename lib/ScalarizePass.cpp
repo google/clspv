@@ -115,7 +115,8 @@ Value *ScalarizePass::ScalarizePhi(PHINode *phi) {
   // insertion location to aid RewriteInsertsPass.
   Value *prev = Constant::getNullValue(phi->getType());
   for (unsigned i = 0; i != replacements.size(); ++i) {
-    auto insert = InsertValueInst::Create(prev, replacements[i], {i}, "", where);
+    auto insert =
+        InsertValueInst::Create(prev, replacements[i], {i}, "", where);
     prev = insert;
   }
 
