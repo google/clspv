@@ -36,6 +36,7 @@
 #include "Builtins.h"
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
+#include "Passes.h"
 
 using namespace llvm;
 
@@ -82,9 +83,8 @@ private:
 } // namespace
 
 char MultiVersionUBOFunctionsPass::ID = 0;
-static RegisterPass<MultiVersionUBOFunctionsPass>
-    X("MultiVersionUBOFunctionsPass",
-      "Multi-version functions with UBO params");
+INITIALIZE_PASS(MultiVersionUBOFunctionsPass, "MultiVersionUBOFunctionsPass",
+                "Multi-version functions with UBO params", false, false)
 
 namespace clspv {
 ModulePass *createMultiVersionUBOFunctionsPass() {
