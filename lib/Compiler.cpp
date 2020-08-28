@@ -608,6 +608,13 @@ int PopulatePassManager(
   }
   pm->add(clspv::createReplaceOpenCLBuiltinPass());
 
+  // Lower longer vectors when requested. Note that this pass depends on
+  // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
+  // afterwards.
+  if (clspv::Option::LongVectorSupport()) {
+    pm->add(clspv::createLongVectorLoweringPass());
+  }
+
   // We need to run mem2reg and inst combine early because our
   // createInlineFuncWithPointerBitCastArgPass pass cannot handle the pattern
   //   %1 = alloca i32 1

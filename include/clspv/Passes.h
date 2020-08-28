@@ -36,6 +36,10 @@ void initializeClspvPasses(PassRegistry &);
 
 namespace clspv {
 
+/// Process long vectors into an equivalent representation that can be mapped to
+/// Vulkan SPIR-V.
+llvm::ModulePass *createLongVectorLoweringPass();
+
 /// Declare a structure with all enabled push constants and attach metadata to
 /// the module for use by the utilities that abstract push constant usage.
 /// @return An LLVM module pass.

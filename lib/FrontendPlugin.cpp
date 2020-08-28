@@ -42,29 +42,30 @@ private:
   enum Layout { UBO, SSBO };
 
   enum CustomDiagnosticType {
-    CustomDiagnosticVectorsMoreThan4Elements = 0,
-    CustomDiagnosticVoidPointer = 1,
-    CustomDiagnosticUnalignedScalar = 2,
-    CustomDiagnosticUnalignedVec2 = 3,
-    CustomDiagnosticUnalignedVec4 = 4,
-    CustomDiagnosticUBOUnalignedArray = 5,
-    CustomDiagnosticUBOUnalignedStruct = 6,
-    CustomDiagnosticSmallStraddle = 7,
-    CustomDiagnosticLargeStraddle = 8,
-    CustomDiagnosticUnalignedStructMember = 9,
-    CustomDiagnosticUBORestrictedSize = 10,
-    CustomDiagnosticUBORestrictedStruct = 11,
-    CustomDiagnosticUBOArrayStride = 12,
-    CustomDiagnosticLocationInfo = 13,
-    CustomDiagnosticSSBOUnalignedArray = 14,
-    CustomDiagnosticSSBOUnalignedStruct = 15,
-    CustomDiagnosticOverloadedKernel = 16,
-    CustomDiagnosticStructContainsPointer = 17,
-    CustomDiagnosticRecursiveStruct = 18,
-    CustomDiagnosticPushConstantSizeExceeded = 19,
-    CustomDiagnosticPushConstantContainsArray = 20,
-    CustomDiagnosticUnsupported16BitStorage = 21,
-    CustomDiagnosticUnsupported8BitStorage = 22,
+    CustomDiagnosticVectorsMoreThan4Elements,
+    CustomDiagnosticUnsupportedKernelParameter,
+    CustomDiagnosticVoidPointer,
+    CustomDiagnosticUnalignedScalar,
+    CustomDiagnosticUnalignedVec2,
+    CustomDiagnosticUnalignedVec4,
+    CustomDiagnosticUBOUnalignedArray,
+    CustomDiagnosticUBOUnalignedStruct,
+    CustomDiagnosticSmallStraddle,
+    CustomDiagnosticLargeStraddle,
+    CustomDiagnosticUnalignedStructMember,
+    CustomDiagnosticUBORestrictedSize,
+    CustomDiagnosticUBORestrictedStruct,
+    CustomDiagnosticUBOArrayStride,
+    CustomDiagnosticLocationInfo,
+    CustomDiagnosticSSBOUnalignedArray,
+    CustomDiagnosticSSBOUnalignedStruct,
+    CustomDiagnosticOverloadedKernel,
+    CustomDiagnosticStructContainsPointer,
+    CustomDiagnosticRecursiveStruct,
+    CustomDiagnosticPushConstantSizeExceeded,
+    CustomDiagnosticPushConstantContainsArray,
+    CustomDiagnosticUnsupported16BitStorage,
+    CustomDiagnosticUnsupported8BitStorage,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -170,7 +171,7 @@ private:
     return false;
   }
 
-  bool IsSupportedType(QualType QT, SourceRange SR) {
+  bool IsSupportedType(QualType QT, SourceRange SR, bool IsKernelParameter) {
     auto *Ty = QT.getTypePtr();
 
     // First check if we have a pointer type.
@@ -183,17 +184,23 @@ private:
         return false;
       }
       // Otherwise check recursively.
-      return IsSupportedType(Ty->getPointeeType(), SR);
+      return IsSupportedType(Ty->getPointeeType(), SR, IsKernelParameter);
     }
 
     const auto &canonicalType = QT.getCanonicalType();
     if (auto *VT = llvm::dyn_cast<ExtVectorType>(canonicalType)) {
-      // We don't support vectors with more than 4 elements.
+      // We don't support vectors with more than 4 elements under all
+      // circumstances.
       if (4 < VT->getNumElements()) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticVectorsMoreThan4Elements]);
-        return false;
+        if (clspv::Option::LongVectorSupport()) {
+          if (IsKernelParameter) {
+            Report(CustomDiagnosticUnsupportedKernelParameter, SR, SR);
+            return false;
+          }
+        } else {
+          Report(CustomDiagnosticVectorsMoreThan4Elements, SR, SR);
+          return false;
+        }
       }
 
       return true;
@@ -212,7 +219,7 @@ private:
       // To avoid infinite recursion, first verify that the record is not
       // recursive and then that its fields are supported.
       for (auto *field_decl : RT->getDecl()->fields()) {
-        if (!IsSupportedType(field_decl->getType(), SR)) {
+        if (!IsSupportedType(field_decl->getType(), SR, IsKernelParameter)) {
           return false;
         }
       }
@@ -221,18 +228,20 @@ private:
     }
 
     if (auto *AT = llvm::dyn_cast<ArrayType>(canonicalType)) {
-      return IsSupportedType(AT->getElementType(), SR);
+      return IsSupportedType(AT->getElementType(), SR, IsKernelParameter);
     }
 
     // For function prototypes, recurse on return type and parameter types.
     if (auto *FT = llvm::dyn_cast<FunctionProtoType>(canonicalType)) {
+      IsKernelParameter =
+          IsKernelParameter || (FT->getCallConv() == CC_OpenCLKernel);
       for (auto param : FT->getParamTypes()) {
-        if (!IsSupportedType(param, SR)) {
+        if (!IsSupportedType(param, SR, IsKernelParameter)) {
           return false;
         }
       }
 
-      if (!IsSupportedType(FT->getReturnType(), SR)) {
+      if (!IsSupportedType(FT->getReturnType(), SR, IsKernelParameter)) {
         return false;
       }
 
@@ -486,11 +495,12 @@ private:
     // Looking at the Decl class hierarchy, it seems ValueDecl and TypeDecl
     // are the only two that might represent an unsupported vector type.
     bool VisitValueDecl(ValueDecl *VD) {
-      return consumer.IsSupportedType(VD->getType(), VD->getSourceRange());
+      return consumer.IsSupportedType(VD->getType(), VD->getSourceRange(),
+                                      false);
     }
     bool VisitValueDecl(TypeDecl *TD) {
       QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
-      return consumer.IsSupportedType(DefinedType, TD->getSourceRange());
+      return consumer.IsSupportedType(DefinedType, TD->getSourceRange(), false);
     }
   };
 
@@ -508,6 +518,10 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Error,
             "vectors with more than 4 elements are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedKernelParameter] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "vectors with more than 4 elements are not "
+                           "supported as kernel parameters");
     CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
         DiagnosticsEngine::Error, "pointer-to-void is not supported");
     CustomDiagnosticsIDMap[CustomDiagnosticUnalignedScalar] =
@@ -599,7 +613,7 @@ public:
         // function.
         if (FD->hasBody()) {
           if (!IsSupportedType(FD->getReturnType(),
-                               FD->getReturnTypeSourceRange())) {
+                               FD->getReturnTypeSourceRange(), false)) {
             return false;
           }
 
@@ -629,7 +643,8 @@ public:
           }
           for (auto *P : FD->parameters()) {
             auto type = P->getType();
-            if (!IsSupportedType(P->getOriginalType(), P->getSourceRange())) {
+            if (!IsSupportedType(P->getOriginalType(), P->getSourceRange(),
+                                 is_opencl_kernel)) {
               return false;
             }
 
