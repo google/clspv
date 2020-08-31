@@ -588,7 +588,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       //
       // We need at most two integers to handle any case here.
       auto ele_ty = dst_vec_ty->getElementType();
-      uint32_t num_elements = dst_vec_ty->getElementCount().Min;
+      uint32_t num_elements = dst_vec_ty->getElementCount().getKnownMinValue();
       assert(num_elements <= 4 && "Unhandled large vectors");
       uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
                         ele_ty->getPrimitiveSizeInBits())
@@ -614,8 +614,9 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
               base_offset == 0) &&
              "Unexpected packed data format");
       uint64_t ele_size = DL.getTypeStoreSize(ele_ty);
-      uint32_t num_elements = dst_vec_ty ? dst_vec_ty->getElementCount().Min
-                                         : dst_array_ty->getNumElements();
+      uint32_t num_elements =
+          dst_vec_ty ? dst_vec_ty->getElementCount().getKnownMinValue()
+                     : dst_array_ty->getNumElements();
 
       // Arrays of shorts/halfs could be offset from the start of an int.
       uint64_t bytes_consumed = 0;

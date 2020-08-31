@@ -144,7 +144,7 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
     return false;
 
   auto vec_ty = extract->getVectorOperandType();
-  if (vec_ty->getElementCount().Min <= 4)
+  if (vec_ty->getElementCount().getKnownMinValue() <= 4)
     return false;
 
   // Instcombine only transforms TruncInst (which operates on integers).
@@ -176,8 +176,8 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
   if (!src_vec_ty)
     return false;
 
-  uint64_t src_elements = src_vec_ty->getElementCount().Min;
-  uint64_t dst_elements = vec_ty->getElementCount().Min;
+  uint64_t src_elements = src_vec_ty->getElementCount().getKnownMinValue();
+  uint64_t dst_elements = vec_ty->getElementCount().getKnownMinValue();
 
   if (dst_elements < src_elements)
     return false;
@@ -220,7 +220,7 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
 
   auto in1 = shuffle->getOperand(0);
   auto in1_vec_ty = cast<VectorType>(in1->getType());
-  if (in1_vec_ty->getElementCount().Min <= 4)
+  if (in1_vec_ty->getElementCount().getKnownMinValue() <= 4)
     return false;
 
   auto in1_load = dyn_cast<LoadInst>(in1);
@@ -249,8 +249,8 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   if (!src_vec_ty)
     return false;
 
-  uint64_t src_elements = src_vec_ty->getElementCount().Min;
-  uint64_t dst_elements = in1_vec_ty->getElementCount().Min;
+  uint64_t src_elements = src_vec_ty->getElementCount().getKnownMinValue();
+  uint64_t dst_elements = in1_vec_ty->getElementCount().getKnownMinValue();
 
   if (dst_elements < src_elements)
     return false;
