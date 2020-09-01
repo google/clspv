@@ -2399,8 +2399,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
           PrevZDimCst = CurZDimCst;
         } else if (CurXDimCst != PrevXDimCst || CurYDimCst != PrevYDimCst ||
                    CurZDimCst != PrevZDimCst) {
-          llvm_unreachable(
-              "reqd_work_group_size must be the same across all kernels");
+          HasMDVec.push_back(false);
+          continue;
         } else {
           continue;
         }
@@ -2439,8 +2439,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
       HasMD = HasMDVec[0];
       for (uint32_t i = 1; i < HasMDVec.size(); i++) {
         if (HasMD != HasMDVec[i]) {
-          llvm_unreachable(
-              "Kernels should have consistent work group size definition");
+          HasMD = false;
+          break;
         }
       }
     }
@@ -2837,36 +2837,32 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     addSPIRVInst<kEntryPoints>(spv::OpEntryPoint, Ops);
   }
 
-  for (auto EntryPoint : EntryPoints) {
-    const MDNode *MD = dyn_cast<Function>(EntryPoint.first)
-                           ->getMetadata("reqd_work_group_size");
-    if ((MD != nullptr) && !clspv::Option::NonUniformNDRangeSupported()) {
+  if (BuiltinDimVec.empty()) {
+    for (auto EntryPoint : EntryPoints) {
+      const MDNode *MD = dyn_cast<Function>(EntryPoint.first)
+                             ->getMetadata("reqd_work_group_size");
+      if ((MD != nullptr) && !clspv::Option::NonUniformNDRangeSupported()) {
+        //
+        // Generate OpExecutionMode
+        //
 
-      if (!BuiltinDimVec.empty()) {
-        llvm_unreachable(
-            "Kernels should have consistent work group size definition");
+        // Ops[0] = Entry Point ID
+        // Ops[1] = Execution Mode
+        // Ops[2] ... Ops[n] = Optional literals according to Execution Mode
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeLocalSize;
+
+        uint32_t XDim = static_cast<uint32_t>(
+            mdconst::extract<ConstantInt>(MD->getOperand(0))->getZExtValue());
+        uint32_t YDim = static_cast<uint32_t>(
+            mdconst::extract<ConstantInt>(MD->getOperand(1))->getZExtValue());
+        uint32_t ZDim = static_cast<uint32_t>(
+            mdconst::extract<ConstantInt>(MD->getOperand(2))->getZExtValue());
+
+        Ops << XDim << YDim << ZDim;
+
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
-
-      //
-      // Generate OpExecutionMode
-      //
-
-      // Ops[0] = Entry Point ID
-      // Ops[1] = Execution Mode
-      // Ops[2] ... Ops[n] = Optional literals according to Execution Mode
-      Ops.clear();
-      Ops << EntryPoint.second << spv::ExecutionModeLocalSize;
-
-      uint32_t XDim = static_cast<uint32_t>(
-          mdconst::extract<ConstantInt>(MD->getOperand(0))->getZExtValue());
-      uint32_t YDim = static_cast<uint32_t>(
-          mdconst::extract<ConstantInt>(MD->getOperand(1))->getZExtValue());
-      uint32_t ZDim = static_cast<uint32_t>(
-          mdconst::extract<ConstantInt>(MD->getOperand(2))->getZExtValue());
-
-      Ops << XDim << YDim << ZDim;
-
-      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
     }
   }
 
