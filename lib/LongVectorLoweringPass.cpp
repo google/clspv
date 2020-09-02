@@ -91,6 +91,9 @@ private:
   /// by their removal.
   void cleanDeadInstructions();
 
+  /// Remove all long-vector functions that were lowered.
+  void cleanDeadFunctions();
+
 private:
   /// A map between long-vector types and their equivalent representation.
   DenseMap<Type *, Type *> TypeMap;
@@ -275,6 +278,8 @@ bool LongVectorLoweringPass::runOnModule(Module &M) {
   for (auto &F : M.functions()) {
     Modified |= runOnFunction(F);
   }
+
+  cleanDeadFunctions();
 
   return Modified;
 }
@@ -549,6 +554,45 @@ void LongVectorLoweringPass::cleanDeadInstructions() {
     llvm_unreachable("Not all supposedly-dead instruction were removed!");
   }
 #endif
+}
+
+void LongVectorLoweringPass::cleanDeadFunctions() {
+  // Take into account dependencies between functions when removing them.
+  // First collect all dead functions.
+  using Functions = SmallVector<Function *, 32>;
+  Functions DeadFunctions;
+  for (const auto &Mapping : FunctionMap) {
+    if (Mapping.getSecond() != nullptr) {
+      Function *F = Mapping.getFirst();
+      DeadFunctions.push_back(F);
+    }
+  }
+
+  // Erase any mapping, as they won't be valid anymore.
+  FunctionMap.clear();
+
+  for (bool Progress = true; Progress;) {
+    std::size_t PreviousSize = DeadFunctions.size();
+
+    Functions NextBatch;
+    for (auto *F : DeadFunctions) {
+      bool Dead = F->use_empty();
+      if (Dead) {
+        LLVM_DEBUG(dbgs() << "Removing " << F->getName()
+                          << " from the module.\n");
+        F->eraseFromParent();
+        Progress = true;
+      } else {
+        NextBatch.push_back(F);
+      }
+    }
+
+    DeadFunctions = std::move(NextBatch);
+    Progress = (DeadFunctions.size() < PreviousSize);
+  }
+
+  assert(DeadFunctions.empty() &&
+         "Not all supposedly-dead functions were removed!");
 }
 
 } // namespace

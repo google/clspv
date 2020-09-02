@@ -13,13 +13,14 @@ define spir_func <8 x float> @test(<8 x float> %x) !info !0 {
 
 !0 = !{!"some metadata"}
 
-; TODO Once dead functions are removed, add CHECK-NOT <8 x float>
+; CHECK-NOT: <8 x float>
 ;
 ; CHECK-LABEL: define spir_func
 ; CHECK-SAME: [[FLOAT8:{ float, float, float, float, float, float, float, float }]]
 ; CHECK-SAME: @test([[FLOAT8]] [[X:%[^ ]+]]) !info [[MD:![0-9]+]]
 ; CHECK-NEXT: ret [[FLOAT8]] [[X]]
 ;
-; TODO Once dead functions are removed, add CHECK-NOT <8 x float>
+; CHECK-NOT: <8 x float>
+; CHECK-NOT: define
 ;
 ; CHECK: [[MD]] = !{!"some metadata"}
