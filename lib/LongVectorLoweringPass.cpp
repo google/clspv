@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
@@ -48,17 +49,42 @@ private:
   Value *visit(Value *V);
 
 private:
+  // Helpers for lowering values.
+
+  /// Register the replacement of @p U with @p V.
+  ///
+  /// If @p U and @p V have the same type, replace the relevant usages as well
+  /// to ensure the rest of the program is using the new instructions.
+  void registerReplacement(Value &U, Value &V);
+
+private:
   // Helpers for lowering types.
 
   /// Get a struct equivalent for this type, if it uses a long vector.
   /// Returns nullptr if no lowering is required.
   Type *getEquivalentType(Type *Ty);
 
+  /// Implementation details of getEquivalentType.
+  Type *getEquivalentTypeImpl(Type *Ty) const;
+
 private:
   // Hight-level implementation details of runOnModule.
 
   /// Lower the given function.
   bool runOnFunction(Function &F);
+
+private:
+  /// A map between long-vector types and their equivalent representation.
+  DenseMap<Type *, Type *> TypeMap;
+
+  /// A map between original values and their replacement.
+  ///
+  /// The content of this mapping is valid only for the function being visited
+  /// at a given time. The keys in this mapping should be removed from the
+  /// function once all instructions in the current function have been visited
+  /// and transformed. Instructions are not removed from the function as they
+  /// are visited because this would invalidate iterators.
+  DenseMap<Value *, Value *> InstructionMap;
 };
 
 char LongVectorLoweringPass::ID = 0;
@@ -142,6 +168,12 @@ bool LongVectorLoweringPass::runOnModule(Module &M) {
 }
 
 Value *LongVectorLoweringPass::visit(Value *V) {
+  // Already handled?
+  auto it = InstructionMap.find(V);
+  if (it != InstructionMap.end()) {
+    return it->second;
+  }
+
   if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
     if (auto *EquivalentType = getEquivalentType(BinOp->getType())) {
       IRBuilder<> B(BinOp);
@@ -167,7 +199,7 @@ Value *LongVectorLoweringPass::visit(Value *V) {
       // aggregate back to a vector to generate a valid module.
       auto *ReplacementValue =
           convertEquivalentValue(B, EquivalentValue, BinOp->getType());
-      BinOp->replaceAllUsesWith(ReplacementValue);
+      registerReplacement(*BinOp, *ReplacementValue);
 
       return ReplacementValue;
     }
@@ -182,7 +214,46 @@ Value *LongVectorLoweringPass::visit(Value *V) {
   return nullptr;
 }
 
+void LongVectorLoweringPass::registerReplacement(Value &U, Value &V) {
+  LLVM_DEBUG(dbgs() << "Replacement for " << U << ": " << V << '\n');
+  assert(InstructionMap.count(&U) == 0 && "Value already registered");
+  InstructionMap.insert({&U, &V});
+
+  if (U.getType() == V.getType()) {
+    LLVM_DEBUG(dbgs() << "\tAnd replace its usages.\n");
+    U.replaceAllUsesWith(&V);
+  }
+
+  if (U.hasName()) {
+    V.takeName(&U);
+  }
+
+  auto *I = dyn_cast<Instruction>(&U);
+  auto *J = dyn_cast<Instruction>(&V);
+  if (I && J) {
+    J->copyMetadata(*I);
+  }
+}
+
 Type *LongVectorLoweringPass::getEquivalentType(Type *Ty) {
+  auto it = TypeMap.find(Ty);
+  if (it != TypeMap.end()) {
+    return it->second;
+  }
+
+  // Recursive implementation, taking advantage of the cache.
+  auto *EquivalentTy = getEquivalentTypeImpl(Ty);
+  TypeMap.insert({Ty, EquivalentTy});
+
+  if (EquivalentTy) {
+    LLVM_DEBUG(dbgs() << "Generating equivalent type for " << *Ty << ": "
+                      << *EquivalentTy << '\n');
+  }
+
+  return EquivalentTy;
+}
+
+Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) const {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
       Ty->isLabelTy()) {
     // No lowering required.
