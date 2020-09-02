@@ -60,11 +60,17 @@ private:
   /// Returns nullptr if no lowering is required.
   Value *visit(Value *V);
 
+  /// Visit Constant. This is not provided by InstVisitor.
+  Value *visitConstant(Constant &Cst);
+
   /// InstVisitor impl, general "catch-all" function.
   Value *visitInstruction(Instruction &I);
 
   // InstVisitor impl, specific cases.
   Value *visitBinaryOperator(BinaryOperator &I);
+  Value *visitExtractElementInst(ExtractElementInst &I);
+  Value *visitInsertElementInst(InsertElementInst &I);
+  Value *visitShuffleVectorInst(ShuffleVectorInst &I);
 
 private:
   // Helpers for lowering values.
@@ -73,6 +79,13 @@ private:
   ///
   /// This only looks at the types involved, not the opcodes or anything else.
   bool handlingRequired(User &U);
+
+  /// Return the lowered version of @p U or @p U itself when no lowering is
+  /// required.
+  Value *visitOrSelf(Value *U) {
+    auto *V = visit(U);
+    return V ? V : U;
+  }
 
   /// Register the replacement of @p U with @p V.
   ///
@@ -88,7 +101,7 @@ private:
   Type *getEquivalentType(Type *Ty);
 
   /// Implementation details of getEquivalentType.
-  Type *getEquivalentTypeImpl(Type *Ty) const;
+  Type *getEquivalentTypeImpl(Type *Ty);
 
   /// Return the equivalent type for @p Ty or @p Ty if no lowering is needed.
   Type *getEquivalentTypeOrSelf(Type *Ty) {
@@ -327,54 +340,171 @@ Value *LongVectorLoweringPass::visit(Value *V) {
     return visit(I);
   }
 
+  if (auto *C = dyn_cast<Constant>(V)) {
+    return visitConstant(*C);
+  }
+
 #ifndef NDEBUG
   dbgs() << "Value not handled: " << *V << '\n';
 #endif
-  // TODO Once additional features are implemented, turn this into an error by
-  // uncommenting the next line.
-  // llvm_unreachable("Kind of value not handled yet.");
-  return nullptr;
+  llvm_unreachable("Kind of value not handled yet.");
+}
+
+Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
+  auto *EquivalentTy = getEquivalentType(Cst.getType());
+  assert(EquivalentTy && "Nothing to lower.");
+
+  if (isa<UndefValue>(Cst)) {
+    return UndefValue::get(EquivalentTy);
+  }
+
+  if (isa<ConstantAggregateZero>(Cst)) {
+    return ConstantAggregateZero::get(EquivalentTy);
+  }
+
+  if (auto *Vector = dyn_cast<ConstantDataVector>(&Cst)) {
+    assert(isa<StructType>(EquivalentTy));
+
+    SmallVector<Constant *, 16> Scalars;
+    for (unsigned i = 0; i < Vector->getNumElements(); ++i) {
+      Scalars.push_back(Vector->getElementAsConstant(i));
+    }
+
+    return ConstantStruct::get(cast<StructType>(EquivalentTy), Scalars);
+  }
+
+#ifndef NDEBUG
+  dbgs() << "Constant not handled: " << Cst << '\n';
+#endif
+  llvm_unreachable("Unsupported kind of constant");
 }
 
 Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
 #ifndef NDEBUG
   dbgs() << "Instruction not handled: " << I << '\n';
 #endif
-  // TODO Once additional features are implemented, turn this into an error by
-  // uncommenting the next line.
-  // llvm_unreachable("Missing support for instruction");
-  return nullptr;
+  llvm_unreachable("Missing support for instruction");
 }
 
 Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
-  if (auto *EquivalentType = getEquivalentType(I.getType())) {
-    IRBuilder<> B(&I);
+  SmallVector<Value *, 16> EquivalentArgs;
+  for (auto &Operand : I.operands()) {
+    Value *EquivalentOperand = visit(Operand.get());
+    assert(EquivalentOperand && "operand not lowered");
+    EquivalentArgs.push_back(EquivalentOperand);
+  }
+  Type *EquivalentReturnTy = getEquivalentType(I.getType());
+  assert(EquivalentReturnTy && "return type not lowered");
 
-    SmallVector<Value *, 16> EquivalentArgs;
-    for (auto &Operand : I.operands()) {
-      auto *Arg = Operand.get();
-      // TODO Visit argument to lower it.
-      // Instead, for now, we create an equivalent aggregate.
-      auto *EquivalentArgTy = getEquivalentType(Arg->getType());
-      auto *EquivalentArg = convertEquivalentValue(B, Arg, EquivalentArgTy);
-      EquivalentArgs.push_back(EquivalentArg);
+  auto ScalarFactory = [Opcode = I.getOpcode()](auto &B, auto Args) {
+    return B.CreateNAryOp(Opcode, Args);
+  };
+
+  IRBuilder<> B(&I);
+  Value *V = convertVectorOperation(B, EquivalentReturnTy, EquivalentArgs,
+                                    ScalarFactory);
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
+  Value *EquivalentValue = visit(I.getOperand(0));
+  assert(EquivalentValue && "value not lowered");
+
+  ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1));
+  // Non-constant indices could be done with a gep + load pair.
+  assert(CI && "Dynamic indices not supported yet");
+  unsigned Index = CI->getZExtValue();
+
+  IRBuilder<> B(&I);
+  auto *V = B.CreateExtractValue(EquivalentValue, Index);
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
+  Value *EquivalentValue = visit(I.getOperand(0));
+  assert(EquivalentValue && "value not lowered");
+
+  Value *ScalarElement = I.getOperand(1);
+  assert(ScalarElement->getType()->isIntegerTy() ||
+         ScalarElement->getType()->isFloatingPointTy());
+
+  ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2));
+  // We'd have to lower this to a store-store-load sequence.
+  assert(CI && "Dynamic indices not supported yet");
+  unsigned Index = CI->getZExtValue();
+
+  IRBuilder<> B(&I);
+  auto *V = B.CreateInsertValue(EquivalentValue, ScalarElement, {Index});
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
+  assert(isa<FixedVectorType>(I.getType()) &&
+         "shufflevector on scalable vectors is not supported.");
+
+  auto *EquivalentLHS = visitOrSelf(I.getOperand(0));
+  auto *EquivalentRHS = visitOrSelf(I.getOperand(1));
+  auto *EquivalentType = getEquivalentTypeOrSelf(I.getType());
+
+  assert(((EquivalentLHS != I.getOperand(0)) ||
+          (EquivalentRHS != I.getOperand(1)) ||
+          (EquivalentType != I.getType())) &&
+         "nothing to lower");
+
+  IRBuilder<> B(&I);
+
+  // The arguments (LHS and RHS) could be either short-vector or long-vector
+  // types. The latter are already lowered to an aggregate type.
+  //
+  // Extract the scalar at the given index using the appropriate method.
+  auto getScalar = [&B](Value *Vector, unsigned Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateExtractElement(Vector, Index);
+    } else {
+      assert(Vector->getType()->isStructTy());
+      return B.CreateExtractValue(Vector, Index);
+    }
+  };
+
+  // The resulting value could be a short or a long vector as well.
+  auto setScalar = [&B](Value *Vector, Value *Scalar, unsigned Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateInsertElement(Vector, Scalar, Index);
+    } else {
+      assert(Vector->getType()->isStructTy());
+      return B.CreateInsertValue(Vector, Scalar, Index);
+    }
+  };
+
+  unsigned Arity = I.getShuffleMask().size();
+  auto *ScalarTy = I.getType()->getElementType();
+
+  auto *LHSTy = cast<VectorType>(I.getOperand(0)->getType());
+  assert(!LHSTy->getElementCount().isScalable() && "broken assumption");
+  unsigned LHSArity = LHSTy->getElementCount().getFixedValue();
+
+  // Construct the equivalent shuffled vector, as a struct or a vector.
+  Value *V = UndefValue::get(EquivalentType);
+  for (unsigned i = 0; i < Arity; ++i) {
+    auto Mask = I.getMaskValue(i);
+
+    Value *Scalar = nullptr;
+    if (Mask == -1) {
+      Scalar = UndefValue::get(ScalarTy);
+    } else if (Mask < LHSArity) {
+      Scalar = getScalar(EquivalentLHS, Mask);
+    } else {
+      Scalar = getScalar(EquivalentRHS, Mask - LHSArity);
     }
 
-    auto ScalarFactory = [Opcode = I.getOpcode()](auto &B, auto Args) {
-      return B.CreateNAryOp(Opcode, Args);
-    };
-    Value *EquivalentValue = convertVectorOperation(
-        B, EquivalentType, EquivalentArgs, ScalarFactory);
-
-    // TODO Implement support for additional instructions.
-    // Because support is very limited, as an initial step we convert the
-    // aggregate back to a vector to generate a valid module.
-    auto *ReplacementValue =
-        convertEquivalentValue(B, EquivalentValue, I.getType());
-    registerReplacement(I, *ReplacementValue);
-
-    return ReplacementValue;
+    V = setScalar(V, Scalar, i);
   }
+
+  registerReplacement(I, *V);
+  return V;
 }
 
 bool LongVectorLoweringPass::handlingRequired(User &U) {
@@ -431,7 +561,7 @@ Type *LongVectorLoweringPass::getEquivalentType(Type *Ty) {
   return EquivalentTy;
 }
 
-Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) const {
+Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
       Ty->isLabelTy()) {
     // No lowering required.
@@ -460,13 +590,30 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) const {
     return nullptr;
   }
 
+  if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
+    if (auto *ElementTy = getEquivalentType(PointerTy->getElementType())) {
+      return ElementTy->getPointerTo(PointerTy->getAddressSpace());
+    }
+
+    return nullptr;
+  }
+
+  if (auto *StructTy = dyn_cast<StructType>(Ty)) {
+    unsigned Arity = StructTy->getStructNumElements();
+    for (unsigned i = 0; i < Arity; ++i) {
+      if (getEquivalentType(StructTy->getContainedType(i)) != nullptr) {
+        llvm_unreachable(
+            "Nested types not yet supported, need test cases (struct)");
+      }
+    }
+
+    return nullptr;
+  }
+
 #ifndef NDEBUG
   dbgs() << "Unsupported type: " << *Ty << '\n';
 #endif
-  // TODO Once additional features are implemented, turn this into an error by
-  // uncommenting the next line.
-  // llvm_unreachable("Unsupported kind of Type.");
-  return nullptr;
+  llvm_unreachable("Unsupported kind of Type.");
 }
 
 bool LongVectorLoweringPass::runOnFunction(Function &F) {
