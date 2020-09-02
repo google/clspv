@@ -18,8 +18,10 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "clspv/Passes.h"
 
@@ -73,6 +75,10 @@ private:
   /// Lower the given function.
   bool runOnFunction(Function &F);
 
+  /// Clears the dead instructions and others that might be rendered dead
+  /// by their removal.
+  void cleanDeadInstructions();
+
 private:
   /// A map between long-vector types and their equivalent representation.
   DenseMap<Type *, Type *> TypeMap;
@@ -88,6 +94,28 @@ private:
 };
 
 char LongVectorLoweringPass::ID = 0;
+
+using PartitionCallback = std::function<void(Instruction *)>;
+
+/// Partition the @p Instructions based on their liveness.
+void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
+                           PartitionCallback OnDead,
+                           PartitionCallback OnAlive) {
+  for (auto OldValueHandle : Instructions) {
+    // Handle situations when the weak handle is no longer valid.
+    if (!OldValueHandle.pointsToAliveValue()) {
+      continue; // Nothing else to do for this handle.
+    }
+
+    auto *OldInstruction = cast<Instruction>(OldValueHandle);
+    bool Dead = OldInstruction->use_empty();
+    if (Dead) {
+      OnDead(OldInstruction);
+    } else {
+      OnAlive(OldInstruction);
+    }
+  }
+}
 
 /// Convert the given value @p V to a value of the given @p EquivalentTy.
 ///
@@ -307,12 +335,83 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
     Modified |= (visit(&I) != nullptr);
   }
 
-  // TODO Clean dead instructions.
+  cleanDeadInstructions();
 
   LLVM_DEBUG(dbgs() << "Final version for " << F.getName() << '\n');
   LLVM_DEBUG(dbgs() << *FunctionToVisit << '\n');
 
   return Modified;
+}
+
+void LongVectorLoweringPass::cleanDeadInstructions() {
+  // Collect all instructions that have been replaced by another one, and remove
+  // them from the function. To address dependencies, use a fixed-point
+  // algorithm:
+  //  1. Collect the instructions that have been replaced.
+  //  2. Collect among these instructions the ones which have no uses and remove
+  //     them.
+  //  3. Repeat step 2 until no progress is made.
+
+  // Select instructions that were replaced by another one.
+  // Ignore constants as they are not owned by the module and therefore don't
+  // need to be removed.
+  using WeakInstructions = SmallVector<WeakTrackingVH, 32>;
+  WeakInstructions OldInstructions;
+  for (const auto &Mapping : InstructionMap) {
+    if (Mapping.getSecond() != nullptr) {
+      if (auto *OldInstruction = dyn_cast<Instruction>(Mapping.getFirst())) {
+        OldInstructions.push_back(OldInstruction);
+      } else {
+        assert(isa<Constant>(Mapping.getFirst()) &&
+               "Only Instruction and Constant are expected in InstructionMap");
+      }
+    }
+  }
+
+  // Erase any mapping, as they won't be valid anymore.
+  InstructionMap.clear();
+
+  for (bool Progress = true; Progress;) {
+    std::size_t PreviousSize = OldInstructions.size();
+
+    // Identify instructions that are actually dead and can be removed using
+    // RecursivelyDeleteTriviallyDeadInstructions.
+    // Use a third buffer to capture the instructions that are still alive to
+    // avoid mutating OldInstructions while iterating over it.
+    WeakInstructions NextBatch;
+    WeakInstructions TriviallyDeads;
+    partitionInstructions(
+        OldInstructions,
+        [&TriviallyDeads](Instruction *DeadInstruction) {
+          // Additionally, manually remove from the parent instructions with
+          // possible side-effect, generally speaking, such as call or alloca
+          // instructions. Those are not trivially dead.
+          if (isInstructionTriviallyDead(DeadInstruction)) {
+            TriviallyDeads.push_back(DeadInstruction);
+          } else {
+            DeadInstruction->eraseFromParent();
+          }
+        },
+        [&NextBatch](Instruction *AliveInstruction) {
+          NextBatch.push_back(AliveInstruction);
+        });
+
+    RecursivelyDeleteTriviallyDeadInstructions(TriviallyDeads);
+
+    // Update OldInstructions for the next iteration of the fixed-point.
+    OldInstructions = std::move(NextBatch);
+    Progress = (OldInstructions.size() < PreviousSize);
+  }
+
+#ifndef NDEBUG
+  if (!OldInstructions.empty()) {
+    dbgs() << "These values were expected to be removed:\n";
+    for (auto ValueHandle : OldInstructions) {
+      dbgs() << '\t' << *ValueHandle << '\n';
+    }
+    llvm_unreachable("Not all supposedly-dead instruction were removed!");
+  }
+#endif
 }
 
 } // namespace

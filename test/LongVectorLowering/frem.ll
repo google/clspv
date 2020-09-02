@@ -31,7 +31,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test8
-; TODO Once dead instructions are removed, add CHECK-NOT: frem <8 x float>
+; CHECK-NOT: frem <8 x float>
 ; CHECK: frem float
 ; CHECK: frem float
 ; CHECK: frem float
@@ -40,6 +40,7 @@ entry:
 ; CHECK: frem float
 ; CHECK: frem float
 ; CHECK: frem float
+; CHECK-NOT: frem <8 x float>
 
 define spir_func void @test16(<4 x float> addrspace(1)* %ptr) {
 entry:
@@ -78,7 +79,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test16
-; TODO Once dead instructions are removed, add CHECK-NOT: frem <16 x float>
+; CHECK-NOT: frem <16 x float>
 ; CHECK: frem float
 ; CHECK: frem float
 ; CHECK: frem float
@@ -95,3 +96,4 @@ entry:
 ; CHECK: frem float
 ; CHECK: frem float
 ; CHECK: frem float
+; CHECK-NOT: frem <16 x float>

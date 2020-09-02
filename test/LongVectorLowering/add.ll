@@ -31,7 +31,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test8
-; TODO Once dead instructions are removed, add CHECK-NOT: add <8 x i32>
+; CHECK-NOT: add <8 x i32>
 ; CHECK: add i32
 ; CHECK: add i32
 ; CHECK: add i32
@@ -40,6 +40,7 @@ entry:
 ; CHECK: add i32
 ; CHECK: add i32
 ; CHECK: add i32
+; CHECK-NOT: add <8 x i32>
 
 define spir_func void @test16(<4 x i32> addrspace(1)* %ptr) {
 entry:
@@ -78,7 +79,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test16
-; TODO Once dead instructions are removed, add CHECK-NOT: add <16 x i32>
+; CHECK-NOT: add <16 x i32>
 ; CHECK: add i32
 ; CHECK: add i32
 ; CHECK: add i32
@@ -95,3 +96,4 @@ entry:
 ; CHECK: add i32
 ; CHECK: add i32
 ; CHECK: add i32
+; CHECK-NOT: add <16 x i32>

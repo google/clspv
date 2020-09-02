@@ -31,7 +31,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test8
-; TODO Once dead instructions are removed, add CHECK-NOT: and <8 x i64>
+; CHECK-NOT: and <8 x i64>
 ; CHECK: and i64
 ; CHECK: and i64
 ; CHECK: and i64
@@ -40,6 +40,7 @@ entry:
 ; CHECK: and i64
 ; CHECK: and i64
 ; CHECK: and i64
+; CHECK-NOT: and <8 x i64>
 
 define spir_func void @test16(<4 x i64> addrspace(1)* %ptr) {
 entry:
@@ -78,7 +79,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test16
-; TODO Once dead instructions are removed, add CHECK-NOT: and <16 x i64>
+; CHECK-NOT: and <16 x i64>
 ; CHECK: and i64
 ; CHECK: and i64
 ; CHECK: and i64
@@ -95,3 +96,4 @@ entry:
 ; CHECK: and i64
 ; CHECK: and i64
 ; CHECK: and i64
+; CHECK-NOT: and <16 x i64>
