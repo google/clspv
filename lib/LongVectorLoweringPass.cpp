@@ -17,6 +17,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
@@ -36,7 +37,9 @@ using namespace llvm;
 
 namespace {
 
-class LongVectorLoweringPass final : public ModulePass {
+class LongVectorLoweringPass final
+    : public ModulePass,
+      public InstVisitor<LongVectorLoweringPass, Value *> {
 public:
   static char ID;
 
@@ -47,12 +50,29 @@ public:
   bool runOnModule(Module &M) override;
 
 private:
-  /// Higher-level dispatcher.
+  // Implementation details for InstVisitor.
+
+  using Visitor = InstVisitor<LongVectorLoweringPass, Value *>;
+  using Visitor::visit;
+  friend Visitor;
+
+  /// Higher-level dispatcher. This is not provided by InstVisitor.
   /// Returns nullptr if no lowering is required.
   Value *visit(Value *V);
 
+  /// InstVisitor impl, general "catch-all" function.
+  Value *visitInstruction(Instruction &I);
+
+  // InstVisitor impl, specific cases.
+  Value *visitBinaryOperator(BinaryOperator &I);
+
 private:
   // Helpers for lowering values.
+
+  /// Return true if the given @p U needs to be lowered.
+  ///
+  /// This only looks at the types involved, not the opcodes or anything else.
+  bool handlingRequired(User &U);
 
   /// Register the replacement of @p U with @p V.
   ///
@@ -105,7 +125,7 @@ private:
   /// function once all instructions in the current function have been visited
   /// and transformed. Instructions are not removed from the function as they
   /// are visited because this would invalidate iterators.
-  DenseMap<Value *, Value *> InstructionMap;
+  DenseMap<Value *, Value *> ValueMap;
 
   /// A map between functions and their replacement.
   ///
@@ -286,40 +306,25 @@ bool LongVectorLoweringPass::runOnModule(Module &M) {
 
 Value *LongVectorLoweringPass::visit(Value *V) {
   // Already handled?
-  auto it = InstructionMap.find(V);
-  if (it != InstructionMap.end()) {
+  auto it = ValueMap.find(V);
+  if (it != ValueMap.end()) {
     return it->second;
   }
 
-  if (auto *BinOp = dyn_cast<BinaryOperator>(V)) {
-    if (auto *EquivalentType = getEquivalentType(BinOp->getType())) {
-      IRBuilder<> B(BinOp);
+  if (isa<Argument>(V)) {
+    assert(getEquivalentType(V->getType()) == nullptr &&
+           "Argument not handled when visiting function.");
+    return nullptr;
+  }
 
-      SmallVector<Value *, 16> EquivalentArgs;
-      for (auto &Operand : BinOp->operands()) {
-        auto *Arg = Operand.get();
-        // TODO Visit argument to lower it.
-        // Instead, for now, we create an equivalent aggregate.
-        auto *EquivalentArgTy = getEquivalentType(Arg->getType());
-        auto *EquivalentArg = convertEquivalentValue(B, Arg, EquivalentArgTy);
-        EquivalentArgs.push_back(EquivalentArg);
-      }
+  assert(isa<User>(V) && "Kind of llvm::Value not yet supported.");
+  if (!handlingRequired(*cast<User>(V))) {
+    return nullptr;
+  }
 
-      auto ScalarFactory = [Opcode = BinOp->getOpcode()](auto &B, auto Args) {
-        return B.CreateNAryOp(Opcode, Args);
-      };
-      Value *EquivalentValue = convertVectorOperation(
-          B, EquivalentType, EquivalentArgs, ScalarFactory);
-
-      // TODO Implement support for additional instructions.
-      // Because support is very limited, as an initial step we convert the
-      // aggregate back to a vector to generate a valid module.
-      auto *ReplacementValue =
-          convertEquivalentValue(B, EquivalentValue, BinOp->getType());
-      registerReplacement(*BinOp, *ReplacementValue);
-
-      return ReplacementValue;
-    }
+  if (auto *I = dyn_cast<Instruction>(V)) {
+    // Dispatch to the appropriate method using InstVisitor.
+    return visit(I);
   }
 
 #ifndef NDEBUG
@@ -331,10 +336,66 @@ Value *LongVectorLoweringPass::visit(Value *V) {
   return nullptr;
 }
 
+Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
+#ifndef NDEBUG
+  dbgs() << "Instruction not handled: " << I << '\n';
+#endif
+  // TODO Once additional features are implemented, turn this into an error by
+  // uncommenting the next line.
+  // llvm_unreachable("Missing support for instruction");
+  return nullptr;
+}
+
+Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
+  if (auto *EquivalentType = getEquivalentType(I.getType())) {
+    IRBuilder<> B(&I);
+
+    SmallVector<Value *, 16> EquivalentArgs;
+    for (auto &Operand : I.operands()) {
+      auto *Arg = Operand.get();
+      // TODO Visit argument to lower it.
+      // Instead, for now, we create an equivalent aggregate.
+      auto *EquivalentArgTy = getEquivalentType(Arg->getType());
+      auto *EquivalentArg = convertEquivalentValue(B, Arg, EquivalentArgTy);
+      EquivalentArgs.push_back(EquivalentArg);
+    }
+
+    auto ScalarFactory = [Opcode = I.getOpcode()](auto &B, auto Args) {
+      return B.CreateNAryOp(Opcode, Args);
+    };
+    Value *EquivalentValue = convertVectorOperation(
+        B, EquivalentType, EquivalentArgs, ScalarFactory);
+
+    // TODO Implement support for additional instructions.
+    // Because support is very limited, as an initial step we convert the
+    // aggregate back to a vector to generate a valid module.
+    auto *ReplacementValue =
+        convertEquivalentValue(B, EquivalentValue, I.getType());
+    registerReplacement(I, *ReplacementValue);
+
+    return ReplacementValue;
+  }
+}
+
+bool LongVectorLoweringPass::handlingRequired(User &U) {
+  if (getEquivalentType(U.getType()) != nullptr) {
+    return true;
+  }
+
+  for (auto &Operand : U.operands()) {
+    auto *OperandTy = Operand.get()->getType();
+    if (getEquivalentType(OperandTy) != nullptr) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void LongVectorLoweringPass::registerReplacement(Value &U, Value &V) {
   LLVM_DEBUG(dbgs() << "Replacement for " << U << ": " << V << '\n');
-  assert(InstructionMap.count(&U) == 0 && "Value already registered");
-  InstructionMap.insert({&U, &V});
+  assert(ValueMap.count(&U) == 0 && "Value already registered");
+  ValueMap.insert({&U, &V});
 
   if (U.getType() == V.getType()) {
     LLVM_DEBUG(dbgs() << "\tAnd replace its usages.\n");
@@ -426,7 +487,8 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
 
   bool Modified = (FunctionToVisit != &F);
   for (Instruction &I : instructions(FunctionToVisit)) {
-    Modified |= (visit(&I) != nullptr);
+    // Use the Value overload of visit to ensure cache is used.
+    Modified |= (visit(static_cast<Value *>(&I)) != nullptr);
   }
 
   cleanDeadInstructions();
@@ -499,19 +561,19 @@ void LongVectorLoweringPass::cleanDeadInstructions() {
   // need to be removed.
   using WeakInstructions = SmallVector<WeakTrackingVH, 32>;
   WeakInstructions OldInstructions;
-  for (const auto &Mapping : InstructionMap) {
+  for (const auto &Mapping : ValueMap) {
     if (Mapping.getSecond() != nullptr) {
       if (auto *OldInstruction = dyn_cast<Instruction>(Mapping.getFirst())) {
         OldInstructions.push_back(OldInstruction);
       } else {
         assert(isa<Constant>(Mapping.getFirst()) &&
-               "Only Instruction and Constant are expected in InstructionMap");
+               "Only Instruction and Constant are expected in ValueMap");
       }
     }
   }
 
   // Erase any mapping, as they won't be valid anymore.
-  InstructionMap.clear();
+  ValueMap.clear();
 
   for (bool Progress = true; Progress;) {
     std::size_t PreviousSize = OldInstructions.size();
