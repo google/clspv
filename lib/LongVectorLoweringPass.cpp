@@ -160,7 +160,8 @@ private:
   /// are visited because this would invalidate iterators.
   DenseMap<Value *, Value *> ValueMap;
 
-  /// A map between functions and their replacement.
+  /// A map between functions and their replacement. This includes OpenCL
+  /// builtin declarations.
   ///
   /// The keys in this mapping should be deleted when finishing processing the
   /// module.
@@ -221,6 +222,60 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     break;
   }
   }
+}
+
+/// Get the scalar overload for the given OpenCL builtin function @p Builtin.
+Function *getBIFScalarVersion(Function &Builtin) {
+  assert(!Builtin.isIntrinsic());
+
+  // TODO For now we are using a hardcodded mapping but this should be replaced
+  // by an automatic solution.
+  StringRef VectorName = Builtin.getName();
+  StringRef ScalarName = StringSwitch<StringRef>(VectorName)
+                             // max
+                             .Case("_Z3maxDv16_fS_", "_Z3maxff")
+                             .Case("_Z3maxDv16_iS_", "_Z3maxii")
+                             .Case("_Z3maxDv8_fS_", "_Z3maxff")
+                             .Case("_Z3maxDv8_iS_", "_Z3maxii")
+                             // default = lookup failure
+                             .Default("");
+  if (ScalarName.empty()) {
+#ifndef NDEBUG
+    dbgs() << "BIF " << Builtin.getName() << " is not yet supported\n";
+#endif
+    llvm_unreachable("BIF not handled yet.");
+  }
+
+  // Get the scalar version, which might not already exist in the module.
+  auto *M = Builtin.getParent();
+  auto *ScalarFn = M->getFunction(ScalarName);
+
+  if (ScalarFn == nullptr) {
+    // Scalarise all the input/output types. Here we intentionally do not rely
+    // on getEquivalentType because we want the scalar overload.
+    SmallVector<Type *, 16> ParamTys;
+    for (auto &Param : Builtin.args()) {
+      // TODO Need support for other types, like pointers. Need test case.
+      assert(Param.getType()->isVectorTy());
+      ParamTys.push_back(Param.getType()->getScalarType());
+    }
+
+    assert(Builtin.getReturnType()->isVectorTy());
+    Type *ReturnTy = Builtin.getReturnType()->getScalarType();
+
+    auto *FunctionTy =
+        FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
+
+    ScalarFn = Function::Create(FunctionTy, Builtin.getLinkage(), ScalarName);
+    ScalarFn->setCallingConv(Builtin.getCallingConv());
+    ScalarFn->copyAttributesFrom(&Builtin);
+
+    M->getFunctionList().push_front(ScalarFn);
+  }
+
+  assert(Builtin.getCallingConv() == ScalarFn->getCallingConv());
+
+  return ScalarFn;
 }
 
 /// Convert the given value @p V to a value of the given @p EquivalentTy.
@@ -871,9 +926,9 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
   if (ScalarFunction == nullptr) {
     // Handle both OpenCL builtin functions, available as simple declarations,
     // and LLVM intrinsics.
-    // TODO Implement support for OpenCL builtins.
-    assert(VectorFunction->isIntrinsic());
-    ScalarFunction = getIntrinsicScalarVersion(*VectorFunction);
+    auto getter = VectorFunction->isIntrinsic() ? getIntrinsicScalarVersion
+                                                : getBIFScalarVersion;
+    ScalarFunction = getter(*VectorFunction);
     FunctionMap[VectorFunction] = ScalarFunction;
   }
   assert(ScalarFunction);
