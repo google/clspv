@@ -123,6 +123,9 @@ private:
 private:
   // Hight-level implementation details of runOnModule.
 
+  /// Lower all global variables in the module.
+  bool runOnGlobals(Module &M);
+
   /// Lower the given function.
   bool runOnFunction(Function &F);
 
@@ -147,6 +150,9 @@ private:
   /// Remove all long-vector functions that were lowered.
   void cleanDeadFunctions();
 
+  /// Remove all long-vector globals that were lowered.
+  void cleanDeadGlobals();
+
 private:
   /// A map between long-vector types and their equivalent representation.
   DenseMap<Type *, Type *> TypeMap;
@@ -166,6 +172,13 @@ private:
   /// The keys in this mapping should be deleted when finishing processing the
   /// module.
   DenseMap<Function *, Function *> FunctionMap;
+
+  /// A map between global variables and their replacement.
+  ///
+  /// The map is filled before any functions are visited, yet the original
+  /// globals are not removed from the module. Their removal is deferred once
+  /// all functions have been visited.
+  DenseMap<GlobalVariable *, GlobalVariable *> GlobalVariableMap;
 };
 
 char LongVectorLoweringPass::ID = 0;
@@ -436,13 +449,14 @@ Function *createFunctionWithMappedTypes(Function &F,
 }
 
 bool LongVectorLoweringPass::runOnModule(Module &M) {
-  bool Modified = false;
+  bool Modified = runOnGlobals(M);
 
   for (auto &F : M.functions()) {
     Modified |= runOnFunction(F);
   }
 
   cleanDeadFunctions();
+  cleanDeadGlobals();
 
   return Modified;
 }
@@ -501,6 +515,13 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
     }
 
     return ConstantStruct::get(cast<StructType>(EquivalentTy), Scalars);
+  }
+
+  if (auto *GV = dyn_cast<GlobalVariable>(&Cst)) {
+    auto *EquivalentGV = GlobalVariableMap[GV];
+    assert(EquivalentGV &&
+           "Global variable should have been already processed.");
+    return EquivalentGV;
   }
 
 #ifndef NDEBUG
@@ -894,6 +915,42 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   llvm_unreachable("Unsupported kind of Type.");
 }
 
+bool LongVectorLoweringPass::runOnGlobals(Module &M) {
+  assert(GlobalVariableMap.empty());
+
+  // Iterate over the globals, generate equivalent ones when needed. Insert the
+  // new globals before the existing one in the module's list to avoid visiting
+  // it again.
+  for (auto &GV : M.globals()) {
+    if (auto *EquivalentTy = getEquivalentType(GV.getValueType())) {
+      Constant *EquivalentInitializer = nullptr;
+      if (GV.hasInitializer()) {
+        auto *Initializer = GV.getInitializer();
+        EquivalentInitializer = cast<Constant>(visitConstant(*Initializer));
+      }
+
+      auto *EquivalentGV = new GlobalVariable(
+          M, EquivalentTy, GV.isConstant(), GV.getLinkage(),
+          EquivalentInitializer, Twine(GV.getName(), ".i"),
+          /* insert before: */ &GV, GV.getThreadLocalMode(),
+          GV.getAddressSpace(), GV.isExternallyInitialized());
+      EquivalentGV->setAlignment(GV.getAlign());
+      EquivalentGV->copyMetadata(&GV, /* offset: */ 0);
+      EquivalentGV->copyAttributesFrom(&GV);
+
+      LLVM_DEBUG(dbgs() << "Mapping global variable:\n\toriginal: " << GV
+                        << "\n\toriginal type: " << *(GV.getValueType())
+                        << "\n\treplacement: " << *EquivalentGV
+                        << "\n\treplacement type: " << *EquivalentTy << "\n");
+
+      GlobalVariableMap.insert({&GV, EquivalentGV});
+    }
+  }
+
+  bool Modified = !GlobalVariableMap.empty();
+  return Modified;
+}
+
 bool LongVectorLoweringPass::runOnFunction(Function &F) {
   LLVM_DEBUG(dbgs() << "Processing " << F.getName() << '\n');
 
@@ -1117,6 +1174,13 @@ void LongVectorLoweringPass::cleanDeadFunctions() {
 
   assert(DeadFunctions.empty() &&
          "Not all supposedly-dead functions were removed!");
+}
+
+void LongVectorLoweringPass::cleanDeadGlobals() {
+  for (auto const &Mapping : GlobalVariableMap) {
+    auto *GV = Mapping.first;
+    GV->eraseFromParent();
+  }
 }
 
 } // namespace
