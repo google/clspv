@@ -2369,10 +2369,10 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
   // Workgroup size is handled differently (it goes into a constant)
   if (spv::BuiltInWorkgroupSize == BuiltinType) {
-    std::vector<bool> HasMDVec;
     uint32_t PrevXDimCst = 0xFFFFFFFF;
     uint32_t PrevYDimCst = 0xFFFFFFFF;
     uint32_t PrevZDimCst = 0xFFFFFFFF;
+    bool HasMD = true;
     for (Function &Func : *GV.getParent()) {
       if (Func.isDeclaration()) {
         continue;
@@ -2399,7 +2399,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
           PrevZDimCst = CurZDimCst;
         } else if (CurXDimCst != PrevXDimCst || CurYDimCst != PrevYDimCst ||
                    CurZDimCst != PrevZDimCst) {
-          HasMDVec.push_back(false);
+          HasMD = false;
           continue;
         } else {
           continue;
@@ -2426,22 +2426,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
         InitializerID =
             addSPIRVInst<kGlobalVariables>(spv::OpConstantComposite, Ops);
-
-        HasMDVec.push_back(true);
       } else {
-        HasMDVec.push_back(false);
-      }
-    }
-
-    // Check all kernels have same definitions for work_group_size.
-    bool HasMD = false;
-    if (!HasMDVec.empty()) {
-      HasMD = HasMDVec[0];
-      for (uint32_t i = 1; i < HasMDVec.size(); i++) {
-        if (HasMD != HasMDVec[i]) {
-          HasMD = false;
-          break;
-        }
+        HasMD = false;
       }
     }
 
