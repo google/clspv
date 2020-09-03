@@ -18,6 +18,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
@@ -121,6 +122,11 @@ private:
   /// Lower the given function.
   bool runOnFunction(Function &F);
 
+  /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
+  /// calls to its scalar version.
+  Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
+                            ArrayRef<Value *> EquivalentArgs);
+
   /// Create an alternative version of @p F that doesn't have long vectors as
   /// parameter or return types.
   /// Returns nullptr if no lowering is required.
@@ -178,6 +184,38 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
     } else {
       OnAlive(OldInstruction);
     }
+  }
+}
+
+/// Get the scalar overload for the given LLVM @p Intrinsic.
+Function *getIntrinsicScalarVersion(Function &Intrinsic) {
+  auto id = Intrinsic.getIntrinsicID();
+  assert(id != Intrinsic::not_intrinsic);
+
+  switch (id) {
+  default:
+#ifndef NDEBUG
+    dbgs() << "Intrinsic " << Intrinsic.getName() << " is not yet supported";
+#endif
+    llvm_unreachable("Missing support for intrinsic.");
+    break;
+
+  case Intrinsic::fmuladd: {
+    SmallVector<Type *, 16> ParamTys;
+    bool Success = Intrinsic::getIntrinsicSignature(&Intrinsic, ParamTys);
+    assert(Success);
+    (void)Success;
+
+    // Map vectors to scalars.
+    for (auto *&Param : ParamTys) {
+      // TODO Need support for other types, like pointers. Need test case.
+      assert(Param->isVectorTy());
+      Param = Param->getScalarType();
+    }
+
+    return Intrinsic::getDeclaration(Intrinsic.getParent(), id, ParamTys);
+    break;
+  }
   }
 }
 
@@ -433,10 +471,10 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
     EquivalentArgs.push_back(EquivalentArg);
   }
 
-#ifndef NDEBUG
   auto *ReturnTy = I.getType();
   auto *EquivalentReturnTy = getEquivalentTypeOrSelf(ReturnTy);
 
+#ifndef NDEBUG
   bool NeedHandling = false;
   NeedHandling |= (EquivalentReturnTy != ReturnTy);
   NeedHandling |=
@@ -456,9 +494,7 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
 
   Value *V = nullptr;
   if (Builtin) {
-    // TODO Handle builtins.
-    llvm_unreachable(
-        "OpenCL builtin and LLVM intrinsics are not yet supported.");
+    V = convertBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
   } else {
     V = convertUserDefinedFunctionCall(I, EquivalentArgs);
   }
@@ -738,6 +774,37 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
   LLVM_DEBUG(dbgs() << *FunctionToVisit << '\n');
 
   return Modified;
+}
+
+Value *
+LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
+                                           Type *EquivalentReturnTy,
+                                           ArrayRef<Value *> EquivalentArgs) {
+  Function *VectorFunction = VectorCall.getCalledFunction();
+  assert(VectorFunction);
+
+  // Use and update the FunctionMap cache.
+  Function *ScalarFunction = FunctionMap[VectorFunction];
+  if (ScalarFunction == nullptr) {
+    // Handle both OpenCL builtin functions, available as simple declarations,
+    // and LLVM intrinsics.
+    // TODO Implement support for OpenCL builtins.
+    assert(VectorFunction->isIntrinsic());
+    ScalarFunction = getIntrinsicScalarVersion(*VectorFunction);
+    FunctionMap[VectorFunction] = ScalarFunction;
+  }
+  assert(ScalarFunction);
+
+  auto ScalarFactory = [ScalarFunction, &VectorCall](auto &B, auto Args) {
+    CallInst *ScalarCall = B.CreateCall(ScalarFunction, Args);
+    ScalarCall->copyIRFlags(&VectorCall);
+    ScalarCall->copyMetadata(VectorCall);
+    ScalarCall->setCallingConv(VectorCall.getCallingConv());
+    return ScalarCall;
+  };
+
+  return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
+                                ScalarFactory);
 }
 
 Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
