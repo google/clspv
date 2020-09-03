@@ -4779,6 +4779,8 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   case Builtins::kHalfPowr:
   case Builtins::kNativePowr:
     return glsl::ExtInst::ExtInstPow;
+  case Builtins::kRint:
+    return glsl::ExtInst::ExtInstRoundEven;
   case Builtins::kRound:
     return glsl::ExtInst::ExtInstRound;
   case Builtins::kSqrt:
