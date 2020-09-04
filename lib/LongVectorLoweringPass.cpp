@@ -270,6 +270,10 @@ Function *getBIFScalarVersion(Function &Builtin) {
 
   // TODO Add support for other builtins by providing testcases and listing the
   // builtins here.
+  case clspv::Builtins::kExp:
+  case clspv::Builtins::kFma:
+  case clspv::Builtins::kFmax:
+  case clspv::Builtins::kFmin:
   case clspv::Builtins::kMax: {
     // Scalarise all the input/output types. Here we intentionally do not rely
     // on getEquivalentType because we want the scalar overload.
