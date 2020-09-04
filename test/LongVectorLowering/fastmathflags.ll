@@ -1,8 +1,6 @@
 ; RUN: clspv-opt --LongVectorLowering %s -o %t
 ; RUN: FileCheck %s < %t
 
-; TODO cover fcmp and select
-
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
@@ -17,6 +15,8 @@ entry:
   %e = fdiv arcp contract <8 x float> %d, %b
   %f = frem reassoc <8 x float> %e, %c
   %g = call fast <8 x float> @llvm.fmuladd.v8f32(<8 x float> %d, <8 x float> %e, <8 x float> %f)
+  %h = fcmp fast oeq <8 x float> %x, %g
+  %i = select fast <8 x i1> %h, <8 x float> %y, <8 x float> %z
   ret <8 x float> %g
 }
 
@@ -82,3 +82,21 @@ entry:
 ; CHECK: call fast float @llvm.fmuladd.f32
 ; CHECK: call fast float @llvm.fmuladd.f32
 ; CHECK: call fast float @llvm.fmuladd.f32
+
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+; CHECK: fcmp fast
+
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
+; CHECK: select fast
