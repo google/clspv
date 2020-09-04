@@ -274,20 +274,36 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kFma:
   case clspv::Builtins::kFmax:
   case clspv::Builtins::kFmin:
+  case clspv::Builtins::kFrexp:
   case clspv::Builtins::kMax: {
     // Scalarise all the input/output types. Here we intentionally do not rely
     // on getEquivalentType because we want the scalar overload.
-    SmallVector<Type *, 16> ParamTys;
+    SmallVector<Type *, 16> ScalarParamTys;
     for (auto &Param : Builtin.args()) {
-      // TODO Need support for other types, like pointers. Need test case.
-      assert(Param.getType()->isVectorTy());
-      ParamTys.push_back(Param.getType()->getScalarType());
+      auto *ParamTy = Param.getType();
+
+      Type *ScalarParamTy = nullptr;
+      if (ParamTy->isPointerTy()) {
+        auto *PointeeTy = ParamTy->getPointerElementType();
+        assert(PointeeTy->isVectorTy() && "Unsupported kind of pointer type.");
+        ScalarParamTy = PointerType::get(PointeeTy->getScalarType(),
+                                         ParamTy->getPointerAddressSpace());
+      } else {
+        assert((ParamTy->isVectorTy() || ParamTy->isFloatingPointTy() ||
+                ParamTy->isIntegerTy()) &&
+               "Unsupported kind of parameter type.");
+        ScalarParamTy = ParamTy->getScalarType();
+      }
+
+      assert(ScalarParamTy);
+      ScalarParamTys.push_back(ScalarParamTy);
     }
 
     assert(Builtin.getReturnType()->isVectorTy());
     Type *ReturnTy = Builtin.getReturnType()->getScalarType();
 
-    FunctionTy = FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
+    FunctionTy =
+        FunctionType::get(ReturnTy, ScalarParamTys, Builtin.isVarArg());
     break;
   }
   }
@@ -368,6 +384,10 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
   Value *ReturnValue = UndefValue::get(EquivalentReturnTy);
   unsigned Arity = EquivalentReturnTy->getNumContainedTypes();
 
+  auto &C = I.getContext();
+  auto *IntTy = IntegerType::get(C, 32);
+  auto *Zero = ConstantInt::get(IntTy, 0);
+
   // Invoke the scalar operation once for each vector element.
   IRBuilder<> B(&I);
   for (unsigned i = 0; i < Arity; ++i) {
@@ -375,8 +395,19 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
     Args.resize(EquivalentArgs.size());
 
     for (unsigned j = 0; j < Args.size(); ++j) {
-      assert(EquivalentArgs[j]->getType()->isStructTy());
-      Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
+      auto *ArgTy = EquivalentArgs[j]->getType();
+      if (ArgTy->isPointerTy()) {
+        assert(ArgTy->getPointerElementType()->isStructTy() &&
+               "Unsupported kind of pointer type.");
+        Args[j] = B.CreateInBoundsGEP(EquivalentArgs[j],
+                                      {Zero, ConstantInt::get(IntTy, i)});
+      } else if (ArgTy->isStructTy()) {
+        Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
+      } else {
+        assert((ArgTy->isFloatingPointTy() || ArgTy->isIntegerTy()) &&
+               "Unsupported kind of parameter type.");
+        Args[j] = EquivalentArgs[j];
+      }
     }
 
     Value *Scalar = ScalarOperation(B, Args);

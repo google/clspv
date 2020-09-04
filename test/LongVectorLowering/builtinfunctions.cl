@@ -32,6 +32,21 @@ kernel void test(global int *in, global int *out) {
   }
 
   {
+    int8 a = vload8(0, in);
+    int8 b = vload8(1, in);
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B:%[^ ]+]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    int8 c = max(a, b.s0);
+    vstore8(c, 0, out);
+  }
+
+  {
     int4 a = vload4(0, in);
     int4 b = vload4(1, in);
     // CHECK: OpExtInst [[UINT4]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
