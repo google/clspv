@@ -629,6 +629,30 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
 
   Value *V = nullptr;
   switch (I.getOpcode()) {
+  case Instruction::Trunc:
+  case Instruction::ZExt:
+  case Instruction::SExt:
+  case Instruction::FPToUI:
+  case Instruction::FPToSI:
+  case Instruction::UIToFP:
+  case Instruction::SIToFP:
+  case Instruction::FPTrunc:
+  case Instruction::FPExt: {
+    // Scalarise the cast.
+    //
+    // Because all the elements of EquivalentDestTy have the same type, we can
+    // simply pick the first.
+    assert(EquivalentDestTy->isStructTy());
+    Type *ScalarTy = EquivalentDestTy->getStructElementType(0);
+    auto ScalarFactory = [&I, ScalarTy](auto &B, auto Args) {
+      assert(Args.size() == 1);
+      return B.CreateCast(I.getOpcode(), Args[0], ScalarTy, I.getName());
+    };
+    V = convertVectorOperation(I, EquivalentDestTy, EquivalentValue,
+                               ScalarFactory);
+    break;
+  }
+
   case Instruction::BitCast: {
     if (OriginalDestTy->isPointerTy()) {
       // Bitcast over pointers are lowered to one bitcast.
