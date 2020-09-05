@@ -952,7 +952,8 @@ int Compile(const int argc, const char *const argv[]) {
 int CompileFromSourceString(const std::string &program,
                             const std::string &sampler_map,
                             const std::string &options,
-                            std::vector<uint32_t> *output_binary) {
+                            std::vector<uint32_t> *output_binary,
+                            std::string *output_log) {
 
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
@@ -998,9 +999,12 @@ int CompileFromSourceString(const std::string &program,
       instance.getDiagnostics().getClient();
   consumer->finish();
 
+  if (output_log != nullptr) {
+    *output_log = log;
+  }
+
   auto num_errors = consumer->getNumErrors();
   if (result || num_errors > 0) {
-    llvm::errs() << log << "\n";
     return -1;
   }
 
