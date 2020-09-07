@@ -20,6 +20,8 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 
+#include "llvm/Support/Debug.h"
+
 #include "clspv/Option.h"
 
 #include "FrontendPlugin.h"
@@ -193,7 +195,11 @@ private:
             CustomDiagnosticsIDMap[CustomDiagnosticVectorsMoreThan4Elements]);
         return false;
       }
-    } else if (canonicalType->isRecordType()) {
+
+      return true;
+    }
+
+    if (auto *RT = llvm::dyn_cast<RecordType>(canonicalType)) {
       // Do not allow recursive struct definitions.
       llvm::DenseSet<const Type *> seen;
       if (IsRecursiveType(canonicalType, &seen)) {
@@ -202,9 +208,46 @@ private:
             CustomDiagnosticsIDMap[CustomDiagnosticRecursiveStruct]);
         return false;
       }
+
+      // To avoid infinite recursion, first verify that the record is not
+      // recursive and then that its fields are supported.
+      for (auto *field_decl : RT->getDecl()->fields()) {
+        if (!IsSupportedType(field_decl->getType(), SR)) {
+          return false;
+        }
+      }
+
+      return true;
     }
 
-    return true;
+    if (auto *AT = llvm::dyn_cast<ArrayType>(canonicalType)) {
+      return IsSupportedType(AT->getElementType(), SR);
+    }
+
+    // For function prototypes, recurse on return type and parameter types.
+    if (auto *FT = llvm::dyn_cast<FunctionProtoType>(canonicalType)) {
+      for (auto param : FT->getParamTypes()) {
+        if (!IsSupportedType(param, SR)) {
+          return false;
+        }
+      }
+
+      if (!IsSupportedType(FT->getReturnType(), SR)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    if (QT->isBuiltinType()) {
+      return true;
+    }
+
+#ifndef NDEBUG
+    llvm::dbgs() << "IsSupportedType lacks support for QualType: "
+                 << QT.getAsString() << '\n';
+#endif
+    llvm_unreachable("Type not covered by IsSupportedType.");
   }
 
   // Report a diagnostic using |diag|. If |arg_range| and |specific_range|
@@ -439,16 +482,15 @@ private:
     // Visits a declaration.  Emits a diagnostic and returns false if the
     // declaration represents an unsupported vector value or vector type.
     // Otherwise returns true.
-    bool VisitDecl(Decl *D) {
-      // Looking at the Decl class hierarchy, it seems ValueDecl and TypeDecl
-      // are the only two that might represent an unsupported vector type.
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        return consumer.IsSupportedType(VD->getType(), D->getSourceRange());
-      } else if (auto *TD = dyn_cast<TypeDecl>(D)) {
-        QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
-        return consumer.IsSupportedType(DefinedType, TD->getSourceRange());
-      }
-      return true;
+    //
+    // Looking at the Decl class hierarchy, it seems ValueDecl and TypeDecl
+    // are the only two that might represent an unsupported vector type.
+    bool VisitValueDecl(ValueDecl *VD) {
+      return consumer.IsSupportedType(VD->getType(), VD->getSourceRange());
+    }
+    bool VisitValueDecl(TypeDecl *TD) {
+      QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
+      return consumer.IsSupportedType(DefinedType, TD->getSourceRange());
     }
   };
 
