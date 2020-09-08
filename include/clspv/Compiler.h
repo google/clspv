@@ -31,7 +31,8 @@ int Compile(const int argc, const char *const argv[]);
 int CompileFromSourceString(const std::string &program,
                             const std::string &sampler_map,
                             const std::string &options,
-                            std::vector<uint32_t> *output_binary);
+                            std::vector<uint32_t> *output_binary,
+                            std::string *output_log = nullptr);
 } // namespace clspv
 
 #endif // CLSPV_INCLUDE_CLSPV_COMPILER_H_
