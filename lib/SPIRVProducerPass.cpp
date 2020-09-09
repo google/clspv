@@ -3909,7 +3909,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       case spv::StorageClassUniform:
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
-        //getTypesNeedingArrayStride().insert(ResultType);
         getTypesNeedingArrayStride().insert(ResultType);
         break;
       default:

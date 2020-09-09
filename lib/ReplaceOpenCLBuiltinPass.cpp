@@ -766,8 +766,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
 
     Type *CorrespondingBoolTy = Type::getInt1Ty(M.getContext());
     if (auto CIVecTy = dyn_cast<VectorType>(CITy)) {
-      CorrespondingBoolTy = FixedVectorType::get(
-          Type::getInt1Ty(M.getContext()), CIVecTy->getElementCount().getKnownMinValue());
+      CorrespondingBoolTy =
+          FixedVectorType::get(Type::getInt1Ty(M.getContext()),
+                               CIVecTy->getElementCount().getKnownMinValue());
     }
 
     auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
