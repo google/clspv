@@ -488,7 +488,7 @@ Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
     else if (arr_ty)
       num_elements = arr_ty->getNumElements();
     else if (vec_ty)
-      num_elements = vec_ty->getNumElements();
+      num_elements = vec_ty->getElementCount().getKnownMinValue();
     SmallVector<Constant *, 8> rebuilt_constants;
     for (unsigned i = 0; i != num_elements; ++i) {
       Constant *element_constant = agg_constant->getAggregateElement(i);

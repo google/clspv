@@ -71,8 +71,9 @@ bool SplatSelectConditionPass::runOnModule(Module &M) {
   for (SelectInst *sel : WorkList) {
     Changed = true;
     auto cond = sel->getCondition();
-    auto numElems =
-        cast<VectorType>(sel->getTrueValue()->getType())->getNumElements();
+    auto numElems = cast<VectorType>(sel->getTrueValue()->getType())
+                        ->getElementCount()
+                        .getKnownMinValue();
     Builder.SetInsertPoint(sel);
     auto splat = Builder.CreateVectorSplat(numElems, cond);
     sel->setCondition(splat);

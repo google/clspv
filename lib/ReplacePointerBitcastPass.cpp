@@ -61,7 +61,8 @@ void GatherBaseElements(Value *v, SmallVectorImpl<Value *> *elements,
   auto &DL = module->getDataLayout();
   auto *type = v->getType();
   if (auto *vec_type = dyn_cast<VectorType>(type)) {
-    for (uint64_t i = 0; i != vec_type->getNumElements(); ++i) {
+    for (uint64_t i = 0; i != vec_type->getElementCount().getKnownMinValue();
+         ++i) {
       elements->push_back(builder.CreateExtractElement(v, i));
     }
   } else if (auto *array_type = dyn_cast<ArrayType>(type)) {
@@ -117,7 +118,8 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
     }
   } else if (auto *dst_vec_ty = dyn_cast<VectorType>(dst_type)) {
     auto *ele_ty = dst_vec_ty->getElementType();
-    for (uint64_t i = 0; i != dst_vec_ty->getNumElements(); ++i) {
+    for (uint64_t i = 0; i != dst_vec_ty->getElementCount().getKnownMinValue();
+         ++i) {
       auto *tmp_value =
           BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
       auto *prev = dst ? dst : UndefValue::get(dst_type);
@@ -468,8 +470,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Type *TmpValTy = SrcTy;
             if (DstTy->isVectorTy()) {
               if (SrcEleTyBitWidth == DstEleTyBitWidth) {
-                TmpValTy =
-                    FixedVectorType::get(SrcEleTy, DstVecTy->getNumElements());
+                TmpValTy = FixedVectorType::get(
+                    SrcEleTy, DstVecTy->getElementCount().getKnownMinValue());
               } else {
                 TmpValTy = FixedVectorType::get(SrcEleTy, NumElement);
               }
@@ -482,7 +484,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 TmpSTVal = Builder.CreateBitCast(STVal, TmpValTy);
               } else {
                 unsigned DstVecTyNumElement =
-                    DstVecTy->getNumElements() / NumVector;
+                    DstVecTy->getElementCount().getKnownMinValue() / NumVector;
                 SmallVector<int32_t, 4> Idxs;
                 for (int i = 0; i < DstVecTyNumElement; i++) {
                   Idxs.push_back(i + (DstVecTyNumElement * VIdx));
@@ -502,8 +504,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 }
               } else {
                 // Handle vector type.
-                unsigned SrcNumElement = SrcVecTy->getNumElements();
-                unsigned DstNumElement = DstVecTy->getNumElements();
+                unsigned SrcNumElement =
+                    SrcVecTy->getElementCount().getKnownMinValue();
+                unsigned DstNumElement =
+                    DstVecTy->getElementCount().getKnownMinValue();
                 for (unsigned i = 0; i < NumElement; i++) {
                   SmallVector<int32_t, 4> Idxs;
                   for (int j = 0; j < SrcNumElement; j++) {
@@ -582,7 +586,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               STValues.push_back(STVal);
             } else {
               // Handle vector type.
-              DstNumElement = DstVecTy->getNumElements();
+              DstNumElement = DstVecTy->getElementCount().getKnownMinValue();
               for (unsigned i = 0; i < DstNumElement; i++) {
                 Value *Idx = Builder.getInt32(i);
                 Value *TmpVal = Builder.CreateExtractElement(STVal, Idx);
@@ -595,11 +599,12 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Value *SubEleIdx = Builder.getInt32(0);
             if (IsGEPUser) {
               // Compute SubNumElement = idxscale
-              unsigned SubNumElement = SrcVecTy->getNumElements();
+              unsigned SubNumElement =
+                  SrcVecTy->getElementCount().getKnownMinValue();
               if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
                 // Same condition under which DstNumElements > 1
-                SubNumElement =
-                    SrcVecTy->getNumElements() / DstVecTy->getNumElements();
+                SubNumElement = SrcVecTy->getElementCount().getKnownMinValue() /
+                                DstVecTy->getElementCount().getKnownMinValue();
               }
 
               // Compute SubEleIdx = idxbase * idxscale
@@ -828,7 +833,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             //
             unsigned NumElement = 1;
             if (SrcTy->isVectorTy()) {
-              NumElement = SrcVecTy->getNumElements() * 2;
+              NumElement = SrcVecTy->getElementCount().getKnownMinValue() * 2;
             }
 
             // Handle scalar type.
