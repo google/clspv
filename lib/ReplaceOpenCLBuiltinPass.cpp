@@ -573,7 +573,8 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
 
 bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
   // convert to natural
-  std::string NewFName = Builtins::GetMangledFunctionName("log", F.getFunctionType());
+  std::string NewFName =
+      Builtins::GetMangledFunctionName("log", F.getFunctionType());
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -581,7 +582,8 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
 
     auto Arg = CI->getOperand(0);
 
-    auto ArgP1 = BinaryOperator::Create(Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
+    auto ArgP1 = BinaryOperator::Create(
+        Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
 
     return CallInst::Create(NewF, ArgP1, "", CI);
   });
