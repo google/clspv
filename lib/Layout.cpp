@@ -66,7 +66,7 @@ uint64_t baseAlignment(Type *type) {
   }
 
   if (auto vec_type = dyn_cast<VectorType>(type)) {
-    unsigned numElems = vec_type->getNumElements();
+    unsigned numElems = vec_type->getElementCount().getKnownMinValue();
 
     // A two-component vector has a base alignment equal to twice its scalar
     // alignment.

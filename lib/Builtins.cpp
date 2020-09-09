@@ -359,8 +359,9 @@ std::string Builtins::GetMangledTypeName(Type *Ty) {
   }
   case Type::FixedVectorTyID: {
     auto VecTy = cast<VectorType>(Ty);
-    mangled_type_str = "Dv" + std::to_string(VecTy->getNumElements()) + "_" +
-                       GetMangledTypeName(VecTy->getElementType());
+    mangled_type_str =
+        "Dv" + std::to_string(VecTy->getElementCount().getKnownMinValue()) +
+        "_" + GetMangledTypeName(VecTy->getElementType());
     break;
   }
 

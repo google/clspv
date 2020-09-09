@@ -108,7 +108,7 @@ private:
     } else if (auto *array_ty = dyn_cast<ArrayType>(type)) {
       return array_ty->getNumElements();
     } else if (auto *vec_ty = dyn_cast<VectorType>(type)) {
-      return vec_ty->getNumElements();
+      return vec_ty->getElementCount().getKnownMinValue();
     }
     return 0;
   }

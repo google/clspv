@@ -1913,7 +1913,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     // <4 x i8> is changed to i32 if i8 is not generally supported.
     if (!clspv::Option::Int8Support() &&
         VecTy->getElementType() == Type::getInt8Ty(module->getContext())) {
-      if (VecTy->getNumElements() == 4) {
+      if (VecTy->getElementCount().getKnownMinValue() == 4) {
         RID = getSPIRVType(VecTy->getElementType());
         break;
       } else {
@@ -1925,7 +1925,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     // Ops[0] = Component Type ID
     // Ops[1] = Component Count (Literal Number)
     SPIRVOperandVec Ops;
-    Ops << VecTy->getElementType() << VecTy->getNumElements();
+    Ops << VecTy->getElementType()
+        << VecTy->getElementCount().getKnownMinValue();
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeVector, Ops);
     break;
@@ -3908,6 +3909,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       case spv::StorageClassUniform:
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
+        //getTypesNeedingArrayStride().insert(ResultType);
         getTypesNeedingArrayStride().insert(ResultType);
         break;
       default:
@@ -4424,7 +4426,7 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
   LLVMContext &Context = Ty->getContext();
   if (auto VecTy = dyn_cast<VectorType>(Ty)) {
     if (VecTy->getElementType() == Type::getInt8Ty(Context) &&
-        VecTy->getNumElements() == 4) {
+        VecTy->getElementCount().getKnownMinValue() == 4) {
       return true;
     }
   }
@@ -4621,7 +4623,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
 
 void SPIRVProducerPass::HandleDeferredDecorations() {
   const auto &DL = module->getDataLayout();
-  if (getTypesNeedingArrayStride().empty() && LocalArgSpecIds.empty()) {
+  if (getTypesNeedingArrayStride().empty()) {
     return;
   }
 

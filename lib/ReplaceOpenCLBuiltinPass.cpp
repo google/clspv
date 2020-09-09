@@ -68,7 +68,8 @@ uint32_t clz(uint32_t v) {
 Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
   Type *IntTy = Type::getIntNTy(C, Ty->getScalarSizeInBits());
   if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
-    IntTy = FixedVectorType::get(IntTy, vec_ty->getNumElements());
+    IntTy = FixedVectorType::get(IntTy,
+                                 vec_ty->getElementCount().getKnownMinValue());
   }
   return IntTy;
 }
@@ -441,7 +442,8 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
 
     Type *IntTy = Type::getIntNTy(F.getContext(), Ty->getScalarSizeInBits());
     if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
-      IntTy = FixedVectorType::get(IntTy, vec_ty->getNumElements());
+      IntTy = FixedVectorType::get(
+          IntTy, vec_ty->getElementCount().getKnownMinValue());
     }
 
     // Return X with the sign of Y
@@ -765,7 +767,7 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
     Type *CorrespondingBoolTy = Type::getInt1Ty(M.getContext());
     if (auto CIVecTy = dyn_cast<VectorType>(CITy)) {
       CorrespondingBoolTy = FixedVectorType::get(
-          Type::getInt1Ty(M.getContext()), CIVecTy->getNumElements());
+          Type::getInt1Ty(M.getContext()), CIVecTy->getElementCount().getKnownMinValue());
     }
 
     auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
@@ -898,7 +900,7 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Function &F) {
     }
 
     if (auto HiVecType = dyn_cast<VectorType>(HiType)) {
-      unsigned NumElements = HiVecType->getNumElements();
+      unsigned NumElements = HiVecType->getElementCount().getKnownMinValue();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
@@ -946,7 +948,7 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
     }
 
     if (auto SrcVecType = dyn_cast<VectorType>(SrcType)) {
-      unsigned NumElements = SrcVecType->getNumElements();
+      unsigned NumElements = SrcVecType->getElementCount().getKnownMinValue();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return nullptr;
@@ -999,8 +1001,10 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
     }
 
     if (auto SrcVecType = dyn_cast<VectorType>(SrcType)) {
-      unsigned SrcNumElements = SrcVecType->getNumElements();
-      unsigned DstNumElements = cast<VectorType>(DstType)->getNumElements();
+      unsigned SrcNumElements =
+          SrcVecType->getElementCount().getKnownMinValue();
+      unsigned DstNumElements =
+          cast<VectorType>(DstType)->getElementCount().getKnownMinValue();
       if (SrcNumElements != DstNumElements) {
         return V;
       }
@@ -1076,7 +1080,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
     }
 
     if (auto AVecType = dyn_cast<VectorType>(AType)) {
-      unsigned NumElements = AVecType->getNumElements();
+      unsigned NumElements = AVecType->getElementCount().getKnownMinValue();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return V;
@@ -1142,8 +1146,10 @@ bool ReplaceOpenCLBuiltinPass::replaceSelect(Function &F) {
     }
 
     if (auto FalseVecType = dyn_cast<VectorType>(FalseType)) {
-      unsigned NumElements = FalseVecType->getNumElements();
-      if (NumElements != cast<VectorType>(PredicateType)->getNumElements()) {
+      unsigned NumElements = FalseVecType->getElementCount().getKnownMinValue();
+      if (NumElements != cast<VectorType>(PredicateType)
+                             ->getElementCount()
+                             .getKnownMinValue()) {
         return nullptr;
       }
 
@@ -1199,7 +1205,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
           !TrueType->getScalarType()->isIntegerTy()) {
         return V;
       }
-      unsigned NumElements = TrueVecType->getNumElements();
+      unsigned NumElements = TrueVecType->getElementCount().getKnownMinValue();
       if ((NumElements != 2) && (NumElements != 3) && (NumElements != 4) &&
           (NumElements != 8) && (NumElements != 16)) {
         return V;
@@ -1277,7 +1283,7 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
 
     for (auto arg : ArgsToSplat) {
       Value *NewVectorArg = UndefValue::get(VecType);
-      for (auto i = 0; i < VecType->getNumElements(); i++) {
+      for (auto i = 0; i < VecType->getElementCount().getKnownMinValue(); i++) {
         auto index = ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
         NewVectorArg =
             InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
@@ -1349,7 +1355,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
 
     auto vec_data_type = cast<VectorType>(data_type);
 
-    auto elems = vec_data_type->getNumElements();
+    auto elems = vec_data_type->getElementCount().getKnownMinValue();
     if (elems != 2 && elems != 3 && elems != 4 && elems != 8 && elems != 16)
       return V;
 
@@ -1385,7 +1391,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
 
     auto vec_ret_type = cast<VectorType>(ret_type);
 
-    auto elems = vec_ret_type->getNumElements();
+    auto elems = vec_ret_type->getElementCount().getKnownMinValue();
     if (elems != 2 && elems != 3 && elems != 4 && elems != 8 && elems != 16)
       return V;
 
@@ -1985,10 +1991,12 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
       args.push_back(CI->getArgOperand(i));
     }
 
-    auto NewFType = FunctionType::get(
-        FixedVectorType::get(Type::getFloatTy(M.getContext()),
-                             cast<VectorType>(CI->getType())->getNumElements()),
-        types, false);
+    auto NewFType =
+        FunctionType::get(FixedVectorType::get(Type::getFloatTy(M.getContext()),
+                                               cast<VectorType>(CI->getType())
+                                                   ->getElementCount()
+                                                   .getKnownMinValue()),
+                          types, false);
 
     std::string NewFName =
         Builtins::GetMangledFunctionName("read_imagef", NewFType);
@@ -2018,9 +2026,11 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     args[1] = CI->getArgOperand(1);
 
     // Data
-    types[2] = FixedVectorType::get(
-        Type::getFloatTy(M.getContext()),
-        cast<VectorType>(CI->getArgOperand(2)->getType())->getNumElements());
+    types[2] =
+        FixedVectorType::get(Type::getFloatTy(M.getContext()),
+                             cast<VectorType>(CI->getArgOperand(2)->getType())
+                                 ->getElementCount()
+                                 .getKnownMinValue());
 
     auto NewFType =
         FunctionType::get(Type::getVoidTy(M.getContext()), types, false);
@@ -2059,9 +2069,10 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(
     if (components == 1) {
       float_ty = Type::getFloatTy(M.getContext());
     } else {
-      float_ty = FixedVectorType::get(
-          Type::getFloatTy(M.getContext()),
-          cast<VectorType>(Arg2->getType())->getNumElements());
+      float_ty = FixedVectorType::get(Type::getFloatTy(M.getContext()),
+                                      cast<VectorType>(Arg2->getType())
+                                          ->getElementCount()
+                                          .getKnownMinValue());
     }
 
     auto NewFType = FunctionType::get(

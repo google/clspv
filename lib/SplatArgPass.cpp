@@ -124,8 +124,9 @@ void SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
   IRBuilder<> Builder(Call);
   for (unsigned i = 0; i < CalleeTy->getNumParams(); i++) {
     if (!CalleeTy->getParamType(i)->isVectorTy()) {
-      Value *NewArg = Builder.CreateVectorSplat(
-          VTy->getNumElements(), Call->getArgOperand(i), "arg_splat");
+      Value *NewArg =
+          Builder.CreateVectorSplat(VTy->getElementCount().getKnownMinValue(),
+                                    Call->getArgOperand(i), "arg_splat");
       Call->setArgOperand(i, NewArg);
     }
   }
