@@ -49,6 +49,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 
 
 
+// NODRA-DAG: OpDecorate [[__runtimearr__struct_8:%[0-9a-zA-Z_]+]] ArrayStride 512
+// NODRA-DAG: OpDecorate [[__ptr_StorageBuffer__struct_8:%[0-9a-zA-Z_]+]] ArrayStride 512
 // NODRA-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // NODRA-DAG:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
 // NODRA-DAG:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
@@ -57,11 +59,11 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
 // NODRA-DAG:  [[_uint_128:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 128
 // NODRA-DAG:  [[__arr_float_uint_128:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_uint_128]]
 // NODRA-DAG:  [[__struct_8:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__arr_float_uint_128]]
-// NODRA-DAG:  [[__runtimearr__struct_8:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[__struct_8]]
+// NODRA-DAG:  [[__runtimearr__struct_8]] = OpTypeRuntimeArray [[__struct_8]]
 // NODRA-DAG:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr__struct_8]]
 // NODRA-DAG:  [[__ptr_StorageBuffer__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_10]]
 // NODRA-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// NODRA-DAG:  [[__ptr_StorageBuffer__struct_8:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_8]]
+// NODRA-DAG:  [[__ptr_StorageBuffer__struct_8]] = OpTypePointer StorageBuffer [[__struct_8]]
 // NODRA:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // NODRA-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // NODRA-DAG:  [[_uint_5:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 5

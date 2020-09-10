@@ -2,7 +2,7 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 
-// TODO(dneto): OpPtrAccessChain on pointer to Private is not alloweed by SPV_KHR_variable_pointers
+// TODO(dneto): OpPtrAccessChain on pointer to Private is not allowed by SPV_KHR_variable_pointers
 // RUN: not spirv-val --target-env vulkan1.0 %t.spv
 
 constant uint b[4] = {42, 13, 0, 5};
