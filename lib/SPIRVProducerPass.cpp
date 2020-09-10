@@ -152,10 +152,10 @@ struct SPIRVOperand {
     }
   }
 
-  SPIRVOperandType getType() const { return Type; };
-  uint32_t getNumID() const { return LiteralNum[0]; };
-  std::string getLiteralStr() const { return LiteralStr; };
-  const uint32_t *getLiteralNum() const { return LiteralNum; };
+  SPIRVOperandType getType() const { return Type; }
+  uint32_t getNumID() const { return LiteralNum[0]; }
+  std::string getLiteralStr() const { return LiteralStr; }
+  const uint32_t *getLiteralNum() const { return LiteralNum; }
 
   uint32_t GetNumWords() const {
     switch (Type) {
@@ -275,18 +275,18 @@ struct SPIRVProducerPass final : public ModulePass {
 
   CapabilitySetType &getCapabilitySet() { return CapabilitySet; }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
-  TypeList &getTypeList() { return Types; };
+  TypeList &getTypeList() { return Types; }
   ValueMapType &getValueMap() { return ValueMap; }
   SPIRVInstructionList &getSPIRVInstList(SPIRVSection Section) {
     return SPIRVSections[Section];
   };
-  EntryPointVecType &getEntryPointVec() { return EntryPointVec; };
-  DeferredInstVecType &getDeferredInstVec() { return DeferredInstVec; };
+  EntryPointVecType &getEntryPointVec() { return EntryPointVec; }
+  DeferredInstVecType &getDeferredInstVec() { return DeferredInstVec; }
   SPIRVIDListType &getEntryPointInterfacesList() {
     return EntryPointInterfacesList;
-  };
+  }
   SPIRVID getOpExtInstImportID();
-  std::vector<SPIRVID> &getBuiltinDimVec() { return BuiltinDimensionVec; };
+  std::vector<SPIRVID> &getBuiltinDimVec() { return BuiltinDimensionVec; }
 
   bool hasVariablePointersStorageBuffer() {
     return HasVariablePointersStorageBuffer;
@@ -297,13 +297,13 @@ struct SPIRVProducerPass final : public ModulePass {
       HasVariablePointersStorageBuffer = true;
     }
   }
-  bool hasVariablePointers() { return HasVariablePointers; };
+  bool hasVariablePointers() { return HasVariablePointers; }
   void setVariablePointers() {
     if (!HasVariablePointers) {
       addCapability(spv::CapabilityVariablePointers);
       HasVariablePointers = true;
     }
-  };
+  }
   ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() {
     return samplerMap;
   }
@@ -895,7 +895,7 @@ void SPIRVProducerPass::FindGlobalConstVars() {
 
   if (clspv::Option::ModuleConstantsInStorageBuffer()) {
     // For now, we only support a single storage buffer.
-    if (GVList.size() > 0) {
+    if (!GVList.empty()) {
       assert(GVList.size() == 1);
       const auto *GV = GVList[0];
       const auto constants_byte_size =
@@ -1019,8 +1019,9 @@ void SPIRVProducerPass::FindResourceVars() {
             SetAndBinding key{set, binding};
             auto where = set_and_binding_map.find(key);
             if (where == set_and_binding_map.end()) {
-              rv = new ResourceVarInfo(int(ResourceVarInfoList.size()), set,
-                                       binding, &F, arg_kind, coherent);
+              rv = new ResourceVarInfo(
+                  static_cast<int>(ResourceVarInfoList.size()), set, binding,
+                  &F, arg_kind, coherent);
               ResourceVarInfoList.emplace_back(rv);
               set_and_binding_map[key] = rv;
             } else {
@@ -1031,8 +1032,9 @@ void SPIRVProducerPass::FindResourceVars() {
             // clspv.resource.var.* function.
             if (first_use) {
               first_use = false;
-              rv = new ResourceVarInfo(int(ResourceVarInfoList.size()), set,
-                                       binding, &F, arg_kind, coherent);
+              rv = new ResourceVarInfo(
+                  static_cast<int>(ResourceVarInfoList.size()), set, binding,
+                  &F, arg_kind, coherent);
               ResourceVarInfoList.emplace_back(rv);
             } else {
               rv = ResourceVarInfoList.back().get();
@@ -1235,7 +1237,7 @@ void SPIRVProducerPass::FindTypePerFunc(Function &F) {
 void SPIRVProducerPass::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (module->getFunction(clspv::LiteralSamplerFunction()) ||
-      0 < getSamplerMap().size()) {
+      !getSamplerMap().empty()) {
     auto SamplerStructTy = module->getTypeByName("opencl.sampler_t");
     if (!SamplerStructTy) {
       SamplerStructTy =
@@ -2223,8 +2225,8 @@ void SPIRVProducerPass::GenerateSamplers() {
     if (SamplerLiteralToBindingMap.find(sampler_value) ==
         SamplerLiteralToBindingMap.end()) {
       // This sampler is not actually used.  Find the next one.
-      for (binding = 0; used_bindings.count(binding); binding++)
-        ;
+      for (binding = 0; used_bindings.count(binding); binding++) {
+      }
       descriptor_set = 0; // Literal samplers always use descriptor set 0.
       used_bindings.insert(binding);
     } else {
@@ -2715,7 +2717,6 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   //
   // Generate OpFunctionParameter for Normal function.
   //
-
   if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
 
     // Iterate Argument for name instead of param type from function type.
@@ -3068,7 +3069,6 @@ SPIRVID SPIRVProducerPass::getSPIRVBuiltin(spv::BuiltIn BID,
   if (ii != BuiltinConstantMap.end()) {
     return ii->second;
   } else {
-
     addCapability(Cap);
 
     Type *type = PointerType::get(IntegerType::get(module->getContext(), 32),
@@ -3283,7 +3283,6 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
         RID = addSPIRVInst(spv::OpBitcast, Ops);
       }
     } else {
-
       // read_image (without a sampler) is mapped to OpImageFetch.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
@@ -3655,7 +3654,6 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
 
       const auto IndirectExtInst = getIndirectExtInstEnum(func_info);
       if (IndirectExtInst != kGlslExtInstBad) {
-
         // Generate one more instruction that uses the result of the extended
         // instruction.  Its result id is one more than the id of the
         // extended instruction.
@@ -3700,7 +3698,6 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
         }
       }
     } else {
-
       // A real function call (not builtin)
       // Call instruction is deferred because it needs function's ID.
       RID = addSPIRVPlaceholder(Call);
@@ -3899,21 +3896,22 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     }
 
     if (Opcode == spv::OpPtrAccessChain) {
-      // Do we need to generate ArrayStride?  Check against the GEP result type
-      // rather than the pointer type of the base because when indexing into
-      // an OpenCL program-scope constant, we'll swap out the LLVM base pointer
-      // for something else in the SPIR-V.
-      // E.g. see test/PointerAccessChain/pointer_index_is_constant_1.cl
+      // Shader validation in the SPIR-V spec requires that the base pointer to
+      // OpPtrAccessChain (in StorageBuffer storage class) be decorated with
+      // ArrayStride.
       auto address_space = ResultType->getAddressSpace();
       setVariablePointersCapabilities(address_space);
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
-      case spv::StorageClassUniform:
         // Save the need to generate an ArrayStride decoration.  But defer
         // generation until later, so we only make one decoration.
-        getTypesNeedingArrayStride().insert(ResultType);
+        getTypesNeedingArrayStride().insert(GEP->getPointerOperandType());
+        break;
+      case spv::StorageClassWorkgroup:
         break;
       default:
+        llvm_unreachable(
+            "OpPtrAccessChain is not supported for this storage class");
         break;
       }
     }
@@ -4412,7 +4410,6 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
 }
 
 void SPIRVProducerPass::GenerateFuncEpilogue() {
-
   //
   // Generate OpFunctionEnd
   //
@@ -4541,7 +4538,6 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
       auto callee_name = Callee->getName();
 
       if (Builtins::Lookup(Callee) == Builtins::kClspvCompositeConstruct) {
-
         // Generate an OpCompositeConstruct
         SPIRVOperandVec Ops;
 
@@ -4659,7 +4655,6 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
 
 glsl::ExtInst
 SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
-
   switch (func_info.getType()) {
   case Builtins::kClamp: {
     auto param_type = func_info.getParameter(0);
@@ -4911,7 +4906,6 @@ void SPIRVProducerPass::WriteSPIRVBinary() {
 }
 
 void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
-
   for (const auto &Inst : SPIRVInstList) {
     const auto &Ops = Inst.getOperands();
     spv::Op Opcode = static_cast<spv::Op>(Inst.getOpcode());
@@ -5258,8 +5252,8 @@ Value *SPIRVProducerPass::GetBasePointer(Value *v) {
 bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
   if (auto *lhs_call = dyn_cast<CallInst>(lhs)) {
     if (auto *rhs_call = dyn_cast<CallInst>(rhs)) {
-      auto lhs_func_info = Builtins::Lookup(lhs_call->getCalledFunction());
-      auto rhs_func_info = Builtins::Lookup(rhs_call->getCalledFunction());
+      const auto &lhs_func_info = Builtins::Lookup(lhs_call->getCalledFunction());
+      const auto &rhs_func_info = Builtins::Lookup(rhs_call->getCalledFunction());
       if (lhs_func_info.getType() == Builtins::kClspvResource &&
           rhs_func_info.getType() == Builtins::kClspvResource) {
         // For resource accessors, match descriptor set and binding.
