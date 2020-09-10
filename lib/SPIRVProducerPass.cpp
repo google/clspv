@@ -5252,8 +5252,10 @@ Value *SPIRVProducerPass::GetBasePointer(Value *v) {
 bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
   if (auto *lhs_call = dyn_cast<CallInst>(lhs)) {
     if (auto *rhs_call = dyn_cast<CallInst>(rhs)) {
-      const auto &lhs_func_info = Builtins::Lookup(lhs_call->getCalledFunction());
-      const auto &rhs_func_info = Builtins::Lookup(rhs_call->getCalledFunction());
+      const auto &lhs_func_info =
+          Builtins::Lookup(lhs_call->getCalledFunction());
+      const auto &rhs_func_info =
+          Builtins::Lookup(rhs_call->getCalledFunction());
       if (lhs_func_info.getType() == Builtins::kClspvResource &&
           rhs_func_info.getType() == Builtins::kClspvResource) {
         // For resource accessors, match descriptor set and binding.
