@@ -5,7 +5,6 @@
 
 //     CHECK: OpCapability Float16
 // CHECK-DAG: %[[half:[0-9a-zA-Z_]+]] = OpTypeFloat 16
-// CHECK-DAG: %[[half_0:[0-9a-zA-Z_]+]] = OpConstant %[[half]] 0x0p+0
 // CHECK-DAG: %[[half_1:[0-9a-zA-Z_]+]] = OpConstant %[[half]] 0x1p+0
 // CHECK-DAG: %[[half_1_25:[0-9a-zA-Z_]+]] = OpConstant %[[half]] 0x1.4p+0
 // CHECK-DAG: %[[half_n4_5:[0-9a-zA-Z_]+]] = OpConstant %[[half]] -0x1.2p+2
