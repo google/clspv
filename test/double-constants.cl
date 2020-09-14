@@ -4,7 +4,6 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[double:[0-9a-zA-Z_]+]] = OpTypeFloat 64
-// CHECK-DAG: %[[double_0:[0-9a-zA-Z_]+]] = OpConstant %[[double]] 0
 // CHECK-DAG: %[[double_1_2:[0-9a-zA-Z_]+]] = OpConstant %[[double]] 1.2
 // CHECK-DAG: %[[double_3_0303030303030303:[0-9a-zA-Z_]+]] = OpConstant %[[double]] 3.0303030303030303
 // CHECK-DAG: %[[double_n42_314:[0-9a-zA-Z_]+]] = OpConstant %[[double]] -42.314
