@@ -36,6 +36,7 @@ void initializeInlineEntryPointsPassPass(PassRegistry &);
 void initializeInlineFuncWithPointerBitCastArgPassPass(PassRegistry &);
 void initializeInlineFuncWithPointerToFunctionArgPassPass(PassRegistry &);
 void initializeInlineFuncWithSingleCallSitePassPass(PassRegistry &);
+void initializeLongVectorLoweringPassPass(PassRegistry &);
 void initializeMultiVersionUBOFunctionsPassPass(PassRegistry &);
 void initializeOpenCLInlinerPassPass(PassRegistry &);
 void initializeRemoveUnusedArgumentsPass(PassRegistry &);

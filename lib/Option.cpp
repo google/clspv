@@ -151,6 +151,10 @@ llvm::cl::opt<bool> keep_unused_arguments(
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
+llvm::cl::opt<bool> long_vector_support(
+    "long-vector", llvm::cl::init(false),
+    llvm::cl::desc("Allow vectors of 8 and 16 elements. Experimental"));
+
 llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
     "cl-std", llvm::cl::desc("Select OpenCL standard"),
     llvm::cl::init(clspv::Option::SourceLanguage::OpenCL_C_12),
@@ -258,6 +262,7 @@ bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
+bool LongVectorSupport() { return long_vector_support; }
 bool ImageSupport() { return images; }
 bool UseSamplerMap() { return use_sampler_map; }
 void SetUseSamplerMap(bool use) { use_sampler_map = use; }
