@@ -1760,14 +1760,15 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
 
         // TODO: Set up Image Format.
         Ops << spv::ImageFormatUnknown;
-
         RID = addSPIRVInst<kTypes>(spv::OpTypeImage, Ops);
 
-        Ops.clear();
-        Ops << RID;
-
-        getImageTypeMap()[Ty] =
-            addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
+        // Only need a sampled version of the type if it is used with a sampler.
+        if (Sampled == 1) {
+          Ops.clear();
+          Ops << RID;
+          getImageTypeMap()[Ty] =
+              addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
+        }
         break;
       }
     }

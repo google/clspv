@@ -22,6 +22,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "clspv/Option.h"
 #include "Builtins.h"
 #include "Constants.h"
 #include "Passes.h"
@@ -179,8 +180,15 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       }
 
       // Read only images are translated as sampled images.
+      const auto pos = name.find("_wo_t");
       if (!IsStorageImageType(imageTy)) {
         name += ".sampled";
+      } else if (clspv::Option::Language() >=
+                     clspv::Option::SourceLanguage::OpenCL_C_20 &&
+                 pos != std::string::npos) {
+        // In OpenCL 2.0 (or later), treat write_only images as read_write
+        // images.
+        name = name.substr(0, pos) + "_rw_t" + name.substr(pos + 5);
       }
 
       StructType *new_struct =
