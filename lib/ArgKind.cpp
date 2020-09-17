@@ -61,6 +61,7 @@ clspv::ArgKind GetArgKindForType(Type *type) {
     if (clspv::IsImageType(type, &image_type)) {
       StringRef name = dyn_cast<StructType>(image_type)->getName();
       // OpenCL 1.2 only has read-only or write-only images.
+      // Treat OpenCL 2.0 read_write images as write-only images.
       return name.contains("_ro_t") ? clspv::ArgKind::ReadOnlyImage
                                     : clspv::ArgKind::WriteOnlyImage;
     }

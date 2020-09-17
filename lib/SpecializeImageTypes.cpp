@@ -178,16 +178,9 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
         break;
       }
 
-      // Both sampled and unsampled reads generate an OpTypeImage with Sampled
-      // operand of 1.
-      switch (func_info.getType()) {
-      case Builtins::kReadImagef:
-      case Builtins::kReadImagei:
-      case Builtins::kReadImageui:
+      // Read only images are translated as sampled images.
+      if (!IsStorageImageType(imageTy)) {
         name += ".sampled";
-        break;
-      default:
-        break;
       }
 
       StructType *new_struct =

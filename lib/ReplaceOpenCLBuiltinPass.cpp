@@ -593,7 +593,11 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
 
 bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 
-  enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
+  enum {
+    CLK_LOCAL_MEM_FENCE = 0x01,
+    CLK_GLOBAL_MEM_FENCE = 0x02,
+    CLK_IMAGE_MEM_FENCE = 0x04
+  };
 
   return replaceCallsWithValue(F, [subgroup](CallInst *CI) {
     auto Arg = CI->getOperand(0);
@@ -603,6 +607,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
     const auto GlobalMemFence =
         ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
+    const auto ImageMemFence =
+        ConstantInt::get(Arg->getType(), CLK_IMAGE_MEM_FENCE);
     const auto ConstantAcquireRelease = ConstantInt::get(
         Arg->getType(), spv::MemorySemanticsAcquireReleaseMask);
     const auto ConstantScopeDevice =
@@ -630,13 +636,26 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         Instruction::Shl, GlobalMemFenceMask,
         ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
 
+    // OpenCL 2.0
+    // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
+    const auto ImageMemFenceMask =
+        BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
+    const auto ImageShiftAmount =
+        clz(spv::MemorySemanticsImageMemoryMask) - clz(CLK_IMAGE_MEM_FENCE);
+    const auto MemorySemanticsImage = BinaryOperator::Create(
+        Instruction::Shl, ImageMemFenceMask,
+        ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
+
     // And combine the above together, also adding in
-    // MemorySemanticsAcquireReleaseMask.
-    auto MemorySemantics =
+    // MemorySemanticsSequentiallyConsistentMask.
+    auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
                                ConstantAcquireRelease, "", CI);
-    MemorySemantics = BinaryOperator::Create(Instruction::Or, MemorySemantics,
-                                             MemorySemanticsUniform, "", CI);
+    auto MemorySemantics2 =
+        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
+                               MemorySemanticsImage, "", CI);
+    auto MemorySemantics = BinaryOperator::Create(
+        Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
 
     // If the memory scope is not specified explicitly, it is either Subgroup
     // or Workgroup depending on the type of barrier.
@@ -680,7 +699,11 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
                                                uint32_t semantics) {
 
   return replaceCallsWithValue(F, [&](CallInst *CI) {
-    enum { CLK_LOCAL_MEM_FENCE = 0x01, CLK_GLOBAL_MEM_FENCE = 0x02 };
+    enum {
+      CLK_LOCAL_MEM_FENCE = 0x01,
+      CLK_GLOBAL_MEM_FENCE = 0x02,
+      CLK_IMAGE_MEM_FENCE = 0x04,
+    };
 
     auto Arg = CI->getOperand(0);
 
@@ -689,6 +712,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
         ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
     const auto GlobalMemFence =
         ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
+    const auto ImageMemFence =
+        ConstantInt::get(Arg->getType(), CLK_IMAGE_MEM_FENCE);
     const auto ConstantMemorySemantics =
         ConstantInt::get(Arg->getType(), semantics);
     const auto ConstantScopeWorkgroup =
@@ -712,13 +737,26 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
         Instruction::Shl, GlobalMemFenceMask,
         ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
 
+    // OpenCL 2.0
+    // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
+    const auto ImageMemFenceMask =
+        BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
+    const auto ImageShiftAmount =
+        clz(spv::MemorySemanticsImageMemoryMask) - clz(CLK_IMAGE_MEM_FENCE);
+    const auto MemorySemanticsImage = BinaryOperator::Create(
+        Instruction::Shl, ImageMemFenceMask,
+        ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
+
     // And combine the above together, also adding in
-    // MemorySemanticsSequentiallyConsistentMask.
-    auto MemorySemantics =
+    // |semantics|.
+    auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
                                ConstantMemorySemantics, "", CI);
-    MemorySemantics = BinaryOperator::Create(Instruction::Or, MemorySemantics,
-                                             MemorySemanticsUniform, "", CI);
+    auto MemorySemantics2 =
+        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
+                               MemorySemanticsImage, "", CI);
+    auto MemorySemantics = BinaryOperator::Create(
+        Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
 
     // Memory Scope is always workgroup.
     const auto MemoryScope = ConstantScopeWorkgroup;

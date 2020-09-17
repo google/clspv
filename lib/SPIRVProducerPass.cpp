@@ -1661,19 +1661,20 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
         RID = addSPIRVInst<kTypes>(spv::OpTypeSampler);
         break;
       } else if (STy->getName().startswith("opencl.image1d_ro_t") ||
+                 STy->getName().startswith("opencl.image1d_rw_t") ||
                  STy->getName().startswith("opencl.image1d_wo_t") ||
                  STy->getName().startswith("opencl.image1d_array_ro_t") ||
+                 STy->getName().startswith("opencl.image1d_array_rw_t") ||
                  STy->getName().startswith("opencl.image1d_array_wo_t") ||
                  STy->getName().startswith("opencl.image2d_ro_t") ||
+                 STy->getName().startswith("opencl.image2d_rw_t") ||
                  STy->getName().startswith("opencl.image2d_wo_t") ||
                  STy->getName().startswith("opencl.image2d_array_ro_t") ||
+                 STy->getName().startswith("opencl.image2d_array_rw_t") ||
                  STy->getName().startswith("opencl.image2d_array_wo_t") ||
                  STy->getName().startswith("opencl.image3d_ro_t") ||
+                 STy->getName().startswith("opencl.image3d_rw_t") ||
                  STy->getName().startswith("opencl.image3d_wo_t")) {
-
-        if (STy->getName().contains("_wo_t")) {
-          addCapability(spv::CapabilityStorageImageWriteWithoutFormat);
-        }
         if (STy->getName().startswith("opencl.image1d_")) {
           if (STy->getName().contains(".sampled"))
             addCapability(spv::CapabilitySampled1D);
@@ -1722,11 +1723,14 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
 
         spv::Dim DimID = spv::Dim2D;
         if (STy->getName().startswith("opencl.image1d_ro_t") ||
+            STy->getName().startswith("opencl.image1d_rw_t") ||
             STy->getName().startswith("opencl.image1d_wo_t") ||
             STy->getName().startswith("opencl.image1d_array_ro_t") ||
+            STy->getName().startswith("opencl.image1d_array_rw_t") ||
             STy->getName().startswith("opencl.image1d_array_wo_t")) {
           DimID = spv::Dim1D;
         } else if (STy->getName().startswith("opencl.image3d_ro_t") ||
+                   STy->getName().startswith("opencl.image3d_rw_t") ||
                    STy->getName().startswith("opencl.image3d_wo_t")) {
           DimID = spv::Dim3D;
         }
@@ -3228,6 +3232,7 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
   case Builtins::kReadImageui: {
     // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
     // Additionally, OpTypeSampledImage is generated.
+    const auto image_ty = Call->getArgOperand(0)->getType();
     const auto &pi = FuncInfo.getParameter(1);
     if (pi.isSampler()) {
       //
@@ -3282,8 +3287,44 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
         Ops << Call->getType() << RID;
         RID = addSPIRVInst(spv::OpBitcast, Ops);
       }
+    } else if (IsStorageImageType(image_ty)) {
+      // read_image on a storage image is mapped to OpImageRead.
+      Value *Image = Call->getArgOperand(0);
+      Value *Coordinate = Call->getArgOperand(1);
+
+      //
+      // Generate OpImageRead
+      //
+      // Ops[0] = Result Type ID
+      // Ops[1] = Image ID
+      // Ops[2] = Coordinate
+      // No optional image operands.
+      //
+      SPIRVOperandVec Ops;
+
+      const bool is_int_image = IsIntImageType(Image->getType());
+      SPIRVID result_type;
+      if (is_int_image) {
+        result_type = v4int32ID;
+      } else {
+        result_type = getSPIRVType(Call->getType());
+      }
+
+      Ops << result_type << Image << Coordinate;
+      RID = addSPIRVInst(spv::OpImageRead, Ops);
+
+      if (is_int_image) {
+        // Generate the bitcast.
+        Ops.clear();
+        Ops << Call->getType() << RID;
+        RID = addSPIRVInst(spv::OpBitcast, Ops);
+      }
+
+      // OpImageRead requires StorageImageReadWithoutFormat.
+      addCapability(spv::CapabilityStorageImageReadWithoutFormat);
     } else {
-      // read_image (without a sampler) is mapped to OpImageFetch.
+      // read_image on a sampled image (without a sampler) is mapped to
+      // OpImageFetch.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
 
@@ -3351,8 +3392,10 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
       Ops.clear();
     }
     Ops << Image << Coordinate << TexelID;
-
     RID = addSPIRVInst(spv::OpImageWrite, Ops);
+
+    // Image writes require StorageImageWriteWithoutFormat.
+    addCapability(spv::CapabilityStorageImageWriteWithoutFormat);
     break;
   }
 
@@ -5054,6 +5097,7 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpFunctionCall:
     case spv::OpSampledImage:
     case spv::OpImageFetch:
+    case spv::OpImageRead:
     case spv::OpImageSampleExplicitLod:
     case spv::OpImageQuerySize:
     case spv::OpImageQuerySizeLod:

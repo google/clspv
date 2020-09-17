@@ -42,14 +42,19 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_ro_t") ||
+            STy->getName().startswith("opencl.image1d_rw_t") ||
             STy->getName().startswith("opencl.image1d_wo_t") ||
             STy->getName().startswith("opencl.image1d_array_ro_t") ||
+            STy->getName().startswith("opencl.image1d_array_rw_t") ||
             STy->getName().startswith("opencl.image1d_array_wo_t") ||
             STy->getName().startswith("opencl.image2d_ro_t") ||
+            STy->getName().startswith("opencl.image2d_rw_t") ||
             STy->getName().startswith("opencl.image2d_wo_t") ||
             STy->getName().startswith("opencl.image2d_array_ro_t") ||
+            STy->getName().startswith("opencl.image2d_array_rw_t") ||
             STy->getName().startswith("opencl.image2d_array_wo_t") ||
             STy->getName().startswith("opencl.image3d_ro_t") ||
+            STy->getName().startswith("opencl.image3d_rw_t") ||
             STy->getName().startswith("opencl.image3d_wo_t")) {
           isImageType = true;
           if (struct_type_ptr)
@@ -100,6 +105,20 @@ bool clspv::IsSampledImageType(Type *type) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
       if (struct_ty->getName().contains(".sampled"))
         return true;
+    }
+  }
+
+  return false;
+}
+
+bool clspv::IsStorageImageType(Type *type) {
+  Type *ty = nullptr;
+  if (IsImageType(type, &ty)) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
+      if (struct_ty->getName().contains("_wo_t") ||
+          struct_ty->getName().contains("_rw_t")) {
+        return true;
+      }
     }
   }
 

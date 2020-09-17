@@ -38,6 +38,10 @@ bool IsArrayImageType(llvm::Type *type);
 // after image specialization.
 bool IsSampledImageType(llvm::Type *type);
 
+// Returns true if the given type is a storage image type. This is the case
+// for read_write and write_only images.
+bool IsStorageImageType(llvm::Type *type);
+
 // Returns true if the given type is a float image type.
 // Before image specialization, all images are considered float images.
 bool IsFloatImageType(llvm::Type *type);
