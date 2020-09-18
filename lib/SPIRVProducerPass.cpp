@@ -1258,8 +1258,8 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
   // To match older clspv codegen, generate the float type first if required
   // for images.
   for (const auto *info : ModuleOrderedResourceVars) {
-    if (info->arg_kind == clspv::ArgKind::ReadOnlyImage ||
-        info->arg_kind == clspv::ArgKind::WriteOnlyImage) {
+    if (info->arg_kind == clspv::ArgKind::SampledImage ||
+        info->arg_kind == clspv::ArgKind::StorageImage) {
       if (IsIntImageType(info->var_fn->getReturnType())) {
         // Nothing for now...
       } else if (IsUintImageType(info->var_fn->getReturnType())) {
@@ -1294,8 +1294,8 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
         llvm_unreachable("POD arguments must map to structures!");
       }
       break;
-    case clspv::ArgKind::ReadOnlyImage:
-    case clspv::ArgKind::WriteOnlyImage:
+    case clspv::ArgKind::SampledImage:
+    case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::Sampler:
       // Sampler and image types map to the pointee type but
       // in the uniform constant address space.
@@ -1510,8 +1510,8 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
     return spv::StorageClassPushConstant;
   case clspv::ArgKind::Local:
     return spv::StorageClassWorkgroup;
-  case clspv::ArgKind::ReadOnlyImage:
-  case clspv::ArgKind::WriteOnlyImage:
+  case clspv::ArgKind::SampledImage:
+  case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
     return spv::StorageClassUniformConstant;
   default:
@@ -2275,8 +2275,8 @@ void SPIRVProducerPass::GenerateResourceVars() {
     // Remap the address space for opaque types.
     switch (info->arg_kind) {
     case clspv::ArgKind::Sampler:
-    case clspv::ArgKind::ReadOnlyImage:
-    case clspv::ArgKind::WriteOnlyImage:
+    case clspv::ArgKind::SampledImage:
+    case clspv::ArgKind::StorageImage:
       type = PointerType::get(type->getPointerElementType(),
                               clspv::AddressSpace::UniformConstant);
       break;
@@ -2306,8 +2306,8 @@ void SPIRVProducerPass::GenerateResourceVars() {
             VMap[call] = info->var_id;
             break;
           case clspv::ArgKind::Sampler:
-          case clspv::ArgKind::ReadOnlyImage:
-          case clspv::ArgKind::WriteOnlyImage:
+          case clspv::ArgKind::SampledImage:
+          case clspv::ArgKind::StorageImage:
             // The call maps to a load we generate later.
             ResourceVarDeferredLoadCalls[call] = info->var_id;
             break;
@@ -2353,11 +2353,16 @@ void SPIRVProducerPass::GenerateResourceVars() {
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
       }
       break;
-    case clspv::ArgKind::WriteOnlyImage:
-      Ops.clear();
-      Ops << info->var_id << spv::DecorationNonReadable;
-      addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+    case clspv::ArgKind::StorageImage: {
+      auto *type = info->var_fn->getReturnType();
+      auto *struct_ty = cast<StructType>(type->getPointerElementType());
+      if (struct_ty->getName().contains("_wo_t")) {
+        Ops.clear();
+        Ops << info->var_id << spv::DecorationNonReadable;
+        addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+      }
       break;
+    }
     default:
       break;
     }
@@ -5865,10 +5870,10 @@ void SPIRVProducerPass::AddArgumentReflection(
   case clspv::ArgKind::PodPushConstant:
     ext_inst = reflection::ExtInstArgumentPodPushConstant;
     break;
-  case clspv::ArgKind::ReadOnlyImage:
+  case clspv::ArgKind::SampledImage:
     ext_inst = reflection::ExtInstArgumentSampledImage;
     break;
-  case clspv::ArgKind::WriteOnlyImage:
+  case clspv::ArgKind::StorageImage:
     ext_inst = reflection::ExtInstArgumentStorageImage;
     break;
   case clspv::ArgKind::Sampler:
@@ -5886,8 +5891,8 @@ void SPIRVProducerPass::AddArgumentReflection(
   case clspv::ArgKind::BufferUBO:
   case clspv::ArgKind::Pod:
   case clspv::ArgKind::PodUBO:
-  case clspv::ArgKind::ReadOnlyImage:
-  case clspv::ArgKind::WriteOnlyImage:
+  case clspv::ArgKind::SampledImage:
+  case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
     Ops << getSPIRVInt32Constant(descriptor_set)
         << getSPIRVInt32Constant(binding);

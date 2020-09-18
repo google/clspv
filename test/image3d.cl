@@ -4,7 +4,6 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-NOT OpCapability StorageImageReadWithoutFormat
-// CHECK-DAG: OpCapability StorageImageWriteWithoutFormat
 // CHECK: OpDecorate %[[ARG0_ID:[a-zA-Z0-9_]*]] DescriptorSet 0
 // CHECK: OpDecorate %[[ARG0_ID]] Binding 0
 // CHECK: OpDecorate %[[ARG1_ID:[a-zA-Z0-9_]*]] DescriptorSet 0

@@ -79,9 +79,9 @@ clspv::ArgKind ReflectionParser::GetArgKindFromExtInst(uint32_t value) {
   case clspv::reflection::ExtInstArgumentPodPushConstant:
     return clspv::ArgKind::PodPushConstant;
   case clspv::reflection::ExtInstArgumentSampledImage:
-    return clspv::ArgKind::ReadOnlyImage;
+    return clspv::ArgKind::SampledImage;
   case clspv::reflection::ExtInstArgumentStorageImage:
-    return clspv::ArgKind::WriteOnlyImage;
+    return clspv::ArgKind::StorageImage;
   case clspv::reflection::ExtInstArgumentSampler:
     return clspv::ArgKind::Sampler;
   case clspv::reflection::ExtInstArgumentWorkgroup:

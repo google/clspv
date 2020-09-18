@@ -26,8 +26,8 @@ enum class ArgKind : int {
   Pod,
   PodUBO,
   PodPushConstant,
-  ReadOnlyImage,
-  WriteOnlyImage,
+  SampledImage,
+  StorageImage,
   Sampler,
 };
 

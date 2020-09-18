@@ -426,8 +426,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
       int separation_token = 0;
       switch (arg_kind) {
-      case clspv::ArgKind::ReadOnlyImage:
-      case clspv::ArgKind::WriteOnlyImage:
+      case clspv::ArgKind::SampledImage:
+      case clspv::ArgKind::StorageImage:
       case clspv::ArgKind::Sampler:
         if (always_distinct_image_sampler) {
           separation_token = num_image_sampler_arguments;
@@ -736,8 +736,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           break;
         }
         case clspv::ArgKind::Sampler:
-        case clspv::ArgKind::ReadOnlyImage:
-        case clspv::ArgKind::WriteOnlyImage:
+        case clspv::ArgKind::SampledImage:
+        case clspv::ArgKind::StorageImage:
           // We won't be translating the value here.  Keep the type the same.
           // since calls using these values need to keep the same type.
           resource_type = argTy->getPointerElementType();
@@ -802,8 +802,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           auto *gep = Builder.CreateGEP(call, {zero, zero});
           replacement = Builder.CreateLoad(gep);
         } break;
-        case clspv::ArgKind::ReadOnlyImage:
-        case clspv::ArgKind::WriteOnlyImage:
+        case clspv::ArgKind::SampledImage:
+        case clspv::ArgKind::StorageImage:
         case clspv::ArgKind::Sampler: {
           // The call returns a pointer to an opaque type.  Eventually the
           // SPIR-V will need to load the variable, so the natural thing would
