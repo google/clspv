@@ -441,12 +441,16 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       int coherent = 0;
       if (uses_barriers && arg_kind == clspv::ArgKind::Buffer) {
         // Coherency is only required if the argument is an SSBO that is both
-        // read and written to. Images do not require coherency because they are
-        // either read only or write only.
+        // read and written to.
         bool reads = false;
         bool writes = false;
         std::tie(reads, writes) = HasReadsAndWrites(&Arg);
         coherent = (reads && writes) ? 1 : 0;
+      } else if (arg_kind == clspv::ArgKind::StorageImage) {
+        // Read-write images should be marked as coherent.
+        auto struct_ty = cast<StructType>(argTy->getPointerElementType());
+        if (struct_ty->getName().contains("_rw_t"))
+          coherent = 1;
       }
 
       KernelArgDiscriminant key(argTy, arg_index, separation_token, coherent);
