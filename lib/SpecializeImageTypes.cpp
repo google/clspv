@@ -187,7 +187,8 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
                      clspv::Option::SourceLanguage::OpenCL_C_20 &&
                  pos != std::string::npos) {
         // In OpenCL 2.0 (or later), treat write_only images as read_write
-        // images.
+        // images. This prevents the compiler from generating duplicate image
+        // types (invalid SPIR-V).
         name = name.substr(0, pos) + "_rw_t" + name.substr(pos + 5);
       }
 

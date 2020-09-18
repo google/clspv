@@ -48,6 +48,10 @@ namespace {
 // SPIR-V. Used to test barrier semantics.
 const uint32_t kMemorySemanticsUniformMemory = 0x40;
 
+// Constant that represents bitfield for ImageMemory Memory Semantics from
+// SPIR-V. Used to test barrier semantics.
+const uint32_t kMemorySemanticsImageMemory = 0x800;
+
 cl::opt<bool> ShowDescriptors("show-desc", cl::init(false), cl::Hidden,
                               cl::desc("Show descriptors"));
 
@@ -439,18 +443,14 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       }
 
       int coherent = 0;
-      if (uses_barriers && arg_kind == clspv::ArgKind::Buffer) {
-        // Coherency is only required if the argument is an SSBO that is both
-        // read and written to.
+      if (uses_barriers && (arg_kind == clspv::ArgKind::Buffer ||
+                            arg_kind == clspv::ArgKind::StorageImage)) {
+        // Coherency is only required if the argument is an SSBO or storage
+        // image that is both read and written to.
         bool reads = false;
         bool writes = false;
         std::tie(reads, writes) = HasReadsAndWrites(&Arg);
         coherent = (reads && writes) ? 1 : 0;
-      } else if (arg_kind == clspv::ArgKind::StorageImage) {
-        // Read-write images should be marked as coherent.
-        auto struct_ty = cast<StructType>(argTy->getPointerElementType());
-        if (struct_ty->getName().contains("_rw_t"))
-          coherent = 1;
       }
 
       KernelArgDiscriminant key(argTy, arg_index, separation_token, coherent);
@@ -975,9 +975,9 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
     for (auto &I : BB) {
       if (auto *call = dyn_cast<CallInst>(&I)) {
         // For barrier and mem_fence semantics, only Uniform (covering Uniform
-        // and StorageBuffer storage classes) semantics are checked because
-        // Workgroup variables are inherently coherent (and do not require the
-        // decoration).
+        // and StorageBuffer storage classes) and Image semantics are checked
+        // because Workgroup variables are inherently coherent (and do not
+        // require the decoration).
         auto &func_info = clspv::Builtins::Lookup(call->getCalledFunction());
         if (func_info.getType() == clspv::Builtins::kSpirvOp) {
           auto *arg0 = dyn_cast<ConstantInt>(call->getArgOperand(0));
@@ -986,14 +986,16 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
             // barrier()
             if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
               uses_barrier =
-                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
 
           } else if (opcode == spv::OpMemoryBarrier) {
             // mem_fence()
             if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
               uses_barrier =
-                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
@@ -1065,8 +1067,28 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
             stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
         }
       } else if (call) {
-        // Check the attributes on the function.
-        if (!call->getCalledFunction()->doesNotAccessMemory()) {
+        auto func_info = clspv::Builtins::Lookup(call->getCalledFunction());
+        if (func_info.getType() != clspv::Builtins::kBuiltinNone) {
+          // Note that image queries (e.g. get_image_width()) do not touch the
+          // actual image memory.
+          switch (func_info.getType()) {
+            case clspv::Builtins::kReadImagef:
+            case clspv::Builtins::kReadImagei:
+            case clspv::Builtins::kReadImageui:
+            case clspv::Builtins::kReadImageh:
+              read = true;
+              break;
+            case clspv::Builtins::kWriteImagef:
+            case clspv::Builtins::kWriteImagei:
+            case clspv::Builtins::kWriteImageui:
+            case clspv::Builtins::kWriteImageh:
+              write = true;
+              break;
+            default:
+              break;
+          }
+        } else if (!call->getCalledFunction()->doesNotAccessMemory()) {
+          // Check the attributes on the function.
           if (!call->getCalledFunction()->doesNotReadMemory())
             read = true;
           if (!call->getCalledFunction()->onlyReadsMemory())

@@ -2356,6 +2356,8 @@ void SPIRVProducerPass::GenerateResourceVars() {
     case clspv::ArgKind::StorageImage: {
       auto *type = info->var_fn->getReturnType();
       auto *struct_ty = cast<StructType>(type->getPointerElementType());
+      // TODO(alan-baker): This is conservative. If compiling for OpenCL 2.0 or
+      // above, the compiler treats all write_only images as read_write images.
       if (struct_ty->getName().contains("_wo_t")) {
         Ops.clear();
         Ops << info->var_id << spv::DecorationNonReadable;
