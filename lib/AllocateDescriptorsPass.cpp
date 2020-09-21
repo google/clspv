@@ -1068,31 +1068,35 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
         }
       } else if (call) {
         auto func_info = clspv::Builtins::Lookup(call->getCalledFunction());
-        if (func_info.getType() != clspv::Builtins::kBuiltinNone) {
-          // Note that image queries (e.g. get_image_width()) do not touch the
-          // actual image memory.
-          switch (func_info.getType()) {
-            case clspv::Builtins::kReadImagef:
-            case clspv::Builtins::kReadImagei:
-            case clspv::Builtins::kReadImageui:
-            case clspv::Builtins::kReadImageh:
+        // Note that image queries (e.g. get_image_width()) do not touch the
+        // actual image memory.
+        switch (func_info.getType()) {
+        case clspv::Builtins::kReadImagef:
+        case clspv::Builtins::kReadImagei:
+        case clspv::Builtins::kReadImageui:
+        case clspv::Builtins::kReadImageh:
+          read = true;
+          break;
+        case clspv::Builtins::kWriteImagef:
+        case clspv::Builtins::kWriteImagei:
+        case clspv::Builtins::kWriteImageui:
+        case clspv::Builtins::kWriteImageh:
+          write = true;
+          break;
+        case clspv::Builtins::kGetImageWidth:
+        case clspv::Builtins::kGetImageHeight:
+        case clspv::Builtins::kGetImageDepth:
+        case clspv::Builtins::kGetImageDim:
+          break;
+        default:
+          // For other calls, check the function attributes.
+          if (!call->getCalledFunction()->doesNotAccessMemory()) {
+            if (!call->getCalledFunction()->doesNotReadMemory())
               read = true;
-              break;
-            case clspv::Builtins::kWriteImagef:
-            case clspv::Builtins::kWriteImagei:
-            case clspv::Builtins::kWriteImageui:
-            case clspv::Builtins::kWriteImageh:
+            if (!call->getCalledFunction()->onlyReadsMemory())
               write = true;
-              break;
-            default:
-              break;
           }
-        } else if (!call->getCalledFunction()->doesNotAccessMemory()) {
-          // Check the attributes on the function.
-          if (!call->getCalledFunction()->doesNotReadMemory())
-            read = true;
-          if (!call->getCalledFunction()->onlyReadsMemory())
-            write = true;
+          break;
         }
       } else {
         // Trace uses that remain a pointer or a function calls.
