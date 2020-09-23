@@ -22,11 +22,11 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "clspv/Option.h"
 #include "Builtins.h"
 #include "Constants.h"
 #include "Passes.h"
 #include "Types.h"
+#include "clspv/Option.h"
 
 using namespace clspv;
 using namespace clspv::Builtins;

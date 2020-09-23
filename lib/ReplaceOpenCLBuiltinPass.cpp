@@ -651,9 +651,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
     auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
                                ConstantAcquireRelease, "", CI);
-    auto MemorySemantics2 =
-        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
-                               MemorySemanticsImage, "", CI);
+    auto MemorySemantics2 = BinaryOperator::Create(
+        Instruction::Or, MemorySemanticsUniform, MemorySemanticsImage, "", CI);
     auto MemorySemantics = BinaryOperator::Create(
         Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
 
@@ -752,9 +751,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
     auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
                                ConstantMemorySemantics, "", CI);
-    auto MemorySemantics2 =
-        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
-                               MemorySemanticsImage, "", CI);
+    auto MemorySemantics2 = BinaryOperator::Create(
+        Instruction::Or, MemorySemanticsUniform, MemorySemanticsImage, "", CI);
     auto MemorySemantics = BinaryOperator::Create(
         Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
 
