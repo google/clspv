@@ -26,6 +26,7 @@
 #include "Constants.h"
 #include "Passes.h"
 #include "Types.h"
+#include "clspv/Option.h"
 
 using namespace clspv;
 using namespace clspv::Builtins;
@@ -178,16 +179,17 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
         break;
       }
 
-      // Both sampled and unsampled reads generate an OpTypeImage with Sampled
-      // operand of 1.
-      switch (func_info.getType()) {
-      case Builtins::kReadImagef:
-      case Builtins::kReadImagei:
-      case Builtins::kReadImageui:
+      // Read only images are translated as sampled images.
+      const auto pos = name.find("_wo_t");
+      if (!IsStorageImageType(imageTy)) {
         name += ".sampled";
-        break;
-      default:
-        break;
+      } else if (clspv::Option::Language() >=
+                     clspv::Option::SourceLanguage::OpenCL_C_20 &&
+                 pos != std::string::npos) {
+        // In OpenCL 2.0 (or later), treat write_only images as read_write
+        // images. This prevents the compiler from generating duplicate image
+        // types (invalid SPIR-V).
+        name = name.substr(0, pos) + "_rw_t" + name.substr(pos + 5);
       }
 
       StructType *new_struct =

@@ -45,8 +45,8 @@ clspv::ArgKind GetArgKindForType(Type *type);
 //   local      - array in Workgroup storage, number of elements given by
 //                a specialization constant
 //   pod        - plain-old-data
-//   ro_image   - read-only image
-//   wo_image   - write-only image
+//   ro_image   - sampled image
+//   wo_image   - storage image
 //   sampler    - sampler
 inline const char *GetArgKindNameForType(llvm::Type *type) {
   return GetArgKindName(GetArgKindForType(type));
@@ -60,9 +60,12 @@ clspv::ArgKind GetArgKindForType(Type *type) {
     llvm::Type *image_type = nullptr;
     if (clspv::IsImageType(type, &image_type)) {
       StringRef name = dyn_cast<StructType>(image_type)->getName();
-      // OpenCL 1.2 only has read-only or write-only images.
-      return name.contains("_ro_t") ? clspv::ArgKind::ReadOnlyImage
-                                    : clspv::ArgKind::WriteOnlyImage;
+      // OpenCL 1.2 only has read-only and write-only images.
+      // OpenCL 2.0 (and later) also has read-write images.
+      // Read-only images are translated to sampled images, while write-only
+      // and read-write images are translated as storage images.
+      return name.contains("_ro_t") ? clspv::ArgKind::SampledImage
+                                    : clspv::ArgKind::StorageImage;
     }
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
@@ -139,9 +142,11 @@ const char *GetArgKindName(ArgKind kind) {
     return "pod_ubo";
   case ArgKind::PodPushConstant:
     return "pod_pushconstant";
-  case ArgKind::ReadOnlyImage:
+  case ArgKind::SampledImage:
+    // For historical purposes this string still refers to read-only images.
     return "ro_image";
-  case ArgKind::WriteOnlyImage:
+  case ArgKind::StorageImage:
+    // For historical purposes this string still refers to write-only images.
     return "wo_image";
   case ArgKind::Sampler:
     return "sampler";
@@ -165,9 +170,9 @@ ArgKind GetArgKindFromName(const std::string &name) {
   } else if (name == "pod_pushconstant") {
     return ArgKind::PodPushConstant;
   } else if (name == "ro_image") {
-    return ArgKind::ReadOnlyImage;
+    return ArgKind::SampledImage;
   } else if (name == "wo_image") {
-    return ArgKind::WriteOnlyImage;
+    return ArgKind::StorageImage;
   } else if (name == "sampler") {
     return ArgKind::Sampler;
   }

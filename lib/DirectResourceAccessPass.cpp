@@ -109,8 +109,8 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
     switch (clspv::GetArgKind(arg)) {
     case clspv::ArgKind::Buffer:
     case clspv::ArgKind::BufferUBO:
-    case clspv::ArgKind::ReadOnlyImage:
-    case clspv::ArgKind::WriteOnlyImage:
+    case clspv::ArgKind::SampledImage:
+    case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::Sampler:
     case clspv::ArgKind::Local:
       Changed |= RewriteAccessesForArg(fn, arg_index, arg);

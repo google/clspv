@@ -48,6 +48,10 @@ namespace {
 // SPIR-V. Used to test barrier semantics.
 const uint32_t kMemorySemanticsUniformMemory = 0x40;
 
+// Constant that represents bitfield for ImageMemory Memory Semantics from
+// SPIR-V. Used to test barrier semantics.
+const uint32_t kMemorySemanticsImageMemory = 0x800;
+
 cl::opt<bool> ShowDescriptors("show-desc", cl::init(false), cl::Hidden,
                               cl::desc("Show descriptors"));
 
@@ -426,8 +430,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
       int separation_token = 0;
       switch (arg_kind) {
-      case clspv::ArgKind::ReadOnlyImage:
-      case clspv::ArgKind::WriteOnlyImage:
+      case clspv::ArgKind::SampledImage:
+      case clspv::ArgKind::StorageImage:
       case clspv::ArgKind::Sampler:
         if (always_distinct_image_sampler) {
           separation_token = num_image_sampler_arguments;
@@ -439,10 +443,10 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       }
 
       int coherent = 0;
-      if (uses_barriers && arg_kind == clspv::ArgKind::Buffer) {
-        // Coherency is only required if the argument is an SSBO that is both
-        // read and written to. Images do not require coherency because they are
-        // either read only or write only.
+      if (uses_barriers && (arg_kind == clspv::ArgKind::Buffer ||
+                            arg_kind == clspv::ArgKind::StorageImage)) {
+        // Coherency is only required if the argument is an SSBO or storage
+        // image that is both read and written to.
         bool reads = false;
         bool writes = false;
         std::tie(reads, writes) = HasReadsAndWrites(&Arg);
@@ -736,8 +740,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           break;
         }
         case clspv::ArgKind::Sampler:
-        case clspv::ArgKind::ReadOnlyImage:
-        case clspv::ArgKind::WriteOnlyImage:
+        case clspv::ArgKind::SampledImage:
+        case clspv::ArgKind::StorageImage:
           // We won't be translating the value here.  Keep the type the same.
           // since calls using these values need to keep the same type.
           resource_type = argTy->getPointerElementType();
@@ -802,8 +806,8 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           auto *gep = Builder.CreateGEP(call, {zero, zero});
           replacement = Builder.CreateLoad(gep);
         } break;
-        case clspv::ArgKind::ReadOnlyImage:
-        case clspv::ArgKind::WriteOnlyImage:
+        case clspv::ArgKind::SampledImage:
+        case clspv::ArgKind::StorageImage:
         case clspv::ArgKind::Sampler: {
           // The call returns a pointer to an opaque type.  Eventually the
           // SPIR-V will need to load the variable, so the natural thing would
@@ -971,9 +975,9 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
     for (auto &I : BB) {
       if (auto *call = dyn_cast<CallInst>(&I)) {
         // For barrier and mem_fence semantics, only Uniform (covering Uniform
-        // and StorageBuffer storage classes) semantics are checked because
-        // Workgroup variables are inherently coherent (and do not require the
-        // decoration).
+        // and StorageBuffer storage classes) and Image semantics are checked
+        // because Workgroup variables are inherently coherent (and do not
+        // require the decoration).
         auto &func_info = clspv::Builtins::Lookup(call->getCalledFunction());
         if (func_info.getType() == clspv::Builtins::kSpirvOp) {
           auto *arg0 = dyn_cast<ConstantInt>(call->getArgOperand(0));
@@ -982,14 +986,16 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
             // barrier()
             if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
               uses_barrier =
-                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
 
           } else if (opcode == spv::OpMemoryBarrier) {
             // mem_fence()
             if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(2))) {
               uses_barrier =
-                  semantics->getZExtValue() & kMemorySemanticsUniformMemory;
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
@@ -1061,12 +1067,36 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
             stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
         }
       } else if (call) {
-        // Check the attributes on the function.
-        if (!call->getCalledFunction()->doesNotAccessMemory()) {
-          if (!call->getCalledFunction()->doesNotReadMemory())
-            read = true;
-          if (!call->getCalledFunction()->onlyReadsMemory())
-            write = true;
+        auto func_info = clspv::Builtins::Lookup(call->getCalledFunction());
+        // Note that image queries (e.g. get_image_width()) do not touch the
+        // actual image memory.
+        switch (func_info.getType()) {
+        case clspv::Builtins::kReadImagef:
+        case clspv::Builtins::kReadImagei:
+        case clspv::Builtins::kReadImageui:
+        case clspv::Builtins::kReadImageh:
+          read = true;
+          break;
+        case clspv::Builtins::kWriteImagef:
+        case clspv::Builtins::kWriteImagei:
+        case clspv::Builtins::kWriteImageui:
+        case clspv::Builtins::kWriteImageh:
+          write = true;
+          break;
+        case clspv::Builtins::kGetImageWidth:
+        case clspv::Builtins::kGetImageHeight:
+        case clspv::Builtins::kGetImageDepth:
+        case clspv::Builtins::kGetImageDim:
+          break;
+        default:
+          // For other calls, check the function attributes.
+          if (!call->getCalledFunction()->doesNotAccessMemory()) {
+            if (!call->getCalledFunction()->doesNotReadMemory())
+              read = true;
+            if (!call->getCalledFunction()->onlyReadsMemory())
+              write = true;
+          }
+          break;
         }
       } else {
         // Trace uses that remain a pointer or a function calls.

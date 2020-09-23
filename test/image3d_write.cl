@@ -16,4 +16,5 @@
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image3d_t b)
 {
+  write_imagef(b, (int4)(0,0,0,0), (float4)(0,0,0,0));
 }
