@@ -232,6 +232,12 @@ static llvm::cl::list<clspv::Option::StorageClass> no_8bit_storage(
         clEnumValN(clspv::Option::StorageClass::kPushConstant, "pushconstant",
                    "Disallow 8-bit types in push constant interfaces")));
 
+static llvm::cl::opt<bool> cl_native_math(
+    "cl-native-math", llvm::cl::init(false),
+    llvm::cl::desc("Perform all math as fast as possible. This option does not "
+                   "guarantee that OpenCL precision bounds are maintained. "
+                   "Implies -cl-fast-relaxed-math."));
+
 } // namespace
 
 namespace clspv {
@@ -295,6 +301,8 @@ bool Supports8BitStorageClass(StorageClass sc) {
 
   return true;
 }
+
+bool NativeMath() { return cl_native_math; }
 
 } // namespace Option
 } // namespace clspv

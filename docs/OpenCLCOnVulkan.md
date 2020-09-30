@@ -757,7 +757,13 @@ Instead, those types are mapped to 32-bit integer types.
 
 For any OpenCL C language built-in functions that are mapped onto their GLSL
 4.5 built-in equivalents, the precision requirements of the OpenCL C language
-built-ins are not necessarily honoured.
+built-ins are not necessarily honoured. In general, implementations should
+satisfy the relaxed precision requirements described in the OpenCL C
+specification. This means kernels will operate as if compiled with
+`--cl-fast-relaxed-math`. For higher performance (lower precision) variants of
+some builtin functions, clspv also provides the `--cl-native-math` option. This
+option goes beyond fast-relaxed math and provides no precision guarantees
+(similar to the native_ functions in OpenCL).
 
 #### Atomic Functions
 
@@ -784,11 +790,7 @@ The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,
 
 #### Math Functions
 
-The `cbrt()`, `cospi()`, `erf()`, `erfc()`, `expm1()`, `fdim()`,
-`hypot()`, `ilogb()`, `lgamma()`, `lgamma_r()`, `logb()`, `maxmag()`,
-`minmag()`, `nan()`, `nextafter()`, `pown()`, `remainder()`, `remquo()`,
-`rint()`, `rootn()`, `sincos()`, `sinpi()`, `tanpi()`, and `tgamma()` built-in
-functions **must not** be used.
+All supported.
 
 #### Integer Functions
 

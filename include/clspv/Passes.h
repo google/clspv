@@ -413,4 +413,8 @@ llvm::ModulePass *createStripFreezePass();
 /// handled.
 llvm::ModulePass *createAutoPodArgsPass();
 
+/// Strips some builtin library functions when -cl-native-math is specified to
+/// provide faster, lower precision alternatives.
+llvm::ModulePass *createNativeMathPass();
+
 } // namespace clspv

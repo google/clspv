@@ -19,10 +19,13 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Support/Allocator.h"
@@ -38,8 +41,10 @@
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 #include "clspv/Sampler.h"
+#include "clspv/clspv_builtin_library.h"
 #include "clspv/opencl_builtins_header.h"
 
+#include "Builtins.h"
 #include "FrontendPlugin.h"
 #include "Passes.h"
 
@@ -163,6 +168,21 @@ static llvm::cl::opt<std::string> IROutputFile(
     llvm::cl::desc(
         "Emit LLVM IR to the given file after parsing and stop compilation."),
     llvm::cl::value_desc("filename"));
+
+namespace {
+struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
+  OpenCLBuiltinMemoryBuffer(const void *data, uint64_t data_length) {
+    const char *dataCasted = reinterpret_cast<const char *>(data);
+    init(dataCasted, dataCasted + data_length, true);
+  }
+
+  virtual llvm::MemoryBuffer::BufferKind getBufferKind() const override {
+    return llvm::MemoryBuffer::MemoryBuffer_Malloc;
+  }
+
+  virtual ~OpenCLBuiltinMemoryBuffer() override {}
+};
+} // namespace
 
 // Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
 // if successful.
@@ -428,17 +448,20 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getCodeGenOpts().LessPreciseFPMAD =
       cl_mad_enable || cl_unsafe_math_optimizations;
   // cl_no_signed_zeros ignored for now!
-  instance.getLangOpts().UnsafeFPMath =
-      cl_unsafe_math_optimizations || cl_fast_relaxed_math;
-  instance.getLangOpts().FiniteMathOnly =
-      cl_finite_math_only || cl_fast_relaxed_math;
-  instance.getLangOpts().FastRelaxedMath = cl_fast_relaxed_math;
+  instance.getLangOpts().UnsafeFPMath = cl_unsafe_math_optimizations ||
+                                        cl_fast_relaxed_math ||
+                                        clspv::Option::NativeMath();
+  instance.getLangOpts().FiniteMathOnly = cl_finite_math_only ||
+                                          cl_fast_relaxed_math ||
+                                          clspv::Option::NativeMath();
+  instance.getLangOpts().FastRelaxedMath =
+      cl_fast_relaxed_math || clspv::Option::NativeMath();
 
   // Preprocessor options
   if (!clspv::Option::ImageSupport()) {
     instance.getPreprocessorOpts().addMacroUndef("__IMAGE_SUPPORT__");
   }
-  if (cl_fast_relaxed_math) {
+  if (cl_fast_relaxed_math || clspv::Option::NativeMath()) {
     instance.getPreprocessorOpts().addMacroDef("__FAST_RELAXED_MATH__");
   }
 
@@ -493,19 +516,6 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
   instance.getPreprocessorOpts().addRemappedFile(overiddenInputFilename,
                                                  memory_buffer.release());
-
-  struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
-    OpenCLBuiltinMemoryBuffer(const void *data, uint64_t data_length) {
-      const char *dataCasted = reinterpret_cast<const char *>(data);
-      init(dataCasted, dataCasted + data_length, true);
-    }
-
-    virtual llvm::MemoryBuffer::BufferKind getBufferKind() const override {
-      return llvm::MemoryBuffer::MemoryBuffer_Malloc;
-    }
-
-    virtual ~OpenCLBuiltinMemoryBuffer() override {}
-  };
 
   std::unique_ptr<llvm::MemoryBuffer> openCLBuiltinMemoryBuffer(
       new OpenCLBuiltinMemoryBuffer(opencl_builtins_header_data,
@@ -599,6 +609,7 @@ int PopulatePassManager(
     break;
   }
 
+  pm->add(clspv::createNativeMathPass());
   pm->add(clspv::createZeroInitializeAllocasPass());
   pm->add(clspv::createAddFunctionAttributesPass());
   pm->add(clspv::createAutoPodArgsPass());
@@ -844,6 +855,28 @@ int GenerateIRFile(llvm::legacy::PassManager *pm, llvm::Module &module,
   return 0;
 }
 
+bool LinkBuiltinLibrary(llvm::Module *module) {
+  std::unique_ptr<llvm::MemoryBuffer> buffer(new OpenCLBuiltinMemoryBuffer(
+      clspv_builtin_library_data, clspv_builtin_library_size - 1));
+
+  llvm::SMDiagnostic Err;
+  auto library = llvm::parseIR(*buffer, Err, module->getContext());
+  if (!library) {
+    llvm::errs() << "Failed to parse builtins library\n";
+    return false;
+  }
+
+  // TODO: when clang generates builtins using the generic address space,
+  // different builtins are used for pointer-based builtins. Need to do some
+  // work to ensure they are kept around.
+  // Affects: modf, remquo, lgamma_r, frexp
+
+  llvm::Linker L(*module);
+  L.linkInModule(std::move(library), 0);
+
+  return true;
+}
+
 } // namespace
 
 namespace clspv {
@@ -933,6 +966,10 @@ int Compile(const int argc, const char *const argv[]) {
   // If --emit-ir was requested, emit the initial LLVM IR and stop compilation.
   if (!IROutputFile.empty()) {
     return GenerateIRFile(&pm, *module, IROutputFile);
+  }
+
+  if (!LinkBuiltinLibrary(module.get())) {
+    return -1;
   }
 
   // Otherwise, populate the pass manager and run the regular passes.
@@ -1031,6 +1068,10 @@ int CompileFromSourceString(const std::string &program,
   llvm::initializeClspvPasses(Registry);
 
   std::unique_ptr<llvm::Module> module(action.takeModule());
+
+  if (!LinkBuiltinLibrary(module.get())) {
+    return -1;
+  }
 
   // Optimize.
   // Create a memory buffer for temporarily writing the result.
