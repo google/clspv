@@ -591,8 +591,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
       uint32_t num_elements = dst_vec_ty->getElementCount().getKnownMinValue();
       assert(num_elements <= 4 && "Unhandled large vectors");
       uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
-                        ele_ty->getPrimitiveSizeInBits())
-                           .getKnownMinSize();
+                        ele_ty->getPrimitiveSizeInBits());
       auto scaled_vec_ty = FixedVectorType::get(ele_ty, ratio);
       Value *casts[2] = {UndefValue::get(scaled_vec_ty),
                          UndefValue::get(scaled_vec_ty)};
@@ -651,8 +650,7 @@ Value *ClusterPodKernelArgumentsPass::BuildFromElements(
         // Bitcast to a vector of |dst_type| and extract the right element. This
         // avoids introducing i16 when converting to half.
         uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
-                          dst_type->getPrimitiveSizeInBits())
-                             .getKnownMinSize();
+                          dst_type->getPrimitiveSizeInBits());
         auto vec_ty = FixedVectorType::get(dst_type, ratio);
         dst = builder.CreateBitCast(dst, vec_ty);
         dst = builder.CreateExtractElement(dst, base_offset / dst_size);
