@@ -36,10 +36,20 @@ struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
   ReplaceLLVMIntrinsicsPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
-  bool replaceFshl(Module &M);
+  // TODO: update module-based funtions to work like function-based ones.
+  // Except maybe lifetime intrinsics.
+  bool runOnFunction(Function &F);
   bool replaceMemset(Module &M);
   bool replaceMemcpy(Module &M);
   bool removeLifetimeDeclarations(Module &M);
+  bool replaceFshl(Function &F);
+  bool replaceCountZeroes(Function &F, bool leading);
+  bool replaceCopysign(Function &F);
+
+  bool replaceCallsWithValue(Function &F,
+                             std::function<Value *(CallInst *)> Replacer);
+
+  SmallVector<Function *, 16> DeadFunctions;
 };
 } // namespace
 
@@ -59,81 +69,92 @@ bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
   // Remove lifetime annotations first.  They could be using memset
   // and memcpy calls.
   Changed |= removeLifetimeDeclarations(M);
-  Changed |= replaceFshl(M);
   Changed |= replaceMemset(M);
   Changed |= replaceMemcpy(M);
+
+  for (auto &F : M) {
+    Changed |= runOnFunction(F);
+  }
+
+  for (auto F : DeadFunctions) {
+    F->eraseFromParent();
+  }
 
   return Changed;
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceFshl(Module &M) {
-  bool changed = false;
+bool ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
+  switch (F.getIntrinsicID()) {
+    case Intrinsic::fshl:
+      return replaceFshl(F);
+    case Intrinsic::copysign:
+      return replaceCopysign(F);
+    case Intrinsic::ctlz:
+      return replaceCountZeroes(F, true);
+    case Intrinsic::cttz:
+      return replaceCountZeroes(F, false);
 
-  // Get list of fshl intrinsic declarations.
-  SmallVector<Function *, 8> intrinsics;
-  for (auto &func : M) {
-    if (func.getName().startswith("llvm.fshl")) {
-      intrinsics.push_back(&func);
+    default:
+      break;
+  }
+
+  return false;
+}
+
+bool ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
+    Function &F, std::function<Value *(CallInst *)> Replacer) {
+  SmallVector<Instruction *, 8> ToRemove;
+  for (auto &U : F.uses()) {
+    if (auto Call = dyn_cast<CallInst>(U.getUser())) {
+      auto replacement = Replacer(Call);
+      if (replacement != nullptr) {
+        Call->replaceAllUsesWith(replacement);
+        ToRemove.push_back(Call);
+      }
     }
   }
 
-  for (auto func : intrinsics) {
-    // Get list of callsites.
-    SmallVector<CallInst *, 8> callsites;
-    for (auto user : func->users()) {
-      if (auto call = dyn_cast<CallInst>(user)) {
-        callsites.push_back(call);
-      }
-    }
-
-    // Replace each callsite with a manual implementation.
-    for (auto call : callsites) {
-      auto arg_hi = call->getArgOperand(0);
-      auto arg_lo = call->getArgOperand(1);
-      auto arg_shift = call->getArgOperand(2);
-
-      // Validate argument types.
-      auto type = arg_hi->getType();
-      if ((type->getScalarSizeInBits() != 8) &&
-          (type->getScalarSizeInBits() != 16) &&
-          (type->getScalarSizeInBits() != 32) &&
-          (type->getScalarSizeInBits() != 64)) {
-        llvm_unreachable("Invalid integer width in llvm.fshl intrinsic");
-        return false;
-      }
-
-      changed = true;
-
-      // We shift the bottom bits of the first argument up, the top bits of the
-      // second argument down, and then OR the two shifted values.
-
-      // The shift amount is treated modulo the element size.
-      auto mod_mask = ConstantInt::get(type, type->getScalarSizeInBits() - 1);
-      auto shift_amount = BinaryOperator::Create(Instruction::And, arg_shift,
-                                                 mod_mask, "", call);
-
-      // Calculate the amount by which to shift the second argument down.
-      auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
-      auto down_amount = BinaryOperator::Create(Instruction::Sub, scalar_size,
-                                                shift_amount, "", call);
-
-      // Shift the two arguments and OR the results together.
-      auto hi_bits = BinaryOperator::Create(Instruction::Shl, arg_hi,
-                                            shift_amount, "", call);
-      auto lo_bits = BinaryOperator::Create(Instruction::LShr, arg_lo,
-                                            down_amount, "", call);
-      auto result =
-          BinaryOperator::Create(Instruction::Or, lo_bits, hi_bits, "", call);
-
-      // Replace the original call with the manually computed result.
-      call->replaceAllUsesWith(result);
-      call->eraseFromParent();
-    }
-
-    func->eraseFromParent();
+  for (auto inst : ToRemove) {
+    inst->eraseFromParent();
   }
 
-  return changed;
+  DeadFunctions.push_back(&F);
+
+  return !ToRemove.empty();
+}
+
+bool ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    auto arg_hi = call->getArgOperand(0);
+    auto arg_lo = call->getArgOperand(1);
+    auto arg_shift = call->getArgOperand(2);
+
+    // Validate argument types.
+    auto type = arg_hi->getType();
+    if ((type->getScalarSizeInBits() != 8) &&
+        (type->getScalarSizeInBits() != 16) &&
+        (type->getScalarSizeInBits() != 32) &&
+        (type->getScalarSizeInBits() != 64)) {
+      return static_cast<Value *>(nullptr);
+    }
+
+    // We shift the bottom bits of the first argument up, the top bits of the
+    // second argument down, and then OR the two shifted values.
+    IRBuilder<> builder(call);
+
+    // The shift amount is treated modulo the element size.
+    auto mod_mask = ConstantInt::get(type, type->getScalarSizeInBits() - 1);
+    auto shift_amount = builder.CreateAnd(arg_shift, mod_mask);
+
+    // Calculate the amount by which to shift the second argument down.
+    auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
+    auto down_amount = builder.CreateSub(scalar_size, shift_amount);
+
+    // Shift the two arguments and OR the results together.
+    auto hi_bits = builder.CreateShl(arg_hi, shift_amount);
+    auto lo_bits = builder.CreateLShr(arg_lo, down_amount);
+    return builder.CreateOr(lo_bits, hi_bits);
+  });
 }
 
 bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
@@ -447,4 +468,119 @@ bool ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
   }
 
   return Changed;
+}
+
+bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
+  if (!isa<IntegerType>(F.getReturnType()->getScalarType()))
+    return false;
+
+  auto bitwidth = F.getReturnType()->getScalarSizeInBits();
+  if (bitwidth == 32 || bitwidth > 64)
+    return false;
+
+  return replaceCallsWithValue(F, [&F, bitwidth, leading](CallInst *Call) {
+    auto c_false = ConstantInt::getFalse(Call->getContext());
+    auto in = Call->getArgOperand(0);
+    IRBuilder<> builder(Call);
+    auto int32_ty = builder.getInt32Ty();
+    Type *ty = int32_ty;
+    Constant *c32 = builder.getInt32(32);
+    if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
+      ty = VectorType::get(ty, vec_ty->getElementCount());
+      c32 = ConstantVector::getSplat(vec_ty->getElementCount(), c32);
+    }
+    auto func_32bit = Intrinsic::getDeclaration(
+        F.getParent(), leading ? Intrinsic::ctlz : Intrinsic::cttz, ty);
+    if (bitwidth < 32) {
+      // Extend the input to 32-bits and perform a clz/ctz.
+      auto zext = builder.CreateZExt(in, ty);
+      Value *call_input = zext;
+      if (!leading) {
+        // Or the extended input value with a constant that caps the max to the
+        // right bitwidth (e.g. 256 for i8 and 65536 for i16).
+        Constant *mask = builder.getInt32(1 << bitwidth);
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          mask = ConstantVector::getSplat(vec_ty->getElementCount(), mask);
+        }
+        call_input = builder.CreateOr(zext, mask);
+      }
+      auto call = builder.CreateCall(func_32bit->getFunctionType(), func_32bit,
+                                     {call_input, c_false});
+      Value *tmp = call;
+      if (leading) {
+        // Clz is implemented as 31 - FindUMsb(|zext|), so adjust the result
+        // the right bitwidth.
+        Constant *sub_const = builder.getInt32(32 - bitwidth);
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          sub_const =
+              ConstantVector::getSplat(vec_ty->getElementCount(), sub_const);
+        }
+        tmp = builder.CreateSub(call, sub_const);
+      }
+      // Truncate the intermediate result to the right size.
+      return builder.CreateTrunc(tmp, Call->getType());
+    } else {
+      // Perform a 32-bit version of clz/ctz on each half of the 64-bit input.
+      auto lshr = builder.CreateLShr(in, 32);
+      auto top_bits = builder.CreateTrunc(lshr, ty);
+      auto bot_bits = builder.CreateTrunc(in, ty);
+      auto top_func = builder.CreateCall(func_32bit->getFunctionType(),
+                                         func_32bit, {top_bits, c_false});
+      auto bot_func = builder.CreateCall(func_32bit->getFunctionType(),
+                                         func_32bit, {bot_bits, c_false});
+      Value *tmp = nullptr;
+      if (leading) {
+        // For clz, if clz(top) is 32, return 32 + clz(bot).
+        auto cmp = builder.CreateICmpEQ(top_func, c32);
+        auto adjust = builder.CreateAdd(bot_func, c32);
+        tmp = builder.CreateSelect(cmp, adjust, top_func);
+      } else {
+        // For ctz, if clz(bot) is 32, return 32 + ctz(top)
+        auto bot_cmp = builder.CreateICmpEQ(bot_func, c32);
+        auto adjust = builder.CreateAdd(top_func, c32);
+        tmp = builder.CreateSelect(bot_cmp, adjust, bot_func);
+      }
+      // Extend the intermediate result to the correct size.
+      return builder.CreateZExt(tmp, Call->getType());
+    }
+  });
+}
+
+bool ReplaceLLVMIntrinsicsPass::replaceCopysign(Function &F) {
+  return replaceCallsWithValue(F, [&F](CallInst *CI) {
+    auto XValue = CI->getOperand(0);
+    auto YValue = CI->getOperand(1);
+
+    auto Ty = XValue->getType();
+
+    Type *IntTy = Type::getIntNTy(F.getContext(), Ty->getScalarSizeInBits());
+    if (auto vec_ty = dyn_cast<VectorType>(Ty)) {
+      IntTy = FixedVectorType::get(
+          IntTy, vec_ty->getElementCount().getKnownMinValue());
+    }
+
+    // Return X with the sign of Y
+
+    // Sign bit masks
+    auto SignBit = IntTy->getScalarSizeInBits() - 1;
+    auto SignBitMask = 1 << SignBit;
+    auto SignBitMaskValue = ConstantInt::get(IntTy, SignBitMask);
+    auto NotSignBitMaskValue = ConstantInt::get(IntTy, ~SignBitMask);
+
+    IRBuilder<> Builder(CI);
+
+    // Extract sign of Y
+    auto YInt = Builder.CreateBitCast(YValue, IntTy);
+    auto YSign = Builder.CreateAnd(YInt, SignBitMaskValue);
+
+    // Clear sign bit in X
+    auto XInt = Builder.CreateBitCast(XValue, IntTy);
+    XInt = Builder.CreateAnd(XInt, NotSignBitMaskValue);
+
+    // Insert sign bit of Y into X
+    auto NewXInt = Builder.CreateOr(XInt, YSign);
+
+    // And cast back to floating-point
+    return Builder.CreateBitCast(NewXInt, Ty);
+  });
 }

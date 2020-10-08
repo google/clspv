@@ -39,18 +39,21 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
     MangledName += Builtins::GetMangledTypeName(Arg->getType());
   }
 
-  // Create a function in the module
   auto M = Insert->getModule();
   auto Int32Ty = Type::getInt32Ty(M->getContext());
-  SmallVector<Type *, 8> ArgTypes = {Int32Ty};
-  for (auto Arg : Args) {
-    ArgTypes.push_back(Arg->getType());
-  }
-  auto NewFType = FunctionType::get(RetType, ArgTypes, false);
-  auto NewFTyC = M->getOrInsertFunction(MangledName, NewFType);
-  auto NewF = cast<Function>(NewFTyC.getCallee());
-  for (auto A : Attributes) {
-    NewF->addFnAttr(A);
+  Function* func = M->getFunction(MangledName);
+  if (!func) {
+    // Create a function in the module
+    SmallVector<Type *, 8> ArgTypes = {Int32Ty};
+    for (auto Arg : Args) {
+      ArgTypes.push_back(Arg->getType());
+    }
+    auto NewFType = FunctionType::get(RetType, ArgTypes, false);
+    auto NewFTyC = M->getOrInsertFunction(MangledName, NewFType);
+    func = cast<Function>(NewFTyC.getCallee());
+    for (auto A : Attributes) {
+      func->addFnAttr(A);
+    }
   }
 
   // Now call it with the values we were passed
@@ -59,7 +62,7 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
     ArgValues.push_back(Arg);
   }
 
-  return CallInst::Create(NewF, ArgValues, "", Insert);
+  return CallInst::Create(func, ArgValues, "", Insert);
 }
 
 }; // namespace clspv
