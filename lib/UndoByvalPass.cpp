@@ -133,8 +133,9 @@ bool UndoByvalPass::runOnModule(Module &M) {
         new StoreInst(NewArg, NewAlloca,
                       &*std::next(BasicBlock::iterator(*NewAlloca)));
 
-        // Remove byval attribute.
+        // Remove byval and align attributes.
         NewArg->removeAttr(Attribute::ByVal);
+        NewArg->removeAttr(Attribute::Alignment);
         NewArg->takeName(Arg);
       }
 
