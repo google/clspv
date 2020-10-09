@@ -103,8 +103,17 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
                   ->getName()
                   .str();
           name += ".float";
-          if (name.find("ro_t") != std::string::npos)
+          const auto pos = name.find("_wo_t");
+          if (!IsStorageImageType(Arg.getType())) {
             name += ".sampled";
+          } else if (clspv::Option::Language() >=
+                         clspv::Option::SourceLanguage::OpenCL_C_20 &&
+                     pos != std::string::npos) {
+            // In OpenCL 2.0 (or later), treat write_only images as read_write
+            // images. This prevents the compiler from generating duplicate
+            // image types (invalid SPIR-V).
+            name = name.substr(0, pos) + "_rw_t" + name.substr(pos + 5);
+          }
           StructType *new_struct = M.getTypeByName(name);
           if (!new_struct)
             new_struct = StructType::create(Arg.getContext(), name);
