@@ -36,6 +36,7 @@ struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
   ReplaceLLVMIntrinsicsPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
+  bool replaceFshl(Module &M);
   bool replaceMemset(Module &M);
   bool replaceMemcpy(Module &M);
   bool removeLifetimeDeclarations(Module &M);
@@ -55,13 +56,84 @@ ModulePass *createReplaceLLVMIntrinsicsPass() {
 bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
   bool Changed = false;
 
-  // Remove lifetime annotations first.  They coulud be using memset
+  // Remove lifetime annotations first.  They could be using memset
   // and memcpy calls.
   Changed |= removeLifetimeDeclarations(M);
+  Changed |= replaceFshl(M);
   Changed |= replaceMemset(M);
   Changed |= replaceMemcpy(M);
 
   return Changed;
+}
+
+bool ReplaceLLVMIntrinsicsPass::replaceFshl(Module &M) {
+  bool changed = false;
+
+  // Get list of fshl intrinsic declarations.
+  SmallVector<Function *, 8> intrinsics;
+  for (auto &func : M) {
+    if (func.getName().startswith("llvm.fshl")) {
+      intrinsics.push_back(&func);
+    }
+  }
+
+  for (auto func : intrinsics) {
+    // Get list of callsites.
+    SmallVector<CallInst *, 8> callsites;
+    for (auto user : func->users()) {
+      if (auto call = dyn_cast<CallInst>(user)) {
+        callsites.push_back(call);
+      }
+    }
+
+    // Replace each callsite with a manual implementation.
+    for (auto call : callsites) {
+      auto arg_hi = call->getArgOperand(0);
+      auto arg_lo = call->getArgOperand(1);
+      auto arg_shift = call->getArgOperand(2);
+
+      // Validate argument types.
+      auto type = arg_hi->getType();
+      if ((type->getScalarSizeInBits() != 8) &&
+          (type->getScalarSizeInBits() != 16) &&
+          (type->getScalarSizeInBits() != 32) &&
+          (type->getScalarSizeInBits() != 64)) {
+        llvm_unreachable("Invalid integer width in llvm.fshl intrinsic");
+        return false;
+      }
+
+      changed = true;
+
+      // We shift the bottom bits of the first argument up, the top bits of the
+      // second argument down, and then OR the two shifted values.
+
+      // The shift amount is treated modulo the element size.
+      auto mod_mask = ConstantInt::get(type, type->getScalarSizeInBits() - 1);
+      auto shift_amount = BinaryOperator::Create(Instruction::And, arg_shift,
+                                                 mod_mask, "", call);
+
+      // Calculate the amount by which to shift the second argument down.
+      auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
+      auto down_amount = BinaryOperator::Create(Instruction::Sub, scalar_size,
+                                                shift_amount, "", call);
+
+      // Shift the two arguments and OR the results together.
+      auto hi_bits = BinaryOperator::Create(Instruction::Shl, arg_hi,
+                                            shift_amount, "", call);
+      auto lo_bits = BinaryOperator::Create(Instruction::LShr, arg_lo,
+                                            down_amount, "", call);
+      auto result =
+          BinaryOperator::Create(Instruction::Or, lo_bits, hi_bits, "", call);
+
+      // Replace the original call with the manually computed result.
+      call->replaceAllUsesWith(result);
+      call->eraseFromParent();
+    }
+
+    func->eraseFromParent();
+  }
+
+  return changed;
 }
 
 bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
