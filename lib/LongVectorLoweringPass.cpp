@@ -21,6 +21,7 @@
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 
 #include "clspv/Passes.h"
@@ -69,15 +70,29 @@ private:
   /// Implementation details of getEquivalentType.
   Type *getEquivalentTypeImpl(Type *Ty) const;
 
+  /// Return the equivalent type for @p Ty or @p Ty if no lowering is needed.
+  Type *getEquivalentTypeOrSelf(Type *Ty) {
+    auto *EquivalentTy = getEquivalentType(Ty);
+    return EquivalentTy ? EquivalentTy : Ty;
+  }
+
 private:
   // Hight-level implementation details of runOnModule.
 
   /// Lower the given function.
   bool runOnFunction(Function &F);
 
+  /// Create an alternative version of @p F that doesn't have long vectors as
+  /// parameter or return types.
+  /// Returns nullptr if no lowering is required.
+  Function *convertUserDefinedFunction(Function &F);
+
   /// Clears the dead instructions and others that might be rendered dead
   /// by their removal.
   void cleanDeadInstructions();
+
+  /// Remove all long-vector functions that were lowered.
+  void cleanDeadFunctions();
 
 private:
   /// A map between long-vector types and their equivalent representation.
@@ -91,6 +106,12 @@ private:
   /// and transformed. Instructions are not removed from the function as they
   /// are visited because this would invalidate iterators.
   DenseMap<Value *, Value *> InstructionMap;
+
+  /// A map between functions and their replacement.
+  ///
+  /// The keys in this mapping should be deleted when finishing processing the
+  /// module.
+  DenseMap<Function *, Function *> FunctionMap;
 };
 
 char LongVectorLoweringPass::ID = 0;
@@ -185,12 +206,80 @@ Value *convertVectorOperation(IRBuilder<> &B, Type *EquivalentReturnTy,
   return ReturnValue;
 }
 
+/// Map the arguments of the wrapper function (which are either not long-vectors
+/// or aggregates of scalars) to the original arguments of the user-defined
+/// function (which can be long-vectors).
+SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
+                                                     Function &Wrappee,
+                                                     Function &Wrapper) {
+  SmallVector<Value *, 16> Args;
+
+  std::size_t ArgumentCount = Wrapper.arg_size();
+  Args.reserve(ArgumentCount);
+
+  for (std::size_t i = 0; i < ArgumentCount; ++i) {
+    auto *NewArg = Wrapper.getArg(i);
+    auto *OldArgTy = Wrappee.getFunctionType()->getParamType(i);
+    auto *EquivalentArg = convertEquivalentValue(B, NewArg, OldArgTy);
+    Args.push_back(EquivalentArg);
+  }
+
+  return Args;
+}
+
+/// Create a new, equivalent function with no long-vector types.
+///
+/// This is achieved by creating a new function (the "wrapper") which inlines
+/// the given function (the "wrappee"). Only the parameters and return types are
+/// mapped. The function body still needs to be lowered.
+Function *createFunctionWithMappedTypes(Function &F, Type *EquivalentReturnTy,
+                                        ArrayRef<Type *> EquivalentParamTys) {
+  assert(!F.isVarArg() && "varargs not supported");
+
+  auto *Wrapper = Function::Create(
+      FunctionType::get(EquivalentReturnTy, EquivalentParamTys, false),
+      F.getLinkage());
+  Wrapper->takeName(&F);
+  Wrapper->setCallingConv(F.getCallingConv());
+  Wrapper->copyAttributesFrom(&F);
+  Wrapper->copyMetadata(&F, /* offset */ 0);
+
+  BasicBlock::Create(F.getContext(), "", Wrapper);
+  IRBuilder<> B(&Wrapper->getEntryBlock());
+
+  // Fill in the body of the wrapper function.
+  auto WrappeeArgs = mapWrapperArgsToWrappeeArgs(B, F, *Wrapper);
+  CallInst *Call = B.CreateCall(&F, WrappeeArgs);
+  if (Call->getType()->isVoidTy()) {
+    B.CreateRetVoid();
+  } else {
+    Value *ReturnValue = convertEquivalentValue(B, Call, EquivalentReturnTy);
+    B.CreateRet(ReturnValue);
+  }
+
+  // Ensure wrapper has a parent or InlineFunction will crash.
+  F.getParent()->getFunctionList().push_front(Wrapper);
+
+  // Inline the original function.
+  InlineFunctionInfo Info;
+  auto Result = InlineFunction(*Call, Info);
+  if (!Result.isSuccess()) {
+    LLVM_DEBUG(dbgs() << "Failed to inline " << F.getName() << '\n');
+    LLVM_DEBUG(dbgs() << "Reason: " << Result.getFailureReason() << '\n');
+    llvm_unreachable("Unexpected failure when inlining function.");
+  }
+
+  return Wrapper;
+}
+
 bool LongVectorLoweringPass::runOnModule(Module &M) {
   bool Modified = false;
 
   for (auto &F : M.functions()) {
     Modified |= runOnFunction(F);
   }
+
+  cleanDeadFunctions();
 
   return Modified;
 }
@@ -327,8 +416,13 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
     return false;
   }
 
-  // TODO Support long-vector types as parameters of non-kernel functions.
-  Function *FunctionToVisit = &F;
+  // Lower the function parameters and return type if needed.
+  Function *FunctionToVisit = convertUserDefinedFunction(F);
+  if (FunctionToVisit == nullptr) {
+    // The parameters don't rely on long vectors, but maybe some instructions in
+    // the function body do.
+    FunctionToVisit = &F;
+  }
 
   bool Modified = (FunctionToVisit != &F);
   for (Instruction &I : instructions(FunctionToVisit)) {
@@ -341,6 +435,54 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
   LLVM_DEBUG(dbgs() << *FunctionToVisit << '\n');
 
   return Modified;
+}
+
+Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
+  auto it = FunctionMap.find(&F);
+  if (it != FunctionMap.end()) {
+    return it->second;
+  }
+
+  LLVM_DEBUG(dbgs() << "Handling of user defined function:\n");
+  LLVM_DEBUG(dbgs() << F << '\n');
+
+  auto *FunctionTy = F.getFunctionType();
+  assert(!FunctionTy->isVarArg() && "VarArgs not supported");
+
+  bool RequireLowering = false;
+
+  // Convert parameter types.
+  SmallVector<Type *, 16> EquivalentParamTys;
+  EquivalentParamTys.reserve(FunctionTy->getNumParams());
+  for (auto *ParamTy : FunctionTy->params()) {
+    auto *EquivalentParamTy = getEquivalentTypeOrSelf(ParamTy);
+    EquivalentParamTys.push_back(EquivalentParamTy);
+    RequireLowering |= (EquivalentParamTy != ParamTy);
+  }
+
+  // Convert return type.
+  auto *ReturnTy = FunctionTy->getReturnType();
+  auto *EquivalentReturnTy = getEquivalentTypeOrSelf(ReturnTy);
+  RequireLowering |= (EquivalentReturnTy != ReturnTy);
+
+  // If no work is needed, mark it as so for future reference and bail out.
+  if (!RequireLowering) {
+    LLVM_DEBUG(dbgs() << "No need of wrapper function\n");
+    FunctionMap.insert({&F, nullptr});
+    return nullptr;
+  }
+
+  Function *EquivalentFunction =
+      createFunctionWithMappedTypes(F, EquivalentReturnTy, EquivalentParamTys);
+
+  LLVM_DEBUG(dbgs() << "Wrapper function:\n" << *EquivalentFunction << "\n");
+
+  // The body of the new function is intentionally not visited right now because
+  // we could be currently visiting a call instruction. Instead, it is being
+  // visited in runOnFunction. This is to ensure the state of the lowering pass
+  // remains valid.
+  FunctionMap.insert({&F, EquivalentFunction});
+  return EquivalentFunction;
 }
 
 void LongVectorLoweringPass::cleanDeadInstructions() {
@@ -412,6 +554,45 @@ void LongVectorLoweringPass::cleanDeadInstructions() {
     llvm_unreachable("Not all supposedly-dead instruction were removed!");
   }
 #endif
+}
+
+void LongVectorLoweringPass::cleanDeadFunctions() {
+  // Take into account dependencies between functions when removing them.
+  // First collect all dead functions.
+  using Functions = SmallVector<Function *, 32>;
+  Functions DeadFunctions;
+  for (const auto &Mapping : FunctionMap) {
+    if (Mapping.getSecond() != nullptr) {
+      Function *F = Mapping.getFirst();
+      DeadFunctions.push_back(F);
+    }
+  }
+
+  // Erase any mapping, as they won't be valid anymore.
+  FunctionMap.clear();
+
+  for (bool Progress = true; Progress;) {
+    std::size_t PreviousSize = DeadFunctions.size();
+
+    Functions NextBatch;
+    for (auto *F : DeadFunctions) {
+      bool Dead = F->use_empty();
+      if (Dead) {
+        LLVM_DEBUG(dbgs() << "Removing " << F->getName()
+                          << " from the module.\n");
+        F->eraseFromParent();
+        Progress = true;
+      } else {
+        NextBatch.push_back(F);
+      }
+    }
+
+    DeadFunctions = std::move(NextBatch);
+    Progress = (DeadFunctions.size() < PreviousSize);
+  }
+
+  assert(DeadFunctions.empty() &&
+         "Not all supposedly-dead functions were removed!");
 }
 
 } // namespace
