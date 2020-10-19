@@ -331,6 +331,14 @@ struct SPIRVProducerPass final : public ModulePass {
   // that |Ty| and its subtypes will need a corresponding SPIR-V type.
   void FindType(Type *Ty);
 
+  // Returns an equivalent type to |type|.
+  //
+  // By default, clspv maps both __constant and __global address space pointers
+  // to StorageBuffer storage class. In order to prevent duplicate types from
+  // being generated, clspv checks if the equivalent type has already been
+  // generated.
+  Type *EquivalentType(Type *type);
+
   // Lookup or create Types, Constants.
   // Returns SPIRVID once it has been created.
   SPIRVID getSPIRVType(Type *Ty);
@@ -1568,11 +1576,84 @@ SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
   return VID;
 }
 
+Type *SPIRVProducerPass::EquivalentType(Type *type) {
+  if (type->getNumContainedTypes() != 0) {
+    switch (type->getTypeID()) {
+    case Type::PointerTyID: {
+      // For the purposes of our Vulkan SPIR-V type system, constant and global
+      // are conflated.
+      auto *ptr_ty = cast<PointerType>(type);
+      unsigned AddrSpace = ptr_ty->getAddressSpace();
+      if (AddressSpace::Constant == AddrSpace) {
+        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+          AddrSpace = AddressSpace::Global;
+          // Check to see if we already created this type (for instance, if we
+          // had a constant <type>* and a global <type>*, the type would be
+          // created by one of these types, and shared by both).
+          auto *GlobalTy =
+              ptr_ty->getPointerElementType()->getPointerTo(AddrSpace);
+          return GlobalTy;
+        }
+      } else if (AddressSpace::Global == AddrSpace) {
+        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+          AddrSpace = AddressSpace::Constant;
+
+          // Check to see if we already created this type (for instance, if we
+          // had a constant <type>* and a global <type>*, the type would be
+          // created by one of these types, and shared by both).
+          auto *ConstantTy =
+              ptr_ty->getPointerElementType()->getPointerTo(AddrSpace);
+          return ConstantTy;
+        }
+      }
+      break;
+    }
+    case Type::StructTyID: {
+      SmallVector<Type *, 8> subtypes;
+      for (auto *subtype : type->subtypes()) {
+        subtypes.push_back(EquivalentType(subtype));
+      }
+      return StructType::get(type->getContext(), subtypes,
+                             cast<StructType>(type)->isPacked());
+    }
+    case Type::ArrayTyID: {
+      auto *elem_ty = type->getArrayElementType();
+      auto *equiv_elem_ty = EquivalentType(elem_ty);
+      if (equiv_elem_ty != elem_ty) {
+        return ArrayType::get(equiv_elem_ty,
+                              cast<ArrayType>(type)->getNumElements());
+      }
+      break;
+    }
+    case Type::FunctionTyID: {
+      auto *func_ty = cast<FunctionType>(type);
+      auto *return_ty = EquivalentType(func_ty->getReturnType());
+      SmallVector<Type *, 8> params;
+      for (auto i = 0; i < func_ty->getNumParams(); ++i) {
+        params.push_back(EquivalentType(func_ty->getParamType(i)));
+      }
+      return FunctionType::get(return_ty, params, func_ty->isVarArg());
+    }
+    default:
+      break;
+    }
+  }
+
+  return type;
+}
+
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
     assert(TI->second.isValid());
     return TI->second;
+  }
+
+  auto equiv = EquivalentType(Ty);
+  auto equivTI = TypeMap.find(equiv);
+  if (equivTI != TypeMap.end()) {
+    assert(equivTI->second.isValid());
+    return equivTI->second;
   }
 
   const auto &DL = module->getDataLayout();
@@ -1601,35 +1682,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
         // TODO(sjw): assert always an image?
         RID = getSPIRVType(PointeeTy);
         break;
-      }
-    }
-
-    // For the purposes of our Vulkan SPIR-V type system, constant and global
-    // are conflated.
-    if (AddressSpace::Constant == AddrSpace) {
-      if (!clspv::Option::ConstantArgsInUniformBuffer()) {
-        AddrSpace = AddressSpace::Global;
-        // Check to see if we already created this type (for instance, if we
-        // had a constant <type>* and a global <type>*, the type would be
-        // created by one of these types, and shared by both).
-        auto GlobalTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(GlobalTy)) {
-          RID = TypeMap[GlobalTy];
-          break;
-        }
-      }
-    } else if (AddressSpace::Global == AddrSpace) {
-      if (!clspv::Option::ConstantArgsInUniformBuffer()) {
-        AddrSpace = AddressSpace::Constant;
-
-        // Check to see if we already created this type (for instance, if we
-        // had a constant <type>* and a global <type>*, the type would be
-        // created by one of these types, and shared by both).
-        auto ConstantTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(ConstantTy)) {
-          RID = TypeMap[ConstantTy];
-          break;
-        }
       }
     }
 
@@ -4681,7 +4733,12 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
 
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
+  DenseSet<uint32_t> seen;
   for (auto *type : getTypesNeedingArrayStride()) {
+    auto id = getSPIRVType(type);
+    if (!seen.insert(id.get()).second)
+      continue;
+
     Type *elemTy = nullptr;
     if (auto *ptrTy = dyn_cast<PointerType>(type)) {
       elemTy = ptrTy->getElementType();
@@ -4702,7 +4759,7 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
     const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
 
-    Ops << type << spv::DecorationArrayStride << stride;
+    Ops << id << spv::DecorationArrayStride << stride;
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
