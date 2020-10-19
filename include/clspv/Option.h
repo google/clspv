@@ -139,6 +139,7 @@ enum class SourceLanguage {
   OpenCL_C_11,
   OpenCL_C_12,
   OpenCL_C_20,
+  OpenCL_C_30,
   OpenCL_CPP
 };
 
@@ -174,7 +175,8 @@ bool GlobalOffsetPushConstant();
 // Returns true when support for non uniform NDRanges is enabled.
 static bool NonUniformNDRangeSupported() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
-         ((Language() == SourceLanguage::OpenCL_C_20));
+         (Language() == SourceLanguage::OpenCL_C_20) ||
+         (Language() == SourceLanguage::OpenCL_C_30);
 }
 
 enum class StorageClass : int {

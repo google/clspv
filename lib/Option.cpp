@@ -166,6 +166,8 @@ llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
                                 "CL1.2", "OpenCL C 1.2"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_20,
                                 "CL2.0", "OpenCL C 2.0"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_30,
+                                "CL3.0", "OpenCL C 3.0"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP,
                                 "CLC++", "C++ for OpenCL")));
 
