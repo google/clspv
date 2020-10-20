@@ -1629,7 +1629,7 @@ Type *SPIRVProducerPass::EquivalentType(Type *type) {
       auto *func_ty = cast<FunctionType>(type);
       auto *return_ty = EquivalentType(func_ty->getReturnType());
       SmallVector<Type *, 8> params;
-      for (auto i = 0; i < func_ty->getNumParams(); ++i) {
+      for (unsigned i = 0; i < func_ty->getNumParams(); ++i) {
         params.push_back(EquivalentType(func_ty->getParamType(i)));
       }
       return FunctionType::get(return_ty, params, func_ty->isVarArg());
