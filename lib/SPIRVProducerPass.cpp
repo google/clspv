@@ -1609,6 +1609,7 @@ Type *SPIRVProducerPass::CanonicalType(Type *type) {
         return StructType::get(type->getContext(), subtypes,
                                cast<StructType>(type)->isPacked());
       }
+      break;
     }
     case Type::ArrayTyID: {
       auto *elem_ty = type->getArrayElementType();
