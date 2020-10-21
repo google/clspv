@@ -1868,7 +1868,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::IntegerTyID: {
-    uint32_t bit_width = static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
+    uint32_t bit_width =
+        static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
 
     if (clspv::Option::Int8Support() && bit_width == 8) {
       addCapability(spv::CapabilityInt8);
@@ -1895,7 +1896,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   case Type::HalfTyID:
   case Type::FloatTyID:
   case Type::DoubleTyID: {
-    uint32_t bit_width = static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
+    uint32_t bit_width =
+        static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
     if (bit_width == 16) {
       addCapability(spv::CapabilityFloat16);
     } else if (bit_width == 64) {
