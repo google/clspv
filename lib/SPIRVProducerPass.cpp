@@ -331,6 +331,13 @@ struct SPIRVProducerPass final : public ModulePass {
   // that |Ty| and its subtypes will need a corresponding SPIR-V type.
   void FindType(Type *Ty);
 
+  // Returns the canonical type of |type|.
+  //
+  // By default, clspv maps both __constant and __global address space pointers
+  // to StorageBuffer storage class. In order to prevent duplicate types from
+  // being generated, clspv uses the canonical type as a representative.
+  Type *CanonicalType(Type *type);
+
   // Lookup or create Types, Constants.
   // Returns SPIRVID once it has been created.
   SPIRVID getSPIRVType(Type *Ty);
@@ -1568,6 +1575,68 @@ SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
   return VID;
 }
 
+Type *SPIRVProducerPass::CanonicalType(Type *type) {
+  if (type->getNumContainedTypes() != 0) {
+    switch (type->getTypeID()) {
+    case Type::PointerTyID: {
+      // For the purposes of our Vulkan SPIR-V type system, constant and global
+      // are conflated.
+      auto *ptr_ty = cast<PointerType>(type);
+      unsigned AddrSpace = ptr_ty->getAddressSpace();
+      if (AddressSpace::Constant == AddrSpace) {
+        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+          AddrSpace = AddressSpace::Global;
+          // The canonical type of __constant is __global unless constants are
+          // passed in uniform buffers.
+          auto *GlobalTy =
+              ptr_ty->getPointerElementType()->getPointerTo(AddrSpace);
+          return GlobalTy;
+        }
+      }
+      break;
+    }
+    case Type::StructTyID: {
+      SmallVector<Type *, 8> subtypes;
+      bool changed = false;
+      for (auto *subtype : type->subtypes()) {
+        auto canonical = CanonicalType(subtype);
+        subtypes.push_back(canonical);
+        if (canonical != subtype) {
+          changed = true;
+        }
+      }
+      if (changed) {
+        return StructType::get(type->getContext(), subtypes,
+                               cast<StructType>(type)->isPacked());
+      }
+      break;
+    }
+    case Type::ArrayTyID: {
+      auto *elem_ty = type->getArrayElementType();
+      auto *equiv_elem_ty = CanonicalType(elem_ty);
+      if (equiv_elem_ty != elem_ty) {
+        return ArrayType::get(equiv_elem_ty,
+                              cast<ArrayType>(type)->getNumElements());
+      }
+      break;
+    }
+    case Type::FunctionTyID: {
+      auto *func_ty = cast<FunctionType>(type);
+      auto *return_ty = CanonicalType(func_ty->getReturnType());
+      SmallVector<Type *, 8> params;
+      for (unsigned i = 0; i < func_ty->getNumParams(); ++i) {
+        params.push_back(CanonicalType(func_ty->getParamType(i)));
+      }
+      return FunctionType::get(return_ty, params, func_ty->isVarArg());
+    }
+    default:
+      break;
+    }
+  }
+
+  return type;
+}
+
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
@@ -1575,13 +1644,24 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     return TI->second;
   }
 
+  auto Canonical = CanonicalType(Ty);
+  if (Canonical != Ty) {
+    auto CanonicalTI = TypeMap.find(Canonical);
+    if (CanonicalTI != TypeMap.end()) {
+      assert(CanonicalTI->second.isValid());
+      return CanonicalTI->second;
+    }
+  }
+
+  // Perform the mapping with the canonical type.
+
   const auto &DL = module->getDataLayout();
 
   SPIRVID RID;
 
-  switch (Ty->getTypeID()) {
+  switch (Canonical->getTypeID()) {
   default: {
-    Ty->print(errs());
+    Canonical->print(errs());
     llvm_unreachable("Unsupported type???");
     break;
   }
@@ -1591,7 +1671,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::PointerTyID: {
-    PointerType *PTy = cast<PointerType>(Ty);
+    PointerType *PTy = cast<PointerType>(Canonical);
     unsigned AddrSpace = PTy->getAddressSpace();
 
     if (AddrSpace != AddressSpace::UniformConstant) {
@@ -1601,35 +1681,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
         // TODO(sjw): assert always an image?
         RID = getSPIRVType(PointeeTy);
         break;
-      }
-    }
-
-    // For the purposes of our Vulkan SPIR-V type system, constant and global
-    // are conflated.
-    if (AddressSpace::Constant == AddrSpace) {
-      if (!clspv::Option::ConstantArgsInUniformBuffer()) {
-        AddrSpace = AddressSpace::Global;
-        // Check to see if we already created this type (for instance, if we
-        // had a constant <type>* and a global <type>*, the type would be
-        // created by one of these types, and shared by both).
-        auto GlobalTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(GlobalTy)) {
-          RID = TypeMap[GlobalTy];
-          break;
-        }
-      }
-    } else if (AddressSpace::Global == AddrSpace) {
-      if (!clspv::Option::ConstantArgsInUniformBuffer()) {
-        AddrSpace = AddressSpace::Constant;
-
-        // Check to see if we already created this type (for instance, if we
-        // had a constant <type>* and a global <type>*, the type would be
-        // created by one of these types, and shared by both).
-        auto ConstantTy = PTy->getPointerElementType()->getPointerTo(AddrSpace);
-        if (0 < TypeMap.count(ConstantTy)) {
-          RID = TypeMap[ConstantTy];
-          break;
-        }
       }
     }
 
@@ -1648,7 +1699,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::StructTyID: {
-    StructType *STy = cast<StructType>(Ty);
+    StructType *STy = cast<StructType>(Canonical);
 
     // Handle sampler type.
     if (STy->isOpaque()) {
@@ -1697,9 +1748,9 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
 
         SPIRVID SampledTyID;
         if (STy->getName().contains(".float")) {
-          SampledTyID = getSPIRVType(Type::getFloatTy(Ty->getContext()));
+          SampledTyID = getSPIRVType(Type::getFloatTy(Canonical->getContext()));
         } else if (STy->getName().contains(".uint")) {
-          SampledTyID = getSPIRVType(Type::getInt32Ty(Ty->getContext()));
+          SampledTyID = getSPIRVType(Type::getInt32Ty(Canonical->getContext()));
         } else if (STy->getName().contains(".int")) {
           // Generate a signed 32-bit integer if necessary.
           if (int32ID == 0) {
@@ -1717,7 +1768,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
           }
         } else {
           // This was likely an UndefValue.
-          SampledTyID = getSPIRVType(Type::getFloatTy(Ty->getContext()));
+          SampledTyID = getSPIRVType(Type::getFloatTy(Canonical->getContext()));
         }
         Ops << SampledTyID;
 
@@ -1766,7 +1817,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
         if (Sampled == 1) {
           Ops.clear();
           Ops << RID;
-          getImageTypeMap()[Ty] =
+          getImageTypeMap()[Canonical] =
               addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
         }
         break;
@@ -1785,8 +1836,11 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeStruct, Ops);
 
-    // Generate OpMemberDecorate.
-    if (TypesNeedingLayout.idFor(STy)) {
+    // Generate OpMemberDecorate unless we are generating it for the canonical
+    // type.
+    StructType *canonical = cast<StructType>(CanonicalType(STy));
+    if (TypesNeedingLayout.idFor(STy) &&
+        (canonical == STy || !TypesNeedingLayout.idFor(canonical))) {
       for (unsigned MemberIdx = 0; MemberIdx < STy->getNumElements();
            MemberIdx++) {
         // Ops[0] = Structure Type ID
@@ -1803,8 +1857,9 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
       }
     }
 
-    // Generate OpDecorate.
-    if (StructTypesNeedingBlock.idFor(STy)) {
+    // Generate OpDecorate unless we are generating it for the canonical type.
+    if (StructTypesNeedingBlock.idFor(STy) &&
+        (canonical == STy || !StructTypesNeedingBlock.idFor(canonical))) {
       Ops.clear();
       // Use Block decorations with StorageBuffer storage class.
       Ops << RID << spv::DecorationBlock;
@@ -1814,7 +1869,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::IntegerTyID: {
-    uint32_t bit_width = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
+    uint32_t bit_width =
+        static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
 
     if (clspv::Option::Int8Support() && bit_width == 8) {
       addCapability(spv::CapabilityInt8);
@@ -1829,7 +1885,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     } else {
       if (!clspv::Option::Int8Support() && bit_width == 8) {
         // i8 is added to TypeMap as i32.
-        RID = getSPIRVType(Type::getIntNTy(Ty->getContext(), 32));
+        RID = getSPIRVType(Type::getIntNTy(Canonical->getContext(), 32));
       } else {
         SPIRVOperandVec Ops;
         Ops << bit_width << 0 /* not signed */;
@@ -1841,7 +1897,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   case Type::HalfTyID:
   case Type::FloatTyID:
   case Type::DoubleTyID: {
-    uint32_t bit_width = static_cast<uint32_t>(Ty->getPrimitiveSizeInBits());
+    uint32_t bit_width =
+        static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
     if (bit_width == 16) {
       addCapability(spv::CapabilityFloat16);
     } else if (bit_width == 64) {
@@ -1855,7 +1912,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::ArrayTyID: {
-    ArrayType *ArrTy = cast<ArrayType>(Ty);
+    ArrayType *ArrTy = cast<ArrayType>(Canonical);
     const uint64_t Length = ArrTy->getArrayNumElements();
     if (Length == 0) {
       // By convention, map it to a RuntimeArray.
@@ -1900,7 +1957,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
           ConstantInt::get(Type::getInt32Ty(module->getContext()), Length);
 
       // Remember to generate ArrayStride later
-      getTypesNeedingArrayStride().insert(Ty);
+      getTypesNeedingArrayStride().insert(Canonical);
 
       //
       // Generate OpTypeArray.
@@ -1916,7 +1973,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
     break;
   }
   case Type::FixedVectorTyID: {
-    auto VecTy = cast<VectorType>(Ty);
+    auto VecTy = cast<VectorType>(Canonical);
     // <4 x i8> is changed to i32 if i8 is not generally supported.
     if (!clspv::Option::Int8Support() &&
         VecTy->getElementType() == Type::getInt8Ty(module->getContext())) {
@@ -1924,7 +1981,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
         RID = getSPIRVType(VecTy->getElementType());
         break;
       } else {
-        Ty->print(errs());
+        Canonical->print(errs());
         llvm_unreachable("Support above i8 vector type");
       }
     }
@@ -1944,7 +2001,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   }
   case Type::FunctionTyID: {
     // Generate SPIRV instruction for function type.
-    FunctionType *FTy = cast<FunctionType>(Ty);
+    FunctionType *FTy = cast<FunctionType>(Canonical);
 
     // Ops[0] = Return Type ID
     // Ops[1] ... Ops[n] = Parameter Type IDs
@@ -1974,7 +2031,12 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   }
 
   if (RID.isValid()) {
-    TypeMap[Ty] = RID;
+    TypeMap[Canonical] = RID;
+    if (Ty != Canonical) {
+      // Speed up future lookups of this type by also caching the non-canonical
+      // type.
+      TypeMap[Ty] = RID;
+    }
   }
   return RID;
 }
@@ -4681,7 +4743,12 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
 
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
+  DenseSet<uint32_t> seen;
   for (auto *type : getTypesNeedingArrayStride()) {
+    auto id = getSPIRVType(type);
+    if (!seen.insert(id.get()).second)
+      continue;
+
     Type *elemTy = nullptr;
     if (auto *ptrTy = dyn_cast<PointerType>(type)) {
       elemTy = ptrTy->getElementType();
@@ -4702,7 +4769,7 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
     const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
 
-    Ops << type << spv::DecorationArrayStride << stride;
+    Ops << id << spv::DecorationArrayStride << stride;
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
