@@ -2457,11 +2457,14 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
         auto zero = Constant::getNullValue(ty);
         // Cannot add the nsw flag.
         auto add = BinaryOperator::Create(Instruction::Add, op0, op1, "", Call);
-        auto add_gt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SGT, add, op0, "", Call);
+        auto add_gt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SGT,
+                                          add, op0, "", Call);
         auto min_clamp = SelectInst::Create(add_gt_op0, min, add, "", Call);
-        auto add_lt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT, add, op0, "", Call);
+        auto add_lt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
+                                          add, op0, "", Call);
         auto max_clamp = SelectInst::Create(add_lt_op0, max, add, "", Call);
-        auto op1_lt_0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT, op1, zero, "", Call);
+        auto op1_lt_0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
+                                        op1, zero, "", Call);
         result = SelectInst::Create(op1_lt_0, min_clamp, max_clamp, "", Call);
       }
     } else {
