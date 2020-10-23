@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
 
     # Strip invalid features.
-    regex = re.compile('(char|short|int|long|float|double|half)(8|16)|(_rt[pn]|_sat)')
+    regex = re.compile('(char|short|int|long|float|double|half)(8|16)|convert_[a-zA-Z0-9]+(_rt[pn]|_sat)')
     with open(args.input_file, "r") as input:
         with open(args.output_file, "w") as output:
             for line in input:
