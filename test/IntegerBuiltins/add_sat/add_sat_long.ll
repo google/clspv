@@ -18,16 +18,10 @@ entry:
 declare i64 @_Z7add_satll(i64, i64)
 
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i64 %a, %b
-; CHECK: [[a_lt0:%[a-zA-Z0-9_.]+]] = icmp slt i64 %a, 0
-; CHECK: [[b_lt0:%[a-zA-Z0-9_.]+]] = icmp slt i64 %b, 0
-; CHECK: [[both_neg:%[a-zA-Z0-9_.]+]] = and i1 [[a_lt0]], [[b_lt0]]
-; CHECK: [[a_ge0:%[a-zA-Z0-9_.]+]] = xor i1 [[a_lt0]], true
-; CHECK: [[b_ge0:%[a-zA-Z0-9_.]+]] = xor i1 [[b_lt0]], true
-; CHECK: [[both_pos:%[a-zA-Z0-9_.]+]] = and i1 [[a_ge0]], [[b_ge0]]
-; CHECK: [[add_ge0:%[a-zA-Z0-9_.]+]] = icmp sge i64 [[add]], 0
-; CHECK: [[add_lt0:%[a-zA-Z0-9_.]+]] = icmp slt i64 [[add]], 0
-; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_lt0]], i64 9223372036854775807, i64 [[add]]
-; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_ge0]], i64 -9223372036854775808, i64 [[add]]
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select i1 [[both_neg]], i64 [[neg_clamp]], i64 [[add]]
-; CHECK: [[sel2:%[a-zA-Z0-9_.]+]] = select i1 [[both_pos]], i64 [[pos_clamp]], i64 [[sel]]
-; CHECK: ret i64 [[sel2]]
+; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt i64 [[add]], %a
+; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_gt_a]], i64 -9223372036854775808, i64 [[add]]
+; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt i64 [[add]], %a
+; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_lt_a]], i64 9223372036854775807, i64 [[add]]
+; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt i64 %b, 0
+; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select i1 [[b_lt_0]], i64 [[min_clamp]], i64 [[max_clamp]]
+; CHECK: ret i64 [[sel]]

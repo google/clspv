@@ -18,16 +18,10 @@ entry:
 declare <4 x i32> @_Z7add_satDv4_iS_(<4 x i32>, <4 x i32>)
 
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <4 x i32> %a, %b
-; CHECK: [[a_lt0:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i32> %a, zeroinitializer
-; CHECK: [[b_lt0:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i32> %b, zeroinitializer
-; CHECK: [[both_neg:%[a-zA-Z0-9_.]+]] = and <4 x i1> [[a_lt0]], [[b_lt0]]
-; CHECK: [[a_ge0:%[a-zA-Z0-9_.]+]] = xor <4 x i1> [[a_lt0]], <i1 true, i1 true, i1 true, i1 true>
-; CHECK: [[b_ge0:%[a-zA-Z0-9_.]+]] = xor <4 x i1> [[b_lt0]], <i1 true, i1 true, i1 true, i1 true>
-; CHECK: [[both_pos:%[a-zA-Z0-9_.]+]] = and <4 x i1> [[a_ge0]], [[b_ge0]]
-; CHECK: [[add_ge0:%[a-zA-Z0-9_.]+]] = icmp sge <4 x i32> [[add]], zeroinitializer
-; CHECK: [[add_lt0:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i32> [[add]], zeroinitializer
-; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_lt0]], <4 x i32> <i32 2147483647, i32 2147483647, i32 2147483647, i32 2147483647>, <4 x i32> [[add]]
-; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_ge0]], <4 x i32> <i32 -2147483648, i32 -2147483648, i32 -2147483648, i32 -2147483648>, <4 x i32> [[add]]
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[both_neg]], <4 x i32> [[neg_clamp]], <4 x i32> [[add]]
-; CHECK: [[sel2:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[both_pos]], <4 x i32> [[pos_clamp]], <4 x i32> [[sel]]
-; CHECK: ret <4 x i32> [[sel2]]
+; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <4 x i32> [[add]], %a
+; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_gt_a]], <4 x i32> <i32 -2147483648, i32 -2147483648, i32 -2147483648, i32 -2147483648>, <4 x i32> [[add]]
+; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i32> [[add]], %a
+; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_lt_a]], <4 x i32> <i32 2147483647, i32 2147483647, i32 2147483647, i32 2147483647>, <4 x i32> [[add]]
+; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i32> %b, zeroinitializer
+; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[b_lt_0]], <4 x i32> [[min_clamp]], <4 x i32> [[max_clamp]]
+; CHECK: ret <4 x i32> [[sel]]

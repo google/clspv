@@ -2366,10 +2366,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
     // instruction for unsigned additions. For signed addition, it is more
     // complicated. For values with bit widths less than 32 bits, we extend
     // to the next power of two and perform the addition. For 32- and
-    // 64-bit values we test the signedness of each operand and the
-    // addition result to determine which clamp to use. 32-bit values are
-    // not extended to 64-bits to avoid the introduction of the Int64
-    // capability.
+    // 64-bit values we test the signedness of op1 to determine how to clamp
+    // the addition.
     Type *ty = Call->getType();
     Value *op0 = Call->getArgOperand(0);
     Value *op1 = Call->getArgOperand(1);
@@ -2440,10 +2438,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
       } else {
         // Pseudo-code:
         // c = a + b;
-        // if (a < 0 && b < 0)
-        //   c = c > 0 ? min : c;
-        // else if (a >= 0 && b >= 0)
-        //   c = c < 0 ? max : c;
+        // if (b < 0)
+        //   c = c > a ? min : c;
+        // else
+        //   c = c < a ? max : c;
         //
         unsigned bitwidth = ty->getScalarSizeInBits();
         Constant *scalar_min = ConstantInt::get(
@@ -2459,24 +2457,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
         auto zero = Constant::getNullValue(ty);
         // Cannot add the nsw flag.
         auto add = BinaryOperator::Create(Instruction::Add, op0, op1, "", Call);
-        auto op0_lt0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
-                                       op0, zero, "", Call);
-        auto op1_lt0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
-                                       op1, zero, "", Call);
-        auto both_neg = BinaryOperator::Create(Instruction::And, op0_lt0,
-                                               op1_lt0, "", Call);
-        auto op0_ge0 = BinaryOperator::CreateNot(op0_lt0, "", Call);
-        auto op1_ge0 = BinaryOperator::CreateNot(op1_lt0, "", Call);
-        auto both_pos = BinaryOperator::Create(Instruction::And, op0_ge0,
-                                               op1_ge0, "", Call);
-        auto add_pos = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SGE,
-                                       add, zero, "", Call);
-        auto add_neg = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
-                                       add, zero, "", Call);
-        auto pos_clamp = SelectInst::Create(add_neg, max, add, "", Call);
-        auto neg_clamp = SelectInst::Create(add_pos, min, add, "", Call);
-        auto sel = SelectInst::Create(both_neg, neg_clamp, add, "", Call);
-        result = SelectInst::Create(both_pos, pos_clamp, sel, "", Call);
+        auto add_gt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SGT, add, op0, "", Call);
+        auto min_clamp = SelectInst::Create(add_gt_op0, min, add, "", Call);
+        auto add_lt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT, add, op0, "", Call);
+        auto max_clamp = SelectInst::Create(add_lt_op0, max, add, "", Call);
+        auto op1_lt_0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT, op1, zero, "", Call);
+        result = SelectInst::Create(op1_lt_0, min_clamp, max_clamp, "", Call);
       }
     } else {
       // Just use OpIAddCarry and use the carry to clamp the result.
