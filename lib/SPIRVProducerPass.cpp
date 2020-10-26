@@ -5058,7 +5058,8 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpMemoryBarrier:
     case spv::OpReturn:
     case spv::OpFunctionEnd:
-    case spv::OpCopyMemory: {
+    case spv::OpCopyMemory:
+    case spv::OpAtomicStore: {
       WriteWordCountAndOpcode(Inst);
       for (uint32_t i = 0; i < Ops.size(); i++) {
         WriteOperand(Ops[i]);
@@ -5184,6 +5185,7 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpSelect:
     case spv::OpPhi:
     case spv::OpLoad:
+    case spv::OpAtomicLoad:
     case spv::OpAtomicIAdd:
     case spv::OpAtomicISub:
     case spv::OpAtomicExchange:
