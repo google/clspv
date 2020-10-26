@@ -1,0 +1,62 @@
+#!amber
+
+SHADER compute test_uint OPENCL-C
+kernel void test_uint(global uint* out, global uint* in_a, global uint* in_b) {
+  uint gid = get_global_id(0);
+  out[gid] = add_sat(in_a[gid], in_b[gid]);
+}
+END
+
+SHADER compute fill OPENCL-C
+kernel void fill(global int* data) {
+  data[0] = 0xffffffff;
+  data[1] = 0xffffffff;
+  data[2] = 0x7fffffff;
+  data[3] = 0x7fffffff;
+  data[4] = 0xfffffffe;
+  data[5] = 0xffffffff;
+  data[6] = 0x00000000;
+  data[7] = 0x00000003;
+}
+END
+
+BUFFER a_buf DATA_TYPE uint32 DATA
+0x80000000
+0x80000000
+0x7fff0000
+0x0000ffff
+0x7fffffff
+0xffff0000
+0x00000000
+0x00000001
+END
+BUFFER b_buf DATA_TYPE uint32 DATA
+0x80000000
+0x7fffffff
+0x0000ffff
+0x7fff0000
+0x7fffffff
+0x0001ffff
+0x00000000
+0x00000002
+END
+BUFFER out_buf DATA_TYPE uint32 SIZE 8 FILL 0
+BUFFER c_buf DATA_TYPE uint32 SIZE 8 FILL 0
+
+PIPELINE compute test_pipe
+  ATTACH test_uint ENTRY_POINT test_uint
+  BIND BUFFER a_buf KERNEL ARG_NAME in_a
+  BIND BUFFER b_buf KERNEL ARG_NAME in_b
+  BIND BUFFER out_buf KERNEL ARG_NAME out
+END
+
+PIPELINE compute fill_pipe
+  ATTACH fill ENTRY_POINT fill
+  BIND BUFFER c_buf KERNEL ARG_NAME data
+END
+
+RUN fill_pipe 1 1 1
+RUN test_pipe 8 1 1
+
+EXPECT out_buf EQ_BUFFER c_buf
+

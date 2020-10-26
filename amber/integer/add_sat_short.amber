@@ -1,0 +1,62 @@
+#!amber
+
+SHADER compute test_short OPENCL-C
+kernel void test_short(global short* out, global short* in_a, global short* in_b) {
+  ushort gid = get_global_id(0);
+  out[gid] = add_sat(in_a[gid], in_b[gid]);
+}
+END
+
+SHADER compute fill OPENCL-C
+kernel void fill(global short* data) {
+  data[0] = 0x8000;
+  data[1] = 0xffff;
+  data[2] = 0x7fff;
+  data[3] = 0x7fff;
+  data[4] = 0x7fff;
+  data[5] = 0x8000;
+  data[6] = 0x8000;
+  data[7] = 0x0000;
+}
+END
+
+BUFFER a_buf DATA_TYPE int16 DATA
+0x8000
+0x8000
+0x7f00
+0x00ff
+0x7fff
+0xff00
+0x80ff
+0x8001
+END
+BUFFER b_buf DATA_TYPE int16 DATA
+0x8000
+0x7fff
+0x00ff
+0x7f00
+0x7fff
+0x80ff
+0xff00
+0x7fff
+END
+BUFFER out_buf DATA_TYPE int16 SIZE 8 FILL 0
+BUFFER c_buf DATA_TYPE int16 SIZE 8 FILL 0
+
+PIPELINE compute test_pipe
+  ATTACH test_short ENTRY_POINT test_short
+  BIND BUFFER a_buf KERNEL ARG_NAME in_a
+  BIND BUFFER b_buf KERNEL ARG_NAME in_b
+  BIND BUFFER out_buf KERNEL ARG_NAME out
+END
+
+PIPELINE compute fill_pipe
+  ATTACH fill ENTRY_POINT fill
+  BIND BUFFER c_buf KERNEL ARG_NAME data
+END
+
+RUN fill_pipe 1 1 1
+RUN test_pipe 8 1 1
+
+EXPECT out_buf EQ_BUFFER c_buf
+

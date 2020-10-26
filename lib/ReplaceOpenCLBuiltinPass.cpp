@@ -157,6 +157,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceFract(Function &F, int vec_size);
   bool replaceVload(Function &F);
   bool replaceVstore(Function &F);
+  bool replaceAddSat(Function &F, bool is_signed);
 };
 
 } // namespace
@@ -202,6 +203,10 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     break;
   case Builtins::kAbsDiff:
     return replaceAbsDiff(F, FI.getParameter(0).is_signed);
+
+  case Builtins::kAddSat:
+    return replaceAddSat(F, FI.getParameter(0).is_signed);
+
   case Builtins::kCopysign:
     return replaceCopysign(F);
 
@@ -2351,5 +2356,130 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
         Builder.CreateCall(fmin_fn, {fract_intermediate, just_under_one});
 
     return fract_result;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
+  Module *module = F.getParent();
+  return replaceCallsWithValue(F, [&module, is_signed](CallInst *Call) {
+    // SPIR-V OpIAddCarry interprets inputs as unsigned. We use that
+    // instruction for unsigned additions. For signed addition, it is more
+    // complicated. For values with bit widths less than 32 bits, we extend
+    // to the next power of two and perform the addition. For 32- and
+    // 64-bit values we test the signedness of op1 to determine how to clamp
+    // the addition.
+    Type *ty = Call->getType();
+    Value *op0 = Call->getArgOperand(0);
+    Value *op1 = Call->getArgOperand(1);
+    Value *result = nullptr;
+    if (is_signed) {
+      unsigned bitwidth = ty->getScalarSizeInBits();
+      if (bitwidth < 32) {
+        // sext_op0 = sext op0
+        // sext_op1 = sext op1
+        // add = add sext_op0 sext_op1
+        // clamp = clamp(add, min, max)
+        // result = trunc clamp
+        unsigned extended_bits = static_cast<unsigned>(bitwidth << 1);
+        // The clamp values are the signed min and max of the original bitwidth
+        // sign extended to the extended bitwidth.
+        Constant *scalar_min = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMinValue(bitwidth).sext(extended_bits));
+        Constant *scalar_max = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMaxValue(bitwidth).sext(extended_bits));
+        Constant *min = scalar_min;
+        Constant *max = scalar_max;
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
+          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
+        }
+        Type *extended_scalar_ty =
+            IntegerType::get(Call->getContext(), extended_bits);
+        Type *extended_ty = extended_scalar_ty;
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          extended_ty =
+              VectorType::get(extended_scalar_ty, vec_ty->getElementCount());
+        }
+        auto sext_op0 =
+            CastInst::Create(Instruction::SExt, op0, extended_ty, "", Call);
+        auto sext_op1 =
+            CastInst::Create(Instruction::SExt, op1, extended_ty, "", Call);
+        // Add the nsw flag since we know no overflow can occur.
+        auto add = BinaryOperator::CreateNSW(Instruction::Add, sext_op0,
+                                             sext_op1, "", Call);
+        FunctionType *func_ty = FunctionType::get(
+            extended_ty, {extended_ty, extended_ty, extended_ty}, false);
+
+        // Don't use the type in GetMangledFunctionName to ensure we get
+        // signed parameters.
+        std::string sclamp_name = Builtins::GetMangledFunctionName("clamp");
+        uint32_t vec_width = 1;
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          vec_width = vec_ty->getElementCount().getKnownMinValue();
+        }
+        if (extended_bits == 32) {
+          if (vec_width == 1) {
+            sclamp_name += "iii";
+          } else {
+            sclamp_name += "Dv" + std::to_string(vec_width) + "_iS_S_";
+          }
+        } else {
+          if (vec_width == 1) {
+            sclamp_name += "sss";
+          } else {
+            sclamp_name += "Dv" + std::to_string(vec_width) + "_sS_S_";
+          }
+        }
+        auto sclamp_callee = module->getOrInsertFunction(sclamp_name, func_ty);
+        auto clamp = CallInst::Create(sclamp_callee, {add, min, max}, "", Call);
+        result = CastInst::Create(Instruction::Trunc, clamp, ty, "", Call);
+      } else {
+        // Pseudo-code:
+        // c = a + b;
+        // if (b < 0)
+        //   c = c > a ? min : c;
+        // else
+        //   c = c < a ? max : c;
+        //
+        unsigned bitwidth = ty->getScalarSizeInBits();
+        Constant *scalar_min = ConstantInt::get(
+            Call->getContext(), APInt::getSignedMinValue(bitwidth));
+        Constant *scalar_max = ConstantInt::get(
+            Call->getContext(), APInt::getSignedMaxValue(bitwidth));
+        Constant *min = scalar_min;
+        Constant *max = scalar_max;
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
+          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
+        }
+        auto zero = Constant::getNullValue(ty);
+        // Cannot add the nsw flag.
+        auto add = BinaryOperator::Create(Instruction::Add, op0, op1, "", Call);
+        auto add_gt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SGT,
+                                          add, op0, "", Call);
+        auto min_clamp = SelectInst::Create(add_gt_op0, min, add, "", Call);
+        auto add_lt_op0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
+                                          add, op0, "", Call);
+        auto max_clamp = SelectInst::Create(add_lt_op0, max, add, "", Call);
+        auto op1_lt_0 = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
+                                        op1, zero, "", Call);
+        result = SelectInst::Create(op1_lt_0, min_clamp, max_clamp, "", Call);
+      }
+    } else {
+      // Just use OpIAddCarry and use the carry to clamp the result.
+      auto ret_ty = StructType::get(Call->getContext(), {ty, ty});
+      auto add = clspv::InsertSPIRVOp(
+          Call, spv::OpIAddCarry, {Attribute::ReadNone}, ret_ty, {op0, op1});
+      auto ex0 = ExtractValueInst::Create(add, {0}, "", Call);
+      auto ex1 = ExtractValueInst::Create(add, {1}, "", Call);
+      auto cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ, ex1,
+                                 Constant::getNullValue(ty), "", Call);
+      result =
+          SelectInst::Create(cmp, ex0, Constant::getAllOnesValue(ty), "", Call);
+    }
+
+    return result;
   });
 }
