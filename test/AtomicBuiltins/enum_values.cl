@@ -1,6 +1,9 @@
 // RUN: clspv --cl-std=CL3.0 %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
+//
+// This test checks that enum values are consistent with the definitions in
+// InitPreprocessor.cpp
 
 kernel void enum_values(global uint* out) {
   int i = 0;
