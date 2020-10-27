@@ -115,15 +115,15 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
   // release semnatics.
   Value *base_order = SeqCstSemantics;
   switch (base_semantics) {
-    case spv::MemorySemanticsAcquireMask:
-      base_order = AcquireSemantics;
-      break;
-    case spv::MemorySemanticsReleaseMask:
-      base_order = ReleaseSemantics;
-      break;
-    default:
-      base_order = AcqRelSemantics;
-      break;
+  case spv::MemorySemanticsAcquireMask:
+    base_order = AcquireSemantics;
+    break;
+  case spv::MemorySemanticsReleaseMask:
+    base_order = ReleaseSemantics;
+    break;
+  default:
+    base_order = AcqRelSemantics;
+    break;
   }
 
   Value *storage = is_global ? UniformSemantics : WorkgroupSemantics;
@@ -160,8 +160,7 @@ Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
       builder.getInt32(AtomicMemoryScope::kMemoryScopeWorkGroup);
   const auto sub_group =
       builder.getInt32(AtomicMemoryScope::kMemoryScopeSubGroup);
-  const auto device =
-      builder.getInt32(AtomicMemoryScope::kMemoryScopeDevice);
+  const auto device = builder.getInt32(AtomicMemoryScope::kMemoryScopeDevice);
 
   // Constants for SPIR-V memory scopes.
   const auto InvocationScope = builder.getInt32(spv::ScopeInvocation);
