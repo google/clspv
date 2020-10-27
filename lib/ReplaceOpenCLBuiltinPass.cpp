@@ -21,6 +21,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
@@ -2650,7 +2651,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
     auto pointer = Call->getArgOperand(0);
     // Clang emits an address space case to the generic address space. Skip the
     // cast and use the input directly.
-    if (auto cast = dyn_cast<AddrSpaceCastInst>(pointer)) {
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
     }
     Value *order_arg =
@@ -2673,7 +2674,7 @@ bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
     auto pointer = Call->getArgOperand(0);
     // Clang emits an address space case to the generic address space. Skip the
     // cast and use the input directly.
-    if (auto cast = dyn_cast<AddrSpaceCastInst>(pointer)) {
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
     }
     Value *value = Call->getArgOperand(1);
@@ -2695,11 +2696,11 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     auto pointer = Call->getArgOperand(0);
     // Clang emits an address space case to the generic address space. Skip the
     // cast and use the input directly.
-    if (auto cast = dyn_cast<AddrSpaceCastInst>(pointer)) {
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
     }
     auto expected = Call->getArgOperand(1);
-    if (auto cast = dyn_cast<AddrSpaceCastInst>(expected)) {
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(expected)) {
       expected = cast->getPointerOperand();
     }
     auto value = Call->getArgOperand(2);
