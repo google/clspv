@@ -252,6 +252,10 @@ private:
       return true;
     }
 
+    if (QT->isAtomicType()) {
+      return true;
+    }
+
 #ifndef NDEBUG
     llvm::dbgs() << "IsSupportedType lacks support for QualType: "
                  << QT.getAsString() << '\n';
