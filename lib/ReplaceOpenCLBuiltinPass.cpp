@@ -694,7 +694,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         subgroup ? ConstantScopeSubgroup : ConstantScopeWorkgroup;
 
     return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
-                                {Attribute::NoDuplicate}, CI->getType(),
+                                {Attribute::NoDuplicate, Attribute::Convergent},
+                                CI->getType(),
                                 {ExecutionScope, MemoryScope, MemorySemantics});
   });
 }
@@ -764,7 +765,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
     // Memory Scope is always workgroup.
     const auto MemoryScope = ConstantScopeWorkgroup;
 
-    return clspv::InsertSPIRVOp(CI, spv::OpMemoryBarrier, {}, CI->getType(),
+    return clspv::InsertSPIRVOp(CI, spv::OpMemoryBarrier,
+                                {Attribute::Convergent}, CI->getType(),
                                 {MemoryScope, MemorySemantics});
   });
 }
