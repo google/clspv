@@ -158,6 +158,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVload(Function &F);
   bool replaceVstore(Function &F);
   bool replaceAddSat(Function &F, bool is_signed);
+  bool replaceHadd(Function &F, Instruction::BinaryOps join_opcode);
 };
 
 } // namespace
@@ -206,6 +207,11 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kAddSat:
     return replaceAddSat(F, FI.getParameter(0).is_signed);
+
+  case Builtins::kHadd:
+    return replaceHadd(F, Instruction::And);
+  case Builtins::kRhadd:
+    return replaceHadd(F, Instruction::Or);
 
   case Builtins::kCopysign:
     return replaceCopysign(F);
@@ -2358,6 +2364,27 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
         Builder.CreateCall(fmin_fn, {fract_intermediate, just_under_one});
 
     return fract_result;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, Instruction::BinaryOps join_opcode) {
+  return replaceCallsWithValue(F, [join_opcode](CallInst *Call) {
+    // a_shr = a >> 1
+    // b_shr = b >> 1
+    // add1 = a_shr + b_shr
+    // join = a |join_opcode| b
+    // and = join & 1
+    // add = add1 + and
+    const auto a = Call->getArgOperand(0);
+    const auto b = Call->getArgOperand(1);
+    IRBuilder<> builder(Call);
+    auto a_shift = builder.CreateLShr(a, 1);
+    auto b_shift = builder.CreateLShr(b, 1);
+    auto add = builder.CreateAdd(a_shift, b_shift);
+    auto join = BinaryOperator::Create(join_opcode, a, b, "", Call);
+    auto constant_one = ConstantInt::get(a->getType(), 1);
+    auto and_bit = builder.CreateAnd(join, constant_one);
+    return builder.CreateAdd(add, and_bit);
   });
 }
 
