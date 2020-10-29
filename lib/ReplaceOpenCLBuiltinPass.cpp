@@ -1187,32 +1187,12 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
       }
     }
 
-    // The approach used is to shift the top bits down, the bottom bits up
-    // and OR the two shifted values.
-
-    // The rotation amount is to be treated modulo the element size.
-    // Since SPIR-V shift ops don't support this, let's apply the
-    // modulo ahead of shifting. The element size is always a power of
-    // two so we can just AND with a mask.
-    auto ModMask =
-        ConstantInt::get(SrcType, SrcType->getScalarSizeInBits() - 1);
-    RotAmount =
-        BinaryOperator::Create(Instruction::And, RotAmount, ModMask, "", CI);
-
-    // Let's calc the amount by which to shift top bits down
-    auto ScalarSize = ConstantInt::get(SrcType, SrcType->getScalarSizeInBits());
-    auto DownAmount =
-        BinaryOperator::Create(Instruction::Sub, ScalarSize, RotAmount, "", CI);
-
-    // Now shift the bottom bits up and the top bits down
-    auto LoRotated =
-        BinaryOperator::Create(Instruction::Shl, SrcValue, RotAmount, "", CI);
-    auto HiRotated =
-        BinaryOperator::Create(Instruction::LShr, SrcValue, DownAmount, "", CI);
-
-    // Finally OR the two shifted values
-    return BinaryOperator::Create(Instruction::Or, LoRotated, HiRotated, "",
-                                  CI);
+    // Replace with LLVM's funnel shift left intrinsic because it is more
+    // generic than rotate.
+    Function *intrinsic =
+        Intrinsic::getDeclaration(F.getParent(), Intrinsic::fshl, SrcType);
+    return CallInst::Create(intrinsic->getFunctionType(), intrinsic,
+                            {SrcValue, SrcValue, RotAmount}, "", CI);
   });
 }
 
