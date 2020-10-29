@@ -103,8 +103,6 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
       builder.getInt32(spv::MemorySemanticsReleaseMask);
   const auto AcqRelSemantics =
       builder.getInt32(spv::MemorySemanticsAcquireReleaseMask);
-  const auto SeqCstSemantics =
-      builder.getInt32(spv::MemorySemanticsSequentiallyConsistentMask);
 
   // Constants for SPIR-V storage class semantics.
   const auto UniformSemantics =
