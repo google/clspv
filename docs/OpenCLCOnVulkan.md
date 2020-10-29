@@ -764,6 +764,18 @@ built-ins are not necessarily honoured.
 The `atomic_xchg()` built-in function that takes a floating-point argument
 **must not** be used.
 
+##### OpenCL 2.0 Atomic Functions
+
+The OpenCL 2.0 atomic functions are supported with the following exceptions:
+* `atomic_flag` functions are not supported
+* atomic initialization functions and macros are not supported
+* `atomic_work_item_fence` is not (currently) supported
+* `memory_order_seq_cst` is weakened to acquire for loads, release for stores
+  and acquire release for read-modify-write operations
+* `memory_scope_all_svm_devices` and `memory_scope_all_devices` are not supported
+* `atomic_compare_exchange_weak*` is implemented as `atomic_compare_exchange_strong*`
+* Due to Vulkan restrictions, only 32-bit integer types are currently supported
+
 #### Conversions
 
 The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,

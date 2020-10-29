@@ -21,10 +21,12 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "spirv/unified1/spirv.hpp"
@@ -72,6 +74,114 @@ Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
                                  vec_ty->getElementCount().getKnownMinValue());
   }
   return IntTy;
+}
+
+Value *MemoryOrderSemantics(Value *order, bool is_global,
+                            Instruction *InsertBefore,
+                            spv::MemorySemanticsMask base_semantics) {
+  enum AtomicMemoryOrder : uint32_t {
+    kMemoryOrderRelaxed = 0,
+    kMemoryOrderAcquire = 2,
+    kMemoryOrderRelease = 3,
+    kMemoryOrderAcqRel = 4,
+    kMemoryOrderSeqCst = 5
+  };
+
+  IRBuilder<> builder(InsertBefore);
+
+  // Constants for OpenCL C 2.0 memory_order.
+  const auto relaxed = builder.getInt32(AtomicMemoryOrder::kMemoryOrderRelaxed);
+  const auto acquire = builder.getInt32(AtomicMemoryOrder::kMemoryOrderAcquire);
+  const auto release = builder.getInt32(AtomicMemoryOrder::kMemoryOrderRelease);
+  const auto acq_rel = builder.getInt32(AtomicMemoryOrder::kMemoryOrderAcqRel);
+
+  // Constants for SPIR-V ordering memory semantics.
+  const auto RelaxedSemantics = builder.getInt32(spv::MemorySemanticsMaskNone);
+  const auto AcquireSemantics =
+      builder.getInt32(spv::MemorySemanticsAcquireMask);
+  const auto ReleaseSemantics =
+      builder.getInt32(spv::MemorySemanticsReleaseMask);
+  const auto AcqRelSemantics =
+      builder.getInt32(spv::MemorySemanticsAcquireReleaseMask);
+
+  // Constants for SPIR-V storage class semantics.
+  const auto UniformSemantics =
+      builder.getInt32(spv::MemorySemanticsUniformMemoryMask);
+  const auto WorkgroupSemantics =
+      builder.getInt32(spv::MemorySemanticsWorkgroupMemoryMask);
+
+  // Instead of sequentially consistent, use acquire, release or acquire
+  // release semantics.
+  Value *base_order = nullptr;
+  switch (base_semantics) {
+  case spv::MemorySemanticsAcquireMask:
+    base_order = AcquireSemantics;
+    break;
+  case spv::MemorySemanticsReleaseMask:
+    base_order = ReleaseSemantics;
+    break;
+  default:
+    base_order = AcqRelSemantics;
+    break;
+  }
+
+  Value *storage = is_global ? UniformSemantics : WorkgroupSemantics;
+  if (order == nullptr)
+    return builder.CreateOr({storage, base_order});
+
+  auto is_relaxed = builder.CreateICmpEQ(order, relaxed);
+  auto is_acquire = builder.CreateICmpEQ(order, acquire);
+  auto is_release = builder.CreateICmpEQ(order, release);
+  auto is_acq_rel = builder.CreateICmpEQ(order, acq_rel);
+  auto semantics =
+      builder.CreateSelect(is_relaxed, RelaxedSemantics, base_order);
+  semantics = builder.CreateSelect(is_acquire, AcquireSemantics, semantics);
+  semantics = builder.CreateSelect(is_release, ReleaseSemantics, semantics);
+  semantics = builder.CreateSelect(is_acq_rel, AcqRelSemantics, semantics);
+  return builder.CreateOr({storage, semantics});
+}
+
+Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
+  enum AtomicMemoryScope : uint32_t {
+    kMemoryScopeWorkItem = 0,
+    kMemoryScopeWorkGroup = 1,
+    kMemoryScopeDevice = 2,
+    kMemoryScopeAllSVMDevices = 3, // not supported
+    kMemoryScopeSubGroup = 4
+  };
+
+  IRBuilder<> builder(InsertBefore);
+
+  // Constants for OpenCL C 2.0 memory_scope.
+  const auto work_item =
+      builder.getInt32(AtomicMemoryScope::kMemoryScopeWorkItem);
+  const auto work_group =
+      builder.getInt32(AtomicMemoryScope::kMemoryScopeWorkGroup);
+  const auto sub_group =
+      builder.getInt32(AtomicMemoryScope::kMemoryScopeSubGroup);
+  const auto device = builder.getInt32(AtomicMemoryScope::kMemoryScopeDevice);
+
+  // Constants for SPIR-V memory scopes.
+  const auto InvocationScope = builder.getInt32(spv::ScopeInvocation);
+  const auto WorkgroupScope = builder.getInt32(spv::ScopeWorkgroup);
+  const auto DeviceScope = builder.getInt32(spv::ScopeDevice);
+  const auto SubgroupScope = builder.getInt32(spv::ScopeSubgroup);
+
+  auto base_scope = is_global ? DeviceScope : WorkgroupScope;
+  if (scope == nullptr)
+    return base_scope;
+
+  auto is_work_item = builder.CreateICmpEQ(scope, work_item);
+  auto is_work_group = builder.CreateICmpEQ(scope, work_group);
+  auto is_sub_group = builder.CreateICmpEQ(scope, sub_group);
+  auto is_device = builder.CreateICmpEQ(scope, device);
+
+  scope = builder.CreateSelect(is_work_item, InvocationScope, base_scope);
+  scope = builder.CreateSelect(is_work_group, WorkgroupScope, scope);
+  scope = builder.CreateSelect(is_sub_group, SubgroupScope, scope);
+  scope = builder.CreateSelect(is_device, DeviceScope, scope);
+
+  return scope;
 }
 
 bool replaceCallsWithValue(Function &F,
@@ -153,6 +263,11 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceSampledReadImageWithIntCoords(Function &F);
   bool replaceAtomics(Function &F, spv::Op Op);
   bool replaceAtomics(Function &F, llvm::AtomicRMWInst::BinOp Op);
+  bool replaceAtomicLoad(Function &F);
+  bool replaceExplicitAtomics(Function &F, spv::Op Op,
+                              spv::MemorySemanticsMask semantics =
+                                  spv::MemorySemanticsAcquireReleaseMask);
+  bool replaceAtomicCompareExchange(Function &);
   bool replaceCross(Function &F);
   bool replaceFract(Function &F, int vec_size);
   bool replaceVload(Function &F);
@@ -302,6 +417,51 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceConvert(F, FI.getParameter(0).is_signed,
                           FI.getReturnType().is_signed);
 
+  // OpenCL 2.0 explicit atomics have different default scopes and semantics
+  // than legacy atomic functions.
+  case Builtins::kAtomicLoad:
+  case Builtins::kAtomicLoadExplicit:
+    return replaceAtomicLoad(F);
+  case Builtins::kAtomicStore:
+  case Builtins::kAtomicStoreExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicStore,
+                                  spv::MemorySemanticsReleaseMask);
+  case Builtins::kAtomicExchange:
+  case Builtins::kAtomicExchangeExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicExchange);
+  case Builtins::kAtomicFetchAdd:
+  case Builtins::kAtomicFetchAddExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicIAdd);
+  case Builtins::kAtomicFetchSub:
+  case Builtins::kAtomicFetchSubExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicISub);
+  case Builtins::kAtomicFetchOr:
+  case Builtins::kAtomicFetchOrExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicOr);
+  case Builtins::kAtomicFetchXor:
+  case Builtins::kAtomicFetchXorExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicXor);
+  case Builtins::kAtomicFetchAnd:
+  case Builtins::kAtomicFetchAndExplicit:
+    return replaceExplicitAtomics(F, spv::OpAtomicAnd);
+  case Builtins::kAtomicFetchMin:
+  case Builtins::kAtomicFetchMinExplicit:
+    return replaceExplicitAtomics(F, FI.getParameter(1).is_signed
+                                         ? spv::OpAtomicSMin
+                                         : spv::OpAtomicUMin);
+  case Builtins::kAtomicFetchMax:
+  case Builtins::kAtomicFetchMaxExplicit:
+    return replaceExplicitAtomics(F, FI.getParameter(1).is_signed
+                                         ? spv::OpAtomicSMax
+                                         : spv::OpAtomicUMax);
+  // Weak compare exchange is generated as strong compare exchange.
+  case Builtins::kAtomicCompareExchangeWeak:
+  case Builtins::kAtomicCompareExchangeWeakExplicit:
+  case Builtins::kAtomicCompareExchangeStrong:
+  case Builtins::kAtomicCompareExchangeStrongExplicit:
+    return replaceAtomicCompareExchange(F);
+
+  // Legacy atomic functions.
   case Builtins::kAtomicInc:
     return replaceAtomics(F, spv::OpAtomicIIncrement);
   case Builtins::kAtomicDec:
@@ -2483,5 +2643,97 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
     }
 
     return result;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    auto pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
+      pointer = cast->getPointerOperand();
+    }
+    Value *order_arg =
+        Call->getNumArgOperands() > 1 ? Call->getArgOperand(1) : nullptr;
+    Value *scope_arg =
+        Call->getNumArgOperands() > 2 ? Call->getArgOperand(2) : nullptr;
+    bool is_global = pointer->getType()->getPointerAddressSpace() ==
+                     clspv::AddressSpace::Global;
+    auto order = MemoryOrderSemantics(order_arg, is_global, Call,
+                                      spv::MemorySemanticsAcquireMask);
+    auto scope = MemoryScope(scope_arg, is_global, Call);
+    return InsertSPIRVOp(Call, spv::OpAtomicLoad, {Attribute::Convergent},
+                         Call->getType(), {pointer, scope, order});
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
+    Function &F, spv::Op Op, spv::MemorySemanticsMask semantics) {
+  return replaceCallsWithValue(F, [Op, semantics](CallInst *Call) {
+    auto pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
+      pointer = cast->getPointerOperand();
+    }
+    Value *value = Call->getArgOperand(1);
+    Value *order_arg =
+        Call->getNumArgOperands() > 2 ? Call->getArgOperand(2) : nullptr;
+    Value *scope_arg =
+        Call->getNumArgOperands() > 3 ? Call->getArgOperand(3) : nullptr;
+    bool is_global = pointer->getType()->getPointerAddressSpace() ==
+                     clspv::AddressSpace::Global;
+    auto scope = MemoryScope(scope_arg, is_global, Call);
+    auto order = MemoryOrderSemantics(order_arg, is_global, Call, semantics);
+    return InsertSPIRVOp(Call, Op, {Attribute::Convergent}, Call->getType(),
+                         {pointer, scope, order, value});
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    auto pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
+      pointer = cast->getPointerOperand();
+    }
+    auto expected = Call->getArgOperand(1);
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(expected)) {
+      expected = cast->getPointerOperand();
+    }
+    auto value = Call->getArgOperand(2);
+    bool is_global = pointer->getType()->getPointerAddressSpace() ==
+                     clspv::AddressSpace::Global;
+    Value *success_arg =
+        Call->getNumArgOperands() > 3 ? Call->getArgOperand(3) : nullptr;
+    Value *failure_arg =
+        Call->getNumArgOperands() > 4 ? Call->getArgOperand(4) : nullptr;
+    Value *scope_arg =
+        Call->getNumArgOperands() > 5 ? Call->getArgOperand(5) : nullptr;
+    auto scope = MemoryScope(scope_arg, is_global, Call);
+    auto success = MemoryOrderSemantics(success_arg, is_global, Call,
+                                        spv::MemorySemanticsAcquireReleaseMask);
+    auto failure = MemoryOrderSemantics(failure_arg, is_global, Call,
+                                        spv::MemorySemanticsAcquireMask);
+
+    // If the value pointed to by |expected| equals the value pointed to by
+    // |pointer|, |value| is written into |pointer|, otherwise the value in
+    // |pointer| is written into |expected|. In order to avoid extra stores,
+    // the basic block with the original atomic is split and the store is
+    // performed in the |then| block. The condition is the inversion of the
+    // comparison result.
+    IRBuilder<> builder(Call);
+    auto load = builder.CreateLoad(expected);
+    auto cmp_xchg = InsertSPIRVOp(
+        Call, spv::OpAtomicCompareExchange, {Attribute::Convergent},
+        value->getType(), {pointer, scope, success, failure, value, load});
+    auto cmp = builder.CreateICmpEQ(cmp_xchg, load);
+    auto not_cmp = builder.CreateNot(cmp);
+    auto then_branch = SplitBlockAndInsertIfThen(not_cmp, Call, false);
+    builder.SetInsertPoint(then_branch);
+    builder.CreateStore(cmp_xchg, expected);
+    return cmp;
   });
 }
