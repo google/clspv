@@ -113,8 +113,8 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
       builder.getInt32(spv::MemorySemanticsWorkgroupMemoryMask);
 
   // Instead of sequentially consistent, use acquire, release or acquire
-  // release semnatics.
-  Value *base_order = SeqCstSemantics;
+  // release semantics.
+  Value *base_order = nullptr;
   switch (base_semantics) {
   case spv::MemorySemanticsAcquireMask:
     base_order = AcquireSemantics;
@@ -419,7 +419,7 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceConvert(F, FI.getParameter(0).is_signed,
                           FI.getReturnType().is_signed);
 
-  // OpenCL 2.0 explicit atomics have different default scopes and semnatics
+  // OpenCL 2.0 explicit atomics have different default scopes and semantics
   // than legacy atomic functions.
   case Builtins::kAtomicLoad:
   case Builtins::kAtomicLoadExplicit:
@@ -2649,7 +2649,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
 bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
   return replaceCallsWithValue(F, [](CallInst *Call) {
     auto pointer = Call->getArgOperand(0);
-    // Clang emits an address space case to the generic address space. Skip the
+    // Clang emits an address space cast to the generic address space. Skip the
     // cast and use the input directly.
     if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
@@ -2672,7 +2672,7 @@ bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
     Function &F, spv::Op Op, spv::MemorySemanticsMask semantics) {
   return replaceCallsWithValue(F, [Op, semantics](CallInst *Call) {
     auto pointer = Call->getArgOperand(0);
-    // Clang emits an address space case to the generic address space. Skip the
+    // Clang emits an address space cast to the generic address space. Skip the
     // cast and use the input directly.
     if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
@@ -2694,7 +2694,7 @@ bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
 bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
   return replaceCallsWithValue(F, [](CallInst *Call) {
     auto pointer = Call->getArgOperand(0);
-    // Clang emits an address space case to the generic address space. Skip the
+    // Clang emits an address space cast to the generic address space. Skip the
     // cast and use the input directly.
     if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
