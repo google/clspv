@@ -29,7 +29,6 @@ target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:2
 target triple = "spir-unknown-unknown"
 )";
 
-
 std::string TypeName(uint32_t width, bool is_signed, uint32_t vector) {
   std::string name = (is_signed ? "" : "u");
   switch (width) {

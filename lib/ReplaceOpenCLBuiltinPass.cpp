@@ -2367,7 +2367,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, Instruction::BinaryOps join_opcode) {
+bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F,
+                                           Instruction::BinaryOps join_opcode) {
   return replaceCallsWithValue(F, [join_opcode](CallInst *Call) {
     // a_shr = a >> 1
     // b_shr = b >> 1
