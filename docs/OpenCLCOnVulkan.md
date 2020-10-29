@@ -793,8 +793,7 @@ functions **must not** be used.
 
 #### Integer Functions
 
-The `add_sat()`, `hadd()`, `mad_sat()`, `rhadd()` and `sub_sat()` built-in
-functions **must not** be used.
+The `mad_sat()`,  and `sub_sat()` built-in functions **must not** be used.
 
 #### Relational Functions
 

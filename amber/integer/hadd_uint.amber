@@ -1,0 +1,51 @@
+#!amber
+
+SHADER compute test OPENCL-C
+kernel void hadd(global uint* out, global uint* a, global uint* b) {
+  uint gid = get_global_id(0);
+  out[gid] = hadd(a[gid], b[gid]);
+}
+END
+
+BUFFER out_buf DATA_TYPE uint32 SIZE 8 FILL 0
+BUFFER a_buf DATA_TYPE uint32 DATA
+0
+1
+0
+0xfffffffe
+0xffffffff
+3
+3
+0x80000000
+END
+BUFFER b_buf DATA_TYPE uint32 DATA
+0
+1
+1
+0xfffffffe
+0xffffffff
+1
+3
+0x80000000
+END
+BUFFER expected DATA_TYPE uint32 DATA
+0
+1
+0
+0xfffffffe
+0xffffffff
+2
+3
+0x80000000
+END
+
+PIPELINE compute test_pipe
+  ATTACH test ENTRY_POINT hadd
+  BIND BUFFER out_buf KERNEL ARG_NAME out
+  BIND BUFFER a_buf KERNEL ARG_NAME a
+  BIND BUFFER b_buf KERNEL ARG_NAME b
+END
+
+RUN test_pipe 8 1 1
+
+EXPECT out_buf EQ_BUFFER expected
