@@ -22,3 +22,4 @@ declare i64 @_Z3clzl(i64)
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select i1 [[cmp]], i32 [[bot_adjust]], i32 [[top_clz]]
 ; CHECK: [[zext:%[a-zA-Z0-9_.]+]] = zext i32 [[sel]] to i64
 ; CHECK: ret i64 [[zext]]
+; CHECK: declare i32 @_Z3clzj(i32)
