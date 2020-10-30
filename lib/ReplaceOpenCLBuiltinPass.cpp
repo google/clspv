@@ -2766,7 +2766,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClz(Function &F) {
     if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
       ty = VectorType::get(ty, vec_ty->getElementCount());
     }
-    auto clz_32bit_ty = FunctionType::get(int32_ty, {int32_ty}, false);
+    auto clz_32bit_ty = FunctionType::get(ty, {ty}, false);
     std::string clz_32bit_name = Builtins::GetMangledFunctionName("clz", ty);
     auto clz_32bit =
         F.getParent()->getOrInsertFunction(clz_32bit_name, clz_32bit_ty);
