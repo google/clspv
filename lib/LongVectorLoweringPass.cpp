@@ -63,6 +63,9 @@ private:
   /// Visit Constant. This is not provided by InstVisitor.
   Value *visitConstant(Constant &Cst);
 
+  /// Visit Unary or Binary Operator. This is not provided by InstVisitor.
+  Value *visitNAryOperator(Instruction &I);
+
   /// InstVisitor impl, general "catch-all" function.
   Value *visitInstruction(Instruction &I);
 
@@ -71,6 +74,7 @@ private:
   Value *visitExtractElementInst(ExtractElementInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
   Value *visitShuffleVectorInst(ShuffleVectorInst &I);
+  Value *visitUnaryOperator(UnaryOperator &I);
 
 private:
   // Helpers for lowering values.
@@ -211,9 +215,9 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
 using ScalarOperationFactory =
     std::function<Value *(IRBuilder<> & /* B */, ArrayRef<Value *> /* Args */)>;
 
-/// Scalarise a vector instruction element-wise by invoking the operation
+/// Scalarise the vector instruction @p I element-wise by invoking the operation
 /// @p ScalarOperation.
-Value *convertVectorOperation(IRBuilder<> &B, Type *EquivalentReturnTy,
+Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
                               ArrayRef<Value *> EquivalentArgs,
                               ScalarOperationFactory ScalarOperation) {
   assert(EquivalentReturnTy != nullptr);
@@ -223,6 +227,7 @@ Value *convertVectorOperation(IRBuilder<> &B, Type *EquivalentReturnTy,
   unsigned Arity = EquivalentReturnTy->getNumContainedTypes();
 
   // Invoke the scalar operation once for each vector element.
+  IRBuilder<> B(&I);
   for (unsigned i = 0; i < Arity; ++i) {
     SmallVector<Value *, 16> Args;
     Args.resize(EquivalentArgs.size());
@@ -233,6 +238,11 @@ Value *convertVectorOperation(IRBuilder<> &B, Type *EquivalentReturnTy,
     }
 
     Value *Scalar = ScalarOperation(B, Args);
+
+    if (isa<Instruction>(Scalar)) {
+      cast<Instruction>(Scalar)->copyIRFlags(&I);
+    }
+
     ReturnValue = B.CreateInsertValue(ReturnValue, Scalar, i);
   }
 
@@ -379,14 +389,7 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
   llvm_unreachable("Unsupported kind of constant");
 }
 
-Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
-#ifndef NDEBUG
-  dbgs() << "Instruction not handled: " << I << '\n';
-#endif
-  llvm_unreachable("Missing support for instruction");
-}
-
-Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
+Value *LongVectorLoweringPass::visitNAryOperator(Instruction &I) {
   SmallVector<Value *, 16> EquivalentArgs;
   for (auto &Operand : I.operands()) {
     Value *EquivalentOperand = visit(Operand.get());
@@ -400,11 +403,21 @@ Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
     return B.CreateNAryOp(Opcode, Args);
   };
 
-  IRBuilder<> B(&I);
-  Value *V = convertVectorOperation(B, EquivalentReturnTy, EquivalentArgs,
+  Value *V = convertVectorOperation(I, EquivalentReturnTy, EquivalentArgs,
                                     ScalarFactory);
   registerReplacement(I, *V);
   return V;
+}
+
+Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
+#ifndef NDEBUG
+  dbgs() << "Instruction not handled: " << I << '\n';
+#endif
+  llvm_unreachable("Missing support for instruction");
+}
+
+Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
+  return visitNAryOperator(I);
 }
 
 Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
@@ -505,6 +518,10 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
 
   registerReplacement(I, *V);
   return V;
+}
+
+Value *LongVectorLoweringPass::visitUnaryOperator(UnaryOperator &I) {
+  return visitNAryOperator(I);
 }
 
 bool LongVectorLoweringPass::handlingRequired(User &U) {
