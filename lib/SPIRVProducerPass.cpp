@@ -3796,10 +3796,12 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
           RID = addSPIRVInst(opcode, Ops);
         };
 
-        auto IntTy = Type::getInt32Ty(Context);
+        auto bitwidth = Call->getType()->getScalarSizeInBits();
         switch (IndirectExtInst) {
         case glsl::ExtInstFindUMsb: // Implementing clz
-          generate_extra_inst(spv::OpISub, ConstantInt::get(IntTy, 31));
+          generate_extra_inst(
+              spv::OpISub,
+              ConstantInt::get(Call->getType()->getScalarType(), bitwidth - 1));
           break;
         case glsl::ExtInstAcos:  // Implementing acospi
         case glsl::ExtInstAsin:  // Implementing asinpi
@@ -3807,7 +3809,7 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
         case glsl::ExtInstAtan2: // Implementing atan2pi
           generate_extra_inst(
               spv::OpFMul,
-              ConstantFP::get(Type::getFloatTy(Context), kOneOverPi));
+              ConstantFP::get(Call->getType()->getScalarType(), kOneOverPi));
           break;
 
         default:

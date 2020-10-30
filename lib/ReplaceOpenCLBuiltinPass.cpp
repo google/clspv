@@ -274,6 +274,7 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVstore(Function &F);
   bool replaceAddSat(Function &F, bool is_signed);
   bool replaceHadd(Function &F, Instruction::BinaryOps join_opcode);
+  bool replaceClz(Function &F);
 };
 
 } // namespace
@@ -322,6 +323,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kAddSat:
     return replaceAddSat(F, FI.getParameter(0).is_signed);
+
+  case Builtins::kClz:
+    return replaceClz(F);
 
   case Builtins::kHadd:
     return replaceHadd(F, Instruction::And);
@@ -2743,5 +2747,60 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     builder.SetInsertPoint(then_branch);
     builder.CreateStore(cmp_xchg, expected);
     return cmp;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceClz(Function &F) {
+  if (!isa<IntegerType>(F.getReturnType()->getScalarType()))
+    return false;
+
+  auto bitwidth = F.getReturnType()->getScalarSizeInBits();
+  if (bitwidth == 32 || bitwidth > 64)
+    return false;
+
+  return replaceCallsWithValue(F, [&F, bitwidth](CallInst *Call) {
+    auto in = Call->getArgOperand(0);
+    IRBuilder<> builder(Call);
+    auto int32_ty = builder.getInt32Ty();
+    Type *ty = int32_ty;
+    if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
+      ty = VectorType::get(ty, vec_ty->getElementCount());
+    }
+    auto clz_32bit_ty = FunctionType::get(int32_ty, {int32_ty}, false);
+    std::string clz_32bit_name = Builtins::GetMangledFunctionName("clz", ty);
+    auto clz_32bit =
+        F.getParent()->getOrInsertFunction(clz_32bit_name, clz_32bit_ty);
+    if (bitwidth < 32) {
+      // Extend the input to 32-bits and perform a clz.  The clz for 32-bit is
+      // tranlated as 31 - FindUMsb(in). Adjust to that result to the right
+      // size.
+      auto zext = builder.CreateZExt(in, ty);
+      auto clz = builder.CreateCall(clz_32bit, {zext});
+      Constant *sub_const = builder.getInt32(32 - bitwidth);
+      if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+        sub_const =
+            ConstantVector::getSplat(vec_ty->getElementCount(), sub_const);
+      }
+      auto sub = builder.CreateSub(clz, sub_const);
+      return builder.CreateTrunc(sub, Call->getType());
+    } else {
+      // Split the input into top and bottom parts and perform clz on both. If
+      // the most significant 1 is in the upper 32-bits, return the top result
+      // directly. Otherwise return 32 + the bottom result to adjust for the
+      // correct size.
+      auto lshr = builder.CreateLShr(in, 32);
+      auto top_bits = builder.CreateTrunc(lshr, ty);
+      auto bot_bits = builder.CreateTrunc(in, ty);
+      auto top_clz = builder.CreateCall(clz_32bit, {top_bits});
+      auto bot_clz = builder.CreateCall(clz_32bit, {bot_bits});
+      Constant *c32 = builder.getInt32(32);
+      if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+        c32 = ConstantVector::getSplat(vec_ty->getElementCount(), c32);
+      }
+      auto cmp = builder.CreateICmpEQ(top_clz, c32);
+      auto bot_adjust = builder.CreateAdd(bot_clz, c32);
+      auto sel = builder.CreateSelect(cmp, bot_adjust, top_clz);
+      return builder.CreateZExt(sel, Call->getType());
+    }
   });
 }
