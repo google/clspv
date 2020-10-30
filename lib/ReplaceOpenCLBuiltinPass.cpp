@@ -2772,8 +2772,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClz(Function &F) {
         F.getParent()->getOrInsertFunction(clz_32bit_name, clz_32bit_ty);
     if (bitwidth < 32) {
       // Extend the input to 32-bits and perform a clz.  The clz for 32-bit is
-      // tranlated as 31 - FindUMsb(in). Adjust to that result to the right
-      // size.
+      // translated as 31 - FindUMsb(in). Adjust that result to the right size.
       auto zext = builder.CreateZExt(in, ty);
       auto clz = builder.CreateCall(clz_32bit, {zext});
       Constant *sub_const = builder.getInt32(32 - bitwidth);
