@@ -17,8 +17,8 @@ entry:
 
 declare i16 @_Z4haddss(i16, i16)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr i16 %a, 1
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr i16 %b, 1
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr i16 %a, 1
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr i16 %b, 1
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i16 [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = and i16 %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and i16 [[join]], 1

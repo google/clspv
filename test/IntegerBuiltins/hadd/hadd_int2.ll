@@ -17,8 +17,8 @@ entry:
 
 declare <2 x i32> @_Z4haddDv2_iS_(<2 x i32>, <2 x i32>)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr <2 x i32> %a, <i32 1, i32 1>
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr <2 x i32> %b, <i32 1, i32 1>
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr <2 x i32> %a, <i32 1, i32 1>
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr <2 x i32> %b, <i32 1, i32 1>
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <2 x i32> [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = and <2 x i32> %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <2 x i32> [[join]], <i32 1, i32 1>

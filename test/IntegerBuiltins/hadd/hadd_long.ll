@@ -17,8 +17,8 @@ entry:
 
 declare i64 @_Z4haddll(i64, i64)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr i64 %a, 1
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr i64 %b, 1
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr i64 %a, 1
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr i64 %b, 1
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i64 [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = and i64 %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and i64 [[join]], 1
