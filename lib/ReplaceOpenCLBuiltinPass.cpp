@@ -273,7 +273,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceVload(Function &F);
   bool replaceVstore(Function &F);
   bool replaceAddSat(Function &F, bool is_signed);
-  bool replaceHadd(Function &F, Instruction::BinaryOps join_opcode);
+  bool replaceHadd(Function &F, bool is_signed,
+                   Instruction::BinaryOps join_opcode);
   bool replaceClz(Function &F);
 };
 
@@ -328,9 +329,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceClz(F);
 
   case Builtins::kHadd:
-    return replaceHadd(F, Instruction::And);
+    return replaceHadd(F, FI.getParameter(0).is_signed, Instruction::And);
   case Builtins::kRhadd:
-    return replaceHadd(F, Instruction::Or);
+    return replaceHadd(F, FI.getParameter(0).is_signed, Instruction::Or);
 
   case Builtins::kCopysign:
     return replaceCopysign(F);
@@ -2511,9 +2512,9 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F,
+bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, bool is_signed,
                                            Instruction::BinaryOps join_opcode) {
-  return replaceCallsWithValue(F, [join_opcode](CallInst *Call) {
+  return replaceCallsWithValue(F, [is_signed, join_opcode](CallInst *Call) {
     // a_shr = a >> 1
     // b_shr = b >> 1
     // add1 = a_shr + b_shr
@@ -2523,8 +2524,14 @@ bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F,
     const auto a = Call->getArgOperand(0);
     const auto b = Call->getArgOperand(1);
     IRBuilder<> builder(Call);
-    auto a_shift = builder.CreateLShr(a, 1);
-    auto b_shift = builder.CreateLShr(b, 1);
+    Value *a_shift, *b_shift;
+    if (is_signed) {
+      a_shift = builder.CreateAShr(a, 1);
+      b_shift = builder.CreateAShr(b, 1);
+    } else {
+      a_shift = builder.CreateLShr(a, 1);
+      b_shift = builder.CreateLShr(b, 1);
+    }
     auto add = builder.CreateAdd(a_shift, b_shift);
     auto join = BinaryOperator::Create(join_opcode, a, b, "", Call);
     auto constant_one = ConstantInt::get(a->getType(), 1);

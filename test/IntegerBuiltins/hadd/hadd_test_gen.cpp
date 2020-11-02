@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -143,12 +144,13 @@ int main() {
               << llvm_name << ")\n";
           str << "\n";
 
-          str << "; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr " << llvm_name
-              << " %a, " << SplatConstant(size, LLVMTypeName(width, 1), "1")
-              << "\n";
-          str << "; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr " << llvm_name
-              << " %b, " << SplatConstant(size, LLVMTypeName(width, 1), "1")
-              << "\n";
+          std::string shift_ins = is_signed ? "ashr" : "lshr";
+          str << "; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = " << shift_ins << " "
+              << llvm_name << " %a, "
+              << SplatConstant(size, LLVMTypeName(width, 1), "1") << "\n";
+          str << "; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = " << shift_ins << " "
+              << llvm_name << " %b, "
+              << SplatConstant(size, LLVMTypeName(width, 1), "1") << "\n";
           str << "; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add " << llvm_name
               << " [[a_shr]], [[b_shr]]\n";
           str << "; CHECK: [[join:%[a-zA-Z0-9_.]+]] = " << join_op << " "

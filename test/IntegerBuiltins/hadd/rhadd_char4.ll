@@ -17,8 +17,8 @@ entry:
 
 declare <4 x i8> @_Z5rhaddDv4_cS_(<4 x i8>, <4 x i8>)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr <4 x i8> %a, <i8 1, i8 1, i8 1, i8 1>
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr <4 x i8> %b, <i8 1, i8 1, i8 1, i8 1>
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr <4 x i8> %a, <i8 1, i8 1, i8 1, i8 1>
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr <4 x i8> %b, <i8 1, i8 1, i8 1, i8 1>
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <4 x i8> [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = or <4 x i8> %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <4 x i8> [[join]], <i8 1, i8 1, i8 1, i8 1>

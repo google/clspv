@@ -17,8 +17,8 @@ entry:
 
 declare <2 x i64> @_Z5rhaddDv2_lS_(<2 x i64>, <2 x i64>)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr <2 x i64> %a, <i64 1, i64 1>
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr <2 x i64> %b, <i64 1, i64 1>
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr <2 x i64> %a, <i64 1, i64 1>
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr <2 x i64> %b, <i64 1, i64 1>
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <2 x i64> [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = or <2 x i64> %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <2 x i64> [[join]], <i64 1, i64 1>

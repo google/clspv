@@ -17,8 +17,8 @@ entry:
 
 declare i32 @_Z5rhaddii(i32, i32)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr i32 %a, 1
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr i32 %b, 1
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = ashr i32 %a, 1
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = ashr i32 %b, 1
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = or i32 %a, %b
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and i32 [[join]], 1
