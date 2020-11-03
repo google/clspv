@@ -19,7 +19,7 @@ declare i16 @_Z7add_satss(i16, i16)
 
 ; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext i16 %a to i32
 ; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext i16 %b to i32
-; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nsw i32 [[sext_a]], [[sext_b]]
+; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw i32 [[sext_a]], [[sext_b]]
 ; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call i32 @_Z5clampiii(i32 [[add]], i32 -32768, i32 32767)
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i32 [[clamp]] to i16
 ; CHECK: ret i16 [[trunc]]

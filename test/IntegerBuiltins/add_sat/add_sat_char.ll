@@ -19,7 +19,7 @@ declare i8 @_Z7add_satcc(i8, i8)
 
 ; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext i8 %a to i16
 ; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext i8 %b to i16
-; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nsw i16 [[sext_a]], [[sext_b]]
+; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw i16 [[sext_a]], [[sext_b]]
 ; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add]], i16 -128, i16 127)
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp]] to i8
 ; CHECK: ret i8 [[trunc]]

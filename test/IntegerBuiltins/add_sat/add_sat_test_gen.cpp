@@ -172,7 +172,7 @@ int main() {
                 << " %a to " << extended_name << "\n";
             str << "; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext " << llvm_name
                 << " %b to " << extended_name << "\n";
-            str << "; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nsw "
+            str << "; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw "
                 << extended_name << " [[sext_a]], [[sext_b]]\n";
             std::string min_value = std::to_string(MinValue(width, is_signed));
             std::string max_value = std::to_string(MaxValue(width, is_signed));
@@ -195,21 +195,21 @@ int main() {
                 std::to_string(MinValue(width, is_signed));
             str << "; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add " << llvm_name
                 << " %a, %b\n";
+            str << "; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt "
+                << llvm_name << " %b, " << (size > 1 ? "zeroinitializer" : "0")
+                << "\n";
             str << "; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt "
+                << llvm_name << " [[add]], %a\n";
+            str << "; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt "
                 << llvm_name << " [[add]], %a\n";
             str << "; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select "
                 << selector_name << " [[add_gt_a]], " << llvm_name << " "
                 << SplatConstant(size, LLVMTypeName(width, 1), min_value)
                 << ", " << llvm_name << " [[add]]\n";
-            str << "; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt "
-                << llvm_name << " [[add]], %a\n";
             str << "; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select "
                 << selector_name << " [[add_lt_a]], " << llvm_name << " "
                 << SplatConstant(size, LLVMTypeName(width, 1), max_value)
                 << ", " << llvm_name << " [[add]]\n";
-            str << "; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt "
-                << llvm_name << " %b, " << (size > 1 ? "zeroinitializer" : "0")
-                << "\n";
             str << "; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select " << selector_name
                 << " [[b_lt_0]], " << llvm_name << " [[min_clamp]], "
                 << llvm_name << " [[max_clamp]]\n";
