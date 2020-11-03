@@ -18,6 +18,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
@@ -27,6 +28,7 @@
 
 #include "clspv/Passes.h"
 
+#include "Builtins.h"
 #include "Passes.h"
 
 #include <functional>
@@ -71,6 +73,7 @@ private:
 
   // InstVisitor impl, specific cases.
   Value *visitBinaryOperator(BinaryOperator &I);
+  Value *visitCallInst(CallInst &I);
   Value *visitExtractElementInst(ExtractElementInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
   Value *visitShuffleVectorInst(ShuffleVectorInst &I);
@@ -119,10 +122,19 @@ private:
   /// Lower the given function.
   bool runOnFunction(Function &F);
 
+  /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
+  /// calls to its scalar version.
+  Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
+                            ArrayRef<Value *> EquivalentArgs);
+
   /// Create an alternative version of @p F that doesn't have long vectors as
   /// parameter or return types.
   /// Returns nullptr if no lowering is required.
   Function *convertUserDefinedFunction(Function &F);
+
+  /// Create (and insert) a call to the equivalent user-defined function.
+  CallInst *convertUserDefinedFunctionCall(CallInst &CI,
+                                           ArrayRef<Value *> EquivalentArgs);
 
   /// Clears the dead instructions and others that might be rendered dead
   /// by their removal.
@@ -172,6 +184,38 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
     } else {
       OnAlive(OldInstruction);
     }
+  }
+}
+
+/// Get the scalar overload for the given LLVM @p Intrinsic.
+Function *getIntrinsicScalarVersion(Function &Intrinsic) {
+  auto id = Intrinsic.getIntrinsicID();
+  assert(id != Intrinsic::not_intrinsic);
+
+  switch (id) {
+  default:
+#ifndef NDEBUG
+    dbgs() << "Intrinsic " << Intrinsic.getName() << " is not yet supported";
+#endif
+    llvm_unreachable("Missing support for intrinsic.");
+    break;
+
+  case Intrinsic::fmuladd: {
+    SmallVector<Type *, 16> ParamTys;
+    bool Success = Intrinsic::getIntrinsicSignature(&Intrinsic, ParamTys);
+    assert(Success);
+    (void)Success;
+
+    // Map vectors to scalars.
+    for (auto *&Param : ParamTys) {
+      // TODO Need support for other types, like pointers. Need test case.
+      assert(Param->isVectorTy());
+      Param = Param->getScalarType();
+    }
+
+    return Intrinsic::getDeclaration(Intrinsic.getParent(), id, ParamTys);
+    break;
+  }
   }
 }
 
@@ -275,13 +319,11 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
 /// This is achieved by creating a new function (the "wrapper") which inlines
 /// the given function (the "wrappee"). Only the parameters and return types are
 /// mapped. The function body still needs to be lowered.
-Function *createFunctionWithMappedTypes(Function &F, Type *EquivalentReturnTy,
-                                        ArrayRef<Type *> EquivalentParamTys) {
+Function *createFunctionWithMappedTypes(Function &F,
+                                        FunctionType *EquivalentFunctionTy) {
   assert(!F.isVarArg() && "varargs not supported");
 
-  auto *Wrapper = Function::Create(
-      FunctionType::get(EquivalentReturnTy, EquivalentParamTys, false),
-      F.getLinkage());
+  auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
   Wrapper->takeName(&F);
   Wrapper->setCallingConv(F.getCallingConv());
   Wrapper->copyAttributesFrom(&F);
@@ -296,6 +338,7 @@ Function *createFunctionWithMappedTypes(Function &F, Type *EquivalentReturnTy,
   if (Call->getType()->isVoidTy()) {
     B.CreateRetVoid();
   } else {
+    auto *EquivalentReturnTy = EquivalentFunctionTy->getReturnType();
     Value *ReturnValue = convertEquivalentValue(B, Call, EquivalentReturnTy);
     B.CreateRet(ReturnValue);
   }
@@ -418,6 +461,46 @@ Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
 
 Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
   return visitNAryOperator(I);
+}
+
+Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
+  SmallVector<Value *, 16> EquivalentArgs;
+  for (auto &ArgUse : I.args()) {
+    Value *Arg = ArgUse.get();
+    Value *EquivalentArg = visitOrSelf(Arg);
+    EquivalentArgs.push_back(EquivalentArg);
+  }
+
+  auto *ReturnTy = I.getType();
+  auto *EquivalentReturnTy = getEquivalentTypeOrSelf(ReturnTy);
+
+#ifndef NDEBUG
+  bool NeedHandling = false;
+  NeedHandling |= (EquivalentReturnTy != ReturnTy);
+  NeedHandling |=
+      !std::equal(I.arg_begin(), I.arg_end(), std::begin(EquivalentArgs),
+                  [](auto const &ArgUse, Value *EquivalentArg) {
+                    return ArgUse.get() == EquivalentArg;
+                  });
+  assert(NeedHandling && "Expected something to lower for this call.");
+#endif
+
+  Function *F = I.getCalledFunction();
+  assert(F && "Only function calls are supported.");
+
+  const auto &Info = clspv::Builtins::Lookup(F);
+  bool OpenCLBuiltin = (Info.getType() != clspv::Builtins::kBuiltinNone);
+  bool Builtin = (OpenCLBuiltin || F->isIntrinsic());
+
+  Value *V = nullptr;
+  if (Builtin) {
+    V = convertBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
+  } else {
+    V = convertUserDefinedFunctionCall(I, EquivalentArgs);
+  }
+
+  registerReplacement(I, *V);
+  return V;
 }
 
 Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
@@ -627,6 +710,33 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
     return nullptr;
   }
 
+  if (auto *FunctionTy = dyn_cast<FunctionType>(Ty)) {
+    assert(!FunctionTy->isVarArg() && "VarArgs not supported");
+
+    bool RequireLowering = false;
+
+    // Convert parameter types.
+    SmallVector<Type *, 16> EquivalentParamTys;
+    EquivalentParamTys.reserve(FunctionTy->getNumParams());
+    for (auto *ParamTy : FunctionTy->params()) {
+      auto *EquivalentParamTy = getEquivalentTypeOrSelf(ParamTy);
+      EquivalentParamTys.push_back(EquivalentParamTy);
+      RequireLowering |= (EquivalentParamTy != ParamTy);
+    }
+
+    // Convert return type.
+    auto *ReturnTy = FunctionTy->getReturnType();
+    auto *EquivalentReturnTy = getEquivalentTypeOrSelf(ReturnTy);
+    RequireLowering |= (EquivalentReturnTy != ReturnTy);
+
+    if (RequireLowering) {
+      return FunctionType::get(EquivalentReturnTy, EquivalentParamTys,
+                               FunctionTy->isVarArg());
+    } else {
+      return nullptr;
+    }
+  }
+
 #ifndef NDEBUG
   dbgs() << "Unsupported type: " << *Ty << '\n';
 #endif
@@ -642,6 +752,9 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
   }
 
   // Lower the function parameters and return type if needed.
+  // It is possible the function was already partially processed when visiting a
+  // call site. If this is the case, a wrapper function has been created for it.
+  // However, its instructions haven't been visited yet.
   Function *FunctionToVisit = convertUserDefinedFunction(F);
   if (FunctionToVisit == nullptr) {
     // The parameters don't rely on long vectors, but maybe some instructions in
@@ -663,6 +776,37 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
   return Modified;
 }
 
+Value *
+LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
+                                           Type *EquivalentReturnTy,
+                                           ArrayRef<Value *> EquivalentArgs) {
+  Function *VectorFunction = VectorCall.getCalledFunction();
+  assert(VectorFunction);
+
+  // Use and update the FunctionMap cache.
+  Function *ScalarFunction = FunctionMap[VectorFunction];
+  if (ScalarFunction == nullptr) {
+    // Handle both OpenCL builtin functions, available as simple declarations,
+    // and LLVM intrinsics.
+    // TODO Implement support for OpenCL builtins.
+    assert(VectorFunction->isIntrinsic());
+    ScalarFunction = getIntrinsicScalarVersion(*VectorFunction);
+    FunctionMap[VectorFunction] = ScalarFunction;
+  }
+  assert(ScalarFunction);
+
+  auto ScalarFactory = [ScalarFunction, &VectorCall](auto &B, auto Args) {
+    CallInst *ScalarCall = B.CreateCall(ScalarFunction, Args);
+    ScalarCall->copyIRFlags(&VectorCall);
+    ScalarCall->copyMetadata(VectorCall);
+    ScalarCall->setCallingConv(VectorCall.getCallingConv());
+    return ScalarCall;
+  };
+
+  return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
+                                ScalarFactory);
+}
+
 Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   auto it = FunctionMap.find(&F);
   if (it != FunctionMap.end()) {
@@ -673,33 +817,18 @@ Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   LLVM_DEBUG(dbgs() << F << '\n');
 
   auto *FunctionTy = F.getFunctionType();
-  assert(!FunctionTy->isVarArg() && "VarArgs not supported");
-
-  bool RequireLowering = false;
-
-  // Convert parameter types.
-  SmallVector<Type *, 16> EquivalentParamTys;
-  EquivalentParamTys.reserve(FunctionTy->getNumParams());
-  for (auto *ParamTy : FunctionTy->params()) {
-    auto *EquivalentParamTy = getEquivalentTypeOrSelf(ParamTy);
-    EquivalentParamTys.push_back(EquivalentParamTy);
-    RequireLowering |= (EquivalentParamTy != ParamTy);
-  }
-
-  // Convert return type.
-  auto *ReturnTy = FunctionTy->getReturnType();
-  auto *EquivalentReturnTy = getEquivalentTypeOrSelf(ReturnTy);
-  RequireLowering |= (EquivalentReturnTy != ReturnTy);
+  auto *EquivalentFunctionTy =
+      cast_or_null<FunctionType>(getEquivalentType(FunctionTy));
 
   // If no work is needed, mark it as so for future reference and bail out.
-  if (!RequireLowering) {
+  if (EquivalentFunctionTy == nullptr) {
     LLVM_DEBUG(dbgs() << "No need of wrapper function\n");
     FunctionMap.insert({&F, nullptr});
     return nullptr;
   }
 
   Function *EquivalentFunction =
-      createFunctionWithMappedTypes(F, EquivalentReturnTy, EquivalentParamTys);
+      createFunctionWithMappedTypes(F, EquivalentFunctionTy);
 
   LLVM_DEBUG(dbgs() << "Wrapper function:\n" << *EquivalentFunction << "\n");
 
@@ -709,6 +838,24 @@ Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   // remains valid.
   FunctionMap.insert({&F, EquivalentFunction});
   return EquivalentFunction;
+}
+
+CallInst *LongVectorLoweringPass::convertUserDefinedFunctionCall(
+    CallInst &Call, ArrayRef<Value *> EquivalentArgs) {
+  Function *Callee = Call.getCalledFunction();
+  assert(Callee);
+
+  Function *EquivalentFunction = convertUserDefinedFunction(*Callee);
+  assert(EquivalentFunction);
+
+  IRBuilder<> B(&Call);
+  CallInst *NewCall = B.CreateCall(EquivalentFunction, EquivalentArgs);
+
+  NewCall->copyIRFlags(&Call);
+  NewCall->copyMetadata(Call);
+  NewCall->setCallingConv(Call.getCallingConv());
+
+  return NewCall;
 }
 
 void LongVectorLoweringPass::cleanDeadInstructions() {
