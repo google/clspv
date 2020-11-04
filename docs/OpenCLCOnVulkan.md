@@ -793,7 +793,7 @@ functions **must not** be used.
 
 #### Integer Functions
 
-The `mad_sat()`,  and `sub_sat()` built-in functions **must not** be used.
+All supported.
 
 #### Relational Functions
 
