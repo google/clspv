@@ -221,6 +221,8 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   ReplaceOpenCLBuiltinPass() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
+
+private:
   bool runOnFunction(Function &F);
   bool replaceAbs(Function &F);
   bool replaceAbsDiff(Function &F, bool is_signed);
@@ -276,6 +278,14 @@ struct ReplaceOpenCLBuiltinPass final : public ModulePass {
   bool replaceHadd(Function &F, bool is_signed,
                    Instruction::BinaryOps join_opcode);
   bool replaceClz(Function &F);
+  bool replaceMadSat(Function &F, bool is_signed);
+
+  // Caches struct types for { |type|, |type| }. This prevents
+  // getOrInsertFunction from introducing a bitcasts between structs with
+  // identical contents.
+  Type *GetPairStruct(Type *type);
+
+  DenseMap<Type *, Type *> PairStructMap;
 };
 
 } // namespace
@@ -517,6 +527,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kMulHi:
     return replaceMulHi(F, FI.getParameter(0).is_signed, false);
 
+  case Builtins::kMadSat:
+    return replaceMadSat(F, FI.getParameter(0).is_signed);
+
   case Builtins::kMad:
   case Builtins::kMad24:
     return replaceMul(F, FI.getParameter(0).type_id == llvm::Type::FloatTyID,
@@ -586,6 +599,16 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   }
 
   return false;
+}
+
+Type *ReplaceOpenCLBuiltinPass::GetPairStruct(Type *type) {
+  auto iter = PairStructMap.find(type);
+  if (iter != PairStructMap.end())
+    return iter->second;
+
+  auto new_struct = StructType::get(type->getContext(), {type, type});
+  PairStructMap[type] = new_struct;
+  return new_struct;
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAbs(Function &F) {
@@ -1305,8 +1328,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
     }
 
     // Our SPIR-V op returns a struct, create a type for it
-    SmallVector<Type *, 2> TwoValueType = {AType, AType};
-    auto ExMulRetType = StructType::create(TwoValueType);
+    auto ExMulRetType = GetPairStruct(AType);
 
     // Select the appropriate signed/unsigned SPIR-V op
     spv::Op opcode = is_signed ? spv::OpSMulExtended : spv::OpUMulExtended;
@@ -2542,7 +2564,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, bool is_signed,
 
 bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
   Module *module = F.getParent();
-  return replaceCallsWithValue(F, [&module, is_signed](CallInst *Call) {
+  return replaceCallsWithValue(F, [&module, is_signed, this](CallInst *Call) {
     // SPIR-V OpIAddCarry interprets inputs as unsigned. We use that
     // instruction for unsigned additions. For signed addition, it is more
     // complicated. For values with bit widths less than 32 bits, we extend
@@ -2650,7 +2672,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSat(Function &F, bool is_signed) {
       }
     } else {
       // Just use OpIAddCarry and use the carry to clamp the result.
-      auto ret_ty = StructType::get(Call->getContext(), {ty, ty});
+      auto ret_ty = GetPairStruct(ty);
       auto add = clspv::InsertSPIRVOp(
           Call, spv::OpIAddCarry, {Attribute::ReadNone}, ret_ty, {op0, op1});
       auto ex0 = ExtractValueInst::Create(add, {0}, "", Call);
@@ -2807,6 +2829,147 @@ bool ReplaceOpenCLBuiltinPass::replaceClz(Function &F) {
       auto bot_adjust = builder.CreateAdd(bot_clz, c32);
       auto sel = builder.CreateSelect(cmp, bot_adjust, top_clz);
       return builder.CreateZExt(sel, Call->getType());
+    }
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
+  return replaceCallsWithValue(F, [&F, is_signed, this](CallInst *Call) {
+    const auto ty = Call->getType();
+    const auto a = Call->getArgOperand(0);
+    const auto b = Call->getArgOperand(1);
+    const auto c = Call->getArgOperand(2);
+    IRBuilder<> builder(Call);
+    if (is_signed) {
+      unsigned bitwidth = Call->getType()->getScalarSizeInBits();
+      if (bitwidth < 32) {
+        // mul = sext(a) * sext(b)
+        // add = mul + sext(c)
+        // res = clamp(add, MIN, MAX)
+        unsigned extended_width = bitwidth << 1;
+        Type *extended_ty = IntegerType::get(F.getContext(), extended_width);
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          extended_ty = VectorType::get(extended_ty, vec_ty->getElementCount());
+        }
+        auto a_sext = builder.CreateSExt(a, extended_ty);
+        auto b_sext = builder.CreateSExt(b, extended_ty);
+        auto c_sext = builder.CreateSExt(c, extended_ty);
+        // Extended the size so no overflows occur.
+        auto mul = builder.CreateMul(a_sext, b_sext, "", true, true);
+        auto add = builder.CreateAdd(mul, c_sext, "", true, true);
+        auto func_ty = FunctionType::get(
+            extended_ty, {extended_ty, extended_ty, extended_ty}, false);
+        // Don't use function type because we need signed parameters.
+        std::string clamp_name = Builtins::GetMangledFunctionName("clamp");
+        // The clamp values are the signed min and max of the original bitwidth
+        // sign extended to the extended bitwidth.
+        Constant *min = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMinValue(bitwidth).sext(extended_width));
+        Constant *max = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMaxValue(bitwidth).sext(extended_width));
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
+          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
+          unsigned vec_width = vec_ty->getElementCount().getKnownMinValue();
+          if (extended_width == 32)
+            clamp_name += "Dv" + std::to_string(vec_width) + "_iS_S_";
+          else
+            clamp_name += "Dv" + std::to_string(vec_width) + "_sS_S_";
+        } else {
+          if (extended_width == 32)
+            clamp_name += "iii";
+          else
+            clamp_name += "sss";
+        }
+        auto callee = F.getParent()->getOrInsertFunction(clamp_name, func_ty);
+        auto clamp = builder.CreateCall(callee, {add, min, max});
+        return builder.CreateTrunc(clamp, ty);
+      } else {
+        auto struct_ty = GetPairStruct(ty);
+        // Compute
+        // {hi, lo} = smul_extended(a, b)
+        // add = lo + c
+        auto mul_ext = InsertSPIRVOp(Call, spv::OpSMulExtended,
+                                     {Attribute::ReadNone}, struct_ty, {a, b});
+        auto mul_lo = builder.CreateExtractValue(mul_ext, {0});
+        auto mul_hi = builder.CreateExtractValue(mul_ext, {1});
+        auto add = builder.CreateAdd(mul_lo, c);
+
+        // Constants for use in the calculation.
+        Constant *min = ConstantInt::get(Call->getContext(),
+                                         APInt::getSignedMinValue(bitwidth));
+        Constant *max = ConstantInt::get(Call->getContext(),
+                                         APInt::getSignedMaxValue(bitwidth));
+        Constant *max_plus_1 = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMaxValue(bitwidth) + APInt(bitwidth, 1));
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
+          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
+          max_plus_1 =
+              ConstantVector::getSplat(vec_ty->getElementCount(), max_plus_1);
+        }
+
+        auto a_xor_b = builder.CreateXor(a, b);
+        auto same_sign =
+            builder.CreateICmpSGT(a_xor_b, Constant::getAllOnesValue(ty));
+        auto different_sign = builder.CreateNot(same_sign);
+        auto hi_eq_0 = builder.CreateICmpEQ(mul_hi, Constant::getNullValue(ty));
+        auto hi_ne_0 = builder.CreateNot(hi_eq_0);
+        auto lo_ge_max = builder.CreateICmpUGE(mul_lo, max);
+        auto c_gt_0 = builder.CreateICmpSGT(c, Constant::getNullValue(ty));
+        auto c_lt_0 = builder.CreateICmpSLT(c, Constant::getNullValue(ty));
+        auto add_gt_max = builder.CreateICmpUGT(add, max);
+        auto hi_eq_m1 =
+            builder.CreateICmpEQ(mul_hi, Constant::getAllOnesValue(ty));
+        auto hi_ne_m1 = builder.CreateNot(hi_eq_m1);
+        auto lo_le_max_plus_1 = builder.CreateICmpULE(mul_lo, max_plus_1);
+        auto max_sub_lo = builder.CreateSub(max, mul_lo);
+        auto c_lt_max_sub_lo = builder.CreateICmpULT(c, max_sub_lo);
+
+        // Equivalent to:
+        // if (((x < 0) == (y < 0)) && mul_hi != 0)
+        //   return MAX
+        // if (mul_hi == 0 && mul_lo >= MAX && (z > 0 || add > MAX))
+        //   return MAX
+        // if (((x < 0) != (y < 0)) && mul_hi != -1)
+        //   return MIN
+        // if (hi == -1 && mul_lo <= (MAX + 1) && (z < 0 || z < (MAX - mul_lo))
+        //   return MIN
+        // return add
+        auto max_clamp_1 = builder.CreateAnd(same_sign, hi_ne_0);
+        auto max_clamp_2 = builder.CreateOr(c_gt_0, add_gt_max);
+        auto tmp = builder.CreateAnd(hi_eq_0, lo_ge_max);
+        max_clamp_2 = builder.CreateAnd(tmp, max_clamp_2);
+        auto max_clamp = builder.CreateOr(max_clamp_1, max_clamp_2);
+        auto min_clamp_1 = builder.CreateAnd(different_sign, hi_ne_m1);
+        auto min_clamp_2 = builder.CreateOr(c_lt_0, c_lt_max_sub_lo);
+        tmp = builder.CreateAnd(hi_eq_m1, lo_le_max_plus_1);
+        min_clamp_2 = builder.CreateAnd(tmp, min_clamp_2);
+        auto min_clamp = builder.CreateOr(min_clamp_1, min_clamp_2);
+        auto sel = builder.CreateSelect(min_clamp, min, add);
+        return builder.CreateSelect(max_clamp, max, sel);
+      }
+    } else {
+      // {lo, hi} = mul_extended(a, b)
+      // {add, carry} = add_carry(lo, c)
+      // cmp = (mul_hi | carry) == 0
+      // mad_sat = cmp ? add : MAX
+      auto struct_ty = GetPairStruct(ty);
+      auto mul_ext = InsertSPIRVOp(Call, spv::OpUMulExtended,
+                                   {Attribute::ReadNone}, struct_ty, {a, b});
+      auto mul_lo = builder.CreateExtractValue(mul_ext, {0});
+      auto mul_hi = builder.CreateExtractValue(mul_ext, {1});
+      auto add_carry =
+          InsertSPIRVOp(Call, spv::OpIAddCarry, {Attribute::ReadNone},
+                        struct_ty, {mul_lo, c});
+      auto add = builder.CreateExtractValue(add_carry, {0});
+      auto carry = builder.CreateExtractValue(add_carry, {1});
+      auto or_value = builder.CreateOr(mul_hi, carry);
+      auto cmp = builder.CreateICmpEQ(or_value, Constant::getNullValue(ty));
+      return builder.CreateSelect(cmp, add, Constant::getAllOnesValue(ty));
     }
   });
 }
