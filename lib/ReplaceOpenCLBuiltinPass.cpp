@@ -2565,8 +2565,10 @@ bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, bool is_signed,
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, bool is_add) {
-  return replaceCallsWithValue(F, [&F, this, is_signed, is_add](CallInst *Call) {
+bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
+                                                bool is_add) {
+  return replaceCallsWithValue(F, [&F, this, is_signed,
+                                   is_add](CallInst *Call) {
     auto ty = Call->getType();
     auto a = Call->getArgOperand(0);
     auto b = Call->getArgOperand(1);
@@ -2575,15 +2577,19 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, boo
       unsigned bitwidth = ty->getScalarSizeInBits();
       if (bitwidth < 32) {
         unsigned extended_width = bitwidth << 1;
-        Type *extended_ty = IntegerType::get(Call->getContext(), extended_width);
-        Constant *min = ConstantInt::get(Call->getContext(), APInt::getSignedMinValue(bitwidth).sext(extended_width));
-        Constant *max = ConstantInt::get(Call->getContext(), APInt::getSignedMaxValue(bitwidth).sext(extended_width));
+        Type *extended_ty =
+            IntegerType::get(Call->getContext(), extended_width);
+        Constant *min = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMinValue(bitwidth).sext(extended_width));
+        Constant *max = ConstantInt::get(
+            Call->getContext(),
+            APInt::getSignedMaxValue(bitwidth).sext(extended_width));
         // Don't use the type in GetMangledFunctionName to ensure we get
         // signed parameters.
         std::string sclamp_name = Builtins::GetMangledFunctionName("clamp");
         if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          extended_ty =
-              VectorType::get(extended_ty, vec_ty->getElementCount());
+          extended_ty = VectorType::get(extended_ty, vec_ty->getElementCount());
           min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
           max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
           unsigned vec_width = vec_ty->getElementCount().getKnownMinValue();
@@ -2599,7 +2605,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, boo
             sclamp_name += "sss";
           }
         }
-        
+
         auto sext_a = builder.CreateSExt(a, extended_ty);
         auto sext_b = builder.CreateSExt(b, extended_ty);
         Value *op = nullptr;
@@ -2608,7 +2614,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, boo
           op = builder.CreateAdd(sext_a, sext_b, "", true, true);
         else
           op = builder.CreateSub(sext_a, sext_b, "", true, true);
-        auto clamp_ty = FunctionType::get(extended_ty, {extended_ty, extended_ty, extended_ty}, false);
+        auto clamp_ty = FunctionType::get(
+            extended_ty, {extended_ty, extended_ty, extended_ty}, false);
         auto callee = F.getParent()->getOrInsertFunction(sclamp_name, clamp_ty);
         auto clamp = builder.CreateCall(callee, {op, min, max});
         return builder.CreateTrunc(clamp, ty);
@@ -2626,8 +2633,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, boo
         //   c = c < a ? max : c;
         // else
         //   c = c > a ? min : c;
-        Constant *min = ConstantInt::get(Call->getContext(), APInt::getSignedMinValue(bitwidth));
-        Constant *max = ConstantInt::get(Call->getContext(), APInt::getSignedMaxValue(bitwidth));
+        Constant *min = ConstantInt::get(Call->getContext(),
+                                         APInt::getSignedMinValue(bitwidth));
+        Constant *max = ConstantInt::get(Call->getContext(),
+                                         APInt::getSignedMaxValue(bitwidth));
         if (auto vec_ty = dyn_cast<VectorType>(ty)) {
           min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
           max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
@@ -2650,18 +2659,20 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed, boo
         return builder.CreateSelect(b_lt_0, neg_clamp, pos_clamp);
       }
     } else {
-      // Replace with OpIAddCarry/OpISubBorrow and clamp to max/0 on a carr/borrow.
+      // Replace with OpIAddCarry/OpISubBorrow and clamp to max/0 on a
+      // carr/borrow.
       spv::Op op = is_add ? spv::OpIAddCarry : spv::OpISubBorrow;
-      auto clamp_value = is_add ? Constant::getAllOnesValue(ty) : Constant::getNullValue(ty);
+      auto clamp_value =
+          is_add ? Constant::getAllOnesValue(ty) : Constant::getNullValue(ty);
       auto struct_ty = GetPairStruct(ty);
-      auto call = InsertSPIRVOp(Call, op, {Attribute::ReadNone}, struct_ty, {a, b});
+      auto call =
+          InsertSPIRVOp(Call, op, {Attribute::ReadNone}, struct_ty, {a, b});
       auto sub = builder.CreateExtractValue(call, {0});
       auto borrow = builder.CreateExtractValue(call, {1});
       auto cmp = builder.CreateICmpEQ(borrow, Constant::getNullValue(ty));
       return builder.CreateSelect(cmp, sub, clamp_value);
     }
-
-                               });
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
