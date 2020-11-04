@@ -3803,6 +3803,23 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
               spv::OpISub,
               ConstantInt::get(Call->getType()->getScalarType(), bitwidth - 1));
           break;
+        case glsl::ExtInstFindILsb: { // Implementing ctz
+          auto neg_one = Constant::getAllOnesValue(Call->getType());
+          Constant *int_32 = ConstantInt::get(Call->getType()->getScalarType(), 32);
+          Type *i1_ty = Type::getInt1Ty(Call->getContext());
+          if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
+            i1_ty = VectorType::get(i1_ty, vec_ty->getElementCount());
+            int_32 = ConstantVector::getSplat(vec_ty->getElementCount(), int_32);
+          }
+          
+          SPIRVOperandVec Ops;
+          Ops << i1_ty << RID << neg_one;
+          auto cmp = addSPIRVInst(spv::OpIEqual, Ops);
+          Ops.clear();
+          Ops << Call->getType() << cmp << int_32 << RID;
+          RID = addSPIRVInst(spv::OpSelect, Ops);
+          break;
+        }
         case glsl::ExtInstAcos:  // Implementing acospi
         case glsl::ExtInstAsin:  // Implementing asinpi
         case glsl::ExtInstAtan:  // Implementing atanpi
@@ -4938,6 +4955,8 @@ glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(
   switch (func_info.getType()) {
   case Builtins::kClz:
     return glsl::ExtInst::ExtInstFindUMsb;
+  case Builtins::kCtz:
+    return glsl::ExtInst::ExtInstFindILsb;
   case Builtins::kAcospi:
     return glsl::ExtInst::ExtInstAcos;
   case Builtins::kAsinpi:
