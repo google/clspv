@@ -2821,8 +2821,12 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
         // Truncate the intermediate result to the right size.
         tmp = builder.CreateSub(call, sub_const);
       } else {
+        Constant *c_width = builder.getInt32(bitwidth);
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          c_width = ConstantVector::getSplat(vec_ty->getElementCount(), c_width);
+        }
         auto cmp = builder.CreateICmpEQ(call, c32);
-        tmp = builder.CreateSelect(cmp, builder.getInt32(bitwidth), call);
+        tmp = builder.CreateSelect(cmp, c_width, call);
       }
       return builder.CreateTrunc(tmp, Call->getType());
     } else {
