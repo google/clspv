@@ -2839,12 +2839,10 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
         auto adjust = builder.CreateAdd(bot_func, c32);
         tmp = builder.CreateSelect(cmp, adjust, top_func);
       } else {
-        auto top_cmp = builder.CreateICmpEQ(top_func, Constant::getNullValue(ty));
-        auto bot_cmp = builder.CreateICmpEQ(bot_func, Constant::getNullValue(ty));
-        auto both = builder.CreateAnd(top_cmp, bot_cmp);
+        // For ctz, if clz(bot) is 32, return 32 + ctz(top)
+        auto bot_cmp = builder.CreateICmpEQ(bot_func, c32);
         auto adjust = builder.CreateAdd(top_func, c32);
         tmp = builder.CreateSelect(bot_cmp, adjust, bot_func);
-        tmp = builder.CreateSelect(both, Constant::getNullValue(ty), tmp);
       }
       // Extend the intermediate result to the correct size.
       return builder.CreateZExt(tmp, Call->getType());
