@@ -3805,19 +3805,21 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
           break;
         case glsl::ExtInstFindILsb: { // Implementing ctz
           auto neg_one = Constant::getAllOnesValue(Call->getType());
-          Constant *int_32 = ConstantInt::get(Call->getType()->getScalarType(), 32);
+          Constant *int_32 =
+              ConstantInt::get(Call->getType()->getScalarType(), 32);
           Type *i1_ty = Type::getInt1Ty(Call->getContext());
           if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
             i1_ty = VectorType::get(i1_ty, vec_ty->getElementCount());
-            int_32 = ConstantVector::getSplat(vec_ty->getElementCount(), int_32);
+            int_32 =
+                ConstantVector::getSplat(vec_ty->getElementCount(), int_32);
           }
-          
-          SPIRVOperandVec Ops;
-          Ops << i1_ty << RID << neg_one;
-          auto cmp = addSPIRVInst(spv::OpIEqual, Ops);
-          Ops.clear();
-          Ops << Call->getType() << cmp << int_32 << RID;
-          RID = addSPIRVInst(spv::OpSelect, Ops);
+
+          SPIRVOperandVec local_ops;
+          local_ops << i1_ty << RID << neg_one;
+          auto cmp = addSPIRVInst(spv::OpIEqual, local_ops);
+          local_ops.clear();
+          local_ops << Call->getType() << cmp << int_32 << RID;
+          RID = addSPIRVInst(spv::OpSelect, local_ops);
           break;
         }
         case glsl::ExtInstAcos:  // Implementing acospi
