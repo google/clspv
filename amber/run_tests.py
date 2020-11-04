@@ -34,7 +34,9 @@ SWIFTSHADER_SUPPRESSIONS = [
     'images/write_image2d_rgba32i.amber',
     'integer/add_sat_short.amber',
     'integer/clz_long.amber',
-    'integer/clz_short.amber']
+    'integer/clz_short.amber',
+    'integer/sub_sat_short.amber',
+    'integer/sub_sat_ushort.amber']
 
 def main():
   parser = argparse.ArgumentParser("Run Amber tests (without validation layers)")
