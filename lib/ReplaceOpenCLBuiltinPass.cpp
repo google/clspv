@@ -2667,10 +2667,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
       auto struct_ty = GetPairStruct(ty);
       auto call =
           InsertSPIRVOp(Call, op, {Attribute::ReadNone}, struct_ty, {a, b});
-      auto sub = builder.CreateExtractValue(call, {0});
-      auto borrow = builder.CreateExtractValue(call, {1});
-      auto cmp = builder.CreateICmpEQ(borrow, Constant::getNullValue(ty));
-      return builder.CreateSelect(cmp, sub, clamp_value);
+      auto add_sub = builder.CreateExtractValue(call, {0});
+      auto carry_borrow = builder.CreateExtractValue(call, {1});
+      auto cmp = builder.CreateICmpEQ(carry_borrow, Constant::getNullValue(ty));
+      return builder.CreateSelect(cmp, add_sub, clamp_value);
     }
   });
 }
