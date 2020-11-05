@@ -1,0 +1,46 @@
+#!amber
+
+SHADER compute ctz OPENCL-C
+kernel void test_ctz(global short* a, global short* b) {
+  uint gid = get_global_id(0);
+  b[gid] = ctz(a[gid]);
+}
+END
+
+BUFFER a_buf DATA_TYPE uint16 DATA
+0x0001
+0x0002
+0x0004
+0x0008
+0x0010
+0x0020
+0x0040
+0x0080
+0x0100
+0x0200
+0x0400
+0x0800
+0x1000
+0x2000
+0x4000
+0x8000
+0x0000
+END
+
+BUFFER b_buf DATA_TYPE uint16 SIZE 17 FILL 0
+BUFFER expected DATA_TYPE uint16 SIZE 17 SERIES_FROM 0 INC_BY 1
+
+PIPELINE compute test_pipe
+  ATTACH ctz ENTRY_POINT test_ctz
+  COMPILE_OPTIONS ctz
+    --cl-std=CL2.0 --inline-entry-points
+  END
+
+  BIND BUFFER a_buf KERNEL ARG_NAME a
+  BIND BUFFER b_buf KERNEL ARG_NAME b
+END
+
+RUN test_pipe 33 1 1
+
+EXPECT b_buf EQ_BUFFER expected
+
