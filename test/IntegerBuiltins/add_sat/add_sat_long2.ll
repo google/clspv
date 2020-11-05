@@ -18,10 +18,10 @@ entry:
 declare <2 x i64> @_Z7add_satDv2_lS_(<2 x i64>, <2 x i64>)
 
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <2 x i64> %a, %b
-; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> [[add]], %a
-; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[add_gt_a]], <2 x i64> <i64 -9223372036854775808, i64 -9223372036854775808>, <2 x i64> [[add]]
-; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> [[add]], %a
-; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[add_lt_a]], <2 x i64> <i64 9223372036854775807, i64 9223372036854775807>, <2 x i64> [[add]]
 ; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> %b, zeroinitializer
+; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> [[add]], %a
+; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> [[add]], %a
+; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[add_gt_a]], <2 x i64> <i64 -9223372036854775808, i64 -9223372036854775808>, <2 x i64> [[add]]
+; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[add_lt_a]], <2 x i64> <i64 9223372036854775807, i64 9223372036854775807>, <2 x i64> [[add]]
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[b_lt_0]], <2 x i64> [[min_clamp]], <2 x i64> [[max_clamp]]
 ; CHECK: ret <2 x i64> [[sel]]

@@ -18,10 +18,10 @@ entry:
 declare i32 @_Z7add_satii(i32, i32)
 
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 %a, %b
-; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt i32 [[add]], %a
-; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_gt_a]], i32 -2147483648, i32 [[add]]
-; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt i32 [[add]], %a
-; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_lt_a]], i32 2147483647, i32 [[add]]
 ; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt i32 %b, 0
+; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt i32 [[add]], %a
+; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt i32 [[add]], %a
+; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_gt_a]], i32 -2147483648, i32 [[add]]
+; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select i1 [[add_lt_a]], i32 2147483647, i32 [[add]]
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select i1 [[b_lt_0]], i32 [[min_clamp]], i32 [[max_clamp]]
 ; CHECK: ret i32 [[sel]]

@@ -1,0 +1,47 @@
+#!amber
+
+SHADER compute test OPENCL-C
+kernel void sub_sat_uint(global uint* out, global uint* a, global uint* b) {
+  uint gid = get_global_id(0);
+  out[gid] = sub_sat(a[gid], b[gid]);
+}
+END
+
+BUFFER a_buf DATA_TYPE uint32 DATA
+0x2f8c7f0a
+0x7fffffff
+0x80000000
+0x00000001
+0x00000002
+END
+
+BUFFER b_buf DATA_TYPE uint32 DATA
+0x6a1902f8
+0x80000000
+0x7fffffff
+0x00000002
+0x00000001
+END
+
+BUFFER expected DATA_TYPE uint32 DATA
+0x00000000
+0x00000000
+0x00000001
+0x00000000
+0x00000001
+END
+
+BUFFER out_buf DATA_TYPE uint32 SIZE 5 FILL 99999
+
+PIPELINE compute test_pipe
+  ATTACH test ENTRY_POINT sub_sat_uint
+
+  BIND BUFFER out_buf KERNEL ARG_NAME out
+  BIND BUFFER a_buf KERNEL ARG_NAME a
+  BIND BUFFER b_buf KERNEL ARG_NAME b
+END
+
+RUN test_pipe 5 1 1
+
+EXPECT out_buf EQ_BUFFER expected
+

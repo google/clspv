@@ -5111,6 +5111,7 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpIAddCarry:
     case spv::OpFAdd:
     case spv::OpISub:
+    case spv::OpISubBorrow:
     case spv::OpFSub:
     case spv::OpIMul:
     case spv::OpFMul:
