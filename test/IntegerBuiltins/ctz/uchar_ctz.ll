@@ -13,7 +13,6 @@ entry:
 declare spir_func i8 @_Z3ctzh(i8)
 
 ; CHECK: [[zext:%[a-zA-Z0-9_.]+]] = zext i8 %in to i32
-; CHECK: [[call:%[a-zA-Z0-9_.]+]] = call i32 @_Z3ctzj(i32 [[zext]])
-; CHECK: [[cmp:%[a-zA-Z0-9_.]+]] = icmp eq i32 [[call]], 32
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select i1 [[cmp]], i32 8, i32 [[call]]
-; CHECK: trunc i32 [[sel]] to  i8
+; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i32 [[zext]], 256
+; CHECK: [[call:%[a-zA-Z0-9_.]+]] = call i32 @_Z3ctzj(i32 [[or]])
+; CHECK: trunc i32 [[call]] to  i8

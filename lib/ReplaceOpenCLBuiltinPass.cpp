@@ -2808,7 +2808,17 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
     if (bitwidth < 32) {
       // Extend the input to 32-bits and perform a clz/ctz.
       auto zext = builder.CreateZExt(in, ty);
-      auto call = builder.CreateCall(func_32bit, {zext});
+      Value *call_input = zext;
+      if (!leading) {
+        // Or the extended input value with a constant that caps the max to the
+        // right bitwidth (e.g. 256 for i8 and 65536 for i16).
+        Constant *mask = builder.getInt32(1 << bitwidth);
+        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+          mask = ConstantVector::getSplat(vec_ty->getElementCount(), mask);
+        }
+        call_input = builder.CreateOr(zext, mask);
+      }
+      auto call = builder.CreateCall(func_32bit, {call_input});
       Value *tmp = call;
       if (leading) {
         // Clz is implemented as 31 - FindUMsb(|zext|), so adjust the result
@@ -2818,17 +2828,9 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
           sub_const =
               ConstantVector::getSplat(vec_ty->getElementCount(), sub_const);
         }
-        // Truncate the intermediate result to the right size.
         tmp = builder.CreateSub(call, sub_const);
-      } else {
-        Constant *c_width = builder.getInt32(bitwidth);
-        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          c_width =
-              ConstantVector::getSplat(vec_ty->getElementCount(), c_width);
-        }
-        auto cmp = builder.CreateICmpEQ(call, c32);
-        tmp = builder.CreateSelect(cmp, c_width, call);
       }
+      // Truncate the intermediate result to the right size.
       return builder.CreateTrunc(tmp, Call->getType());
     } else {
       // Perform a 32-bit version of clz/ctz on each half of the 64-bit input.
