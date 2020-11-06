@@ -3044,7 +3044,7 @@ bool ReplaceOpenCLBuiltinPass::replaceOrdered(Function &F, bool is_ordered) {
     // OpenCL CTS requires that vector versions use sign extension, but scalar
     // versions use zero extension.
     if (isa<VectorType>(Call->getType()))
-        return builder.CreateSExt(tmp, Call->getType());
+      return builder.CreateSExt(tmp, Call->getType());
     return builder.CreateZExt(tmp, Call->getType());
   });
 }
