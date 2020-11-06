@@ -237,7 +237,7 @@ private:
   bool replaceBarrier(Function &F, bool subgroup = false);
   bool replaceMemFence(Function &F, uint32_t semantics);
   bool replacePrefetch(Function &F);
-  bool replaceRelational(Function &F, CmpInst::Predicate P, int32_t C);
+  bool replaceRelational(Function &F, CmpInst::Predicate P);
   bool replaceIsInfAndIsNan(Function &F, spv::Op SPIRVOp, int32_t isvec);
   bool replaceIsFinite(Function &F);
   bool replaceAllAndAny(Function &F, spv::Op SPIRVOp);
@@ -393,23 +393,19 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
     // Relational
   case Builtins::kIsequal:
-    return replaceRelational(F, CmpInst::FCMP_OEQ,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_OEQ);
   case Builtins::kIsgreater:
-    return replaceRelational(F, CmpInst::FCMP_OGT,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_OGT);
   case Builtins::kIsgreaterequal:
-    return replaceRelational(F, CmpInst::FCMP_OGE,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_OGE);
   case Builtins::kIsless:
-    return replaceRelational(F, CmpInst::FCMP_OLT,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_OLT);
   case Builtins::kIslessequal:
-    return replaceRelational(F, CmpInst::FCMP_OLE,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_OLE);
   case Builtins::kIsnotequal:
-    return replaceRelational(F, CmpInst::FCMP_ONE,
-                             FI.getParameter(0).vector_size ? -1 : 1);
+    return replaceRelational(F, CmpInst::FCMP_UNE);
+  case Builtins::kIslessgreater:
+    return replaceRelational(F, CmpInst::FCMP_ONE);
 
   case Builtins::kIsordered:
     return replaceOrdered(F, true);
@@ -1001,25 +997,19 @@ bool ReplaceOpenCLBuiltinPass::replacePrefetch(Function &F) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceRelational(Function &F,
-                                                 CmpInst::Predicate P,
-                                                 int32_t C) {
+                                                 CmpInst::Predicate P) {
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     // The predicate to use in the CmpInst.
     auto Predicate = P;
-
-    // The value to return for true.
-    auto TrueValue = ConstantInt::getSigned(CI->getType(), C);
-
-    // The value to return for false.
-    auto FalseValue = Constant::getNullValue(CI->getType());
 
     auto Arg1 = CI->getOperand(0);
     auto Arg2 = CI->getOperand(1);
 
     const auto Cmp =
         CmpInst::Create(Instruction::FCmp, Predicate, Arg1, Arg2, "", CI);
-
-    return SelectInst::Create(Cmp, TrueValue, FalseValue, "", CI);
+    if (isa<VectorType>(F.getReturnType()))
+      return CastInst::Create(Instruction::SExt, Cmp, CI->getType(), "", CI);
+    return CastInst::Create(Instruction::ZExt, Cmp, CI->getType(), "", CI);
   });
 }
 
