@@ -279,6 +279,7 @@ private:
                    Instruction::BinaryOps join_opcode);
   bool replaceCountZeroes(Function &F, bool leading);
   bool replaceMadSat(Function &F, bool is_signed);
+  bool replaceOrdered(Function &F, bool is_ordered);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
@@ -409,6 +410,12 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kIsnotequal:
     return replaceRelational(F, CmpInst::FCMP_ONE,
                              FI.getParameter(0).vector_size ? -1 : 1);
+
+  case Builtins::kIsordered:
+    return replaceOrdered(F, true);
+
+  case Builtins::kIsunordered:
+    return replaceOrdered(F, false);
 
   case Builtins::kIsinf: {
     bool is_vec = FI.getParameter(0).vector_size != 0;
@@ -2983,5 +2990,61 @@ bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
       auto cmp = builder.CreateICmpEQ(or_value, Constant::getNullValue(ty));
       return builder.CreateSelect(cmp, add, Constant::getAllOnesValue(ty));
     }
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceOrdered(Function &F, bool is_ordered) {
+  if (!isa<IntegerType>(F.getReturnType()->getScalarType()))
+    return false;
+
+  if (F.getFunctionType()->getNumParams() != 2)
+    return false;
+
+  if (F.getFunctionType()->getParamType(0) !=
+      F.getFunctionType()->getParamType(1)) {
+    return false;
+  }
+
+  switch (F.getFunctionType()->getParamType(0)->getScalarType()->getTypeID()) {
+  case Type::FloatTyID:
+  case Type::HalfTyID:
+  case Type::DoubleTyID:
+    break;
+  default:
+    return false;
+  }
+
+  // Scalar versions all return an int, while vector versions return a vector
+  // of an equally sized integer types (e.g. short, int or long).
+  if (isa<VectorType>(F.getReturnType())) {
+    if (F.getReturnType()->getScalarSizeInBits() !=
+        F.getFunctionType()->getParamType(0)->getScalarSizeInBits()) {
+      return false;
+    }
+  } else {
+    if (F.getReturnType()->getScalarSizeInBits() != 32)
+      return false;
+  }
+
+  return replaceCallsWithValue(F, [is_ordered](CallInst *Call) {
+    // Replace with a floating point [un]ordered comparison followed by an
+    // extension.
+    auto x = Call->getArgOperand(0);
+    auto y = Call->getArgOperand(1);
+    IRBuilder<> builder(Call);
+    Value *tmp = nullptr;
+    if (is_ordered) {
+      // This leads to a slight inefficiency in the SPIR-V that is easy for
+      // drivers to optimize where the SPIR-V for the comparison and the
+      // extension could be fused to drop the inversion of the OpIsNan.
+      tmp = builder.CreateFCmpORD(x, y);
+    } else {
+      tmp = builder.CreateFCmpUNO(x, y);
+    }
+    // OpenCL CTS requires that vector versions use sign extension, but scalar
+    // versions use zero extension.
+    if (isa<VectorType>(Call->getType()))
+      return builder.CreateSExt(tmp, Call->getType());
+    return builder.CreateZExt(tmp, Call->getType());
   });
 }
