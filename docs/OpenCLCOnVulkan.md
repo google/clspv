@@ -797,8 +797,7 @@ All supported.
 
 #### Relational Functions
 
-The `islessgreater()`, `isfinite()`, `isnormal()`, `isordered()` and
-`isunordered()` built-in functions **must not** be used.
+The `islessgreater()` and `isnormal()` built-in functions **must not** be used.
 
 #### Vector Data Load and Store Functions
 

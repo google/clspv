@@ -4326,15 +4326,64 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       break;
     }
 
-    // Ops[0] = Result Type ID
-    // Ops[1] = Operand 1 ID
-    // Ops[2] = Operand 2 ID
     SPIRVOperandVec Ops;
+    if (CmpI->getPredicate() == CmpInst::FCMP_ORD ||
+        CmpI->getPredicate() == CmpInst::FCMP_UNO) {
+      // Implement ordered and unordered comparisons are OpIsNan instructions.
+      // Optimize the constants to simplify the resulting code.
+      auto lhs = CmpI->getOperand(0);
+      auto rhs = CmpI->getOperand(1);
+      auto const_lhs = dyn_cast_or_null<Constant>(lhs);
+      auto const_rhs = dyn_cast_or_null<Constant>(rhs);
+      if ((const_lhs && const_lhs->isNaN()) ||
+          (const_rhs && const_rhs->isNaN())) {
+        // Result is a constant, false of ordered, true for unordered.
+        if (CmpI->getPredicate() == CmpInst::FCMP_ORD) {
+          RID = getSPIRVConstant(ConstantInt::getFalse(CmpI->getType()));
+        } else {
+          RID = getSPIRVConstant(ConstantInt::getTrue(CmpI->getType()));
+        }
+        break;
+      }
+      SPIRVID lhs_id;
+      SPIRVID rhs_id;
+      if (!const_lhs) {
+        // Generate OpIsNan for the lhs.
+        Ops.clear();
+        Ops << CmpI->getType() << lhs;
+        lhs_id = addSPIRVInst(spv::OpIsNan, Ops);
+      }
+      if (!const_rhs) {
+        // Generate OpIsNan for the rhs.
+        Ops.clear();
+        Ops << CmpI->getType() << rhs;
+        rhs_id = addSPIRVInst(spv::OpIsNan, Ops);
+      }
+      if (lhs_id.isValid() && rhs_id.isValid()) {
+        // Or the results for the lhs and rhs.
+        Ops.clear();
+        Ops << CmpI->getType() << lhs_id << rhs_id;
+        RID = addSPIRVInst(spv::OpLogicalOr, Ops);
+      } else {
+        RID = lhs_id.isValid() ? lhs_id : rhs_id;
+      }
+      if (CmpI->getPredicate() == CmpInst::FCMP_ORD) {
+        // For ordered comparisons, invert the intermediate result.
+        Ops.clear();
+        Ops << CmpI->getType() << RID;
+        RID = addSPIRVInst(spv::OpLogicalNot, Ops);
+      }
+      break;
+    } else {
+      // Remaining comparisons map directly to SPIR-V opcodes.
+      // Ops[0] = Result Type ID
+      // Ops[1] = Operand 1 ID
+      // Ops[2] = Operand 2 ID
+      Ops << CmpI->getType() << CmpI->getOperand(0) << CmpI->getOperand(1);
 
-    Ops << CmpI->getType() << CmpI->getOperand(0) << CmpI->getOperand(1);
-
-    spv::Op Opcode = GetSPIRVCmpOpcode(CmpI);
-    RID = addSPIRVInst(Opcode, Ops);
+      spv::Op Opcode = GetSPIRVCmpOpcode(CmpI);
+      RID = addSPIRVInst(Opcode, Ops);
+    }
     break;
   }
   case Instruction::Br: {
