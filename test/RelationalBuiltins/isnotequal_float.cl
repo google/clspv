@@ -10,7 +10,7 @@
 // CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 // CHECK: %[[B0_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]]
 // CHECK: %[[B1_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]]
-// CHECK: %[[CMP_ID:[a-zA-Z0-9_]*]] = OpFOrdNotEqual %[[BOOL_TYPE_ID]] %[[B0_LOAD_ID]] %[[B1_LOAD_ID]]
+// CHECK: %[[CMP_ID:[a-zA-Z0-9_]*]] = OpFUnordNotEqual %[[BOOL_TYPE_ID]] %[[B0_LOAD_ID]] %[[B1_LOAD_ID]]
 // CHECK: %[[CAS_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[CMP_ID]] %[[CONSTANT_1_ID]] %[[CONSTANT_0_ID]]
 // CHECK: OpStore {{.*}} %[[CAS_ID]]
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int* a, global float* b)
