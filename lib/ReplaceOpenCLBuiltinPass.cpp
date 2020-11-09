@@ -3048,7 +3048,6 @@ bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
     auto ty = Call->getType();
     auto x = Call->getArgOperand(0);
     unsigned width = x->getType()->getScalarSizeInBits();
-    Type *bool_ty = Type::getInt1Ty(Call->getContext());
     Type *int_ty = IntegerType::get(Call->getContext(), width);
     uint64_t abs_mask = 0x7fffffff;
     uint64_t exp_mask = 0x7f800000;
@@ -3066,7 +3065,6 @@ bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
     Constant *exp_const = ConstantInt::get(int_ty, APInt(width, exp_mask));
     Constant *min_const = ConstantInt::get(int_ty, APInt(width, min_mask));
     if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-      bool_ty = VectorType::get(bool_ty, vec_ty->getElementCount());
       int_ty = VectorType::get(int_ty, vec_ty->getElementCount());
       abs_const =
           ConstantVector::getSplat(vec_ty->getElementCount(), abs_const);
