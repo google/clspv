@@ -3068,9 +3068,12 @@ bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
     if (auto vec_ty = dyn_cast<VectorType>(ty)) {
       bool_ty = VectorType::get(bool_ty, vec_ty->getElementCount());
       int_ty = VectorType::get(int_ty, vec_ty->getElementCount());
-      abs_const = ConstantVector::getSplat(vec_ty->getElementCount(), abs_const);
-      exp_const = ConstantVector::getSplat(vec_ty->getElementCount(), exp_const);
-      min_const = ConstantVector::getSplat(vec_ty->getElementCount(), min_const);
+      abs_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), abs_const);
+      exp_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), exp_const);
+      min_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), min_const);
     }
     // Drop the sign bit and then check that the number is between
     // (exclusive) the min and max exponent values for the bit width.
