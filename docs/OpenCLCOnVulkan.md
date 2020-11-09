@@ -797,7 +797,7 @@ All supported.
 
 #### Relational Functions
 
-The `isnormal()` built-in function **must not** be used.
+All supported.
 
 #### Vector Data Load and Store Functions
 
