@@ -280,6 +280,7 @@ private:
   bool replaceCountZeroes(Function &F, bool leading);
   bool replaceMadSat(Function &F, bool is_signed);
   bool replaceOrdered(Function &F, bool is_ordered);
+  bool replaceIsNormal(Function &F);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
@@ -433,6 +434,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     bool is_vec = FI.getParameter(0).vector_size != 0;
     return replaceAllAndAny(F, !is_vec ? spv::OpNop : spv::OpAny);
   }
+
+  case Builtins::kIsnormal:
+    return replaceIsNormal(F);
 
   case Builtins::kUpsample:
     return replaceUpsample(F);
@@ -3036,5 +3040,51 @@ bool ReplaceOpenCLBuiltinPass::replaceOrdered(Function &F, bool is_ordered) {
     if (isa<VectorType>(Call->getType()))
       return builder.CreateSExt(tmp, Call->getType());
     return builder.CreateZExt(tmp, Call->getType());
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
+  return replaceCallsWithValue(F, [this](CallInst *Call) {
+    auto ty = Call->getType();
+    auto x = Call->getArgOperand(0);
+    unsigned width = x->getType()->getScalarSizeInBits();
+    Type *int_ty = IntegerType::get(Call->getContext(), width);
+    uint64_t abs_mask = 0x7fffffff;
+    uint64_t exp_mask = 0x7f800000;
+    uint64_t min_mask = 0x00800000;
+    if (width == 16) {
+      abs_mask = 0x7fff;
+      exp_mask = 0x7c00;
+      min_mask = 0x0400;
+    } else if (width == 64) {
+      abs_mask = 0x7fffffffffffffff;
+      exp_mask = 0x7ff0000000000000;
+      min_mask = 0x0010000000000000;
+    }
+    Constant *abs_const = ConstantInt::get(int_ty, APInt(width, abs_mask));
+    Constant *exp_const = ConstantInt::get(int_ty, APInt(width, exp_mask));
+    Constant *min_const = ConstantInt::get(int_ty, APInt(width, min_mask));
+    if (auto vec_ty = dyn_cast<VectorType>(ty)) {
+      int_ty = VectorType::get(int_ty, vec_ty->getElementCount());
+      abs_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), abs_const);
+      exp_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), exp_const);
+      min_const =
+          ConstantVector::getSplat(vec_ty->getElementCount(), min_const);
+    }
+    // Drop the sign bit and then check that the number is between
+    // (exclusive) the min and max exponent values for the bit width.
+    IRBuilder<> builder(Call);
+    auto bitcast = builder.CreateBitCast(x, int_ty);
+    auto abs = builder.CreateAnd(bitcast, abs_const);
+    auto lt = builder.CreateICmpULT(abs, exp_const);
+    auto ge = builder.CreateICmpUGE(abs, min_const);
+    auto tmp = builder.CreateAnd(lt, ge);
+    // OpenCL CTS requires that vector versions use sign extension, but scalar
+    // versions use zero extension.
+    if (isa<VectorType>(ty))
+      return builder.CreateSExt(tmp, ty);
+    return builder.CreateZExt(tmp, ty);
   });
 }
