@@ -281,6 +281,7 @@ private:
   bool replaceMadSat(Function &F, bool is_signed);
   bool replaceOrdered(Function &F, bool is_ordered);
   bool replaceIsNormal(Function &F);
+  bool replaceFDim(Function &F);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
@@ -374,6 +375,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kLog1p:
     return replaceLog1p(F);
+
+  case Builtins::kFdim:
+    return replaceFDim(F);
 
   case Builtins::kFmod:
     return replaceFmod(F);
@@ -3086,5 +3090,17 @@ bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
     if (isa<VectorType>(ty))
       return builder.CreateSExt(tmp, ty);
     return builder.CreateZExt(tmp, ty);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceFDim(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    const auto x = Call->getArgOperand(0);
+    const auto y = Call->getArgOperand(1);
+    IRBuilder<> builder(Call);
+    auto sub = builder.CreateFSub(x, y);
+    auto cmp = builder.CreateFCmpUGT(x, y);
+    return builder.CreateSelect(cmp, sub,
+                                Constant::getNullValue(Call->getType()));
   });
 }
