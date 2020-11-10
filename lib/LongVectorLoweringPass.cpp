@@ -72,11 +72,15 @@ private:
   Value *visitInstruction(Instruction &I);
 
   // InstVisitor impl, specific cases.
+  Value *visitAllocaInst(AllocaInst &I);
   Value *visitBinaryOperator(BinaryOperator &I);
   Value *visitCallInst(CallInst &I);
+  Value *visitCastInst(CastInst &I);
   Value *visitExtractElementInst(ExtractElementInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
+  Value *visitLoadInst(LoadInst &I);
   Value *visitShuffleVectorInst(ShuffleVectorInst &I);
+  Value *visitStoreInst(StoreInst &I);
   Value *visitUnaryOperator(UnaryOperator &I);
 
 private:
@@ -222,6 +226,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
 /// Convert the given value @p V to a value of the given @p EquivalentTy.
 ///
 /// @return @p V when @p V's type is @p newType.
+/// @return an equivalent pointer when both @p V and @p newType are pointers.
 /// @return an equivalent vector when @p V is an aggregate.
 /// @return an equivalent aggregate when @p V is a vector.
 Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
@@ -229,7 +234,11 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
     return V;
   }
 
-  // TODO Support pointer types.
+  if (EquivalentTy->isPointerTy()) {
+    assert(V->getType()->isPointerTy());
+    return B.CreateBitCast(V, EquivalentTy);
+  }
+
   assert(EquivalentTy->isVectorTy() || EquivalentTy->isStructTy());
 
   Value *NewValue = UndefValue::get(EquivalentTy);
@@ -295,7 +304,7 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
 
 /// Map the arguments of the wrapper function (which are either not long-vectors
 /// or aggregates of scalars) to the original arguments of the user-defined
-/// function (which can be long-vectors).
+/// function (which can be long-vectors). Handle pointers as well.
 SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
                                                      Function &Wrappee,
                                                      Function &Wrapper) {
@@ -407,12 +416,12 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
   auto *EquivalentTy = getEquivalentType(Cst.getType());
   assert(EquivalentTy && "Nothing to lower.");
 
-  if (isa<UndefValue>(Cst)) {
-    return UndefValue::get(EquivalentTy);
+  if (Cst.isZeroValue()) {
+    return Constant::getNullValue(EquivalentTy);
   }
 
-  if (isa<ConstantAggregateZero>(Cst)) {
-    return ConstantAggregateZero::get(EquivalentTy);
+  if (isa<UndefValue>(Cst)) {
+    return UndefValue::get(EquivalentTy);
   }
 
   if (auto *Vector = dyn_cast<ConstantDataVector>(&Cst)) {
@@ -459,6 +468,21 @@ Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
   llvm_unreachable("Missing support for instruction");
 }
 
+Value *LongVectorLoweringPass::visitAllocaInst(AllocaInst &I) {
+  auto *EquivalentTy = getEquivalentType(I.getAllocatedType());
+  assert(EquivalentTy && "type not lowered");
+
+  Value *ArraySize = I.getArraySize();
+  assert(visit(ArraySize) == nullptr && "TODO Need test case");
+
+  IRBuilder<> B(&I);
+  unsigned AS = I.getType()->getAddressSpace();
+  auto *V = B.CreateAlloca(EquivalentTy, AS, ArraySize);
+  V->setAlignment(I.getAlign());
+  registerReplacement(I, *V);
+  return V;
+}
+
 Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
   return visitNAryOperator(I);
 }
@@ -503,6 +527,39 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
   return V;
 }
 
+Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
+  auto *OriginalValue = I.getOperand(0);
+  auto *EquivalentValue = visitOrSelf(OriginalValue);
+  auto *OriginalDestTy = I.getDestTy();
+  auto *EquivalentDestTy = getEquivalentTypeOrSelf(OriginalDestTy);
+
+  // We expect something to lower, or this function shouldn't have been called.
+  assert(((OriginalValue != EquivalentValue) ||
+          (OriginalDestTy != EquivalentDestTy)) &&
+         "nothing to lower");
+
+  Value *V = nullptr;
+  switch (I.getOpcode()) {
+  case Instruction::BitCast: {
+    if (OriginalDestTy->isPointerTy()) {
+      // Bitcast over pointers are lowered to one bitcast.
+      assert(EquivalentDestTy->isPointerTy());
+      IRBuilder<> B(&I);
+      V = B.CreateBitCast(EquivalentValue, EquivalentDestTy, I.getName());
+      break;
+    }
+  } // fall-through
+
+  default:
+    llvm_unreachable("Cast unsupported.");
+    break;
+  }
+
+  assert(V);
+  registerReplacement(I, *V);
+  return V;
+}
+
 Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   assert(EquivalentValue && "value not lowered");
@@ -533,6 +590,19 @@ Value *LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
 
   IRBuilder<> B(&I);
   auto *V = B.CreateInsertValue(EquivalentValue, ScalarElement, {Index});
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
+  Value *EquivalentPointer = visit(I.getPointerOperand());
+  assert(EquivalentPointer && "pointer not lowered");
+  Type *EquivalentTy = getEquivalentType(I.getType());
+  assert(EquivalentTy && "type not lowered");
+
+  IRBuilder<> B(&I);
+  auto *V = B.CreateAlignedLoad(EquivalentTy, EquivalentPointer, I.getAlign(),
+                                I.isVolatile());
   registerReplacement(I, *V);
   return V;
 }
@@ -599,6 +669,19 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
     V = setScalar(V, Scalar, i);
   }
 
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
+  Value *EquivalentValue = visit(I.getValueOperand());
+  assert(EquivalentValue && "value not lowered");
+  Value *EquivalentPointer = visit(I.getPointerOperand());
+  assert(EquivalentPointer && "pointer not lowered");
+
+  IRBuilder<> B(&I);
+  auto *V = B.CreateAlignedStore(EquivalentValue, EquivalentPointer,
+                                 I.getAlign(), I.isVolatile());
   registerReplacement(I, *V);
   return V;
 }
