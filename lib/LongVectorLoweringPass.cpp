@@ -224,33 +224,36 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   }
 }
 
+std::string
+getMangledScalarName(const clspv::Builtins::FunctionInfo &VectorInfo) {
+  // Copy the informations about the vector version.
+  // Return type is not important for mangling.
+  // Only update arguments to make them scalars.
+  clspv::Builtins::FunctionInfo ScalarInfo = VectorInfo;
+  for (size_t i = 0; i < ScalarInfo.getParameterCount(); ++i) {
+    ScalarInfo.getParameter(i).vector_size = 0;
+  }
+  return clspv::Builtins::GetMangledFunctionName(ScalarInfo);
+}
+
 /// Get the scalar overload for the given OpenCL builtin function @p Builtin.
 Function *getBIFScalarVersion(Function &Builtin) {
   assert(!Builtin.isIntrinsic());
+  const auto &Info = clspv::Builtins::Lookup(&Builtin);
+  assert(Info.getType() != clspv::Builtins::kBuiltinNone);
 
-  // TODO For now we are using a hardcodded mapping but this should be replaced
-  // by an automatic solution.
-  StringRef VectorName = Builtin.getName();
-  StringRef ScalarName = StringSwitch<StringRef>(VectorName)
-                             // max
-                             .Case("_Z3maxDv16_fS_", "_Z3maxff")
-                             .Case("_Z3maxDv16_iS_", "_Z3maxii")
-                             .Case("_Z3maxDv8_fS_", "_Z3maxff")
-                             .Case("_Z3maxDv8_iS_", "_Z3maxii")
-                             // default = lookup failure
-                             .Default("");
-  if (ScalarName.empty()) {
+  FunctionType *FunctionTy = nullptr;
+  switch (Info.getType()) {
+  default: {
 #ifndef NDEBUG
     dbgs() << "BIF " << Builtin.getName() << " is not yet supported\n";
 #endif
     llvm_unreachable("BIF not handled yet.");
   }
 
-  // Get the scalar version, which might not already exist in the module.
-  auto *M = Builtin.getParent();
-  auto *ScalarFn = M->getFunction(ScalarName);
-
-  if (ScalarFn == nullptr) {
+  // TODO Add support for other builtins by providing testcases and listing the
+  // builtins here.
+  case clspv::Builtins::kMax: {
     // Scalarise all the input/output types. Here we intentionally do not rely
     // on getEquivalentType because we want the scalar overload.
     SmallVector<Type *, 16> ParamTys;
@@ -263,9 +266,19 @@ Function *getBIFScalarVersion(Function &Builtin) {
     assert(Builtin.getReturnType()->isVectorTy());
     Type *ReturnTy = Builtin.getReturnType()->getScalarType();
 
-    auto *FunctionTy =
-        FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
+    FunctionTy = FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
+    break;
+  }
+  }
 
+  // Handle signedness of parameters by using clspv::Builtins API.
+  std::string ScalarName = getMangledScalarName(Info);
+
+  // Get the scalar version, which might not already exist in the module.
+  auto *M = Builtin.getParent();
+  auto *ScalarFn = M->getFunction(ScalarName);
+
+  if (ScalarFn == nullptr) {
     ScalarFn = Function::Create(FunctionTy, Builtin.getLinkage(), ScalarName);
     ScalarFn->setCallingConv(Builtin.getCallingConv());
     ScalarFn->copyAttributesFrom(&Builtin);

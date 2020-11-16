@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Support/raw_ostream.h"
+
 #include "Builtins.h"
 
 #include <cstdlib>
@@ -255,6 +257,11 @@ Builtins::FunctionInfo::getParameter(size_t _arg) const {
   return params_[_arg];
 }
 
+Builtins::ParamTypeInfo &Builtins::FunctionInfo::getParameter(size_t _arg) {
+  assert(params_.size() > _arg);
+  return params_[_arg];
+}
+
 // Test for OCL Sampler parameter type
 bool Builtins::ParamTypeInfo::isSampler() const {
   return type_id == Type::StructTyID &&
@@ -298,6 +305,98 @@ std::string Builtins::GetMangledFunctionName(const char *name, Type *type) {
 std::string Builtins::GetMangledFunctionName(const char *name) {
   assert(name);
   return std::string("_Z") + std::to_string(strlen(name)) + name;
+}
+
+std::string
+Builtins::GetMangledFunctionName(const Builtins::FunctionInfo &info) {
+  // This is a best-effort attempt at reconstructing the mangled name for the
+  // given function. Because demangling is a lossy process some information may
+  // be lost and is therefore no longer available.
+  std::string name;
+  raw_string_ostream out(name);
+
+  StringRef function_name = info.getName();
+  out << "_Z" << function_name.size() << function_name;
+
+  for (size_t i = 0; i < info.getParameterCount(); ++i) {
+    const auto &param = info.getParameter(i);
+
+    if (param.vector_size != 0) {
+      out << "Dv" << param.vector_size << '_';
+    }
+
+    switch (param.type_id) {
+    case Type::FloatTyID:
+      switch (param.byte_len) {
+      case 2:
+        out << "Dh";
+        break;
+      case 4:
+        out << "f";
+        break;
+      case 8:
+        out << "d";
+        break;
+      default:
+        llvm_unreachable("Invalid byte_len for floating point type.");
+        break;
+      }
+      break;
+
+    case Type::IntegerTyID:
+      if (param.is_signed) {
+        switch (param.byte_len) {
+        case 1:
+          // Not enough information to distinguish between char (c) and signed
+          // char (a).
+          out << 'c';
+          break;
+        case 2:
+          out << "s";
+          break;
+        case 4:
+          out << "i";
+          break;
+        case 8:
+          out << "l";
+          break;
+        default:
+          llvm_unreachable("Invalid byte_len for signed integer type.");
+          break;
+        }
+      } else {
+        switch (param.byte_len) {
+        case 1:
+          out << 'h';
+          break;
+        case 2:
+          out << "t";
+          break;
+        case 4:
+          out << "j";
+          break;
+        case 8:
+          out << "m";
+          break;
+        default:
+          llvm_unreachable("Invalid byte_len for unsigned integer type.");
+          break;
+        }
+      }
+      break;
+
+    case Type::StructTyID:
+      out << param.name.size() << param.name;
+      break;
+
+    default:
+      llvm_unreachable("Unsupported type id");
+      break;
+    }
+  }
+
+  out.flush();
+  return name;
 }
 
 // The mangling loosely follows the Itanium convention.
