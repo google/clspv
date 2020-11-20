@@ -107,7 +107,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   for (auto &U : F.uses()) {
     if (auto Call = dyn_cast<CallInst>(U.getUser())) {
       auto replacement = Replacer(Call);
-      if (replacement != nullptr) {
+      if (replacement != nullptr && replacement != Call) {
         Call->replaceAllUsesWith(replacement);
         ToRemove.push_back(Call);
       }
