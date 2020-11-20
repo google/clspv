@@ -3887,7 +3887,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         } else if (I.getOpcode() == Instruction::SExt) {
           Ops << ConstantInt::getSigned(I.getType(), -1);
         } else {
-          Ops << ConstantFP::get(Context, APFloat(1.0f));
+          Ops << ConstantFP::get(I.getType(), 1.0);
         }
 
         if (I.getOpcode() == Instruction::ZExt) {
@@ -3895,7 +3895,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         } else if (I.getOpcode() == Instruction::SExt) {
           Ops << Constant::getNullValue(I.getType());
         } else {
-          Ops << ConstantFP::get(Context, APFloat(0.0f));
+          Ops << ConstantFP::get(I.getType(), 0.0);
         }
 
         RID = addSPIRVInst(spv::OpSelect, Ops);
