@@ -57,6 +57,7 @@ public:
   operator int() const { return type_; }
   const std::string &getName() const { return name_; }
   const ParamTypeInfo &getParameter(size_t arg) const;
+  ParamTypeInfo &getParameter(size_t arg);
   const ParamTypeInfo &getLastParameter() const { return params_.back(); }
   size_t getParameterCount() const { return params_.size(); }
   const ParamTypeInfo &getReturnType() const { return return_type_; }
@@ -80,6 +81,8 @@ inline const FunctionInfo &Lookup(llvm::Function *func) {
 std::string GetMangledFunctionName(const char *name, llvm::Type *type);
 
 std::string GetMangledFunctionName(const char *name);
+
+std::string GetMangledFunctionName(const FunctionInfo &Info);
 
 std::string GetMangledTypeName(llvm::Type *T);
 

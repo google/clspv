@@ -160,7 +160,8 @@ private:
   /// are visited because this would invalidate iterators.
   DenseMap<Value *, Value *> ValueMap;
 
-  /// A map between functions and their replacement.
+  /// A map between functions and their replacement. This includes OpenCL
+  /// builtin declarations.
   ///
   /// The keys in this mapping should be deleted when finishing processing the
   /// module.
@@ -221,6 +222,73 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     break;
   }
   }
+}
+
+std::string
+getMangledScalarName(const clspv::Builtins::FunctionInfo &VectorInfo) {
+  // Copy the informations about the vector version.
+  // Return type is not important for mangling.
+  // Only update arguments to make them scalars.
+  clspv::Builtins::FunctionInfo ScalarInfo = VectorInfo;
+  for (size_t i = 0; i < ScalarInfo.getParameterCount(); ++i) {
+    ScalarInfo.getParameter(i).vector_size = 0;
+  }
+  return clspv::Builtins::GetMangledFunctionName(ScalarInfo);
+}
+
+/// Get the scalar overload for the given OpenCL builtin function @p Builtin.
+Function *getBIFScalarVersion(Function &Builtin) {
+  assert(!Builtin.isIntrinsic());
+  const auto &Info = clspv::Builtins::Lookup(&Builtin);
+  assert(Info.getType() != clspv::Builtins::kBuiltinNone);
+
+  FunctionType *FunctionTy = nullptr;
+  switch (Info.getType()) {
+  default: {
+#ifndef NDEBUG
+    dbgs() << "BIF " << Builtin.getName() << " is not yet supported\n";
+#endif
+    llvm_unreachable("BIF not handled yet.");
+  }
+
+  // TODO Add support for other builtins by providing testcases and listing the
+  // builtins here.
+  case clspv::Builtins::kMax: {
+    // Scalarise all the input/output types. Here we intentionally do not rely
+    // on getEquivalentType because we want the scalar overload.
+    SmallVector<Type *, 16> ParamTys;
+    for (auto &Param : Builtin.args()) {
+      // TODO Need support for other types, like pointers. Need test case.
+      assert(Param.getType()->isVectorTy());
+      ParamTys.push_back(Param.getType()->getScalarType());
+    }
+
+    assert(Builtin.getReturnType()->isVectorTy());
+    Type *ReturnTy = Builtin.getReturnType()->getScalarType();
+
+    FunctionTy = FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
+    break;
+  }
+  }
+
+  // Handle signedness of parameters by using clspv::Builtins API.
+  std::string ScalarName = getMangledScalarName(Info);
+
+  // Get the scalar version, which might not already exist in the module.
+  auto *M = Builtin.getParent();
+  auto *ScalarFn = M->getFunction(ScalarName);
+
+  if (ScalarFn == nullptr) {
+    ScalarFn = Function::Create(FunctionTy, Builtin.getLinkage(), ScalarName);
+    ScalarFn->setCallingConv(Builtin.getCallingConv());
+    ScalarFn->copyAttributesFrom(&Builtin);
+
+    M->getFunctionList().push_front(ScalarFn);
+  }
+
+  assert(Builtin.getCallingConv() == ScalarFn->getCallingConv());
+
+  return ScalarFn;
 }
 
 /// Convert the given value @p V to a value of the given @p EquivalentTy.
@@ -871,9 +939,9 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
   if (ScalarFunction == nullptr) {
     // Handle both OpenCL builtin functions, available as simple declarations,
     // and LLVM intrinsics.
-    // TODO Implement support for OpenCL builtins.
-    assert(VectorFunction->isIntrinsic());
-    ScalarFunction = getIntrinsicScalarVersion(*VectorFunction);
+    auto getter = VectorFunction->isIntrinsic() ? getIntrinsicScalarVersion
+                                                : getBIFScalarVersion;
+    ScalarFunction = getter(*VectorFunction);
     FunctionMap[VectorFunction] = ScalarFunction;
   }
   assert(ScalarFunction);
