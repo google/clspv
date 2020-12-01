@@ -1245,7 +1245,8 @@ void SPIRVProducerPass::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (module->getFunction(clspv::LiteralSamplerFunction()) ||
       !getSamplerMap().empty()) {
-    auto SamplerStructTy = module->getTypeByName("opencl.sampler_t");
+    auto SamplerStructTy =
+        StructType::getTypeByName(module->getContext(), "opencl.sampler_t");
     if (!SamplerStructTy) {
       SamplerStructTy =
           StructType::create(module->getContext(), "opencl.sampler_t");
