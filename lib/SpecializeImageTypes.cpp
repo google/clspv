@@ -114,7 +114,8 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
             // image types (invalid SPIR-V).
             name = name.substr(0, pos) + "_rw_t" + name.substr(pos + 5);
           }
-          StructType *new_struct = M.getTypeByName(name);
+          StructType *new_struct =
+              StructType::getTypeByName(M.getContext(), name);
           if (!new_struct)
             new_struct = StructType::create(Arg.getContext(), name);
           new_type = PointerType::get(new_struct,
@@ -202,7 +203,7 @@ Type *SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       }
 
       StructType *new_struct =
-          call->getParent()->getParent()->getParent()->getTypeByName(name);
+          StructType::getTypeByName(call->getContext(), name);
       if (!new_struct) {
         new_struct = StructType::create(call->getContext(), name);
       }

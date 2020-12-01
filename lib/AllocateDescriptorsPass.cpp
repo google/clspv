@@ -237,7 +237,8 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
 
   // Generate the function type for clspv::LiteralSamplerFunction()
   IRBuilder<> Builder(M.getContext());
-  auto *sampler_struct_ty = M.getTypeByName("opencl.sampler_t");
+  auto *sampler_struct_ty =
+      StructType::getTypeByName(M.getContext(), "opencl.sampler_t");
   if (!sampler_struct_ty) {
     sampler_struct_ty = StructType::create(M.getContext(), "opencl.sampler_t");
   }
