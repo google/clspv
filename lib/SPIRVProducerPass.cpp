@@ -3741,13 +3741,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
         << glsl::ExtInst::ExtInstFindUMsb << Call->getArgOperand(0);
     auto find_msb = addSPIRVInst(spv::OpExtInst, Ops);
 
-    Constant *thirty_one =
-        ConstantInt::get(Call->getType()->getScalarType(),
-                         Call->getType()->getScalarSizeInBits() - 1);
-    if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
-      thirty_one =
-          ConstantVector::getSplat(vec_ty->getElementCount(), thirty_one);
-    }
+    Constant *thirty_one = ConstantInt::get(
+        Call->getType(), Call->getType()->getScalarSizeInBits() - 1);
     Ops.clear();
     Ops << Call->getType() << thirty_one << find_msb;
     return addSPIRVInst(spv::OpISub, Ops);
@@ -3764,13 +3759,9 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
     auto find_lsb = addSPIRVInst(spv::OpExtInst, Ops);
 
     auto neg_one = Constant::getAllOnesValue(Call->getType());
-    Constant *width = ConstantInt::get(Call->getType()->getScalarType(),
-                                       Call->getType()->getScalarSizeInBits());
-    Type *i1_ty = Type::getInt1Ty(Call->getContext());
-    if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
-      i1_ty = VectorType::get(i1_ty, vec_ty->getElementCount());
-      width = ConstantVector::getSplat(vec_ty->getElementCount(), width);
-    }
+    auto i1_ty = Call->getType()->getWithNewBitWidth(1);
+    auto width = ConstantInt::get(Call->getType(),
+                                  Call->getType()->getScalarSizeInBits());
 
     Ops.clear();
     Ops << i1_ty << find_lsb << neg_one;

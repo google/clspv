@@ -482,13 +482,8 @@ bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
     auto c_false = ConstantInt::getFalse(Call->getContext());
     auto in = Call->getArgOperand(0);
     IRBuilder<> builder(Call);
-    auto int32_ty = builder.getInt32Ty();
-    Type *ty = int32_ty;
-    Constant *c32 = builder.getInt32(32);
-    if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
-      ty = VectorType::get(ty, vec_ty->getElementCount());
-      c32 = ConstantVector::getSplat(vec_ty->getElementCount(), c32);
-    }
+    auto ty = Call->getType()->getWithNewBitWidth(32);
+    auto c32 = ConstantInt::get(ty, 32);
     auto func_32bit = Intrinsic::getDeclaration(
         F.getParent(), leading ? Intrinsic::ctlz : Intrinsic::cttz, ty);
     if (bitwidth < 32) {
@@ -498,10 +493,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
       if (!leading) {
         // Or the extended input value with a constant that caps the max to the
         // right bitwidth (e.g. 256 for i8 and 65536 for i16).
-        Constant *mask = builder.getInt32(1 << bitwidth);
-        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          mask = ConstantVector::getSplat(vec_ty->getElementCount(), mask);
-        }
+        auto mask = ConstantInt::get(ty, 1 << bitwidth);
         call_input = builder.CreateOr(zext, mask);
       }
       auto call = builder.CreateCall(func_32bit->getFunctionType(), func_32bit,
@@ -510,11 +502,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
       if (leading) {
         // Clz is implemented as 31 - FindUMsb(|zext|), so adjust the result
         // the right bitwidth.
-        Constant *sub_const = builder.getInt32(32 - bitwidth);
-        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          sub_const =
-              ConstantVector::getSplat(vec_ty->getElementCount(), sub_const);
-        }
+        auto sub_const = ConstantInt::get(ty, 32 - bitwidth);
         tmp = builder.CreateSub(call, sub_const);
       }
       // Truncate the intermediate result to the right size.
