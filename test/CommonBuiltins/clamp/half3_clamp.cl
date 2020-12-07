@@ -9,7 +9,7 @@
 // CHECK-DAG: [[ld0:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
 // CHECK-DAG: [[ld1:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
 // CHECK-DAG: [[ld2:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
-// CHECK: OpExtInst [[half3]] [[EXT]] FClamp [[ld0]] [[ld1]] [[ld2]]
+// CHECK: OpExtInst [[half3]] [[EXT]] NClamp [[ld0]] [[ld1]] [[ld2]]
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 
