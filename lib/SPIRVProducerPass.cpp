@@ -34,6 +34,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
@@ -3733,6 +3734,49 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
 
   SPIRVID RID;
 
+  switch (Call->getCalledFunction()->getIntrinsicID()) {
+  case Intrinsic::ctlz: {
+    // Implement as 31 - FindUMsb. Ignore the second operand of llvm.ctlz.
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << getOpExtInstImportID()
+        << glsl::ExtInst::ExtInstFindUMsb << Call->getArgOperand(0);
+    auto find_msb = addSPIRVInst(spv::OpExtInst, Ops);
+
+    Constant *thirty_one = ConstantInt::get(
+        Call->getType(), Call->getType()->getScalarSizeInBits() - 1);
+    Ops.clear();
+    Ops << Call->getType() << thirty_one << find_msb;
+    return addSPIRVInst(spv::OpISub, Ops);
+  }
+  case Intrinsic::cttz: {
+    // Implement as:
+    // lsb = FindILsb x
+    // res = lsb == -1 ? width : lsb
+    //
+    // Ignore the second operand of llvm.cttz.
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << getOpExtInstImportID()
+        << glsl::ExtInst::ExtInstFindILsb << Call->getArgOperand(0);
+    auto find_lsb = addSPIRVInst(spv::OpExtInst, Ops);
+
+    auto neg_one = Constant::getAllOnesValue(Call->getType());
+    auto i1_ty = Call->getType()->getWithNewBitWidth(1);
+    auto width = ConstantInt::get(Call->getType(),
+                                  Call->getType()->getScalarSizeInBits());
+
+    Ops.clear();
+    Ops << i1_ty << find_lsb << neg_one;
+    auto cmp = addSPIRVInst(spv::OpIEqual, Ops);
+
+    Ops.clear();
+    Ops << Call->getType() << cmp << width << find_lsb;
+    return addSPIRVInst(spv::OpSelect, Ops);
+  }
+
+  default:
+    break;
+  }
+
   switch (func_type) {
   case Builtins::kPopcount: {
     //
@@ -3749,7 +3793,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
   default: {
     glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(func_info);
 
-    if (EInst) {
+    // Do not replace functions with implementations.
+    if (EInst && Call->getCalledFunction()->isDeclaration()) {
       SPIRVID ExtInstImportID = getOpExtInstImportID();
 
       //
@@ -3797,32 +3842,7 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
           RID = addSPIRVInst(opcode, Ops);
         };
 
-        auto bitwidth = Call->getType()->getScalarSizeInBits();
         switch (IndirectExtInst) {
-        case glsl::ExtInstFindUMsb: // Implementing clz
-          generate_extra_inst(
-              spv::OpISub,
-              ConstantInt::get(Call->getType()->getScalarType(), bitwidth - 1));
-          break;
-        case glsl::ExtInstFindILsb: { // Implementing ctz
-          auto neg_one = Constant::getAllOnesValue(Call->getType());
-          Constant *int_32 =
-              ConstantInt::get(Call->getType()->getScalarType(), 32);
-          Type *i1_ty = Type::getInt1Ty(Call->getContext());
-          if (auto vec_ty = dyn_cast<VectorType>(Call->getType())) {
-            i1_ty = VectorType::get(i1_ty, vec_ty->getElementCount());
-            int_32 =
-                ConstantVector::getSplat(vec_ty->getElementCount(), int_32);
-          }
-
-          SPIRVOperandVec local_ops;
-          local_ops << i1_ty << RID << neg_one;
-          auto cmp = addSPIRVInst(spv::OpIEqual, local_ops);
-          local_ops.clear();
-          local_ops << Call->getType() << cmp << int_32 << RID;
-          RID = addSPIRVInst(spv::OpSelect, local_ops);
-          break;
-        }
         case glsl::ExtInstAcos:  // Implementing acospi
         case glsl::ExtInstAsin:  // Implementing asinpi
         case glsl::ExtInstAtan:  // Implementing atanpi
@@ -4996,8 +5016,21 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
     break;
   }
 
+  // TODO: improve this by checking the intrinsic id.
   if (func_info.getName().find("llvm.fmuladd.") == 0) {
     return glsl::ExtInst::ExtInstFma;
+  }
+  if (func_info.getName().find("llvm.sqrt.") == 0) {
+    return glsl::ExtInst::ExtInstSqrt;
+  }
+  if (func_info.getName().find("llvm.trunc.") == 0) {
+    return glsl::ExtInst::ExtInstTrunc;
+  }
+  if (func_info.getName().find("llvm.ctlz.") == 0) {
+    return glsl::ExtInst::ExtInstFindUMsb;
+  }
+  if (func_info.getName().find("llvm.cttz.") == 0) {
+    return glsl::ExtInst::ExtInstFindILsb;
   }
   return kGlslExtInstBad;
 }
@@ -5005,10 +5038,6 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
 glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(
     const Builtins::FunctionInfo &func_info) {
   switch (func_info.getType()) {
-  case Builtins::kClz:
-    return glsl::ExtInst::ExtInstFindUMsb;
-  case Builtins::kCtz:
-    return glsl::ExtInst::ExtInstFindILsb;
   case Builtins::kAcospi:
     return glsl::ExtInst::ExtInstAcos;
   case Builtins::kAsinpi:

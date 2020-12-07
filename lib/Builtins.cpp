@@ -288,7 +288,8 @@ std::string Builtins::GetMangledFunctionName(const char *name, Type *type) {
   if (auto *func_type = dyn_cast<FunctionType>(type)) {
     Type *last_arg_type = nullptr;
     for (auto *arg_type : func_type->params()) {
-      if (arg_type == last_arg_type) {
+      std::string arg_name = GetMangledTypeName(arg_type);
+      if (arg_name.size() > 1 && arg_type == last_arg_type) {
         mangled_name += "S_";
       } else {
         mangled_name += GetMangledTypeName(arg_type);
