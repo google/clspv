@@ -4852,7 +4852,7 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   case Builtins::kClamp: {
     auto param_type = func_info.getParameter(0);
     if (param_type.type_id == Type::FloatTyID) {
-      return glsl::ExtInst::ExtInstFClamp;
+      return glsl::ExtInst::ExtInstNClamp;
     }
     return param_type.is_signed ? glsl::ExtInst::ExtInstSClamp
                                 : glsl::ExtInst::ExtInstUClamp;

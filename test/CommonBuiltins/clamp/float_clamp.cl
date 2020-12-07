@@ -8,7 +8,7 @@
 // CHECK-DAG: %[[CONSTANT_FLOAT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0
 // CHECK-DAG: %[[CONSTANT_FLOAT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 1
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_TYPE_ID]]
-// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] FClamp %[[LOADB_ID]] %[[CONSTANT_FLOAT_0_ID]] %[[CONSTANT_FLOAT_1_ID]]
+// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] NClamp %[[LOADB_ID]] %[[CONSTANT_FLOAT_0_ID]] %[[CONSTANT_FLOAT_1_ID]]
 // CHECK: OpStore {{.*}} %[[OP_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, global float* b)
