@@ -41,7 +41,7 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
 
   auto M = Insert->getModule();
   auto Int32Ty = Type::getInt32Ty(M->getContext());
-  Function* func = M->getFunction(MangledName);
+  Function *func = M->getFunction(MangledName);
   if (!func) {
     // Create a function in the module
     SmallVector<Type *, 8> ArgTypes = {Int32Ty};

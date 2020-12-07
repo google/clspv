@@ -85,17 +85,17 @@ bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
 
 bool ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   switch (F.getIntrinsicID()) {
-    case Intrinsic::fshl:
-      return replaceFshl(F);
-    case Intrinsic::copysign:
-      return replaceCopysign(F);
-    case Intrinsic::ctlz:
-      return replaceCountZeroes(F, true);
-    case Intrinsic::cttz:
-      return replaceCountZeroes(F, false);
+  case Intrinsic::fshl:
+    return replaceFshl(F);
+  case Intrinsic::copysign:
+    return replaceCopysign(F);
+  case Intrinsic::ctlz:
+    return replaceCountZeroes(F, true);
+  case Intrinsic::cttz:
+    return replaceCountZeroes(F, false);
 
-    default:
-      break;
+  default:
+    break;
   }
 
   return false;
