@@ -3077,10 +3077,7 @@ bool ReplaceOpenCLBuiltinPass::replaceTrigPi(Function &F,
   return replaceCallsWithValue(F, [&F, type](CallInst *Call) -> Value * {
     const auto x = Call->getArgOperand(0);
     const double k_pi = 0x1.921fb54442d18p+1;
-    Constant *pi = ConstantFP::get(x->getType()->getScalarType(), k_pi);
-    if (auto vec_ty = dyn_cast<VectorType>(x->getType())) {
-      pi = ConstantVector::getSplat(vec_ty->getElementCount(), pi);
-    }
+    Constant *pi = ConstantFP::get(x->getType(), k_pi);
 
     IRBuilder<> builder(Call);
     auto mul = builder.CreateFMul(x, pi);
