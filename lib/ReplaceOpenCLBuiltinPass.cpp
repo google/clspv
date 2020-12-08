@@ -3056,7 +3056,7 @@ bool ReplaceOpenCLBuiltinPass::replaceRound(Function &F) {
     auto fabs = Intrinsic::getDeclaration(F.getParent(), Intrinsic::fabs,
                                           Call->getType());
     auto copysign = Intrinsic::getDeclaration(
-        F.getParent(), Intrinsic::copysign, Call->getType());
+        F.getParent(), Intrinsic::copysign, {Call->getType(), Call->getType()});
 
     IRBuilder<> builder(Call);
 
@@ -3068,7 +3068,7 @@ bool ReplaceOpenCLBuiltinPass::replaceRound(Function &F) {
         builder.CreateCall(F.getFunctionType(), clspv_fract_fn, {fabs_call});
     auto cmp = builder.CreateFCmpOGE(fract_call, halfway);
     auto sel = builder.CreateSelect(cmp, ceil_call, floor_call);
-    return builder.CreateCall(F.getFunctionType(), copysign, {sel, x});
+    return builder.CreateCall(copysign->getFunctionType(), copysign, {sel, x});
   });
 }
 
