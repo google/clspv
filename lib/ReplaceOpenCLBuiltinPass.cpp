@@ -282,6 +282,8 @@ private:
   bool replaceOrdered(Function &F, bool is_ordered);
   bool replaceIsNormal(Function &F);
   bool replaceFDim(Function &F);
+  bool replaceRound(Function &F);
+  bool replaceTrigPi(Function &F, Builtins::BuiltinType type);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
@@ -381,6 +383,14 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kFmod:
     return replaceFmod(F);
+
+  case Builtins::kRound:
+    return replaceRound(F);
+
+  case Builtins::kCospi:
+  case Builtins::kSinpi:
+  case Builtins::kTanpi:
+    return replaceTrigPi(F, FI.getType());
 
   case Builtins::kBarrier:
   case Builtins::kWorkGroupBarrier:
@@ -3017,5 +3027,84 @@ bool ReplaceOpenCLBuiltinPass::replaceFDim(Function &F) {
     auto cmp = builder.CreateFCmpUGT(x, y);
     return builder.CreateSelect(cmp, sub,
                                 Constant::getNullValue(Call->getType()));
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceRound(Function &F) {
+  return replaceCallsWithValue(F, [&F](CallInst *Call) {
+    const auto x = Call->getArgOperand(0);
+    const double c_halfway = 0.5;
+    auto halfway = ConstantFP::get(Call->getType(), c_halfway);
+
+    const auto clspv_fract_name =
+        Builtins::GetMangledFunctionName("clspv.fract", F.getFunctionType());
+    Function *clspv_fract_fn = F.getParent()->getFunction(clspv_fract_name);
+    if (!clspv_fract_fn) {
+      // Make the clspv_fract function.
+      clspv_fract_fn = cast<Function>(
+          F.getParent()
+              ->getOrInsertFunction(clspv_fract_name, F.getFunctionType())
+              .getCallee());
+      clspv_fract_fn->addFnAttr(Attribute::ReadNone);
+      clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
+    }
+
+    auto ceil = Intrinsic::getDeclaration(F.getParent(), Intrinsic::ceil,
+                                          Call->getType());
+    auto floor = Intrinsic::getDeclaration(F.getParent(), Intrinsic::floor,
+                                           Call->getType());
+    auto fabs = Intrinsic::getDeclaration(F.getParent(), Intrinsic::fabs,
+                                          Call->getType());
+    auto copysign = Intrinsic::getDeclaration(
+        F.getParent(), Intrinsic::copysign, {Call->getType(), Call->getType()});
+
+    IRBuilder<> builder(Call);
+
+    auto fabs_call = builder.CreateCall(F.getFunctionType(), fabs, {x});
+    auto ceil_call = builder.CreateCall(F.getFunctionType(), ceil, {fabs_call});
+    auto floor_call =
+        builder.CreateCall(F.getFunctionType(), floor, {fabs_call});
+    auto fract_call =
+        builder.CreateCall(F.getFunctionType(), clspv_fract_fn, {fabs_call});
+    auto cmp = builder.CreateFCmpOGE(fract_call, halfway);
+    auto sel = builder.CreateSelect(cmp, ceil_call, floor_call);
+    return builder.CreateCall(copysign->getFunctionType(), copysign, {sel, x});
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceTrigPi(Function &F,
+                                             Builtins::BuiltinType type) {
+  return replaceCallsWithValue(F, [&F, type](CallInst *Call) -> Value * {
+    const auto x = Call->getArgOperand(0);
+    const double k_pi = 0x1.921fb54442d18p+1;
+    Constant *pi = ConstantFP::get(x->getType(), k_pi);
+
+    IRBuilder<> builder(Call);
+    auto mul = builder.CreateFMul(x, pi);
+    switch (type) {
+    case Builtins::kSinpi: {
+      auto func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
+                                            x->getType());
+      return builder.CreateCall(func->getFunctionType(), func, {mul});
+    }
+    case Builtins::kCospi: {
+      auto func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
+                                            x->getType());
+      return builder.CreateCall(func->getFunctionType(), func, {mul});
+    }
+    case Builtins::kTanpi: {
+      auto sin = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
+                                           x->getType());
+      auto sin_call = builder.CreateCall(sin->getFunctionType(), sin, {mul});
+      auto cos = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
+                                           x->getType());
+      auto cos_call = builder.CreateCall(cos->getFunctionType(), cos, {mul});
+      return builder.CreateFDiv(sin_call, cos_call);
+    }
+    default:
+      llvm_unreachable("unexpected builtin");
+      break;
+    }
+    return nullptr;
   });
 }
