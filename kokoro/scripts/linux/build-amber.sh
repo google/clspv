@@ -58,9 +58,9 @@ ninja
 echo $(date): Build completed.
 
 echo $(date): Starting amber tests...
-export VK_ICD_FILENAMES=$BUILD_ROOT/github/amber/build/Linux/vk_swiftshader_icd.json
 /usr/bin/python3 $SRC/amber/run_tests.py \
   --amber $BUILD_ROOT/github/amber/build/amber \
   --dir $SRC/amber \
-  --swiftshader
+  --swiftshader \
+  --vk-icd $BUILD_ROOT/github/amber/build/Linux/vk_swiftshader_icd.json
 echo $(date): Unit tests completed.
