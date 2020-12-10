@@ -40,28 +40,45 @@ SWIFTSHADER_SUPPRESSIONS = [
     'integer/sub_sat_short.amber',
     'integer/sub_sat_ushort.amber']
 
+
 def main():
-  parser = argparse.ArgumentParser("Run Amber tests (without validation layers)")
+  parser = argparse.ArgumentParser('Run Amber tests (without validation layers)')
   parser.add_argument('--dir', dest='test_dir', default='.',
                       help='Specify the base directory of tests')
   parser.add_argument('--amber', dest='amber',
                       help='Specify the path to the amber executable')
   parser.add_argument('--swiftshader', dest='swiftshader', action='store_true',
                       help='Only run tests compatible with Swiftshader')
+  parser.add_argument('--vk-icd', dest='vk_icd',
+                      help='Specify the path to the Vulkan ICD json')
+  parser.add_argument('--one-dir', dest='one_dir', action='store_true',
+                      help='Avoid large globs and assume tests are directly in --dir')
 
   args = parser.parse_args()
 
-  tests = glob.glob(os.path.join(args.test_dir, "**/*.amber"))
+  if args.vk_icd:
+    os.environ['VK_ICD_FILENAMES'] = args.vk_icd
+
+  tests = []
+  if args.one_dir:
+    tests = glob.glob(os.path.join(args.test_dir, '*.amber'))
+  else:
+    tests = glob.glob(os.path.join(args.test_dir, '**/*.amber'))
   if args.swiftshader:
     for suppress in SWIFTSHADER_SUPPRESSIONS:
-      tests.remove(os.path.join(args.test_dir, suppress))
+      p = suppress
+      if args.one_dir:
+        p = p.split('/')[1]
+      adjusted = os.path.join(args.test_dir, p)
+      if adjusted in tests:
+        tests.remove(adjusted)
   cmd = [args.amber, '-d', '-V']
   cmd = cmd + tests
   p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
   (stdout, _) = p.communicate()
   if p.returncode != 0:
-    raise RuntimeError('Failed tests \'{}\''.format(stdout.decode("utf-8")))
-  print(stdout.decode("utf-8"))
+    raise RuntimeError('Failed tests \'{}\''.format(stdout.decode('utf-8')))
+  print(stdout.decode('utf-8'))
 
   sys.exit(0)
 
