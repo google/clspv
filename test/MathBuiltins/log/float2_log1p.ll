@@ -8,7 +8,7 @@ define spir_kernel void @test(<2 x float> %val, <2 x float> addrspace(1)* nocapt
 entry:
   %call = tail call spir_func <2 x float> @_Z5log1pDv2_f(<2 x float> %val)
   ; CHECK: %0 = fadd <2 x float> <float 1.000000e+00, float 1.000000e+00>, %val
-  ; CHECK: %1 = call <2 x float> @_Z3logDv2_f(<2 x float> %0)
+  ; CHECK: %1 = call <2 x float> @llvm.log.v2f32(<2 x float> %0)
   store <2 x float> %call, <2 x float> addrspace(1)* %out, align 8
   ret void
 }

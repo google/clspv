@@ -284,6 +284,9 @@ private:
   bool replaceFDim(Function &F);
   bool replaceRound(Function &F);
   bool replaceTrigPi(Function &F, Builtins::BuiltinType type);
+  bool replaceSincos(Function &F);
+  bool replaceExpm1(Function &F);
+  bool replacePown(Function &F);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
@@ -370,6 +373,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kNativeExp10:
     return replaceExp10(F, FI.getName());
 
+  case Builtins::kExpm1:
+    return replaceExpm1(F);
+
   case Builtins::kLog10:
   case Builtins::kHalfLog10:
   case Builtins::kNativeLog10:
@@ -384,6 +390,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kFmod:
     return replaceFmod(F);
 
+  case Builtins::kPown:
+    return replacePown(F);
+
   case Builtins::kRound:
     return replaceRound(F);
 
@@ -391,6 +400,9 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kSinpi:
   case Builtins::kTanpi:
     return replaceTrigPi(F, FI.getType());
+
+  case Builtins::kSincos:
+    return replaceSincos(F);
 
   case Builtins::kBarrier:
   case Builtins::kWorkGroupBarrier:
@@ -773,19 +785,15 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
 
 bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
   // convert to natural
-  std::string NewFName =
-      Builtins::GetMangledFunctionName("log", F.getFunctionType());
-
-  Module &M = *F.getParent();
-  return replaceCallsWithValue(F, [&](CallInst *CI) {
-    auto NewF = M.getOrInsertFunction(NewFName, F.getFunctionType());
-
+  return replaceCallsWithValue(F, [&F](CallInst *CI) {
     auto Arg = CI->getOperand(0);
 
     auto ArgP1 = BinaryOperator::Create(
         Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
 
-    return CallInst::Create(NewF, ArgP1, "", CI);
+    auto log =
+        Intrinsic::getDeclaration(F.getParent(), Intrinsic::log, CI->getType());
+    return CallInst::Create(log, ArgP1, "", CI);
   });
 }
 
@@ -3106,5 +3114,46 @@ bool ReplaceOpenCLBuiltinPass::replaceTrigPi(Function &F,
       break;
     }
     return nullptr;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceSincos(Function &F) {
+  return replaceCallsWithValue(F, [&F](CallInst *Call) {
+    auto sin_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
+                                              Call->getType());
+    auto cos_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
+                                              Call->getType());
+
+    IRBuilder<> builder(Call);
+    auto sin = builder.CreateCall(sin_func->getFunctionType(), sin_func,
+                                  {Call->getArgOperand(0)});
+    auto cos = builder.CreateCall(cos_func->getFunctionType(), cos_func,
+                                  {Call->getArgOperand(0)});
+    builder.CreateStore(cos, Call->getArgOperand(1));
+    return sin;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceExpm1(Function &F) {
+  return replaceCallsWithValue(F, [&F](CallInst *Call) {
+    auto exp_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::exp,
+                                              Call->getType());
+
+    IRBuilder<> builder(Call);
+    auto exp = builder.CreateCall(exp_func->getFunctionType(), exp_func,
+                                  {Call->getArgOperand(0)});
+    return builder.CreateFSub(exp, ConstantFP::get(Call->getType(), 1.0));
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replacePown(Function &F) {
+  return replaceCallsWithValue(F, [&F](CallInst *Call) {
+    auto pow_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::pow,
+                                              Call->getType());
+
+    IRBuilder<> builder(Call);
+    auto conv = builder.CreateSIToFP(Call->getArgOperand(1), Call->getType());
+    return builder.CreateCall(pow_func->getFunctionType(), pow_func,
+                              {Call->getArgOperand(0), conv});
   });
 }
