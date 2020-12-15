@@ -31,6 +31,7 @@
 #include "Builtins.h"
 #include "Passes.h"
 
+#include <array>
 #include <functional>
 
 using namespace llvm;
@@ -76,9 +77,12 @@ private:
   Value *visitBinaryOperator(BinaryOperator &I);
   Value *visitCallInst(CallInst &I);
   Value *visitCastInst(CastInst &I);
+  Value *visitCmpInst(CmpInst &I);
   Value *visitExtractElementInst(ExtractElementInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
   Value *visitLoadInst(LoadInst &I);
+  Value *visitPHINode(PHINode &I);
+  Value *visitSelectInst(SelectInst &I);
   Value *visitShuffleVectorInst(ShuffleVectorInst &I);
   Value *visitStoreInst(StoreInst &I);
   Value *visitUnaryOperator(UnaryOperator &I);
@@ -673,6 +677,31 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
   return V;
 }
 
+Value *LongVectorLoweringPass::visitCmpInst(CmpInst &I) {
+  auto *EquivalentType = getEquivalentType(I.getType());
+  assert(EquivalentType && "type not lowered");
+
+  std::array<Value *, 2> EquivalentArgs{{
+      visit(I.getOperand(0)),
+      visit(I.getOperand(1)),
+  }};
+  assert(EquivalentArgs[0] && EquivalentArgs[1] && "argument(s) not lowered");
+
+  Value *V = convertVectorOperation(
+      I, EquivalentType, EquivalentArgs,
+      [Int = I.isIntPredicate(), P = I.getPredicate()](auto &B, auto Args) {
+        assert(Args.size() == 2);
+        if (Int) {
+          return B.CreateICmp(P, Args[0], Args[1]);
+        } else {
+          return B.CreateFCmp(P, Args[0], Args[1]);
+        }
+      });
+
+  registerReplacement(I, *V);
+  return V;
+}
+
 Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   assert(EquivalentValue && "value not lowered");
@@ -716,6 +745,77 @@ Value *LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   IRBuilder<> B(&I);
   auto *V = B.CreateAlignedLoad(EquivalentTy, EquivalentPointer, I.getAlign(),
                                 I.isVolatile());
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitPHINode(PHINode &I) {
+  // TODO Handle PHIs.
+  //
+  // PHIs are tricky because they require their incoming values
+  // to be handled first, which may not have been defined yet.
+  // We can't explicitly visit them because a PHI may depend on itself,
+  // leading to infinite loops. Defer until we have a test case.
+  //
+  // TODO Add PHI instruction with fast math flag to fastmathflags.ll test.
+  llvm_unreachable("PHI node not yet supported");
+}
+
+Value *LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
+  auto *EquivalentCondition = visitOrSelf(I.getCondition());
+  auto *EquivalentTrueValue = visitOrSelf(I.getTrueValue());
+  auto *EquivalentFalseValue = visitOrSelf(I.getFalseValue());
+
+  assert(((EquivalentCondition != I.getCondition()) ||
+          (EquivalentTrueValue != I.getTrueValue()) ||
+          (EquivalentFalseValue != I.getFalseValue())) &&
+         "nothing to lower");
+
+  auto *EquivalentReturnTy = EquivalentTrueValue->getType();
+  assert(EquivalentFalseValue->getType() == EquivalentReturnTy);
+
+  // We have two cases to handle here:
+  // - when the condition is a scalar to select one of the two long-vector
+  //   alternatives. In this case, we would ideally create a single select
+  //   instruction. However, the SPIR-V producer does not yet handle aggregate
+  //   selections correctly. Therefore, we scalarise the selection when
+  //   vectors/aggregates are involved.
+  // - when the condition is a long-vector, too. In this case, we do an
+  //   element-wise select and construct an aggregate for the result.
+  Value *V = nullptr;
+  if (EquivalentCondition->getType()->isSingleValueType()) {
+    assert(EquivalentTrueValue->getType()->isAggregateType());
+    assert(EquivalentFalseValue->getType()->isAggregateType());
+
+    std::array<Value *, 2> EquivalentArgs{{
+        EquivalentTrueValue,
+        EquivalentFalseValue,
+    }};
+    auto ScalarFactory = [EquivalentCondition](auto &B, auto Args) {
+      assert(Args.size() == 2);
+      return B.CreateSelect(EquivalentCondition, Args[0], Args[1]);
+    };
+
+    V = convertVectorOperation(I, EquivalentReturnTy, EquivalentArgs,
+                               ScalarFactory);
+  } else {
+    assert(EquivalentCondition->getType()->isAggregateType());
+
+    std::array<Value *, 3> EquivalentArgs{{
+        EquivalentCondition,
+        EquivalentTrueValue,
+        EquivalentFalseValue,
+    }};
+
+    auto ScalarFactory = [](auto &B, auto Args) {
+      assert(Args.size() == 3);
+      return B.CreateSelect(Args[0], Args[1], Args[2]);
+    };
+    V = convertVectorOperation(I, EquivalentReturnTy, EquivalentArgs,
+                               ScalarFactory);
+  }
+
+  assert(V);
   registerReplacement(I, *V);
   return V;
 }
