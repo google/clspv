@@ -791,8 +791,8 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
     auto ArgP1 = BinaryOperator::Create(
         Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
 
-    auto log = Intrinsic::getDeclaration(F.getParent(), Intrinsic::log,
-                                         CI->getType());
+    auto log =
+        Intrinsic::getDeclaration(F.getParent(), Intrinsic::log, CI->getType());
     return CallInst::Create(log, ArgP1, "", CI);
   });
 }
