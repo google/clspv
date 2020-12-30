@@ -16,10 +16,6 @@
 // CHECK: OpConvertSToF [[FLOAT]]
 // CHECK: OpConvertSToF [[FLOAT]]
 
-void kernel test(global int *in, global float *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  int8 x = vload8(0, in);
-  float8 y = convert_float8(x);
-  vstore8(y, 0, out);
+void kernel test(global int8 *in, global float8 *out) {
+  *out = convert_float8(*in);
 }

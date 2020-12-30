@@ -24,10 +24,6 @@
 // CHECK: OpConvertFToS [[CHAR]]
 // CHECK: OpConvertFToS [[CHAR]]
 
-void kernel test(global float *in, global char *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload16 and vstore16 to read/write the values.
-  float16 x = vload16(0, in);
-  char16 y = convert_char16(x);
-  vstore16(y, 0, out);
+void kernel test(global float16 *in, global char16 *out) {
+  *out = convert_char16(*in);
 }
