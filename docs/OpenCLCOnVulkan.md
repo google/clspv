@@ -601,7 +601,7 @@ the work-group size that **must** be used with that kernel.
 
 The OpenCL C language allows the work-group size to be set just before executing
 the kernel on the device, at `clEnqueueNDRangeKernel()` time.
-Vulkan requires that the work group size be specified no later than when the
+Vulkan requires that the work-group size be specified no later than when the
 `VkPipeline` is created, which in OpenCL terms corresponds to when the
 `cl_kernel` is created.
 
@@ -610,10 +610,13 @@ the work-group size in the host API and not in the device-side kernel
 language, we can use _specialization constants_ to allow for setting the work-group
 size at `VkPipeline` creation time.
 
-If the `reqd_work_group_size` attribute is used in the OpenCL C source, then that
-attribute will specify the work-group size that must be used.
-Otherwise, the Vulkan SPIR-V produced by the compiler will contain specialization
-constants as follows:
+If all kernels in the OpenCL C source use the `reqd_work_group_size` attribute,
+then that attribute will specify the work-group size that must be used and the
+required values will be set in the SPIR-V via the `LocalSize` execution mode.
+
+If at least one of the kernels does not use the `reqd_work_group_size`
+attribute, the Vulkan SPIR-V produced by the compiler will contain
+specialization constants as follows:
 
 - The _x_ dimension of the work-group size is stored in a specialization
   constant that is decorated with the `SpecId`, whose value defaults to
@@ -625,13 +628,10 @@ constants as follows:
   constant that is decorated with the `SpecId`, whose value defaults to
   _1_.
 
-The ids for the work-group size are recorded in the descriptor map.
-
-If a compilation unit contains multiple kernels, then either:
-- All kernels should have a `reqd_work_group_size` attribute, or
-- No kernels should have a `reqd_work_group_size` attribute.  In this case
-  work group sizes would be set via specialization constants for the
-  pipeline as described above.
+In either case, metadata that can be used by the runtime or host code is
+recorded in the generated SPIR-V module, using either
+`PropertyRequiredWorkgroupSize` and/or `SpecConstantWorkgroupSize` non-semantic
+instructions.
 
 ### Types
 
