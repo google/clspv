@@ -1,8 +1,8 @@
 ; RUN: clspv-opt -SplatArg %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: [[x_in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x half> undef, half %x, i32 0
-; CHECK: [[x_shuffle:%[a-zA-Z0-9_.]+]] = shufflevector <4 x half> [[x_in0]], <4 x half> undef, <4 x i32> zeroinitializer
+; CHECK: [[x_in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x half> {{.*}}, half %x, i32 0
+; CHECK: [[x_shuffle:%[a-zA-Z0-9_.]+]] = shufflevector <4 x half> [[x_in0]], <4 x half> {{.*}}, <4 x i32> zeroinitializer
 ; CHECK: [[call:%[a-zA-Z0-9_.]+]] = call spir_func <4 x half> @_Z3minDv4_DhS_(<4 x half> %in, <4 x half> [[x_shuffle]])
 ; CHECK: ret <4 x half> [[call]]
 
