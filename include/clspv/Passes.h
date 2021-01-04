@@ -338,7 +338,7 @@ llvm::ModulePass *createAllocateDescriptorsPass(
 /// Direct Resource Access
 /// @return An LLVM module pass.
 ///
-/// For kernel arguments that map to resource variabls (descriptors),
+/// For kernel arguments that map to resource variables (descriptors),
 /// try to avoid passing them by pointer down into helper functions.
 /// Find and exploit commonality among callees of each helper function.
 /// Assumes descriptors have been allocated and mapped to function
