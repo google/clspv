@@ -17,11 +17,6 @@
 // CHECK: OpExtInst [[USHORT]] [[GLSL]] UMax
 // CHECK: OpExtInst [[USHORT]] [[GLSL]] UMax
 
-void kernel test(global ushort *in, global ushort *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  ushort8 in0 = vload8(0, in);
-  ushort8 in1 = vload8(1, in);
-  ushort8 value = max(in0, in1);
-  vstore8(value, 0, out);
+void kernel test(global ushort8 *in, global ushort8 *out) {
+  *out = max(in[0], in[1]);
 }

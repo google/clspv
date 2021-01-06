@@ -1,4 +1,4 @@
-// Copyright 2018 The Clspv Authors. All rights reserved.
+// Copyright 2018-2021 The Clspv Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ private:
 
   enum CustomDiagnosticType {
     CustomDiagnosticVectorsMoreThan4Elements,
-    CustomDiagnosticUnsupportedKernelParameter,
     CustomDiagnosticVoidPointer,
     CustomDiagnosticUnalignedScalar,
     CustomDiagnosticUnalignedVec2,
@@ -191,16 +190,9 @@ private:
     if (auto *VT = llvm::dyn_cast<ExtVectorType>(canonicalType)) {
       // We don't support vectors with more than 4 elements under all
       // circumstances.
-      if (4 < VT->getNumElements()) {
-        if (clspv::Option::LongVectorSupport()) {
-          if (IsKernelParameter) {
-            Report(CustomDiagnosticUnsupportedKernelParameter, SR, SR);
-            return false;
-          }
-        } else {
-          Report(CustomDiagnosticVectorsMoreThan4Elements, SR, SR);
-          return false;
-        }
+      if (4 < VT->getNumElements() && !clspv::Option::LongVectorSupport()) {
+        Report(CustomDiagnosticVectorsMoreThan4Elements, SR, SR);
+        return false;
       }
 
       return true;
@@ -522,10 +514,6 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Error,
             "vectors with more than 4 elements are not supported");
-    CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedKernelParameter] =
-        DE.getCustomDiagID(DiagnosticsEngine::Error,
-                           "vectors with more than 4 elements are not "
-                           "supported as kernel parameters");
     CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
         DiagnosticsEngine::Error, "pointer-to-void is not supported");
     CustomDiagnosticsIDMap[CustomDiagnosticUnalignedScalar] =

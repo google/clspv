@@ -17,11 +17,6 @@
 // CHECK: OpExtInst [[INT]] [[GLSL]] SMax
 // CHECK: OpExtInst [[INT]] [[GLSL]] SMax
 
-void kernel test(global int *in, global int *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  int8 in0 = vload8(0, in);
-  int8 in1 = vload8(1, in);
-  int8 value = max(in0, in1);
-  vstore8(value, 0, out);
+void kernel test(global int8 *in, global int8 *out) {
+  *out = max(in[0], in[1]);
 }

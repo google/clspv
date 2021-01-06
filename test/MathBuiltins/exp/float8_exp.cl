@@ -17,10 +17,6 @@
 // CHECK: OpExtInst [[FLOAT]] [[GLSL]] Exp
 // CHECK: OpExtInst [[FLOAT]] [[GLSL]] Exp
 
-void kernel test(global float *in, global float *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  float8 x = vload8(0, in);
-  float8 y = exp(x);
-  vstore8(y, 0, out);
+void kernel test(global float8 *in, global float8 *out) {
+  *out = exp(*in);
 }

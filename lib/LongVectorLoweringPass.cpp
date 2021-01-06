@@ -1,4 +1,4 @@
-// Copyright 2020 The Clspv Authors. All rights reserved.
+// Copyright 2020-2021 The Clspv Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,6 +79,7 @@ private:
   Value *visitCastInst(CastInst &I);
   Value *visitCmpInst(CmpInst &I);
   Value *visitExtractElementInst(ExtractElementInst &I);
+  Value *visitGetElementPtrInst(GetElementPtrInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
   Value *visitLoadInst(LoadInst &I);
   Value *visitPHINode(PHINode &I);
@@ -748,6 +749,42 @@ Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
 
   IRBuilder<> B(&I);
   auto *V = B.CreateExtractValue(EquivalentValue, Index);
+  registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
+  // GEP can be tricky so we implement support only for the available test
+  // cases.
+#ifndef NDEBUG
+  {
+    assert(I.getNumIndices() == 1 &&
+           "Need test case to implement GEP with multiple indices.");
+
+    assert(I.isInBounds() && "Need test case to implement GEP not 'inbound'.");
+
+    auto *ResultTy = I.getResultElementType();
+    assert(ResultTy->isVectorTy() &&
+           "Need test case to implement GEP with non-vector result type.");
+
+    auto *ScalarTy = ResultTy->getScalarType();
+    assert((ScalarTy->isIntegerTy() || ScalarTy->isFloatingPointTy()) &&
+           "Expected a vector of integer or floating-point elements.");
+
+    auto OperandTy = I.getPointerOperandType();
+    assert(OperandTy->isPointerTy() &&
+           "Need test case to implement GEP for non-pointer operand.");
+    assert(!OperandTy->isVectorTy() &&
+           "Need test case to implement GEP for vector of pointers.");
+  }
+#endif
+
+  auto *EquivalentPointer = visit(I.getPointerOperand());
+  assert(EquivalentPointer && "pointer not lowered");
+
+  IRBuilder<> B(&I);
+  SmallVector<Value *, 1> Indices(I.indices());
+  auto *V = B.CreateInBoundsGEP(EquivalentPointer, Indices);
   registerReplacement(I, *V);
   return V;
 }

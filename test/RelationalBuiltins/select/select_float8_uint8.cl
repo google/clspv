@@ -30,12 +30,6 @@
 // CHECK-DAG: OpSelect [[FLOAT]] [[COND_6]] {{%[^ ]+}} {{%[^ ]+}}
 // CHECK-DAG: OpSelect [[FLOAT]] [[COND_7]] {{%[^ ]+}} {{%[^ ]+}}
 
-void kernel test(global float *out, global float *in1, global uint *in2) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  float8 a = vload8(0, in1);
-  float8 b = vload8(1, in1);
-  uint8 cond = vload8(0, in2);
-  float8 value = select(a, b, cond);
-  vstore8(value, 0, out);
+void kernel test(global float8 *out, global float8 *in, global uint8 *cond) {
+  *out = select(in[0], in[1], *cond);
 }

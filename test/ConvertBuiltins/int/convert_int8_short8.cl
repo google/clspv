@@ -15,10 +15,6 @@
 // CHECK: OpSConvert [[INT]]
 // CHECK: OpSConvert [[INT]]
 
-void kernel test(global short *in, global int *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  short8 x = vload8(0, in);
-  int8 y = convert_int8(x);
-  vstore8(y, 0, out);
+void kernel test(global short8 *in, global int8 *out) {
+  *out = convert_int8(*in);
 }

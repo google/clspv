@@ -15,10 +15,6 @@
 // CHECK: OpUConvert [[SHORT]]
 // CHECK: OpUConvert [[SHORT]]
 
-void kernel test(global int *in, global short *out) {
-  // Because long vectors are not supported as kernel argument, we rely on
-  // vload8 and vstore8 to read/write the values.
-  int8 x = vload8(0, in);
-  short8 y = convert_short8(x);
-  vstore8(y, 0, out);
+void kernel test(global int8 *in, global short8 *out) {
+  *out = convert_short8(*in);
 }
