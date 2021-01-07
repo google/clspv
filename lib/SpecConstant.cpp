@@ -30,7 +30,7 @@ void InitSpecConstantMetadata(Module *module) {
   const uint32_t first_spec_id = 3;
   auto id_const = ValueAsMetadata::getConstant(ConstantInt::get(
       IntegerType::get(module->getContext(), 32), first_spec_id));
-  auto id_md = MDTuple::get(module->getContext(), {id_const});
+  auto id_md = MDTuple::getDistinct(module->getContext(), {id_const});
   next_spec_id_md->addOperand(id_md);
 
   auto spec_constant_list_md =
