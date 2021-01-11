@@ -3886,10 +3886,11 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
       auto OpTy = I.getOperand(0)->getType();
       auto toI8 = Ty == Type::getInt8Ty(Context);
       auto fromI32 = OpTy == Type::getInt32Ty(Context);
-      // Handle zext, sext and uitofp with i1 type specially.
+      // Handle zext, sext, uitofp, and sitofp with i1 type specially.
       if ((I.getOpcode() == Instruction::ZExt ||
            I.getOpcode() == Instruction::SExt ||
-           I.getOpcode() == Instruction::UIToFP) &&
+           I.getOpcode() == Instruction::UIToFP ||
+           I.getOpcode() == Instruction::SIToFP) &&
           OpTy->isIntOrIntVectorTy(1)) {
         //
         // Generate OpSelect.
@@ -3907,8 +3908,10 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
           Ops << ConstantInt::get(I.getType(), 1);
         } else if (I.getOpcode() == Instruction::SExt) {
           Ops << ConstantInt::getSigned(I.getType(), -1);
-        } else {
+        } else if (I.getOpcode() == Instruction::UIToFP) {
           Ops << ConstantFP::get(I.getType(), 1.0);
+        } else if (I.getOpcode() == Instruction::SIToFP) {
+          Ops << ConstantFP::get(I.getType(), -1.0);
         }
 
         if (I.getOpcode() == Instruction::ZExt) {
