@@ -1066,6 +1066,15 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
     return nullptr;
   }
 
+  if (auto *ArrayTy = dyn_cast<ArrayType>(Ty)) {
+    if (getEquivalentType(ArrayTy->getElementType()) != nullptr) {
+      llvm_unreachable(
+          "Nested types not yet supported, need test cases (array)");
+    }
+
+    return nullptr;
+  }
+
   if (auto *StructTy = dyn_cast<StructType>(Ty)) {
     unsigned Arity = StructTy->getStructNumElements();
     for (unsigned i = 0; i < Arity; ++i) {
