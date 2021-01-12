@@ -117,6 +117,8 @@ ArgKind GetArgKindForPodArgs(Function &F) {
   case kSSBO:
     return ArgKind::Pod;
   }
+  errs() << "Unhandled case in clspv::GetArgKindForPodArgs: " << impl << "\n";
+  llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
 ArgKind GetArgKind(Argument &Arg) {
