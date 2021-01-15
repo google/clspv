@@ -507,7 +507,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
       new OpenCLBuiltinMemoryBuffer(opencl_builtins_header_data,
                                     opencl_builtins_header_size - 1));
 
-  instance.getPreprocessorOpts().Includes.push_back("openclc.h");
+  instance.getPreprocessorOpts().Includes.push_back("opencl-c.h");
 
   std::unique_ptr<llvm::MemoryBuffer> openCLBaseBuiltinMemoryBuffer(
       new OpenCLBuiltinMemoryBuffer(opencl_base_builtins_header_data,
@@ -535,7 +535,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
 #endif
 
   auto entry = instance.getFileManager().getVirtualFile(
-      includePrefix + "openclc.h", openCLBuiltinMemoryBuffer->getBufferSize(),
+      includePrefix + "opencl-c.h", openCLBuiltinMemoryBuffer->getBufferSize(),
       0);
 
   instance.getSourceManager().overrideFileContents(
