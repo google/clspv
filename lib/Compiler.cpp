@@ -463,9 +463,10 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   // We use the 32-bit pointer-width SPIR triple
   llvm::Triple triple("spir-unknown-unknown");
 
+  std::vector<std::string> includes;
   instance.getInvocation().setLangDefaults(
       instance.getLangOpts(), clang::InputKind(clang::Language::OpenCL), triple,
-      instance.getPreprocessorOpts(), standard);
+      includes, standard);
 
   // Override the C99 inline semantics to accommodate for more OpenCL C
   // programs in the wild.
