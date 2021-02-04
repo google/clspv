@@ -78,7 +78,8 @@ Type *getIntOrIntVectorTyForCast(LLVMContext &C, Type *Ty) {
 
 Value *MemoryOrderSemantics(Value *order, bool is_global,
                             Instruction *InsertBefore,
-                            spv::MemorySemanticsMask base_semantics) {
+                            spv::MemorySemanticsMask base_semantics,
+                            bool include_storage = true) {
   enum AtomicMemoryOrder : uint32_t {
     kMemoryOrderRelaxed = 0,
     kMemoryOrderAcquire = 2,
@@ -126,8 +127,12 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
   }
 
   Value *storage = is_global ? UniformSemantics : WorkgroupSemantics;
-  if (order == nullptr)
-    return builder.CreateOr({storage, base_order});
+  if (order == nullptr) {
+    if (include_storage)
+      return builder.CreateOr({storage, base_order});
+    else
+      return base_order;
+  }
 
   auto is_relaxed = builder.CreateICmpEQ(order, relaxed);
   auto is_acquire = builder.CreateICmpEQ(order, acquire);
@@ -138,7 +143,10 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
   semantics = builder.CreateSelect(is_acquire, AcquireSemantics, semantics);
   semantics = builder.CreateSelect(is_release, ReleaseSemantics, semantics);
   semantics = builder.CreateSelect(is_acq_rel, AcqRelSemantics, semantics);
-  return builder.CreateOr({storage, semantics});
+  if (include_storage)
+    return builder.CreateOr({storage, semantics});
+  else
+    return semantics;
 }
 
 Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
@@ -235,7 +243,7 @@ private:
   bool replaceLog10(Function &F, const std::string &basename);
   bool replaceLog1p(Function &F);
   bool replaceBarrier(Function &F, bool subgroup = false);
-  bool replaceMemFence(Function &F, uint32_t semantics);
+  bool replaceMemFence(Function &F, spv::MemorySemanticsMask semantics);
   bool replacePrefetch(Function &F);
   bool replaceRelational(Function &F, CmpInst::Predicate P);
   bool replaceIsInfAndIsNan(Function &F, spv::Op SPIRVOp, int32_t isvec);
@@ -411,6 +419,8 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kSubGroupBarrier:
     return replaceBarrier(F, true);
 
+  case Builtins::kAtomicWorkItemFence:
+    return replaceMemFence(F, spv::MemorySemanticsMaskNone);
   case Builtins::kMemFence:
     return replaceMemFence(F, spv::MemorySemanticsAcquireReleaseMask);
   case Builtins::kReadMemFence:
@@ -902,7 +912,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
-                                               uint32_t semantics) {
+                                               spv::MemorySemanticsMask semantics) {
 
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     enum {
@@ -953,22 +963,24 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
         Instruction::Shl, ImageMemFenceMask,
         ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
 
-    // And combine the above together, also adding in
-    // |semantics|.
+    Value *MemOrder = ConstantMemorySemantics;
+    Value *MemScope = ConstantScopeWorkgroup;
+    IRBuilder<> builder(CI);
+    if (CI->getNumArgOperands() > 1) {
+      MemOrder = MemoryOrderSemantics(CI->getArgOperand(1), false, CI,
+                                      semantics, false);
+      MemScope = MemoryScope(CI->getArgOperand(2), false, CI);
+    }
+    // Join the storage semantics and the order semantics.
     auto MemorySemantics1 =
-        BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
-                               ConstantMemorySemantics, "", CI);
-    auto MemorySemantics2 = BinaryOperator::Create(
-        Instruction::Or, MemorySemanticsUniform, MemorySemanticsImage, "", CI);
-    auto MemorySemantics = BinaryOperator::Create(
-        Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
-
-    // Memory Scope is always workgroup.
-    const auto MemoryScope = ConstantScopeWorkgroup;
+        builder.CreateOr({MemorySemanticsWorkgroup, MemorySemanticsUniform});
+    auto MemorySemantics2 = builder.CreateOr({MemorySemanticsImage, MemOrder});
+    auto MemorySemantics =
+        builder.CreateOr({MemorySemantics1, MemorySemantics2});
 
     return clspv::InsertSPIRVOp(CI, spv::OpMemoryBarrier,
                                 {Attribute::Convergent}, CI->getType(),
-                                {MemoryScope, MemorySemantics});
+                                {MemScope, MemorySemantics});
   });
 }
 
