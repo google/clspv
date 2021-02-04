@@ -911,8 +911,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceMemFence(Function &F,
-                                               spv::MemorySemanticsMask semantics) {
+bool ReplaceOpenCLBuiltinPass::replaceMemFence(
+    Function &F, spv::MemorySemanticsMask semantics) {
 
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     enum {
