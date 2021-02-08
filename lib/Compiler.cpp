@@ -397,6 +397,8 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
     break;
   case clspv::Option::SourceLanguage::OpenCL_C_30:
     standard = clang::LangStandard::lang_opencl30;
+    // TODO: See #705, find a better solution for this.
+    instance.getPreprocessorOpts().addMacroUndef("cl_khr_3d_image_writes");
     break;
   case clspv::Option::SourceLanguage::OpenCL_CPP:
     standard = clang::LangStandard::lang_openclcpp;
