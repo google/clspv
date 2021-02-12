@@ -18,6 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "Passes.h"
 
@@ -289,7 +290,8 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
   const DataLayout &DL = M.getDataLayout();
 
-  SmallVector<Instruction *, 16> ToBeDeleted;
+  using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
+  WeakInstructions ToBeDeleted;
   SmallVector<Instruction *, 16> VectorWorkList;
   SmallVector<Instruction *, 16> ScalarWorkList;
   SmallVector<User *, 16> UserWorkList;
@@ -969,7 +971,11 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       }
     }
 
-    ToBeDeleted.push_back(Inst);
+    // Schedule for removal only if Inst has no users. If all its users are
+    // later also replaced in the module, Inst will be remove by transitivity.
+    if (Inst->user_empty()) {
+      ToBeDeleted.push_back(Inst);
+    }
   }
 
   for (Instruction *Inst : ScalarWorkList) {
@@ -982,7 +988,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
     // errs () << " Scalar bitcast is " << *Inst << "\n";
 
-    if (!Inst->hasNUsesOrMore(1)) {
+    if (Inst->use_empty()) {
       ToBeDeleted.push_back(Inst);
       continue;
     }
@@ -1044,7 +1050,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       if (iter_count > 1000) {
         llvm_unreachable("ReplacePointerBitcastPass: Too many iterations!");
       }
-    };
+    }
 #if 0
     errs() << " Src is " << *Src << "\n";
     errs() << " Dst is " << *Inst << "\n";
@@ -1188,12 +1194,46 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       }
     }
 
-    ToBeDeleted.push_back(Inst);
+    // Schedule for removal only if Inst has no users. If all its users are
+    // later also replaced in the module, Inst will be remove by transitivity.
+    if (Inst->user_empty()) {
+      ToBeDeleted.push_back(Inst);
+    }
   }
 
-  for (Instruction *Inst : ToBeDeleted) {
-    Inst->eraseFromParent();
+  // Remove all dead instructions, including their dead operands. Proceed with a
+  // fixed-point algorithm to handle dependencies.
+  for (bool Progress = true; Progress;) {
+    std::size_t PreviousSize = ToBeDeleted.size();
+
+    WeakInstructions Deads;
+    WeakInstructions NextBatch;
+    for (WeakTrackingVH Handle : ToBeDeleted) {
+      if (!Handle.pointsToAliveValue())
+        continue;
+
+      auto *Inst = cast<Instruction>(Handle);
+
+      // We need to remove stores manually given they are never trivially dead.
+      if (auto *Store = dyn_cast<StoreInst>(Inst)) {
+        Store->eraseFromParent();
+        continue;
+      }
+
+      if (isInstructionTriviallyDead(Inst)) {
+        Deads.push_back(Handle);
+      } else {
+        NextBatch.push_back(Handle);
+      }
+    }
+
+    RecursivelyDeleteTriviallyDeadInstructions(Deads);
+
+    ToBeDeleted = std::move(NextBatch);
+    Progress = (ToBeDeleted.size() < PreviousSize);
   }
+
+  assert(ToBeDeleted.empty() && "Some instructions were not deleted.");
 
   return Changed;
 }
