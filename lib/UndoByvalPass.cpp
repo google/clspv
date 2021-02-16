@@ -123,7 +123,8 @@ bool UndoByvalPass::runOnModule(Module &M) {
 
       // Clone original function into new function.
       SmallVector<ReturnInst *, 4> RetInsts;
-      CloneFunctionInto(NewFunc, F, VMap, false, RetInsts);
+      CloneFunctionInto(NewFunc, F, VMap,
+                        CloneFunctionChangeType::LocalChangesOnly, RetInsts);
 
       // Store new arguments to their alloca space.
       for (Argument *Arg : ByValList) {
