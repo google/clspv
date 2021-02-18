@@ -564,6 +564,30 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return EquivalentGV;
   }
 
+  if (auto *CE = dyn_cast<ConstantExpr>(&Cst)) {
+    switch (CE->getOpcode()) {
+    case Instruction::GetElementPtr: {
+      auto *GEP = cast<GEPOperator>(CE);
+      auto *EquivalentSourceTy = getEquivalentType(GEP->getSourceElementType());
+      auto *EquivalentPointer = cast<Constant>(visit(GEP->getPointerOperand()));
+      SmallVector<Value *, 4> Indices(GEP->idx_begin(), GEP->idx_end());
+
+      auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
+          EquivalentSourceTy, EquivalentPointer, Indices, GEP->isInBounds(),
+          GEP->getInRangeIndex());
+
+      return EquivalentGEP;
+    }
+
+    default:
+#ifndef NDEBUG
+      dbgs() << "Constant Expression not handled: " << *CE << '\n';
+      dbgs() << "Constant Expression Opcode: " << CE->getOpcodeName() << '\n';
+#endif
+      llvm_unreachable("Unsupported kind of ConstantExpr");
+    }
+  }
+
 #ifndef NDEBUG
   dbgs() << "Constant not handled: " << Cst << '\n';
 #endif
@@ -758,9 +782,6 @@ Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   // cases.
 #ifndef NDEBUG
   {
-    assert(I.getNumIndices() == 1 &&
-           "Need test case to implement GEP with multiple indices.");
-
     assert(I.isInBounds() && "Need test case to implement GEP not 'inbound'.");
 
     auto *ResultTy = I.getResultElementType();
@@ -783,7 +804,7 @@ Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   assert(EquivalentPointer && "pointer not lowered");
 
   IRBuilder<> B(&I);
-  SmallVector<Value *, 1> Indices(I.indices());
+  SmallVector<Value *, 4> Indices(I.indices());
   auto *V = B.CreateInBoundsGEP(EquivalentPointer, Indices);
   registerReplacement(I, *V);
   return V;
@@ -1067,9 +1088,8 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *ArrayTy = dyn_cast<ArrayType>(Ty)) {
-    if (getEquivalentType(ArrayTy->getElementType()) != nullptr) {
-      llvm_unreachable(
-          "Nested types not yet supported, need test cases (array)");
+    if (auto *ElementTy = getEquivalentType(ArrayTy->getElementType())) {
+      return ArrayType::get(ElementTy, ArrayTy->getNumElements());
     }
 
     return nullptr;
@@ -1136,9 +1156,10 @@ bool LongVectorLoweringPass::runOnGlobals(Module &M) {
 
       auto *EquivalentGV = new GlobalVariable(
           M, EquivalentTy, GV.isConstant(), GV.getLinkage(),
-          EquivalentInitializer, Twine(GV.getName(), ".i"),
+          EquivalentInitializer, "",
           /* insert before: */ &GV, GV.getThreadLocalMode(),
           GV.getAddressSpace(), GV.isExternallyInitialized());
+      EquivalentGV->takeName(&GV);
       EquivalentGV->setAlignment(GV.getAlign());
       EquivalentGV->copyMetadata(&GV, /* offset: */ 0);
       EquivalentGV->copyAttributesFrom(&GV);
