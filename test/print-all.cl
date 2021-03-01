@@ -11,6 +11,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
   }
 }
 
-// BEFORE: *** IR Dump Before Cluster POD Kernel Arguments Pass ***
+// BEFORE: *** IR Dump Before Cluster POD Kernel Arguments Pass
 
-// AFTER: *** IR Dump After Cluster POD Kernel Arguments Pass ***
+// AFTER: *** IR Dump After Cluster POD Kernel Arguments Pass
