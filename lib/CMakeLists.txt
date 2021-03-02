@@ -97,7 +97,7 @@ foreach(clspv_lib clspv_core clspv_passes)
 
 endforeach(clspv_lib)
 
-set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore LLVMTransformUtils)
+set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore LLVMTransformUtils LLVMCodeGen)
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
