@@ -757,7 +757,13 @@ Instead, those types are mapped to 32-bit integer types.
 
 For any OpenCL C language built-in functions that are mapped onto their GLSL
 4.5 built-in equivalents, the precision requirements of the OpenCL C language
-built-ins are not necessarily honoured.
+built-ins are not necessarily honoured. In general, Clspv authors expect
+implementations will satisfy the relaxed precision requirements described in
+the OpenCL C specification. This means kernels will operate as if compiled with
+`--cl-fast-relaxed-math`. For higher performance (lower accuracy) variants of
+some builtin functions, clspv also provides the `--cl-native-math` option. This
+option goes beyond fast-relaxed math and provides no precision guarantees
+(similar to the native_ functions in OpenCL).
 
 #### Atomic Functions
 
@@ -784,11 +790,7 @@ The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,
 
 #### Math Functions
 
-The `cbrt()`, `cospi()`, `erf()`, `erfc()`, `expm1()`, `fdim()`,
-`hypot()`, `ilogb()`, `lgamma()`, `lgamma_r()`, `logb()`, `maxmag()`,
-`minmag()`, `nan()`, `nextafter()`, `pown()`, `remainder()`, `remquo()`,
-`rint()`, `rootn()`, `sincos()`, `sinpi()`, `tanpi()`, and `tgamma()` built-in
-functions **must not** be used.
+All supported.
 
 #### Integer Functions
 
@@ -902,3 +904,54 @@ These extension built-in functions are not supported:
 - `sub_group_commit_write_pipe()`
 - `get_kernel_sub_group_count_for_ndrange()`
 - `get_kernel_max_sub_group_size_for_ndrange()`
+
+### Numerical Compliance
+
+Clspv is not able to reach full accuracy requirements on the supported builtin
+functions in all cases. Instead, currently, it is able to meet the requirements
+tested by OpenCL CTS under relaxed precision requirements. In order to achieve
+this goal, some functions are implemented using the GLSL.std.450 extended or
+core instructions, some are implemented in the builtin library and some are
+emulated by the compiler.
+
+Note: Clspv has been tested against five Vulkan implementations from different
+vendors and is able to achieve the relaxed accuracy requirements broadly.
+
+#### Implementations Using Core and Extended Instructions
+
+`add`, `subtract`, `divide`, `multiply`, `assignment`, `not`, `acos`, `asin`,
+`ceil`, `cos`, `cosh`, `exp`, `exp2`, `exp10`, `fabs`, `floor`, `fmax`, `fmin`,
+`log`, `log2`, `log10`, `mad`, `pow`, `powr`, `rint`, `rsqrt`, `sin`, `sinh`,
+`tan`, `trunc`, `half_cos`, `half_exp`, `half_exp2`, `half_exp10`, `half_log`,
+`half_log2`, `half_log10`, `half_powr`, `half_rsqrt`, `half_sin`, `half_tan`,
+`clamp`, `degrees`, `mix`, `radians`, `sign`, `smoothstep`, `step`, `cross`,
+`dot`, `normalize`, `fast_distance`, `fast_length`, `fast_normalize`.
+
+#### Implementations Using Builtin Library
+
+`acosh`, `asinh`, `atanh`, `cbrt`, `erfc`, `erf`, `fma`, `fmod`, `fract`,
+`frexp`, `hypot`, `ilogb`, `ldexp`, `lgamma`, `lgamma_r`, `logb`, `maxmag`,
+`modf`, `nan`, `nextafter`, `remainder`, `remquo`, `rootn`, `sqrt`, `tanh`,
+`tgamma`, `half_divide`, `half_recip`, `half_sqrt`, `distance`, `length`,
+`atan`, `atan2pi`, `atanpi`, `atan2`.
+
+Note: `fma` has a very high runtime cost unless compiling with
+`-cl-native-math`. Its accuracy requirements are not relaxed by
+`-cl-fast-relaxed-math` and the library implementation emulates it using
+integers.
+
+Note: `acosh`, `asinh`, `atanh`, `atan`, `atan2`, `atanpi` and `atan2pi`,
+`fma`, `fmod`, `fract`, `frexp`, `ldexp`, `rsqrt`, `half_sqrt`, `sqrt`, `tanh`,
+`distance`, and `length` are all implemented using core or extended
+instructions when compiling with `-cl-native-math`.
+
+#### Implementations Using Emulation
+
+`acospi`, `asinpi`, `copysign`, `cospi`, `expm1`, `fdim`, `log1p`, `pown`,
+`round`, `sincos`, `sinpi`, `tanpi`.
+
+#### Known Conformance Issues
+
+* `frexp` fails using Swiftshader as an implementation due to an internal error.
+* `ldexp` and `rsqrt` fail to meet accuracy requirements on some Adreno GPUs. 
+

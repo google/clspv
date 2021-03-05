@@ -35,6 +35,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeInlineFuncWithSingleCallSitePassPass(r);
   initializeLongVectorLoweringPassPass(r);
   initializeMultiVersionUBOFunctionsPassPass(r);
+  initializeNativeMathPassPass(r);
   initializeOpenCLInlinerPassPass(r);
   initializeRemoveUnusedArgumentsPass(r);
   initializeReorderBasicBlocksPassPass(r);

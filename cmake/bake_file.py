@@ -24,16 +24,16 @@ def main():
     parser.add_argument('--input-header-file', metavar='<path>',
             type=str, required=True, help='input OpenCL C header file')
     parser.add_argument('--input-base-file', metavar='<path>',
-            type=str, required=True, help='input base OpenCL C header file')
+            type=str, required=False, help='input base OpenCL C header file')
     parser.add_argument('--output-file', metavar='<path>',
             type=str, required=True, help='output file')
     parser.add_argument('--header-var', type=str, required=True,
             help='Header variable name')
     parser.add_argument('--header-size-var', type=str, required=True,
             help='Header size variable name')
-    parser.add_argument('--base-var', type=str, required=True,
+    parser.add_argument('--base-var', type=str, required=False,
             help='Base header variable name')
-    parser.add_argument('--base-size-var', type=str, required=True,
+    parser.add_argument('--base-size-var', type=str, required=False,
             help='Base header size variable name')
 
     args = parser.parse_args()
@@ -76,19 +76,20 @@ def main():
                 byte = input.read(1)
         output.write("  '\\0'\n};\n\n")
 
-        # Write the contents of the array for the OpenCL base header.
-        base_size = os.stat(args.input_base_file).st_size + 1
-        output.write("static const unsigned int %s = %d;\n"
-                % (args.base_size_var, base_size))
-        output.write("static const char %s[%s] = {\n"
-                % (args.base_var, args.base_size_var))
-        with open(args.input_base_file, "rb") as input:
-            byte = input.read(1)
-            while byte != b"":
-                output.write("  '\\x%s',\n"
-                        % binascii.hexlify(byte).decode('utf-8'))
+        if args.input_base_file:
+            # Write the contents of the array for the OpenCL base header.
+            base_size = os.stat(args.input_base_file).st_size + 1
+            output.write("static const unsigned int %s = %d;\n"
+                    % (args.base_size_var, base_size))
+            output.write("static const char %s[%s] = {\n"
+                    % (args.base_var, args.base_size_var))
+            with open(args.input_base_file, "rb") as input:
                 byte = input.read(1)
-        output.write("  '\\0'\n};\n\n")
+                while byte != b"":
+                    output.write("  '\\x%s',\n"
+                            % binascii.hexlify(byte).decode('utf-8'))
+                    byte = input.read(1)
+            output.write("  '\\0'\n};\n\n")
 
         output.write("\n\n")
         output.write("#ifdef __cplusplus\n")

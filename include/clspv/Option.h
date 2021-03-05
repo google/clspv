@@ -191,6 +191,9 @@ bool Supports16BitStorageClass(StorageClass sc);
 // Returns true if |sc| supports 8-bit storage.
 bool Supports8BitStorageClass(StorageClass sc);
 
+// Returns true if -cl-native-math is enabled.
+bool NativeMath();
+
 } // namespace Option
 } // namespace clspv
 

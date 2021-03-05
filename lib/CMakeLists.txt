@@ -49,6 +49,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/Layout.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LongVectorLoweringPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/NativeMathPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NormalizeGlobalVariable.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCLInlinerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
@@ -111,8 +112,8 @@ endif()
 add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection)
 target_link_libraries(clspv_passes PRIVATE ${CLSPV_LLVM_COMPONENTS})
 
-# clspv_baked_opencl_header is used by Compiler.cpp.
-add_dependencies(clspv_core clspv_baked_opencl_header)
+# clspv_baked_opencl_header and clspv_builtin_library are used by Compiler.cpp.
+add_dependencies(clspv_core clspv_baked_opencl_header clspv_builtin_library)
 target_link_libraries(clspv_core PUBLIC clspv_passes)
 target_link_libraries(clspv_core PRIVATE clangCodeGen)
 
