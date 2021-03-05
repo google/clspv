@@ -904,3 +904,47 @@ These extension built-in functions are not supported:
 - `sub_group_commit_write_pipe()`
 - `get_kernel_sub_group_count_for_ndrange()`
 - `get_kernel_max_sub_group_size_for_ndrange()`
+
+### Numerical Compliance
+
+Clspv is not able to reach full precision requirements on the supported builtin
+functions in all cases. Instead, currently, it is able to meet the requirements
+tested by CTS under relaxed precision requirements. In order to achieve this
+goal, some functions are implemented using the GLSL.std.450 extended or core
+instructions, some are implemented in the built-in library and some are
+emulated by the compiler.
+
+#### Implementations Using Core and Extended Instructions
+
+`add`, `subtract`, `divide`, `multiply`, `assignment`, `not`, `acos`, `asin`,
+`ceil`, `cos`, `cosh`, `exp`, `exp2`, `exp10`, `fabs`, `floor`, `fmax`, `fmin`,
+`log`, `log2`, `log10`, `mad`, `pow`, `powr`, `rint`, `rsqrt`, `sin`, `sinh`,
+`tan`, `trunc`, `half_cos`, `half_exp`, `half_exp2`, `half_exp10`, `half_log`,
+`half_log2`, `half_log10`, `half_powr`, `half_rsqrt`, `half_sin`, `half_tan`,
+`clamp`, `degrees`, `mix`, `radians`, `sign`, `smoothstep`, `step`, `cross`,
+`dot`, `normalize`, `fast_distance`, `fast_length`, `fast_normalize`.
+
+#### Implementations Using Builtin Library
+
+`acosh`, `asinh`, `atanh`, `cbrt`, `erfc`, `erf`, `fma`, `fmod`, `fract`,
+`frexp`, `hypot`, `ilogb`, `ldexp`, `lgamma`, `lgamma_r`, `logb`, `maxmag`,
+`modf`, `nan`, `nextafter`, `remainder`, `remquo`, `rootn`, `sqrt`, `tanh`,
+`tgamma`, `half_divide`, `half_recip`, `half_sqrt`, `distance`, `length`,
+`atan`, `atan2pi`, `atanpi`, `atan2`.
+
+Note: `fma` should be avoided at all costs unless compiling with
+-cl-native-math. Its precision requirements are not relaxed by
+-cl-fast-relaxed-math and the library implementation emulates it using
+integers.
+
+Note: `acosh`, `asinh`, `atanh`, `atan`, `atan2`, `atanpi` and `atan2pi`,
+`fma`, `fmod`, `fract`, `frexp`, `ldexp`, `rsqrt`, `half_sqrt`, `sqrt`, `tanh`,
+`distance`, and `length` are all implemented using core or extended
+instructions when compiling with -cl-native-math.
+
+#### Implementations Using Emulation
+
+`acospi`, `asinpi`, `copysign`, `cospi`, `expm1`, `fdim`, `log1p`, `pown`,
+`round`, `sincos`, `sinpi`, `tanpi`.
+
+
