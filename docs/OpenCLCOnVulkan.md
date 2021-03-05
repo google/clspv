@@ -757,10 +757,10 @@ Instead, those types are mapped to 32-bit integer types.
 
 For any OpenCL C language built-in functions that are mapped onto their GLSL
 4.5 built-in equivalents, the precision requirements of the OpenCL C language
-built-ins are not necessarily honoured. In general, implementations should
-satisfy the relaxed precision requirements described in the OpenCL C
-specification. This means kernels will operate as if compiled with
-`--cl-fast-relaxed-math`. For higher performance (lower precision) variants of
+built-ins are not necessarily honoured. In general, Clspv authors expect
+implementations will satisfy the relaxed precision requirements described in
+the OpenCL C specification. This means kernels will operate as if compiled with
+`--cl-fast-relaxed-math`. For higher performance (lower accuracy) variants of
 some builtin functions, clspv also provides the `--cl-native-math` option. This
 option goes beyond fast-relaxed math and provides no precision guarantees
 (similar to the native_ functions in OpenCL).
@@ -907,12 +907,15 @@ These extension built-in functions are not supported:
 
 ### Numerical Compliance
 
-Clspv is not able to reach full precision requirements on the supported builtin
+Clspv is not able to reach full accuracy requirements on the supported builtin
 functions in all cases. Instead, currently, it is able to meet the requirements
-tested by CTS under relaxed precision requirements. In order to achieve this
-goal, some functions are implemented using the GLSL.std.450 extended or core
-instructions, some are implemented in the built-in library and some are
+tested by OpenCL CTS under relaxed precision requirements. In order to achieve
+this goal, some functions are implemented using the GLSL.std.450 extended or
+core instructions, some are implemented in the builtin library and some are
 emulated by the compiler.
+
+Note: Clspv has been tested against five Vulkan implementations from different
+vendors and is able to achieve the relaxed accuracy requirements broadly.
 
 #### Implementations Using Core and Extended Instructions
 
@@ -932,19 +935,23 @@ emulated by the compiler.
 `tgamma`, `half_divide`, `half_recip`, `half_sqrt`, `distance`, `length`,
 `atan`, `atan2pi`, `atanpi`, `atan2`.
 
-Note: `fma` should be avoided at all costs unless compiling with
--cl-native-math. Its precision requirements are not relaxed by
--cl-fast-relaxed-math and the library implementation emulates it using
+Note: `fma` has a very high runtime cost unless compiling with
+`-cl-native-math`. Its accuracy requirements are not relaxed by
+`-cl-fast-relaxed-math` and the library implementation emulates it using
 integers.
 
 Note: `acosh`, `asinh`, `atanh`, `atan`, `atan2`, `atanpi` and `atan2pi`,
 `fma`, `fmod`, `fract`, `frexp`, `ldexp`, `rsqrt`, `half_sqrt`, `sqrt`, `tanh`,
 `distance`, and `length` are all implemented using core or extended
-instructions when compiling with -cl-native-math.
+instructions when compiling with `-cl-native-math`.
 
 #### Implementations Using Emulation
 
 `acospi`, `asinpi`, `copysign`, `cospi`, `expm1`, `fdim`, `log1p`, `pown`,
 `round`, `sincos`, `sinpi`, `tanpi`.
 
+#### Known Conformance Issues
+
+* `frexp` fails using Swiftshader as an implementation due to an internal error.
+* `ldexp` and `rsqrt` fail to meet accuracy requirements on some Adreno GPUs. 
 
