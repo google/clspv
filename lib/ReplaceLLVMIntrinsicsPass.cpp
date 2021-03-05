@@ -572,4 +572,3 @@ bool ReplaceLLVMIntrinsicsPass::replaceCopysign(Function &F) {
     return Builder.CreateBitCast(NewXInt, Ty);
   });
 }
-
