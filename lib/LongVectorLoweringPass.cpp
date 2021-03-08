@@ -223,7 +223,15 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     llvm_unreachable("Missing support for intrinsic.");
     break;
 
-  case Intrinsic::fmuladd: {
+  case Intrinsic::ceil:
+  case Intrinsic::copysign:
+  case Intrinsic::cos:
+  case Intrinsic::exp:
+  case Intrinsic::fabs:
+  case Intrinsic::fmuladd:
+  case Intrinsic::log:
+  case Intrinsic::pow:
+  case Intrinsic::sin: {
     SmallVector<Type *, 16> ParamTys;
     bool Success = Intrinsic::getIntrinsicSignature(&Intrinsic, ParamTys);
     assert(Success);
@@ -271,12 +279,47 @@ Function *getBIFScalarVersion(Function &Builtin) {
 
   // TODO Add support for other builtins by providing testcases and listing the
   // builtins here.
+  case clspv::Builtins::kAcosh:
+  case clspv::Builtins::kAcos:
+  case clspv::Builtins::kAcospi:
+  case clspv::Builtins::kAsin:
+  case clspv::Builtins::kAsinh:
+  case clspv::Builtins::kAsinpi:
+  case clspv::Builtins::kAtanh:
+  case clspv::Builtins::kCeil:
+  case clspv::Builtins::kCos:
+  case clspv::Builtins::kCosh:
+  case clspv::Builtins::kCospi:
   case clspv::Builtins::kExp:
+  case clspv::Builtins::kExp2:
+  case clspv::Builtins::kExpm1:
+  case clspv::Builtins::kFabs:
+  case clspv::Builtins::kFloor:
   case clspv::Builtins::kFma:
   case clspv::Builtins::kFmax:
   case clspv::Builtins::kFmin:
   case clspv::Builtins::kFrexp:
-  case clspv::Builtins::kMax: {
+  case clspv::Builtins::kHalfCos:
+  case clspv::Builtins::kHalfExp:
+  case clspv::Builtins::kHalfExp2:
+  case clspv::Builtins::kHalfLog:
+  case clspv::Builtins::kHalfLog2:
+  case clspv::Builtins::kHalfPowr:
+  case clspv::Builtins::kHalfRsqrt:
+  case clspv::Builtins::kHalfSin:
+  case clspv::Builtins::kHalfTan:
+  case clspv::Builtins::kLog:
+  case clspv::Builtins::kLog2:
+  case clspv::Builtins::kMax:
+  case clspv::Builtins::kPow:
+  case clspv::Builtins::kPowr:
+  case clspv::Builtins::kRint:
+  case clspv::Builtins::kSin:
+  case clspv::Builtins::kSinh:
+  case clspv::Builtins::kSinpi:
+  case clspv::Builtins::kTan:
+  case clspv::Builtins::kTanh:
+  case clspv::Builtins::kTrunc: {
     // Scalarise all the input/output types. Here we intentionally do not rely
     // on getEquivalentType because we want the scalar overload.
     SmallVector<Type *, 16> ScalarParamTys;
@@ -670,7 +713,7 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
   bool Builtin = (OpenCLBuiltin || F->isIntrinsic());
 
   Value *V = nullptr;
-  if (Builtin) {
+  if (Builtin && F->isDeclaration()) {
     V = convertBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
   } else {
     V = convertUserDefinedFunctionCall(I, EquivalentArgs);
@@ -693,6 +736,16 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
 
   Value *V = nullptr;
   switch (I.getOpcode()) {
+  case Instruction::BitCast: {
+    if (OriginalDestTy->isPointerTy()) {
+      // Bitcast over pointers are lowered to one bitcast.
+      assert(EquivalentDestTy->isPointerTy());
+      IRBuilder<> B(&I);
+      V = B.CreateBitCast(EquivalentValue, EquivalentDestTy, I.getName());
+      break;
+    }
+    LLVM_FALLTHROUGH;
+  }
   case Instruction::Trunc:
   case Instruction::ZExt:
   case Instruction::SExt:
@@ -716,16 +769,6 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
                                ScalarFactory);
     break;
   }
-
-  case Instruction::BitCast: {
-    if (OriginalDestTy->isPointerTy()) {
-      // Bitcast over pointers are lowered to one bitcast.
-      assert(EquivalentDestTy->isPointerTy());
-      IRBuilder<> B(&I);
-      V = B.CreateBitCast(EquivalentValue, EquivalentDestTy, I.getName());
-      break;
-    }
-  } // fall-through
 
   default:
     llvm_unreachable("Cast unsupported.");
