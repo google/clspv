@@ -116,7 +116,7 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
             } else if (!phi_values.empty()) {
               auto new_phi = PHINode::Create(phi->getType(), phi_values.size(),
                                              "", new_exit->getTerminator());
-              for (auto i = 0; i < phi_values.size(); ++i) {
+              for (size_t i = 0; i < phi_values.size(); ++i) {
                 new_phi->addIncoming(phi_values[i], loop_preds[i]);
               }
               phi->addIncoming(new_phi, new_exit);

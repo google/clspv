@@ -961,12 +961,13 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   // Construct the equivalent shuffled vector, as a struct or a vector.
   Value *V = UndefValue::get(EquivalentType);
   for (unsigned i = 0; i < Arity; ++i) {
-    auto Mask = I.getMaskValue(i);
+    int Mask = I.getMaskValue(i);
+    assert(-1 <= Mask && "Unexpected mask value.");
 
     Value *Scalar = nullptr;
     if (Mask == -1) {
       Scalar = UndefValue::get(ScalarTy);
-    } else if (Mask < LHSArity) {
+    } else if (static_cast<unsigned>(Mask) < LHSArity) {
       Scalar = getScalar(EquivalentLHS, Mask);
     } else {
       Scalar = getScalar(EquivalentRHS, Mask - LHSArity);

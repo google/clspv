@@ -146,7 +146,7 @@ enum class SourceLanguage {
 SourceLanguage Language();
 
 // Returns true when the source language makes use of the generic address space.
-static bool LanguageUsesGenericAddressSpace() {
+inline bool LanguageUsesGenericAddressSpace() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
          ((Language() == SourceLanguage::OpenCL_C_20));
 }
@@ -173,7 +173,7 @@ bool GlobalOffset();
 bool GlobalOffsetPushConstant();
 
 // Returns true when support for non uniform NDRanges is enabled.
-static bool NonUniformNDRangeSupported() {
+inline bool NonUniformNDRangeSupported() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
          (Language() == SourceLanguage::OpenCL_C_20) ||
          (Language() == SourceLanguage::OpenCL_C_30);

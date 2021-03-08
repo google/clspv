@@ -1535,7 +1535,8 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
 
     for (auto arg : ArgsToSplat) {
       Value *NewVectorArg = UndefValue::get(VecType);
-      for (auto i = 0; i < VecType->getElementCount().getKnownMinValue(); i++) {
+      for (size_t i = 0; i < VecType->getElementCount().getKnownMinValue();
+           i++) {
         auto index = ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
         NewVectorArg =
             InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
@@ -1623,7 +1624,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     IRBuilder<> builder(CI);
     auto elems_const = builder.getInt32(elems);
     auto adjust = builder.CreateMul(offset, elems_const);
-    for (auto i = 0; i < elems; ++i) {
+    for (size_t i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
       auto gep = builder.CreateGEP(ptr, add);
@@ -1660,7 +1661,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     auto elems_const = builder.getInt32(elems);
     V = UndefValue::get(ret_type);
     auto adjust = builder.CreateMul(offset, elems_const);
-    for (auto i = 0; i < elems; ++i) {
+    for (unsigned i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
       auto gep = builder.CreateGEP(ptr, add);
@@ -1688,6 +1689,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F,
     if (!is_clspv_version) {
       return replaceVloadHalf(F);
     }
+    // Fall-through
   default:
     llvm_unreachable("Unsupported vload_half vector size");
     break;
@@ -2238,7 +2240,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     SmallVector<Type *, 3> types;
     SmallVector<Value *, 3> args;
-    for (auto i = 0; i < CI->getNumArgOperands(); ++i) {
+    for (size_t i = 0; i < CI->getNumArgOperands(); ++i) {
       types.push_back(CI->getArgOperand(i)->getType());
       args.push_back(CI->getArgOperand(i));
     }

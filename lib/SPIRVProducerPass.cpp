@@ -325,7 +325,6 @@ struct SPIRVProducerPass final : public ModulePass {
   // ModuleOrderedResourceVars.
   void FindResourceVars();
   void FindTypePerGlobalVar(GlobalVariable &GV);
-  void FindTypePerFunc(Function &F);
   void FindTypesForSamplerMap();
   void FindTypesForResourceVars();
   // Inserts |Ty| and relevant sub-types into the |Types| member, indicating
@@ -415,7 +414,6 @@ struct SPIRVProducerPass final : public ModulePass {
   // Wrapped methods of DataLayout accessors. If |type| was remapped for UBOs,
   // uses the internal map, otherwise it falls back on the data layout.
   uint64_t GetTypeSizeInBits(Type *type, const DataLayout &DL);
-  uint64_t GetTypeStoreSize(Type *type, const DataLayout &DL);
   uint64_t GetTypeAllocSize(Type *type, const DataLayout &DL);
   uint32_t GetExplicitLayoutStructMemberOffset(StructType *type,
                                                unsigned member,
@@ -566,9 +564,7 @@ private:
 
   // If a function F has a pointer-to-__constant parameter, then this variable
   // will map F's type to (G, index of the parameter), where in a first phase
-  // G is F's type.  During FindTypePerFunc, G will be changed to F's type
-  // but replacing the pointer-to-constant parameter with
-  // pointer-to-ModuleScopePrivate.
+  // G is F's type.
   // TODO(dneto): This doesn't seem general enough?  A function might have
   // more than one such parameter.
   GlobalConstFuncMapType GlobalConstFuncTypeMap;
@@ -867,14 +863,6 @@ void SPIRVProducerPass::GenerateLLVMIRInfo() {
 
   FindResourceVars();
 
-  bool HasWorkGroupBuiltin = false;
-  for (GlobalVariable &GV : module->globals()) {
-    const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
-    if (spv::BuiltInWorkgroupSize == BuiltinType) {
-      HasWorkGroupBuiltin = true;
-    }
-  }
-
   FindTypesForSamplerMap();
   FindTypesForResourceVars();
 }
@@ -1084,162 +1072,6 @@ void SPIRVProducerPass::FindResourceVars() {
 void SPIRVProducerPass::FindTypePerGlobalVar(GlobalVariable &GV) {
   // Investigate global variable's type.
   FindType(GV.getType());
-}
-
-void SPIRVProducerPass::FindTypePerFunc(Function &F) {
-  // Investigate function's type.
-  FunctionType *FTy = F.getFunctionType();
-
-  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
-    auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
-    // Handle a regular function with global constant parameters.
-    if (GlobalConstFuncTyMap.count(FTy)) {
-      uint32_t GVCstArgIdx = GlobalConstFuncTypeMap[FTy].second;
-      SmallVector<Type *, 4> NewFuncParamTys;
-      for (unsigned i = 0; i < FTy->getNumParams(); i++) {
-        Type *ParamTy = FTy->getParamType(i);
-        if (i == GVCstArgIdx) {
-          Type *EleTy = ParamTy->getPointerElementType();
-          ParamTy = PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
-        }
-
-        NewFuncParamTys.push_back(ParamTy);
-      }
-
-      FunctionType *NewFTy =
-          FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
-      GlobalConstFuncTyMap[FTy] = std::make_pair(NewFTy, GVCstArgIdx);
-      FTy = NewFTy;
-    }
-
-    FindType(FTy);
-  } else {
-    // As kernel functions do not have parameters, create new function type and
-    // add it to type map.
-    SmallVector<Type *, 4> NewFuncParamTys;
-    FunctionType *NewFTy =
-        FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
-    FindType(NewFTy);
-  }
-
-  // Investigate instructions' type in function body.
-  for (BasicBlock &BB : F) {
-    for (Instruction &I : BB) {
-      if (isa<ShuffleVectorInst>(I)) {
-        for (unsigned i = 0; i < I.getNumOperands(); i++) {
-          // Ignore type for mask of shuffle vector instruction.
-          if (i == 2) {
-            continue;
-          }
-
-          Value *Op = I.getOperand(i);
-          if (!isa<MetadataAsValue>(Op)) {
-            FindType(Op->getType());
-          }
-        }
-
-        FindType(I.getType());
-        continue;
-      }
-
-      CallInst *Call = dyn_cast<CallInst>(&I);
-
-      if (Call) {
-        auto &func_info = Builtins::Lookup(Call->getCalledFunction());
-        if (func_info.getType() == Builtins::kClspvResource ||
-            func_info.getType() == Builtins::kClspvLocal) {
-          // This is a fake call representing access to a resource/workgroup
-          // variable. We handle that elsewhere.
-          continue;
-        }
-      }
-
-      // #497: InsertValue and ExtractValue map to OpCompositeInsert and
-      // OpCompositeExtract which takes literal values for indices. As a result
-      // don't map the type of indices.
-      if (I.getOpcode() == Instruction::ExtractValue) {
-        FindType(I.getOperand(0)->getType());
-        continue;
-      }
-      if (I.getOpcode() == Instruction::InsertValue) {
-        FindType(I.getOperand(0)->getType());
-        FindType(I.getOperand(1)->getType());
-        continue;
-      }
-
-      // #497: InsertElement and ExtractElement map to OpCompositeExtract if
-      // the index is a constant. In such a case don't map the index type.
-      if (I.getOpcode() == Instruction::ExtractElement) {
-        FindType(I.getOperand(0)->getType());
-        Value *op1 = I.getOperand(1);
-        if (!isa<Constant>(op1) || isa<GlobalValue>(op1)) {
-          FindType(op1->getType());
-        }
-        continue;
-      }
-      if (I.getOpcode() == Instruction::InsertElement) {
-        FindType(I.getOperand(0)->getType());
-        FindType(I.getOperand(1)->getType());
-        Value *op2 = I.getOperand(2);
-        if (!isa<Constant>(op2) || isa<GlobalValue>(op2)) {
-          FindType(op2->getType());
-        }
-        continue;
-      }
-
-      // Work through the operands of the instruction.
-      for (unsigned i = 0; i < I.getNumOperands(); i++) {
-        Value *const Op = I.getOperand(i);
-        // If any of the operands is a constant, find the type!
-        if (isa<Constant>(Op) && !isa<GlobalValue>(Op)) {
-          FindType(Op->getType());
-        }
-      }
-
-      for (Use &Op : I.operands()) {
-        if (isa<CallInst>(&I)) {
-          // Avoid to check call instruction's type.
-          break;
-        }
-        if (CallInst *OpCall = dyn_cast<CallInst>(Op)) {
-          if (Builtins::Lookup(OpCall->getCalledFunction()) ==
-              Builtins::kClspvLocal) {
-            // This is a fake call representing access to a workgroup variable.
-            // We handle that elsewhere.
-            continue;
-          }
-        }
-        if (!isa<MetadataAsValue>(&Op)) {
-          FindType(Op->getType());
-          continue;
-        }
-      }
-
-      // We don't want to track the type of this call as we are going to replace
-      // it.
-      if (Call && Builtins::Lookup(Call->getCalledFunction()) ==
-                      Builtins::kClspvSamplerVarLiteral) {
-        continue;
-      }
-
-      if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-        // If gep's base operand has ModuleScopePrivate address space, make gep
-        // return ModuleScopePrivate address space.
-        if (GEP->getPointerAddressSpace() == AddressSpace::ModuleScopePrivate) {
-          // Add pointer type with private address space for global constant to
-          // type list.
-          Type *EleTy = I.getType()->getPointerElementType();
-          Type *NewPTy =
-              PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
-
-          FindType(NewPTy);
-          continue;
-        }
-      }
-
-      FindType(I.getType());
-    }
-  }
 }
 
 void SPIRVProducerPass::FindTypesForSamplerMap() {
@@ -5454,15 +5286,6 @@ uint64_t SPIRVProducerPass::GetTypeSizeInBits(Type *type,
   return DL.getTypeSizeInBits(type);
 }
 
-uint64_t SPIRVProducerPass::GetTypeStoreSize(Type *type, const DataLayout &DL) {
-  auto iter = RemappedUBOTypeSizes.find(type);
-  if (iter != RemappedUBOTypeSizes.end()) {
-    return std::get<1>(iter->second);
-  }
-
-  return DL.getTypeStoreSize(type);
-}
-
 uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
   auto iter = RemappedUBOTypeSizes.find(type);
   if (iter != RemappedUBOTypeSizes.end()) {
@@ -5769,14 +5592,15 @@ void SPIRVProducerPass::GeneratePushConstantReflection() {
 
       auto memberType = STy->getElementType(i);
       auto offset = GetExplicitLayoutStructMemberOffset(STy, i, DL);
+#ifndef NDEBUG
       unsigned previousOffset = 0;
       if (i > 0) {
         previousOffset = GetExplicitLayoutStructMemberOffset(STy, i - 1, DL);
       }
-      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
       assert(isValidExplicitLayout(*module, STy, i,
                                    spv::StorageClassPushConstant, offset,
                                    previousOffset));
+#endif
 
       reflection::ExtInst pc_inst = reflection::ExtInstMax;
       switch (pc) {
@@ -5804,6 +5628,7 @@ void SPIRVProducerPass::GeneratePushConstantReflection() {
       }
 
       auto import_id = getReflectionImport();
+      auto size = static_cast<uint32_t>(GetTypeSizeInBits(memberType, DL)) / 8;
       SPIRVOperandVec Ops;
       Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
           << pc_inst << getSPIRVInt32Constant(offset)

@@ -87,13 +87,17 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
 
   // Find requested pc in metadata
   auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
+#ifndef NDEBUG
   bool found = false;
+#endif
   uint32_t idx = 0;
   for (auto &PCMD : MD->operands()) {
     auto mpc = static_cast<PushConstant>(
         mdconst::extract<ConstantInt>(PCMD)->getZExtValue());
     if (mpc == pc) {
+#ifndef NDEBUG
       found = true;
+#endif
       break;
     }
     idx++;

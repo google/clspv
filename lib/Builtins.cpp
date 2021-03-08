@@ -57,7 +57,7 @@ std::string GetUnmangledName(const std::string &str, size_t *pos) {
     return "";
   }
   ptrdiff_t name_pos = end - str.data();
-  if (name_pos + name_len > str.size()) {
+  if (static_cast<std::size_t>(name_pos + name_len) > str.size()) {
     // Protect against maliciously large number.
     return "";
   }
