@@ -69,7 +69,7 @@ void FlattenConstant(Constant *constant, std::vector<Constant *> *flattened) {
     // Special cases for constant aggregate zero and constant data sequential
     // to populate the right number of constant elements into |flattened|.
     if (auto caz = dyn_cast<ConstantAggregateZero>(const_element)) {
-      for (auto i = 0; i != GetNumElements(element_ty); ++i) {
+      for (size_t i = 0; i != GetNumElements(element_ty); ++i) {
         if (element_ty->isStructTy()) {
           flattened->push_back(caz->getStructElement(i));
         } else {

@@ -98,7 +98,21 @@ foreach(clspv_lib clspv_core clspv_passes)
 
 endforeach(clspv_lib)
 
-set(CLSPV_LLVM_COMPONENTS LLVMAnalysis LLVMScalarOpts LLVMCore LLVMTransformUtils LLVMCodeGen)
+# Dependencies of clspv_lib
+set(CLSPV_LLVM_COMPONENTS
+  LLVMAggressiveInstCombine
+  LLVMAnalysis
+  LLVMCodeGen
+  LLVMCore
+  LLVMInstCombine
+  LLVMInstrumentation
+  LLVMObjCARCOpts
+  LLVMScalarOpts
+  LLVMSupport
+  LLVMTransformUtils
+  LLVMVectorize
+  LLVMipo
+)
 
 if(${EXTERNAL_LLVM} EQUAL 1)
   include(${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm/LLVMConfig.cmake)
@@ -115,7 +129,15 @@ target_link_libraries(clspv_passes PRIVATE ${CLSPV_LLVM_COMPONENTS})
 # clspv_baked_opencl_header and clspv_builtin_library are used by Compiler.cpp.
 add_dependencies(clspv_core clspv_baked_opencl_header clspv_builtin_library)
 target_link_libraries(clspv_core PUBLIC clspv_passes)
-target_link_libraries(clspv_core PRIVATE clangCodeGen)
+target_link_libraries(clspv_core PRIVATE
+  LLVMIRReader
+  LLVMLinker
+  clangAST
+  clangBasic
+  clangCodeGen
+  clangFrontend
+  clangSerialization
+)
 
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"

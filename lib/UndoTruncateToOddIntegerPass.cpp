@@ -44,7 +44,7 @@ private:
   // values are created.
   // TODO(dneto): Handle 64 bit case as well, but separately.
   Value *ZeroExtend(Value *v, uint32_t desired_bit_width) {
-    auto bit_width = 0;
+    unsigned bit_width = 0;
     if (v->getType()->isIntegerTy())
       bit_width = v->getType()->getIntegerBitWidth();
     if (bit_width > 32) {

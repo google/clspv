@@ -488,7 +488,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 unsigned DstVecTyNumElement =
                     DstVecTy->getElementCount().getKnownMinValue() / NumVector;
                 SmallVector<int32_t, 4> Idxs;
-                for (int i = 0; i < DstVecTyNumElement; i++) {
+                for (unsigned i = 0; i < DstVecTyNumElement; i++) {
                   Idxs.push_back(i + (DstVecTyNumElement * VIdx));
                 }
                 Value *UndefVal = UndefValue::get(DstTy);
@@ -512,7 +512,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                     DstVecTy->getElementCount().getKnownMinValue();
                 for (unsigned i = 0; i < NumElement; i++) {
                   SmallVector<int32_t, 4> Idxs;
-                  for (int j = 0; j < SrcNumElement; j++) {
+                  for (unsigned j = 0; j < SrcNumElement; j++) {
                     Idxs.push_back(i * SrcNumElement + j);
                   }
 
@@ -762,7 +762,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                 Value *Undef = UndefValue::get(SrcTy);
 
                 SmallVector<int32_t, 4> Idxs;
-                for (int i = 0; i < NumElement; i++) {
+                for (unsigned i = 0; i < NumElement; i++) {
                   Idxs.push_back(i);
                 }
                 DstVal = Builder.CreateShuffleVector(LDValues[0], Undef, Idxs);
@@ -876,7 +876,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
                     Values[i] = Builder.CreateBitCast(Values[i], TmpVecTy);
                   }
                   SmallVector<int32_t, 4> Idxs;
-                  for (int i = 0; i < (NumVector * 2); i++) {
+                  for (unsigned i = 0; i < (NumVector * 2); i++) {
                     Idxs.push_back(i);
                   }
                   for (unsigned i = 0; i < Values.size(); i = i + 2) {
@@ -909,7 +909,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               SmallVector<Value *, 4> TmpLDValues;
               for (unsigned i = 0; i < LDValues.size(); i = i + 2) {
                 SmallVector<int32_t, 4> Idxs;
-                for (int j = 0; j < NumElement; j++) {
+                for (unsigned j = 0; j < NumElement; j++) {
                   Idxs.push_back(j);
                 }
                 Value *TmpVal = Builder.CreateShuffleVector(
@@ -1072,12 +1072,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       SmallVector<std::pair<User *, bool>, 32> Users;
 
       GetElementPtrInst *GEP = nullptr;
-      Value *OrgGEPIdx = nullptr;
       if ((GEP = dyn_cast<GetElementPtrInst>(BitCastUser))) {
         IRBuilder<> Builder(GEP);
 
         // Build new src/dst address.
-        OrgGEPIdx = GEP->getOperand(1);
         NewAddrIdx = CalculateNewGEPIdx(SrcTyBitWidth, DstTyBitWidth, GEP);
 
         // If bitcast's user is gep, investigate gep's users too.

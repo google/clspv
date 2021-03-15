@@ -65,4 +65,4 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
   return CallInst::Create(func, ArgValues, "", Insert);
 }
 
-}; // namespace clspv
+} // namespace clspv

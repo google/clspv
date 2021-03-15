@@ -15,17 +15,19 @@
 #ifndef CLSPV_LIB_BUILTINSMAP_INC_
 #define CLSPV_LIB_BUILTINSMAP_INC_
 
+#include <cstdint>
+
 ////////////////////////////////////////////////////////////////////////////////
 // utilities for const char* map keys
 struct cstr_hash {
-#define FNV_PRIME_64 1099511628211ULL
-#define FNV_OFFSET_64 14695981039346656037ULL
+#define FNV_PRIME_64 UINT64_C(1099511628211)
+#define FNV_OFFSET_64 UINT64_C(14695981039346656037)
   // hash function for const char* hashmap based on FNV-1a
-  std::size_t operator()(const char *cstr) const {
-    std::size_t hash = FNV_OFFSET_64;
+  std::uint64_t operator()(const char *cstr) const {
+    std::uint64_t hash = FNV_OFFSET_64;
     for (char c = *cstr; c != '\0'; c = *(++cstr)) {
-      hash ^= static_cast<std::size_t>(c);
-      hash *= static_cast<std::size_t>(FNV_PRIME_64);
+      hash ^= static_cast<std::uint64_t>(c);
+      hash *= static_cast<std::uint64_t>(FNV_PRIME_64);
     }
     return hash;
   }
