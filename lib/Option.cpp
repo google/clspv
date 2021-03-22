@@ -155,6 +155,10 @@ llvm::cl::opt<bool> long_vector_support(
     "long-vector", llvm::cl::init(false),
     llvm::cl::desc("Allow vectors of 8 and 16 elements. Experimental"));
 
+llvm::cl::opt<bool> cl_arm_non_uniform_work_group_size(
+    "cl-arm-non-uniform-work-group-size", llvm::cl::init(false),
+    llvm::cl::desc("Enable the cl_arm_non_uniform_work_group_size extension."));
+
 llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
     "cl-std", llvm::cl::desc("Select OpenCL standard"),
     llvm::cl::init(clspv::Option::SourceLanguage::OpenCL_C_12),
@@ -280,6 +284,12 @@ bool ScalarBlockLayout() { return scalar_block_layout; }
 bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
+bool NonUniformNDRangeSupported() {
+  return (Language() == SourceLanguage::OpenCL_CPP) ||
+         (Language() == SourceLanguage::OpenCL_C_20) ||
+         (Language() == SourceLanguage::OpenCL_C_30) ||
+         cl_arm_non_uniform_work_group_size;
+}
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
 bool Supports16BitStorageClass(StorageClass sc) {

@@ -173,11 +173,7 @@ bool GlobalOffset();
 bool GlobalOffsetPushConstant();
 
 // Returns true when support for non uniform NDRanges is enabled.
-inline bool NonUniformNDRangeSupported() {
-  return (Language() == SourceLanguage::OpenCL_CPP) ||
-         (Language() == SourceLanguage::OpenCL_C_20) ||
-         (Language() == SourceLanguage::OpenCL_C_30);
-}
+bool NonUniformNDRangeSupported();
 
 enum class StorageClass : int {
   kSSBO = 0,

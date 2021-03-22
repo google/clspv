@@ -2,6 +2,11 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+//
+// RUN: clspv -cl-arm-non-uniform-work-group-size %s -o %t.spv
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK:     OpEntryPoint GLCompute %[[__original_id_16:[0-9]+]] "test"
 // CHECK:     OpDecorate %[[gl_WorkGroupSize:[0-9a-zA-Z_]+]] BuiltIn WorkgroupSize
