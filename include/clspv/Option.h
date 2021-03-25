@@ -190,6 +190,12 @@ bool Supports8BitStorageClass(StorageClass sc);
 // Returns true if -cl-native-math is enabled.
 bool NativeMath();
 
+// Returns true if cl_khr_fp16 is enabled
+bool FP16();
+
+// Returns true if FP64 support is enabled
+bool FP64();
+
 } // namespace Option
 } // namespace clspv
 

@@ -242,6 +242,15 @@ static llvm::cl::opt<bool> cl_native_math(
                    "guarantee that OpenCL precision bounds are maintained. "
                    "Implies -cl-fast-relaxed-math."));
 
+static llvm::cl::opt<bool>
+    fp16("fp16", llvm::cl::init(true),
+         llvm::cl::desc("Enable support for cl_khr_fp16."));
+
+static llvm::cl::opt<bool>
+    fp64("fp64", llvm::cl::init(true),
+         llvm::cl::desc(
+             "Enable support for FP64 (cl_khr_fp64 and/or __opencl_c_fp64)."));
+
 } // namespace
 
 namespace clspv {
@@ -313,6 +322,9 @@ bool Supports8BitStorageClass(StorageClass sc) {
 }
 
 bool NativeMath() { return cl_native_math; }
+
+bool FP16() { return fp16; }
+bool FP64() { return fp64; }
 
 } // namespace Option
 } // namespace clspv
