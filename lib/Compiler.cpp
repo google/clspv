@@ -372,6 +372,51 @@ int ParseSamplerMap(const std::string &sampler_map,
   return 0;
 }
 
+clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
+  // Create target info
+  auto TargetInfo = clang::TargetInfo::CreateTargetInfo(
+      instance.getDiagnostics(),
+      std::make_shared<clang::TargetOptions>(instance.getTargetOpts()));
+
+  // The SPIR target enables all possible options, disable the ones we don't
+  // want
+  auto &Opts = TargetInfo->getSupportedOpenCLOpts();
+
+  // Conditionally disable extensions based on support
+  if (!clspv::Option::FP16()) {
+    Opts["cl_khr_fp16"] = false;
+  }
+  if (!clspv::Option::FP64()) {
+    Opts["cl_khr_fp64"] = false;
+  }
+
+  // Disable CL3.0 feature macros for unsupported features
+  if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
+
+    // TODO: See #705, find a better solution for this.
+    // TODO(kpet): This is a Clang bug (the pragma isn't enabled when the macro
+    // is defined)
+    Opts["cl_khr_3d_image_writes"] = false;
+
+    // The following features are never supported
+    Opts["__opencl_c_pipes"] = false;
+    Opts["__opencl_c_generic_address_space"] = false;
+    Opts["__opencl_c_atomic_order_seq_cst"] = false;
+    Opts["__opencl_c_device_enqueue"] = false;
+    Opts["__opencl_c_program_scope_global_variables"] = false;
+
+    if (!clspv::Option::ImageSupport()) {
+      Opts["__opencl_c_images"] = false;
+    }
+
+    if (!clspv::Option::FP64()) {
+      Opts["__opencl_c_fp64"] = false;
+    }
+  }
+
+  return TargetInfo;
+}
+
 // Sets |instance|'s options for compiling. Returns 0 if successful.
 int SetCompilerInstanceOptions(CompilerInstance &instance,
                                const llvm::StringRef &overiddenInputFilename,
@@ -417,8 +462,6 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
     break;
   case clspv::Option::SourceLanguage::OpenCL_C_30:
     standard = clang::LangStandard::lang_opencl30;
-    // TODO: See #705, find a better solution for this.
-    instance.getPreprocessorOpts().addMacroUndef("cl_khr_3d_image_writes");
     break;
   case clspv::Option::SourceLanguage::OpenCL_CPP:
     standard = clang::LangStandard::lang_openclcpp;
@@ -535,9 +578,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   // Add the __OPENCL_VERSION__ macro.
   instance.getPreprocessorOpts().addMacroDef("__OPENCL_VERSION__=120");
 
-  instance.setTarget(clang::TargetInfo::CreateTargetInfo(
-      instance.getDiagnostics(),
-      std::make_shared<clang::TargetOptions>(instance.getTargetOpts())));
+  instance.setTarget(PrepareTargetInfo(instance));
 
   instance.createFileManager();
   instance.createSourceManager(instance.getFileManager());
