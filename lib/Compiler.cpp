@@ -393,11 +393,6 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   // Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
 
-    // TODO: See #705, find a better solution for this.
-    // TODO(kpet): This is a Clang bug (the pragma isn't enabled when the macro
-    // is defined)
-    Opts["cl_khr_3d_image_writes"] = false;
-
     // The following features are never supported
     Opts["__opencl_c_pipes"] = false;
     Opts["__opencl_c_generic_address_space"] = false;
