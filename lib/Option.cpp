@@ -253,7 +253,7 @@ static llvm::cl::opt<bool>
 
 static llvm::cl::opt<bool> uniform_workgroup_size(
     "uniform-workgroup-size", llvm::cl::init(false),
-    llvm::cl::desc("Disable support for non-uniform workgroup size."));
+    llvm::cl::desc("Assume all workgroups are uniformly sized."));
 
 } // namespace
 
@@ -298,6 +298,9 @@ bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool NonUniformNDRangeSupported() {
+  assert(!(cl_arm_non_uniform_work_group_size && uniform_workgroup_size) &&
+         "uniform-workgroup-size overrides cl-arm-non-uniform-work-group-size. "
+         "Use only one.");
   return ((Language() == SourceLanguage::OpenCL_CPP) ||
           (Language() == SourceLanguage::OpenCL_C_20) ||
           (Language() == SourceLanguage::OpenCL_C_30) ||
