@@ -744,6 +744,8 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
       V = B.CreateBitCast(EquivalentValue, EquivalentDestTy, I.getName());
       break;
     }
+    // TODO Handle casts between scalars to vectors, vectors to scalars, and
+    // between vectors of different lengths.
     LLVM_FALLTHROUGH;
   }
   case Instruction::Trunc:
