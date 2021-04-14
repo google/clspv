@@ -298,9 +298,6 @@ bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool NonUniformNDRangeSupported() {
-  assert(!(cl_arm_non_uniform_work_group_size && uniform_workgroup_size) &&
-         "uniform-workgroup-size overrides cl-arm-non-uniform-work-group-size. "
-         "Use only one.");
   return ((Language() == SourceLanguage::OpenCL_CPP) ||
           (Language() == SourceLanguage::OpenCL_C_20) ||
           (Language() == SourceLanguage::OpenCL_C_30) ||
@@ -333,6 +330,9 @@ bool NativeMath() { return cl_native_math; }
 
 bool FP16() { return fp16; }
 bool FP64() { return fp64; }
+
+bool ArmNonUniformWorkGroupSize() { return cl_arm_non_uniform_work_group_size; }
+bool UniformWorkgroupSize() { return uniform_workgroup_size; }
 
 } // namespace Option
 } // namespace clspv

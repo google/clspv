@@ -873,6 +873,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
     }
   }
 
+  if (clspv::Option::ArmNonUniformWorkGroupSize() &&
+      clspv::Option::UniformWorkgroupSize()) {
+    llvm::errs() << "cannot enable Arm non-uniform workgroup extension support "
+                    "and assume uniform workgroup sizes\n";
+    return -1;
+  }
+
   return 0;
 }
 
