@@ -301,8 +301,8 @@ bool NonUniformNDRangeSupported() {
   return ((Language() == SourceLanguage::OpenCL_CPP) ||
           (Language() == SourceLanguage::OpenCL_C_20) ||
           (Language() == SourceLanguage::OpenCL_C_30) ||
-          cl_arm_non_uniform_work_group_size) &&
-         !uniform_workgroup_size;
+          ArmNonUniformWorkGroupSize()) &&
+         !UniformWorkgroupSize();
 }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
