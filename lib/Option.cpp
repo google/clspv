@@ -251,6 +251,10 @@ static llvm::cl::opt<bool>
          llvm::cl::desc(
              "Enable support for FP64 (cl_khr_fp64 and/or __opencl_c_fp64)."));
 
+static llvm::cl::opt<bool> uniform_workgroup_size(
+    "uniform-workgroup-size", llvm::cl::init(false),
+    llvm::cl::desc("Assume all workgroups are uniformly sized."));
+
 } // namespace
 
 namespace clspv {
@@ -294,10 +298,11 @@ bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool NonUniformNDRangeSupported() {
-  return (Language() == SourceLanguage::OpenCL_CPP) ||
-         (Language() == SourceLanguage::OpenCL_C_20) ||
-         (Language() == SourceLanguage::OpenCL_C_30) ||
-         cl_arm_non_uniform_work_group_size;
+  return ((Language() == SourceLanguage::OpenCL_CPP) ||
+          (Language() == SourceLanguage::OpenCL_C_20) ||
+          (Language() == SourceLanguage::OpenCL_C_30) ||
+          ArmNonUniformWorkGroupSize()) &&
+         !UniformWorkgroupSize();
 }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
@@ -325,6 +330,9 @@ bool NativeMath() { return cl_native_math; }
 
 bool FP16() { return fp16; }
 bool FP64() { return fp64; }
+
+bool ArmNonUniformWorkGroupSize() { return cl_arm_non_uniform_work_group_size; }
+bool UniformWorkgroupSize() { return uniform_workgroup_size; }
 
 } // namespace Option
 } // namespace clspv

@@ -196,6 +196,12 @@ bool FP16();
 // Returns true if FP64 support is enabled
 bool FP64();
 
+// Returns true if cl_arm_non_uniform_work_group_size is enabled
+bool ArmNonUniformWorkGroupSize();
+
+// Returns true if uniform_workgroup_size is enabled
+bool UniformWorkgroupSize();
+
 } // namespace Option
 } // namespace clspv
 
