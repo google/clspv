@@ -4894,6 +4894,12 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   if (func_info.getName().find("llvm.pow.") == 0) {
     return glsl::ExtInst::ExtInstPow;
   }
+  if (func_info.getName().find("llvm.smax.") == 0) {
+    return glsl::ExtInst::ExtInstSMax;
+  }
+  if (func_info.getName().find("llvm.smin.") == 0) {
+    return glsl::ExtInst::ExtInstSMin;
+  }
   return kGlslExtInstBad;
 }
 

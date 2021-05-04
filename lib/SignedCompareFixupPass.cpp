@@ -120,6 +120,24 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
           default:
             break;
           }
+
+          switch (call->getIntrinsicID()) {
+          case Intrinsic::smax:
+          case Intrinsic::smin:
+            if (ShowSCF) {
+              outs() << "SCF: Replace " << *call << "\n";
+            }
+            ReplaceBuiltin(call,
+                           call->getIntrinsicID() == Intrinsic::smax
+                               ? Builtins::kMax
+                               : Builtins::kMin,
+                           &work_list);
+            Changed = true;
+            to_remove.push_back(call);
+            break;
+          default:
+            break;
+          }
         }
       }
     }
