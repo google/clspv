@@ -14,8 +14,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int *out, 
 }
 
 // CHECK: [[bool:%[a-zA-Z0-9_]+]] = OpTypeBool
+// CHECK: [[false:%[a-zA-Z0-9_]+]] = OpConstantFalse [[bool]]
 // CHECK: [[less:%[a-zA-Z0-9_]+]] = OpSLessThan [[bool]]
 // CHECK: [[greater:%[a-zA-Z0-9_]+]] = OpSGreaterThan [[bool]]
-// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpLogicalAnd [[bool]] [[less]] [[greater]]
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpSelect [[bool]] [[less]] [[greater]] [[false]]
 // CHECK: OpBranchConditional [[and]]
 
