@@ -100,14 +100,14 @@ void ConstantEmitter::EmitAggregateZero(ConstantAggregateZero *c) {
     const StructLayout *sl = Layout.getStructLayout(sty);
     AlignTo(sl->getAlignment().value()); // Might be redundant.
     const size_t BaseOffset = Offset;
-    for (unsigned i = 0; i < c->getNumElements(); ++i) {
+    for (unsigned i = 0; i < c->getElementCount().getFixedValue(); ++i) {
       EmitZeroes(sl->getElementOffset(i) - (Offset - BaseOffset));
       Emit(c->getElementValue(i));
     }
     EmitZeroes(sl->getSizeInBytes() - (Offset - BaseOffset));
 
   } else {
-    for (unsigned i = 0; i < c->getNumElements(); ++i) {
+    for (unsigned i = 0; i < c->getElementCount().getFixedValue(); ++i) {
       // The elements will align themselves.
       Emit(c->getElementValue(i));
     }
