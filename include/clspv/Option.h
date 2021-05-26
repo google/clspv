@@ -152,10 +152,12 @@ inline bool LanguageUsesGenericAddressSpace() {
 }
 
 // Return the SPIR-V binary version
-enum class SPIRVVersion {
-  SPIRV_1_0,
+enum class SPIRVVersion : uint32_t {
+  SPIRV_1_0 = 0,
+  // No SPIR-V 1.1 or 1.2 because they add purely OpenCL features.
   SPIRV_1_3,
-  SPIRV_1_5, // note that lack of command line option to specify it
+  SPIRV_1_4,
+  SPIRV_1_5,
 };
 
 SPIRVVersion SpvVersion();
