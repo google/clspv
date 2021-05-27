@@ -796,7 +796,7 @@ int PopulatePassManager(
   // This pass mucks with types to point where you shouldn't rely on DataLayout
   // anymore so leave this right before SPIR-V generation.
   pm->add(clspv::createUBOTypeTransformPass());
-  pm->add(clspv::createSPIRVProducerPass(*binaryStream, *SamplerMapEntries,
+  pm->add(clspv::createSPIRVProducerPass(binaryStream, SamplerMapEntries,
                                          OutputFormat == "c"));
 
   return 0;

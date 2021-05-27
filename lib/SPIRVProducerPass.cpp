@@ -40,6 +40,7 @@
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -86,6 +87,10 @@ enum LayoutIndex {
   kUniformLayout = 2,
   kNumLayouts = 3,
 };
+
+cl::opt<std::string> TestOutFile("producer-out-file", cl::init("test.spv"),
+                                 cl::ReallyHidden,
+                                 cl::desc("SPIRVProducer testing output file"));
 
 cl::opt<bool> ShowResourceVars("show-rv", cl::init(false), cl::Hidden,
                                cl::desc("Show resource variable creation"));
@@ -235,6 +240,8 @@ private:
 };
 
 struct SPIRVProducerPass final : public ModulePass {
+  static char ID;
+
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
   typedef DenseMap<Type *, SmallVector<SPIRVID, 3>> LayoutTypeMapType;
   typedef UniqueVector<Type *> TypeList;
@@ -253,15 +260,26 @@ struct SPIRVProducerPass final : public ModulePass {
       GlobalConstFuncMapType;
 
   explicit SPIRVProducerPass(
-      raw_pwrite_stream &out,
-      ArrayRef<std::pair<unsigned, std::string>> samplerMap,
+      raw_pwrite_stream *out,
+      SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
       bool outputCInitList)
       : ModulePass(ID), module(nullptr), samplerMap(samplerMap), out(out),
-        binaryTempOut(binaryTempUnderlyingVector), binaryOut(&out),
+        binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0) {
+        WorkgroupSizeVarID(0), TestOutput(false) {
+    addCapability(spv::CapabilityShader);
+    Ptr = this;
+  }
+
+  explicit SPIRVProducerPass()
+      : ModulePass(ID), module(nullptr), samplerMap(nullptr), out(nullptr),
+        binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
+        outputCInitList(false), patchBoundOffset(0), nextID(1),
+        OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
+        HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
+        WorkgroupSizeVarID(0), TestOutput(true) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -313,7 +331,7 @@ struct SPIRVProducerPass final : public ModulePass {
       HasVariablePointers = true;
     }
   }
-  ArrayRef<std::pair<unsigned, std::string>> &getSamplerMap() {
+  SmallVectorImpl<std::pair<unsigned, std::string>> *getSamplerMap() {
     return samplerMap;
   }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
@@ -517,7 +535,6 @@ struct SPIRVProducerPass final : public ModulePass {
                              uint32_t elem_size);
 
 private:
-  static char ID;
 
   Module *module;
 
@@ -527,8 +544,8 @@ private:
   // Map from clspv::BuiltinType to SPIRV Global Variable
   BuiltinConstantMapType BuiltinConstantMap;
 
-  ArrayRef<std::pair<unsigned, std::string>> samplerMap;
-  raw_pwrite_stream &out;
+  SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap;
+  raw_pwrite_stream *out;
 
   // TODO(dneto): Wouldn't it be better to always just emit a binary, and then
   // convert to other formats on demand?
@@ -597,6 +614,8 @@ private:
   // TODO(dneto): Remove this once drivers are fixed.
   SPIRVID WorkgroupSizeValueID;
   SPIRVID WorkgroupSizeVarID;
+
+  bool TestOutput;
 
   // Bookkeeping for mapping kernel arguments to resource variables.
   struct ResourceVarInfo {
@@ -678,17 +697,24 @@ public:
   static SPIRVProducerPass *Ptr;
 };
 
-char SPIRVProducerPass::ID;
-SPIRVProducerPass *SPIRVProducerPass::Ptr = nullptr;
-
 } // namespace
+
+char SPIRVProducerPass::ID = 0;
+SPIRVProducerPass *SPIRVProducerPass::Ptr = nullptr;
+INITIALIZE_PASS(SPIRVProducerPass, "SPIRVProducerPass", "SPIR-V output pass",
+                false, false)
 
 namespace clspv {
 ModulePass *
-createSPIRVProducerPass(raw_pwrite_stream &out,
-                        ArrayRef<std::pair<unsigned, std::string>> samplerMap,
+createSPIRVProducerPass(raw_pwrite_stream *out,
+                        SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
                         bool outputCInitList) {
   return new SPIRVProducerPass(out, samplerMap, outputCInitList);
+}
+
+ModulePass *
+createSPIRVProducerPass() {
+  return new SPIRVProducerPass();
 }
 } // namespace clspv
 
@@ -738,7 +764,12 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
   if (ShowProducerIR) {
     llvm::outs() << *module << "\n";
   }
-  binaryOut = outputCInitList ? &binaryTempOut : &out;
+  if (TestOutput) {
+    SmallVector<char, 10000> binary;
+    out = new raw_svector_ostream(binary);
+  }
+
+  binaryOut = outputCInitList ? &binaryTempOut : out;
 
   PopulateUBOTypeMaps();
   PopulateStructuredCFGMaps();
@@ -827,7 +858,14 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
       emit_word(a | (b << 8) | (c << 16) | (d << 24));
     }
     os << "}\n";
-    out << os.str();
+    *out << os.str();
+  }
+
+  if (TestOutput) {
+    std::error_code error;
+    raw_fd_ostream test_output(TestOutFile, error, llvm::sys::fs::FA_Write);
+    test_output << static_cast<raw_svector_ostream *>(out)->str();
+    delete out;
   }
 
   return false;
@@ -1102,7 +1140,7 @@ void SPIRVProducerPass::FindTypePerGlobalVar(GlobalVariable &GV) {
 void SPIRVProducerPass::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (module->getFunction(clspv::LiteralSamplerFunction()) ||
-      !getSamplerMap().empty()) {
+      (getSamplerMap() && !getSamplerMap()->empty())) {
     auto SamplerStructTy =
         StructType::getTypeByName(module->getContext(), "opencl.sampler_t");
     if (!SamplerStructTy) {
@@ -2158,7 +2196,6 @@ SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
 }
 
 void SPIRVProducerPass::GenerateSamplers() {
-  auto &sampler_map = getSamplerMap();
   SamplerLiteralToIDMap.clear();
   DenseMap<unsigned, unsigned> SamplerLiteralToDescriptorSetMap;
   DenseMap<unsigned, unsigned> SamplerLiteralToBindingMap;
@@ -2188,6 +2225,7 @@ void SPIRVProducerPass::GenerateSamplers() {
           dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
       auto sampler_value = third_param;
       if (clspv::Option::UseSamplerMap()) {
+        auto &sampler_map = *getSamplerMap();
         if (third_param >= sampler_map.size()) {
           errs() << "Out of bounds index to sampler map: " << third_param;
           llvm_unreachable("bad sampler init: out of bounds");
@@ -2221,7 +2259,7 @@ void SPIRVProducerPass::GenerateSamplers() {
 
     auto sampler_value = third_param;
     if (clspv::Option::UseSamplerMap()) {
-      sampler_value = sampler_map[third_param].first;
+      sampler_value = (*getSamplerMap())[third_param].first;
     }
 
     auto sampler_var_id = addSPIRVGlobalVariable(
@@ -3154,7 +3192,7 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
         dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
     auto sampler_value = third_param;
     if (clspv::Option::UseSamplerMap()) {
-      sampler_value = getSamplerMap()[third_param].first;
+      sampler_value = (*getSamplerMap())[third_param].first;
     }
 
     // Generate an OpLoad

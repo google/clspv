@@ -153,9 +153,10 @@ llvm::ModulePass *createReplaceOpenCLBuiltinPass();
 /// Create a pass to emit SPIR-V for the module.
 /// @return An LLVM module pass.
 llvm::ModulePass *createSPIRVProducerPass(
-    llvm::raw_pwrite_stream &out,
-    llvm::ArrayRef<std::pair<unsigned, std::string>> samplerMap,
+    llvm::raw_pwrite_stream *out,
+    llvm::SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
     bool outputCInitList);
+llvm::ModulePass *createSPIRVProducerPass();
 
 /// Undo LLVM's bitcast instructions with pointer type.
 /// @return An LLVM module pass.
