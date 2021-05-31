@@ -820,10 +820,12 @@ int ParseOptions(const int argc, const char *const argv[]) {
     }
   }
 
-  int llvmArgc = 2;
-  const char *llvmArgv[4];
+  int llvmArgc = 3;
+  const char *llvmArgv[5];
   llvmArgv[0] = argv[0];
   llvmArgv[1] = "-simplifycfg-sink-common=false";
+  // TODO(#738): find a better solution to this.
+  llvmArgv[2] = "-disable-vector-combine";
   if (!has_pre) {
     llvmArgv[llvmArgc++] = "-enable-pre=0";
   }
