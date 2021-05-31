@@ -1887,9 +1887,21 @@ SPIRVID SPIRVProducerPass::getSPIRVInt32Constant(uint32_t CstVal) {
   return getSPIRVValue(Cst);
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *Cst) {
+SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *C) {
   ValueMapType &VMap = getValueMap();
   const bool hack_undef = clspv::Option::HackUndef();
+
+  // Treat poison as an undef.
+  auto *Cst = C;
+  if (isa<PoisonValue>(Cst)) {
+    Cst = UndefValue::get(Cst->getType());
+  }
+
+  auto VI = VMap.find(Cst);
+  if (VI != VMap.end()) {
+    assert(VI->second.isValid());
+    return VI->second;
+  }
 
   SPIRVID RID;
 
