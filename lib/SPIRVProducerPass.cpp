@@ -3282,16 +3282,14 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
       // OpLoad
       // OpCopyLogical
       // OpStore
-      auto load_type_id = getSPIRVType(
-          src->getType()->getPointerElementType(),
-          GetPointerLayout(src->getType()->getPointerAddressSpace()));
+      auto load_type_id =
+          getSPIRVType(src->getType()->getPointerElementType(), src_layout);
       Ops << load_type_id << src << MemoryAccess
           << static_cast<uint32_t>(Alignment);
       auto load = addSPIRVInst(spv::OpLoad, Ops);
 
-      auto copy_type_id = getSPIRVType(
-          dst->getType()->getPointerElementType(),
-          GetPointerLayout(dst->getType()->getPointerAddressSpace()));
+      auto copy_type_id =
+          getSPIRVType(dst->getType()->getPointerElementType(), dst_layout);
       Ops.clear();
       Ops << copy_type_id << load;
       auto copy = addSPIRVInst(spv::OpCopyLogical, Ops);
