@@ -764,9 +764,11 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
   if (ShowProducerIR) {
     llvm::outs() << *module << "\n";
   }
+
+  SmallVector<char, 10000> *binary = nullptr;
   if (TestOutput) {
-    SmallVector<char, 10000> binary;
-    out = new raw_svector_ostream(binary);
+    binary = new SmallVector<char, 10000>();
+    out = new raw_svector_ostream(*binary);
   }
 
   binaryOut = outputCInitList ? &binaryTempOut : out;
@@ -866,6 +868,7 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
     raw_fd_ostream test_output(TestOutFile, error, llvm::sys::fs::FA_Write);
     test_output << static_cast<raw_svector_ostream *>(out)->str();
     delete out;
+    delete binary;
   }
 
   return false;
@@ -3267,14 +3270,13 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
     auto dst_layout =
         GetPointerLayout(dst->getType()->getPointerAddressSpace());
     auto src_layout =
-        GetPointerLayout(dst->getType()->getPointerAddressSpace());
+        GetPointerLayout(src->getType()->getPointerAddressSpace());
     auto dst_id =
         getSPIRVType(dst->getType()->getPointerElementType(), dst_layout);
     auto src_id =
         getSPIRVType(src->getType()->getPointerElementType(), src_layout);
     SPIRVOperandVec Ops;
     if (dst_id.get() != src_id.get()) {
-      llvm::errs() << "Call: " << *Call << "\n";
       assert(Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4);
       // Types differ so generate:
       // OpLoad
