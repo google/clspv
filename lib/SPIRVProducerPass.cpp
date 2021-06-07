@@ -81,13 +81,6 @@ using namespace mdconst;
 
 namespace {
 
-enum LayoutIndex {
-  kNoLayout = 0,
-  kStandardLayout = 1,
-  kUniformLayout = 2,
-  kNumLayouts = 3,
-};
-
 cl::opt<std::string> TestOutFile("producer-out-file", cl::init("test.spv"),
                                  cl::ReallyHidden,
                                  cl::desc("SPIRVProducer testing output file"));
@@ -243,7 +236,7 @@ struct SPIRVProducerPass final : public ModulePass {
   static char ID;
 
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
-  typedef DenseMap<Type *, SmallVector<SPIRVID, 3>> LayoutTypeMapType;
+  typedef DenseMap<Type *, SmallVector<SPIRVID, 2>> LayoutTypeMapType;
   typedef UniqueVector<Type *> TypeList;
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
   typedef std::list<SPIRVID> SPIRVIDListType;
@@ -366,14 +359,14 @@ struct SPIRVProducerPass final : public ModulePass {
 
   // Lookup or create Types, Constants.
   // Returns SPIRVID once it has been created.
-  SPIRVID getSPIRVType(Type *Ty, LayoutIndex layout);
+  SPIRVID getSPIRVType(Type *Ty, bool needs_layout);
   SPIRVID getSPIRVType(Type *Ty);
   SPIRVID getSPIRVConstant(Constant *Cst);
   SPIRVID getSPIRVInt32Constant(uint32_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V);
 
-  LayoutIndex GetPointerLayout(unsigned aspace);
+  bool PointerRequiresLayout(unsigned aspace);
 
   SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
 
@@ -1537,43 +1530,37 @@ Type *SPIRVProducerPass::CanonicalType(Type *type) {
   return type;
 }
 
-LayoutIndex SPIRVProducerPass::GetPointerLayout(unsigned aspace) {
-  LayoutIndex layout = LayoutIndex::kNoLayout;
+bool SPIRVProducerPass::PointerRequiresLayout(unsigned aspace) {
   if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
     switch (aspace) {
     case AddressSpace::PushConstant:
     case AddressSpace::Global:
-      layout = LayoutIndex::kStandardLayout;
-      break;
     case AddressSpace::Constant:
-      layout = Option::ConstantArgsInUniformBuffer()
-                   ? LayoutIndex::kUniformLayout
-                   : LayoutIndex::kStandardLayout;
-      break;
+      return true;
     default:
       break;
     }
   }
-  return layout;
+  return false;;
 }
 
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   // Prior to 1.4, layout decorations are more relaxed so we can reuse a laid
   // out type in non-laid out storage classes.
-  LayoutIndex layout = LayoutIndex::kNoLayout;
+  bool needs_layout = false;
   if (auto ptr_ty = dyn_cast<PointerType>(Ty)) {
-    layout = GetPointerLayout(ptr_ty->getPointerAddressSpace());
+    needs_layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
   }
-  return getSPIRVType(Ty, layout);
+  return getSPIRVType(Ty, needs_layout);
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
+SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   // Only pointers, structs and arrays should have layout decorations.
   if (!(isa<PointerType>(Ty) || isa<ArrayType>(Ty) || isa<StructType>(Ty))) {
-    layout = LayoutIndex::kNoLayout;
+    needs_layout = false;
   }
+  const unsigned layout = needs_layout ? 1 : 0;
 
-  assert(layout < LayoutIndex::kNumLayouts);
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
     assert(layout < TI->second.size());
@@ -1588,7 +1575,14 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
      if (CanonicalTI != TypeMap.end()) {
        assert(layout < CanonicalTI->second.size());
        if (CanonicalTI->second[layout].isValid()) {
-         return CanonicalTI->second[layout];
+         //return CanonicalTI->second[layout];
+         auto id = CanonicalTI->second[layout];
+         auto &base = TypeMap[Ty];
+         if (base.empty()) {
+           base.resize(2);
+         }
+         base[layout] = id;
+         return id;
        }
      }
   }
@@ -1620,7 +1614,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
       auto PointeeTy = PTy->getElementType();
       if (PointeeTy->isStructTy() &&
           dyn_cast<StructType>(PointeeTy)->isOpaque()) {
-        RID = getSPIRVType(PointeeTy, layout);
+        RID = getSPIRVType(PointeeTy, needs_layout);
         break;
       }
     }
@@ -1635,7 +1629,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
     SPIRVOperandVec Ops;
 
     Ops << GetStorageClass(AddrSpace)
-        << getSPIRVType(PTy->getElementType(), layout);
+        << getSPIRVType(PTy->getElementType(), needs_layout);
 
     RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
     break;
@@ -1691,11 +1685,11 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
         SPIRVID SampledTyID;
         // None of the sampled types have a layout.
         if (STy->getName().contains(".float")) {
-          SampledTyID = getSPIRVType(Type::getFloatTy(Canonical->getContext()),
-                                     LayoutIndex::kNoLayout);
+          SampledTyID =
+              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
         } else if (STy->getName().contains(".uint")) {
-          SampledTyID = getSPIRVType(Type::getInt32Ty(Canonical->getContext()),
-                                     LayoutIndex::kNoLayout);
+          SampledTyID =
+              getSPIRVType(Type::getInt32Ty(Canonical->getContext()), false);
         } else if (STy->getName().contains(".int")) {
           // Generate a signed 32-bit integer if necessary.
           if (int32ID == 0) {
@@ -1713,8 +1707,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
           }
         } else {
           // This was likely an UndefValue.
-          SampledTyID = getSPIRVType(Type::getFloatTy(Canonical->getContext()),
-                                     LayoutIndex::kNoLayout);
+          SampledTyID =
+              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
         }
         Ops << SampledTyID;
 
@@ -1777,7 +1771,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
     SPIRVOperandVec Ops;
 
     for (auto *EleTy : STy->elements()) {
-      Ops << getSPIRVType(EleTy, layout);
+      Ops << getSPIRVType(EleTy, needs_layout);
     }
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeStruct, Ops);
@@ -1785,8 +1779,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
     // Generate OpMemberDecorate unless we are generating it for the canonical
     // type.
     StructType *canonical = cast<StructType>(CanonicalType(STy));
-    bool use_layout = (Option::SpvVersion() < SPIRVVersion::SPIRV_1_4) ||
-                      (layout != LayoutIndex::kNoLayout);
+    bool use_layout =
+        (Option::SpvVersion() < SPIRVVersion::SPIRV_1_4) || needs_layout;
     if (TypesNeedingLayout.idFor(STy) &&
         (canonical == STy || !TypesNeedingLayout.idFor(canonical)) &&
         use_layout) {
@@ -1835,8 +1829,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
     } else {
       if (!clspv::Option::Int8Support() && bit_width == 8) {
         // i8 is added to TypeMap as i32.
-        RID = getSPIRVType(Type::getIntNTy(Canonical->getContext(), 32),
-                           LayoutIndex::kNoLayout);
+        RID = getSPIRVType(Type::getIntNTy(Canonical->getContext(), 32), false);
       } else {
         SPIRVOperandVec Ops;
         Ops << bit_width << 0 /* not signed */;
@@ -1876,13 +1869,12 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
       // OpTypeRuntimeArray
       // Ops[0] = Element Type ID
       SPIRVOperandVec Ops;
-      Ops << getSPIRVType(EleTy, layout);
+      Ops << getSPIRVType(EleTy, needs_layout);
 
       RID = addSPIRVInst<kTypes>(spv::OpTypeRuntimeArray, Ops);
 
       if (Hack_generate_runtime_array_stride_early &&
-          (Option::SpvVersion() < SPIRVVersion::SPIRV_1_4 ||
-           layout != LayoutIndex::kNoLayout)) {
+          (Option::SpvVersion() < SPIRVVersion::SPIRV_1_4 || needs_layout)) {
         // Generate OpDecorate.
 
         // Ops[0] = Target ID
@@ -1919,7 +1911,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
       // Ops[1] = Array Length Constant ID
       SPIRVOperandVec Ops;
 
-      Ops << getSPIRVType(ArrTy->getElementType(), layout) << CstLength;
+      Ops << getSPIRVType(ArrTy->getElementType(), needs_layout) << CstLength;
 
       RID = addSPIRVInst<kTypes>(spv::OpTypeArray, Ops);
     }
@@ -1975,7 +1967,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
         }
       }
 
-      Ops << getSPIRVType(ParamTy, layout);
+      Ops << getSPIRVType(ParamTy, needs_layout);
     }
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeFunction, Ops);
@@ -1986,11 +1978,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
   if (RID.isValid()) {
     auto& entry = TypeMap[Canonical];
     if (entry.empty()) {
-      if (Option::SpvVersion() < Option::SPIRVVersion::SPIRV_1_4) {
-        entry.resize(1);
-      } else {
-        entry.resize(LayoutIndex::kNumLayouts);
-      }
+      entry.resize(2);
     }
     entry[layout] = RID;
     //llvm::errs() << "  Mapped canonical (" << *Canonical << ") to (" << layout << ") " << RID.get() << "\n";
@@ -1999,11 +1987,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, LayoutIndex layout) {
       // Also cache the original type.
       auto &base_entry = TypeMap[Ty];
       if (base_entry.empty()) {
-        if (Option::SpvVersion() < Option::SPIRVVersion::SPIRV_1_4) {
-          base_entry.resize(1);
-        } else {
-          base_entry.resize(LayoutIndex::kNumLayouts);
-        }
+        base_entry.resize(2);
       }
       base_entry[layout] = RID;
       //llvm::errs() << "  Mapped (" << *Ty << ") to (" << layout << ") " << RID.get() << "\n";
@@ -3268,9 +3252,9 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
     auto dst = Call->getArgOperand(0);
     auto src = Call->getArgOperand(1);
     auto dst_layout =
-        GetPointerLayout(dst->getType()->getPointerAddressSpace());
+        PointerRequiresLayout(dst->getType()->getPointerAddressSpace());
     auto src_layout =
-        GetPointerLayout(src->getType()->getPointerAddressSpace());
+        PointerRequiresLayout(src->getType()->getPointerAddressSpace());
     auto dst_id =
         getSPIRVType(dst->getType()->getPointerElementType(), dst_layout);
     auto src_id =
@@ -4511,7 +4495,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     if (LD->getType()->isPointerTy()) {
       result_type_id = getSPIRVType(LD->getType());
     } else {
-      auto layout = GetPointerLayout(ptr_ty->getPointerAddressSpace());
+      auto layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
       result_type_id = getSPIRVType(LD->getType(), layout);
     }
     SPIRVOperandVec Ops;
@@ -4547,13 +4531,12 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
     auto ptr_ty = ptr->getType();
     auto value = ST->getValueOperand();
     auto value_ty = value->getType();
-    auto layout = GetPointerLayout(ptr_ty->getPointerAddressSpace());
-    if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
-        layout != LayoutIndex::kNoLayout &&
+    auto needs_layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
+    if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4 && needs_layout &&
         (value_ty->isArrayTy() || value_ty->isStructTy())) {
       // Generate an OpCopyLogical to convert from the non-laid type to the
       // laid out type.
-      Ops << getSPIRVType(value_ty, layout) << value;
+      Ops << getSPIRVType(value_ty, needs_layout) << value;
       RID = addSPIRVInst(spv::OpCopyLogical, Ops);
       Ops.clear();
     }
@@ -4895,46 +4878,42 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
   // instructions we generated earlier.
   DenseSet<uint32_t> seen;
   for (auto *type : getTypesNeedingArrayStride()) {
+    //llvm::errs() << "Type for array stride: " << *type << "\n";
     auto TI = TypeMap.find(type);
-    // Add the array stride for each layout of this array that we generated.
-    for (uint32_t i = LayoutIndex::kNoLayout; i < LayoutIndex::kNumLayouts;
-         ++i) {
-      if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
-          i == LayoutIndex::kNoLayout) {
-        continue;
-      }
-      if (TI->second.size() <= i || !TI->second[i].isValid())
-        continue;
+    //auto TI = TypeMap.find(CanonicalType(type));
+    unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
+    assert(TI != TypeMap.end());
+    assert(index < TI->second.size());
+    if (!TI->second[index].isValid())
+      continue;
 
-      auto id = TI->second[i];
-      if (!seen.insert(id.get()).second)
-        continue;
+    auto id = TI->second[index];
+    if (!seen.insert(id.get()).second)
+      continue;
 
-      Type *elemTy = nullptr;
-      if (auto *ptrTy = dyn_cast<PointerType>(type)) {
-        elemTy = ptrTy->getElementType();
-      } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
-        elemTy = arrayTy->getElementType();
-      } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
-        elemTy = vecTy->getElementType();
-      } else {
-        errs() << "Unhandled strided type " << *type << "\n";
-        llvm_unreachable("Unhandled strided type");
-      }
-
-      // Ops[0] = Target ID
-      // Ops[1] = Decoration (ArrayStride)
-      // Ops[2] = Stride number (Literal Number)
-      SPIRVOperandVec Ops;
-
-      // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
-      const uint32_t stride =
-          static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
-
-      Ops << id << spv::DecorationArrayStride << stride;
-
-      addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+    Type *elemTy = nullptr;
+    if (auto *ptrTy = dyn_cast<PointerType>(type)) {
+      elemTy = ptrTy->getElementType();
+    } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
+      elemTy = arrayTy->getElementType();
+    } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
+      elemTy = vecTy->getElementType();
+    } else {
+      errs() << "Unhandled strided type " << *type << "\n";
+      llvm_unreachable("Unhandled strided type");
     }
+
+    // Ops[0] = Target ID
+    // Ops[1] = Decoration (ArrayStride)
+    // Ops[2] = Stride number (Literal Number)
+    SPIRVOperandVec Ops;
+
+    // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
+    const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
+
+    Ops << id << spv::DecorationArrayStride << stride;
+
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
 }
 
