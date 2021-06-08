@@ -277,9 +277,9 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
     }
   };
 
+  SmallPtrSet<Instruction *, 8> BitCastsToForget;
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memcpy")) {
-      SmallPtrSet<Instruction *, 8> BitCastsToForget;
       SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
 
       for (auto U : F.users()) {
@@ -433,10 +433,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         if (isa<BitCastInst>(Arg1))
           BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg1));
       }
-      for (auto *Inst : BitCastsToForget) {
-        Inst->eraseFromParent();
-      }
     }
+  }
+  for (auto *Inst : BitCastsToForget) {
+    Inst->eraseFromParent();
   }
 
   return Changed;
