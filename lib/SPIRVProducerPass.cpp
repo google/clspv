@@ -3281,16 +3281,22 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
     // Ops[2] = Memory Access
     // Ops[3] = Alignment
 
-    auto IsVolatile =
-        dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue() != 0;
+    const auto volatile_arg = SpvVersion() >= SPIRVVersion::SPIRV_1_4 ? 4 : 3;
+    auto IsVolatile = dyn_cast<ConstantInt>(Call->getArgOperand(volatile_arg))
+                          ->getZExtValue() != 0;
 
     auto VolatileMemoryAccess = (IsVolatile) ? spv::MemoryAccessVolatileMask
                                              : spv::MemoryAccessMaskNone;
 
     auto MemoryAccess = VolatileMemoryAccess | spv::MemoryAccessAlignedMask;
 
-    auto Alignment =
+    auto DstAlignment =
         dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
+    auto SrcAlignment = DstAlignment;
+    if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
+      SrcAlignment =
+          dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue();
+    }
 
     // OpCopyMemory only works if the pointer element type are the same id. If
     // we are generating code for SPIR-V 1.4 or later, this may not be the
@@ -3315,7 +3321,7 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
       auto load_type_id =
           getSPIRVType(src->getType()->getPointerElementType(), src_layout);
       Ops << load_type_id << src << MemoryAccess
-          << static_cast<uint32_t>(Alignment);
+          << static_cast<uint32_t>(SrcAlignment);
       auto load = addSPIRVInst(spv::OpLoad, Ops);
 
       auto copy_type_id =
@@ -3325,10 +3331,13 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
       auto copy = addSPIRVInst(spv::OpCopyLogical, Ops);
 
       Ops.clear();
-      Ops << dst << copy << MemoryAccess << static_cast<uint32_t>(Alignment);
+      Ops << dst << copy << MemoryAccess << static_cast<uint32_t>(DstAlignment);
       RID = addSPIRVInst(spv::OpStore, Ops);
     } else {
-      Ops << dst << src << MemoryAccess << static_cast<uint32_t>(Alignment);
+      Ops << dst << src << MemoryAccess << static_cast<uint32_t>(DstAlignment);
+      if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
+        Ops << MemoryAccess << static_cast<uint32_t>(SrcAlignment);
+      }
 
       RID = addSPIRVInst(spv::OpCopyMemory, Ops);
     }
