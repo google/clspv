@@ -1590,8 +1590,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
      }
   }
 
-  //llvm::errs() << "Mapping type: (" << layout << ") " << *Ty << "\n";
-
   // Perform the mapping with the canonical type.
 
   const auto &DL = module->getDataLayout();
@@ -1984,7 +1982,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
       entry.resize(2);
     }
     entry[layout] = RID;
-    //llvm::errs() << "  Mapped canonical (" << *Canonical << ") to (" << layout << ") " << RID.get() << "\n";
 
     if (Canonical != Ty) {
       // Also cache the original type.
@@ -1993,7 +1990,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         base_entry.resize(2);
       }
       base_entry[layout] = RID;
-      //llvm::errs() << "  Mapped (" << *Ty << ") to (" << layout << ") " << RID.get() << "\n";
     }
   }
   return RID;
