@@ -771,7 +771,11 @@ int PopulatePassManager(
   // pointers.
   pm->add(clspv::createRemoveUnusedArgumentsPass());
 
-  pm->add(clspv::createSplatSelectConditionPass());
+  // SPIR-V 1.4 and higher do not need to splat scalar conditions for vector
+  // data.
+  if (clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_4) {
+    pm->add(clspv::createSplatSelectConditionPass());
+  }
   pm->add(clspv::createSignedCompareFixupPass());
   // This pass generates insertions that need to be rewritten.
   pm->add(clspv::createScalarizePass());
