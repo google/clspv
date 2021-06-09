@@ -3353,6 +3353,18 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
                                             const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
+  auto GetExtendMask = [this](Type *sample_type,
+                              bool is_int_image) -> uint32_t {
+    if (SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
+        sample_type->getScalarType()->isIntegerTy()) {
+      if (is_int_image)
+        return spv::ImageOperandsSignExtendMask;
+      else
+        return spv::ImageOperandsZeroExtendMask;
+    }
+    return 0;
+  };
+
   LLVMContext &Context = module->getContext();
   switch (FuncInfo.getType()) {
   case Builtins::kReadImagef:
@@ -3404,9 +3416,11 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
         result_type = getSPIRVType(Call->getType());
       }
 
+      uint32_t mask = spv::ImageOperandsLodMask |
+                      GetExtendMask(Call->getType(), is_int_image);
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
       Ops << result_type << SampledImageID << Coordinate
-          << spv::ImageOperandsLodMask << CstFP0;
+          << mask << CstFP0;
 
       RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
 
@@ -3440,6 +3454,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
       }
 
       Ops << result_type << Image << Coordinate;
+      uint32_t mask = GetExtendMask(Call->getType(), is_int_image);
+      if (mask != 0) Ops << mask;
       RID = addSPIRVInst(spv::OpImageRead, Ops);
 
       if (is_int_image) {
@@ -3476,7 +3492,9 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
         result_type = getSPIRVType(Call->getType());
       }
 
-      Ops << result_type << Image << Coordinate << spv::ImageOperandsLodMask
+      uint32_t mask = spv::ImageOperandsLodMask |
+                      GetExtendMask(Call->getType(), is_int_image);
+      Ops << result_type << Image << Coordinate << mask
           << getSPIRVInt32Constant(0);
 
       RID = addSPIRVInst(spv::OpImageFetch, Ops);
@@ -3521,6 +3539,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
       Ops.clear();
     }
     Ops << Image << Coordinate << TexelID;
+    uint32_t mask = GetExtendMask(Texel->getType(), is_int_image);
+    if (mask != 0) Ops << mask;
     RID = addSPIRVInst(spv::OpImageWrite, Ops);
 
     // Image writes require StorageImageWriteWithoutFormat.
