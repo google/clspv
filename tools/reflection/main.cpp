@@ -66,6 +66,7 @@ int main(const int argc, const char *const argv[]) {
       case SPV_ENV_UNIVERSAL_1_5:
       case SPV_ENV_VULKAN_1_0:
       case SPV_ENV_VULKAN_1_1:
+      case SPV_ENV_VULKAN_1_1_SPIRV_1_4:
       case SPV_ENV_VULKAN_1_2:
         break;
       default:

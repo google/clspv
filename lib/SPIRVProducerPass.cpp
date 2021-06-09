@@ -514,7 +514,8 @@ struct SPIRVProducerPass final : public ModulePass {
   //
   // Add global variable and capture entry point interface
   SPIRVID addSPIRVGlobalVariable(const SPIRVID &TypeID, spv::StorageClass SC,
-                                 const SPIRVID &InitID = SPIRVID());
+                                 const SPIRVID &InitID = SPIRVID(),
+                                 bool add_interface = false);
 
   SPIRVID getReflectionImport();
   void GenerateReflection();
@@ -1446,7 +1447,8 @@ SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
 
 SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
                                                   spv::StorageClass SC,
-                                                  const SPIRVID &InitID) {
+                                                  const SPIRVID &InitID,
+                                                  bool add_interface) {
   // Generate OpVariable.
   //
   // Ops[0] : Result Type ID
@@ -1461,7 +1463,8 @@ SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
 
   SPIRVID VID = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
 
-  if (SC == spv::StorageClassInput) {
+  if (SC == spv::StorageClassInput ||
+      (add_interface && SpvVersion() >= SPIRVVersion::SPIRV_1_4)) {
     getEntryPointInterfacesList().push_back(VID);
   }
 
@@ -2619,8 +2622,13 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     }
   }
 
+  // All private, module private, and local global variables can be added to
+  // interfaces conservatively.
+  const bool interface =
+      (AS == AddressSpace::Private || AS == AddressSpace::ModuleScopePrivate ||
+       AS == AddressSpace::Local);
   SPIRVID var_id =
-      addSPIRVGlobalVariable(getSPIRVType(Ty), spvSC, InitializerID);
+      addSPIRVGlobalVariable(getSPIRVType(Ty), spvSC, InitializerID, interface);
 
   VMap[&GV] = var_id;
 
@@ -2813,8 +2821,8 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     addSPIRVInst<kCapabilities>(spv::OpCapability, Capability);
   }
 
-  // Always add the storage buffer extension
-  {
+  // Storage buffer and variable pointer extensions were made core in SPIR-V 1.3.
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_3) {
     //
     // Generate OpExtension.
     //
@@ -2822,15 +2830,15 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     //
     addSPIRVInst<kExtensions>(spv::OpExtension,
                               "SPV_KHR_storage_buffer_storage_class");
-  }
 
-  if (hasVariablePointers() || hasVariablePointersStorageBuffer()) {
-    //
-    // Generate OpExtension.
-    //
-    // Ops[0] = Name (Literal String)
-    //
-    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_variable_pointers");
+    if (hasVariablePointers() || hasVariablePointersStorageBuffer()) {
+      //
+      // Generate OpExtension.
+      //
+      // Ops[0] = Name (Literal String)
+      //
+      addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_variable_pointers");
+    }
   }
 
   //
@@ -2861,6 +2869,49 @@ void SPIRVProducerPass::GenerateModuleInfo() {
 
     for (auto &Interface : EntryPointInterfaces) {
       Ops << Interface;
+    }
+
+    // Starting in SPIR-V 1.4, all statically used global variables must be
+    // included in the interface. Private and statically-sized workgroup
+    // variables are added to all entry points. Kernel arguments are handled
+    // here.
+    if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
+      auto *F = dyn_cast<Function>(EntryPoint.first);
+      assert(F);
+      assert(F->getCallingConv() == CallingConv::SPIR_KERNEL);
+
+      auto &resource_var_at_index = FunctionToResourceVarsMap[F];
+      for (auto *info : resource_var_at_index) {
+        if (info) {
+          Ops << info->var_id;
+        }
+      }
+
+      auto local_spec_id_md =
+          module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+      if (local_spec_id_md) {
+        for (auto spec_id_op : local_spec_id_md->operands()) {
+          if (dyn_cast<Function>(
+                  dyn_cast<ValueAsMetadata>(spec_id_op->getOperand(0))
+                      ->getValue()) == F) {
+            int64_t spec_id =
+                mdconst::extract<ConstantInt>(spec_id_op->getOperand(2))
+                    ->getSExtValue();
+            if (spec_id > 0) {
+              auto &info = LocalSpecIdInfoMap[spec_id];
+              Ops << info.variable_id;
+            }
+          }
+        }
+      }
+
+      // If the kernel uses the global push constant interface it will not be
+      // covered by the resource variable iteration above.
+      if (GetPodArgsImpl(*F) == PodArgImpl::kGlobalPushConstant) {
+        auto *PC = module->getGlobalVariable(clspv::PushConstantsVariableName());
+        assert(PC);
+        Ops << getValueMap()[PC];
+      }
     }
 
     addSPIRVInst<kEntryPoints>(spv::OpEntryPoint, Ops);
@@ -4878,9 +4929,7 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
   // instructions we generated earlier.
   DenseSet<uint32_t> seen;
   for (auto *type : getTypesNeedingArrayStride()) {
-    //llvm::errs() << "Type for array stride: " << *type << "\n";
     auto TI = TypeMap.find(type);
-    //auto TI = TypeMap.find(CanonicalType(type));
     unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
     assert(TI != TypeMap.end());
     assert(index < TI->second.size());
