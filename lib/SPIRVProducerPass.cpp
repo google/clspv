@@ -699,17 +699,14 @@ INITIALIZE_PASS(SPIRVProducerPass, "SPIRVProducerPass", "SPIR-V output pass",
                 false, false)
 
 namespace clspv {
-ModulePass *
-createSPIRVProducerPass(raw_pwrite_stream *out,
-                        SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
-                        bool outputCInitList) {
+ModulePass *createSPIRVProducerPass(
+    raw_pwrite_stream *out,
+    SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
+    bool outputCInitList) {
   return new SPIRVProducerPass(out, samplerMap, outputCInitList);
 }
 
-ModulePass *
-createSPIRVProducerPass() {
-  return new SPIRVProducerPass();
-}
+ModulePass *createSPIRVProducerPass() { return new SPIRVProducerPass(); }
 } // namespace clspv
 
 namespace {
@@ -873,21 +870,21 @@ void SPIRVProducerPass::outputHeader() {
                    sizeof(spv::MagicNumber));
   uint32_t minor = 0;
   switch (SpvVersion()) {
-    case SPIRVVersion::SPIRV_1_0:
-      minor = 0;
-      break;
-    case SPIRVVersion::SPIRV_1_3:
-      minor = 3;
-      break;
-    case SPIRVVersion::SPIRV_1_4:
-      minor = 4;
-      break;
-    case SPIRVVersion::SPIRV_1_5:
-      minor = 5;
-      break;
-    default:
-      llvm_unreachable("unhandled spir-v version");
-      break;
+  case SPIRVVersion::SPIRV_1_0:
+    minor = 0;
+    break;
+  case SPIRVVersion::SPIRV_1_3:
+    minor = 3;
+    break;
+  case SPIRVVersion::SPIRV_1_4:
+    minor = 4;
+    break;
+  case SPIRVVersion::SPIRV_1_5:
+    minor = 5;
+    break;
+  default:
+    llvm_unreachable("unhandled spir-v version");
+    break;
   }
   uint32_t version = (1 << 16) | (minor << 8);
   binaryOut->write(reinterpret_cast<const char *>(&version), sizeof(version));
@@ -1544,7 +1541,7 @@ bool SPIRVProducerPass::PointerRequiresLayout(unsigned aspace) {
       break;
     }
   }
-  return false;;
+  return false;
 }
 
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
@@ -1574,20 +1571,20 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
 
   auto Canonical = CanonicalType(Ty);
   if (Canonical != Ty) {
-     auto CanonicalTI = TypeMap.find(Canonical);
-     if (CanonicalTI != TypeMap.end()) {
-       assert(layout < CanonicalTI->second.size());
-       if (CanonicalTI->second[layout].isValid()) {
-         //return CanonicalTI->second[layout];
-         auto id = CanonicalTI->second[layout];
-         auto &base = TypeMap[Ty];
-         if (base.empty()) {
-           base.resize(2);
-         }
-         base[layout] = id;
-         return id;
-       }
-     }
+    auto CanonicalTI = TypeMap.find(Canonical);
+    if (CanonicalTI != TypeMap.end()) {
+      assert(layout < CanonicalTI->second.size());
+      if (CanonicalTI->second[layout].isValid()) {
+        // return CanonicalTI->second[layout];
+        auto id = CanonicalTI->second[layout];
+        auto &base = TypeMap[Ty];
+        if (base.empty()) {
+          base.resize(2);
+        }
+        base[layout] = id;
+        return id;
+      }
+    }
   }
 
   // Perform the mapping with the canonical type.
@@ -1977,7 +1974,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   }
 
   if (RID.isValid()) {
-    auto& entry = TypeMap[Canonical];
+    auto &entry = TypeMap[Canonical];
     if (entry.empty()) {
       entry.resize(2);
     }
@@ -2817,7 +2814,8 @@ void SPIRVProducerPass::GenerateModuleInfo() {
     addSPIRVInst<kCapabilities>(spv::OpCapability, Capability);
   }
 
-  // Storage buffer and variable pointer extensions were made core in SPIR-V 1.3.
+  // Storage buffer and variable pointer extensions were made core in SPIR-V
+  // 1.3.
   if (SpvVersion() < SPIRVVersion::SPIRV_1_3) {
     //
     // Generate OpExtension.
@@ -2904,7 +2902,8 @@ void SPIRVProducerPass::GenerateModuleInfo() {
       // If the kernel uses the global push constant interface it will not be
       // covered by the resource variable iteration above.
       if (GetPodArgsImpl(*F) == PodArgImpl::kGlobalPushConstant) {
-        auto *PC = module->getGlobalVariable(clspv::PushConstantsVariableName());
+        auto *PC =
+            module->getGlobalVariable(clspv::PushConstantsVariableName());
         assert(PC);
         Ops << getValueMap()[PC];
       }
@@ -3326,12 +3325,10 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
       auto copy = addSPIRVInst(spv::OpCopyLogical, Ops);
 
       Ops.clear();
-      Ops << dst << copy << MemoryAccess
-          << static_cast<uint32_t>(Alignment);
+      Ops << dst << copy << MemoryAccess << static_cast<uint32_t>(Alignment);
       RID = addSPIRVInst(spv::OpStore, Ops);
     } else {
-      Ops << dst << src << MemoryAccess
-          << static_cast<uint32_t>(Alignment);
+      Ops << dst << src << MemoryAccess << static_cast<uint32_t>(Alignment);
 
       RID = addSPIRVInst(spv::OpCopyMemory, Ops);
     }
@@ -3415,8 +3412,7 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
       uint32_t mask = spv::ImageOperandsLodMask |
                       GetExtendMask(Call->getType(), is_int_image);
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
-      Ops << result_type << SampledImageID << Coordinate
-          << mask << CstFP0;
+      Ops << result_type << SampledImageID << Coordinate << mask << CstFP0;
 
       RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
 
@@ -3451,7 +3447,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
 
       Ops << result_type << Image << Coordinate;
       uint32_t mask = GetExtendMask(Call->getType(), is_int_image);
-      if (mask != 0) Ops << mask;
+      if (mask != 0)
+        Ops << mask;
       RID = addSPIRVInst(spv::OpImageRead, Ops);
 
       if (is_int_image) {
@@ -3536,7 +3533,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
     }
     Ops << Image << Coordinate << TexelID;
     uint32_t mask = GetExtendMask(Texel->getType(), is_int_image);
-    if (mask != 0) Ops << mask;
+    if (mask != 0)
+      Ops << mask;
     RID = addSPIRVInst(spv::OpImageWrite, Ops);
 
     // Image writes require StorageImageWriteWithoutFormat.
