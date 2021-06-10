@@ -65,7 +65,6 @@ echo $(date): Starting SwiftShader build...
 SWIFTSHADER_SRC="$BUILD_ROOT/github/swiftshader"
 SWIFTSHADER_BUILD="$SWIFTSHADER_SRC/kokoro-build"
 git clone https://swiftshader.googlesource.com/SwiftShader.git "$SWIFTSHADER_SRC"
-cd "$SWIFTSHADER_SRC" && git submodule update --init
 mkdir "$SWIFTSHADER_BUILD" && cd "$SWIFTSHADER_BUILD"
 cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DSWIFTSHADER_WARNINGS_AS_ERRORS=OFF  -DSWIFTSHADER_BUILD_VULKAN=ON -DSWIFTSHADER_BUILD_EGL=OFF -DSWIFTSHADER_BUILD_GLESv2=OFF \
