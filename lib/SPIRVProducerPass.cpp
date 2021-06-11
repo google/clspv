@@ -3934,9 +3934,17 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
         }
       }
     } else {
-      // A real function call (not builtin)
-      // Call instruction is deferred because it needs function's ID.
-      RID = addSPIRVPlaceholder(Call);
+      switch (Call->getIntrinsicID()) {
+      // These LLVM intrinsics have no SPV equivalent.
+      // Because they are optimiser hints, we can safely discard them.
+      case Intrinsic::experimental_noalias_scope_decl:
+        break;
+      default:
+        // A real function call (not builtin)
+        // Call instruction is deferred because it needs function's ID.
+        RID = addSPIRVPlaceholder(Call);
+        break;
+      }
     }
 
     break;
