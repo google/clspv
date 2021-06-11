@@ -4147,6 +4147,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         getTypesNeedingArrayStride().insert(GEP->getPointerOperandType());
         break;
       case spv::StorageClassWorkgroup:
+      case spv::StorageClassFunction:
         break;
       default:
         llvm_unreachable(
