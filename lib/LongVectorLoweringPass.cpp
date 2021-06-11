@@ -1098,7 +1098,7 @@ Type *LongVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy()) {
+      Ty->isLabelTy() || Ty->isMetadataTy()) {
     // No lowering required.
     return nullptr;
   }
