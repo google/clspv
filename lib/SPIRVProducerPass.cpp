@@ -141,12 +141,12 @@ public:
 enum SPIRVOperandType { NUMBERID, LITERAL_WORD, LITERAL_DWORD, LITERAL_STRING };
 
 struct SPIRVOperand {
-  explicit SPIRVOperand(SPIRVOperandType Ty, uint32_t Num) : Type(Ty) {
+  SPIRVOperand(SPIRVOperandType Ty, uint32_t Num) : Type(Ty) {
     LiteralNum[0] = Num;
   }
-  explicit SPIRVOperand(SPIRVOperandType Ty, const char *Str)
+  SPIRVOperand(SPIRVOperandType Ty, const char *Str)
       : Type(Ty), LiteralStr(Str) {}
-  explicit SPIRVOperand(SPIRVOperandType Ty, StringRef Str)
+  SPIRVOperand(SPIRVOperandType Ty, StringRef Str)
       : Type(Ty), LiteralStr(Str) {}
   explicit SPIRVOperand(ArrayRef<uint32_t> NumVec) {
     auto sz = NumVec.size();
@@ -252,7 +252,7 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
 
-  explicit SPIRVProducerPass(
+  SPIRVProducerPass(
       raw_pwrite_stream *out,
       SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
       bool outputCInitList)
@@ -266,7 +266,7 @@ struct SPIRVProducerPass final : public ModulePass {
     Ptr = this;
   }
 
-  explicit SPIRVProducerPass()
+  SPIRVProducerPass()
       : ModulePass(ID), module(nullptr), samplerMap(nullptr), out(nullptr),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
         outputCInitList(false), patchBoundOffset(0), nextID(1),
@@ -1559,6 +1559,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   if (!(isa<PointerType>(Ty) || isa<ArrayType>(Ty) || isa<StructType>(Ty))) {
     needs_layout = false;
   }
+  // |layout| is the index used for |Ty|'s entry in the type map. Each type
+  // stores a laid out and non-laid out version of the type.
   const unsigned layout = needs_layout ? 1 : 0;
 
   auto TI = TypeMap.find(Ty);
@@ -1575,7 +1577,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
     if (CanonicalTI != TypeMap.end()) {
       assert(layout < CanonicalTI->second.size());
       if (CanonicalTI->second[layout].isValid()) {
-        // return CanonicalTI->second[layout];
         auto id = CanonicalTI->second[layout];
         auto &base = TypeMap[Ty];
         if (base.empty()) {
