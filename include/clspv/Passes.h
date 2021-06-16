@@ -23,6 +23,7 @@ class ModulePass;
 class raw_pwrite_stream;
 class raw_ostream;
 template <typename T> class ArrayRef;
+template <typename T> class SmallVectorImpl;
 
 // This initializes all the clspv passes.  When creating a new pass, you should:
 //
