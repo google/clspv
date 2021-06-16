@@ -21,6 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "clspv/Option.h"
 #include "spirv/unified1/spirv.hpp"
 
 #include "Constants.h"
@@ -277,9 +278,9 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
     }
   };
 
+  SmallPtrSet<Instruction *, 8> BitCastsToForget;
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memcpy")) {
-      SmallPtrSet<Instruction *, 8> BitCastsToForget;
       SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
 
       for (auto U : F.users()) {
@@ -349,8 +350,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto Alignment =
-            ConstantInt::get(I32Ty, cast<MemIntrinsic>(CI)->getDestAlignment());
+        auto DstAlignment =
+            ConstantInt::get(I32Ty, cast<MemCpyInst>(CI)->getDestAlignment());
+        auto SrcAlignment =
+            ConstantInt::get(I32Ty, cast<MemCpyInst>(CI)->getSourceAlignment());
         auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
 
         auto Dst = Arg0->getOperand(0);
@@ -370,12 +373,20 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         IRBuilder<> Builder(CI);
 
         if (NumSrcUnpackings == 0 && NumDstUnpackings == 0) {
-          auto NewFType = FunctionType::get(
-              F.getReturnType(), {Dst->getType(), Src->getType(), I32Ty, I32Ty},
-              false);
+          SmallVector<Type *, 5> param_tys = {Dst->getType(), Src->getType(),
+                                              I32Ty, I32Ty};
+          SmallVector<Value *, 5> param_values = {Dst, Src, DstAlignment};
+          if (clspv::Option::SpvVersion() >=
+              clspv::Option::SPIRVVersion::SPIRV_1_4) {
+            param_tys.push_back(I32Ty);
+            param_values.push_back(SrcAlignment);
+          }
+          param_values.push_back(Volatile);
+          auto NewFType =
+              FunctionType::get(F.getReturnType(), param_tys, false);
           auto NewF =
               Function::Create(NewFType, F.getLinkage(), SPIRVIntrinsic, &M);
-          Builder.CreateCall(NewF, {Dst, Src, Alignment, Volatile}, "");
+          Builder.CreateCall(NewF, param_values, "");
         } else {
           auto Zero = ConstantInt::get(I32Ty, 0);
           SmallVector<Value *, 3> SrcIndices;
@@ -408,18 +419,24 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
             auto SrcElemPtr =
                 GetElementPtrInst::CreateInBounds(Src, SrcIndices, "", CI);
             auto DstElemPtr = Builder.CreateGEP(Dst, DstIndices);
+            SmallVector<Type *, 5> param_tys = {
+                DstElemPtr->getType(), SrcElemPtr->getType(), I32Ty, I32Ty};
+            SmallVector<Value *, 5> param_values = {DstElemPtr, SrcElemPtr,
+                                                    DstAlignment};
+            if (clspv::Option::SpvVersion() >=
+                clspv::Option::SPIRVVersion::SPIRV_1_4) {
+              param_tys.push_back(I32Ty);
+              param_values.push_back(SrcAlignment);
+            }
+            param_values.push_back(Volatile);
             NewFType =
                 NewFType != nullptr
                     ? NewFType
-                    : FunctionType::get(F.getReturnType(),
-                                        {DstElemPtr->getType(),
-                                         SrcElemPtr->getType(), I32Ty, I32Ty},
-                                        false);
+                    : FunctionType::get(F.getReturnType(), param_tys, false);
             NewF = NewF != nullptr ? NewF
                                    : Function::Create(NewFType, F.getLinkage(),
                                                       SPIRVIntrinsic, &M);
-            Builder.CreateCall(
-                NewF, {DstElemPtr, SrcElemPtr, Alignment, Volatile}, "");
+            Builder.CreateCall(NewF, param_values, "");
           }
         }
 
@@ -433,10 +450,10 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         if (isa<BitCastInst>(Arg1))
           BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg1));
       }
-      for (auto *Inst : BitCastsToForget) {
-        Inst->eraseFromParent();
-      }
     }
+  }
+  for (auto *Inst : BitCastsToForget) {
+    Inst->eraseFromParent();
   }
 
   return Changed;

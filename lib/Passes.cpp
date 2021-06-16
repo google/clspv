@@ -47,6 +47,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeShareModuleScopeVariablesPassPass(r);
   initializeSignedCompareFixupPassPass(r);
   initializeSimplifyPointerBitcastPassPass(r);
+  initializeSPIRVProducerPassPass(r);
   initializeSplatArgPassPass(r);
   initializeSplatSelectConditionPassPass(r);
   initializeSpecializeImageTypesPassPass(r);

@@ -771,7 +771,11 @@ int PopulatePassManager(
   // pointers.
   pm->add(clspv::createRemoveUnusedArgumentsPass());
 
-  pm->add(clspv::createSplatSelectConditionPass());
+  // SPIR-V 1.4 and higher do not need to splat scalar conditions for vector
+  // data.
+  if (clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_4) {
+    pm->add(clspv::createSplatSelectConditionPass());
+  }
   pm->add(clspv::createSignedCompareFixupPass());
   // This pass generates insertions that need to be rewritten.
   pm->add(clspv::createScalarizePass());
@@ -796,7 +800,7 @@ int PopulatePassManager(
   // This pass mucks with types to point where you shouldn't rely on DataLayout
   // anymore so leave this right before SPIR-V generation.
   pm->add(clspv::createUBOTypeTransformPass());
-  pm->add(clspv::createSPIRVProducerPass(*binaryStream, *SamplerMapEntries,
+  pm->add(clspv::createSPIRVProducerPass(binaryStream, SamplerMapEntries,
                                          OutputFormat == "c"));
 
   return 0;

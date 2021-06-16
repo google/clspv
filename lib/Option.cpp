@@ -182,7 +182,11 @@ llvm::cl::opt<clspv::Option::SPIRVVersion> spv_version(
         clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_0, "1.0",
                    "SPIR-V version 1.0 (Vulkan 1.0)"),
         clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_3, "1.3",
-                   "SPIR-V version 1.3 (Vulkan 1.1). Experimental")));
+                   "SPIR-V version 1.3 (Vulkan 1.1). Experimental"),
+        clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_4, "1.4",
+                   "SPIR-V version 1.4 (Vulkan 1.1). Experimental"),
+        clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_5, "1.5",
+                   "SPIR-V version 1.5 (Vulkan 1.2). Experimental")));
 
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));

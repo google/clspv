@@ -50,6 +50,7 @@ void initializeScalarizePassPass(PassRegistry &);
 void initializeShareModuleScopeVariablesPassPass(PassRegistry &);
 void initializeSignedCompareFixupPassPass(PassRegistry &);
 void initializeSimplifyPointerBitcastPassPass(PassRegistry &);
+void initializeSPIRVProducerPassPass(PassRegistry &);
 void initializeSplatArgPassPass(PassRegistry &);
 void initializeSplatSelectConditionPassPass(PassRegistry &);
 void initializeSpecializeImageTypesPassPass(PassRegistry &);
