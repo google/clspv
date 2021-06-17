@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
   std::error_code ec;
   std::unique_ptr<llvm::ToolOutputFile> out(
-      new llvm::ToolOutputFile(OutputFile, ec, sys::fs::F_None));
+      new llvm::ToolOutputFile(OutputFile, ec, sys::fs::OF_None));
   if (ec) {
     errs() << ec.message() << '\n';
     return 1;

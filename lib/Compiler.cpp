@@ -893,7 +893,7 @@ int GenerateIRFile(llvm::legacy::PassManager *pm, llvm::Module &module,
                    std::string output) {
   std::error_code ec;
   std::unique_ptr<llvm::ToolOutputFile> out(
-      new llvm::ToolOutputFile(output, ec, llvm::sys::fs::F_None));
+      new llvm::ToolOutputFile(output, ec, llvm::sys::fs::OF_None));
   if (ec) {
     llvm::errs() << output << ": " << ec.message() << '\n';
     return -1;
