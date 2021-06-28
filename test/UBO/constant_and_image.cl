@@ -27,29 +27,30 @@ kernel void foo(read_only image2d_t i, sampler_t s, constant float4* offset, flo
 // CHECK-DAG: OpDecorate [[c_var]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[data_var:%[0-9a-zA-Z_]+]] Binding 4
 // CHECK-DAG: OpDecorate [[data_var]] DescriptorSet 0
-// CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK: [[image:%[0-9a-zA-Z_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
-// CHECK: [[sampled_image:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[image]]
-// CHECK: [[image_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[image]]
-// CHECK: [[sampler:%[0-9a-zA-Z_]+]] = OpTypeSampler
-// CHECK: [[sampler_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[sampler]]
-// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 4
-// CHECK: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
-// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[v4float]] [[int_4096]]
-// CHECK: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
-// CHECK: [[offset_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
-// CHECK: [[v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 2
-// CHECK: [[struct_v2float:%[0-9a-zA-Z_]+]] = OpTypeStruct [[v2float]]
-// CHECK: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct_v2float]]
-// CHECK: [[runtime]] = OpTypeRuntimeArray [[v4float]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
-// CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
-// CHECK: [[ptr_uniform_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v4float]]
-// CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
-// CHECK: [[ptr_uniform_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v2float]]
-// CHECK: [[ptr_storagebuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v4float]]
-// CHECK: [[float_zero:%[0-9a-zA-Z_]+]] = OpConstant [[float]] 0
+// CHECK-NOT: OpExtension
+// CHECK-DAG: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[image:%[0-9a-zA-Z_]+]] = OpTypeImage [[float]] 2D 0 0 0 1 Unknown
+// CHECK-DAG: [[sampled_image:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[image]]
+// CHECK-DAG: [[image_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[image]]
+// CHECK-DAG: [[sampler:%[0-9a-zA-Z_]+]] = OpTypeSampler
+// CHECK-DAG: [[sampler_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer UniformConstant [[sampler]]
+// CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
+// CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[v4float]] [[int_4096]]
+// CHECK-DAG: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[array]]
+// CHECK-DAG: [[offset_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
+// CHECK-DAG: [[v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[float]] 2
+// CHECK-DAG: [[struct_v2float:%[0-9a-zA-Z_]+]] = OpTypeStruct [[v2float]]
+// CHECK-DAG: [[c_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[struct_v2float]]
+// CHECK-DAG: [[runtime]] = OpTypeRuntimeArray [[v4float]]
+// CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
+// CHECK-DAG: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
+// CHECK-DAG: [[ptr_uniform_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v4float]]
+// CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+// CHECK-DAG: [[ptr_uniform_v2float:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[v2float]]
+// CHECK-DAG: [[ptr_storagebuffer_v4float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[v4float]]
+// CHECK-DAG: [[float_zero:%[0-9a-zA-Z_]+]] = OpConstant [[float]] 0
 // CHECK: [[image_var]] = OpVariable [[image_ptr]] UniformConstant
 // CHECK: [[sampler_var]] = OpVariable [[sampler_ptr]] UniformConstant
 // CHECK: [[offset_var]] = OpVariable [[offset_ptr]] Uniform

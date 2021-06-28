@@ -7,13 +7,9 @@
 
 // DMAP: pushconstant,name,global_offset,offset,0,size,12
 
-// CHECK:     OpMemberDecorate %[[_struct_3:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpDecorate %[[_struct_3]] Block
-// CHECK:     OpMemberDecorate %[[_struct_10:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpDecorate %[[_struct_10]] Block
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[v3uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 3
-// CHECK-DAG: %[[_struct_10]] = OpTypeStruct %[[v3uint]]
+// CHECK-DAG: %[[_struct_10:[0-9a-zA-Z_]+]] = OpTypeStruct %[[v3uint]]
 // CHECK-DAG: %[[_ptr_PushConstant__struct_10:[0-9a-zA-Z_]+]] = OpTypePointer PushConstant %[[_struct_10]]
 // CHECK-DAG: %[[_ptr_PushConstant_uint:[0-9a-zA-Z_]+]] = OpTypePointer PushConstant %[[uint]]
 // CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0

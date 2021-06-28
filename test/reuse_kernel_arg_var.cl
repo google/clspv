@@ -42,24 +42,25 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 
 // CHECK:  OpEntryPoint GLCompute [[foo:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpEntryPoint GLCompute [[bar:%[0-9a-zA-Z_]+]] "bar"
-// CHECK:  OpDecorate [[A_R:%[0-9a-zA-Z_]+]] Binding 0
-// CHECK:  OpDecorate [[B_S:%[0-9a-zA-Z_]+]] Binding 1
-// CHECK:  OpDecorate [[C:%[0-9a-zA-Z_]+]] Binding 2
-// CHECK:  OpDecorate [[D:%[0-9a-zA-Z_]+]] Binding 3
-// CHECK:  OpDecorate [[f_y:%[0-9a-zA-Z_]+]] Binding 4
-// CHECK:  OpDecorate [[g:%[0-9a-zA-Z_]+]] Binding 5
-// CHECK:  OpDecorate [[T:%[0-9a-zA-Z_]+]] Binding 2
-// CHECK:  OpDecorate [[x:%[0-9a-zA-Z_]+]] Binding 3
-// CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
-// CHECK:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
-// CHECK:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
-// CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK:  [[__runtimearr_uint:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_uint]]
-// CHECK:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_uint]]
-// CHECK:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CHECK:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]]
-// CHECK:  [[__ptr_Uniform__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_9]]
+// CHECK-DAG:  OpDecorate [[A_R:%[0-9a-zA-Z_]+]] Binding 0
+// CHECK-DAG:  OpDecorate [[B_S:%[0-9a-zA-Z_]+]] Binding 1
+// CHECK-DAG:  OpDecorate [[C:%[0-9a-zA-Z_]+]] Binding 2
+// CHECK-DAG:  OpDecorate [[D:%[0-9a-zA-Z_]+]] Binding 3
+// CHECK-DAG:  OpDecorate [[f_y:%[0-9a-zA-Z_]+]] Binding 4
+// CHECK-DAG:  OpDecorate [[g:%[0-9a-zA-Z_]+]] Binding 5
+// CHECK-DAG:  OpDecorate [[T:%[0-9a-zA-Z_]+]] Binding 2
+// CHECK-DAG:  OpDecorate [[x:%[0-9a-zA-Z_]+]] Binding 3
+// CHECK-NOT: OpExtension
+// CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
+// CHECK-DAG:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
+// CHECK-DAG:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
+// CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG:  [[__runtimearr_uint:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_uint]]
+// CHECK-DAG:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_uint]]
+// CHECK-DAG:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CHECK-DAG:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]]
+// CHECK-DAG:  [[__ptr_Uniform__struct_9:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[__struct_9]]
 // CHECK:  [[A_R]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CHECK:  [[B_S]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CHECK:  [[C]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
@@ -84,22 +85,23 @@ kernel void bar(global float* R, global float* S, global float* T, float x, floa
 
 // CLUSTER:  OpEntryPoint GLCompute [[foo:%[0-9a-zA-Z_]+]] "foo"
 // CLUSTER:  OpEntryPoint GLCompute [[bar:%[0-9a-zA-Z_]+]] "bar"
-// CLUSTER:  OpDecorate [[A_R:%[0-9a-zA-Z_]+]] Binding 0
-// CLUSTER:  OpDecorate [[B_S:%[0-9a-zA-Z_]+]] Binding 1
-// CLUSTER:  OpDecorate [[C:%[0-9a-zA-Z_]+]] Binding 2
-// CLUSTER:  OpDecorate [[D:%[0-9a-zA-Z_]+]] Binding 3
-// CLUSTER:  OpDecorate [[T:%[0-9a-zA-Z_]+]] Binding 2
-// CLUSTER:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CLUSTER:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
-// CLUSTER:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
-// CLUSTER:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
-// CLUSTER:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CLUSTER:  [[__runtimearr_uint:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_uint]]
-// CLUSTER:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_uint]]
-// CLUSTER:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CLUSTER:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]] [[_float]]
-// CLUSTER:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__struct_9]]
-// CLUSTER:  [[__ptr_PushConstant__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer PushConstant [[__struct_10]]
+// CLUSTER-DAG:  OpDecorate [[A_R:%[0-9a-zA-Z_]+]] Binding 0
+// CLUSTER-DAG:  OpDecorate [[B_S:%[0-9a-zA-Z_]+]] Binding 1
+// CLUSTER-DAG:  OpDecorate [[C:%[0-9a-zA-Z_]+]] Binding 2
+// CLUSTER-DAG:  OpDecorate [[D:%[0-9a-zA-Z_]+]] Binding 3
+// CLUSTER-DAG:  OpDecorate [[T:%[0-9a-zA-Z_]+]] Binding 2
+// CLUSTER-NOT: OpExtension
+// CLUSTER-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CLUSTER-DAG:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
+// CLUSTER-DAG:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
+// CLUSTER-DAG:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
+// CLUSTER-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CLUSTER-DAG:  [[__runtimearr_uint:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_uint]]
+// CLUSTER-DAG:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_uint]]
+// CLUSTER-DAG:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
+// CLUSTER-DAG:  [[__struct_9:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]] [[_float]]
+// CLUSTER-DAG:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__struct_9]]
+// CLUSTER-DAG:  [[__ptr_PushConstant__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer PushConstant [[__struct_10]]
 // CLUSTER:  [[A_R]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CLUSTER:  [[B_S]] = OpVariable [[__ptr_StorageBuffer__struct_3]] StorageBuffer
 // CLUSTER:  [[C]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer

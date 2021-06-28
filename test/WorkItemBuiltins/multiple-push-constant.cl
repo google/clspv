@@ -8,11 +8,7 @@
 // DMAP: pushconstant,name,global_offset,offset,0,size,12
 // DMAP: pushconstant,name,enqueued_local_size,offset,16,size,12
 
-// CHECK:     OpMemberDecorate %[[_struct_3:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpDecorate %[[_struct_3]] Block
-// CHECK:     OpMemberDecorate %[[_struct_10:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpMemberDecorate %[[_struct_10]] 1 Offset 16
-// CHECK:     OpDecorate %[[_struct_10]] Block
+// CHECK:     OpMemberDecorate %[[_struct_10:[0-9a-zA-Z_]+]] 1 Offset 16
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[v3uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 3
 // CHECK-DAG: %[[_struct_10]] = OpTypeStruct %[[v3uint]] %[[v3uint]]

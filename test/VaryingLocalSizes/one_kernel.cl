@@ -9,9 +9,9 @@
 // CHECK: OpDecorate %[[BUILTIN_Z_ID:[a-zA-Z0-9_]*]] SpecId 2
 // CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 // CHECK-DAG: %[[UINT3_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[UINT_TYPE_ID]] 3
-// CHECK: %[[BUILTIN_X_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
-// CHECK: %[[BUILTIN_Y_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
-// CHECK: %[[BUILTIN_Z_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
+// CHECK-DAG: %[[BUILTIN_X_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
+// CHECK-DAG: %[[BUILTIN_Y_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
+// CHECK-DAG: %[[BUILTIN_Z_ID]] = OpSpecConstant %[[UINT_TYPE_ID]] 1
 // CHECK: %[[BUILTIN_ID]] = OpSpecConstantComposite %[[UINT3_TYPE_ID]] %[[BUILTIN_X_ID]] %[[BUILTIN_Y_ID]] %[[BUILTIN_Z_ID]]
 // CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 

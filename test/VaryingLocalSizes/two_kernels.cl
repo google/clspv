@@ -29,10 +29,10 @@ void kernel bar(global uint* a)
 // CHECK: OpDecorate [[_16:%[a-zA-Z0-9_]+]] SpecId 2
 // CHECK-DAG: [[_uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[_v3uint:%[a-zA-Z0-9_]+]] = OpTypeVector [[_uint]] 3
-// CHECK: [[_14]] = OpSpecConstant [[_uint]] 1
-// CHECK: [[_15]] = OpSpecConstant [[_uint]] 1
-// CHECK: [[_16]] = OpSpecConstant [[_uint]] 1
-// CHECK: [[_gl_WorkGroupSize]] = OpSpecConstantComposite [[_v3uint]] [[_14]] [[_15]] [[_16]]
+// CHECK-DAG: [[_14]] = OpSpecConstant [[_uint]] 1
+// CHECK-DAG: [[_15]] = OpSpecConstant [[_uint]] 1
+// CHECK-DAG: [[_16]] = OpSpecConstant [[_uint]] 1
+// CHECK-DAG: [[_gl_WorkGroupSize]] = OpSpecConstantComposite [[_v3uint]] [[_14]] [[_15]] [[_16]]
 // CHECK-DAG: [[_uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[_uint]] 1
 // CHECK: [[_20]] = OpFunction
 // CHECK: [[_23:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[_v3uint]] [[_gl_WorkGroupSize]] [[_gl_WorkGroupSize]]

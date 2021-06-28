@@ -21,9 +21,13 @@ kernel void foo(global float4* data, read_only image2d_t im) {
 
 // CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.1"
 // CHECK-DAG: OpDecorate [[s1:%[a-zA-Z0-9_]+]] Binding 3
+// CHECK-DAG: OpDecorate [[s1]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[s2:%[a-zA-Z0-9_]+]] Binding 2
+// CHECK-DAG: OpDecorate [[s2]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[s3:%[a-zA-Z0-9_]+]] Binding 1
+// CHECK-DAG: OpDecorate [[s3]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[s4:%[a-zA-Z0-9_]+]] Binding 0
+// CHECK-DAG: OpDecorate [[s4]] DescriptorSet 0
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint_19:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 19
@@ -37,26 +41,27 @@ kernel void foo(global float4* data, read_only image2d_t im) {
 // CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 2
 // CHECK-DAG: [[float2_0:%[a-zA-Z0-9_]+]] = OpConstantNull [[float2]]
+// CHECK-DAG: [[sampler:%[a-zA-Z0-9_]+]] = OpTypeSampler
 //
 // CHECK: [[gep0:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
-// CHECK: [[s1_ld:%[a-zA-Z0-9_]+]] = OpLoad {{.*}} [[s1]]
+// CHECK: [[s1_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s1]]
 // CHECK: [[s1_combined:%[a-zA-Z0-9_]+]] = OpSampledImage {{.*}} {{.*}} [[s1_ld]]
 // CHECK: [[read:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod {{.*}} [[s1_combined]]
 // CHECK: OpStore [[gep0]] [[read]]
 //
-// CHECK: [[s2_ld:%[a-zA-Z0-9_]+]] = OpLoad {{.*}} [[s2]]
+// CHECK: [[s2_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s2]]
 // CHECK: [[s2_combined:%[a-zA-Z0-9_]+]] = OpSampledImage {{.*}} {{.*}} [[s2_ld]]
 // CHECK: [[read:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod {{.*}} [[s2_combined]]
 // CHECK: [[gep1:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_1]]
 // CHECK: OpStore [[gep1]] [[read]]
 //
-// CHECK: [[s3_ld:%[a-zA-Z0-9_]+]] = OpLoad {{.*}} [[s3]]
+// CHECK: [[s3_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s3]]
 // CHECK: [[s3_combined:%[a-zA-Z0-9_]+]] = OpSampledImage {{.*}} {{.*}} [[s3_ld]]
 // CHECK: [[read:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod {{.*}} [[s3_combined]]
 // CHECK: [[gep2:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_2]]
 // CHECK: OpStore [[gep2]] [[read]]
 //
-// CHECK: [[s4_ld:%[a-zA-Z0-9_]+]] = OpLoad {{.*}} [[s4]]
+// CHECK: [[s4_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s4]]
 // CHECK: [[s4_combined:%[a-zA-Z0-9_]+]] = OpSampledImage {{.*}} {{.*}} [[s4_ld]]
 // CHECK: [[read:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod {{.*}} [[s4_combined]]
 // CHECK: [[gep3:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_3]]

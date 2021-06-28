@@ -26,25 +26,26 @@ __kernel void foo(__global data_type* data, __constant data_type* c_arg, __local
 // CHECK-DAG: OpDecorate [[c_arg:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[c_arg]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[spec_id:%[0-9a-zA-Z_]+]] SpecId 3
-// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[data_type]] = OpTypeStruct [[int]] [[int]]
-// CHECK: [[runtime]] = OpTypeRuntimeArray [[data_type]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
-// CHECK: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
-// CHECK: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
-// CHECK: [[ubo_array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[int_4096]]
-// CHECK: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
-// CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
-// CHECK: [[size1:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
-// CHECK: [[size2:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
-// CHECK: [[size3:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
-// CHECK: [[size:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
-// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[size]]
-// CHECK: [[l_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[array]]
-// CHECK: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
-// CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
-// CHECK: [[l_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[int]]
-// CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
+// CHECK-NOT: OpExtension
+// CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[data_type]] = OpTypeStruct [[int]] [[int]]
+// CHECK-DAG: [[runtime]] = OpTypeRuntimeArray [[data_type]]
+// CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
+// CHECK-DAG: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
+// CHECK-DAG: [[int_4096:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 4096
+// CHECK-DAG: [[ubo_array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[int_4096]]
+// CHECK-DAG: [[ubo_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ubo_array]]
+// CHECK-DAG: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
+// CHECK-DAG: [[size1:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK-DAG: [[size2:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK-DAG: [[size3:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK-DAG: [[size:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
+// CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[size]]
+// CHECK-DAG: [[l_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[array]]
+// CHECK-DAG: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
+// CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+// CHECK-DAG: [[l_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[int]]
+// CHECK-DAG: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 // CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
 // CHECK: [[l_arg:%[0-9a-zA-Z_]+]] = OpVariable [[l_arg_ptr]] Workgroup
