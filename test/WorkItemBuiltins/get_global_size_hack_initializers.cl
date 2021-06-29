@@ -12,9 +12,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
 }
 
 // CHECK:  OpDecorate [[_gl_WorkGroupSize:%[0-9a-zA-Z_]+]] BuiltIn WorkgroupSize
-// CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
-// CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK:  [[_gl_WorkGroupSize]] = OpConstantComposite [[_v3uint]] [[_uint_1]] [[_uint_1]] [[_uint_1]]
+// CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
+// CHECK-DAG:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
+// CHECK-DAG:  [[_gl_WorkGroupSize]] = OpConstantComposite [[_v3uint]] [[_uint_1]] [[_uint_1]] [[_uint_1]]
 // CHECK:  [[_21:%[0-9a-zA-Z_]+]] = OpVariable {{.*}} Private [[_gl_WorkGroupSize]]
 // CHECK:  OpStore [[_21]] [[_gl_WorkGroupSize]]

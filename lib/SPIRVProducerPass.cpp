@@ -295,7 +295,6 @@ struct SPIRVProducerPass final : public ModulePass {
 
   CapabilitySetType &getCapabilitySet() { return CapabilitySet; }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
-  TypeList &getTypeList() { return Types; }
   ValueMapType &getValueMap() { return ValueMap; }
   SPIRVInstructionList &getSPIRVInstList(SPIRVSection Section) {
     return SPIRVSections[Section];
@@ -343,12 +342,8 @@ struct SPIRVProducerPass final : public ModulePass {
   // Populate ResourceVarInfoList, FunctionToResourceVarsMap, and
   // ModuleOrderedResourceVars.
   void FindResourceVars();
-  void FindTypePerGlobalVar(GlobalVariable &GV);
   void FindTypesForSamplerMap();
   void FindTypesForResourceVars();
-  // Inserts |Ty| and relevant sub-types into the |Types| member, indicating
-  // that |Ty| and its subtypes will need a corresponding SPIR-V type.
-  void FindType(Type *Ty);
 
   // Returns the canonical type of |type|.
   //
@@ -370,12 +365,6 @@ struct SPIRVProducerPass final : public ModulePass {
 
   SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
 
-  // Generates instructions for SPIR-V types corresponding to the LLVM types
-  // saved in the |Types| member.  A type follows its subtypes.  IDs are
-  // allocated sequentially starting with the current value of nextID, and
-  // with a type following its subtypes.  Also updates nextID to just beyond
-  // the last generated ID.
-  void GenerateSPIRVTypes();
   void GenerateModuleInfo();
   void GenerateGlobalVar(GlobalVariable &GV);
   void GenerateWorkgroupVars();
@@ -782,13 +771,7 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
         GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
       GV.setInitializer(nullptr);
     }
-
-    // Collect types' information from global variable.
-    FindTypePerGlobalVar(GV);
   }
-
-  // Generate SPIRV instructions for types.
-  GenerateSPIRVTypes();
 
   // Generate literal samplers if necessary.
   GenerateSamplers();
@@ -1126,11 +1109,6 @@ void SPIRVProducerPass::FindResourceVars() {
   }
 }
 
-void SPIRVProducerPass::FindTypePerGlobalVar(GlobalVariable &GV) {
-  // Investigate global variable's type.
-  FindType(GV.getType());
-}
-
 void SPIRVProducerPass::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (module->getFunction(clspv::LiteralSamplerFunction()) ||
@@ -1141,10 +1119,7 @@ void SPIRVProducerPass::FindTypesForSamplerMap() {
       SamplerStructTy =
           StructType::create(module->getContext(), "opencl.sampler_t");
     }
-
     SamplerTy = SamplerStructTy->getPointerTo(AddressSpace::UniformConstant);
-
-    FindType(SamplerTy);
   }
 }
 
@@ -1152,22 +1127,6 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
   // Record types so they are generated.
   TypesNeedingLayout.reset();
   StructTypesNeedingBlock.reset();
-
-  // To match older clspv codegen, generate the float type first if required
-  // for images.
-  for (const auto *info : ModuleOrderedResourceVars) {
-    if (info->arg_kind == clspv::ArgKind::SampledImage ||
-        info->arg_kind == clspv::ArgKind::StorageImage) {
-      if (IsIntImageType(info->var_fn->getReturnType())) {
-        // Nothing for now...
-      } else if (IsUintImageType(info->var_fn->getReturnType())) {
-        FindType(Type::getInt32Ty(module->getContext()));
-      }
-
-      // We need "float" either for the sampled type or for the Lod operand.
-      FindType(Type::getFloatTy(module->getContext()));
-    }
-  }
 
   for (const auto *info : ModuleOrderedResourceVars) {
     Type *type = info->var_fn->getReturnType();
@@ -1203,11 +1162,6 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
     default:
       break;
     }
-
-    // The converted type is the type of the OpVariable we will generate.
-    // If the pointee type is an array of size zero, FindType will convert it
-    // to a runtime array.
-    FindType(type);
   }
 
   // If module constants are clustered in a storage buffer then that struct
@@ -1322,48 +1276,6 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
                       ArrayTypeID, PtrArrayTypeID, spec_id};
     LocalSpecIdInfoMap[spec_id] = info;
   }
-}
-
-void SPIRVProducerPass::FindType(Type *Ty) {
-  TypeList &TyList = getTypeList();
-
-  if (0 != TyList.idFor(Ty)) {
-    return;
-  }
-
-  if (Ty->isPointerTy()) {
-    auto AddrSpace = Ty->getPointerAddressSpace();
-    if ((AddressSpace::Constant == AddrSpace) ||
-        (AddressSpace::Global == AddrSpace)) {
-      auto PointeeTy = Ty->getPointerElementType();
-
-      if (PointeeTy->isStructTy() &&
-          dyn_cast<StructType>(PointeeTy)->isOpaque()) {
-        FindType(PointeeTy);
-        auto ActualPointerTy =
-            PointeeTy->getPointerTo(AddressSpace::UniformConstant);
-        FindType(ActualPointerTy);
-        return;
-      }
-    }
-  }
-
-  // By convention, LLVM array type with 0 elements will map to
-  // OpTypeRuntimeArray.  Otherwise, it will map to OpTypeArray, which
-  // has a constant number of elements. We need to support type of the
-  // constant.
-  if (auto *arrayTy = dyn_cast<ArrayType>(Ty)) {
-    if (arrayTy->getNumElements() > 0) {
-      LLVMContext &Context = Ty->getContext();
-      FindType(Type::getInt32Ty(Context));
-    }
-  }
-
-  for (Type *SubTy : Ty->subtypes()) {
-    FindType(SubTy);
-  }
-
-  TyList.insert(Ty);
 }
 
 spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
@@ -1991,12 +1903,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
     }
   }
   return RID;
-}
-
-void SPIRVProducerPass::GenerateSPIRVTypes() {
-  for (Type *Ty : getTypeList()) {
-    getSPIRVType(Ty);
-  }
 }
 
 SPIRVID SPIRVProducerPass::getSPIRVInt32Constant(uint32_t CstVal) {

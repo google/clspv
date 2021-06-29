@@ -4,22 +4,18 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK:     OpDecorate %[[_runtimearr_uint:[0-9a-zA-Z_]+]] ArrayStride 4
-// CHECK:     OpMemberDecorate %[[_struct_3:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpDecorate %[[_struct_3]] Block
-// CHECK:     OpMemberDecorate %[[_struct_11:[0-9a-zA-Z_]+]] 0 Offset 0
-// CHECK:     OpDecorate %[[_struct_11]] Block
 // CHECK:     OpDecorate %[[__original_id_19:[0-9]+]] DescriptorSet 0
 // CHECK:     OpDecorate %[[__original_id_19]] Binding 0
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[_runtimearr_uint]] = OpTypeRuntimeArray %[[uint]]
-// CHECK-DAG: %[[_struct_3]] = OpTypeStruct %[[_runtimearr_uint]]
+// CHECK-DAG: %[[_struct_3:[0-9a-zA-Z_]+]] = OpTypeStruct %[[_runtimearr_uint]]
 // CHECK-DAG: %[[_ptr_StorageBuffer__struct_3:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[_struct_3]]
 // CHECK-DAG: %[[void:[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: %[[__original_id_7:[0-9]+]] = OpTypeFunction %[[void]]
 // CHECK-DAG: %[[_ptr_StorageBuffer_uint:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[uint]]
 // CHECK-DAG: %[[__original_id_9:[0-9]+]] = OpTypeFunction %[[uint]] %[[uint]]
 // CHECK-DAG: %[[v3uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 3
-// CHECK-DAG: %[[_struct_11]] = OpTypeStruct %[[v3uint]]
+// CHECK-DAG: %[[_struct_11:[0-9a-zA-Z_]+]] = OpTypeStruct %[[v3uint]]
 // CHECK-DAG: %[[_ptr_PushConstant__struct_11:[0-9a-zA-Z_]+]] = OpTypePointer PushConstant %[[_struct_11]]
 // CHECK-DAG: %[[_ptr_PushConstant_uint:[0-9a-zA-Z_]+]] = OpTypePointer PushConstant %[[uint]]
 // CHECK-DAG: %[[bool:[0-9a-zA-Z_]+]] = OpTypeBool

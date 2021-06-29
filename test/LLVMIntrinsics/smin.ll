@@ -7,10 +7,10 @@ target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:2
 target triple = "spir-unknown-unknown"
 
 ; CHECK: %[[EXT_INST:[a-zA-Z0-9_]*]] = OpExtInstImport "GLSL.std.450"
-; CHECK: %[[INT8_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 8 0
-; CHECK: %[[INT16_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 16 0
-; CHECK: %[[INT32_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
-; CHECK: %[[INT64_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 64 0
+; CHECK-DAG: %[[INT8_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 8 0
+; CHECK-DAG: %[[INT16_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 16 0
+; CHECK-DAG: %[[INT32_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
+; CHECK-DAG: %[[INT64_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 64 0
 
 define spir_kernel void @smin_i8(i8 addrspace(1)* %out, i8 %a, i8 %b) {
 entry:
