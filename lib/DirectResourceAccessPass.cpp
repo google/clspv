@@ -258,7 +258,8 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
     }
     // Builder.CreateGEP is not used to avoid creating a GEPConstantExpr in the
     // case of global variables.
-    replacement = GetElementPtrInst::Create(nullptr, replacement, zeroes);
+    replacement = GetElementPtrInst::Create(
+        replacement->getType()->getPointerElementType(), replacement, zeroes);
     Builder.Insert(cast<Instruction>(replacement));
     if (ShowDRA) {
       outs() << "DRA:    Replace: gep  " << *replacement << "\n";
