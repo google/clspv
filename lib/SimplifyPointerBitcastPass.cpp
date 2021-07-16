@@ -289,10 +289,12 @@ bool SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     // and create the GEP instruction directly.
     if (GEP->isInBounds() && OtherGEP->isInBounds()) {
       NewGEP = GetElementPtrInst::CreateInBounds(
-          nullptr, OtherGEP->getPointerOperand(), Idxs, "", GEP);
+          OtherGEP->getSourceElementType(), OtherGEP->getPointerOperand(), Idxs,
+          "", GEP);
     } else {
-      NewGEP = GetElementPtrInst::Create(nullptr, OtherGEP->getPointerOperand(),
-                                         Idxs, "", GEP);
+      NewGEP = GetElementPtrInst::Create(OtherGEP->getSourceElementType(),
+                                         OtherGEP->getPointerOperand(), Idxs,
+                                         "", GEP);
     }
 
     // And replace the original GEP with our replacement GEP.
