@@ -9,7 +9,7 @@ kernel void bar() { }
 
 kernel void baz() { }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.1"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
 // CHECK-DAG: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
 // CHECK-DAG: OpEntryPoint GLCompute [[bar:%[a-zA-Z0-9_]+]] "bar"
 // CHECK-DAG: OpEntryPoint GLCompute [[baz:%[a-zA-Z0-9_]+]] "baz"

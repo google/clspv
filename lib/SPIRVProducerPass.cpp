@@ -1339,6 +1339,7 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
       .Case("__spirv_WorkgroupId", spv::BuiltInWorkgroupId)
       .Case("__spirv_WorkDim", spv::BuiltInWorkDim)
       .Case("__spirv_GlobalOffset", spv::BuiltInGlobalOffset)
+      .Case("__spirv_SubgroupMaxSize", spv::BuiltInSubgroupMaxSize)
       .Default(spv::BuiltInMax);
 }
 
@@ -2516,6 +2517,33 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
     Ops.clear();
     Ops << GV.getType()->getPointerElementType() << x_id << y_id << z_id;
     InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstantComposite, Ops);
+  } else if (BuiltinType == spv::BuiltInSubgroupMaxSize) {
+    // 1. Generate a specialization constant with a default of 1.
+    // 2. Allocate and annotate a SpecId for the constant.
+    // 3. Use the spec constant as the initializer for the variable.
+    SPIRVOperandVec Ops;
+
+    //
+    // Generate OpSpecConstant.
+    //
+    // Ops[0] : Result Type ID
+    // Ops[1] : Default literal value
+
+    Ops << IntegerType::get(GV.getContext(), 32) << 1;
+
+    InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
+
+    //
+    // Generate SpecId decoration.
+    //
+    // Ops[0] : target
+    // Ops[1] : decoration
+    // Ops[2] : SpecId
+    auto spec_id = AllocateSpecConstant(module, SpecConstant::kSubgroupMaxSize);
+    Ops.clear();
+    Ops << InitializerID << spv::DecorationSpecId << spec_id;
+
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
 
   const auto AS = PTy->getAddressSpace();
@@ -2544,7 +2572,8 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
 
   auto IsOpenCLBuiltin = [](spv::BuiltIn builtin) {
     return builtin == spv::BuiltInWorkDim ||
-           builtin == spv::BuiltInGlobalOffset;
+           builtin == spv::BuiltInGlobalOffset ||
+           builtin == spv::BuiltInSubgroupMaxSize;
   };
 
   // If we have a builtin (not an OpenCL builtin).
@@ -3670,9 +3699,7 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
   }
 
   case Builtins::kGetEnqueuedNumSubGroups:
-    // TODO(sjw): requires CapabilityKernel (incompatible with Shader)
   case Builtins::kGetMaxSubGroupSize:
-    // TODO(sjw): use SpecConstant, capability Kernel (incompatible with Shader)
   case Builtins::kSubGroupBarrier:
   case Builtins::kSubGroupReserveReadPipe:
   case Builtins::kSubGroupReserveWritePipe:
@@ -5849,7 +5876,7 @@ SPIRVID SPIRVProducerPass::getReflectionImport() {
   if (!ReflectionID.isValid()) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
     ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport,
-                                          "NonSemantic.ClspvReflection.1");
+                                          "NonSemantic.ClspvReflection.2");
   }
   return ReflectionID;
 }
@@ -5925,6 +5952,7 @@ void SPIRVProducerPass::GenerateSpecConstantReflection() {
   uint32_t wgsize_id[3] = {kMax, kMax, kMax};
   uint32_t global_offset_id[3] = {kMax, kMax, kMax};
   uint32_t work_dim_id = kMax;
+  uint32_t subgroup_max_size_id = kMax;
   for (auto pair : clspv::GetSpecConstants(module)) {
     auto kind = pair.first;
     auto id = pair.second;
@@ -5954,6 +5982,9 @@ void SPIRVProducerPass::GenerateSpecConstantReflection() {
       break;
     case SpecConstant::kWorkDim:
       work_dim_id = id;
+      break;
+    case SpecConstant::kSubgroupMaxSize:
+      subgroup_max_size_id = id;
       break;
     default:
       llvm_unreachable("Unhandled spec constant");
@@ -5987,6 +6018,13 @@ void SPIRVProducerPass::GenerateSpecConstantReflection() {
     Ops.clear();
     Ops << void_id << import_id << reflection::ExtInstSpecConstantWorkDim
         << getSPIRVInt32Constant(work_dim_id);
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
+  if (subgroup_max_size_id != kMax) {
+    Ops.clear();
+    Ops << void_id << import_id
+        << reflection::ExtInstSpecConstantSubgroupMaxSize
+        << getSPIRVInt32Constant(subgroup_max_size_id);
     addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
   }
 }

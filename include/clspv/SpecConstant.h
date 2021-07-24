@@ -32,6 +32,8 @@ enum class SpecConstant : int {
   kGlobalOffsetX,
   kGlobalOffsetY,
   kGlobalOffsetZ,
+  // Max subgroup size
+  kSubgroupMaxSize,
 };
 
 // Converts an SpecConstant to its string name.

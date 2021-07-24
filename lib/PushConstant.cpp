@@ -136,7 +136,8 @@ bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
 
 bool ShouldDeclareEnqueuedLocalSizePushConstant(Module &M) {
   bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z23get_enqueued_local_sizej") != nullptr;
+  bool isUsed = (M.getFunction("_Z23get_enqueued_local_sizej") != nullptr) ||
+                (M.getFunction("_Z27get_enqueued_num_sub_groupsv") != nullptr);
   return isEnabled && isUsed;
 }
 
