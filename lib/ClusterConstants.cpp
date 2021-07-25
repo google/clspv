@@ -33,6 +33,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Constants.h"
 #include "NormalizeGlobalVariable.h"
 #include "Passes.h"
 
@@ -110,7 +111,7 @@ bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
         ConstantStruct::get(type, initializers_as_vec);
     GlobalVariable *clustered_gv = new GlobalVariable(
         M, type, true, GlobalValue::InternalLinkage, clustered_initializer,
-        "clspv.clustered_constants", nullptr,
+        clspv::ClusteredConstantsVariableName(), nullptr,
         GlobalValue::ThreadLocalMode::NotThreadLocal,
         clspv::AddressSpace::Constant);
     assert(clustered_gv);

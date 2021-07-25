@@ -79,6 +79,11 @@ inline std::string PodArgsImplMetadataName() { return "clspv.pod_args_impl"; }
 // Clustered arguments mapping metadata name.
 inline std::string KernelArgMapMetadataName() { return "kernel_arg_map"; }
 
+// Clustered constants global variable name.
+inline std::string ClusteredConstantsVariableName() {
+  return "clspv.clustered_constants";
+}
+
 } // namespace clspv
 
 #endif
