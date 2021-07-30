@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
 
     # Strip invalid features.
-    regex = re.compile('convert_[a-zA-Z0-9]+(_rt[pn]|_sat)')
+    regex = re.compile('(convert_[a-zA-Z0-9]+(_rt[pn]|_sat))|(reserve_id_t)')
     with open(args.input_file, "r") as input:
         with open(args.output_file, "w") as output:
             for line in input:

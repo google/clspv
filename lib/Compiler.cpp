@@ -396,7 +396,6 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
     // The following features are never supported
     Opts["__opencl_c_pipes"] = false;
     Opts["__opencl_c_generic_address_space"] = false;
-    Opts["__opencl_c_atomic_order_seq_cst"] = false;
     Opts["__opencl_c_device_enqueue"] = false;
     Opts["__opencl_c_program_scope_global_variables"] = false;
 
