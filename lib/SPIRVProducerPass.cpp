@@ -377,6 +377,7 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateFuncBody(Function &F);
   void GenerateEntryPointInitialStores();
   spv::Op GetSPIRVCmpOpcode(CmpInst *CmpI);
+  spv::Op GetSPIRVPointerCmpOpcode(CmpInst *CmpI);
   spv::Op GetSPIRVCastOpcode(Instruction &I);
   spv::Op GetSPIRVBinaryOpcode(Instruction &I);
   SPIRVID GenerateClspvInstruction(CallInst *Call,
@@ -3018,6 +3019,18 @@ spv::Op SPIRVProducerPass::GetSPIRVCmpOpcode(CmpInst *I) {
   return Map.at(I->getPredicate());
 }
 
+spv::Op SPIRVProducerPass::GetSPIRVPointerCmpOpcode(CmpInst *I) {
+  const std::map<CmpInst::Predicate, spv::Op> Map = {
+      {CmpInst::ICMP_UGT, spv::OpSGreaterThan},
+      {CmpInst::ICMP_UGE, spv::OpSGreaterThanEqual},
+      {CmpInst::ICMP_ULT, spv::OpSLessThan},
+      {CmpInst::ICMP_ULE, spv::OpSLessThanEqual}};
+
+  assert(0 != Map.count(I->getPredicate()));
+
+  return Map.at(I->getPredicate());
+}
+
 spv::Op SPIRVProducerPass::GetSPIRVCastOpcode(Instruction &I) {
   const std::map<unsigned, spv::Op> Map{
       {Instruction::Trunc, spv::OpUConvert},
@@ -4346,15 +4359,48 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   case Instruction::FCmp: {
     CmpInst *CmpI = cast<CmpInst>(&I);
 
-    // Pointer equality is invalid.
+    // Pointer comparisons are only supported from SPIR-V 1.4 onwards.
     Type *ArgTy = CmpI->getOperand(0)->getType();
     if (isa<PointerType>(ArgTy)) {
-      CmpI->print(errs());
-      std::string name = I.getParent()->getParent()->getName().str();
-      errs()
-          << "\nPointer equality test is not supported by SPIR-V for Vulkan, "
-          << "in function " << name << "\n";
-      llvm_unreachable("Pointer equality check is invalid");
+      if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
+        SPIRVID cmp_lhs = getSPIRVValue(CmpI->getOperand(0));
+        SPIRVID cmp_rhs = getSPIRVValue(CmpI->getOperand(1));
+        spv::Op Opcode;
+        SPIRVOperandVec Ops;
+        switch (CmpI->getPredicate()) {
+        case CmpInst::ICMP_NE:
+          Opcode = spv::OpPtrNotEqual;
+          break;
+        case CmpInst::ICMP_EQ:
+          Opcode = spv::OpPtrEqual;
+          break;
+        case CmpInst::ICMP_UGT:
+        case CmpInst::ICMP_UGE:
+        case CmpInst::ICMP_ULT:
+        case CmpInst::ICMP_ULE:
+          Opcode = GetSPIRVPointerCmpOpcode(CmpI);
+          Ops << getSPIRVType(Type::getInt32Ty(Context)) << cmp_lhs << cmp_rhs;
+          RID = addSPIRVInst(spv::OpPtrDiff, Ops);
+          cmp_lhs = RID;
+          cmp_rhs = getSPIRVInt32Constant(0);
+          break;
+        default:
+          llvm_unreachable("Unexpected signed pointer comparison");
+          break;
+        }
+
+        Ops.clear();
+        Ops << CmpI->getType() << cmp_lhs << cmp_rhs;
+        RID = addSPIRVInst(Opcode, Ops);
+
+        setVariablePointersCapabilities(ArgTy->getPointerAddressSpace());
+      } else {
+        CmpI->print(errs());
+        std::string name = I.getParent()->getParent()->getName().str();
+        errs() << "\nPointer comparisons not supported prior to SPIR-V 1.4, "
+               << "in function " << name << "\n";
+        llvm_unreachable("Pointer comparisons not supported");
+      }
       break;
     }
 
@@ -5335,6 +5381,9 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
     case spv::OpVectorShuffle:
     case spv::OpIEqual:
     case spv::OpINotEqual:
+    case spv::OpPtrEqual:
+    case spv::OpPtrNotEqual:
+    case spv::OpPtrDiff:
     case spv::OpUGreaterThan:
     case spv::OpUGreaterThanEqual:
     case spv::OpULessThan:
