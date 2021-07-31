@@ -8,10 +8,6 @@
 #error FAIL
 #endif
 
-#ifdef __opencl_c_atomic_order_seq_cst
-#error FAIL
-#endif
-
 #ifdef __opencl_c_device_enqueue
 #error FAIL
 #endif
