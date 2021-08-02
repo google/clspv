@@ -20,6 +20,7 @@ namespace llvm {
 // This is against Google C++ style guide.
 class FunctionPass;
 class ModulePass;
+class LoopPass;
 class raw_pwrite_stream;
 class raw_ostream;
 template <typename T> class ArrayRef;
@@ -419,4 +420,6 @@ llvm::ModulePass *createAutoPodArgsPass();
 /// provide faster, lower precision alternatives.
 llvm::ModulePass *createNativeMathPass();
 
+/// Simplifies GEPs used as loop variables into a counter+GEP pair.
+llvm::Pass *createGEPVarPass();
 } // namespace clspv
