@@ -630,6 +630,9 @@ private:
   using FunctionToResourceVarsMapType =
       DenseMap<Function *, SmallVector<ResourceVarInfo *, 8>>;
   FunctionToResourceVarsMapType FunctionToResourceVarsMap;
+  // Map of functions and the literal samplers they use.  Built during sampler
+  // generation and used to create entry point interfaces.
+  DenseMap<Function *, SmallVector<SPIRVID, 8>> FunctionToLiteralSamplersMap;
 
   // What LLVM types map to SPIR-V types needing layout?  These are the
   // arrays and structures supporting storage buffers and uniform buffers.
@@ -1446,6 +1449,7 @@ bool SPIRVProducerPass::PointerRequiresLayout(unsigned aspace) {
   if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
     switch (aspace) {
     case AddressSpace::PushConstant:
+    case AddressSpace::Uniform:
     case AddressSpace::Global:
     case AddressSpace::Constant:
       return true;
@@ -1878,7 +1882,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         }
       }
 
-      Ops << getSPIRVType(ParamTy, needs_layout);
+      Ops << getSPIRVType(ParamTy);
     }
 
     RID = addSPIRVInst<kTypes>(spv::OpTypeFunction, Ops);
@@ -2156,6 +2160,11 @@ void SPIRVProducerPass::GenerateSamplers() {
         getSPIRVType(SamplerTy), spv::StorageClassUniformConstant);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
+
+    // Record mapping between the parent function and the sampler variables it
+    // uses so we can add it to its interface list
+    auto F = call->getParent()->getParent();
+    FunctionToLiteralSamplersMap[F].push_back(sampler_var_id);
 
     unsigned descriptor_set;
     unsigned binding;
@@ -2785,6 +2794,18 @@ void SPIRVProducerPass::GenerateModuleInfo() {
       for (auto *info : resource_var_at_index) {
         if (info) {
           Ops << info->var_id;
+        }
+      }
+
+      for (auto sampler_id : FunctionToLiteralSamplersMap[F]) {
+        Ops << sampler_id;
+      }
+
+      if (clspv::Option::ModuleConstantsInStorageBuffer()) {
+        auto *V = module->getGlobalVariable(
+            clspv::ClusteredConstantsVariableName(), true);
+        if (V) {
+          Ops << getValueMap()[V];
         }
       }
 
