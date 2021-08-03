@@ -458,7 +458,7 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
     standard = clang::LangStandard::lang_opencl30;
     break;
   case clspv::Option::SourceLanguage::OpenCL_CPP:
-    standard = clang::LangStandard::lang_openclcpp;
+    standard = clang::LangStandard::lang_openclcpp10;
     break;
   default:
     llvm_unreachable("Unknown source language");
