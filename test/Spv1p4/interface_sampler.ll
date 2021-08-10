@@ -3,7 +3,7 @@
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.1spv1.4 %t.spv
 
-; CHECK: OpEntryPoint GLCompute %{{.*}} "test" {{.*}} [[sampler:%[a-zA-Z0-9_]+]]
+; CHECK: OpEntryPoint GLCompute %{{.*}} "test" [[sampler:%[a-zA-Z0-9_]+]]
 ; CHECK: [[sampler_type:%[a-zA-Z0-9_]+]] = OpTypeSampler
 ; CHECK: [[sampler_ptr:%[a-zA-Z0-9_]+]] = OpTypePointer UniformConstant [[sampler_type]]
 ; CHECK: [[sampler]] = OpVariable [[sampler_ptr]] UniformConstant

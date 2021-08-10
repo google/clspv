@@ -633,6 +633,7 @@ private:
   // Map of functions and the literal samplers they use.  Built during sampler
   // generation and used to create entry point interfaces.
   DenseMap<Function *, SmallVector<SPIRVID, 8>> FunctionToLiteralSamplersMap;
+  UniqueVector<SPIRVID> LiteralSamplers;
 
   // What LLVM types map to SPIR-V types needing layout?  These are the
   // arrays and structures supporting storage buffers and uniform buffers.
@@ -1471,9 +1472,14 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
 }
 
 SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
-  // Only pointers, structs and arrays should have layout decorations.
+  // Only pointers, non-opaque structs and arrays should have layout
+  // decorations.
   if (!(isa<PointerType>(Ty) || isa<ArrayType>(Ty) || isa<StructType>(Ty))) {
     needs_layout = false;
+  } else if (auto StructTy = dyn_cast<StructType>(Ty)) {
+    if (StructTy->isOpaque()) {
+      needs_layout = false;
+    }
   }
   // |layout| is the index used for |Ty|'s entry in the type map. Each type
   // stores a laid out and non-laid out version of the type.
@@ -2156,15 +2162,19 @@ void SPIRVProducerPass::GenerateSamplers() {
       sampler_value = (*getSamplerMap())[third_param].first;
     }
 
+    // Add literal samplers to each entry point interface as an
+    // over-approximation.
     auto sampler_var_id = addSPIRVGlobalVariable(
-        getSPIRVType(SamplerTy), spv::StorageClassUniformConstant);
+        getSPIRVType(SamplerTy), spv::StorageClassUniformConstant,
+        /* InitId = */ SPIRVID(0), /* add_interface = */ true);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
 
     // Record mapping between the parent function and the sampler variables it
     // uses so we can add it to its interface list
-    auto F = call->getParent()->getParent();
-    FunctionToLiteralSamplersMap[F].push_back(sampler_var_id);
+    //auto F = call->getParent()->getParent();
+    //FunctionToLiteralSamplersMap[F].push_back(sampler_var_id);
+    //LiteralSamplers.insert(sampler_var_id);
 
     unsigned descriptor_set;
     unsigned binding;
@@ -2797,9 +2807,9 @@ void SPIRVProducerPass::GenerateModuleInfo() {
         }
       }
 
-      for (auto sampler_id : FunctionToLiteralSamplersMap[F]) {
-        Ops << sampler_id;
-      }
+      //for (auto sampler_id : LiteralSamplers) {
+      //  Ops << sampler_id;
+      //}
 
       if (clspv::Option::ModuleConstantsInStorageBuffer()) {
         auto *V = module->getGlobalVariable(
