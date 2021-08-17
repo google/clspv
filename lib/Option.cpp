@@ -122,11 +122,11 @@ llvm::cl::opt<bool> constant_args_in_uniform_buffer(
     llvm::cl::desc("Put pointer-to-constant kernel args in UBOs."));
 
 // Default to 64kB.
-llvm::cl::opt<int> maximum_ubo_size(
+llvm::cl::opt<uint32_t> maximum_ubo_size(
     "max-ubo-size", llvm::cl::init(64 << 10),
     llvm::cl::desc("Specify the maximum UBO array size in bytes."));
 
-llvm::cl::opt<int> maximum_pushconstant_size(
+llvm::cl::opt<uint32_t> maximum_pushconstant_size(
     "max-pushconstant-size", llvm::cl::init(128),
     llvm::cl::desc(
         "Specify the maximum push constant interface size in bytes."));
@@ -285,7 +285,7 @@ bool PodArgsInUniformBuffer() { return pod_ubo; }
 bool PodArgsInPushConstants() { return pod_pushconstant; }
 bool ShowIDs() { return show_ids; }
 bool ConstantArgsInUniformBuffer() { return constant_args_in_uniform_buffer; }
-uint64_t MaxUniformBufferSize() { return maximum_ubo_size; }
+uint32_t MaxUniformBufferSize() { return maximum_ubo_size; }
 uint32_t MaxPushConstantsSize() { return maximum_pushconstant_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
