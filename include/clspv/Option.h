@@ -98,7 +98,7 @@ bool ConstantArgsInUniformBuffer();
 // Returns the maximum UBO size. This size is specified in bytes and is used to
 // calculate the size of UBO arrays for constant arguments if
 // ConstantArgsInUniformBuffer returns true.
-uint64_t MaxUniformBufferSize();
+uint32_t MaxUniformBufferSize();
 
 // Returns the maximum push constant interface size. This size is specified in
 // bytes and is used to validate the the size of the POD kernel interface
