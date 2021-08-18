@@ -268,7 +268,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // Return attributes have to come first
     if (Attributes.hasAttributes(AttributeList::ReturnIndex)) {
       auto idx = AttributeList::ReturnIndex;
-      auto attrs = Attributes.getRetAttributes();
+      auto attrs = Attributes.getRetAttrs();
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
     }
 
@@ -279,7 +279,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
                       rinfo.arg_kind == clspv::ArgKind::PodPushConstant;
       if (!argIsPod && Attributes.hasParamAttrs(rinfo.old_index)) {
         auto idx = rinfo.new_index + AttributeList::FirstArgIndex;
-        auto attrs = Attributes.getParamAttributes(rinfo.old_index);
+        auto attrs = Attributes.getParamAttrs(rinfo.old_index);
         AttrBuildInfo.push_back(std::make_pair(idx, attrs));
       }
     }
@@ -287,7 +287,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     // And finally function attributes.
     if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
       auto idx = AttributeList::FunctionIndex;
-      auto attrs = Attributes.getFnAttributes();
+      auto attrs = Attributes.getFnAttrs();
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
     }
     auto newAttributes = AttributeList::get(M.getContext(), AttrBuildInfo);
