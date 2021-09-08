@@ -266,7 +266,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     SmallVector<std::pair<unsigned, AttributeSet>, 8> AttrBuildInfo;
 
     // Return attributes have to come first
-    if (Attributes.hasAttributes(AttributeList::ReturnIndex)) {
+    if (Attributes.hasAttributeAtIndex(AttributeList::ReturnIndex)) {
       auto idx = AttributeList::ReturnIndex;
       auto attrs = Attributes.getRetAttrs();
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
@@ -285,7 +285,7 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     }
 
     // And finally function attributes.
-    if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
+    if (Attributes.hasAttributeAtIndex(AttributeList::FunctionIndex)) {
       auto idx = AttributeList::FunctionIndex;
       auto attrs = Attributes.getFnAttrs();
       AttrBuildInfo.push_back(std::make_pair(idx, attrs));
