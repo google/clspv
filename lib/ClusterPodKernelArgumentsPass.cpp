@@ -266,11 +266,16 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     SmallVector<std::pair<unsigned, AttributeSet>, 8> AttrBuildInfo;
 
     // Return attributes have to come first
-    if (Attributes.hasAttributes(AttributeList::ReturnIndex)) {
+    const auto retAttrs = Attributes.getRetAttrs();
+    if (retAttrs.hasAttributes()) {
       auto idx = AttributeList::ReturnIndex;
-      auto attrs = Attributes.getRetAttrs();
-      AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+      AttrBuildInfo.push_back(std::make_pair(idx, retAttrs));
     }
+    //if (Attributes.hasAttributes(AttributeList::ReturnIndex)) {
+    //  auto idx = AttributeList::ReturnIndex;
+    //  auto attrs = Attributes.getRetAttrs();
+    //  AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+    //}
 
     // Then attributes for non-POD parameters
     for (auto &rinfo : RemapInfo) {
@@ -285,11 +290,16 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
     }
 
     // And finally function attributes.
-    if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
+    const auto fnAttrs = Attributes.getFnAttrs();
+    if (fnAttrs.hasAttributes()) {
       auto idx = AttributeList::FunctionIndex;
-      auto attrs = Attributes.getFnAttrs();
-      AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+      AttrBuildInfo.push_back(std::make_pair(idx, fnAttrs));
     }
+    //if (Attributes.hasAttributes(AttributeList::FunctionIndex)) {
+    //  auto idx = AttributeList::FunctionIndex;
+    //  auto attrs = Attributes.getFnAttrs();
+    //  AttrBuildInfo.push_back(std::make_pair(idx, attrs));
+    //}
     auto newAttributes = AttributeList::get(M.getContext(), AttrBuildInfo);
     NewFunc->setAttributes(newAttributes);
 
