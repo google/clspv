@@ -126,6 +126,11 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
       auto *prev = dst ? dst : UndefValue::get(dst_type);
       dst = builder.CreateInsertElement(prev, tmp_value, i);
     }
+  } else if (auto *dst_ptr_ty = dyn_cast<PointerType>(dst_type)) {
+    auto *ele = src_elements[*index];
+    dst = builder.CreateBitCast(ele, dst_ptr_ty);
+    assert(dst_ptr_ty == ele->getType() && "pointer type mismatch");
+    ++(*index);
   } else {
     // Scalar conversion eats up elements in src_elements.
     auto dst_width = DL.getTypeStoreSizeInBits(dst_type);
