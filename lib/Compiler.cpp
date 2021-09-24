@@ -747,6 +747,7 @@ int PopulatePassManager(
   pm->add(clspv::createSplatArgPass());
   pm->add(clspv::createSimplifyPointerBitcastPass());
   pm->add(clspv::createReplacePointerBitcastPass());
+  pm->add(llvm::createDeadCodeEliminationPass());
 
   pm->add(clspv::createUndoTranslateSamplerFoldPass());
 
@@ -769,6 +770,7 @@ int PopulatePassManager(
   // Run after DRA to clean up parameters and help reduce the need for variable
   // pointers.
   pm->add(clspv::createRemoveUnusedArgumentsPass());
+  pm->add(llvm::createDeadCodeEliminationPass());
 
   // SPIR-V 1.4 and higher do not need to splat scalar conditions for vector
   // data.
