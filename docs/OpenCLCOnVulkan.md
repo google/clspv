@@ -213,8 +213,7 @@ currently. Users should be aware of this and ensure they are not relying on alia
 
 #### Embedded Reflection Instructions
 
-Clspv embeds reflection information via use of the [NonSemantic.ClspvReflection](
-(http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html)
+Clspv embeds reflection information via use of the [NonSemantic.ClspvReflection](http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html)
 non-semantic extended instruction set.  It requires
 SPV\_KHR\_non\_semantic\_info. If your Vulkan implementation does not support
 VK\_KHR\_shader\_non\_semantic\_info, the reflection instructions should be
