@@ -652,11 +652,11 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   // Asynchronous copies
   case Builtins::kAsyncWorkGroupCopy:
-      return replaceAsyncWorkGroupCopy(F);
+    return replaceAsyncWorkGroupCopy(F);
   case Builtins::kAsyncWorkGroupStridedCopy:
-      return replaceAsyncWorkGroupStridedCopy(F);
+    return replaceAsyncWorkGroupStridedCopy(F);
   case Builtins::kWaitGroupEvents:
-      return replaceWaitGroupEvents(F);
+    return replaceWaitGroupEvents(F);
 
   default:
     break;
@@ -832,7 +832,7 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F) {
-    return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
     Module &M = *F.getParent();
 
     auto Dst = CI->getOperand(0);
@@ -846,7 +846,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F) {
-    return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
     Module &M = *F.getParent();
 
     auto Dst = CI->getOperand(0);
