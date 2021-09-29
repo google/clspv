@@ -14,7 +14,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float4* a,
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]]
-// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_22]]
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} {{.*}} [[_uint_0]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpBitcast [[_float]] [[_23]]
-// CHECK:  OpStore [[_24]] [[_25]]
+// CHECK-NEXT:  [[_23:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_22]]
+// CHECK-NEXT:  [[_24:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} {{.*}} [[_uint_0]] [[_uint_0]] [[_uint_0]]
+// CHECK-NEXT:  [[_25:%[0-9a-zA-Z_]+]] = OpBitcast [[_float]] [[_23]]
+// CHECK-NEXT:  OpStore [[_24]] [[_25]]

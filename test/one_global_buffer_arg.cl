@@ -5,6 +5,7 @@
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a)
 {
+  *a = 42;
 }
 // CHECK:  OpDecorate [[__runtimearr_uint:%[0-9a-zA-Z_]+]] ArrayStride 4
 // CHECK:  OpMemberDecorate [[__struct_3:%[0-9a-zA-Z_]+]] 0 Offset 0
