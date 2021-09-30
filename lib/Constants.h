@@ -84,6 +84,14 @@ inline std::string ClusteredConstantsVariableName() {
   return "clspv.clustered_constants";
 }
 
+inline std::string LocalInvocationIdVariableName() {
+  return "__spirv_LocalInvocationId";
+}
+
+inline std::string WorkgroupSizeVariableName() {
+  return "__spirv_WorkgroupSize";
+}
+
 } // namespace clspv
 
 #endif

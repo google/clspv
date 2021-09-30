@@ -73,11 +73,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
   changed |= defineGlobalOffsetBuiltin(M);
   changed |= defineGlobalIDBuiltin(M);
 
-  changed |=
-      defineMappedBuiltin(M, "_Z14get_local_sizej", "__spirv_WorkgroupSize", 1,
-                          AddressSpace::ModuleScopePrivate);
+  changed |= defineMappedBuiltin(M, "_Z14get_local_sizej",
+                                 clspv::WorkgroupSizeVariableName(), 1,
+                                 AddressSpace::ModuleScopePrivate);
   changed |= defineMappedBuiltin(M, "_Z12get_local_idj",
-                                 "__spirv_LocalInvocationId", 0);
+                                 clspv::LocalInvocationIdVariableName(), 0);
   changed |= defineNumGroupsBuiltin(M);
   changed |= defineGroupIDBuiltin(M);
   changed |= defineGlobalSizeBuiltin(M);

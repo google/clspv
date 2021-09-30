@@ -762,13 +762,15 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto Cst2 = Builder.getInt32(2);
 
   // get_local_id({0, 1, 2});
-  GlobalVariable *GVId = M.getGlobalVariable("__spirv_LocalInvocationId");
+  GlobalVariable *GVId =
+      M.getGlobalVariable(clspv::LocalInvocationIdVariableName());
   auto LocalId0 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst0}));
   auto LocalId1 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst1}));
   auto LocalId2 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst2}));
 
   // get_local_size({0, 1, 2});
-  GlobalVariable *GVSize = M.getGlobalVariable("__spirv_WorkgroupSize");
+  GlobalVariable *GVSize =
+      M.getGlobalVariable(clspv::WorkgroupSizeVariableName());
   auto LocalSize = Builder.CreateLoad(GVSize);
   auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
   auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);
