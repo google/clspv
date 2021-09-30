@@ -700,12 +700,16 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
         Builder.getInt32(clz(spv::MemorySemanticsWorkgroupMemoryMask) -
                          clz(CLK_LOCAL_MEM_FENCE)),
         "", CI);
+    auto MemorySemantics = BinaryOperator::Create(
+        Instruction::Or, MemorySemanticsWorkgroup,
+        ConstantInt::get(Builder.getInt32Ty(),
+                         spv::MemorySemanticsAcquireReleaseMask),
+        "", CI);
 
-    return clspv::InsertSPIRVOp(CI, spv::OpControlBarrier,
-                                {Attribute::NoDuplicate, Attribute::Convergent},
-                                Builder.getVoidTy(),
-                                {ConstantScopeWorkgroup, ConstantScopeWorkgroup,
-                                 MemorySemanticsWorkgroup});
+    return clspv::InsertSPIRVOp(
+        CI, spv::OpControlBarrier,
+        {Attribute::NoDuplicate, Attribute::Convergent}, Builder.getVoidTy(),
+        {ConstantScopeWorkgroup, ConstantScopeWorkgroup, MemorySemantics});
   });
 }
 

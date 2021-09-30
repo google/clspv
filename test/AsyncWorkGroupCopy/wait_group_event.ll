@@ -17,5 +17,6 @@ entry:
 
 declare spir_func void @_Z17wait_group_eventsiP9ocl_event(i32, %opencl.event_t**)
 
-; CHECK: [[tmp:%[a-zA-Z0-9_.]+]] = shl i32 1, 8
-; CHECK: call void @_Z8spirv.op.224.jjj(i32 224, i32 2, i32 2, i32 [[tmp]])
+; CHECK: [[tmp1:%[a-zA-Z0-9_.]+]] = shl i32 1, 8
+; CHECK: [[tmp2:%[a-zA-Z0-9_.]+]] = or i32 [[tmp1]], 8
+; CHECK: call void @_Z8spirv.op.224.jjj(i32 224, i32 2, i32 2, i32 [[tmp2]])
