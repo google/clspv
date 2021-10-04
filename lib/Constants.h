@@ -15,8 +15,8 @@
 #ifndef CLSPV_LIB_CONSTANTS_H_
 #define CLSPV_LIB_CONSTANTS_H_
 
-#include <string>
 #include "clspv/AddressSpace.h"
+#include <string>
 
 namespace clspv {
 

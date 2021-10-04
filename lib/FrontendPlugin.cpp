@@ -190,7 +190,7 @@ private:
     if (auto *VT = llvm::dyn_cast<ExtVectorType>(canonicalType)) {
       // We don't support vectors with more than 4 elements under all
       // circumstances.
-      if (4 < VT->getNumElements() && !clspv::Option::LongVectorSupport()) {
+      if (16 < VT->getNumElements() && !clspv::Option::LongVectorSupport()) {
         Report(CustomDiagnosticVectorsMoreThan4Elements, SR, SR);
         return false;
       }
