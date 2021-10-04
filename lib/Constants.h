@@ -16,6 +16,7 @@
 #define CLSPV_LIB_CONSTANTS_H_
 
 #include <string>
+#include "clspv/AddressSpace.h"
 
 namespace clspv {
 
@@ -88,8 +89,16 @@ inline std::string LocalInvocationIdVariableName() {
   return "__spirv_LocalInvocationId";
 }
 
+inline AddressSpace::Type LocalInvocationIdAddressSpace() {
+  return AddressSpace::Input;
+}
+
 inline std::string WorkgroupSizeVariableName() {
   return "__spirv_WorkgroupSize";
+}
+
+inline AddressSpace::Type WorkgroupSizeAddressSpace() {
+  return AddressSpace::ModuleScopePrivate;
 }
 
 } // namespace clspv

@@ -297,6 +297,9 @@ private:
   bool replacePown(Function &F);
 
   bool replaceWaitGroupEvents(Function &F);
+  GlobalVariable *
+  getOrCreateGlobalVariable(Module &M, std::string VariableName,
+                            AddressSpace::Type VariableAddressSpace);
   Value *replaceAsyncWorkGroupCopies(Module &M, CallInst *CI, Value *Dst,
                                      Value *Src, Value *NumGentypes,
                                      Value *Stride, Value *Event);
@@ -713,6 +716,23 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
   });
 }
 
+GlobalVariable *ReplaceOpenCLBuiltinPass::getOrCreateGlobalVariable(
+    Module &M, std::string VariableName,
+    AddressSpace::Type VariableAddressSpace) {
+    GlobalVariable *GV = M.getGlobalVariable(VariableName);
+    if (GV == nullptr) {
+        IntegerType *IT = IntegerType::get(M.getContext(), 32);
+        VectorType *VT = FixedVectorType::get(IT, 3);
+
+        GV = new GlobalVariable(M, VT, false, GlobalValue::ExternalLinkage,
+                                nullptr, VariableName, nullptr,
+                                GlobalValue::ThreadLocalMode::NotThreadLocal,
+                                VariableAddressSpace);
+        GV->setInitializer(Constant::getNullValue(VT));
+    }
+    return GV;
+}
+
 Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
     Module &M, CallInst *CI, Value *Dst, Value *Src, Value *NumGentypes,
     Value *Stride, Value *Event) {
@@ -767,14 +787,16 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
 
   // get_local_id({0, 1, 2});
   GlobalVariable *GVId =
-      M.getGlobalVariable(clspv::LocalInvocationIdVariableName());
+      getOrCreateGlobalVariable(M, clspv::LocalInvocationIdVariableName(),
+                                clspv::LocalInvocationIdAddressSpace());
   auto LocalId0 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst0}));
   auto LocalId1 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst1}));
   auto LocalId2 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst2}));
 
   // get_local_size({0, 1, 2});
   GlobalVariable *GVSize =
-      M.getGlobalVariable(clspv::WorkgroupSizeVariableName());
+      getOrCreateGlobalVariable(M, clspv::WorkgroupSizeVariableName(),
+                                clspv::WorkgroupSizeAddressSpace());
   auto LocalSize = Builder.CreateLoad(GVSize);
   auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
   auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);

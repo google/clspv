@@ -11,16 +11,15 @@ target triple = "spir-unknown-unknown"
 
 %opencl.event_t = type opaque
 
-@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+
 
 define dso_local spir_func %opencl.event_t* @foo(i16 addrspace(1)* %dst, i16 addrspace(3)* %src, i32 %num_gentypes, %opencl.event_t* %event) {
 entry:
-  %call = call spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1sPU3AS3Kcj9ocl_event(i16 addrspace(1)* %dst, i16 addrspace(3)* %src, i32 %num_gentypes, %opencl.event_t* %event)
+  %call = call spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1sPU3AS3Ksj9ocl_event(i16 addrspace(1)* %dst, i16 addrspace(3)* %src, i32 %num_gentypes, %opencl.event_t* %event)
   ret %opencl.event_t* %call
 }
 
-declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1sPU3AS3Kcj9ocl_event(i16 addrspace(1)*, i16 addrspace(3)*, i32, %opencl.event_t*)
+declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1sPU3AS3Ksj9ocl_event(i16 addrspace(1)*, i16 addrspace(3)*, i32, %opencl.event_t*)
 
 ; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* getelementptr (<3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 0), align
 ; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* getelementptr (<3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 1), align

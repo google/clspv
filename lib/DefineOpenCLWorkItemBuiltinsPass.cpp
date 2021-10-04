@@ -42,7 +42,7 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
 
   bool defineMappedBuiltin(Module &M, StringRef FuncName,
                            StringRef GlobalVarName, unsigned DefaultValue,
-                           AddressSpace::Type AddrSpace = AddressSpace::Input);
+                           AddressSpace::Type AddrSpace);
 
   bool defineGlobalIDBuiltin(Module &M);
   bool defineNumGroupsBuiltin(Module &M);
@@ -75,9 +75,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
 
   changed |= defineMappedBuiltin(M, "_Z14get_local_sizej",
                                  clspv::WorkgroupSizeVariableName(), 1,
-                                 AddressSpace::ModuleScopePrivate);
+                                 clspv::WorkgroupSizeAddressSpace());
   changed |= defineMappedBuiltin(M, "_Z12get_local_idj",
-                                 clspv::LocalInvocationIdVariableName(), 0);
+                                 clspv::LocalInvocationIdVariableName(), 0,
+                                 clspv::LocalInvocationIdAddressSpace());
   changed |= defineNumGroupsBuiltin(M);
   changed |= defineGroupIDBuiltin(M);
   changed |= defineGlobalSizeBuiltin(M);

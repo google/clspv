@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 
 # Copyright 2020 The Clspv Authors. All rights reserved.
@@ -30,8 +31,7 @@ target triple = "spir-unknown-unknown"
 
 %opencl.event_t = type opaque
 
-@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+${spirv_variables}
 
 define dso_local spir_func %opencl.event_t* @foo(${type} addrspace(${dst_addrspace})* %dst, ${type} addrspace(${src_addrspace})* %src, i32 %num_gentypes, i32 %stride, %opencl.event_t* %event) {
 entry:
@@ -77,6 +77,11 @@ STRIDE_SRC_TEMPLATE=Template("""
 ; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${src_addrspace})* %src, i32 [[srciterator]]
 """)
 
+SPIRV_VARIABLES="""
+@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
+@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+"""
+
 WIDTHS=[8, 16, 32, 64]
 VECTOR_SIZES=[1, 2, 3, 4]
 GLOBAL_ADDRSPACE='global'
@@ -117,7 +122,7 @@ def get_async_mangling(dst, src, width, vector_size):
     return get_addr_mangling(dst) + get_type_mangling(width, vector_size, 'signed') \
         + get_addr_mangling(src) + get_async_mangling_suffix(width, vector_size)
 
-def generate_one(dst, src, width, vector_size):
+def generate_one(dst, src, width, vector_size, spirv_variables):
     if src == GLOBAL_ADDRSPACE:
         stride_block = STRIDE_SRC_TEMPLATE.substitute(type = get_type(width, vector_size),
                                                       dst_addrspace = ADDRESS_SPACE[dst],
@@ -131,18 +136,23 @@ def generate_one(dst, src, width, vector_size):
                                    type = get_type(width, vector_size),
                                    dst_addrspace = ADDRESS_SPACE[dst],
                                    src_addrspace = ADDRESS_SPACE[src],
+                                   spirv_variables = SPIRV_VARIABLES if spirv_variables else "",
                                    async_mangling = get_async_mangling(dst, src, width, vector_size),
                                    op_copy_mangling = get_op_copy_mangling(dst, src, width, vector_size),
                                    stride_block = stride_block)
-    filename = 'async_work_group_strided_copy' +  '_v' + str(vector_size) + get_scalar_type(width) + '_' + src + '_to_' + dst + '.ll'
+    filename = 'async_work_group_strided_copy' +  '_v' + str(vector_size) + get_scalar_type(width) \
+        + '_' + src + '_to_' + dst \
+        + ('_explicit_spirv_variables' if spirv_variables else '') + '.ll'
     with open(filename, 'w') as file:
         file.write(template)
 
-def generate(dst, src):
+def generate(dst, src, spirv_variables):
     for width in WIDTHS:
         for vector_size in VECTOR_SIZES:
-            generate_one(dst, src, width, vector_size)
+            generate_one(dst, src, width, vector_size, spirv_variables)
 
-generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE)
-generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE)
+generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE, spirv_variables = True)
+generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE, spirv_variables = False)
+generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE, spirv_variables = True)
+generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE, spirv_variables = False)
 

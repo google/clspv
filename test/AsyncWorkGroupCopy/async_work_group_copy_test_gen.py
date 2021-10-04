@@ -30,8 +30,7 @@ target triple = "spir-unknown-unknown"
 
 %opencl.event_t = type opaque
 
-@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+${spirv_variables}
 
 define dso_local spir_func %opencl.event_t* @foo(${type} addrspace(${dst_addrspace})* %dst, ${type} addrspace(${src_addrspace})* %src, i32 %num_gentypes, %opencl.event_t* %event) {
 entry:
@@ -66,6 +65,11 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copy${async_mangling}j9
 ; CHECK: call void @_Z8spirv.op.63.${op_copy_mangling}(i32 63, ${type} addrspace(${dst_addrspace})* [[dsti]], ${type} addrspace(${src_addrspace})* [[srci]])
 ; CHECK: br label %[[cmp]]
 """)
+
+SPIRV_VARIABLES="""
+@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
+@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+"""
 
 WIDTHS=[8, 16, 32, 64]
 VECTOR_SIZES=[1, 2, 3, 4]
@@ -107,22 +111,27 @@ def get_async_mangling(dst, src, width, vector_size):
     return get_addr_mangling(dst) + get_type_mangling(width, vector_size, 'signed') \
         + get_addr_mangling(src) + get_async_mangling_suffix(width, vector_size)
 
-def generate_one(dst, src, width, vector_size):
+def generate_one(dst, src, width, vector_size, spirv_variables):
     template = TEMPLATE.substitute(test_gen_file = os.path.basename(__file__),
                                    type = get_type(width, vector_size),
                                    dst_addrspace = ADDRESS_SPACE[dst],
                                    src_addrspace = ADDRESS_SPACE[src],
+                                   spirv_variables = SPIRV_VARIABLES if spirv_variables else "",
                                    async_mangling = get_async_mangling(dst, src, width, vector_size),
                                    op_copy_mangling = get_op_copy_mangling(dst, src, width, vector_size))
-    filename = 'async_work_group_copy' +  '_v' + str(vector_size) + get_scalar_type(width) + '_' + src + '_to_' + dst + '.ll'
+    filename = 'async_work_group_copy' +  '_v' + str(vector_size) + get_scalar_type(width) \
+        + '_' + src + '_to_' + dst \
+        + ('_explicit_spirv_variables' if spirv_variables else '') + '.ll'
     with open(filename, 'w') as file:
         file.write(template)
 
-def generate(dst, src):
+def generate(dst, src, spirv_variables):
     for width in WIDTHS:
         for vector_size in VECTOR_SIZES:
-            generate_one(dst, src, width, vector_size)
+            generate_one(dst, src, width, vector_size, spirv_variables)
 
-generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE)
-generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE)
+generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE, spirv_variables = True)
+generate(dst = GLOBAL_ADDRSPACE, src = LOCAL_ADDRSPACE, spirv_variables = False)
+generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE, spirv_variables = True)
+generate(dst = LOCAL_ADDRSPACE, src = GLOBAL_ADDRSPACE, spirv_variables = False)
 

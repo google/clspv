@@ -11,8 +11,7 @@ target triple = "spir-unknown-unknown"
 
 %opencl.event_t = type opaque
 
-@__spirv_LocalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
-@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+
 
 define dso_local spir_func %opencl.event_t* @foo(<2 x i16> addrspace(1)* %dst, <2 x i16> addrspace(3)* %src, i32 %num_gentypes, %opencl.event_t* %event) {
 entry:
