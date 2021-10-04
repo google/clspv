@@ -719,18 +719,18 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
 GlobalVariable *ReplaceOpenCLBuiltinPass::getOrCreateGlobalVariable(
     Module &M, std::string VariableName,
     AddressSpace::Type VariableAddressSpace) {
-    GlobalVariable *GV = M.getGlobalVariable(VariableName);
-    if (GV == nullptr) {
-        IntegerType *IT = IntegerType::get(M.getContext(), 32);
-        VectorType *VT = FixedVectorType::get(IT, 3);
+  GlobalVariable *GV = M.getGlobalVariable(VariableName);
+  if (GV == nullptr) {
+    IntegerType *IT = IntegerType::get(M.getContext(), 32);
+    VectorType *VT = FixedVectorType::get(IT, 3);
 
-        GV = new GlobalVariable(M, VT, false, GlobalValue::ExternalLinkage,
-                                nullptr, VariableName, nullptr,
-                                GlobalValue::ThreadLocalMode::NotThreadLocal,
-                                VariableAddressSpace);
-        GV->setInitializer(Constant::getNullValue(VT));
-    }
-    return GV;
+    GV = new GlobalVariable(M, VT, false, GlobalValue::ExternalLinkage, nullptr,
+                            VariableName, nullptr,
+                            GlobalValue::ThreadLocalMode::NotThreadLocal,
+                            VariableAddressSpace);
+    GV->setInitializer(Constant::getNullValue(VT));
+  }
+  return GV;
 }
 
 Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
