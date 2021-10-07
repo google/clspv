@@ -15,6 +15,7 @@
 #ifndef CLSPV_LIB_CONSTANTS_H_
 #define CLSPV_LIB_CONSTANTS_H_
 
+#include "clspv/AddressSpace.h"
 #include <string>
 
 namespace clspv {
@@ -82,6 +83,22 @@ inline std::string KernelArgMapMetadataName() { return "kernel_arg_map"; }
 // Clustered constants global variable name.
 inline std::string ClusteredConstantsVariableName() {
   return "clspv.clustered_constants";
+}
+
+inline std::string LocalInvocationIdVariableName() {
+  return "__spirv_LocalInvocationId";
+}
+
+inline AddressSpace::Type LocalInvocationIdAddressSpace() {
+  return AddressSpace::Input;
+}
+
+inline std::string WorkgroupSizeVariableName() {
+  return "__spirv_WorkgroupSize";
+}
+
+inline AddressSpace::Type WorkgroupSizeAddressSpace() {
+  return AddressSpace::ModuleScopePrivate;
 }
 
 } // namespace clspv

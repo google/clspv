@@ -296,6 +296,16 @@ private:
   bool replaceExpm1(Function &F);
   bool replacePown(Function &F);
 
+  bool replaceWaitGroupEvents(Function &F);
+  GlobalVariable *
+  getOrCreateGlobalVariable(Module &M, std::string VariableName,
+                            AddressSpace::Type VariableAddressSpace);
+  Value *replaceAsyncWorkGroupCopies(Module &M, CallInst *CI, Value *Dst,
+                                     Value *Src, Value *NumGentypes,
+                                     Value *Stride, Value *Event);
+  bool replaceAsyncWorkGroupCopy(Function &F);
+  bool replaceAsyncWorkGroupStridedCopy(Function &F);
+
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertFunction from introducing a bitcasts between structs with
   // identical contents.
@@ -643,6 +653,14 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kPrefetch:
     return replacePrefetch(F);
 
+  // Asynchronous copies
+  case Builtins::kAsyncWorkGroupCopy:
+    return replaceAsyncWorkGroupCopy(F);
+  case Builtins::kAsyncWorkGroupStridedCopy:
+    return replaceAsyncWorkGroupStridedCopy(F);
+  case Builtins::kWaitGroupEvents:
+    return replaceWaitGroupEvents(F);
+
   default:
     break;
   }
@@ -658,6 +676,216 @@ Type *ReplaceOpenCLBuiltinPass::GetPairStruct(Type *type) {
   auto new_struct = StructType::get(type->getContext(), {type, type});
   PairStructMap[type] = new_struct;
   return new_struct;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
+  /* Simple implementation for wait_group_events to avoid dealing with the event
+   * list:
+   *
+   * void wait_group_events(int num_events, event_t *event_list) {
+   *   barrier(CLK_LOCAL_MEM_FENCE);
+   * }
+   *
+   */
+
+  enum {
+    CLK_LOCAL_MEM_FENCE = 0x01,
+    CLK_GLOBAL_MEM_FENCE = 0x02,
+    CLK_IMAGE_MEM_FENCE = 0x04
+  };
+
+  return replaceCallsWithValue(F, [](CallInst *CI) {
+    IRBuilder<> Builder(CI);
+
+    const auto ConstantScopeWorkgroup = Builder.getInt32(spv::ScopeWorkgroup);
+    const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
+        Instruction::Shl, Builder.getInt32(CLK_LOCAL_MEM_FENCE),
+        Builder.getInt32(clz(spv::MemorySemanticsWorkgroupMemoryMask) -
+                         clz(CLK_LOCAL_MEM_FENCE)),
+        "", CI);
+    auto MemorySemantics = BinaryOperator::Create(
+        Instruction::Or, MemorySemanticsWorkgroup,
+        ConstantInt::get(Builder.getInt32Ty(),
+                         spv::MemorySemanticsAcquireReleaseMask),
+        "", CI);
+
+    return clspv::InsertSPIRVOp(
+        CI, spv::OpControlBarrier,
+        {Attribute::NoDuplicate, Attribute::Convergent}, Builder.getVoidTy(),
+        {ConstantScopeWorkgroup, ConstantScopeWorkgroup, MemorySemantics});
+  });
+}
+
+GlobalVariable *ReplaceOpenCLBuiltinPass::getOrCreateGlobalVariable(
+    Module &M, std::string VariableName,
+    AddressSpace::Type VariableAddressSpace) {
+  GlobalVariable *GV = M.getGlobalVariable(VariableName);
+  if (GV == nullptr) {
+    IntegerType *IT = IntegerType::get(M.getContext(), 32);
+    VectorType *VT = FixedVectorType::get(IT, 3);
+
+    GV = new GlobalVariable(M, VT, false, GlobalValue::ExternalLinkage, nullptr,
+                            VariableName, nullptr,
+                            GlobalValue::ThreadLocalMode::NotThreadLocal,
+                            VariableAddressSpace);
+    GV->setInitializer(Constant::getNullValue(VT));
+  }
+  return GV;
+}
+
+Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
+    Module &M, CallInst *CI, Value *Dst, Value *Src, Value *NumGentypes,
+    Value *Stride, Value *Event) {
+  /*
+   * event_t *async_work_group_strided_copy(T *dst, T *src, size_t num_gentypes,
+   *                                        size_t stride, event_t event) {
+   *   size_t start_id = ((get_local_id(2) * get_local_size(1))
+   *                     + get_local_id(1)) * get_local_size(0)
+   *                     + get_local_id(0);
+   *   size_t incr = get_local_size(0) * get_local_size(1) * get_local_size(2);
+   *   for (size_t it = start_id; it < num_gentypes; it += incr) {
+   *     dst[it] = src[it * stride];
+   *   }
+   *   return event;
+   * }
+   */
+
+  /* BB:
+   *    before
+   *    async_work_group_strided_copy
+   *    after
+   *
+   * ================================
+   *
+   * BB:
+   *    before
+   *    start_id = f(get_local_ids, get_local_sizes)
+   *    incr = g(get_local_sizes)
+   *    br CmpBB
+   *
+   * CmpBB:
+   *    it = PHI(start_id, it)
+   *    cmp = it < NumGentypes
+   *    condBr cmp, LoopBB, ExitBB
+   *
+   * LoopBB:
+   *    dstI = dst[it]
+   *    srcI = src[it * stride]
+   *    OpCopyMemory dstI, srcI
+   *    it += incr
+   *    br CmpBB
+   *
+   * ExitBB:
+   *    after
+   */
+
+  IRBuilder<> Builder(CI);
+
+  auto Cst0 = Builder.getInt32(0);
+  auto Cst1 = Builder.getInt32(1);
+  auto Cst2 = Builder.getInt32(2);
+
+  // get_local_id({0, 1, 2});
+  GlobalVariable *GVId =
+      getOrCreateGlobalVariable(M, clspv::LocalInvocationIdVariableName(),
+                                clspv::LocalInvocationIdAddressSpace());
+  auto LocalId0 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst0}));
+  auto LocalId1 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst1}));
+  auto LocalId2 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst2}));
+
+  // get_local_size({0, 1, 2});
+  GlobalVariable *GVSize =
+      getOrCreateGlobalVariable(M, clspv::WorkgroupSizeVariableName(),
+                                clspv::WorkgroupSizeAddressSpace());
+  auto LocalSize = Builder.CreateLoad(GVSize);
+  auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
+  auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);
+  auto LocalSize2 = Builder.CreateExtractElement(LocalSize, Cst2);
+
+  // size_t start_id = ((get_local_id(2) * get_local_size(1))
+  //                   + get_local_id(1)) * get_local_size(0)
+  //                   + get_local_id(0);
+  auto tmp0 = Builder.CreateMul(LocalId2, LocalSize1);
+  auto tmp1 = Builder.CreateAdd(tmp0, LocalId1);
+  auto tmp2 = Builder.CreateMul(tmp1, LocalSize0);
+  auto StartId = Builder.CreateAdd(tmp2, LocalId0);
+
+  // size_t incr = get_local_size(0) * get_local_size(1) * get_local_size(2);
+  auto tmp3 = Builder.CreateMul(LocalSize0, LocalSize1);
+  auto Incr = Builder.CreateMul(tmp3, LocalSize2);
+
+  // Create BasicBlocks
+  auto BB = CI->getParent();
+  auto CmpBB = BasicBlock::Create(BB->getContext(), "", BB->getParent());
+  auto LoopBB = BasicBlock::Create(BB->getContext(), "", BB->getParent());
+  auto ExitBB = SplitBlock(BB, CI);
+
+  // BB
+  auto BrCmpBB = BranchInst::Create(CmpBB);
+  ReplaceInstWithInst(BB->getTerminator(), BrCmpBB);
+
+  // CmpBB
+  Builder.SetInsertPoint(CmpBB);
+  auto PHIIterator = Builder.CreatePHI(Builder.getInt32Ty(), 2);
+  auto Cmp = Builder.CreateCmp(CmpInst::ICMP_ULT, PHIIterator, NumGentypes);
+  Builder.CreateCondBr(Cmp, LoopBB, ExitBB);
+
+  // LoopBB
+  Builder.SetInsertPoint(LoopBB);
+
+  // default values for non-strided copies
+  Value *SrcIterator = PHIIterator;
+  Value *DstIterator = PHIIterator;
+  if (Stride != nullptr && (Dst->getType()->getPointerAddressSpace() ==
+                            clspv::AddressSpace::Global)) {
+    // async_work_group_strided_copy local to global case
+    DstIterator = Builder.CreateMul(PHIIterator, Stride);
+  } else if (Stride != nullptr && (Dst->getType()->getPointerAddressSpace() ==
+                                   clspv::AddressSpace::Local)) {
+    // async_work_group_strided_copy global to local case
+    SrcIterator = Builder.CreateMul(PHIIterator, Stride);
+  }
+  auto DstI = Builder.CreateGEP(Dst, {DstIterator});
+  auto SrcI = Builder.CreateGEP(Src, {SrcIterator});
+  auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
+  auto Br = Builder.CreateBr(CmpBB);
+  clspv::InsertSPIRVOp(Br, spv::OpCopyMemory, {}, Builder.getVoidTy(),
+                       {DstI, SrcI});
+
+  // Set PHIIterator for CmpBB now that we have NewIterator
+  PHIIterator->addIncoming(StartId, BB);
+  PHIIterator->addIncoming(NewIterator, LoopBB);
+
+  return Event;
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F) {
+  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+    Module &M = *F.getParent();
+
+    auto Dst = CI->getOperand(0);
+    auto Src = CI->getOperand(1);
+    auto NumGentypes = CI->getOperand(2);
+    auto Event = CI->getOperand(3);
+
+    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, NumGentypes, nullptr,
+                                       Event);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F) {
+  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+    Module &M = *F.getParent();
+
+    auto Dst = CI->getOperand(0);
+    auto Src = CI->getOperand(1);
+    auto NumGentypes = CI->getOperand(2);
+    auto Stride = CI->getOperand(3);
+    auto Event = CI->getOperand(4);
+
+    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, NumGentypes, Stride,
+                                       Event);
+  });
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceAbs(Function &F) {

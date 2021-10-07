@@ -832,11 +832,6 @@ The `vstore_half_rte()`, `vstore_half_rtz()`, `vstore_half<size>_rte()`,
 result correctly if the destination address was not declared as a `half*` on the
 kernel entry point.
 
-#### Async Copy and Prefetch Functions
-
-The `async_work_group_copy()`, `async_work_group_strided_copy()`,
-`wait_group_events()`, and `prefetch()` built-in functions **must not** be used.
-
 #### Miscellaneous Vector Functions
 
 The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions **must not**
