@@ -67,7 +67,8 @@ if (NOT DEFINED SPIRV_TOOLS_SOURCE_DIR)
   use_component(${SPIRV_TOOLS_SOURCE_DIR})
 endif()
 
-if (NOT TARGET spirv-dis)
+option(CLSPV_BUILD_TESTS "Enable the build of clspv tests" ON)
+if (NOT TARGET spirv-dis AND CLSPV_BUILD_TESTS)
   # First tell SPIR-V Tools where to find SPIR-V Headers
   set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
 
@@ -170,8 +171,10 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 # Bring in our tools folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
-# Bring in our test folder
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+if (CLSPV_BUILD_TESTS)
+  # Bring in our test folder
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+endif()
 
 
 if(ENABLE_CLSPV_TOOLS_INSTALL)
