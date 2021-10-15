@@ -962,7 +962,7 @@ void SPIRVProducerPass::FindGlobalConstVars() {
           [&GlobalConstFuncTyMap](Value *gv, CallInst *call) {
             // Find argument index.
             unsigned index = 0;
-            for (unsigned i = 0; i < call->getNumArgOperands(); i++) {
+            for (unsigned i = 0; i < call->arg_size(); i++) {
               if (gv == call->getOperand(i)) {
                 // TODO(dneto): Should we break here?
                 index = i;
@@ -3182,7 +3182,7 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
       Ops << Call->getType();
     }
 
-    for (unsigned i = 0; i < Call->getNumArgOperands(); i++) {
+    for (unsigned i = 0; i < Call->arg_size(); i++) {
       Ops << Call->getArgOperand(i);
     }
 
@@ -3200,7 +3200,7 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
         Ops << Call->getType();
       }
 
-      for (unsigned i = 1; i < Call->getNumArgOperands(); i++) {
+      for (unsigned i = 1; i < Call->arg_size(); i++) {
         Ops << Call->getArgOperand(i);
       }
 
@@ -3724,7 +3724,7 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
     break;
   }
 
-  for (Use &use : Call->arg_operands()) {
+  for (Use &use : Call->args()) {
     Operands << use.get();
   }
 
@@ -3822,7 +3822,7 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
 
       Ops << Call->getType() << ExtInstImportID << EInst;
 
-      for (auto &use : Call->arg_operands()) {
+      for (auto &use : Call->args()) {
         Ops << use.get();
       }
 
@@ -4846,7 +4846,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
         // The result type.
         Ops << Call->getType();
 
-        for (Use &use : Call->arg_operands()) {
+        for (Use &use : Call->args()) {
           Ops << use.get();
         }
 
