@@ -177,7 +177,7 @@ bool UnhideConstantLoadsPass::runOnModule(Module &M) {
   for (auto *F : WorkList) {
     for (auto &use : F->uses()) {
       if (auto *call = dyn_cast<CallInst>(use.getUser())) {
-        assert(call->getNumArgOperands() == 1);
+        assert(call->arg_size() == 1);
         auto *load = call->getArgOperand(0);
         call->replaceAllUsesWith(load);
         RemoveList.push_back(call);

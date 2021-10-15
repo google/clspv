@@ -1194,7 +1194,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     Value *MemOrder = ConstantMemorySemantics;
     Value *MemScope = ConstantScopeWorkgroup;
     IRBuilder<> builder(CI);
-    if (CI->getNumArgOperands() > 1) {
+    if (CI->arg_size() > 1) {
       MemOrder = MemoryOrderSemantics(CI->getArgOperand(1), false, CI,
                                       semantics, false);
       MemScope = MemoryScope(CI->getArgOperand(2), false, CI);
@@ -2468,7 +2468,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     SmallVector<Type *, 3> types;
     SmallVector<Value *, 3> args;
-    for (size_t i = 0; i < CI->getNumArgOperands(); ++i) {
+    for (size_t i = 0; i < CI->arg_size(); ++i) {
       types.push_back(CI->getArgOperand(i)->getType());
       args.push_back(CI->getArgOperand(i));
     }
@@ -2592,7 +2592,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
     // The memory semantics.
     Params.push_back(ConstantMemorySemantics);
 
-    if (2 < CI->getNumArgOperands()) {
+    if (2 < CI->arg_size()) {
       // The unequal memory semantics.
       Params.push_back(ConstantMemorySemantics);
 
@@ -2601,7 +2601,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
       // The comparator.
       Params.push_back(CI->getArgOperand(1));
-    } else if (1 < CI->getNumArgOperands()) {
+    } else if (1 < CI->arg_size()) {
       // The value.
       Params.push_back(CI->getArgOperand(1));
     }
@@ -2923,10 +2923,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
     if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
       pointer = cast->getPointerOperand();
     }
-    Value *order_arg =
-        Call->getNumArgOperands() > 1 ? Call->getArgOperand(1) : nullptr;
-    Value *scope_arg =
-        Call->getNumArgOperands() > 2 ? Call->getArgOperand(2) : nullptr;
+    Value *order_arg = Call->arg_size() > 1 ? Call->getArgOperand(1) : nullptr;
+    Value *scope_arg = Call->arg_size() > 2 ? Call->getArgOperand(2) : nullptr;
     bool is_global = pointer->getType()->getPointerAddressSpace() ==
                      clspv::AddressSpace::Global;
     auto order = MemoryOrderSemantics(order_arg, is_global, Call,
@@ -2947,10 +2945,8 @@ bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
       pointer = cast->getPointerOperand();
     }
     Value *value = Call->getArgOperand(1);
-    Value *order_arg =
-        Call->getNumArgOperands() > 2 ? Call->getArgOperand(2) : nullptr;
-    Value *scope_arg =
-        Call->getNumArgOperands() > 3 ? Call->getArgOperand(3) : nullptr;
+    Value *order_arg = Call->arg_size() > 2 ? Call->getArgOperand(2) : nullptr;
+    Value *scope_arg = Call->arg_size() > 3 ? Call->getArgOperand(3) : nullptr;
     bool is_global = pointer->getType()->getPointerAddressSpace() ==
                      clspv::AddressSpace::Global;
     auto scope = MemoryScope(scope_arg, is_global, Call);
@@ -2976,11 +2972,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     bool is_global = pointer->getType()->getPointerAddressSpace() ==
                      clspv::AddressSpace::Global;
     Value *success_arg =
-        Call->getNumArgOperands() > 3 ? Call->getArgOperand(3) : nullptr;
+        Call->arg_size() > 3 ? Call->getArgOperand(3) : nullptr;
     Value *failure_arg =
-        Call->getNumArgOperands() > 4 ? Call->getArgOperand(4) : nullptr;
-    Value *scope_arg =
-        Call->getNumArgOperands() > 5 ? Call->getArgOperand(5) : nullptr;
+        Call->arg_size() > 4 ? Call->getArgOperand(4) : nullptr;
+    Value *scope_arg = Call->arg_size() > 5 ? Call->getArgOperand(5) : nullptr;
     auto scope = MemoryScope(scope_arg, is_global, Call);
     auto success = MemoryOrderSemantics(success_arg, is_global, Call,
                                         spv::MemorySemanticsAcquireReleaseMask);
