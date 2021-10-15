@@ -26,6 +26,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 
+#include "Constants.h"
 #include "clspv/Passes.h"
 
 #include "Builtins.h"
@@ -138,6 +139,9 @@ private:
   /// calls to its scalar version.
   Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
                             ArrayRef<Value *> EquivalentArgs);
+
+  Value *convertSpirvOpBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
+                                   ArrayRef<Value *> EquivalentArgs);
 
   /// Create an alternative version of @p F that doesn't have long vectors as
   /// parameter or return types.
@@ -260,6 +264,17 @@ getMangledScalarName(const clspv::Builtins::FunctionInfo &VectorInfo) {
     ScalarInfo.getParameter(i).vector_size = 0;
   }
   return clspv::Builtins::GetMangledFunctionName(ScalarInfo);
+}
+
+std::string
+getSpirvCompliantOpAnyOrAllName(const clspv::Builtins::FunctionInfo &IInfo) {
+  clspv::Builtins::FunctionInfo Info = IInfo;
+  for (size_t i = 0; i < Info.getParameterCount(); ++i) {
+    if (Info.getParameter(i).vector_size > (int)clspv::SPIRVMaxVectorSize()) {
+      Info.getParameter(i).vector_size = clspv::SPIRVMaxVectorSize();
+    }
+  }
+  return clspv::Builtins::GetMangledFunctionName(Info);
 }
 
 /// Get the scalar overload for the given OpenCL builtin function @p Builtin.
@@ -531,6 +546,87 @@ Function *createFunctionWithMappedTypes(Function &F,
   return Wrapper;
 }
 
+FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
+  while (VectorTy->getNumElements() > clspv::SPIRVMaxVectorSize()) {
+    VectorTy = FixedVectorType::getHalfElementsVectorType(VectorTy);
+  }
+  return VectorTy;
+}
+
+using ReduceOperationFactory =
+    std::function<Value *(IRBuilder<> &, Value *, Value *)>;
+
+Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
+                                  ArrayRef<Value *> EquivalentArgs,
+                                  ReduceOperationFactory Reduce) {
+  assert(EquivalentArgs.size() == 2);
+  auto *VectorOperand = VectorCall.getOperand(1);
+  auto *VectorTy = VectorOperand->getType();
+  assert(VectorTy->isVectorTy());
+  FixedVectorType *FixedVectorTy = dyn_cast<FixedVectorType>(VectorTy);
+  FixedVectorType *DstType = getSpirvCompliantVectorType(FixedVectorTy);
+
+  Function *OpAnyOrAllInitialFunction = VectorCall.getCalledFunction();
+
+  std::string OpAnyOrAllFunctionName = getSpirvCompliantOpAnyOrAllName(
+      clspv::Builtins::Lookup(OpAnyOrAllInitialFunction));
+
+  auto *M = OpAnyOrAllInitialFunction->getParent();
+  Function *OpAnyOrAllFunction = M->getFunction(OpAnyOrAllFunctionName);
+
+  /* Create the function if it does not exist in the module */
+  if (OpAnyOrAllFunction == nullptr) {
+    SmallVector<Type *, 2> ParamTys;
+    ParamTys.push_back(VectorCall.getOperand(0)->getType());
+    ParamTys.push_back(DstType);
+
+    OpAnyOrAllFunction = Function::Create(
+        FunctionType::get(VectorCall.getFunctionType()->getReturnType(),
+                          ParamTys, false),
+        OpAnyOrAllInitialFunction->getLinkage(), OpAnyOrAllFunctionName);
+
+    OpAnyOrAllFunction->setCallingConv(
+        OpAnyOrAllInitialFunction->getCallingConv());
+    OpAnyOrAllFunction->copyAttributesFrom(OpAnyOrAllInitialFunction);
+
+    M->getFunctionList().push_front(OpAnyOrAllFunction);
+  }
+
+  IRBuilder<> B(&VectorCall);
+  Value *ReturnValue = nullptr;
+  Value *Vector = UndefValue::get(DstType);
+  unsigned int InitNumElements = FixedVectorTy->getNumElements();
+  unsigned int DstNumElements = DstType->getNumElements();
+  for (unsigned eachCall = 0; eachCall < InitNumElements / DstNumElements;
+       eachCall++) {
+    for (unsigned eachVecElement = 0; eachVecElement < DstNumElements;
+         eachVecElement++) {
+      auto *Val = B.CreateExtractValue(
+          EquivalentArgs[1], eachVecElement + eachCall * DstNumElements);
+      Vector = B.CreateInsertElement(Vector, Val, B.getInt64(eachVecElement));
+    }
+
+    SmallVector<Value *, 2> Args;
+    Args.push_back(EquivalentArgs[0]);
+    Args.push_back(Vector);
+
+    CallInst *Call = B.CreateCall(OpAnyOrAllFunction, Args);
+    Call->copyIRFlags(&VectorCall);
+    Call->copyMetadata(VectorCall);
+    Call->setCallingConv(VectorCall.getCallingConv());
+
+    if (eachCall == 0) {
+      ReturnValue = Call;
+    } else {
+      ReturnValue = Reduce(B, ReturnValue, Call);
+    }
+  }
+
+  assert(ReturnValue != nullptr);
+
+  return ReturnValue;
+}
+
 bool LongVectorLoweringPass::runOnModule(Module &M) {
   bool Modified = runOnGlobals(M);
 
@@ -709,12 +805,15 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
   assert(F && "Only function calls are supported.");
 
   const auto &Info = clspv::Builtins::Lookup(F);
+  bool SpirvOpBuiltin = (Info.getType() == clspv::Builtins::kSpirvOp);
   bool OpenCLBuiltin = (Info.getType() != clspv::Builtins::kBuiltinNone);
   bool Builtin = (OpenCLBuiltin || F->isIntrinsic());
 
   Value *V = nullptr;
-  if (Builtin && F->isDeclaration()) {
+  if (Builtin && F->isDeclaration() && !SpirvOpBuiltin) {
     V = convertBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
+  } else if (SpirvOpBuiltin && F->isDeclaration()) {
+    V = convertSpirvOpBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
   } else {
     V = convertUserDefinedFunctionCall(I, EquivalentArgs);
   }
@@ -1285,6 +1384,30 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
 
   return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
                                 ScalarFactory);
+}
+
+Value *LongVectorLoweringPass::convertSpirvOpBuiltinCall(
+    CallInst &VectorCall, Type *EquivalentReturnTy,
+    ArrayRef<Value *> EquivalentArgs) {
+  if (auto *SpirvIdValue = dyn_cast<ConstantInt>(VectorCall.getOperand(0))) {
+    switch (SpirvIdValue->getZExtValue()) {
+    case 154: { // OpAny
+      auto ReduceFactory = [](auto &Builder, auto A, auto B) {
+        return Builder.CreateOr(A, B);
+      };
+      return convertOpAnyOrAllOperation(VectorCall, EquivalentArgs,
+                                        ReduceFactory);
+    }
+    case 155: { // OpAll
+      auto ReduceFactory = [](auto &Builder, auto A, auto B) {
+        return Builder.CreateAnd(A, B);
+      };
+      return convertOpAnyOrAllOperation(VectorCall, EquivalentArgs,
+                                        ReduceFactory);
+    }
+    }
+  }
+  return convertBuiltinCall(VectorCall, EquivalentReturnTy, EquivalentArgs);
 }
 
 Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {

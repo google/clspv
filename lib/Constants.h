@@ -101,6 +101,8 @@ inline AddressSpace::Type WorkgroupSizeAddressSpace() {
   return AddressSpace::ModuleScopePrivate;
 }
 
+inline unsigned int SPIRVMaxVectorSize() { return 4; }
+
 } // namespace clspv
 
 #endif
