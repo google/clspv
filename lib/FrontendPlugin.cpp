@@ -24,8 +24,8 @@
 
 #include "clspv/Option.h"
 
-#include "FrontendPlugin.h"
 #include "Constants.h"
+#include "FrontendPlugin.h"
 
 #include <unordered_set>
 
