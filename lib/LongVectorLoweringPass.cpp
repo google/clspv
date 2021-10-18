@@ -140,6 +140,8 @@ private:
   Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
                             ArrayRef<Value *> EquivalentArgs);
 
+  // Map calls of Spirv Operators builtin that cannot be convert using
+  // convertBuiltinCall
   Value *convertSpirvOpBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
                                    ArrayRef<Value *> EquivalentArgs);
 
@@ -266,8 +268,10 @@ getMangledScalarName(const clspv::Builtins::FunctionInfo &VectorInfo) {
   return clspv::Builtins::GetMangledFunctionName(ScalarInfo);
 }
 
-std::string
-getSpirvCompliantOpAnyOrAllName(const clspv::Builtins::FunctionInfo &IInfo) {
+std::string getSpirvCompliantName(const clspv::Builtins::FunctionInfo &IInfo) {
+  // Copy the informations about the vector version.
+  // Return type is not important for mangling.
+  // Only update arguments to have spirv compatible vectors.
   clspv::Builtins::FunctionInfo Info = IInfo;
   for (size_t i = 0; i < Info.getParameterCount(); ++i) {
     if (Info.getParameter(i).vector_size > (int)clspv::SPIRVMaxVectorSize()) {
@@ -556,6 +560,11 @@ FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
 using ReduceOperationFactory =
     std::function<Value *(IRBuilder<> &, Value *, Value *)>;
 
+/*
+ * Convert Any/All Operation on long vectors by using Any/All operators on
+ * smaller sub-vectors.
+ * Then reduce the severals results with Or/And operator.
+ */
 Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
                                   ArrayRef<Value *> EquivalentArgs,
                                   ReduceOperationFactory Reduce) {
@@ -568,8 +577,8 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
 
   Function *OpAnyOrAllInitialFunction = VectorCall.getCalledFunction();
 
-  std::string OpAnyOrAllFunctionName = getSpirvCompliantOpAnyOrAllName(
-      clspv::Builtins::Lookup(OpAnyOrAllInitialFunction));
+  std::string OpAnyOrAllFunctionName =
+      getSpirvCompliantName(clspv::Builtins::Lookup(OpAnyOrAllInitialFunction));
 
   auto *M = OpAnyOrAllInitialFunction->getParent();
   Function *OpAnyOrAllFunction = M->getFunction(OpAnyOrAllFunctionName);
@@ -597,8 +606,11 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
   Value *Vector = UndefValue::get(DstType);
   unsigned int InitNumElements = FixedVectorTy->getNumElements();
   unsigned int DstNumElements = DstType->getNumElements();
+  // for each sub-vector calls
   for (unsigned eachCall = 0; eachCall < InitNumElements / DstNumElements;
        eachCall++) {
+
+    // recreate the sub-vector
     for (unsigned eachVecElement = 0; eachVecElement < DstNumElements;
          eachVecElement++) {
       auto *Val = B.CreateExtractValue(
