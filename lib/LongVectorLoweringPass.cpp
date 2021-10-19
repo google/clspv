@@ -558,6 +558,30 @@ FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
   return VectorTy;
 }
 
+Value *convertOpCopyMemoryOperation(CallInst &VectorCall,
+                                    ArrayRef<Value *> EquivalentArgs) {
+  auto *DstOperand = EquivalentArgs[1];
+  auto *SrcOperand = EquivalentArgs[2];
+  auto *DstTy = DstOperand->getType()->getPointerElementType();
+  assert(DstTy->isStructTy());
+  StructType *Ty = dyn_cast<StructType>(DstTy);
+
+  IRBuilder<> B(&VectorCall);
+  Value *ReturnValue = nullptr;
+  unsigned int InitNumElements = Ty->getNumElements();
+  // for each element
+  for (unsigned eachElem = 0; eachElem < InitNumElements; eachElem++) {
+    auto *SrcGEP =
+        B.CreateGEP(SrcOperand, {B.getInt32(0), B.getInt32(eachElem)});
+    auto *Val = B.CreateLoad(SrcGEP);
+    auto *DstGEP =
+        B.CreateGEP(DstOperand, {B.getInt32(0), B.getInt32(eachElem)});
+    ReturnValue = B.CreateStore(Val, DstGEP);
+  }
+
+  return ReturnValue;
+}
+
 using ReduceOperationFactory =
     std::function<Value *(IRBuilder<> &, Value *, Value *)>;
 
@@ -1418,6 +1442,8 @@ Value *LongVectorLoweringPass::convertSpirvOpBuiltinCall(
       return convertOpAnyOrAllOperation(VectorCall, EquivalentArgs,
                                         ReduceFactory);
     }
+    case 63: // OpCopyMemory
+      return convertOpCopyMemoryOperation(VectorCall, EquivalentArgs);
     }
   }
   return convertBuiltinCall(VectorCall, EquivalentReturnTy, EquivalentArgs);
