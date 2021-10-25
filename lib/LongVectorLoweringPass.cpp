@@ -479,6 +479,7 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
 
   for (std::size_t i = 0; i < ArgumentCount; ++i) {
     auto *NewArg = Wrapper.getArg(i);
+    NewArg->takeName(Wrappee.getArg(i));
     auto *OldArgTy = Wrappee.getFunctionType()->getParamType(i);
     auto *EquivalentArg = convertEquivalentValue(B, NewArg, OldArgTy);
     Args.push_back(EquivalentArg);

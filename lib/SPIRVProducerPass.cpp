@@ -512,11 +512,11 @@ struct SPIRVProducerPass final : public ModulePass {
   void GenerateKernelReflection();
   void GeneratePushConstantReflection();
   void GenerateSpecConstantReflection();
-  void AddArgumentReflection(SPIRVID kernel_decl, const std::string &name,
-                             clspv::ArgKind arg_kind, uint32_t ordinal,
-                             uint32_t descriptor_set, uint32_t binding,
-                             uint32_t offset, uint32_t size, uint32_t spec_id,
-                             uint32_t elem_size);
+  void AddArgumentReflection(const Function &F, SPIRVID kernel_decl,
+                             const std::string &name, clspv::ArgKind arg_kind,
+                             uint32_t ordinal, uint32_t descriptor_set,
+                             uint32_t binding, uint32_t offset, uint32_t size,
+                             uint32_t spec_id, uint32_t elem_size);
 
 private:
 
@@ -6097,7 +6097,7 @@ void SPIRVProducerPass::GenerateKernelReflection() {
           descriptor_set = info->descriptor_set;
           binding = info->binding;
         }
-        AddArgumentReflection(kernel_decl, name.str(), argKind, ordinal,
+        AddArgumentReflection(F, kernel_decl, name.str(), argKind, ordinal,
                               descriptor_set, binding, arg_offset, arg_size,
                               static_cast<uint32_t>(spec_id), elem_size);
       }
@@ -6125,7 +6125,7 @@ void SPIRVProducerPass::GenerateKernelReflection() {
 
           // Local pointer arguments are unused in this case.
           // offset, spec_id and elem_size always 0.
-          AddArgumentReflection(kernel_decl, arg->getName().str(),
+          AddArgumentReflection(F, kernel_decl, arg->getName().str(),
                                 info->arg_kind, arg_index, info->descriptor_set,
                                 info->binding, 0, arg_size, 0, 0);
         }
@@ -6139,7 +6139,7 @@ void SPIRVProducerPass::GenerateKernelReflection() {
           auto &local_arg_info = LocalSpecIdInfoMap[where->second];
 
           // descriptor_set, binding, offset and size are always 0.
-          AddArgumentReflection(kernel_decl, arg->getName().str(),
+          AddArgumentReflection(F, kernel_decl, arg->getName().str(),
                                 ArgKind::Local, arg_index, 0, 0, 0, 0,
                                 static_cast<uint32_t>(local_arg_info.spec_id),
                                 static_cast<uint32_t>(GetTypeAllocSize(
@@ -6151,16 +6151,77 @@ void SPIRVProducerPass::GenerateKernelReflection() {
 }
 
 void SPIRVProducerPass::AddArgumentReflection(
-    SPIRVID kernel_decl, const std::string &name, clspv::ArgKind arg_kind,
-    uint32_t ordinal, uint32_t descriptor_set, uint32_t binding,
-    uint32_t offset, uint32_t size, uint32_t spec_id, uint32_t elem_size) {
+    const Function &kernelFn, SPIRVID kernel_decl, const std::string &name,
+    clspv::ArgKind arg_kind, uint32_t ordinal, uint32_t descriptor_set,
+    uint32_t binding, uint32_t offset, uint32_t size, uint32_t spec_id,
+    uint32_t elem_size) {
   // Generate ArgumentInfo for this argument.
-  // TODO: generate remaining optional operands.
   auto import_id = getReflectionImport();
   auto arg_name = addSPIRVInst<kDebug>(spv::OpString, name.c_str());
   auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
   SPIRVOperandVec Ops;
   Ops << void_id << import_id << reflection::ExtInstArgumentInfo << arg_name;
+
+  if (clspv::Option::KernelArgInfo()) {
+    auto const &type_op =
+        kernelFn.getMetadata("kernel_arg_type")->getOperand(ordinal);
+    auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
+    auto type_name =
+        addSPIRVInst<kDebug>(spv::OpString, type_name_str.str().c_str());
+    Ops << type_name;
+
+    auto const &addrspace_op =
+        kernelFn.getMetadata("kernel_arg_addr_space")->getOperand(ordinal);
+    auto addrspace =
+        mdconst::extract<ConstantInt>(addrspace_op)->getZExtValue();
+    unsigned addrspace_enum_value = 0x119E; // CL_KERNEL_ARG_ADDRESS_PRIVATE
+    switch (addrspace) {
+    case clspv::AddressSpace::Global:
+      addrspace_enum_value = 0x119B; // CL_KERNEL_ARG_ADDRESS_GLOBAL
+      break;
+    case clspv::AddressSpace::Constant:
+      addrspace_enum_value = 0x119D; // CL_KERNEL_ARG_ADDRESS_CONSTANT
+      break;
+    case clspv::AddressSpace::Local:
+      addrspace_enum_value = 0x119C; // CL_KERNEL_ARG_ADDRESS_LOCAL
+      break;
+    }
+    auto addrspace_enum = getSPIRVInt32Constant(addrspace_enum_value);
+    Ops << addrspace_enum;
+
+    auto const &access_qual_op =
+        kernelFn.getMetadata("kernel_arg_access_qual")->getOperand(ordinal);
+    auto const &access_qual_str =
+        dyn_cast<MDString>(access_qual_op)->getString();
+    unsigned access_qual_enum_value =
+        StringSwitch<unsigned>(access_qual_str)
+            .Case("read_only", 0x11A0)  // CL_KERNEL_ARG_ACCESS_READ_ONLY
+            .Case("write_only", 0x11A1) // CL_KERNEL_ARG_ACCESS_WRITE_ONLY
+            .Case("read_write", 0x11A2) // CL_KERNEL_ARG_ACCESS_READ_WRITE
+            .Default(0x11A3);           // CL_KERNEL_ARG_ACCESS_NONE
+    auto access_qual_enum = getSPIRVInt32Constant(access_qual_enum_value);
+    Ops << access_qual_enum;
+
+    auto const &type_qual_op =
+        kernelFn.getMetadata("kernel_arg_type_qual")->getOperand(ordinal);
+    auto const &type_qual_str = dyn_cast<MDString>(type_qual_op)->getString();
+    unsigned type_qual_enum_value = 0; // CL_KERNEL_ARG_TYPE_NONE
+    if (type_qual_str.find("const") != std::string::npos) {
+      type_qual_enum_value |= (1 << 0); // CL_KERNEL_ARG_TYPE_CONST
+    }
+    if (type_qual_str.find("restrict") != std::string::npos) {
+      type_qual_enum_value |= (1 << 1); // CL_KERNEL_ARG_TYPE_RESTRICT
+    }
+    if (type_qual_str.find("volatile") != std::string::npos) {
+      type_qual_enum_value |= (1 << 2); // CL_KERNEL_ARG_TYPE_VOLATILE
+    }
+    if (type_qual_str.find("pipe") != std::string::npos) {
+      type_qual_enum_value |= (1 << 3); // CL_KERNEL_ARG_TYPE_PIPE
+    }
+    auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
+    Ops << type_qual_enum;
+  }
+
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
   Ops.clear();

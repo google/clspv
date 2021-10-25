@@ -259,6 +259,10 @@ static llvm::cl::opt<bool> uniform_workgroup_size(
     "uniform-workgroup-size", llvm::cl::init(false),
     llvm::cl::desc("Assume all workgroups are uniformly sized."));
 
+static llvm::cl::opt<bool>
+    cl_kernel_arg_info("cl-kernel-arg-info", llvm::cl::init(false),
+                       llvm::cl::desc("Produce kernel argument info."));
+
 } // namespace
 
 namespace clspv {
@@ -337,6 +341,8 @@ bool FP64() { return fp64; }
 
 bool ArmNonUniformWorkGroupSize() { return cl_arm_non_uniform_work_group_size; }
 bool UniformWorkgroupSize() { return uniform_workgroup_size; }
+
+bool KernelArgInfo() { return cl_kernel_arg_info; }
 
 } // namespace Option
 } // namespace clspv
