@@ -662,6 +662,8 @@ int PopulatePassManager(
   }
   pm->add(clspv::createReplaceOpenCLBuiltinPass());
 
+  pm->add(clspv::createThreeElementVectorLoweringPass());
+
   // Lower longer vectors when requested. Note that this pass depends on
   // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
   // afterwards.

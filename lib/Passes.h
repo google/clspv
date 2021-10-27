@@ -55,6 +55,7 @@ void initializeSplatArgPassPass(PassRegistry &);
 void initializeSplatSelectConditionPassPass(PassRegistry &);
 void initializeSpecializeImageTypesPassPass(PassRegistry &);
 void initializeStripFreezePassPass(PassRegistry &);
+void initializeThreeElementVectorLoweringPassPass(PassRegistry &);
 void initializeUBOTypeTransformPassPass(PassRegistry &);
 void initializeUndoBoolPassPass(PassRegistry &);
 void initializeUndoByvalPassPass(PassRegistry &);

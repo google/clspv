@@ -263,6 +263,10 @@ static llvm::cl::opt<bool>
     cl_kernel_arg_info("cl-kernel-arg-info", llvm::cl::init(false),
                        llvm::cl::desc("Produce kernel argument info."));
 
+static llvm::cl::opt<bool>
+    force_vec3_to_vec4("vec3-to-vec4", llvm::cl::init(false),
+                       llvm::cl::desc("Force lowering vec3 to vec4"));
+
 } // namespace
 
 namespace clspv {
@@ -343,6 +347,8 @@ bool ArmNonUniformWorkGroupSize() { return cl_arm_non_uniform_work_group_size; }
 bool UniformWorkgroupSize() { return uniform_workgroup_size; }
 
 bool KernelArgInfo() { return cl_kernel_arg_info; }
+
+bool Vec3ToVec4() { return force_vec3_to_vec4; }
 
 } // namespace Option
 } // namespace clspv

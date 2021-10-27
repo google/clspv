@@ -52,6 +52,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeSplatSelectConditionPassPass(r);
   initializeSpecializeImageTypesPassPass(r);
   initializeStripFreezePassPass(r);
+  initializeThreeElementVectorLoweringPassPass(r);
   initializeUBOTypeTransformPassPass(r);
   initializeUndoBoolPassPass(r);
   initializeUndoByvalPassPass(r);

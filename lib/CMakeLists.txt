@@ -48,6 +48,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Layout.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LongVectorLoweringPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/ThreeElementVectorLoweringPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NativeMathPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NormalizeGlobalVariable.cpp
