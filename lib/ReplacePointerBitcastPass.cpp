@@ -1019,9 +1019,30 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       if (SrcTyBitWidth <= DstTyBitWidth)
         break;
 
+      // We are looking for either a real array or a structure of the same
+      // element.
+      // The long vector lowering pass is producing such structures.
+      bool isArrayLikeTy = false;
+      if (SrcTy->isArrayTy()) {
+        isArrayLikeTy = true;
+      } else if (SrcTy->isStructTy()) {
+        StructType *StructTy = dyn_cast<StructType>(SrcTy);
+        assert(StructTy->getNumElements() > 0);
+        Type *Ty = StructTy->getElementType(0);
+        isArrayLikeTy = true;
+        for (unsigned int each_elem = 0; each_elem < StructTy->getNumElements();
+             each_elem++) {
+          Type *ElemTy = StructTy->getElementType(each_elem);
+          if (ElemTy != Ty) {
+            isArrayLikeTy = false;
+            break;
+          }
+        }
+      }
+
       // The Source type is bigger than the destination type.
       // Walk into the source type to break it down.
-      if (SrcTy->isArrayTy()) {
+      if (isArrayLikeTy) {
         // If it's an array, consider only the first element.
         Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Instruction *NewSrc =
