@@ -204,6 +204,9 @@ bool ArmNonUniformWorkGroupSize();
 // Returns true if uniform_workgroup_size is enabled
 bool UniformWorkgroupSize();
 
+// Returns true if kernel argument info production is enabled
+bool KernelArgInfo();
+
 } // namespace Option
 } // namespace clspv
 
