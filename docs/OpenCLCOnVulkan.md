@@ -881,7 +881,7 @@ constants as follows:
 - `sub_group_barrier()` is mapped to OpControlBarrier with an execution scope of
   `Subgroup`. If no memory scope is specified, `Subgroup` is used. The memory
   semantics depend on the flags on the barrier.
-- `get_max_sub_group_size()` is mapped to a specilisation constant whose value
+- `get_max_sub_group_size()` is mapped to a specilization constant whose value
   must be set by the runtime or application.
 - `get_enqueued_num_sub_groups()` computes its return value from that of
   `get_max_sub_group_size()` and `get_enqueued_local_size()`.
