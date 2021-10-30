@@ -15,17 +15,28 @@
 #ifndef CLSPV_LIB_TYPES_H
 #define CLSPV_LIB_TYPES_H
 
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
 
 namespace clspv {
+
+// Returns true if the given struct type is a sampler type.
+bool IsSamplerType(llvm::StructType *type);
 
 // Returns true if the given type is a sampler type.  If it is, then the
 // struct type is sent back through the ptr argument.
 bool IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 
+// Returns true if the given struct type is an image type.
+bool IsImageType(llvm::StructType *type);
+
 // Returns true if the given type is a image type.  If it is, then the
 // struct type is sent back through the ptr argument.
 bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
+
+// Returns the dimensionality of the image struct type. If |type| is not an
+// image, returns 0.
+uint32_t ImageDimensionality(llvm::StructType *type);
 
 // Returns the dimensionality of the image type. If |type| is not an image,
 // returns 0.
@@ -33,6 +44,10 @@ uint32_t ImageDimensionality(llvm::Type *type);
 
 // Returns true if the given type is an array image type.
 bool IsArrayImageType(llvm::Type *type);
+
+// Returns true if the given struct type is a sampled image type. Can only
+// return true after image specialization.
+bool IsSampledImageType(llvm::StructType *type);
 
 // Returns true if the given type is a sampled image type. Can only return true
 // after image specialization.
