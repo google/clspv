@@ -29,7 +29,7 @@ define dso_local spir_kernel void @test3([2 x [3 x <8 x i16>]] addrspace(1)* %in
 
 ; This test covers ConstantExpr.
 define dso_local spir_kernel void @test4(<8 x float> addrspace(1)* %out) {
-  %ptr = getelementptr inbounds [1 x <8 x float>], [1 x <8 x float>] addrspace(3)* @global, i32 0, i32 undef
+  %ptr = getelementptr [1 x <8 x float>], [1 x <8 x float>] addrspace(3)* @global, i32 0, i32 undef
   %vec = load <8 x float>, <8 x float> addrspace(3)* %ptr, align 32
   store <8 x float> %vec, <8 x float> addrspace(1)* %out, align 32
   ret void
@@ -65,7 +65,7 @@ define dso_local spir_kernel void @test6(<8 x float> addrspace(1)* %out) {
 
 ; CHECK-LABEL: @test4(
 ; CHECK: load [[FLOAT8]], [[FLOAT8]] addrspace(3)*
-; CHECK-SAME: getelementptr inbounds ([1 x [[FLOAT8]]], [1 x [[FLOAT8]]] addrspace(3)* @global, i32 0, i32 undef),
+; CHECK-SAME: getelementptr ([1 x [[FLOAT8]]], [1 x [[FLOAT8]]] addrspace(3)* @global, i32 0, i32 undef),
 ; CHECK-SAME: align 32
 
 ; CHECK-LABEL: @test3(

@@ -963,8 +963,6 @@ Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   // cases.
 #ifndef NDEBUG
   {
-    assert(I.isInBounds() && "Need test case to implement GEP not 'inbound'.");
-
     auto *ResultTy = I.getResultElementType();
     assert(ResultTy->isVectorTy() &&
            "Need test case to implement GEP with non-vector result type.");
@@ -986,7 +984,14 @@ Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   IRBuilder<> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
-  auto *V = B.CreateInBoundsGEP(EquivalentPointer, Indices);
+  Value *V;
+  auto *Type =
+      EquivalentPointer->getType()->getScalarType()->getPointerElementType();
+  if (I.isInBounds()) {
+    V = B.CreateInBoundsGEP(Type, EquivalentPointer, Indices);
+  } else {
+    V = B.CreateGEP(Type, EquivalentPointer, Indices);
+  }
   registerReplacement(I, *V);
   return V;
 }
