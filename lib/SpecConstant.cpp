@@ -60,6 +60,8 @@ const char *GetSpecConstantName(SpecConstant kind) {
     return "global_offset_y";
   case SpecConstant::kGlobalOffsetZ:
     return "global_offset_z";
+  case SpecConstant::kSubgroupMaxSize:
+    return "subgroup_max_size";
   }
   llvm::errs() << "Unhandled case in clspv::GetSpecConstantName: " << int(kind)
                << "\n";
@@ -83,6 +85,8 @@ SpecConstant GetSpecConstantFromName(const std::string &name) {
     return SpecConstant::kGlobalOffsetY;
   else if (name == "global_offset_z")
     return SpecConstant::kGlobalOffsetZ;
+  else if (name == "subgroup_max_size")
+    return SpecConstant::kSubgroupMaxSize;
 
   llvm::errs() << "Unhandled csae in clspv::GetSpecConstantFromName: " << name
                << "\n";

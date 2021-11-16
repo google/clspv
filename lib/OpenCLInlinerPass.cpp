@@ -22,6 +22,8 @@
 #include "Builtins.h"
 #include "Passes.h"
 
+#include <unordered_set>
+
 using namespace llvm;
 using namespace clspv;
 
@@ -47,11 +49,16 @@ ModulePass *createOpenCLInlinerPass() { return new OpenCLInlinerPass(); }
 bool OpenCLInlinerPass::runOnModule(Module &M) {
   bool changed = false;
   std::list<Function *> func_list;
+  const std::unordered_set<Builtins::BuiltinType> inlinedBuiltins = {
+      Builtins::kGetEnqueuedNumSubGroups,
+      Builtins::kGetMaxSubGroupSize,
+  };
   for (auto &F : M.getFunctionList()) {
-    // process only WorkItem functions
+    // process only select functions
     auto &func_info = Builtins::Lookup(&F);
-    if (func_info.getType() > Builtins::kType_WorkItem_Start &&
-        func_info.getType() < Builtins::kType_WorkItem_End) {
+    auto func_type = func_info.getType();
+    if (BUILTIN_IN_GROUP(func_type, WorkItem) ||
+        (inlinedBuiltins.count(func_type) != 0)) {
       SmallVector<CallInst *, 4> Calls;
 
       // Walk the users of the function.

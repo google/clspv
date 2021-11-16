@@ -6,7 +6,7 @@
 kernel void foo(global int* data) {
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.1"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
 // CHECK: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
 // CHECK-DAG: [[foo_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[data_name:%[a-zA-Z0-9_]+]] = OpString "data"

@@ -881,6 +881,10 @@ constants as follows:
 - `sub_group_barrier()` is mapped to OpControlBarrier with an execution scope of
   `Subgroup`. If no memory scope is specified, `Subgroup` is used. The memory
   semantics depend on the flags on the barrier.
+- `get_max_sub_group_size()` is mapped to a specilization constant whose value
+  must be set by the runtime or application.
+- `get_enqueued_num_sub_groups()` computes its return value from that of
+  `get_max_sub_group_size()` and `get_enqueued_local_size()`.
 
 The `group_op` qualifier translates as follows:
 
@@ -890,8 +894,6 @@ The `group_op` qualifier translates as follows:
 
 These extension built-in functions are not supported:
 
-- `get_max_sub_group_size()` requires CapabilityKernel (incompatible with Shader)
-- `get_enqueued_num_sub_groups()` requires CapabilityKernel (incompatible with Shader)
 - `sub_group_reserve_read_pipe()`
 - `sub_group_reserve_write_pipe()`
 - `sub_group_commit_read_pipe()`

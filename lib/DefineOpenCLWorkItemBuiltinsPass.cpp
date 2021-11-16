@@ -51,6 +51,8 @@ struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
   bool defineGlobalOffsetBuiltin(Module &M);
   bool defineWorkDimBuiltin(Module &M);
   bool defineEnqueuedLocalSizeBuiltin(Module &M);
+  bool defineMaxSubGroupSizeBuiltin(Module &M);
+  bool defineEnqueuedNumSubGroupsBuiltin(Module &M);
 
   bool addWorkgroupSizeIfRequired(Module &M);
 };
@@ -84,6 +86,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
   changed |= defineGlobalSizeBuiltin(M);
   changed |= defineWorkDimBuiltin(M);
   changed |= defineEnqueuedLocalSizeBuiltin(M);
+  changed |= defineMaxSubGroupSizeBuiltin(M);
+  changed |= defineEnqueuedNumSubGroupsBuiltin(M);
   changed |= addWorkgroupSizeIfRequired(M);
 
   return changed;
@@ -440,10 +444,26 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
     Module &M) {
 
   Function *F = M.getFunction("_Z23get_enqueued_local_sizej");
+  bool isUsedDirectly = F != nullptr;
+  bool isUsedIndirectly =
+      M.getFunction("_Z27get_enqueued_num_sub_groupsv") != nullptr;
+  bool isUsed = isUsedDirectly || isUsedIndirectly;
 
   // If the builtin was not used in the module, don't create it!
-  if (nullptr == F) {
+  if (!isUsed) {
     return false;
+  }
+
+  // If get_enqueued_local_size is used indirectly then we need to declare it
+  // ourselves.
+  auto &C = M.getContext();
+  auto Int32Ty = IntegerType::get(C, 32);
+  if (isUsedIndirectly && !isUsedDirectly) {
+    auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+    F = cast<Function>(
+        M.getOrInsertFunction("_Z23get_enqueued_local_sizej", FType)
+            .getCallee());
+    F->setCallingConv(CallingConv::SPIR_FUNC);
   }
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
@@ -456,6 +476,82 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
   auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
   auto Size = Builder.CreateLoad(DimPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
+  Builder.CreateRet(Ret);
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineMaxSubGroupSizeBuiltin(Module &M) {
+
+  Function *F = M.getFunction("_Z22get_max_sub_group_sizev");
+  bool isUsedDirectly = F != nullptr;
+  bool isUsedIndirectly =
+      M.getFunction("_Z27get_enqueued_num_sub_groupsv") != nullptr;
+  bool isUsed = isUsedDirectly || isUsedIndirectly;
+
+  // If the builtin was not used in the module, don't create it!
+  if (!isUsed) {
+    return false;
+  }
+
+  // If get_max_sub_group_size is used indirectly then we need to declare it
+  // ourselves.
+  auto &C = M.getContext();
+  auto Int32Ty = IntegerType::get(C, 32);
+  if (isUsedIndirectly && !isUsedDirectly) {
+    auto FType = FunctionType::get(Int32Ty, false);
+    F = cast<Function>(
+        M.getOrInsertFunction("_Z22get_max_sub_group_sizev", FType)
+            .getCallee());
+    F->setCallingConv(CallingConv::SPIR_FUNC);
+  }
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  StringRef name = "__spirv_SubgroupMaxSize";
+  auto var =
+      createGlobalVariable(M, name, IT, AddressSpace::ModuleScopePrivate);
+  auto ret = Builder.CreateLoad(var);
+  Builder.CreateRet(ret);
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedNumSubGroupsBuiltin(
+    Module &M) {
+
+  Function *F = M.getFunction("_Z27get_enqueued_num_sub_groupsv");
+
+  // If the builtin was not used in the module, don't create it!
+  if (nullptr == F) {
+    return false;
+  }
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  auto FELS = M.getFunction("_Z23get_enqueued_local_sizej");
+
+  auto ELS0 = Builder.CreateCall(FELS, Builder.getInt32(0));
+  ELS0->setCallingConv(CallingConv::SPIR_FUNC);
+  auto ELS1 = Builder.CreateCall(FELS, Builder.getInt32(1));
+  ELS1->setCallingConv(CallingConv::SPIR_FUNC);
+  auto ELS2 = Builder.CreateCall(FELS, Builder.getInt32(2));
+  ELS2->setCallingConv(CallingConv::SPIR_FUNC);
+  auto ELS = Builder.CreateMul(ELS0, ELS1);
+  ELS = Builder.CreateMul(ELS, ELS2);
+
+  auto MaxSubgroupSize =
+      Builder.CreateCall(M.getFunction("_Z22get_max_sub_group_sizev"));
+  MaxSubgroupSize->setCallingConv(CallingConv::SPIR_FUNC);
+
+  auto ELSRoundedUp = Builder.CreateAdd(ELS, MaxSubgroupSize);
+  ELSRoundedUp = Builder.CreateSub(ELSRoundedUp, Builder.getInt32(1));
+
+  auto Ret = Builder.CreateUDiv(ELSRoundedUp, MaxSubgroupSize);
+
   Builder.CreateRet(Ret);
 
   return true;
