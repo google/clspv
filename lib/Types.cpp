@@ -22,9 +22,9 @@ using namespace llvm;
 
 bool clspv::IsSamplerType(llvm::StructType *STy) {
   if (STy->isOpaque()) {
-     if (STy->getName().equals("opencl.sampler_t")) {
-        return true;
-     }
+    if (STy->getName().equals("opencl.sampler_t")) {
+      return true;
+    }
   }
   return false;
 }
@@ -34,9 +34,9 @@ bool clspv::IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
       if (IsSamplerType(STy)) {
-          isSamplerType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
+        isSamplerType = true;
+        if (struct_type_ptr)
+          *struct_type_ptr = STy;
       }
     }
   }
@@ -44,26 +44,26 @@ bool clspv::IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
 }
 
 bool clspv::IsImageType(llvm::StructType *STy) {
- if (STy->isOpaque()) {
-   if (STy->getName().startswith("opencl.image1d_ro_t") ||
-       STy->getName().startswith("opencl.image1d_rw_t") ||
-       STy->getName().startswith("opencl.image1d_wo_t") ||
-       STy->getName().startswith("opencl.image1d_array_ro_t") ||
-       STy->getName().startswith("opencl.image1d_array_rw_t") ||
-       STy->getName().startswith("opencl.image1d_array_wo_t") ||
-       STy->getName().startswith("opencl.image2d_ro_t") ||
-       STy->getName().startswith("opencl.image2d_rw_t") ||
-       STy->getName().startswith("opencl.image2d_wo_t") ||
-       STy->getName().startswith("opencl.image2d_array_ro_t") ||
-       STy->getName().startswith("opencl.image2d_array_rw_t") ||
-       STy->getName().startswith("opencl.image2d_array_wo_t") ||
-       STy->getName().startswith("opencl.image3d_ro_t") ||
-       STy->getName().startswith("opencl.image3d_rw_t") ||
-       STy->getName().startswith("opencl.image3d_wo_t")) {
-     return true;
-   }
- }
- return false;
+  if (STy->isOpaque()) {
+    if (STy->getName().startswith("opencl.image1d_ro_t") ||
+        STy->getName().startswith("opencl.image1d_rw_t") ||
+        STy->getName().startswith("opencl.image1d_wo_t") ||
+        STy->getName().startswith("opencl.image1d_array_ro_t") ||
+        STy->getName().startswith("opencl.image1d_array_rw_t") ||
+        STy->getName().startswith("opencl.image1d_array_wo_t") ||
+        STy->getName().startswith("opencl.image2d_ro_t") ||
+        STy->getName().startswith("opencl.image2d_rw_t") ||
+        STy->getName().startswith("opencl.image2d_wo_t") ||
+        STy->getName().startswith("opencl.image2d_array_ro_t") ||
+        STy->getName().startswith("opencl.image2d_array_rw_t") ||
+        STy->getName().startswith("opencl.image2d_array_wo_t") ||
+        STy->getName().startswith("opencl.image3d_ro_t") ||
+        STy->getName().startswith("opencl.image3d_rw_t") ||
+        STy->getName().startswith("opencl.image3d_wo_t")) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
@@ -71,9 +71,9 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
       if (IsImageType(STy)) {
-          isImageType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
+        isImageType = true;
+        if (struct_type_ptr)
+          *struct_type_ptr = STy;
       }
     }
   }
@@ -95,7 +95,8 @@ uint32_t clspv::ImageDimensionality(StructType *STy) {
 
 uint32_t clspv::ImageDimensionality(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+    if (auto struct_ty =
+            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
       return ImageDimensionality(struct_ty);
     }
   }
@@ -130,7 +131,8 @@ bool clspv::IsSampledImageType(StructType *STy) {
 
 bool clspv::IsSampledImageType(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+    if (auto struct_ty =
+            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
       return IsSampledImageType(struct_ty);
     }
   }
