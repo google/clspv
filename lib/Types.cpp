@@ -51,6 +51,9 @@ bool clspv::IsImageType(llvm::StructType *STy) {
         STy->getName().startswith("opencl.image1d_array_ro_t") ||
         STy->getName().startswith("opencl.image1d_array_rw_t") ||
         STy->getName().startswith("opencl.image1d_array_wo_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_ro_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_rw_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_wo_t") ||
         STy->getName().startswith("opencl.image2d_ro_t") ||
         STy->getName().startswith("opencl.image2d_rw_t") ||
         STy->getName().startswith("opencl.image2d_wo_t") ||

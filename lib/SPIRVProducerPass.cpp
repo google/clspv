@@ -1492,6 +1492,22 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   }
 
   auto Canonical = CanonicalType(Ty);
+
+  // remove buffer from type name
+  if (Canonical->isStructTy() && IsImageType(dyn_cast<StructType>(Canonical))) {
+    const char *bufferString = "_buffer_";
+    StringRef CanonicalName = Canonical->getStructName();
+    size_t bufferPos = CanonicalName.find(bufferString);
+    if (bufferPos != std::string::npos) {
+      std::string NewName =
+          CanonicalName.str().erase(bufferPos, strlen(bufferString) - 1);
+      Canonical = StructType::getTypeByName(module->getContext(), NewName);
+      if (!Canonical) {
+        Canonical = StructType::create(module->getContext(), NewName);
+      }
+    }
+  }
+
   if (Canonical != Ty) {
     auto CanonicalTI = TypeMap.find(Canonical);
     if (CanonicalTI != TypeMap.end()) {
