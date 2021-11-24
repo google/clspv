@@ -1558,7 +1558,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
 
     // Handle sampler type.
     if (STy->isOpaque()) {
-      if (STy->getName().equals("opencl.sampler_t")) {
+      if (IsSamplerType(STy)) {
         //
         // Generate OpTypeSampler
         //
@@ -1566,23 +1566,9 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
 
         RID = addSPIRVInst<kTypes>(spv::OpTypeSampler);
         break;
-      } else if (STy->getName().startswith("opencl.image1d_ro_t") ||
-                 STy->getName().startswith("opencl.image1d_rw_t") ||
-                 STy->getName().startswith("opencl.image1d_wo_t") ||
-                 STy->getName().startswith("opencl.image1d_array_ro_t") ||
-                 STy->getName().startswith("opencl.image1d_array_rw_t") ||
-                 STy->getName().startswith("opencl.image1d_array_wo_t") ||
-                 STy->getName().startswith("opencl.image2d_ro_t") ||
-                 STy->getName().startswith("opencl.image2d_rw_t") ||
-                 STy->getName().startswith("opencl.image2d_wo_t") ||
-                 STy->getName().startswith("opencl.image2d_array_ro_t") ||
-                 STy->getName().startswith("opencl.image2d_array_rw_t") ||
-                 STy->getName().startswith("opencl.image2d_array_wo_t") ||
-                 STy->getName().startswith("opencl.image3d_ro_t") ||
-                 STy->getName().startswith("opencl.image3d_rw_t") ||
-                 STy->getName().startswith("opencl.image3d_wo_t")) {
-        if (STy->getName().startswith("opencl.image1d_")) {
-          if (STy->getName().contains(".sampled"))
+      } else if (IsImageType(STy)) {
+        if (ImageDimensionality(STy) == 1) {
+          if (IsSampledImageType(STy))
             addCapability(spv::CapabilitySampled1D);
           else
             addCapability(spv::CapabilityImage1D);
@@ -1631,18 +1617,17 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         }
         Ops << SampledTyID;
 
-        spv::Dim DimID = spv::Dim2D;
-        if (STy->getName().startswith("opencl.image1d_ro_t") ||
-            STy->getName().startswith("opencl.image1d_rw_t") ||
-            STy->getName().startswith("opencl.image1d_wo_t") ||
-            STy->getName().startswith("opencl.image1d_array_ro_t") ||
-            STy->getName().startswith("opencl.image1d_array_rw_t") ||
-            STy->getName().startswith("opencl.image1d_array_wo_t")) {
+        spv::Dim DimID;
+        switch (ImageDimensionality(STy)) {
+        case 1:
           DimID = spv::Dim1D;
-        } else if (STy->getName().startswith("opencl.image3d_ro_t") ||
-                   STy->getName().startswith("opencl.image3d_rw_t") ||
-                   STy->getName().startswith("opencl.image3d_wo_t")) {
+          break;
+        case 3:
           DimID = spv::Dim3D;
+          break;
+        default:
+          DimID = spv::Dim2D;
+          break;
         }
         Ops << DimID;
 
@@ -1663,7 +1648,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         // 1 indicates will be used with sampler
         // 2 indicates will be used without a sampler (a storage image)
         uint32_t Sampled = 1;
-        if (!STy->getName().contains(".sampled")) {
+        if (!IsSampledImageType(STy)) {
           Sampled = 2;
         }
         Ops << Sampled;

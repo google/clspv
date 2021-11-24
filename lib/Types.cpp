@@ -20,62 +20,84 @@
 using namespace clspv;
 using namespace llvm;
 
+bool clspv::IsSamplerType(llvm::StructType *STy) {
+  if (STy->isOpaque()) {
+    if (STy->getName().equals("opencl.sampler_t")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool clspv::IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   bool isSamplerType = false;
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
-      if (STy->isOpaque()) {
-        if (STy->getName().equals("opencl.sampler_t")) {
-          isSamplerType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
-        }
+      if (IsSamplerType(STy)) {
+        isSamplerType = true;
+        if (struct_type_ptr)
+          *struct_type_ptr = STy;
       }
     }
   }
   return isSamplerType;
 }
 
+bool clspv::IsImageType(llvm::StructType *STy) {
+  if (STy->isOpaque()) {
+    if (STy->getName().startswith("opencl.image1d_ro_t") ||
+        STy->getName().startswith("opencl.image1d_rw_t") ||
+        STy->getName().startswith("opencl.image1d_wo_t") ||
+        STy->getName().startswith("opencl.image1d_array_ro_t") ||
+        STy->getName().startswith("opencl.image1d_array_rw_t") ||
+        STy->getName().startswith("opencl.image1d_array_wo_t") ||
+        STy->getName().startswith("opencl.image2d_ro_t") ||
+        STy->getName().startswith("opencl.image2d_rw_t") ||
+        STy->getName().startswith("opencl.image2d_wo_t") ||
+        STy->getName().startswith("opencl.image2d_array_ro_t") ||
+        STy->getName().startswith("opencl.image2d_array_rw_t") ||
+        STy->getName().startswith("opencl.image2d_array_wo_t") ||
+        STy->getName().startswith("opencl.image3d_ro_t") ||
+        STy->getName().startswith("opencl.image3d_rw_t") ||
+        STy->getName().startswith("opencl.image3d_wo_t")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   bool isImageType = false;
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
-      if (STy->isOpaque()) {
-        if (STy->getName().startswith("opencl.image1d_ro_t") ||
-            STy->getName().startswith("opencl.image1d_rw_t") ||
-            STy->getName().startswith("opencl.image1d_wo_t") ||
-            STy->getName().startswith("opencl.image1d_array_ro_t") ||
-            STy->getName().startswith("opencl.image1d_array_rw_t") ||
-            STy->getName().startswith("opencl.image1d_array_wo_t") ||
-            STy->getName().startswith("opencl.image2d_ro_t") ||
-            STy->getName().startswith("opencl.image2d_rw_t") ||
-            STy->getName().startswith("opencl.image2d_wo_t") ||
-            STy->getName().startswith("opencl.image2d_array_ro_t") ||
-            STy->getName().startswith("opencl.image2d_array_rw_t") ||
-            STy->getName().startswith("opencl.image2d_array_wo_t") ||
-            STy->getName().startswith("opencl.image3d_ro_t") ||
-            STy->getName().startswith("opencl.image3d_rw_t") ||
-            STy->getName().startswith("opencl.image3d_wo_t")) {
-          isImageType = true;
-          if (struct_type_ptr)
-            *struct_type_ptr = STy;
-        }
+      if (IsImageType(STy)) {
+        isImageType = true;
+        if (struct_type_ptr)
+          *struct_type_ptr = STy;
       }
     }
   }
   return isImageType;
 }
 
+uint32_t clspv::ImageDimensionality(StructType *STy) {
+  if (IsImageType(STy)) {
+    if (STy->getName().contains("image1d"))
+      return 1;
+    if (STy->getName().contains("image2d"))
+      return 2;
+    if (STy->getName().contains("image3d"))
+      return 3;
+  }
+
+  return 0;
+}
+
 uint32_t clspv::ImageDimensionality(Type *type) {
-  Type *ty = nullptr;
-  if (IsImageType(type, &ty)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
-      if (struct_ty->getName().contains("image1d"))
-        return 1;
-      if (struct_ty->getName().contains("image2d"))
-        return 2;
-      if (struct_ty->getName().contains("image3d"))
-        return 3;
+  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
+    if (auto struct_ty =
+            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+      return ImageDimensionality(struct_ty);
     }
   }
 
@@ -99,12 +121,19 @@ bool clspv::IsArrayImageType(Type *type) {
   return isArrayImageType;
 }
 
+bool clspv::IsSampledImageType(StructType *STy) {
+  if (IsImageType(STy)) {
+    return STy->getName().contains(".sampled");
+  }
+
+  return false;
+}
+
 bool clspv::IsSampledImageType(Type *type) {
-  Type *ty = nullptr;
-  if (IsImageType(type, &ty)) {
-    if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
-      if (struct_ty->getName().contains(".sampled"))
-        return true;
+  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
+    if (auto struct_ty =
+            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+      return IsSampledImageType(struct_ty);
     }
   }
 
