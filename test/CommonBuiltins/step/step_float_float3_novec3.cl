@@ -11,8 +11,8 @@
 // CHECK-DAG: %[[undefv3:[0-9]+]] = OpUndef %[[v3float]]
 // CHECK:     %[[__original_id_23:[0-9]+]] = OpLoad %[[float]]
 // CHECK:     %[[__original_id_24:[0-9]+]] = OpLoad %[[v4float]]
-// CHECK:     %[[__original_id_25:[0-9]+]] = OpCompositeInsert %[[v3float]] %[[__original_id_23]] %[[undefv3]] 0
-// CHECK:     %[[__original_id_26:[0-9]+]] = OpVectorShuffle %[[v3float]] %[[__original_id_25]] %[[undefv3]] 0 0 0
+// CHECK:     %[[__original_id_25:[0-9]+]] = OpCompositeInsert %[[v4float]] %[[__original_id_23]] %[[undefv4]] 0
+// CHECK:     %[[__original_id_26:[0-9]+]] = OpVectorShuffle %[[v3float]] %[[__original_id_25]] %[[undefv4]] 0 0 0
 // CHECK:     %[[__original_id_24_shuffle:[0-9]+]] = OpVectorShuffle %[[v3float]] %[[__original_id_24]] %[[undefv4]] 0 1 2
 // CHECK:     %[[__original_id_27:[0-9]+]] = OpExtInst %[[v3float]] %[[__original_id_1]] Step %[[__original_id_26]] %[[__original_id_24_shuffle]]
 // CHECK:     %[[__original_id_27_shuffle:[0-9]+]] = OpVectorShuffle %[[v4float]] %[[__original_id_27]] %[[undefv3]] 0 1 2 4294967295
