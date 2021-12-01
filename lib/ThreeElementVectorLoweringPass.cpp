@@ -261,11 +261,17 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
   } else if (EquivalentTy->isVectorTy()) {
     assert(Ty->isVectorTy());
 
-    unsigned Arity = dyn_cast<FixedVectorType>(Ty)->getNumElements();
-    for (unsigned i = 0; i < Arity; ++i) {
-      Value *Scalar = B.CreateExtractElement(V, i);
-      NewValue = B.CreateInsertElement(NewValue, Scalar, i);
+    unsigned OldArity = dyn_cast<FixedVectorType>(Ty)->getNumElements();
+    unsigned NewArity = dyn_cast<FixedVectorType>(EquivalentTy)->getNumElements();
+    SmallVector<int , 4> Idxs;
+    for (unsigned i = 0; i < NewArity; i++) {
+      if (i < OldArity) {
+        Idxs.push_back(i);
+      } else {
+        Idxs.push_back(-1);
+      }
     }
+    NewValue = B.CreateShuffleVector(V, Idxs);
   } else {
     return nullptr;
   }
@@ -1152,15 +1158,7 @@ Value *ThreeElementVectorLoweringPass::convertBuiltinCall(
   SmallVector<Value *, 16> Args;
   for (Value *Arg : EquivalentArgs) {
     if (Arg->getType()->isVectorTy()) {
-      Value *NewArg = UndefValue::get(
-          VectorType::get(Arg->getType()->getScalarType(), 3, false));
-      Value *tmp = B.CreateExtractElement(Arg, (uint64_t)0);
-      NewArg = B.CreateInsertElement(NewArg, tmp, (uint64_t)0);
-      tmp = B.CreateExtractElement(Arg, (uint64_t)1);
-      NewArg = B.CreateInsertElement(NewArg, tmp, (uint64_t)1);
-      tmp = B.CreateExtractElement(Arg, (uint64_t)2);
-      NewArg = B.CreateInsertElement(NewArg, tmp, (uint64_t)2);
-      Args.push_back(NewArg);
+      Args.push_back(B.CreateShuffleVector(Arg, {0, 1, 2}));
     } else {
       Args.push_back(Arg);
     }
@@ -1174,13 +1172,7 @@ Value *ThreeElementVectorLoweringPass::convertBuiltinCall(
   Type *RetTy = VectorFunction->getReturnType();
 
   if (RetTy->isVectorTy()) {
-    Value *NewRet = UndefValue::get(RetTy);
-    Value *tmp = B.CreateExtractElement(NewVectorCall, (uint64_t)0);
-    NewRet = B.CreateInsertElement(NewRet, tmp, (uint64_t)0);
-    tmp = B.CreateExtractElement(NewVectorCall, (uint64_t)1);
-    NewRet = B.CreateInsertElement(NewRet, tmp, (uint64_t)1);
-    tmp = B.CreateExtractElement(NewVectorCall, (uint64_t)2);
-    NewRet = B.CreateInsertElement(NewRet, tmp, (uint64_t)2);
+    Value *NewRet = B.CreateShuffleVector(NewVectorCall, {0, 1, 2, -1});
 
     return NewRet;
   }
