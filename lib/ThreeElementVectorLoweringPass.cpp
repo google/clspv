@@ -578,11 +578,18 @@ Value *ThreeElementVectorLoweringPass::visitConstant(Constant &Cst) {
 
 Value *ThreeElementVectorLoweringPass::visitNAryOperator(Instruction &I) {
   SmallVector<Value *, 16> EquivalentArgs;
+  bool NothingLowered = true;
   for (auto &Operand : I.operands()) {
     Value *EquivalentOperand = visit(Operand.get());
-    assert(EquivalentOperand && "operand not lowered");
-    EquivalentArgs.push_back(EquivalentOperand);
+    if (EquivalentOperand == nullptr) {
+      EquivalentArgs.push_back(Operand.get());
+    } else {
+      NothingLowered = false;
+      EquivalentArgs.push_back(EquivalentOperand);
+    }
   }
+  if (NothingLowered)
+    return nullptr;
 
   IRBuilder<> B(&I);
   Value *V = B.CreateNAryOp(I.getOpcode(), EquivalentArgs);
@@ -602,7 +609,8 @@ Value *ThreeElementVectorLoweringPass::visitInstruction(Instruction &I) {
 
 Value *ThreeElementVectorLoweringPass::visitAllocaInst(AllocaInst &I) {
   auto *EquivalentTy = getEquivalentType(I.getAllocatedType());
-  assert(EquivalentTy && "type not lowered");
+  if (EquivalentTy == nullptr)
+    return nullptr;
 
   IRBuilder<> B(&I);
   unsigned AS = I.getType()->getAddressSpace();
@@ -669,10 +677,9 @@ Value *ThreeElementVectorLoweringPass::visitCastInst(CastInst &I) {
   auto *OriginalDestTy = I.getDestTy();
   auto *EquivalentDestTy = getEquivalentTypeOrSelf(OriginalDestTy);
 
-  // We expect something to lower, or this function shouldn't have been called.
-  assert(((OriginalValue != EquivalentValue) ||
-          (OriginalDestTy != EquivalentDestTy)) &&
-         "nothing to lower");
+  if (EquivalentValue == OriginalValue &&
+      EquivalentDestTy == OriginalDestTy) // Nothing Lowered
+    return nullptr;
 
   IRBuilder<> B(&I);
   Value *V = B.CreateCast(I.getOpcode(), EquivalentValue, EquivalentDestTy,
@@ -687,10 +694,13 @@ Value *ThreeElementVectorLoweringPass::visitCastInst(CastInst &I) {
 
 Value *ThreeElementVectorLoweringPass::visitCmpInst(CmpInst &I) {
   std::array<Value *, 2> EquivalentArgs{{
-      visit(I.getOperand(0)),
-      visit(I.getOperand(1)),
+      visitOrSelf(I.getOperand(0)),
+      visitOrSelf(I.getOperand(1)),
   }};
-  assert(EquivalentArgs[0] && EquivalentArgs[1] && "argument(s) not lowered");
+
+  if (EquivalentArgs[0] == I.getOperand(0) &&
+      EquivalentArgs[1] == I.getOperand(1)) // Nothing lowered
+    return nullptr;
 
   IRBuilder<> B(&I);
   Value *V = nullptr;
@@ -709,7 +719,8 @@ Value *ThreeElementVectorLoweringPass::visitCmpInst(CmpInst &I) {
 Value *
 ThreeElementVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
-  assert(EquivalentValue && "value not lowered");
+  if (EquivalentValue == nullptr)
+    return nullptr;
 
   Value *Index = I.getOperand(1);
 
@@ -724,7 +735,8 @@ ThreeElementVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
 Value *
 ThreeElementVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
-  assert(EquivalentValue && "value not lowered");
+  if (EquivalentValue == nullptr)
+    return nullptr;
 
   auto Indices = I.getIndices();
 
@@ -742,7 +754,8 @@ ThreeElementVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   }
 
   auto *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
+  if (EquivalentPointer == nullptr)
+    return nullptr;
 
   IRBuilder<> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
@@ -756,7 +769,8 @@ ThreeElementVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
 Value *
 ThreeElementVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
-  assert(EquivalentValue && "value not lowered");
+  if (EquivalentValue == nullptr)
+    return nullptr;
 
   Value *ScalarElement = I.getOperand(1);
   assert(ScalarElement->getType()->isIntegerTy() ||
@@ -776,8 +790,13 @@ ThreeElementVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
 
 Value *
 ThreeElementVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
-  Value *EquivalentAggregate = visit(I.getOperand(0));
-  Value *EquivalentInsertValue = visit(I.getOperand(1));
+  Value *EquivalentAggregate = visitOrSelf(I.getOperand(0));
+  Value *EquivalentInsertValue = visitOrSelf(I.getOperand(1));
+
+  if (EquivalentAggregate == I.getOperand(0) &&
+      EquivalentInsertValue == I.getOperand(1)) // Nothing lowered
+    return nullptr;
+
   auto Idxs = I.getIndices();
 
   IRBuilder<> B(&I);
@@ -795,9 +814,9 @@ Value *ThreeElementVectorLoweringPass::visitLoadInst(LoadInst &I) {
   }
 
   Value *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
   Type *EquivalentTy = getEquivalentType(I.getType());
-  assert(EquivalentTy && "type not lowered");
+  if (EquivalentPointer == nullptr || EquivalentTy == nullptr)
+    return nullptr;
 
   IRBuilder<> B(&I);
   auto *V = B.CreateAlignedLoad(EquivalentTy, EquivalentPointer, I.getAlign(),
@@ -823,11 +842,6 @@ Value *ThreeElementVectorLoweringPass::visitSelectInst(SelectInst &I) {
   auto *EquivalentTrueValue = visitOrSelf(I.getTrueValue());
   auto *EquivalentFalseValue = visitOrSelf(I.getFalseValue());
 
-  assert(((EquivalentCondition != I.getCondition()) ||
-          (EquivalentTrueValue != I.getTrueValue()) ||
-          (EquivalentFalseValue != I.getFalseValue())) &&
-         "nothing to lower");
-
   IRBuilder<> B(&I);
   Value *V = B.CreateSelect(EquivalentCondition, EquivalentTrueValue,
                             EquivalentFalseValue);
@@ -846,11 +860,6 @@ ThreeElementVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   auto *EquivalentLHS = visitOrSelf(I.getOperand(0));
   auto *EquivalentRHS = visitOrSelf(I.getOperand(1));
   auto *EquivalentType = getEquivalentTypeOrSelf(I.getType());
-
-  assert(((EquivalentLHS != I.getOperand(0)) ||
-          (EquivalentRHS != I.getOperand(1)) ||
-          (EquivalentType != I.getType())) &&
-         "nothing to lower");
 
   IRBuilder<> B(&I);
 
@@ -904,9 +913,10 @@ ThreeElementVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
 
 Value *ThreeElementVectorLoweringPass::visitStoreInst(StoreInst &I) {
   Value *EquivalentValue = visit(I.getValueOperand());
-  assert(EquivalentValue && "value not lowered");
   Value *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
+
+  if (EquivalentValue == nullptr || EquivalentPointer == nullptr)
+    return nullptr;
 
   IRBuilder<> B(&I);
   auto *V = B.CreateAlignedStore(EquivalentValue, EquivalentPointer,
@@ -1017,6 +1027,8 @@ Type *ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *StructTy = dyn_cast<StructType>(Ty)) {
+    if (StructTy->isPacked())
+      return nullptr;
     unsigned Arity = StructTy->getStructNumElements();
     if (Arity == 0)
       return nullptr;
@@ -1035,7 +1047,7 @@ Type *ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
     }
 
     if (RequiredLowering) {
-      return StructType::get(Ctx, Types, StructTy->isPacked());
+      return StructType::get(Ctx, Types, false);
     } else {
       return nullptr;
     }
