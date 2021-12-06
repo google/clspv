@@ -789,15 +789,23 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   GlobalVariable *GVId =
       getOrCreateGlobalVariable(M, clspv::LocalInvocationIdVariableName(),
                                 clspv::LocalInvocationIdAddressSpace());
-  auto LocalId0 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst0}));
-  auto LocalId1 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst1}));
-  auto LocalId2 = Builder.CreateLoad(Builder.CreateGEP(GVId, {Cst0, Cst2}));
+  Type *GVIdElTy = GVId->getType()->getScalarType()->getPointerElementType();
+  Value *GEP0 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst0});
+  Value *LocalId0 =
+      Builder.CreateLoad(GEP0->getType()->getPointerElementType(), GEP0);
+  Value *GEP1 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst1});
+  Value *LocalId1 =
+      Builder.CreateLoad(GEP1->getType()->getPointerElementType(), GEP1);
+  Value *GEP2 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst2});
+  Value *LocalId2 =
+      Builder.CreateLoad(GEP2->getType()->getPointerElementType(), GEP2);
 
   // get_local_size({0, 1, 2});
   GlobalVariable *GVSize =
       getOrCreateGlobalVariable(M, clspv::WorkgroupSizeVariableName(),
                                 clspv::WorkgroupSizeAddressSpace());
-  auto LocalSize = Builder.CreateLoad(GVSize);
+  auto LocalSize =
+      Builder.CreateLoad(GVSize->getType()->getPointerElementType(), GVSize);
   auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
   auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);
   auto LocalSize2 = Builder.CreateExtractElement(LocalSize, Cst2);
@@ -845,8 +853,12 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
     // async_work_group_strided_copy global to local case
     SrcIterator = Builder.CreateMul(PHIIterator, Stride);
   }
-  auto DstI = Builder.CreateGEP(Dst, {DstIterator});
-  auto SrcI = Builder.CreateGEP(Src, {SrcIterator});
+  auto DstI = Builder.CreateGEP(
+      Dst->getType()->getScalarType()->getPointerElementType(), Dst,
+      DstIterator);
+  auto SrcI = Builder.CreateGEP(
+      Src->getType()->getScalarType()->getPointerElementType(), Src,
+      SrcIterator);
   auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
   auto Br = Builder.CreateBr(CmpBB);
   clspv::InsertSPIRVOp(Br, spv::OpCopyMemory, {}, Builder.getVoidTy(),
@@ -1855,7 +1867,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     for (size_t i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(ptr, add);
+      auto gep = builder.CreateGEP(
+          ptr->getType()->getScalarType()->getPointerElementType(), ptr, add);
       auto extract = builder.CreateExtractElement(data, i);
       V = builder.CreateStore(extract, gep);
     }
@@ -1892,8 +1905,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     for (unsigned i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(ptr, add);
-      auto load = builder.CreateLoad(gep);
+      auto gep = builder.CreateGEP(
+          ptr_type->getScalarType()->getPointerElementType(), ptr, add);
+      auto load =
+          builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
       V = builder.CreateInsertElement(V, load, i);
     }
     return V;
@@ -2989,7 +3004,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     // performed in the |then| block. The condition is the inversion of the
     // comparison result.
     IRBuilder<> builder(Call);
-    auto load = builder.CreateLoad(expected);
+    auto load = builder.CreateLoad(expected->getType()->getPointerElementType(),
+                                   expected);
     auto cmp_xchg = InsertSPIRVOp(
         Call, spv::OpAtomicCompareExchange, {Attribute::Convergent},
         value->getType(), {pointer, scope, success, failure, value, load});

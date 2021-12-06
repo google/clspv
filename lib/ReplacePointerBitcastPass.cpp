@@ -361,8 +361,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               SmallVector<Value *, 4> indices(
                   count,
                   ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
-              auto gep = GetElementPtrInst::CreateInBounds(inst->getOperand(0),
-                                                           indices, "", inst);
+              auto gep = GetElementPtrInst::CreateInBounds(
+                  inst->getOperand(0)->getType()->getPointerElementType(),
+                  inst->getOperand(0), indices, "", inst);
               ToBeDeleted.push_back(&I);
               auto cast = new BitCastInst(gep, inst->getType(), "", inst);
               inst->replaceAllUsesWith(cast);
@@ -530,7 +531,11 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               Value *BaseAddr = BitCastSrc;
               for (unsigned i = 0; i < NumElement; i++) {
                 // Calculate store address.
-                Value *DstAddr = Builder.CreateGEP(BaseAddr, SrcAddrIdx);
+                Value *DstAddr =
+                    Builder.CreateGEP(BaseAddr->getType()
+                                          ->getScalarType()
+                                          ->getPointerElementType(),
+                                      BaseAddr, SrcAddrIdx);
                 Builder.CreateStore(STValues[i], DstAddr);
 
                 if (i + 1 < NumElement) {
@@ -625,7 +630,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               }
 
               Value *Idxs[] = {NewAddrIdx, SubEleIdx};
-              Value *DstAddr = Builder.CreateGEP(BaseAddr, Idxs);
+              Value *DstAddr = Builder.CreateGEP(
+                  BaseAddr->getType()->getScalarType()->getPointerElementType(),
+                  BaseAddr, Idxs);
               Type *TmpSrcTy = SrcEleTy;
               if (auto TmpSrcVecTy = dyn_cast<VectorType>(TmpSrcTy)) {
                 TmpSrcTy = TmpSrcVecTy->getElementType();
@@ -644,7 +651,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               for (unsigned i = 1; i < GEP->getNumOperands(); i++) {
                 Idxs.push_back(GEP->getOperand(i));
               }
-              DstAddr = Builder.CreateGEP(BitCastSrc, Idxs);
+              DstAddr = Builder.CreateGEP(BitCastSrc->getType()
+                                              ->getScalarType()
+                                              ->getPointerElementType(),
+                                          BitCastSrc, Idxs);
 
               if (GEP->getNumOperands() > 2) {
                 TmpSrcTy = SrcEleTy;
@@ -665,8 +675,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           SmallVector<Value *, 8> LDValues;
 
           for (unsigned i = 1; i <= NumIter; i++) {
-            Value *SrcAddr = Builder.CreateGEP(Src, SrcAddrIdx);
-            LoadInst *SrcVal = Builder.CreateLoad(SrcAddr, "src_val");
+            Value *SrcAddr = Builder.CreateGEP(
+                Src->getType()->getScalarType()->getPointerElementType(), Src,
+                SrcAddrIdx);
+            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
             LDValues.push_back(SrcVal);
 
             if (i + 1 <= NumIter) {
@@ -942,9 +954,11 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               for (unsigned i = 1; i < GEP->getNumOperands(); i++) {
                 Idxs.push_back(GEP->getOperand(i));
               }
-              SrcAddr = Builder.CreateGEP(Src, Idxs);
+              SrcAddr = Builder.CreateGEP(
+                  Src->getType()->getScalarType()->getPointerElementType(), Src,
+                  Idxs);
             }
-            LoadInst *SrcVal = Builder.CreateLoad(SrcAddr, "src_val");
+            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
 
             Type *TmpDstTy = DstTy;
             if (IsGEPUser) {
@@ -1046,7 +1060,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         // If it's an array, consider only the first element.
         Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
         Instruction *NewSrc =
-            GetElementPtrInst::CreateInBounds(Src, {Zero, Zero});
+            GetElementPtrInst::CreateInBounds(SrcTy, Src, {Zero, Zero});
         Changed = true;
         // errs() << "NewSrc is " << *NewSrc << "\n";
         if (auto *SrcInst = dyn_cast<Instruction>(Src)) {
@@ -1120,7 +1134,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           // errs() << " store is " << *ST << "\n";
           if (SrcTyBitWidth == DstTyBitWidth) {
             auto STVal = ConvertValue(ST->getValueOperand(), SrcTy, Builder);
-            Value *DstAddr = Builder.CreateGEP(Src, NewAddrIdx);
+            Value *DstAddr = Builder.CreateGEP(
+                Src->getType()->getScalarType()->getPointerElementType(), Src,
+                NewAddrIdx);
             Builder.CreateStore(STVal, DstAddr);
           } else if (SrcTyBitWidth < DstTyBitWidth) {
             unsigned NumElement = DstTyBitWidth / SrcTyBitWidth;
@@ -1142,7 +1158,9 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             Value *BaseAddr = Src;
             for (unsigned i = 0; i < NumElement; i++) {
               // Calculate store address.
-              Value *DstAddr = Builder.CreateGEP(BaseAddr, SrcAddrIdx);
+              Value *DstAddr = Builder.CreateGEP(
+                  BaseAddr->getType()->getScalarType()->getPointerElementType(),
+                  BaseAddr, SrcAddrIdx);
               Builder.CreateStore(STValues[i], DstAddr);
 
               if (i + 1 < NumElement) {
@@ -1158,8 +1176,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           }
         } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
           if (SrcTyBitWidth == DstTyBitWidth) {
-            Value *SrcAddr = Builder.CreateGEP(Src, NewAddrIdx);
-            LoadInst *SrcVal = Builder.CreateLoad(SrcAddr, "src_val");
+            Value *SrcAddr = Builder.CreateGEP(
+                Src->getType()->getScalarType()->getPointerElementType(), Src,
+                NewAddrIdx);
+            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
             LD->replaceAllUsesWith(ConvertValue(SrcVal, DstTy, Builder));
           } else if (SrcTyBitWidth < DstTyBitWidth) {
             Value *SrcAddrIdx = NewAddrIdx;
@@ -1168,8 +1188,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             unsigned NumIter = CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
             SmallVector<Value *, 8> LDValues;
             for (unsigned i = 1; i <= NumIter; i++) {
-              Value *SrcAddr = Builder.CreateGEP(Src, SrcAddrIdx);
-              LoadInst *SrcVal = Builder.CreateLoad(SrcAddr, "src_val");
+              Value *SrcAddr = Builder.CreateGEP(
+                  Src->getType()->getScalarType()->getPointerElementType(), Src,
+                  SrcAddrIdx);
+              LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
               LDValues.push_back(SrcVal);
 
               if (i + 1 <= NumIter) {

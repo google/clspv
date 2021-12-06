@@ -462,8 +462,9 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
       if (ArgTy->isPointerTy()) {
         assert(ArgTy->getPointerElementType()->isStructTy() &&
                "Unsupported kind of pointer type.");
-        Args[j] = B.CreateInBoundsGEP(EquivalentArgs[j],
-                                      {Zero, ConstantInt::get(IntTy, i)});
+        Args[j] = B.CreateInBoundsGEP(
+            ArgTy->getScalarType()->getPointerElementType(), EquivalentArgs[j],
+            {Zero, ConstantInt::get(IntTy, i)});
       } else if (ArgTy->isStructTy()) {
         Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
       } else {
@@ -571,11 +572,14 @@ Value *convertOpCopyMemoryOperation(CallInst &VectorCall,
   unsigned int InitNumElements = Ty->getNumElements();
   // for each element
   for (unsigned eachElem = 0; eachElem < InitNumElements; eachElem++) {
-    auto *SrcGEP =
-        B.CreateGEP(SrcOperand, {B.getInt32(0), B.getInt32(eachElem)});
-    auto *Val = B.CreateLoad(SrcGEP);
-    auto *DstGEP =
-        B.CreateGEP(DstOperand, {B.getInt32(0), B.getInt32(eachElem)});
+    auto *SrcGEP = B.CreateGEP(
+        SrcOperand->getType()->getScalarType()->getPointerElementType(),
+        SrcOperand, {B.getInt32(0), B.getInt32(eachElem)});
+    auto *Val =
+        B.CreateLoad(SrcGEP->getType()->getPointerElementType(), SrcGEP);
+    auto *DstGEP = B.CreateGEP(
+        DstOperand->getType()->getScalarType()->getPointerElementType(),
+        DstOperand, {B.getInt32(0), B.getInt32(eachElem)});
     ReturnValue = B.CreateStore(Val, DstGEP);
   }
 

@@ -416,9 +416,12 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
             // Avoid the builder for Src in order to prevent the folder from
             // creating constant expressions for constant memcpys.
-            auto SrcElemPtr =
-                GetElementPtrInst::CreateInBounds(Src, SrcIndices, "", CI);
-            auto DstElemPtr = Builder.CreateGEP(Dst, DstIndices);
+            auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
+                Src->getType()->getScalarType()->getPointerElementType(), Src,
+                SrcIndices, "", CI);
+            auto DstElemPtr = Builder.CreateGEP(
+                Dst->getType()->getScalarType()->getPointerElementType(), Dst,
+                DstIndices);
             SmallVector<Type *, 5> param_tys = {
                 DstElemPtr->getType(), SrcElemPtr->getType(), I32Ty, I32Ty};
             SmallVector<Value *, 5> param_values = {DstElemPtr, SrcElemPtr,

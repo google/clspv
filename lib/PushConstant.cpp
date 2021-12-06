@@ -113,7 +113,7 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
   Indices[1] = Builder.getInt32(idx);
   for (auto idx : extra_indices)
     Indices.push_back(idx);
-  return Builder.CreateInBoundsGEP(GV, Indices);
+  return Builder.CreateInBoundsGEP(GV->getValueType(), GV, Indices);
 }
 
 bool UsesGlobalPushConstants(Module &M) {

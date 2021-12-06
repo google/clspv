@@ -152,12 +152,12 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
   if (GlobalVarName == "__spirv_WorkgroupSize") {
     // Ugly hack to work around implementation bugs.
     // Load the whole vector and extract the result
-    Value *LoadVec = Builder.CreateLoad(GV);
+    Value *LoadVec = Builder.CreateLoad(GV->getValueType(), GV);
     Result = Builder.CreateExtractElement(LoadVec, InBoundsDim);
   } else {
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-    Value *GEP = Builder.CreateGEP(GV, Indices);
-    Result = Builder.CreateLoad(GEP);
+    Value *GEP = Builder.CreateGEP(GV->getValueType(), GV, Indices);
+    Result = Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
   }
 
   Value *Select2 =
@@ -190,16 +190,18 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
   Value *Result = nullptr;
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-  Value *GEP = Builder.CreateGEP(GV, Indices);
-  Result = Builder.CreateLoad(GEP);
+  Value *GEP = Builder.CreateGEP(GV->getValueType(), GV, Indices);
+  Result = Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
   auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
 
   Value *Ret = GidBase;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::RegionOffset);
-    auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
-    auto Size = Builder.CreateLoad(DimPtr);
+    auto DimPtr = Builder.CreateInBoundsGEP(
+        Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
+    auto Size =
+        Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
     auto RegOff = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 0);
     Ret = Builder.CreateAdd(Ret, RegOff);
   } else {
@@ -236,8 +238,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   Value *GlobalSize;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::GlobalSize);
-    auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
-    GlobalSize = Builder.CreateLoad(DimPtr);
+    auto DimPtr = Builder.CreateInBoundsGEP(
+        Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
+    GlobalSize =
+        Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
   } else {
     IntegerType *IT = IntegerType::get(M.getContext(), 32);
     VectorType *VT = FixedVectorType::get(IT, 3);
@@ -263,10 +267,16 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
     }
 
     // Load the workgroup size.
-    Value *LoadWGS = Builder.CreateLoad(Builder.CreateGEP(WGS, Indices));
+    Value *GEP = Builder.CreateGEP(
+        WGS->getType()->getScalarType()->getPointerElementType(), WGS, Indices);
+    Value *LoadWGS =
+        Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
     // And the number of workgroups.
-    Value *LoadNWG = Builder.CreateLoad(Builder.CreateGEP(NWG, Indices));
+    GEP = Builder.CreateGEP(
+        NWG->getType()->getScalarType()->getPointerElementType(), NWG, Indices);
+    Value *LoadNWG =
+        Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
 
     // We multiply the workgroup size by the number of workgroups to calculate
     // the global size.
@@ -306,8 +316,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
                                            AddressSpace::Input);
   }
 
-  auto NumGroupsPtr = Builder.CreateInBoundsGEP(NumGroupsVarPtr, Indices);
-  auto NumGroups = Builder.CreateLoad(NumGroupsPtr);
+  auto NumGroupsPtr = Builder.CreateInBoundsGEP(
+      NumGroupsVarPtr->getType()->getScalarType()->getPointerElementType(),
+      NumGroupsVarPtr, Indices);
+  auto NumGroups = Builder.CreateLoad(
+      NumGroupsPtr->getType()->getPointerElementType(), NumGroupsPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, NumGroups, 1);
   Builder.CreateRet(Ret);
 
@@ -336,16 +349,22 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
       createGlobalVariable(M, "__spirv_WorkgroupId", VT, AddressSpace::Input);
 
   auto RegionGroupIDPtr =
-      Builder.CreateInBoundsGEP(RegionGroupIDVarPtr, Indices);
-  auto RegionGroupID = Builder.CreateLoad(RegionGroupIDPtr);
+      Builder.CreateInBoundsGEP(VT, RegionGroupIDVarPtr, Indices);
+  auto RegionGroupID = Builder.CreateLoad(
+      RegionGroupIDPtr->getType()->getPointerElementType(), RegionGroupIDPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupID, 0);
 
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto RegionGroupOffsetVarPtr =
         GetPushConstantPointer(BB, clspv::PushConstant::RegionGroupOffset);
     auto RegionGroupOffsetPtr =
-        Builder.CreateInBoundsGEP(RegionGroupOffsetVarPtr, Indices);
-    auto RegionGroupOffsetVal = Builder.CreateLoad(RegionGroupOffsetPtr);
+        Builder.CreateInBoundsGEP(RegionGroupOffsetVarPtr->getType()
+                                      ->getScalarType()
+                                      ->getPointerElementType(),
+                                  RegionGroupOffsetVarPtr, Indices);
+    auto RegionGroupOffsetVal = Builder.CreateLoad(
+        RegionGroupOffsetPtr->getType()->getPointerElementType(),
+        RegionGroupOffsetPtr);
     auto RegionGroupOffset =
         inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupOffsetVal, 0);
 
@@ -395,15 +414,18 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
     if (uses_push_constant) {
       auto GoffPtr =
           GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
-      gep = Builder.CreateInBoundsGEP(GoffPtr, Indices);
+      gep = Builder.CreateInBoundsGEP(
+          GoffPtr->getType()->getScalarType()->getPointerElementType(), GoffPtr,
+          Indices);
     } else {
       auto VecTy = FixedVectorType::get(Int32Ty, 3);
       StringRef name = "__spirv_GlobalOffset";
       auto offset_var = createGlobalVariable(M, name, VecTy,
                                              AddressSpace::ModuleScopePrivate);
-      gep = Builder.CreateInBoundsGEP(offset_var, Indices);
+      gep = Builder.CreateInBoundsGEP(VecTy, offset_var, Indices);
     }
-    auto load = Builder.CreateLoad(gep);
+    auto load = Builder.CreateLoad(
+        gep->getType()->getScalarType()->getPointerElementType(), gep);
     auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
     Builder.CreateRet(Ret);
   } else {
@@ -430,7 +452,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
     StringRef name = "__spirv_WorkDim";
     auto work_dim_var =
         createGlobalVariable(M, name, IT, AddressSpace::ModuleScopePrivate);
-    auto load = Builder.CreateLoad(work_dim_var);
+    auto load = Builder.CreateLoad(IT, work_dim_var);
     Builder.CreateRet(load);
   } else {
     // Get work dim is easy for us as it only returns 3.
@@ -473,8 +495,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
   auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
   auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::EnqueuedLocalSize);
-  auto DimPtr = Builder.CreateInBoundsGEP(Ptr, Indices);
-  auto Size = Builder.CreateLoad(DimPtr);
+  auto DimPtr = Builder.CreateInBoundsGEP(
+      Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
+  auto Size =
+      Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
   Builder.CreateRet(Ret);
 
@@ -513,7 +537,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMaxSubGroupSizeBuiltin(Module &M) {
   StringRef name = "__spirv_SubgroupMaxSize";
   auto var =
       createGlobalVariable(M, name, IT, AddressSpace::ModuleScopePrivate);
-  auto ret = Builder.CreateLoad(var);
+  auto ret = Builder.CreateLoad(IT, var);
   Builder.CreateRet(ret);
 
   return true;

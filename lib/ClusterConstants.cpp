@@ -128,7 +128,8 @@ bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
         } else if (auto *inst = dyn_cast<Instruction>(user)) {
           unsigned index = initializers.idFor(GV->getInitializer()) - 1;
           Instruction *gep = GetElementPtrInst::CreateInBounds(
-              clustered_gv, {zero, Builder.getInt32(index)}, "", inst);
+              clustered_gv->getValueType(), clustered_gv,
+              {zero, Builder.getInt32(index)}, "", inst);
           user->replaceUsesOfWith(GV, gep);
         } else {
           errs() << "Don't know how to handle updating user of __constant: "

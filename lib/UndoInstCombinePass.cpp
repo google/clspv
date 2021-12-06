@@ -196,7 +196,7 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
   Value *new_src = nullptr;
   if (load) {
     potentially_dead_.insert(load);
-    new_src = builder.CreateLoad(src);
+    new_src = builder.CreateLoad(src_vec_ty, src);
     src = new_src;
   }
   new_src = builder.CreateExtractElement(src, builder.getInt32(new_idx));
@@ -273,7 +273,7 @@ bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   Value *insert = nullptr;
   if (in1_load) {
     potentially_dead_.insert(in1_load);
-    src = builder.CreateLoad(src);
+    src = builder.CreateLoad(src_vec_ty, src);
   }
 
   int i = 0;
