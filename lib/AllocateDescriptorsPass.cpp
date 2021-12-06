@@ -798,14 +798,19 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::BufferUBO:
           // Return a GEP to the first element
           // in the runtime array we'll make.
-          replacement = Builder.CreateGEP(call, {zero, zero, zero});
+          replacement = Builder.CreateGEP(
+              call->getType()->getScalarType()->getPointerElementType(), call,
+              {zero, zero, zero});
           break;
         case clspv::ArgKind::Pod:
         case clspv::ArgKind::PodUBO:
         case clspv::ArgKind::PodPushConstant: {
           // Replace with a load of the start of the (virtual) variable.
-          auto *gep = Builder.CreateGEP(call, {zero, zero});
-          replacement = Builder.CreateLoad(gep);
+          auto *gep = Builder.CreateGEP(
+              call->getType()->getScalarType()->getPointerElementType(), call,
+              {zero, zero});
+          replacement =
+              Builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
         } break;
         case clspv::ArgKind::SampledImage:
         case clspv::ArgKind::StorageImage:
@@ -933,7 +938,9 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
 
         // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
         // addrspace(3)*, generate two zero indices for the gep.
-        auto *replacement = Builder.CreateGEP(call, {zero, zero});
+        auto *replacement = Builder.CreateGEP(
+            call->getType()->getScalarType()->getPointerElementType(), call,
+            {zero, zero});
         Arg.replaceAllUsesWith(replacement);
 
         // We record the assignment of the spec id for this particular argument

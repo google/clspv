@@ -251,7 +251,9 @@ void MultiVersionUBOFunctionsPass::SpecializeCall(
           ++new_arg_iter;
         }
       }
-      ptr = builder.CreateGEP(ptr, indices);
+      ptr = builder.CreateGEP(
+          ptr->getType()->getScalarType()->getPointerElementType(), ptr,
+          indices);
     }
 
     // Now replace the use of the argument with the result GEP.
