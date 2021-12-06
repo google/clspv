@@ -262,8 +262,9 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
     assert(Ty->isVectorTy());
 
     unsigned OldArity = dyn_cast<FixedVectorType>(Ty)->getNumElements();
-    unsigned NewArity = dyn_cast<FixedVectorType>(EquivalentTy)->getNumElements();
-    SmallVector<int , 4> Idxs;
+    unsigned NewArity =
+        dyn_cast<FixedVectorType>(EquivalentTy)->getNumElements();
+    SmallVector<int, 4> Idxs;
     for (unsigned i = 0; i < NewArity; i++) {
       if (i < OldArity) {
         Idxs.push_back(i);
