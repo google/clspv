@@ -390,7 +390,8 @@ Value *convertOpCopyMemoryOperation(CallInst &VectorCall,
     auto *SrcGEP = B.CreateGEP(
         SrcOperand->getType()->getScalarType()->getPointerElementType(),
         SrcOperand, {B.getInt32(0), B.getInt32(eachElem)});
-    auto *Val = B.CreateLoad(SrcGEP->getType()->getPointerElementType(), SrcGEP);
+    auto *Val =
+        B.CreateLoad(SrcGEP->getType()->getPointerElementType(), SrcGEP);
     auto *DstGEP = B.CreateGEP(
         DstOperand->getType()->getScalarType()->getPointerElementType(),
         DstOperand, {B.getInt32(0), B.getInt32(eachElem)});
