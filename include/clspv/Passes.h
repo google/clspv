@@ -41,6 +41,10 @@ namespace clspv {
 /// Vulkan SPIR-V.
 llvm::ModulePass *createLongVectorLoweringPass();
 
+// Process vectors of 3 elements into a vector of 4 elements to be able to
+// access the padding element of vec3 when cast are use in OpenCL.
+llvm::ModulePass *createThreeElementVectorLoweringPass();
+
 /// Declare a structure with all enabled push constants and attach metadata to
 /// the module for use by the utilities that abstract push constant usage.
 /// @return An LLVM module pass.

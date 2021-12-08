@@ -8,8 +8,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int3* a, g
   *a = ((global int3*)b)[i];
 }
 // CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
+// CHECK:  [[_v4uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 4
 // CHECK:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK:  [[_v3float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 3
-// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_v3float]]
-// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpBitcast [[_v3uint]] [[_28]]
+// CHECK:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
+// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]]
+// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_28]]
