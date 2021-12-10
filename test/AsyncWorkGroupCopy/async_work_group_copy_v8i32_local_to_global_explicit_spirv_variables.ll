@@ -43,48 +43,48 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1Dv8_iPU3AS3KS
 ; CHECK: [[icmp:%[a-zA-Z0-9_.]+]] = icmp ult i32 [[phiiterator]], %num_gentypes
 ; CHECK: br i1 [[icmp]], label %[[loop]], label %[[exit:[a-zA-Z0-9_.]+]]
 ; CHECK: [[loop]]:
-; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* %dst, i32 [[phiiterator]]
-; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* %src, i32 [[phiiterator]]
+; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* %dst, i32 [[phiiterator]]
+; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* %src, i32 [[phiiterator]]
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
 
-;CHECK: [[gepsrc0:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 0
+;CHECK: [[gepsrc0:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 0
 ;CHECK: [[loadsrc0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc0]], align 4
-;CHECK: [[gepdst0:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 0
+;CHECK: [[gepdst0:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 0
 ;CHECK: store i32 [[loadsrc0]], i32 addrspace(1)* [[gepdst0]], align 4
 
-;CHECK: [[gepsrc1:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 1
+;CHECK: [[gepsrc1:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 1
 ;CHECK: [[loadsrc1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc1]], align 4
-;CHECK: [[gepdst1:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 1
+;CHECK: [[gepdst1:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 1
 ;CHECK: store i32 [[loadsrc1]], i32 addrspace(1)* [[gepdst1]], align 4
 
-;CHECK: [[gepsrc2:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 2
+;CHECK: [[gepsrc2:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 2
 ;CHECK: [[loadsrc2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc2]], align 4
-;CHECK: [[gepdst2:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 2
+;CHECK: [[gepdst2:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 2
 ;CHECK: store i32 [[loadsrc2]], i32 addrspace(1)* [[gepdst2]], align 4
 
-;CHECK: [[gepsrc3:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 3
+;CHECK: [[gepsrc3:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 3
 ;CHECK: [[loadsrc3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc3]], align 4
-;CHECK: [[gepdst3:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 3
+;CHECK: [[gepdst3:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 3
 ;CHECK: store i32 [[loadsrc3]], i32 addrspace(1)* [[gepdst3]], align 4
 
-;CHECK: [[gepsrc4:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 4
+;CHECK: [[gepsrc4:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 4
 ;CHECK: [[loadsrc4:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc4]], align 4
-;CHECK: [[gepdst4:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 4
+;CHECK: [[gepdst4:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 4
 ;CHECK: store i32 [[loadsrc4]], i32 addrspace(1)* [[gepdst4]], align 4
 
-;CHECK: [[gepsrc5:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 5
+;CHECK: [[gepsrc5:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 5
 ;CHECK: [[loadsrc5:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc5]], align 4
-;CHECK: [[gepdst5:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 5
+;CHECK: [[gepdst5:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 5
 ;CHECK: store i32 [[loadsrc5]], i32 addrspace(1)* [[gepdst5]], align 4
 
-;CHECK: [[gepsrc6:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 6
+;CHECK: [[gepsrc6:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 6
 ;CHECK: [[loadsrc6:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc6]], align 4
-;CHECK: [[gepdst6:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 6
+;CHECK: [[gepdst6:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 6
 ;CHECK: store i32 [[loadsrc6]], i32 addrspace(1)* [[gepdst6]], align 4
 
-;CHECK: [[gepsrc7:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(3)* [[srci]], i32 0, i32 7
+;CHECK: [[gepsrc7:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(3)* [[srci]], i32 0, i32 7
 ;CHECK: [[loadsrc7:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* [[gepsrc7]], align 4
-;CHECK: [[gepdst7:%[a-zA-Z0-9_.]+]] = getelementptr { i32, i32, i32, i32, i32, i32, i32, i32 }, { i32, i32, i32, i32, i32, i32, i32, i32 } addrspace(1)* [[dsti]], i32 0, i32 7
+;CHECK: [[gepdst7:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* [[dsti]], i32 0, i32 7
 ;CHECK: store i32 [[loadsrc7]], i32 addrspace(1)* [[gepdst7]], align 4
 
 ; CHECK: br label %[[cmp]]

@@ -14,7 +14,7 @@ entry:
   ret <8 x i32> %x
 }
 
-; CHECK: define spir_func [[INT8:{ i32, i32, i32, i32, i32, i32, i32, i32 }]]
+; CHECK: define spir_func [[INT8:\[8 x i32\]]]
 ; CHECK-SAME: @test(<3 x i32> [[A:%[^ ]+]])
 ; CHECK-DAG: [[S0:%[^ ]+]] = extractelement <3 x i32> [[A]], i64 0
 ; CHECK-DAG: [[S1:%[^ ]+]] = extractelement <3 x i32> [[A]], i64 1

@@ -12,7 +12,7 @@ entry:
 }
 
 ; CHECK: define spir_func
-; CHECK-SAME: [[FLOAT8:{ float, float, float, float, float, float, float, float }]]
+; CHECK-SAME: [[FLOAT8:\[8 x float\]]]
 ; CHECK-SAME: @test(
 ; CHECK-SAME: i1 [[COND:%[^ ]+]],
 ; CHECK-SAME: [[FLOAT8]] [[A:%[^ ]+]],

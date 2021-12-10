@@ -24,7 +24,7 @@ define spir_func void @test2(<8 x i32>* %ptr) {
 }
 
 ; CHECK-LABEL: define spir_func void @test2(
-; CHECK-SAME: [[INT8:{ i32, i32, i32, i32, i32, i32, i32, i32 }]]* [[PTR:%[^ ]+]])
+; CHECK-SAME: [[INT8:\[8 x i32\]]]* [[PTR:%[^ ]+]])
 ; CHECK: [[ALLOCA:%[^ ]+]] = alloca [[INT8]], align 32
 ; CHECK: [[VALUE:%[^ ]+]] = load volatile [[INT8]], [[INT8]]* [[PTR]], align 32
 ; CHECK: store [[INT8]] [[VALUE]], [[INT8]]* [[ALLOCA]], align 32
@@ -33,7 +33,7 @@ define spir_func void @test2(<8 x i32>* %ptr) {
 ; CHECK: ret void
 
 ; CHECK-LABEL: define spir_func void @test1(
-; CHECK-SAME: [[HALF16:{ half, half, half, half, half, half, half, half, half, half, half, half, half, half, half, half }]]* [[PTR:%[^ ]+]])
+; CHECK-SAME: [[HALF16:\[16 x half\]]]* [[PTR:%[^ ]+]])
 ; CHECK: [[ALLOCA:%[^ ]+]] = alloca [[HALF16]], align 16
 ; CHECK: [[VALUE:%[^ ]+]] = load [[HALF16]], [[HALF16]]* [[PTR]], align 16
 ; CHECK: store volatile [[HALF16]] [[VALUE]], [[HALF16]]* [[ALLOCA]], align 16

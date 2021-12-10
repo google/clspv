@@ -51,7 +51,7 @@ define dso_local spir_kernel void @test6(<8 x float> addrspace(1)* %out) {
 }
 
 ; CHECK: @global = external dso_local addrspace(3) global
-; CHECK-SAME: [1 x [[FLOAT8:{ float, float, float, float, float, float, float, float }]]], align 32
+; CHECK-SAME: [1 x [[FLOAT8:\[8 x float\]]]], align 32
 
 ; CHECK-LABEL: @test6(
 ; CHECK: load [[FLOAT8]], [[FLOAT8]] addrspace(3)*
@@ -69,12 +69,12 @@ define dso_local spir_kernel void @test6(<8 x float> addrspace(1)* %out) {
 ; CHECK-SAME: align 32
 
 ; CHECK-LABEL: @test3(
-; CHECK-SAME: [[TYPE:\[2 x \[3 x { i16, i16, i16, i16, i16, i16, i16, i16 }\]\]]] addrspace(1)* [[IN:%[^,]+]],
+; CHECK-SAME: [[TYPE:\[2 x \[3 x \[8 x i16\]\]\]]] addrspace(1)* [[IN:%[^,]+]],
 ; CHECK: [[PTR:%[^ ]+]] = getelementptr inbounds [[TYPE]], [[TYPE]] addrspace(1)* [[IN]], i32 0, i32 1, i32 undef
-; CHECK: load [[SHORT8:{ i16, i16, i16, i16, i16, i16, i16, i16 }]], [[SHORT8]] addrspace(1)* [[PTR]], align 32
+; CHECK: load [[SHORT8:\[8 x i16\]]], [[SHORT8]] addrspace(1)* [[PTR]], align 32
 
 ; CHECK-LABEL: @test2(
-; CHECK-SAME: [1 x [[HALF8:{ half, half, half, half, half, half, half, half, half, half, half, half, half, half, half, half }]]]
+; CHECK-SAME: [1 x [[HALF8:\[16 x half\]]]]
 ; CHECK-SAME: addrspace(1)* [[IN:%[^,]+]],
 ; CHECK: [[PTR:%[^ ]+]] = getelementptr inbounds [1 x [[HALF8]]], [1 x [[HALF8]]] addrspace(1)* [[IN]], i32 0, i32 undef
 ; CHECK: load [[HALF8]], [[HALF8]] addrspace(1)* [[PTR]], align 32

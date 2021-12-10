@@ -43,88 +43,88 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS1Dv16_cPU3AS3K
 ; CHECK: [[icmp:%[a-zA-Z0-9_.]+]] = icmp ult i32 [[phiiterator]], %num_gentypes
 ; CHECK: br i1 [[icmp]], label %[[loop]], label %[[exit:[a-zA-Z0-9_.]+]]
 ; CHECK: [[loop]]:
-; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* %dst, i32 [[phiiterator]]
-; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* %src, i32 [[phiiterator]]
+; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* %dst, i32 [[phiiterator]]
+; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* %src, i32 [[phiiterator]]
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
 
-;CHECK: [[gepsrc0:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 0
+;CHECK: [[gepsrc0:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 0
 ;CHECK: [[loadsrc0:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc0]], align 1
-;CHECK: [[gepdst0:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 0
+;CHECK: [[gepdst0:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 0
 ;CHECK: store i8 [[loadsrc0]], i8 addrspace(1)* [[gepdst0]], align 1
 
-;CHECK: [[gepsrc1:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 1
+;CHECK: [[gepsrc1:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 1
 ;CHECK: [[loadsrc1:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc1]], align 1
-;CHECK: [[gepdst1:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 1
+;CHECK: [[gepdst1:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 1
 ;CHECK: store i8 [[loadsrc1]], i8 addrspace(1)* [[gepdst1]], align 1
 
-;CHECK: [[gepsrc2:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 2
+;CHECK: [[gepsrc2:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 2
 ;CHECK: [[loadsrc2:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc2]], align 1
-;CHECK: [[gepdst2:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 2
+;CHECK: [[gepdst2:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 2
 ;CHECK: store i8 [[loadsrc2]], i8 addrspace(1)* [[gepdst2]], align 1
 
-;CHECK: [[gepsrc3:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 3
+;CHECK: [[gepsrc3:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 3
 ;CHECK: [[loadsrc3:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc3]], align 1
-;CHECK: [[gepdst3:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 3
+;CHECK: [[gepdst3:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 3
 ;CHECK: store i8 [[loadsrc3]], i8 addrspace(1)* [[gepdst3]], align 1
 
-;CHECK: [[gepsrc4:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 4
+;CHECK: [[gepsrc4:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 4
 ;CHECK: [[loadsrc4:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc4]], align 1
-;CHECK: [[gepdst4:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 4
+;CHECK: [[gepdst4:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 4
 ;CHECK: store i8 [[loadsrc4]], i8 addrspace(1)* [[gepdst4]], align 1
 
-;CHECK: [[gepsrc5:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 5
+;CHECK: [[gepsrc5:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 5
 ;CHECK: [[loadsrc5:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc5]], align 1
-;CHECK: [[gepdst5:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 5
+;CHECK: [[gepdst5:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 5
 ;CHECK: store i8 [[loadsrc5]], i8 addrspace(1)* [[gepdst5]], align 1
 
-;CHECK: [[gepsrc6:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 6
+;CHECK: [[gepsrc6:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 6
 ;CHECK: [[loadsrc6:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc6]], align 1
-;CHECK: [[gepdst6:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 6
+;CHECK: [[gepdst6:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 6
 ;CHECK: store i8 [[loadsrc6]], i8 addrspace(1)* [[gepdst6]], align 1
 
-;CHECK: [[gepsrc7:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 7
+;CHECK: [[gepsrc7:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 7
 ;CHECK: [[loadsrc7:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc7]], align 1
-;CHECK: [[gepdst7:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 7
+;CHECK: [[gepdst7:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 7
 ;CHECK: store i8 [[loadsrc7]], i8 addrspace(1)* [[gepdst7]], align 1
 
-;CHECK: [[gepsrc8:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 8
+;CHECK: [[gepsrc8:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 8
 ;CHECK: [[loadsrc8:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc8]], align 1
-;CHECK: [[gepdst8:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 8
+;CHECK: [[gepdst8:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 8
 ;CHECK: store i8 [[loadsrc8]], i8 addrspace(1)* [[gepdst8]], align 1
 
-;CHECK: [[gepsrc9:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 9
+;CHECK: [[gepsrc9:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 9
 ;CHECK: [[loadsrc9:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc9]], align 1
-;CHECK: [[gepdst9:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 9
+;CHECK: [[gepdst9:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 9
 ;CHECK: store i8 [[loadsrc9]], i8 addrspace(1)* [[gepdst9]], align 1
 
-;CHECK: [[gepsrc10:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 10
+;CHECK: [[gepsrc10:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 10
 ;CHECK: [[loadsrc10:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc10]], align 1
-;CHECK: [[gepdst10:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 10
+;CHECK: [[gepdst10:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 10
 ;CHECK: store i8 [[loadsrc10]], i8 addrspace(1)* [[gepdst10]], align 1
 
-;CHECK: [[gepsrc11:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 11
+;CHECK: [[gepsrc11:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 11
 ;CHECK: [[loadsrc11:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc11]], align 1
-;CHECK: [[gepdst11:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 11
+;CHECK: [[gepdst11:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 11
 ;CHECK: store i8 [[loadsrc11]], i8 addrspace(1)* [[gepdst11]], align 1
 
-;CHECK: [[gepsrc12:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 12
+;CHECK: [[gepsrc12:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 12
 ;CHECK: [[loadsrc12:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc12]], align 1
-;CHECK: [[gepdst12:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 12
+;CHECK: [[gepdst12:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 12
 ;CHECK: store i8 [[loadsrc12]], i8 addrspace(1)* [[gepdst12]], align 1
 
-;CHECK: [[gepsrc13:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 13
+;CHECK: [[gepsrc13:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 13
 ;CHECK: [[loadsrc13:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc13]], align 1
-;CHECK: [[gepdst13:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 13
+;CHECK: [[gepdst13:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 13
 ;CHECK: store i8 [[loadsrc13]], i8 addrspace(1)* [[gepdst13]], align 1
 
-;CHECK: [[gepsrc14:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 14
+;CHECK: [[gepsrc14:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 14
 ;CHECK: [[loadsrc14:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc14]], align 1
-;CHECK: [[gepdst14:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 14
+;CHECK: [[gepdst14:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 14
 ;CHECK: store i8 [[loadsrc14]], i8 addrspace(1)* [[gepdst14]], align 1
 
-;CHECK: [[gepsrc15:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(3)* [[srci]], i32 0, i32 15
+;CHECK: [[gepsrc15:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* [[srci]], i32 0, i32 15
 ;CHECK: [[loadsrc15:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(3)* [[gepsrc15]], align 1
-;CHECK: [[gepdst15:%[a-zA-Z0-9_.]+]] = getelementptr { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 }, { i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8 } addrspace(1)* [[dsti]], i32 0, i32 15
+;CHECK: [[gepdst15:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* [[dsti]], i32 0, i32 15
 ;CHECK: store i8 [[loadsrc15]], i8 addrspace(1)* [[gepdst15]], align 1
 
 ; CHECK: br label %[[cmp]]

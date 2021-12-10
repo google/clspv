@@ -31,23 +31,23 @@ define spir_func <8 x i32> @test6() {
 }
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[INT8:{ i32, i32, i32, i32, i32, i32, i32, i32 }]]
+; CHECK-SAME: [[INT8:\[8 x i32\]]]
 ; CHECK-SAME: @test6()
-; CHECK-NEXT: ret [[INT8]] { i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7 }
+; CHECK-NEXT: ret [[INT8]] [i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7]
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[FLOAT8:{ float, float, float, float, float, float, float, float }]]
+; CHECK-SAME: [[FLOAT8:\[8 x float\]]]
 ; CHECK-SAME: @test5()
-; CHECK-NEXT: ret [[FLOAT8]] { float 0[[SUFFIX:\.0+e\+0+]], float 1[[SUFFIX]], float 2[[SUFFIX]],
-; CHECK-SAME: float 3[[SUFFIX]], float 4[[SUFFIX]], float 5[[SUFFIX]], float 6[[SUFFIX]], float 7[[SUFFIX]] }
+; CHECK-NEXT: ret [[FLOAT8]] [float 0[[SUFFIX:\.0+e\+0+]], float 1[[SUFFIX]], float 2[[SUFFIX]],
+; CHECK-SAME: float 3[[SUFFIX]], float 4[[SUFFIX]], float 5[[SUFFIX]], float 6[[SUFFIX]], float 7[[SUFFIX]]]
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[INT16:{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 }]]
+; CHECK-SAME: [[INT16:\[16 x i32\]]]
 ; CHECK-SAME: @test4()
 ; CHECK-NEXT: ret [[INT16]] undef
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[FLOAT16:{ float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float }]]
+; CHECK-SAME: [[FLOAT16:\[16 x float\]]]
 ; CHECK-SAME: @test3()
 ; CHECK-NEXT: ret [[FLOAT16]] undef
 

@@ -10,7 +10,8 @@ __kernel void bitselect(__global float8 *A, __global float8 *B,
 
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG: %[[float8:[0-9a-zA-Z_]+]] = OpTypeStruct %[[float]] %[[float]] %[[float]] %[[float]] %[[float]] %[[float]] %[[float]] %[[float]]
+// CHECK-DAG: %[[uint_8:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 8
+// CHECK-DAG: %[[float8:[0-9a-zA-Z_]+]] = OpTypeArray %[[float]] %[[uint_8]]
 // CHECK-DAG: %[[array_float8:[0-9a-zA-Z_]+]] = OpTypeRuntimeArray %[[float8]]
 // CHECK-DAG: %[[struct_float8:[0-9a-zA-Z_]+]] = OpTypeStruct %[[array_float8]]
 // CHECK-DAG: %[[ptr_float8:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[struct_float8]]

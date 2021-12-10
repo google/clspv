@@ -9,10 +9,10 @@ target triple = "spir-unknown-unknown"
 ; NEGATIVE-NOT: <16 x float>
 
 @global_a = external addrspace(2) constant <8 x float>, align 32
-; CHECK: external addrspace(2) constant { float, float, float, float, float, float, float, float }, align 32
+; CHECK: external addrspace(2) constant [8 x float], align 32
 
 @global_b = addrspace(3) global <16 x i16> zeroinitializer, align 16
-; CHECK: addrspace(3) global { i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16, i16 }
+; CHECK: addrspace(3) global [16 x i16]
 ; CHECK-SAME: zeroinitializer, align 16
 
 define spir_func <8 x float> @test_a() {

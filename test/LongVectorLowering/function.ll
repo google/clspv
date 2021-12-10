@@ -40,13 +40,13 @@ define spir_func <8 x i32> @test2(i32 %a) {
 ; CHECK-NOT: <8 x i32>
 ;
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[INT8:{ i32, i32, i32, i32, i32, i32, i32, i32 }]]
+; CHECK-SAME: [[INT8:\[8 x i32\]]]
 ; CHECK-SAME: @test2(i32 {{%[^ ]+}})
 ; CHECK-NEXT: call spir_func i32 @foo()
 ; CHECK: ret [[INT8]] {{%[^ ]+}}
 ;
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[FLOAT8:{ float, float, float, float, float, float, float, float }]]
+; CHECK-SAME: [[FLOAT8:\[8 x float\]]]
 ; CHECK-SAME: @test1([[FLOAT8]] [[X:%[^ ]+]])
 ; CHECK-SAME: !info [[MD:![0-9]+]]
 ; CHECK-NEXT: [[Y:%[^ ]+]] = call spir_func [[FLOAT8]] @id([[FLOAT8]] [[X]])

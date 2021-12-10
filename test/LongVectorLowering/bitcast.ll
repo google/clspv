@@ -87,25 +87,25 @@ define spir_func <2 x i32 addrspace(5)*> @pv2pv_C(<2 x float addrspace(5)*> %x) 
 ; process re-orders functions in the module.
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } addrspace\(5\)\*]]
+; CHECK-SAME: [[OUT:\[16 x i32\] addrspace\(5\)\*]]
 ; CHECK-SAME: @ps2ps_B(
-; CHECK-SAME: [[IN:{ float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } addrspace\(5\)\*]]
+; CHECK-SAME: [[IN:\[16 x float\] addrspace\(5\)\*]]
 ; CHECK-SAME: [[X:%[^ ]+]])
 ; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
 ; CHECK-NEXT: ret [[OUT]] [[Y]]
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:{ i32, i32, i32, i32, i32, i32, i32, i32 }\*]]
+; CHECK-SAME: [[OUT:\[8 x i32\]\*]]
 ; CHECK-SAME: @ps2ps_A(
-; CHECK-SAME: [[IN:{ float, float, float, float, float, float, float, float }\*]]
+; CHECK-SAME: [[IN:\[8 x float\]\*]]
 ; CHECK-SAME: [[X:%[^ ]+]])
 ; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
 ; CHECK-NEXT: ret [[OUT]] [[Y]]
 
 ; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:{ i32, i32, i32, i32, i32, i32, i32, i32 }]]
+; CHECK-SAME: [[OUT:\[8 x i32\]]]
 ; CHECK-SAME: @v2v_A(
-; CHECK-SAME: [[IN:{ float, float, float, float, float, float, float, float }]]
+; CHECK-SAME: [[IN:\[8 x float\]]]
 ; CHECK-SAME: [[X:%[^ ]+]])
 ; CHECK-DAG: [[X0:%[^ ]+]] = extractvalue [[IN]] [[X]], 0
 ; CHECK-DAG: [[X1:%[^ ]+]] = extractvalue [[IN]] [[X]], 1

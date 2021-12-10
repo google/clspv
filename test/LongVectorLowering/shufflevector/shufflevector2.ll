@@ -15,7 +15,7 @@ entry:
 }
 
 ; CHECK: @test(
-; CHECK-SAME: [[FLOAT8:{ float, float, float, float, float, float, float, float }]] [[A:%[^ ]+]],
+; CHECK-SAME: [[FLOAT8:\[8 x float\]]] [[A:%[^ ]+]],
 ; CHECK-SAME: [[FLOAT8]] [[B:%[^ ]+]])
 ; CHECK-DAG: [[S0:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 1
 ; CHECK-DAG: [[S1:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 4

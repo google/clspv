@@ -13,7 +13,7 @@ define spir_func <8 x i32> @test(<8 x i32> %xs) {
 }
 
 ; CHECK-LABEL: @test
-; CHECK-SAME: ([[INT8:{ i32, i32, i32, i32, i32, i32, i32, i32 }]] [[XS:%[^ ]+]])
+; CHECK-SAME: ([[INT8:\[8 x i32\]]] [[XS:%[^ ]+]])
 ; CHECK-DAG: [[A:%[^ ]+]] = extractvalue [[INT8]] [[XS]], 0
 ; CHECK-DAG: [[B:%[^ ]+]] = extractvalue [[INT8]] [[XS]], 1
 ; CHECK-DAG: insertvalue {{.*}} i32 [[A]], 1
