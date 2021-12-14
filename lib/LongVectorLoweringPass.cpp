@@ -113,7 +113,7 @@ private:
 private:
   // Helpers for lowering types.
 
-  /// Get a struct equivalent for this type, if it uses a long vector.
+  /// Get a array equivalent for this type, if it uses a long vector.
   /// Returns nullptr if no lowering is required.
   Type *getEquivalentType(Type *Ty);
 
@@ -407,23 +407,23 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
     return B.CreateBitCast(V, EquivalentTy);
   }
 
-  assert(EquivalentTy->isVectorTy() || EquivalentTy->isStructTy());
+  assert(EquivalentTy->isVectorTy() || EquivalentTy->isArrayTy());
 
   Value *NewValue = UndefValue::get(EquivalentTy);
 
   if (EquivalentTy->isVectorTy()) {
-    assert(V->getType()->isStructTy());
+    assert(V->getType()->isArrayTy());
 
-    unsigned Arity = V->getType()->getNumContainedTypes();
+    unsigned Arity = V->getType()->getArrayNumElements();
     for (unsigned i = 0; i < Arity; ++i) {
       Value *Scalar = B.CreateExtractValue(V, i);
       NewValue = B.CreateInsertElement(NewValue, Scalar, i);
     }
   } else {
-    assert(EquivalentTy->isStructTy());
+    assert(EquivalentTy->isArrayTy());
     assert(V->getType()->isVectorTy());
 
-    unsigned Arity = EquivalentTy->getNumContainedTypes();
+    unsigned Arity = EquivalentTy->getArrayNumElements();
     for (unsigned i = 0; i < Arity; ++i) {
       Value *Scalar = B.CreateExtractElement(V, i);
       NewValue = B.CreateInsertValue(NewValue, Scalar, i);
@@ -442,10 +442,10 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
                               ArrayRef<Value *> EquivalentArgs,
                               ScalarOperationFactory ScalarOperation) {
   assert(EquivalentReturnTy != nullptr);
-  assert(EquivalentReturnTy->isStructTy());
+  assert(EquivalentReturnTy->isArrayTy());
 
   Value *ReturnValue = UndefValue::get(EquivalentReturnTy);
-  unsigned Arity = EquivalentReturnTy->getNumContainedTypes();
+  unsigned Arity = EquivalentReturnTy->getArrayNumElements();
 
   auto &C = I.getContext();
   auto *IntTy = IntegerType::get(C, 32);
@@ -460,12 +460,12 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
     for (unsigned j = 0; j < Args.size(); ++j) {
       auto *ArgTy = EquivalentArgs[j]->getType();
       if (ArgTy->isPointerTy()) {
-        assert(ArgTy->getPointerElementType()->isStructTy() &&
+        assert(ArgTy->getPointerElementType()->isArrayTy() &&
                "Unsupported kind of pointer type.");
         Args[j] = B.CreateInBoundsGEP(
             ArgTy->getScalarType()->getPointerElementType(), EquivalentArgs[j],
             {Zero, ConstantInt::get(IntTy, i)});
-      } else if (ArgTy->isStructTy()) {
+      } else if (ArgTy->isArrayTy()) {
         Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
       } else {
         assert((ArgTy->isFloatingPointTy() || ArgTy->isIntegerTy()) &&
@@ -564,8 +564,8 @@ Value *convertOpCopyMemoryOperation(CallInst &VectorCall,
   auto *DstOperand = EquivalentArgs[1];
   auto *SrcOperand = EquivalentArgs[2];
   auto *DstTy = DstOperand->getType()->getPointerElementType();
-  assert(DstTy->isStructTy());
-  StructType *Ty = dyn_cast<StructType>(DstTy);
+  assert(DstTy->isArrayTy());
+  ArrayType *Ty = dyn_cast<ArrayType>(DstTy);
 
   IRBuilder<> B(&VectorCall);
   Value *ReturnValue = nullptr;
@@ -727,14 +727,14 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
   }
 
   if (auto *Vector = dyn_cast<ConstantDataVector>(&Cst)) {
-    assert(isa<StructType>(EquivalentTy));
+    assert(isa<ArrayType>(EquivalentTy));
 
     SmallVector<Constant *, 16> Scalars;
     for (unsigned i = 0; i < Vector->getNumElements(); ++i) {
       Scalars.push_back(Vector->getElementAsConstant(i));
     }
 
-    return ConstantStruct::get(cast<StructType>(EquivalentTy), Scalars);
+    return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
   }
 
   if (auto *GV = dyn_cast<GlobalVariable>(&Cst)) {
@@ -901,8 +901,8 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
     //
     // Because all the elements of EquivalentDestTy have the same type, we can
     // simply pick the first.
-    assert(EquivalentDestTy->isStructTy());
-    Type *ScalarTy = EquivalentDestTy->getStructElementType(0);
+    assert(EquivalentDestTy->isArrayTy());
+    Type *ScalarTy = EquivalentDestTy->getArrayElementType();
     auto ScalarFactory = [&I, ScalarTy](auto &B, auto Args) {
       assert(Args.size() == 1);
       return B.CreateCast(I.getOpcode(), Args[0], ScalarTy, I.getName());
@@ -1126,7 +1126,7 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
     if (Vector->getType()->isVectorTy()) {
       return B.CreateExtractElement(Vector, Index);
     } else {
-      assert(Vector->getType()->isStructTy());
+      assert(Vector->getType()->isArrayTy());
       return B.CreateExtractValue(Vector, Index);
     }
   };
@@ -1136,7 +1136,7 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
     if (Vector->getType()->isVectorTy()) {
       return B.CreateInsertElement(Vector, Scalar, Index);
     } else {
-      assert(Vector->getType()->isStructTy());
+      assert(Vector->getType()->isArrayTy());
       return B.CreateInsertValue(Vector, Scalar, Index);
     }
   };
@@ -1148,7 +1148,7 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   assert(!LHSTy->getElementCount().isScalable() && "broken assumption");
   unsigned LHSArity = LHSTy->getElementCount().getFixedValue();
 
-  // Construct the equivalent shuffled vector, as a struct or a vector.
+  // Construct the equivalent shuffled vector, as an array or a vector.
   Value *V = UndefValue::get(EquivalentType);
   for (unsigned i = 0; i < Arity; ++i) {
     int Mask = I.getMaskValue(i);
@@ -1262,9 +1262,7 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
       assert((ScalarTy->isFloatingPointTy() || ScalarTy->isIntegerTy()) &&
              "Unsupported scalar type");
 
-      SmallVector<Type *, 16> AggregateBody(Arity, ScalarTy);
-      auto &C = Ty->getContext();
-      return StructType::get(C, AggregateBody);
+      return ArrayType::get(ScalarTy, Arity);
     }
 
     return nullptr;

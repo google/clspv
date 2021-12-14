@@ -10,6 +10,7 @@ kernel void foo(global int* a, global short16* b) {
 // CHECK-DAG: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[short:%[a-zA-Z0-9_]+]] = OpTypeInt 16 0
 // CHECK-DAG: [[bool:%[a-zA-Z0-9_]+]] = OpTypeBool
+// CHECK-DAG: [[int_16:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 16
 // CHECK-DAG: [[int_0:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 0
 // CHECK-DAG: [[int_1:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 1
 // CHECK-DAG: [[short0:%[a-zA-Z0-9_]+]] = OpConstant [[short]] 0

@@ -14,7 +14,7 @@ entry:
   ret <8 x float> %x
 }
 
-; CHECK: define spir_func [[FLOAT8:{ float, float, float, float, float, float, float, float }]]
+; CHECK: define spir_func [[FLOAT8:\[8 x float\]]]
 ; CHECK-SAME: @test([[FLOAT8]] [[A:%[^ ]+]])
 ; CHECK-DAG: [[S0:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 0
 ; CHECK-DAG: [[S1:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 1

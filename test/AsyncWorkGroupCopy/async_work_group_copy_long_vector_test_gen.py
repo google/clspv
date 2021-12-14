@@ -92,8 +92,7 @@ def get_type(width, vector_size):
     return '<' + str(vector_size) + ' x ' + get_scalar_type(width) + '>'
 
 def get_check_type(width, vector_size):
-    type_array = [ get_scalar_type(width) ] * vector_size
-    return '{ ' + ', '.join(type_array) + ' }'
+    return '[' + str(vector_size) + ' x ' + str(get_scalar_type(width)) + ']'
 
 def get_type_mangling(width, vector_size, signed):
     if vector_size > 1:
