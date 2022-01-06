@@ -306,9 +306,11 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kAsinpi:
   case clspv::Builtins::kAtanh:
   case clspv::Builtins::kCeil:
+  case clspv::Builtins::kClamp:
   case clspv::Builtins::kCos:
   case clspv::Builtins::kCosh:
   case clspv::Builtins::kCospi:
+  case clspv::Builtins::kDegrees:
   case clspv::Builtins::kExp:
   case clspv::Builtins::kExp2:
   case clspv::Builtins::kExpm1:
@@ -330,12 +332,17 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kLog:
   case clspv::Builtins::kLog2:
   case clspv::Builtins::kMax:
+  case clspv::Builtins::kMin:
   case clspv::Builtins::kPow:
   case clspv::Builtins::kPowr:
+  case clspv::Builtins::kRadians:
   case clspv::Builtins::kRint:
+  case clspv::Builtins::kSign:
   case clspv::Builtins::kSin:
   case clspv::Builtins::kSinh:
   case clspv::Builtins::kSinpi:
+  case clspv::Builtins::kSmoothstep:
+  case clspv::Builtins::kStep:
   case clspv::Builtins::kTan:
   case clspv::Builtins::kTanh:
   case clspv::Builtins::kTrunc: {
