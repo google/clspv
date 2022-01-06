@@ -1099,7 +1099,7 @@ std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
         default:
           // For other calls, check the function attributes.
           if (!call->getCalledFunction()->doesNotAccessMemory()) {
-            if (!call->getCalledFunction()->doesNotReadMemory())
+            if (!call->getCalledFunction()->onlyWritesMemory())
               read = true;
             if (!call->getCalledFunction()->onlyReadsMemory())
               write = true;
