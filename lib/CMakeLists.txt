@@ -133,6 +133,7 @@ target_link_libraries(clspv_core PUBLIC clspv_passes)
 target_link_libraries(clspv_core PRIVATE
   LLVMIRReader
   LLVMLinker
+  ${CLSPV_LLVM_COMPONENTS}
   clangAST
   clangBasic
   clangCodeGen
