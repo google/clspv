@@ -85,6 +85,8 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
 
 uint32_t clspv::ImageDimensionality(StructType *STy) {
   if (IsImageType(STy)) {
+    if (STy->getName().contains("image1d_buffer"))
+      return 5;
     if (STy->getName().contains("image1d"))
       return 1;
     if (STy->getName().contains("image2d"))
@@ -148,7 +150,8 @@ bool clspv::IsStorageImageType(Type *type) {
   if (IsImageType(type, &ty)) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
       if (struct_ty->getName().contains("_wo_t") ||
-          struct_ty->getName().contains("_rw_t")) {
+          struct_ty->getName().contains("_rw_t") ||
+          struct_ty->getName().contains("image1d_buffer")) {
         return true;
       }
     }

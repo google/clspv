@@ -1493,21 +1493,6 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
 
   auto Canonical = CanonicalType(Ty);
 
-  // remove buffer from type name
-  if (Canonical->isStructTy() && IsImageType(dyn_cast<StructType>(Canonical))) {
-    const char *bufferString = "_buffer_";
-    StringRef CanonicalName = Canonical->getStructName();
-    size_t bufferPos = CanonicalName.find(bufferString);
-    if (bufferPos != std::string::npos) {
-      std::string NewName =
-          CanonicalName.str().erase(bufferPos, strlen(bufferString) - 1);
-      Canonical = StructType::getTypeByName(module->getContext(), NewName);
-      if (!Canonical) {
-        Canonical = StructType::create(module->getContext(), NewName);
-      }
-    }
-  }
-
   if (Canonical != Ty) {
     auto CanonicalTI = TypeMap.find(Canonical);
     if (CanonicalTI != TypeMap.end()) {
@@ -1583,11 +1568,19 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         RID = addSPIRVInst<kTypes>(spv::OpTypeSampler);
         break;
       } else if (IsImageType(STy)) {
-        if (ImageDimensionality(STy) == 1) {
+        switch (ImageDimensionality(STy)) {
+        case 1: {
           if (IsSampledImageType(STy))
             addCapability(spv::CapabilitySampled1D);
           else
             addCapability(spv::CapabilityImage1D);
+        } break;
+        case 5: {
+          if (IsSampledImageType(STy))
+            addCapability(spv::CapabilitySampledBuffer);
+          else
+            addCapability(spv::CapabilityImageBuffer);
+        } break;
         }
 
         //
@@ -1640,6 +1633,9 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
           break;
         case 3:
           DimID = spv::Dim3D;
+          break;
+        case 5:
+          DimID = spv::DimBuffer;
           break;
         default:
           DimID = spv::Dim2D;
