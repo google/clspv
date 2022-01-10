@@ -939,7 +939,11 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
 } // namespace
 
 namespace clspv {
+
+static std::mutex g_compiler_lock;
+
 int Compile(const int argc, const char *const argv[]) {
+  std::lock_guard<std::mutex> lock(g_compiler_lock);
 
   if (auto error = ParseOptions(argc, argv))
     return error;
@@ -1067,6 +1071,7 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::string *output_log) {
+  std::lock_guard<std::mutex> lock(g_compiler_lock);
 
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
