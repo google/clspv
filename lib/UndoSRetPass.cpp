@@ -157,13 +157,13 @@ bool UndoSRetPass::runOnModule(Module &M) {
             auto attrs(Call->getAttributes());
             AttributeList new_attrs(
                 AttributeList::get(Context, AttributeList::FunctionIndex,
-                                   AttrBuilder(attrs.getFnAttrs())));
+                                   AttrBuilder(Context, attrs.getFnAttrs())));
             new_attrs = new_attrs.addAttributesAtIndex(
                 Context, AttributeList::ReturnIndex,
-                AttrBuilder(attrs.getRetAttrs()));
+                AttrBuilder(Context, attrs.getRetAttrs()));
             for (unsigned i = 1; i < Call->arg_size(); i++) {
               new_attrs = new_attrs.addParamAttributes(
-                  Context, i - 1, AttrBuilder(attrs.getParamAttrs(i)));
+                  Context, i - 1, AttrBuilder(Context, attrs.getParamAttrs(i)));
             }
             NewCall->setAttributes(new_attrs);
 
