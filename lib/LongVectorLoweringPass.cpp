@@ -80,8 +80,10 @@ private:
   Value *visitCastInst(CastInst &I);
   Value *visitCmpInst(CmpInst &I);
   Value *visitExtractElementInst(ExtractElementInst &I);
+  Value *visitExtractValueInst(ExtractValueInst &I);
   Value *visitGetElementPtrInst(GetElementPtrInst &I);
   Value *visitInsertElementInst(InsertElementInst &I);
+  Value *visitInsertValueInst(InsertValueInst &I);
   Value *visitLoadInst(LoadInst &I);
   Value *visitPHINode(PHINode &I);
   Value *visitSelectInst(SelectInst &I);
@@ -414,11 +416,23 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
     return B.CreateBitCast(V, EquivalentTy);
   }
 
-  assert(EquivalentTy->isVectorTy() || EquivalentTy->isArrayTy());
+  assert(EquivalentTy->isVectorTy() || EquivalentTy->isArrayTy() ||
+         EquivalentTy->isStructTy());
 
   Value *NewValue = UndefValue::get(EquivalentTy);
 
-  if (EquivalentTy->isVectorTy()) {
+  if (EquivalentTy->isStructTy()) {
+    StructType *StructTy = dyn_cast<StructType>(EquivalentTy);
+    unsigned Arity = StructTy->getStructNumElements();
+    if (Arity == 0)
+      return nullptr;
+    for (unsigned i = 0; i < Arity; ++i) {
+      Type *ElementType = StructTy->getContainedType(i);
+      Value *Element = B.CreateExtractValue(V, {i});
+      Value *NewElement = convertEquivalentValue(B, Element, ElementType);
+      NewValue = B.CreateInsertValue(NewValue, NewElement, {i});
+    }
+  } else if (EquivalentTy->isVectorTy()) {
     assert(V->getType()->isArrayTy());
 
     unsigned Arity = V->getType()->getArrayNumElements();
@@ -969,29 +983,23 @@ Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   return V;
 }
 
+Value *LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
+  Value *EquivalentValue = visit(I.getOperand(0));
+  if (!EquivalentValue)
+    return nullptr;
+
+  auto Indices = I.getIndices();
+
+  IRBuilder<> B(&I);
+  Value *V = B.CreateExtractValue(EquivalentValue, Indices);
+  registerReplacement(I, *V);
+  return V;
+}
+
 Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
-  // GEP can be tricky so we implement support only for the available test
-  // cases.
-#ifndef NDEBUG
-  {
-    auto *ResultTy = I.getResultElementType();
-    assert(ResultTy->isVectorTy() &&
-           "Need test case to implement GEP with non-vector result type.");
-
-    auto *ScalarTy = ResultTy->getScalarType();
-    assert((ScalarTy->isIntegerTy() || ScalarTy->isFloatingPointTy()) &&
-           "Expected a vector of integer or floating-point elements.");
-
-    auto OperandTy = I.getPointerOperandType();
-    assert(OperandTy->isPointerTy() &&
-           "Need test case to implement GEP for non-pointer operand.");
-    assert(!OperandTy->isVectorTy() &&
-           "Need test case to implement GEP for vector of pointers.");
-  }
-#endif
-
   auto *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
+  if (!EquivalentPointer)
+    return nullptr;
 
   IRBuilder<> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
@@ -1023,6 +1031,24 @@ Value *LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
   IRBuilder<> B(&I);
   auto *V = B.CreateInsertValue(EquivalentValue, ScalarElement, {Index});
   registerReplacement(I, *V);
+  return V;
+}
+
+Value *LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
+  Value *EquivalentAggregate = visitOrSelf(I.getOperand(0));
+  Value *EquivalentInsertValue = visitOrSelf(I.getOperand(1));
+
+  if (EquivalentAggregate == I.getOperand(0) &&
+      EquivalentInsertValue == I.getOperand(1)) // Nothing lowered
+    return nullptr;
+
+  auto Idxs = I.getIndices();
+
+  IRBuilder<> B(&I);
+  Value *V =
+      B.CreateInsertValue(EquivalentAggregate, EquivalentInsertValue, Idxs);
+  registerReplacement(I, *V);
+
   return V;
 }
 
@@ -1293,14 +1319,27 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
 
   if (auto *StructTy = dyn_cast<StructType>(Ty)) {
     unsigned Arity = StructTy->getStructNumElements();
+    if (Arity == 0)
+      return nullptr;
+    LLVMContext &Ctx = StructTy->getContainedType(0)->getContext();
+    SmallVector<Type *, 16> Types;
+    bool RequiredLowering = false;
     for (unsigned i = 0; i < Arity; ++i) {
-      if (getEquivalentType(StructTy->getContainedType(i)) != nullptr) {
-        llvm_unreachable(
-            "Nested types not yet supported, need test cases (struct)");
+      Type *CTy = StructTy->getContainedType(i);
+      auto *EquivalentTy = getEquivalentType(CTy);
+      if (EquivalentTy != nullptr) {
+        Types.push_back(EquivalentTy);
+        RequiredLowering = true;
+      } else {
+        Types.push_back(CTy);
       }
     }
 
-    return nullptr;
+    if (RequiredLowering) {
+      return StructType::get(Ctx, Types, false);
+    } else {
+      return nullptr;
+    }
   }
 
   if (auto *FunctionTy = dyn_cast<FunctionType>(Ty)) {
