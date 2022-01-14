@@ -830,15 +830,20 @@ Value *ThreeElementVectorLoweringPass::visitLoadInst(LoadInst &I) {
 }
 
 Value *ThreeElementVectorLoweringPass::visitPHINode(PHINode &I) {
-  // TODO Handle PHIs.
-  //
-  // PHIs are tricky because they require their incoming values
-  // to be handled first, which may not have been defined yet.
-  // We can't explicitly visit them because a PHI may depend on itself,
-  // leading to infinite loops. Defer until we have a test case.
-  //
-  // TODO Add PHI instruction with fast math flag to fastmathflags.ll test.
-  llvm_unreachable("PHI node not yet supported");
+  Type *EquivalentTy = getEquivalentType(I.getType());
+  assert(EquivalentTy && "type not lowered");
+  IRBuilder<> B(&I);
+  auto NbVal = I.getNumIncomingValues();
+  auto *V = B.CreatePHI(EquivalentTy, NbVal);
+
+  for (unsigned EachVal = 0; EachVal < NbVal; EachVal++) {
+    auto BB = I.getIncomingBlock(EachVal);
+    auto *NewVal = visit(I.getIncomingValue(EachVal));
+    V->addIncoming(NewVal, BB);
+  }
+
+  registerReplacement(I, *V);
+  return V;
 }
 
 Value *ThreeElementVectorLoweringPass::visitSelectInst(SelectInst &I) {
