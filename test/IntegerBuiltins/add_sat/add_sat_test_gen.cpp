@@ -165,7 +165,7 @@ int main() {
 
         if (is_signed) {
           if (width < 32) {
-            uint32_t extended_width = width << 1;
+            uint32_t extended_width = std::max(width << 1, (uint32_t)32);
             const std::string extended_name =
                 LLVMTypeName(extended_width, size);
             str << "; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext " << llvm_name

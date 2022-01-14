@@ -17,11 +17,11 @@ entry:
 
 declare <2 x i8> @_Z7mad_satDv2_cS_S_(<2 x i8>, <2 x i8>, <2 x i8>)
 
-; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %a to <2 x i16>
-; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %b to <2 x i16>
-; CHECK: [[sext_c:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %c to <2 x i16>
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = mul nuw nsw <2 x i16> [[sext_a]], [[sext_b]]
-; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw <2 x i16> [[mul]], [[sext_c]]
-; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <2 x i16> @_Z5clampDv2_sS_S_(<2 x i16> [[add]], <2 x i16> <i16 -128, i16 -128>, <2 x i16> <i16 127, i16 127>)
-; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <2 x i16> [[clamp]] to <2 x i8>
+; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %a to <2 x i32>
+; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %b to <2 x i32>
+; CHECK: [[sext_c:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %c to <2 x i32>
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = mul nuw nsw <2 x i32> [[sext_a]], [[sext_b]]
+; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw <2 x i32> [[mul]], [[sext_c]]
+; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <2 x i32> @_Z5clampDv2_iS_S_(<2 x i32> [[add]], <2 x i32> <i32 -128, i32 -128>, <2 x i32> <i32 127, i32 127>)
+; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <2 x i32> [[clamp]] to <2 x i8>
 ; CHECK: ret <2 x i8> [[trunc]]
