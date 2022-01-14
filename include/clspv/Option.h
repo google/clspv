@@ -207,8 +207,9 @@ bool UniformWorkgroupSize();
 // Returns true if kernel argument info production is enabled
 bool KernelArgInfo();
 
-// Returns true if lowering to vec3 to vec4 should be done whether or not it
-// seems necessary
+// Returns a positive value to force usage of the pass
+// Returns a negative value to force not to use the vecc3 pass
+// Returns zero if the decision is left to the pass to do anything
 int Vec3ToVec4();
 
 } // namespace Option
