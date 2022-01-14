@@ -333,50 +333,51 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             auto inst = &I;
             Type *SrcEleTy =
                 inst->getOperand(0)->getType()->getPointerElementType();
-
-            // De-"canonicalize" the input pointer.
-            // If Src is an array, LLVM has likely canonicalized all GEPs to
-            // the first element away as the following addresses are all
-            // equivalent:
-            // * %in = alloca [4 x [4 x float]]
-            // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-            //   %in
-            // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-            //   %in, i32 0
-            // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-            //   %in, i32 0, i32 0
-            // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-            //   %in, i32 0, i32 0, i32 0
-            //
-            // Note: count initialized to 1 to account for the first gep index.
-            uint32_t count = 1;
-            while (auto ArrayTy = dyn_cast<ArrayType>(SrcEleTy)) {
-              ++count;
-              SrcEleTy = ArrayTy->getElementType();
-            }
-
-            if (count > 1) {
-              // Create a cast of the pointer. Replace the original cast with
-              // it and mark the original cast for deletion.
-              SmallVector<Value *, 4> indices(
-                  count,
-                  ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
-              auto gep = GetElementPtrInst::CreateInBounds(
-                  inst->getOperand(0)->getType()->getPointerElementType(),
-                  inst->getOperand(0), indices, "", inst);
-              ToBeDeleted.push_back(&I);
-              auto cast = new BitCastInst(gep, inst->getType(), "", inst);
-              inst->replaceAllUsesWith(cast);
-              inst = cast;
-            }
-
             Type *DstEleTy = inst->getType()->getPointerElementType();
+
             if (SrcEleTy->isVectorTy() || DstEleTy->isVectorTy()) {
+              // De-"canonicalize" the input pointer.
+              // If Src is an array, LLVM has likely canonicalized all GEPs to
+              // the first element away as the following addresses are all
+              // equivalent:
+              // * %in = alloca [4 x [4 x float]]
+              // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+              //   %in
+              // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+              //   %in, i32 0
+              // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+              //   %in, i32 0, i32 0
+              // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
+              //   %in, i32 0, i32 0, i32 0
+              //
+              // Note: count initialized to 1 to account for the first gep
+              // index.
+              uint32_t count = 1;
+              while (auto ArrayTy = dyn_cast<ArrayType>(SrcEleTy)) {
+                ++count;
+                SrcEleTy = ArrayTy->getElementType();
+              }
+
+              if (count > 1) {
+                // Create a cast of the pointer. Replace the original cast with
+                // it and mark the original cast for deletion.
+                SmallVector<Value *, 4> indices(
+                    count,
+                    ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
+                auto gep = GetElementPtrInst::CreateInBounds(
+                    inst->getOperand(0)->getType()->getPointerElementType(),
+                    inst->getOperand(0), indices, "", inst);
+                ToBeDeleted.push_back(&I);
+                auto cast = new BitCastInst(gep, inst->getType(), "", inst);
+                inst->replaceAllUsesWith(cast);
+                inst = cast;
+              }
+
               // Handle case either operand is vector type like char4* -> int4*.
               VectorWorkList.push_back(inst);
             } else {
               // Handle case all operands are scalar type like char* -> int*.
-              ScalarWorkList.push_back(inst);
+              ScalarWorkList.push_back(&I);
             }
 
             Changed = true;
@@ -1010,16 +1011,16 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
     Value *Src = Inst->getOperand(0);
     Type *SrcTy; // Original type
     Type *DstTy; // Type that SrcTy is cast to.
-    unsigned SrcTyBitWidth;
-    unsigned DstTyBitWidth;
 
     bool BailOut = false;
     SrcTy = Src->getType()->getPointerElementType();
     DstTy = Inst->getType()->getPointerElementType();
+    unsigned SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
+    unsigned DstTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(DstTy));
+
+    SmallVector<unsigned, 4> SrcTyBitWidths;
     int iter_count = 0;
     while (++iter_count) {
-      SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
-      DstTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(DstTy));
 #if 0
       errs() << "  Try Src " << *Src << "\n";
       errs() << "  SrcTy elem " << *SrcTy << " bit width " << SrcTyBitWidth
@@ -1028,56 +1029,18 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
              << "\n";
 #endif
 
+      SrcTyBitWidths.push_back(SrcTyBitWidth);
+
       // The normal case that we can handle is source type is smaller than
       // the dest type.
       if (SrcTyBitWidth <= DstTyBitWidth)
         break;
 
-      // We are looking for either a real array or a structure of the same
-      // element.
-      // The long vector lowering pass is producing such structures.
-      bool isArrayLikeTy = false;
-      if (SrcTy->isArrayTy()) {
-        isArrayLikeTy = true;
-      } else if (SrcTy->isStructTy()) {
-        StructType *StructTy = dyn_cast<StructType>(SrcTy);
-        assert(StructTy->getNumElements() > 0);
-        Type *Ty = StructTy->getElementType(0);
-        isArrayLikeTy = true;
-        for (unsigned int each_elem = 0; each_elem < StructTy->getNumElements();
-             each_elem++) {
-          Type *ElemTy = StructTy->getElementType(each_elem);
-          if (ElemTy != Ty) {
-            isArrayLikeTy = false;
-            break;
-          }
-        }
-      }
-
       // The Source type is bigger than the destination type.
       // Walk into the source type to break it down.
-      if (isArrayLikeTy) {
-        // If it's an array, consider only the first element.
-        Value *Zero = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-        Instruction *NewSrc =
-            GetElementPtrInst::CreateInBounds(SrcTy, Src, {Zero, Zero});
-        Changed = true;
-        // errs() << "NewSrc is " << *NewSrc << "\n";
-        if (auto *SrcInst = dyn_cast<Instruction>(Src)) {
-          // errs() << " instruction case\n";
-          NewSrc->insertAfter(SrcInst);
-        } else {
-          // Could be a parameter.
-          auto where = Inst->getParent()
-                           ->getParent()
-                           ->getEntryBlock()
-                           .getFirstInsertionPt();
-          Instruction &whereInst = *where;
-          // errs() << "insert " << *NewSrc << " before " << whereInst << "\n";
-          NewSrc->insertBefore(&whereInst);
-        }
-        Src = NewSrc;
-        SrcTy = Src->getType()->getPointerElementType();
+      if (SrcTy->isArrayTy()) {
+        SrcTy = SrcTy->getArrayElementType();
+        SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
       } else {
         BailOut = true;
         break;
@@ -1101,8 +1064,18 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       continue;
     }
 
+    Changed = true;
+
+    // If we detect a private memory, the first index of the GEP will need to be
+    // zero (meaning that we are not explicitly trying to access private memory
+    // out-of-bounds).
+    // spirv-val is not yet capable of detecting it, but such access would fail
+    // at runtime (see https://github.com/KhronosGroup/SPIRV-Tools/issues/1585).
+    bool isPrivateMemory = isa<AllocaInst>(Src);
+
     for (User *BitCastUser : Inst->users()) {
-      Value *NewAddrIdx = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+      SmallVector<Value *, 4> NewAddrIdxs;
+
       // It consist of User* and bool whether user is gep or not.
       SmallVector<std::pair<User *, bool>, 32> Users;
 
@@ -1111,13 +1084,54 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
         IRBuilder<> Builder(GEP);
 
         // Build new src/dst address.
-        NewAddrIdx = CalculateNewGEPIdx(SrcTyBitWidth, DstTyBitWidth, GEP);
+        Value *GEPIdx = GEP->getOperand(1);
+        if (SrcTyBitWidths.size() > 0) {
+          unsigned SmallerSrcBitWidth =
+              SrcTyBitWidths[SrcTyBitWidths.size() - 1];
+          if (SmallerSrcBitWidth > DstTyBitWidth) {
+            GEPIdx = Builder.CreateUDiv(
+                GEPIdx, Builder.getInt32(SmallerSrcBitWidth / DstTyBitWidth));
+          } else if (SmallerSrcBitWidth < DstTyBitWidth) {
+            GEPIdx = Builder.CreateMul(
+                GEPIdx, Builder.getInt32(DstTyBitWidth / SmallerSrcBitWidth));
+          }
+          for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
+            unsigned TyBitWidth = SrcTyBitWidths[i];
+            if (isPrivateMemory && i == 0) {
+              NewAddrIdxs.push_back(Builder.getInt32(0));
+              continue;
+            }
+            Value *Idx;
+            unsigned div = TyBitWidth / SmallerSrcBitWidth;
+            if (div <= 1) {
+              Idx = GEPIdx;
+            } else {
+              Value *divInt = Builder.getInt32(div);
+              Idx = Builder.CreateUDiv(GEPIdx, divInt);
+              GEPIdx = Builder.CreateURem(GEPIdx, divInt);
+            }
+            NewAddrIdxs.push_back(Idx);
+          }
+        }
+        if (NewAddrIdxs.size() == 0) {
+          NewAddrIdxs.push_back(
+              CalculateNewGEPIdx(SrcTyBitWidth, DstTyBitWidth, GEP));
+        }
 
         // If bitcast's user is gep, investigate gep's users too.
         for (User *GEPUser : GEP->users()) {
           Users.push_back(std::make_pair(GEPUser, true));
         }
       } else {
+        NewAddrIdxs.push_back(
+            ConstantInt::get(Type::getInt32Ty(M.getContext()), 0));
+        Type *SrcEleTy =
+            Inst->getOperand(0)->getType()->getPointerElementType();
+        while (SrcEleTy->isArrayTy()) {
+          NewAddrIdxs.push_back(
+              ConstantInt::get(Type::getInt32Ty(M.getContext()), 0));
+          SrcEleTy = SrcEleTy->getArrayElementType();
+        }
         Users.push_back(std::make_pair(BitCastUser, false));
       }
 
@@ -1136,7 +1150,7 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             auto STVal = ConvertValue(ST->getValueOperand(), SrcTy, Builder);
             Value *DstAddr = Builder.CreateGEP(
                 Src->getType()->getScalarType()->getPointerElementType(), Src,
-                NewAddrIdx);
+                NewAddrIdxs);
             Builder.CreateStore(STVal, DstAddr);
           } else if (SrcTyBitWidth < DstTyBitWidth) {
             unsigned NumElement = DstTyBitWidth / SrcTyBitWidth;
@@ -1154,18 +1168,19 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             }
 
             // Generate stores.
-            Value *SrcAddrIdx = NewAddrIdx;
-            Value *BaseAddr = Src;
             for (unsigned i = 0; i < NumElement; i++) {
               // Calculate store address.
               Value *DstAddr = Builder.CreateGEP(
-                  BaseAddr->getType()->getScalarType()->getPointerElementType(),
-                  BaseAddr, SrcAddrIdx);
+                  Src->getType()->getScalarType()->getPointerElementType(), Src,
+                  NewAddrIdxs);
               Builder.CreateStore(STValues[i], DstAddr);
 
               if (i + 1 < NumElement) {
                 // Calculate next store address
-                SrcAddrIdx = Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(1));
+                Value *LastAddrIdx = NewAddrIdxs.pop_back_val();
+                LastAddrIdx =
+                    Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+                NewAddrIdxs.push_back(LastAddrIdx);
               }
             }
 
@@ -1178,11 +1193,10 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
           if (SrcTyBitWidth == DstTyBitWidth) {
             Value *SrcAddr = Builder.CreateGEP(
                 Src->getType()->getScalarType()->getPointerElementType(), Src,
-                NewAddrIdx);
+                NewAddrIdxs);
             LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
             LD->replaceAllUsesWith(ConvertValue(SrcVal, DstTy, Builder));
           } else if (SrcTyBitWidth < DstTyBitWidth) {
-            Value *SrcAddrIdx = NewAddrIdx;
 
             // Load value from src.
             unsigned NumIter = CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
@@ -1190,13 +1204,16 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
             for (unsigned i = 1; i <= NumIter; i++) {
               Value *SrcAddr = Builder.CreateGEP(
                   Src->getType()->getScalarType()->getPointerElementType(), Src,
-                  SrcAddrIdx);
+                  NewAddrIdxs);
               LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
               LDValues.push_back(SrcVal);
 
               if (i + 1 <= NumIter) {
                 // Calculate next SrcAddrIdx.
-                SrcAddrIdx = Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(1));
+                Value *LastAddrIdx = NewAddrIdxs.pop_back_val();
+                LastAddrIdx =
+                    Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+                NewAddrIdxs.push_back(LastAddrIdx);
               }
             }
 
