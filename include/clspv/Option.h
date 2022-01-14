@@ -209,7 +209,7 @@ bool KernelArgInfo();
 
 // Returns true if lowering to vec3 to vec4 should be done whether or not it
 // seems necessary
-bool Vec3ToVec4();
+int Vec3ToVec4();
 
 } // namespace Option
 } // namespace clspv

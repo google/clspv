@@ -434,8 +434,11 @@ bool vec3BitcastInFunction(Function &F) {
 
 /// Returns whether the vec3 should be transform into vec4
 bool vec3ShouldBeLowered(Module &M) {
-  if (clspv::Option::Vec3ToVec4())
+  int vec3ToVec4 = clspv::Option::Vec3ToVec4();
+  if (vec3ToVec4 > 0)
     return true;
+  if (vec3ToVec4 < 0)
+    return false;
 
   for (auto &F : M.functions()) {
     if (vec3BitcastInFunction(F))

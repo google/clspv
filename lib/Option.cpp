@@ -267,6 +267,10 @@ static llvm::cl::opt<bool>
     force_vec3_to_vec4("vec3-to-vec4", llvm::cl::init(false),
                        llvm::cl::desc("Force lowering vec3 to vec4"));
 
+static llvm::cl::opt<bool>
+    force_no_vec3_to_vec4("no-vec3-to-vec4", llvm::cl::init(false),
+                          llvm::cl::desc("Force NOT lowering vec3 to vec4"));
+
 } // namespace
 
 namespace clspv {
@@ -348,7 +352,9 @@ bool UniformWorkgroupSize() { return uniform_workgroup_size; }
 
 bool KernelArgInfo() { return cl_kernel_arg_info; }
 
-bool Vec3ToVec4() { return force_vec3_to_vec4; }
+int Vec3ToVec4() {
+  return force_no_vec3_to_vec4 ? -1 : (force_vec3_to_vec4 ? 1 : 0);
+}
 
 } // namespace Option
 } // namespace clspv
