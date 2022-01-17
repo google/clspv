@@ -207,10 +207,17 @@ bool UniformWorkgroupSize();
 // Returns true if kernel argument info production is enabled
 bool KernelArgInfo();
 
+enum class Vec3ToVec4SupportClass : int {
+  vec3ToVec4SupportDefault = 0,
+  vec3ToVec4SupportError,   // -vec3-to-vec4 & -no-vec3-to-vec4
+  vec3ToVec4SupportForce,   // -vec3-to-vec4
+  vec3ToVec4SupportDisable, // -no-vec3-to-vec4
+};
+
 // Returns a positive value to force usage of the pass
 // Returns a negative value to force not to use the vecc3 pass
 // Returns zero if the decision is left to the pass to do anything
-int Vec3ToVec4();
+Vec3ToVec4SupportClass Vec3ToVec4();
 
 } // namespace Option
 } // namespace clspv

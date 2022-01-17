@@ -352,8 +352,16 @@ bool UniformWorkgroupSize() { return uniform_workgroup_size; }
 
 bool KernelArgInfo() { return cl_kernel_arg_info; }
 
-int Vec3ToVec4() {
-  return force_no_vec3_to_vec4 ? -1 : (force_vec3_to_vec4 ? 1 : 0);
+Vec3ToVec4SupportClass Vec3ToVec4() {
+  if (force_no_vec3_to_vec4 && force_vec3_to_vec4) {
+    return Vec3ToVec4SupportClass::vec3ToVec4SupportError;
+  } else if (force_vec3_to_vec4) {
+    return Vec3ToVec4SupportClass::vec3ToVec4SupportForce;
+  } else if (force_no_vec3_to_vec4) {
+    return Vec3ToVec4SupportClass::vec3ToVec4SupportDisable;
+  } else {
+    return Vec3ToVec4SupportClass::vec3ToVec4SupportDefault;
+  }
 }
 
 } // namespace Option
