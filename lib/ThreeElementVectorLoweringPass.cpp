@@ -830,19 +830,27 @@ Value *ThreeElementVectorLoweringPass::visitLoadInst(LoadInst &I) {
 }
 
 Value *ThreeElementVectorLoweringPass::visitPHINode(PHINode &I) {
+  static std::map<PHINode *, Value *> PHIMap;
+  if (PHIMap.count(&I) > 0) {
+    return PHIMap[&I];
+  }
+
   Type *EquivalentTy = getEquivalentType(I.getType());
   assert(EquivalentTy && "type not lowered");
   IRBuilder<> B(&I);
   auto NbVal = I.getNumIncomingValues();
   auto *V = B.CreatePHI(EquivalentTy, NbVal);
+  PHIMap[&I] = V;
 
   for (unsigned EachVal = 0; EachVal < NbVal; EachVal++) {
-    auto BB = I.getIncomingBlock(EachVal);
-    auto *NewVal = visit(I.getIncomingValue(EachVal));
+    auto BB = I.getIncomingBlock(0);
+    auto *NewVal = visit(I.getIncomingValue(0));
     V->addIncoming(NewVal, BB);
+    I.removeIncomingValue((int)0, false);
   }
 
   registerReplacement(I, *V);
+  PHIMap.erase(&I);
   return V;
 }
 
