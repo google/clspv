@@ -644,13 +644,6 @@ int PopulatePassManager(
     break;
   }
 
-  if (clspv::Option::Vec3ToVec4() ==
-      clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportError) {
-    llvm::errs() << "error: -vec3-to-vec4 and -no-vec3-to-vec4 are exclusive "
-                    "so they cannot be used together!\n";
-    return -1;
-  }
-
   pm->add(clspv::createNativeMathPass());
   pm->add(clspv::createZeroInitializeAllocasPass());
   pm->add(clspv::createAddFunctionAttributesPass());
@@ -893,6 +886,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
       clspv::Option::UniformWorkgroupSize()) {
     llvm::errs() << "cannot enable Arm non-uniform workgroup extension support "
                     "and assume uniform workgroup sizes\n";
+    return -1;
+  }
+
+  if (clspv::Option::Vec3ToVec4() ==
+      clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportError) {
+    llvm::errs() << "error: -vec3-to-vec4 and -no-vec3-to-vec4 are exclusive "
+                    "so they cannot be used together!\n";
     return -1;
   }
 
