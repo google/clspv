@@ -846,7 +846,7 @@ Value *ThreeElementVectorLoweringPass::visitPHINode(PHINode &I) {
     auto BB = I.getIncomingBlock(0);
     auto *NewVal = visit(I.getIncomingValue(0));
     V->addIncoming(NewVal, BB);
-    I.removeIncomingValue((int)0, false);
+    I.removeIncomingValue(BB, false);
   }
 
   registerReplacement(I, *V);
