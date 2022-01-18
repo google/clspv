@@ -889,6 +889,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (clspv::Option::Vec3ToVec4() ==
+      clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportError) {
+    llvm::errs() << "error: -vec3-to-vec4 and -no-vec3-to-vec4 are exclusive "
+                    "so they cannot be used together!\n";
+    return -1;
+  }
+
   return 0;
 }
 

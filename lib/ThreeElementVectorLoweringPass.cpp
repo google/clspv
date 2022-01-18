@@ -434,14 +434,18 @@ bool vec3BitcastInFunction(Function &F) {
 
 /// Returns whether the vec3 should be transform into vec4
 bool vec3ShouldBeLowered(Module &M) {
-  if (clspv::Option::Vec3ToVec4())
+  switch (clspv::Option::Vec3ToVec4()) {
+  case clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportForce:
     return true;
-
-  for (auto &F : M.functions()) {
-    if (vec3BitcastInFunction(F))
-      return true;
+  case clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportDisable:
+    return false;
+  default:
+    for (auto &F : M.functions()) {
+      if (vec3BitcastInFunction(F))
+        return true;
+    }
+    return false;
   }
-  return false;
 }
 
 bool ThreeElementVectorLoweringPass::runOnModule(Module &M) {

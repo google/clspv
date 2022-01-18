@@ -207,9 +207,14 @@ bool UniformWorkgroupSize();
 // Returns true if kernel argument info production is enabled
 bool KernelArgInfo();
 
-// Returns true if lowering to vec3 to vec4 should be done whether or not it
-// seems necessary
-bool Vec3ToVec4();
+enum class Vec3ToVec4SupportClass : int {
+  vec3ToVec4SupportDefault = 0,
+  vec3ToVec4SupportError,   // -vec3-to-vec4 & -no-vec3-to-vec4
+  vec3ToVec4SupportForce,   // -vec3-to-vec4
+  vec3ToVec4SupportDisable, // -no-vec3-to-vec4
+};
+
+Vec3ToVec4SupportClass Vec3ToVec4();
 
 } // namespace Option
 } // namespace clspv
