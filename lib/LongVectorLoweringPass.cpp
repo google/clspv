@@ -26,6 +26,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/Local.h"
 
+#include "BuiltinsEnum.h"
 #include "Constants.h"
 #include "clspv/Passes.h"
 
@@ -344,6 +345,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kSinh:
   case clspv::Builtins::kSinpi:
   case clspv::Builtins::kSmoothstep:
+  case clspv::Builtins::kSpirvOp:
   case clspv::Builtins::kStep:
   case clspv::Builtins::kTan:
   case clspv::Builtins::kTanh:
@@ -371,8 +373,21 @@ Function *getBIFScalarVersion(Function &Builtin) {
       ScalarParamTys.push_back(ScalarParamTy);
     }
 
-    assert(Builtin.getReturnType()->isVectorTy());
-    Type *ReturnTy = Builtin.getReturnType()->getScalarType();
+    Type *ReturnTy;
+    if (!Builtin.getReturnType()->isVectorTy()) {
+      SmallVector<Type *, 16> RetTys;
+      assert(Builtin.getReturnType()->isStructTy());
+      StructType *RetTy = cast<StructType>(Builtin.getReturnType());
+      for (unsigned int eachRetTy = 0;
+           eachRetTy < RetTy->getStructNumElements(); eachRetTy++) {
+        assert(RetTy->getStructElementType(eachRetTy)->isVectorTy());
+        RetTys.push_back(
+            RetTy->getStructElementType(eachRetTy)->getScalarType());
+      }
+      ReturnTy = StructType::create(RetTys);
+    } else {
+      ReturnTy = Builtin.getReturnType()->getScalarType();
+    }
 
     FunctionTy =
         FunctionType::get(ReturnTy, ScalarParamTys, Builtin.isVarArg());
@@ -463,10 +478,26 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
                               ArrayRef<Value *> EquivalentArgs,
                               ScalarOperationFactory ScalarOperation) {
   assert(EquivalentReturnTy != nullptr);
-  assert(EquivalentReturnTy->isArrayTy());
+
+  unsigned Arity;
+  if (!EquivalentReturnTy->isArrayTy()) {
+    assert(EquivalentReturnTy->isStructTy());
+    assert(EquivalentReturnTy->getStructNumElements() != 0);
+    StructType *RetTy = cast<StructType>(EquivalentReturnTy);
+    Arity = UINT_MAX;
+    for (unsigned int eachRetTy = 0; eachRetTy < RetTy->getStructNumElements();
+         eachRetTy++) {
+      assert(RetTy->getStructElementType(eachRetTy)->isArrayTy());
+      assert(Arity == UINT_MAX ||
+             Arity ==
+                 RetTy->getStructElementType(eachRetTy)->getArrayNumElements());
+      Arity = RetTy->getStructElementType(eachRetTy)->getArrayNumElements();
+    }
+  } else {
+    Arity = EquivalentReturnTy->getArrayNumElements();
+  }
 
   Value *ReturnValue = UndefValue::get(EquivalentReturnTy);
-  unsigned Arity = EquivalentReturnTy->getArrayNumElements();
 
   auto &C = I.getContext();
   auto *IntTy = IntegerType::get(C, 32);
@@ -501,7 +532,16 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
       cast<Instruction>(Scalar)->copyIRFlags(&I);
     }
 
-    ReturnValue = B.CreateInsertValue(ReturnValue, Scalar, i);
+    if (!EquivalentReturnTy->isArrayTy()) {
+      StructType *RetTy = cast<StructType>(EquivalentReturnTy);
+      for (unsigned int eachRetTy = 0;
+           eachRetTy < RetTy->getStructNumElements(); eachRetTy++) {
+        auto Val = B.CreateExtractValue(Scalar, eachRetTy);
+        ReturnValue = B.CreateInsertValue(ReturnValue, Val, {eachRetTy, i});
+      }
+    } else {
+      ReturnValue = B.CreateInsertValue(ReturnValue, Scalar, i);
+    }
   }
 
   return ReturnValue;
