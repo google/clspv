@@ -848,7 +848,7 @@ Value *ThreeElementVectorLoweringPass::visitPHINode(PHINode &I) {
 
   for (unsigned EachVal = 0; EachVal < NbVal; EachVal++) {
     auto BB = I.getIncomingBlock(0);
-    auto *NewVal = visit(I.getIncomingValue(0));
+    auto *NewVal = visitOrSelf(I.getIncomingValue(0));
     V->addIncoming(NewVal, BB);
     I.removeIncomingValue(BB, false);
   }
