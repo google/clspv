@@ -232,9 +232,11 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::ceil:
   case Intrinsic::copysign:
   case Intrinsic::cos:
+  case Intrinsic::ctlz:
   case Intrinsic::exp:
   case Intrinsic::fabs:
   case Intrinsic::fmuladd:
+  case Intrinsic::fshl:
   case Intrinsic::log:
   case Intrinsic::pow:
   case Intrinsic::sin: {
@@ -298,6 +300,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
 
   // TODO Add support for other builtins by providing testcases and listing the
   // builtins here.
+  case clspv::Builtins::kAbs:
   case clspv::Builtins::kAcosh:
   case clspv::Builtins::kAcos:
   case clspv::Builtins::kAcospi:
@@ -333,6 +336,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kLog2:
   case clspv::Builtins::kMax:
   case clspv::Builtins::kMin:
+  case clspv::Builtins::kPopcount:
   case clspv::Builtins::kPow:
   case clspv::Builtins::kPowr:
   case clspv::Builtins::kRadians:
