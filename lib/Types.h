@@ -18,6 +18,8 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
 
+#include "spirv/unified1/spirv.hpp"
+
 namespace clspv {
 
 // Returns true if the given struct type is a sampler type.
@@ -35,12 +37,20 @@ bool IsImageType(llvm::StructType *type);
 bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 
 // Returns the dimensionality of the image struct type. If |type| is not an
+// image, returns spv::DimMax.
+spv::Dim ImageDimensionality(llvm::StructType *type);
+
+// Returns the dimensionality of the image type. If |type| is not an image,
+// returns spv::DimMax.
+spv::Dim ImageDimensionality(llvm::Type *type);
+
+// Returns the dimensionality of the image struct type. If |type| is not an
 // image, returns 0.
-uint32_t ImageDimensionality(llvm::StructType *type);
+uint32_t ImageNumDimensions(llvm::StructType *type);
 
 // Returns the dimensionality of the image type. If |type| is not an image,
 // returns 0.
-uint32_t ImageDimensionality(llvm::Type *type);
+uint32_t ImageNumDimensions(llvm::Type *type);
 
 // Returns true if the given type is an array image type.
 bool IsArrayImageType(llvm::Type *type);

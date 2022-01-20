@@ -1569,18 +1569,17 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         break;
       } else if (IsImageType(STy)) {
         switch (ImageDimensionality(STy)) {
-        case 1: {
+        case spv::Dim1D: {
           if (IsSampledImageType(STy))
             addCapability(spv::CapabilitySampled1D);
           else
             addCapability(spv::CapabilityImage1D);
         } break;
-        case 5: {
-          if (IsSampledImageType(STy))
-            addCapability(spv::CapabilitySampledBuffer);
-          else
-            addCapability(spv::CapabilityImageBuffer);
+        case spv::DimBuffer: {
+          addCapability(spv::CapabilityImageBuffer);
         } break;
+        default:
+          break;
         }
 
         //
@@ -1626,21 +1625,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         }
         Ops << SampledTyID;
 
-        spv::Dim DimID;
-        switch (ImageDimensionality(STy)) {
-        case 1:
-          DimID = spv::Dim1D;
-          break;
-        case 3:
-          DimID = spv::Dim3D;
-          break;
-        case 5:
-          DimID = spv::DimBuffer;
-          break;
-        default:
-          DimID = spv::Dim2D;
-          break;
-        }
+        spv::Dim DimID = ImageDimensionality(STy);
         Ops << DimID;
 
         // TODO: Set up Depth.
@@ -3537,7 +3522,7 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
     SPIRVID SizesTypeID;
 
     Value *Image = Call->getArgOperand(0);
-    const uint32_t dim = ImageDimensionality(Image->getType());
+    const uint32_t dim = ImageNumDimensions(Image->getType());
     const uint32_t components =
         dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
     if (components == 1) {
