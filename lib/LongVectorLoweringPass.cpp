@@ -1040,15 +1040,28 @@ Value *LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
 }
 
 Value *LongVectorLoweringPass::visitPHINode(PHINode &I) {
-  // TODO Handle PHIs.
-  //
-  // PHIs are tricky because they require their incoming values
-  // to be handled first, which may not have been defined yet.
-  // We can't explicitly visit them because a PHI may depend on itself,
-  // leading to infinite loops. Defer until we have a test case.
-  //
-  // TODO Add PHI instruction with fast math flag to fastmathflags.ll test.
-  llvm_unreachable("PHI node not yet supported");
+  static std::map<PHINode *, Value *> PHIMap;
+  if (PHIMap.count(&I) > 0) {
+    return PHIMap[&I];
+  }
+
+  Type *EquivalentTy = getEquivalentType(I.getType());
+  assert(EquivalentTy && "type not lowered");
+  IRBuilder<> B(&I);
+  auto NbVal = I.getNumIncomingValues();
+  auto *V = B.CreatePHI(EquivalentTy, NbVal);
+  PHIMap[&I] = V;
+
+  for (unsigned EachVal = 0; EachVal < NbVal; EachVal++) {
+    auto BB = I.getIncomingBlock(0);
+    auto *NewVal = visitOrSelf(I.getIncomingValue(0));
+    V->addIncoming(NewVal, BB);
+    I.removeIncomingValue(BB, false);
+  }
+
+  registerReplacement(I, *V);
+  PHIMap.erase(&I);
+  return V;
 }
 
 Value *LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
