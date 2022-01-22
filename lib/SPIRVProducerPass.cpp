@@ -1483,6 +1483,23 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   // stores a laid out and non-laid out version of the type.
   const unsigned layout = needs_layout ? 1 : 0;
 
+  if (dyn_cast<StructType>(Ty) && IsImageType(dyn_cast<StructType>(Ty))) {
+    // %opencl.image1d_buffer_ro.t, %opencl.image1d_buffer_wo.t and
+    // %opencl.image1d_buffer_rw.t needs to be rework as they will map on the
+    // same SPIRV type.
+    const char *bufferString = "_buffer_";
+    StringRef CanonicalName = Ty->getStructName();
+    size_t bufferPos = CanonicalName.find(bufferString);
+    if (bufferPos != std::string::npos) {
+      std::string NewName = CanonicalName.str().replace(
+          bufferPos + strlen(bufferString), 2, "rw");
+      Ty = StructType::getTypeByName(module->getContext(), NewName);
+      if (!Ty) {
+        Ty = StructType::create(module->getContext(), NewName);
+      }
+    }
+  }
+
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
     assert(layout < TI->second.size());
