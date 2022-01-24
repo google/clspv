@@ -749,8 +749,7 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
 
     SmallVector<Constant *, 16> Scalars;
     for (unsigned i = 0; i < Vector->getNumOperands(); ++i) {
-      Scalars.push_back(
-          dyn_cast<Constant>(visitOrSelf(Vector->getOperand(i))));
+      Scalars.push_back(dyn_cast<Constant>(visitOrSelf(Vector->getOperand(i))));
     }
 
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
