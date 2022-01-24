@@ -151,11 +151,11 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
       if (*used_bits != 0) {
         tmp_value = builder.CreateLShr(tmp_value, *used_bits);
       }
-      if (needed_bits < remaining_bits) {
+      if (needed_bits < remaining_bits && needed_bits < dst_width) {
         // Ensure only the needed bits are used.
         uint64_t mask = (1ull << needed_bits) - 1;
         tmp_value =
-            builder.CreateAnd(tmp_value, builder.getIntN(dst_width, mask));
+            builder.CreateAnd(tmp_value, builder.getIntN(ele_width, mask));
       }
       // Cast to tbe destination bit width, but stay as a integer type.
       if (ele_width != dst_width) {
