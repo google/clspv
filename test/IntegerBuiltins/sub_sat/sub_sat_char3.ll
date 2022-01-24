@@ -17,9 +17,9 @@ entry:
 
 declare <3 x i8> @_Z7sub_satDv3_cS_(<3 x i8>, <3 x i8>)
 
-; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <3 x i8> %a to <3 x i32>
-; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <3 x i8> %b to <3 x i32>
-; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = sub nuw nsw <3 x i32> [[sext_a]], [[sext_b]]
-; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <3 x i32> @_Z5clampDv3_iS_S_(<3 x i32> [[sub]], <3 x i32> <i32 -128, i32 -128, i32 -128>, <3 x i32> <i32 127, i32 127, i32 127>)
-; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <3 x i32> [[clamp]] to <3 x i8>
+; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <3 x i8> %a to <3 x i16>
+; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <3 x i8> %b to <3 x i16>
+; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = sub nuw nsw <3 x i16> [[sext_a]], [[sext_b]]
+; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <3 x i16> @_Z5clampDv3_sS_S_(<3 x i16> [[sub]], <3 x i16> <i16 -128, i16 -128, i16 -128>, <3 x i16> <i16 127, i16 127, i16 127>)
+; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <3 x i16> [[clamp]] to <3 x i8>
 ; CHECK: ret <3 x i8> [[trunc]]
