@@ -1483,6 +1483,23 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   // stores a laid out and non-laid out version of the type.
   const unsigned layout = needs_layout ? 1 : 0;
 
+  if (dyn_cast<StructType>(Ty) && IsImageType(dyn_cast<StructType>(Ty))) {
+    // %opencl.image1d_buffer_ro.t, %opencl.image1d_buffer_wo.t and
+    // %opencl.image1d_buffer_rw.t needs to be rework as they will map on the
+    // same SPIRV type.
+    const char *bufferString = "_buffer_";
+    StringRef CanonicalName = Ty->getStructName();
+    size_t bufferPos = CanonicalName.find(bufferString);
+    if (bufferPos != std::string::npos) {
+      std::string NewName = CanonicalName.str().replace(
+          bufferPos + strlen(bufferString), 2, "rw");
+      Ty = StructType::getTypeByName(module->getContext(), NewName);
+      if (!Ty) {
+        Ty = StructType::create(module->getContext(), NewName);
+      }
+    }
+  }
+
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
     assert(layout < TI->second.size());
@@ -1492,6 +1509,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   }
 
   auto Canonical = CanonicalType(Ty);
+
   if (Canonical != Ty) {
     auto CanonicalTI = TypeMap.find(Canonical);
     if (CanonicalTI != TypeMap.end()) {
@@ -1567,11 +1585,18 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         RID = addSPIRVInst<kTypes>(spv::OpTypeSampler);
         break;
       } else if (IsImageType(STy)) {
-        if (ImageDimensionality(STy) == 1) {
+        switch (ImageDimensionality(STy)) {
+        case spv::Dim1D: {
           if (IsSampledImageType(STy))
             addCapability(spv::CapabilitySampled1D);
           else
             addCapability(spv::CapabilityImage1D);
+        } break;
+        case spv::DimBuffer: {
+          addCapability(spv::CapabilityImageBuffer);
+        } break;
+        default:
+          break;
         }
 
         //
@@ -1617,18 +1642,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
         }
         Ops << SampledTyID;
 
-        spv::Dim DimID;
-        switch (ImageDimensionality(STy)) {
-        case 1:
-          DimID = spv::Dim1D;
-          break;
-        case 3:
-          DimID = spv::Dim3D;
-          break;
-        default:
-          DimID = spv::Dim2D;
-          break;
-        }
+        spv::Dim DimID = ImageDimensionality(STy);
         Ops << DimID;
 
         // TODO: Set up Depth.
@@ -3525,7 +3539,7 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
     SPIRVID SizesTypeID;
 
     Value *Image = Call->getArgOperand(0);
-    const uint32_t dim = ImageDimensionality(Image->getType());
+    const uint32_t dim = ImageNumDimensions(Image->getType());
     const uint32_t components =
         dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
     if (components == 1) {

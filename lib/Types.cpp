@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Types.h"
+#include "spirv/unified1/spirv.hpp"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -51,6 +52,9 @@ bool clspv::IsImageType(llvm::StructType *STy) {
         STy->getName().startswith("opencl.image1d_array_ro_t") ||
         STy->getName().startswith("opencl.image1d_array_rw_t") ||
         STy->getName().startswith("opencl.image1d_array_wo_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_ro_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_rw_t") ||
+        STy->getName().startswith("opencl.image1d_buffer_wo_t") ||
         STy->getName().startswith("opencl.image2d_ro_t") ||
         STy->getName().startswith("opencl.image2d_rw_t") ||
         STy->getName().startswith("opencl.image2d_wo_t") ||
@@ -80,24 +84,51 @@ bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   return isImageType;
 }
 
-uint32_t clspv::ImageDimensionality(StructType *STy) {
+spv::Dim clspv::ImageDimensionality(StructType *STy) {
   if (IsImageType(STy)) {
+    if (STy->getName().contains("image1d_buffer"))
+      return spv::DimBuffer;
     if (STy->getName().contains("image1d"))
-      return 1;
+      return spv::Dim1D;
     if (STy->getName().contains("image2d"))
-      return 2;
+      return spv::Dim2D;
     if (STy->getName().contains("image3d"))
-      return 3;
+      return spv::Dim3D;
   }
 
-  return 0;
+  return spv::DimMax;
 }
 
-uint32_t clspv::ImageDimensionality(Type *type) {
+spv::Dim clspv::ImageDimensionality(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
     if (auto struct_ty =
             dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
       return ImageDimensionality(struct_ty);
+    }
+  }
+
+  return spv::DimMax;
+}
+
+uint32_t clspv::ImageNumDimensions(StructType *STy) {
+  switch (ImageDimensionality(STy)) {
+  case spv::Dim1D:
+  case spv::DimBuffer:
+    return 1;
+  case spv::Dim2D:
+    return 2;
+  case spv::Dim3D:
+    return 3;
+  default:
+    return 0;
+  }
+}
+
+uint32_t clspv::ImageNumDimensions(Type *type) {
+  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
+    if (auto struct_ty =
+            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+      return ImageNumDimensions(struct_ty);
     }
   }
 
@@ -145,7 +176,8 @@ bool clspv::IsStorageImageType(Type *type) {
   if (IsImageType(type, &ty)) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
       if (struct_ty->getName().contains("_wo_t") ||
-          struct_ty->getName().contains("_rw_t")) {
+          struct_ty->getName().contains("_rw_t") ||
+          struct_ty->getName().contains("image1d_buffer")) {
         return true;
       }
     }
