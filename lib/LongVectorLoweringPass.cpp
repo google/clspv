@@ -798,6 +798,17 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
   }
 
+  if (auto *Vector = dyn_cast<ConstantVector>(&Cst)) {
+    assert(isa<ArrayType>(EquivalentTy));
+
+    SmallVector<Constant *, 16> Scalars;
+    for (unsigned i = 0; i < Vector->getNumOperands(); ++i) {
+      Scalars.push_back(dyn_cast<Constant>(visitOrSelf(Vector->getOperand(i))));
+    }
+
+    return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
+  }
+
   if (auto *GV = dyn_cast<GlobalVariable>(&Cst)) {
     auto *EquivalentGV = GlobalVariableMap[GV];
     assert(EquivalentGV &&
