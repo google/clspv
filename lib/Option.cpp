@@ -98,6 +98,11 @@ llvm::cl::opt<bool> hack_block_order(
     "hack-block-order", llvm::cl::init(false),
     llvm::cl::desc("Order basic blocks using structured order"));
 
+llvm::cl::opt<bool> hack_clamp_width(
+    "hack-clamp-width", llvm::cl::init(false),
+    llvm::cl::desc("Force clamp to be on 32bit elements at least when "
+                   "performing staturating operations"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -290,6 +295,7 @@ bool HackSignedCompareFixup() { return hack_signed_compare_fixup; }
 bool HackUndef() { return hack_undef; }
 bool HackPhis() { return hack_phis; }
 bool HackBlockOrder() { return hack_block_order; }
+bool HackClampWidth() { return hack_clamp_width; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }

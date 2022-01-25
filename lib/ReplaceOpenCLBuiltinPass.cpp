@@ -2832,6 +2832,9 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
       unsigned bitwidth = ty->getScalarSizeInBits();
       if (bitwidth < 32) {
         unsigned extended_width = bitwidth << 1;
+        if (clspv::Option::HackClampWidth() && extended_width < 32) {
+          extended_width = 32;
+        }
         Type *extended_ty =
             IntegerType::get(Call->getContext(), extended_width);
         Constant *min = ConstantInt::get(
@@ -3050,6 +3053,9 @@ bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
         // add = mul + sext(c)
         // res = clamp(add, MIN, MAX)
         unsigned extended_width = bitwidth << 1;
+        if (clspv::Option::HackClampWidth() && extended_width < 32) {
+          extended_width = 32;
+        }
         Type *extended_ty = IntegerType::get(F.getContext(), extended_width);
         if (auto vec_ty = dyn_cast<VectorType>(ty)) {
           extended_ty = VectorType::get(extended_ty, vec_ty->getElementCount());

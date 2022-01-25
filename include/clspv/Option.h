@@ -66,6 +66,10 @@ bool HackPhis();
 // Returns true if basic blocks should be in "structured" order.
 bool HackBlockOrder();
 
+// Returns true if clamp should be on 32bit elements when performing staturating
+// operations. Works around a driver bug.
+bool HackClampWidth();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
