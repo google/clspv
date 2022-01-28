@@ -30,7 +30,13 @@ def main():
     args = parser.parse_args()
 
     # Strip invalid features.
-    regex = re.compile('(convert_[a-zA-Z0-9]+(_rt[pn]|_sat))|(reserve_id_t)')
+    unsupported_features = '(convert_[a-zA-Z0-9]+(_rt[pn]|_sat))'
+    unsupported_features += '|(reserve_id_t)'
+    unsupported_features += '|(ndrange_t)'
+    unsupported_features += '|(queue_t)'
+    unsupported_features += '|(clk_event_t)'
+    unsupported_features += '|(clk_profiling_info)'
+    regex = re.compile(unsupported_features)
     with open(args.input_file, "r") as input:
         with open(args.output_file, "w") as output:
             for line in input:
