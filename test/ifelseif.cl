@@ -15,10 +15,9 @@
 
 // CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
-// CHECK: %[[CMP0_ID:[a-zA-Z0-9_]*]] = OpUGreaterThan %[[BOOL_TYPE_ID]] %[[LOAD_ID]] %[[CONSTANT_42_ID]]
-// CHECK: %[[NOT_CMP0_ID:[a-zA-Z0-9_]*]] = OpLogicalNot %[[BOOL_TYPE_ID]] %[[CMP0_ID]]
+// CHECK: %[[CMP0_ID:[a-zA-Z0-9_]*]] = OpULessThanEqual %[[BOOL_TYPE_ID]] %[[LOAD_ID]] %[[CONSTANT_42_ID]]
 // CHECK: OpSelectionMerge %[[MERGE0_LABEL_ID:[a-zA-Z0-9_]*]] None
-// CHECK: OpBranchConditional %[[NOT_CMP0_ID]] %[[MERGE2_LABEL_ID:[a-zA-Z0-9_]*]] %[[MERGE0_LABEL_ID]]
+// CHECK: OpBranchConditional %[[CMP0_ID]] %[[MERGE2_LABEL_ID:[a-zA-Z0-9_]*]] %[[MERGE0_LABEL_ID]]
 
 // CHECK: %[[MERGE2_LABEL_ID]] = OpLabel
 // CHECK: %[[CMP1_ID:[a-zA-Z0-9_]*]] = OpIEqual %[[BOOL_TYPE_ID]] %[[LOAD_ID]] %[[CONSTANT_42_ID]]
