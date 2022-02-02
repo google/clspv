@@ -35,6 +35,7 @@
 
 #include <array>
 #include <functional>
+#include <map>
 
 using namespace llvm;
 
