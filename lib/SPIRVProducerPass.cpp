@@ -3832,55 +3832,38 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
     auto TyBitWidth = Ty->getScalarSizeInBits();
 
     SPIRVOperandVec Ops;
-    if (TyBitWidth > BitcountSize) {
-      SPIRVID Value;
-      bool bAdd = false;
-      auto Cst32 = ConstantInt::get(Ty, BitcountSize);
+    if (TyBitWidth == BitcountSize * 2) {
+      Ops.clear();
+      Ops << Int32Ty << BaseValue;
+      auto convertLower = addSPIRVInst(spv::OpUConvert, Ops);
 
-      assert(TyBitWidth % BitcountSize == 0);
+      Ops.clear();
+      Ops << Int32Ty << convertLower;
+      auto bitcountLower = addSPIRVInst(spv::OpBitCount, Ops);
 
-      while (TyBitWidth != 0) {
-        Ops.clear();
-        Ops << Int32Ty;
-        if (bAdd)
-          Ops << Value;
-        else
-          Ops << BaseValue;
-        auto convert = addSPIRVInst(spv::OpUConvert, Ops);
+      Ops.clear();
+      Ops << Ty << BaseValue << ConstantInt::get(Ty, BitcountSize);
+      auto UpperValue = addSPIRVInst(spv::OpShiftRightLogical, Ops);
 
-        Ops.clear();
-        Ops << Int32Ty << convert;
-        auto bitcount = addSPIRVInst(spv::OpBitCount, Ops);
+      Ops.clear();
+      Ops << Int32Ty << UpperValue;
+      auto convertUpper = addSPIRVInst(spv::OpUConvert, Ops);
 
-        if (TyBitWidth != BitcountSize) {
-          Ops.clear();
-          Ops << Ty;
-          if (bAdd)
-            Ops << Value;
-          else
-            Ops << BaseValue;
-          Ops << Cst32;
-          Value = addSPIRVInst(spv::OpShiftRightLogical, Ops);
-        }
+      Ops.clear();
+      Ops << Int32Ty << convertUpper;
+      auto bitcountUpper = addSPIRVInst(spv::OpBitCount, Ops);
 
-        TyBitWidth -= BitcountSize;
+      Ops.clear();
+      Ops << Int32Ty << bitcountLower << bitcountUpper;
+      RID = addSPIRVInst(spv::OpIAdd, Ops);
 
-        if (bAdd) {
-          Ops.clear();
-          Ops << Int32Ty << RID << bitcount;
-          RID = addSPIRVInst(spv::OpIAdd, Ops);
-        } else {
-          bAdd = true;
-          RID = bitcount;
-        }
-      }
       Ops.clear();
       Ops << Ty << RID;
       RID = addSPIRVInst(spv::OpUConvert, Ops);
     } else if (TyBitWidth == BitcountSize) {
-      Ops << Ty << Call->getOperand(0);
+      Ops << Ty << BaseValue;
       RID = addSPIRVInst(spv::OpBitCount, Ops);
-    } else {
+    } else if (TyBitWidth < BitcountSize) {
       Ops << Int32Ty << BaseValue;
       RID = addSPIRVInst(spv::OpUConvert, Ops);
 
@@ -3891,6 +3874,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
       Ops.clear();
       Ops << Ty << RID;
       RID = addSPIRVInst(spv::OpUConvert, Ops);
+    } else {
+      llvm_unreachable("Unsupported type width for kpopcount");
     }
     break;
   }
