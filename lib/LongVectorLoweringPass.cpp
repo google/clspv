@@ -1371,7 +1371,8 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
-    if (auto *ElementTy = getEquivalentType(PointerTy->getNonOpaquePointerElementType())) {
+    if (auto *ElementTy =
+            getEquivalentType(PointerTy->getNonOpaquePointerElementType())) {
       return ElementTy->getPointerTo(PointerTy->getAddressSpace());
     }
 

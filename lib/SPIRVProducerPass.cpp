@@ -1565,8 +1565,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
     // Ops[1] = Element Type ID
     SPIRVOperandVec Ops;
 
-    Ops << GetStorageClass(AddrSpace)
-        << getSPIRVType(PointeeTy, needs_layout);
+    Ops << GetStorageClass(AddrSpace) << getSPIRVType(PointeeTy, needs_layout);
 
     RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
     break;
