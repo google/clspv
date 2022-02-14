@@ -33,7 +33,8 @@ bool clspv::IsSamplerType(llvm::StructType *STy) {
 bool clspv::IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   bool isSamplerType = false;
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
+    if (StructType *STy =
+            dyn_cast<StructType>(TmpArgPTy->getNonOpaquePointerElementType())) {
       if (IsSamplerType(STy)) {
         isSamplerType = true;
         if (struct_type_ptr)
@@ -73,7 +74,8 @@ bool clspv::IsImageType(llvm::StructType *STy) {
 bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
   bool isImageType = false;
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
+    if (StructType *STy =
+            dyn_cast<StructType>(TmpArgPTy->getNonOpaquePointerElementType())) {
       if (IsImageType(STy)) {
         isImageType = true;
         if (struct_type_ptr)
@@ -101,8 +103,8 @@ spv::Dim clspv::ImageDimensionality(StructType *STy) {
 
 spv::Dim clspv::ImageDimensionality(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (auto struct_ty =
-            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(
+            TmpArgPTy->getNonOpaquePointerElementType())) {
       return ImageDimensionality(struct_ty);
     }
   }
@@ -126,8 +128,8 @@ uint32_t clspv::ImageNumDimensions(StructType *STy) {
 
 uint32_t clspv::ImageNumDimensions(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (auto struct_ty =
-            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(
+            TmpArgPTy->getNonOpaquePointerElementType())) {
       return ImageNumDimensions(struct_ty);
     }
   }
@@ -138,7 +140,8 @@ uint32_t clspv::ImageNumDimensions(Type *type) {
 bool clspv::IsArrayImageType(Type *type) {
   bool isArrayImageType = false;
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy = dyn_cast<StructType>(TmpArgPTy->getElementType())) {
+    if (StructType *STy =
+            dyn_cast<StructType>(TmpArgPTy->getNonOpaquePointerElementType())) {
       if (STy->isOpaque()) {
         if (STy->getName().startswith("opencl.image1d_array_ro_t") ||
             STy->getName().startswith("opencl.image1d_array_wo_t") ||
@@ -162,8 +165,8 @@ bool clspv::IsSampledImageType(StructType *STy) {
 
 bool clspv::IsSampledImageType(Type *type) {
   if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (auto struct_ty =
-            dyn_cast_or_null<StructType>(TmpArgPTy->getElementType())) {
+    if (auto struct_ty = dyn_cast_or_null<StructType>(
+            TmpArgPTy->getNonOpaquePointerElementType())) {
       return IsSampledImageType(struct_ty);
     }
   }

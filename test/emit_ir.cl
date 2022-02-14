@@ -9,4 +9,6 @@ void kernel foo(global double *out, int in)
 // CHECK: target triple = "spir-unknown-unknown"
 // CHECK: define
 // CHECK-SAME: spir_kernel
-// CHECK-SAME: void @foo(double addrspace(1)* noundef align 8 %out, i32 noundef %in)
+// CHECK-SAME: void @foo
+// CHECK-SAME: double addrspace(1)* {{[^%]+}}%out
+// CHECK-SAME: i32 {{[^%]+}}%in

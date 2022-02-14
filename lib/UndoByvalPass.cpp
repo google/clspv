@@ -69,7 +69,7 @@ bool UndoByvalPass::runOnModule(Module &M) {
       // Check byval attribute and build new function's parameter type.
       if (Arg.hasByValAttr()) {
         PointerType *PTy = cast<PointerType>(Arg.getType());
-        Type *ArgTy = PTy->getElementType();
+        Type *ArgTy = PTy->getNonOpaquePointerElementType();
         NewFuncParamTys.push_back(ArgTy);
 
         ByValList.push_back(&Arg);
@@ -104,7 +104,7 @@ bool UndoByvalPass::runOnModule(Module &M) {
       ValueToValueMapTy ArgVMap;
       for (Argument *Arg : ByValList) {
         PointerType *PTy = cast<PointerType>(Arg->getType());
-        Type *ArgTy = PTy->getElementType();
+        Type *ArgTy = PTy->getNonOpaquePointerElementType();
         AllocaInst *ArgAddr = new AllocaInst(
             ArgTy, 0, nullptr, Arg->getName() + ".addr", InsertPoint);
 
