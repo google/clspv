@@ -173,7 +173,8 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M, bool rewrite) {
   switch (type->getTypeID()) {
   case Type::PointerTyID: {
     PointerType *pointer = cast<PointerType>(type);
-    Type *pointee = MapType(pointer->getElementType(), M, rewrite);
+    Type *pointee =
+        MapType(pointer->getNonOpaquePointerElementType(), M, rewrite);
     remapped = PointerType::get(pointee, pointer->getAddressSpace());
     break;
   }
@@ -380,8 +381,8 @@ bool UBOTypeTransformPass::RemapGlobalVariables(
   bool changed = false;
   for (auto &GV : M.globals()) {
     if (auto *ptr_ty = dyn_cast<PointerType>(GV.getType())) {
-      auto *remapped = RebuildType(ptr_ty->getElementType(), M);
-      if (ptr_ty->getElementType() != remapped) {
+      auto *remapped = RebuildType(ptr_ty->getNonOpaquePointerElementType(), M);
+      if (ptr_ty->getNonOpaquePointerElementType() != remapped) {
         changed = true;
         variables_to_modify->push_back(&GV);
       }

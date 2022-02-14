@@ -1033,7 +1033,8 @@ Type *ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
-    if (auto *ElementTy = getEquivalentType(PointerTy->getElementType())) {
+    if (auto *ElementTy =
+            getEquivalentType(PointerTy->getNonOpaquePointerElementType())) {
       return ElementTy->getPointerTo(PointerTy->getAddressSpace());
     }
 

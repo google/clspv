@@ -70,7 +70,7 @@ bool UndoSRetPass::runOnModule(Module &M) {
       // Check sret attribute.
       if (Arg.hasStructRetAttr()) {
         PointerType *PTy = cast<PointerType>(Arg.getType());
-        Type *RetTy = PTy->getElementType();
+        Type *RetTy = PTy->getNonOpaquePointerElementType();
         // Create alloca instruction for return value on function's entry
         // block.
         AllocaInst *RetVal =

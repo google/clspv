@@ -1547,8 +1547,8 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
     PointerType *PTy = cast<PointerType>(Canonical);
     unsigned AddrSpace = PTy->getAddressSpace();
 
+    auto PointeeTy = PTy->getNonOpaquePointerElementType();
     if (AddrSpace != AddressSpace::UniformConstant) {
-      auto PointeeTy = PTy->getElementType();
       if (PointeeTy->isStructTy() &&
           dyn_cast<StructType>(PointeeTy)->isOpaque()) {
         RID = getSPIRVType(PointeeTy, needs_layout);
@@ -1566,7 +1566,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
     SPIRVOperandVec Ops;
 
     Ops << GetStorageClass(AddrSpace)
-        << getSPIRVType(PTy->getElementType(), needs_layout);
+        << getSPIRVType(PointeeTy, needs_layout);
 
     RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
     break;
@@ -5019,7 +5019,7 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
 
     Type *elemTy = nullptr;
     if (auto *ptrTy = dyn_cast<PointerType>(type)) {
-      elemTy = ptrTy->getElementType();
+      elemTy = ptrTy->getNonOpaquePointerElementType();
     } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
       elemTy = arrayTy->getElementType();
     } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
