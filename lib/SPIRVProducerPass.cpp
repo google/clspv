@@ -3101,7 +3101,6 @@ spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
       {Instruction::SDiv, spv::OpSDiv},
       {Instruction::FDiv, spv::OpFDiv},
       {Instruction::URem, spv::OpUMod},
-      {Instruction::SRem, spv::OpSRem},
       {Instruction::FRem, spv::OpFRem},
       {Instruction::Or, spv::OpBitwiseOr},
       {Instruction::Xor, spv::OpBitwiseXor},
@@ -4070,6 +4069,61 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Ops << CondV;
 
         RID = addSPIRVInst(spv::OpLogicalNot, Ops);
+      } else if (I.getOpcode() == Instruction::SRem) {
+        // We cannot map SRem to OpSRem because:
+        // For the OpSRem and OpSMod instructions, if either operand is negative
+        // the result is undefined.
+        // https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/chap46.html#spirvenv-precision-operation
+        //
+        // Let's implement signed modulus like that:
+        // SRem(x, y) {
+        //   return (abs(x) % abs(y)) * (x > 0 ? 1 : -1);
+        // }
+
+        SPIRVOperandVec Ops;
+        Type *Ty = I.getType();
+        Type *boolTy = Ty->getInt1Ty(Ty->getContext());
+        if (Ty->isVectorTy()) {
+          boolTy = VectorType::get(boolTy, dyn_cast<VectorType>(Ty));
+        }
+
+        auto Cst0 = ConstantInt::get(Ty, 0, true);
+        auto Cst1 = ConstantInt::get(Ty, 1, true);
+        auto Cstm1 = ConstantInt::get(Ty, -1, true);
+        auto X = I.getOperand(0);
+        auto Y = I.getOperand(1);
+
+        // abs(x)
+        Ops << Ty << getOpExtInstImportID() << glsl::ExtInst::ExtInstSAbs << X;
+        auto AbsX = addSPIRVInst(spv::OpExtInst, Ops);
+
+        // abs(y)
+        Ops.clear();
+        Ops << Ty << getOpExtInstImportID() << glsl::ExtInst::ExtInstSAbs << Y;
+        auto AbsY = addSPIRVInst(spv::OpExtInst, Ops);
+
+        // abs(x) % abs(y)
+        Ops.clear();
+        Ops << Ty << AbsX << AbsY;
+        auto Mod = addSPIRVInst(spv::OpSRem, Ops);
+
+        // x > 0
+        Ops.clear();
+        Ops << boolTy << X << Cst0;
+        auto Cmp = addSPIRVInst(spv::OpSGreaterThan, Ops);
+
+        // x > 0 ? 1 : -1
+        Ops.clear();
+        Ops << Ty << Cmp << Cst1 << Cstm1;
+        auto Select = addSPIRVInst(spv::OpSelect, Ops);
+
+        Ops.clear();
+        Ops << StructType::get(Ty, Ty) << Mod << Select;
+        auto Mul = addSPIRVInst(spv::OpSMulExtended, Ops);
+
+        Ops.clear();
+        Ops << Ty << Mul << 0;
+        RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
       } else {
         // Ops[0] = Result Type ID
         // Ops[1] = Operand 0
