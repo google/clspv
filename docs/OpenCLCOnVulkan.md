@@ -639,9 +639,6 @@ instructions.
 Signed integer types are mapped down onto their unsigned equivalents in SPIR-V
 as produced from OpenCL C.
 
-Signed integer modulus (`%`) operations, where either argument to the modulus is
-a negative integer, will result in an undefined result.
-
 ### OpenCL C Built-In Functions
 
 OpenCL C language built-in functions are mapped, where possible, onto their GLSL
@@ -717,10 +714,6 @@ can be used. To disable general support for these types, use `-int8=0`.
 
 The `double`, `double2`, `double3` and `double4` types **must not** be used.
 
-#### Images
-
-The `image1d_buffer_t` type **must not** be used.
-
 #### Events
 
 The `event_t` type **must not** be used.
@@ -736,10 +729,6 @@ Pointer-to-integer casts **must not** be used.
 Integer-to-pointer casts **must not** be used.
 
 Pointers **must not** be compared for equality or inequality.
-
-#### 8- and 16-Wide Vectors
-
-Vectors of 8 and 16 elements **must not** be used.
 
 #### Recursive Struct Types
 
