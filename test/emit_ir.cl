@@ -10,5 +10,5 @@ void kernel foo(global double *out, int in)
 // CHECK: define
 // CHECK-SAME: spir_kernel
 // CHECK-SAME: void @foo
-// CHECK-SAME: double addrspace(1)* {{[^%]+}}%out
-// CHECK-SAME: i32 {{[^%]+}}%in
+// CHECK-SAME: double addrspace(1)*{{[^%]+}}%out
+// CHECK-SAME: i32{{[^%]+}}%in
