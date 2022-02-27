@@ -271,6 +271,7 @@ int SetCompilerInstanceOptions(
   instance.getLangOpts().NoBuiltin = true;
   instance.getLangOpts().ModulesSearchAll = false;
   instance.getLangOpts().SinglePrecisionConstants = true;
+  instance.getLangOpts().DeclareOpenCLBuiltins = true;
   instance.getCodeGenOpts().StackRealignment = true;
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
@@ -354,17 +355,17 @@ int SetCompilerInstanceOptions(
   }
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
 
-  std::unique_ptr<llvm::MemoryBuffer> openCLBuiltinMemoryBuffer(
-      new OpenCLBuiltinMemoryBuffer(opencl_builtins_header_data,
-                                    opencl_builtins_header_size - 1));
-
-  instance.getPreprocessorOpts().Includes.push_back("opencl-c.h");
-
   std::unique_ptr<llvm::MemoryBuffer> openCLBaseBuiltinMemoryBuffer(
       new OpenCLBuiltinMemoryBuffer(opencl_base_builtins_header_data,
                                     opencl_base_builtins_header_size - 1));
 
   instance.getPreprocessorOpts().Includes.push_back("opencl-c-base.h");
+
+  std::unique_ptr<llvm::MemoryBuffer> clspvBuiltinMemoryBuffer(
+      new OpenCLBuiltinMemoryBuffer(clspv_builtins_header_data,
+                                    clspv_builtins_header_size - 1));
+
+  instance.getPreprocessorOpts().Includes.push_back("clspv-builtins.h");
 
   // Add the VULKAN macro.
   instance.getPreprocessorOpts().addMacroDef("VULKAN=100");
@@ -384,11 +385,11 @@ int SetCompilerInstanceOptions(
 #endif
 
   auto entry = instance.getFileManager().getVirtualFile(
-      includePrefix + "opencl-c.h", openCLBuiltinMemoryBuffer->getBufferSize(),
-      0);
+      includePrefix + "clspv-builtins.h",
+      clspvBuiltinMemoryBuffer->getBufferSize(), 0);
 
   instance.getSourceManager().overrideFileContents(
-      entry, std::move(openCLBuiltinMemoryBuffer));
+      entry, std::move(clspvBuiltinMemoryBuffer));
 
   auto base_entry = instance.getFileManager().getVirtualFile(
       includePrefix + "opencl-c-base.h",

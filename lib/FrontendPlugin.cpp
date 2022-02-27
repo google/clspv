@@ -66,6 +66,7 @@ private:
     CustomDiagnosticPushConstantContainsArray,
     CustomDiagnosticUnsupported16BitStorage,
     CustomDiagnosticUnsupported8BitStorage,
+    CustomDiagnosticUnsupportedPipes,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -173,6 +174,13 @@ private:
 
   bool IsSupportedType(QualType QT, SourceRange SR, bool IsKernelParameter) {
     auto *Ty = QT.getTypePtr();
+
+    // Reject Pipe types with an error
+    if (Ty->getTypeClass() == Type::Pipe) {
+        Instance.getDiagnostics().Report(
+            SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes]);
+        return false;
+    }
 
     // First check if we have a pointer type.
     if (Ty->isPointerType()) {
@@ -598,6 +606,9 @@ public:
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "8-bit storage is not supported for "
                            "%select{SSBOs|UBOs|push constants}0");
+    CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "pipes are not supported");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
