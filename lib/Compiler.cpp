@@ -1053,7 +1053,7 @@ int Compile(const int argc, const char *const argv[]) {
   if (auto error = ParseOptions(argc, argv))
     return error;
 
-  // if no output file was provided, use a default
+  // if no input file was provided, use a default
   llvm::StringRef overiddenInputFilename = InputFilename.getValue();
 
   // If we are reading our input file from stdin.
