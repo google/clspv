@@ -412,12 +412,11 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
 }
 
 // Sets |instance|'s options for compiling. Returns 0 if successful.
-int SetCompilerInstanceOptions(CompilerInstance &instance,
-                               const llvm::StringRef &overiddenInputFilename,
-                               const clang::FrontendInputFile &kernelFile,
-                               const std::string &program,
-                               llvm::raw_string_ostream *diagnosticsStream) {
-  std::unique_ptr<llvm::MemoryBuffer> memory_buffer(nullptr);
+int SetCompilerInstanceOptions(
+    CompilerInstance &instance, const llvm::StringRef &overiddenInputFilename,
+    clang::FrontendInputFile &kernelFile, const std::string &program,
+    std::unique_ptr<llvm::MemoryBuffer> &file_memory_buffer,
+    llvm::raw_string_ostream *diagnosticsStream) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> errorOrInputFile(nullptr);
   if (program.empty()) {
     auto errorOrInputFile =
@@ -429,10 +428,10 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
                    << InputFilename.getValue() << "'\n";
       return -1;
     }
-    memory_buffer.reset(errorOrInputFile.get().release());
+    file_memory_buffer = std::move(errorOrInputFile.get());
   } else {
-    memory_buffer = llvm::MemoryBuffer::getMemBuffer(program.c_str(),
-                                                     overiddenInputFilename);
+    file_memory_buffer =
+        llvm::MemoryBuffer::getMemBuffer(program, overiddenInputFilename);
   }
 
   if (verify) {
@@ -550,9 +549,15 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
   instance.getCodeGenOpts().PreserveVec3Type = true;
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
+  if (InputLanguage == clang::Language::OpenCL) {
+    instance.getPreprocessorOpts().addRemappedFile(
+        overiddenInputFilename, file_memory_buffer.release());
+  } else if (!program.empty()) {
+    // Can't use preprocessor to do file remapping for LLVM_IR
+    kernelFile = clang::FrontendInputFile(*file_memory_buffer,
+                                          clang::InputKind(InputLanguage));
+  }
   instance.getFrontendOpts().Inputs.push_back(kernelFile);
-  instance.getPreprocessorOpts().addRemappedFile(overiddenInputFilename,
-                                                 memory_buffer.release());
 
   std::unique_ptr<llvm::MemoryBuffer> openCLBuiltinMemoryBuffer(
       new OpenCLBuiltinMemoryBuffer(opencl_builtins_header_data,
@@ -939,42 +944,24 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
 } // namespace
 
 namespace clspv {
-int Compile(const int argc, const char *const argv[]) {
-
-  if (auto error = ParseOptions(argc, argv))
-    return error;
-
+int Compile(const llvm::StringRef &input_filename, const std::string &program,
+            const std::string &sampler_map,
+            std::vector<uint32_t> *output_binary, std::string *output_log) {
   llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
-  if (auto error = ParseSamplerMap("", &SamplerMapEntries))
+  if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
     return error;
 
-  // if no output file was provided, use a default
-  llvm::StringRef overiddenInputFilename = InputFilename.getValue();
-
-  // If we are reading our input file from stdin.
-  if ("-" == InputFilename) {
-    // We need to overwrite the file name we use.
-    switch (InputLanguage) {
-    case clang::Language::OpenCL:
-      overiddenInputFilename = "stdin.cl";
-      break;
-    case clang::Language::LLVM_IR:
-      overiddenInputFilename = "stdin.ll";
-      break;
-    default:
-      // Default to fix compiler warnings/errors. Option parsing will reject a
-      // bad enum value for the option so there is no need for a message.
-      return -1;
-    }
-  }
+  llvm::StringRef overiddenInputFilename = input_filename;
 
   clang::CompilerInstance instance;
   clang::FrontendInputFile kernelFile(overiddenInputFilename,
                                       clang::InputKind(InputLanguage));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
+  std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer;
   if (auto error = SetCompilerInstanceOptions(
-          instance, overiddenInputFilename, kernelFile, "", &diagnosticsStream))
+          instance, overiddenInputFilename, kernelFile, program,
+          file_memory_buffer, &diagnosticsStream))
     return error;
 
   // Parse.
@@ -996,7 +983,9 @@ int Compile(const int argc, const char *const argv[]) {
 
   auto num_warnings = consumer->getNumWarnings();
   auto num_errors = consumer->getNumErrors();
-  if ((num_errors > 0) || (num_warnings > 0)) {
+  if (output_log != nullptr) {
+    *output_log = log;
+  } else if ((num_errors > 0) || (num_warnings > 0)) {
     llvm::errs() << log;
   }
   if (result || num_errors > 0) {
@@ -1036,12 +1025,54 @@ int Compile(const int argc, const char *const argv[]) {
     return error;
   pm.run(*module);
 
-  // Write outputs
-  std::error_code error;
-
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
+  if (output_binary) {
+    output_binary->resize(binary.size() / 4);
+    memcpy(output_binary->data(), binary.data(), binary.size());
+  }
+
+  if (!OutputFilename.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream outStream(OutputFilename, error,
+                                   llvm::sys::fs::FA_Write);
+
+    if (error) {
+      llvm::errs() << "Unable to open output file '" << OutputFilename
+                   << "': " << error.message() << '\n';
+      return -1;
+    }
+    outStream << binaryStream.str();
+  }
+
+  return 0;
+}
+
+int Compile(const int argc, const char *const argv[]) {
+  if (auto error = ParseOptions(argc, argv))
+    return error;
+
+  // if no input file was provided, use a default
+  llvm::StringRef overiddenInputFilename = InputFilename.getValue();
+
+  // If we are reading our input file from stdin.
+  if ("-" == InputFilename) {
+    // We need to overwrite the file name we use.
+    switch (InputLanguage) {
+    case clang::Language::OpenCL:
+      overiddenInputFilename = "stdin.cl";
+      break;
+    case clang::Language::LLVM_IR:
+      overiddenInputFilename = "stdin.ll";
+      break;
+    default:
+      // Default to fix compiler warnings/errors. Option parsing will reject a
+      // bad enum value for the option so there is no need for a message.
+      return -1;
+    }
+  }
+
   if (OutputFilename.empty()) {
     if (OutputFormat == "c") {
       OutputFilename = "a.spvinc";
@@ -1049,17 +1080,8 @@ int Compile(const int argc, const char *const argv[]) {
       OutputFilename = "a.spv";
     }
   }
-  llvm::raw_fd_ostream outStream(OutputFilename, error,
-                                 llvm::sys::fs::FA_Write);
 
-  if (error) {
-    llvm::errs() << "Unable to open output file '" << OutputFilename
-                 << "': " << error.message() << '\n';
-    return -1;
-  }
-  outStream << binaryStream.str();
-
-  return 0;
+  return Compile(overiddenInputFilename, "", "", nullptr, nullptr);
 }
 
 int CompileFromSourceString(const std::string &program,
@@ -1078,80 +1100,6 @@ int CompileFromSourceString(const std::string &program,
   if (auto error = ParseOptions(argc, &argv[0]))
     return error;
 
-  llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
-  if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
-    return error;
-
-  InputFilename = "source.cl";
-  llvm::StringRef overiddenInputFilename = InputFilename.getValue();
-
-  clang::CompilerInstance instance;
-  clang::FrontendInputFile kernelFile(
-      overiddenInputFilename, clang::InputKind(clang::Language::OpenCL));
-  std::string log;
-  llvm::raw_string_ostream diagnosticsStream(log);
-  if (auto error =
-          SetCompilerInstanceOptions(instance, overiddenInputFilename,
-                                     kernelFile, program, &diagnosticsStream))
-    return error;
-
-  // Parse.
-  llvm::LLVMContext context;
-  clang::EmitLLVMOnlyAction action(&context);
-
-  // Prepare the action for processing kernelFile
-  const bool success = action.BeginSourceFile(instance, kernelFile);
-  if (!success) {
-    return -1;
-  }
-
-  auto result = action.Execute();
-  action.EndSourceFile();
-
-  clang::DiagnosticConsumer *const consumer =
-      instance.getDiagnostics().getClient();
-  consumer->finish();
-
-  if (output_log != nullptr) {
-    *output_log = log;
-  }
-
-  auto num_errors = consumer->getNumErrors();
-  if (result || num_errors > 0) {
-    return -1;
-  }
-
-  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
-  llvm::initializeCore(Registry);
-  llvm::initializeScalarOpts(Registry);
-  llvm::initializeClspvPasses(Registry);
-
-  std::unique_ptr<llvm::Module> module(action.takeModule());
-
-  if (!LinkBuiltinLibrary(module.get())) {
-    return -1;
-  }
-
-  // Optimize.
-  // Create a memory buffer for temporarily writing the result.
-  SmallVector<char, 10000> binary;
-  llvm::raw_svector_ostream binaryStream(binary);
-  llvm::legacy::PassManager pm;
-  if (auto error = PopulatePassManager(&pm, &binaryStream, &SamplerMapEntries))
-    return error;
-  pm.run(*module);
-
-  // Write the resulting binary.
-  // Wait until now to try writing the file so that we only write it on
-  // successful compilation.
-  assert(output_binary && "Valid binary container is required.");
-  if (!OutputFilename.empty()) {
-    llvm::outs()
-        << "Warning: -o is ignored when binary container is provided.\n";
-  }
-  output_binary->resize(binary.size() / 4);
-  memcpy(output_binary->data(), binary.data(), binary.size());
-
-  return 0;
+  return Compile("source", program, sampler_map, output_binary, output_log);
 }
 } // namespace clspv
