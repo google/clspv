@@ -1562,9 +1562,8 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
 Value *LongVectorLoweringPass::convertAllBuiltinCall(
     CallInst &CI, Type *EquivalentReturnTy, ArrayRef<Value *> EquivalentArgs) {
   Function *Builtin = CI.getCalledFunction();
-  assert(Builtin && !Builtin->isIntrinsic());
+  assert(Builtin);
   const auto &Info = clspv::Builtins::Lookup(Builtin);
-  assert(Info.getType() != clspv::Builtins::kBuiltinNone);
 
   switch (Info.getType()) {
   default:
