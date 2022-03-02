@@ -1770,7 +1770,8 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(
     Value *ScalarA = getScalarWithIdValue(SrcA, Maskimod);
     Value *ScalarB = getScalarWithIdValue(SrcB, Maskimod);
 
-    Value *NumElementsValTimes2 = B.getIntN(MaskElementSizeInBits, NumElements * 2);
+    Value *NumElementsValTimes2 =
+        B.getIntN(MaskElementSizeInBits, NumElements * 2);
     Value *Maskimod2 = B.CreateURem(Maski, NumElementsValTimes2);
     Value *Cmp = B.CreateCmp(CmpInst::ICMP_SGE, Maskimod2, NumElementsVal);
     Value *Scalar = B.CreateSelect(Cmp, ScalarB, ScalarA);
