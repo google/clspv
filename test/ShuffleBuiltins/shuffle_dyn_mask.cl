@@ -10,6 +10,7 @@ kernel void foo(global int2 *src, global uint2 *mask, global int2 *dst) {
 // CHECK: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK: [[v2uint:%[^ ]+]] = OpTypeVector [[uint]] 2
 // CHECK: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
+// CHECK: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2
 
 // CHECK: [[src_addr:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
 // CHECK: [[mask_addr:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
@@ -19,11 +20,13 @@ kernel void foo(global int2 *src, global uint2 *mask, global int2 *dst) {
 // CHECK: [[dst:%[^ ]+]] = OpUndef [[v2uint]]
 
 // CHECK: [[mask0:%[^ ]+]] = OpCompositeExtract [[uint]] [[mask]] 0
-// CHECK: [[src0:%[^ ]+]] = OpVectorExtractDynamic [[uint]] [[src]] [[mask0]]
+// CHECK: [[mask0mod:%[^ ]+]] = OpUMod [[uint]] [[mask0]] [[uint_2]]
+// CHECK: [[src0:%[^ ]+]] = OpVectorExtractDynamic [[uint]] [[src]] [[mask0mod]]
 // CHECK: [[dst0:%[^ ]+]] = OpCompositeInsert [[v2uint]] [[src0]] [[dst]] 0
 
 // CHECK: [[mask1:%[^ ]+]] = OpCompositeExtract [[uint]] [[mask]] 1
-// CHECK: [[src1:%[^ ]+]] = OpVectorExtractDynamic [[uint]] [[src]] [[mask1]]
+// CHECK: [[mask1mod:%[^ ]+]] = OpUMod [[uint]] [[mask1]] [[uint_2]]
+// CHECK: [[src1:%[^ ]+]] = OpVectorExtractDynamic [[uint]] [[src]] [[mask1mod]]
 // CHECK: [[dst1:%[^ ]+]] = OpCompositeInsert [[v2uint]] [[src1]] [[dst0]] 1
 
 // CHECK: OpStore [[dst_addr]] [[dst1]]

@@ -101,21 +101,23 @@ declare spir_func <2 x i32> @_Z8shuffle2Dv8_iS_Dv2_j(<8 x i32> noundef, <8 x i32
 
 ; CHECK: [[mask0:%[^ ]+]] = extractelement <2 x i32> %mask, i64 0
 ; CHECK: [[mask0mod:%[^ ]+]] = urem i32 [[mask0]], 8
-; CHECK: [[srcAGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask0]]
+; CHECK: [[srcAGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask0mod]]
 ; CHECK: [[srcA0:%[^ ]+]] = load i32, i32* [[srcAGepi0]], align 4
 ; CHECK: [[srcBGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask0mod]]
 ; CHECK: [[srcB0:%[^ ]+]] = load i32, i32* [[srcBGepi0]], align 4
-; CHECK: [[cmp0:%[^ ]+]] = icmp sge i32 [[mask0]], 8
+; CHECK: [[mask0mod2:%[^ ]+]] = urem i32 [[mask0]], 16
+; CHECK: [[cmp0:%[^ ]+]] = icmp sge i32 [[mask0mod2]], 8
 ; CHECK: [[val0:%[^ ]+]] = select i1 [[cmp0]], i32 [[srcB0]], i32 [[srcA0]]
 ; CHECK: [[res0:%[^ ]+]] = insertelement <2 x i32> undef, i32 [[val0]], i64 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractelement <2 x i32> %mask, i64 1
 ; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 8
-; CHECK: [[srcAGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask1]]
+; CHECK: [[srcAGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask1mod]]
 ; CHECK: [[srcA1:%[^ ]+]] = load i32, i32* [[srcAGepi1]], align 4
 ; CHECK: [[srcBGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask1mod]]
 ; CHECK: [[srcB1:%[^ ]+]] = load i32, i32* [[srcBGepi1]], align 4
-; CHECK: [[cmp1:%[^ ]+]] = icmp sge i32 [[mask1]], 8
+; CHECK: [[mask1mod2:%[^ ]+]] = urem i32 [[mask1]], 16
+; CHECK: [[cmp1:%[^ ]+]] = icmp sge i32 [[mask1mod2]], 8
 ; CHECK: [[val1:%[^ ]+]] = select i1 [[cmp1]], i32 [[srcB1]], i32 [[srcA1]]
 ; CHECK: [[res1:%[^ ]+]] = insertelement <2 x i32> [[res0]], i32 [[val1]], i64 1
 

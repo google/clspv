@@ -31,35 +31,43 @@ declare spir_func <8 x i32> @_Z7shuffleDv2_iDv8_j(<2 x i32> noundef, <8 x i32> n
 ; CHECK: [[mask:%[^ ]+]] = insertvalue [8 x i32] [[_maski6]], i32 [[_mask7]], 7
 
 ; CHECK: [[mask0:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 0
-; CHECK: [[src0:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask0]]
+; CHECK: [[mask0mod:%[^ ]+]] = urem i32 [[mask0]], 2
+; CHECK: [[src0:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask0mod]]
 ; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[src0]], 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 1
-; CHECK: [[src1:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask1]]
+; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 2
+; CHECK: [[src1:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask1mod]]
 ; CHECK: [[res1:%[^ ]+]] = insertvalue [8 x i32] [[res0]], i32 [[src1]], 1
 
 ; CHECK: [[mask2:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 2
-; CHECK: [[src2:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask2]]
+; CHECK: [[mask2mod:%[^ ]+]] = urem i32 [[mask2]], 2
+; CHECK: [[src2:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask2mod]]
 ; CHECK: [[res2:%[^ ]+]] = insertvalue [8 x i32] [[res1]], i32 [[src2]], 2
 
 ; CHECK: [[mask3:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 3
-; CHECK: [[src3:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask3]]
+; CHECK: [[mask3mod:%[^ ]+]] = urem i32 [[mask3]], 2
+; CHECK: [[src3:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask3mod]]
 ; CHECK: [[res3:%[^ ]+]] = insertvalue [8 x i32] [[res2]], i32 [[src3]], 3
 
 ; CHECK: [[mask4:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 4
-; CHECK: [[src4:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask4]]
+; CHECK: [[mask4mod:%[^ ]+]] = urem i32 [[mask4]], 2
+; CHECK: [[src4:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask4mod]]
 ; CHECK: [[res4:%[^ ]+]] = insertvalue [8 x i32] [[res3]], i32 [[src4]], 4
 
 ; CHECK: [[mask5:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 5
-; CHECK: [[src5:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask5]]
+; CHECK: [[mask5mod:%[^ ]+]] = urem i32 [[mask5]], 2
+; CHECK: [[src5:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask5mod]]
 ; CHECK: [[res5:%[^ ]+]] = insertvalue [8 x i32] [[res4]], i32 [[src5]], 5
 
 ; CHECK: [[mask6:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 6
-; CHECK: [[src6:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask6]]
+; CHECK: [[mask6mod:%[^ ]+]] = urem i32 [[mask6]], 2
+; CHECK: [[src6:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask6mod]]
 ; CHECK: [[res6:%[^ ]+]] = insertvalue [8 x i32] [[res5]], i32 [[src6]], 6
 
 ; CHECK: [[mask7:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 7
-; CHECK: [[src7:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask7]]
+; CHECK: [[mask7mod:%[^ ]+]] = urem i32 [[mask7]], 2
+; CHECK: [[src7:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask7mod]]
 ; CHECK: [[res7:%[^ ]+]] = insertvalue [8 x i32] [[res6]], i32 [[src7]], 7
 
 ; CHECK: store [8 x i32] [[res7]], [8 x i32] addrspace(1)* %dst, align 32

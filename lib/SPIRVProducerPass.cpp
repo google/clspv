@@ -3884,6 +3884,8 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
     assert(Ty->isVectorTy());
     auto MaskTy = Mask->getType();
     assert(MaskTy->isVectorTy());
+    auto VTy = cast<FixedVectorType>(Ty);
+    auto NumElements = VTy->getNumElements();
     auto MaskVTy = cast<FixedVectorType>(MaskTy);
     auto MaskNumElements = MaskVTy->getNumElements();
 
@@ -3904,13 +3906,21 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
       SPIRVOperandVec Ops;
       Ops << VTy;
       RID = addSPIRVInst(spv::OpUndef, Ops);
+      auto CstNumElements = getSPIRVValue(
+          ConstantInt::get(Type::getIntNTy(module->getContext(),
+                                           MaskScalarTy->getScalarSizeInBits()),
+                           NumElements));
       for (unsigned each = 0; each < MaskNumElements; each++) {
         Ops.clear();
         Ops << MaskScalarTy << Mask << each;
-        auto Indice = addSPIRVInst(spv::OpCompositeExtract, Ops);
+        auto Index = addSPIRVInst(spv::OpCompositeExtract, Ops);
 
         Ops.clear();
-        Ops << ScalarTy << Src << Indice;
+        Ops << MaskScalarTy << Index << CstNumElements;
+        auto IndexMod = addSPIRVInst(spv::OpUMod, Ops);
+
+        Ops.clear();
+        Ops << ScalarTy << Src << IndexMod;
         auto Value = addSPIRVInst(spv::OpVectorExtractDynamic, Ops);
 
         Ops.clear();
@@ -3956,26 +3966,35 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
           ConstantInt::get(Type::getIntNTy(module->getContext(),
                                            MaskScalarTy->getScalarSizeInBits()),
                            NumElements));
+      auto CstNumElements2 = getSPIRVValue(
+          ConstantInt::get(Type::getIntNTy(module->getContext(),
+                                           MaskScalarTy->getScalarSizeInBits()),
+                           NumElements * 2));
 
       for (unsigned each = 0; each < MaskNumElements; each++) {
         Ops.clear();
         Ops << MaskScalarTy << Mask << each;
-        auto IndiceA = addSPIRVInst(spv::OpCompositeExtract, Ops);
+        auto Index = addSPIRVInst(spv::OpCompositeExtract, Ops);
 
         Ops.clear();
-        Ops << ScalarTy << SrcA << IndiceA;
+        Ops << MaskScalarTy << Index << CstNumElements;
+        auto IndexMod = addSPIRVInst(spv::OpUMod, Ops);
+
+        Ops.clear();
+        Ops << ScalarTy << SrcA << IndexMod;
         auto ValueA = addSPIRVInst(spv::OpVectorExtractDynamic, Ops);
 
-        Ops.clear();
-        Ops << MaskScalarTy << IndiceA << CstNumElements;
-        auto IndiceB = addSPIRVInst(spv::OpISub, Ops);
 
         Ops.clear();
-        Ops << ScalarTy << SrcB << IndiceB;
+        Ops << ScalarTy << SrcB << IndexMod;
         auto ValueB = addSPIRVInst(spv::OpVectorExtractDynamic, Ops);
 
         Ops.clear();
-        Ops << Type::getInt1Ty(module->getContext()) << IndiceA
+        Ops << MaskScalarTy << Index << CstNumElements2;
+        auto IndexMod2 = addSPIRVInst(spv::OpUMod, Ops);
+
+        Ops.clear();
+        Ops << Type::getInt1Ty(module->getContext()) << IndexMod2
             << CstNumElements;
         auto Cmp = addSPIRVInst(spv::OpUGreaterThanEqual, Ops);
 

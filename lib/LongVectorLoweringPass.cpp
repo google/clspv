@@ -1581,11 +1581,16 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle(
 
   auto Mask = EquivalentArgs[1];
   auto MaskTy = Mask->getType();
+  unsigned MaskElementSizeInBits;
   unsigned MaskArity;
   if (MaskTy->isVectorTy()) {
     MaskArity = cast<FixedVectorType>(MaskTy)->getNumElements();
+    MaskElementSizeInBits =
+        cast<FixedVectorType>(MaskTy)->getScalarSizeInBits();
   } else if (MaskTy->isArrayTy()) {
     MaskArity = cast<ArrayType>(MaskTy)->getArrayNumElements();
+    MaskElementSizeInBits =
+        cast<ArrayType>(MaskTy)->getElementType()->getScalarSizeInBits();
   } else {
     llvm_unreachable("unexpected Type for Mask in Shuffle");
   }
@@ -1595,6 +1600,7 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle(
   Value *Src = EquivalentArgs[0];
   auto SrcTy = Src->getType();
   Type *ScalarTy;
+  unsigned NumElements;
   if (SrcTy->isArrayTy()) {
     auto SrcArrayTy = cast<ArrayType>(SrcTy);
     ScalarTy = SrcArrayTy->getElementType();
@@ -1611,9 +1617,11 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle(
       B.CreateStore(Val, Gep);
     }
     Src = alloca;
+    NumElements = SrcTy->getArrayNumElements();
   } else {
     assert(SrcTy->isVectorTy());
     ScalarTy = SrcTy->getScalarType();
+    NumElements = cast<FixedVectorType>(SrcTy)->getNumElements();
   }
 
   auto getScalar = [&B](Value *Vector, unsigned Index) {
@@ -1649,7 +1657,11 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle(
   for (unsigned i = 0; i < MaskArity; ++i) {
 
     Value *Maski = getScalar(Mask, i);
-    Value *Scalar = getScalarWithIdValue(Src, Maski);
+    Value *NumElementsVal = B.getIntN(MaskElementSizeInBits, NumElements);
+    // Make sure that we consider only the ilogb(2m-1) least significant bit of
+    // the mask as required by the OpenCL-C specification, by doing a modulo.
+    Value *Maskimod = B.CreateURem(Maski, NumElementsVal);
+    Value *Scalar = getScalarWithIdValue(Src, Maskimod);
 
     Res = setScalar(Res, Scalar, i);
   }
@@ -1755,10 +1767,12 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(
     Value *Maski = getScalar(Mask, i);
     Value *Maskimod = B.CreateURem(Maski, NumElementsVal);
 
-    Value *ScalarA = getScalarWithIdValue(SrcA, Maski);
+    Value *ScalarA = getScalarWithIdValue(SrcA, Maskimod);
     Value *ScalarB = getScalarWithIdValue(SrcB, Maskimod);
 
-    Value *Cmp = B.CreateCmp(CmpInst::ICMP_SGE, Maski, NumElementsVal);
+    Value *NumElementsValTimes2 = B.getIntN(MaskElementSizeInBits, NumElements * 2);
+    Value *Maskimod2 = B.CreateURem(Maski, NumElementsValTimes2);
+    Value *Cmp = B.CreateCmp(CmpInst::ICMP_SGE, Maskimod2, NumElementsVal);
     Value *Scalar = B.CreateSelect(Cmp, ScalarB, ScalarA);
 
     Res = setScalar(Res, Scalar, i);

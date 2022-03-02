@@ -74,42 +74,50 @@ declare spir_func <8 x i32> @_Z7shuffleDv8_iDv8_j(<8 x i32> noundef, <8 x i32> n
 ; CHECK: store i32 [[_srcii7]], i32* [[srcGep7]], align 4
 
 ; CHECK: [[mask0:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 0
-; CHECK: [[srcGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask0]]
+; CHECK: [[mask0mod:%[^ ]+]] = urem i32 [[mask0]], 8
+; CHECK: [[srcGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask0mod]]
 ; CHECK: [[src0:%[^ ]+]] = load i32, i32* [[srcGepi0]], align 4
 ; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[src0]], 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 1
-; CHECK: [[srcGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask1]]
+; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 8
+; CHECK: [[srcGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask1mod]]
 ; CHECK: [[src1:%[^ ]+]] = load i32, i32* [[srcGepi1]], align 4
 ; CHECK: [[res1:%[^ ]+]] = insertvalue [8 x i32] [[res0]], i32 [[src1]], 1
 
 ; CHECK: [[mask2:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 2
-; CHECK: [[srcGepi2:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask2]]
+; CHECK: [[mask2mod:%[^ ]+]] = urem i32 [[mask2]], 8
+; CHECK: [[srcGepi2:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask2mod]]
 ; CHECK: [[src2:%[^ ]+]] = load i32, i32* [[srcGepi2]], align 4
 ; CHECK: [[res2:%[^ ]+]] = insertvalue [8 x i32] [[res1]], i32 [[src2]], 2
 
 ; CHECK: [[mask3:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 3
-; CHECK: [[srcGepi3:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask3]]
+; CHECK: [[mask3mod:%[^ ]+]] = urem i32 [[mask3]], 8
+; CHECK: [[srcGepi3:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask3mod]]
 ; CHECK: [[src3:%[^ ]+]] = load i32, i32* [[srcGepi3]], align 4
 ; CHECK: [[res3:%[^ ]+]] = insertvalue [8 x i32] [[res2]], i32 [[src3]], 3
 
 ; CHECK: [[mask4:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 4
-; CHECK: [[srcGepi4:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask4]]
+; CHECK: [[mask4mod:%[^ ]+]] = urem i32 [[mask4]], 8
+; CHECK: [[srcGepi4:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask4mod]]
 ; CHECK: [[src4:%[^ ]+]] = load i32, i32* [[srcGepi4]], align 4
 ; CHECK: [[res4:%[^ ]+]] = insertvalue [8 x i32] [[res3]], i32 [[src4]], 4
 
 ; CHECK: [[mask5:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 5
-; CHECK: [[srcGepi5:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask5]]
+; CHECK: [[mask5mod:%[^ ]+]] = urem i32 [[mask5]], 8
+; CHECK: [[srcGepi5:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask5mod]]
 ; CHECK: [[src5:%[^ ]+]] = load i32, i32* [[srcGepi5]], align 4
 ; CHECK: [[res5:%[^ ]+]] = insertvalue [8 x i32] [[res4]], i32 [[src5]], 5
 
 ; CHECK: [[mask6:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 6
-; CHECK: [[srcGepi6:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask6]]
+; CHECK: [[mask6mod:%[^ ]+]] = urem i32 [[mask6]], 8
+; CHECK: [[srcGepi6:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask6mod]]
 ; CHECK: [[src6:%[^ ]+]] = load i32, i32* [[srcGepi6]], align 4
 ; CHECK: [[res6:%[^ ]+]] = insertvalue [8 x i32] [[res5]], i32 [[src6]], 6
 
 ; CHECK: [[mask7:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 7
-; CHECK: [[srcGepi7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask7]]
+; CHECK: [[mask7mod:%[^ ]+]] = urem i32 [[mask7]], 8
+; CHECK: [[srcGepi7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 [[mask7mod]]
 ; CHECK: [[src7:%[^ ]+]] = load i32, i32* [[srcGepi7]], align 4
 ; CHECK: [[res7:%[^ ]+]] = insertvalue [8 x i32] [[res6]], i32 [[src7]], 7
 

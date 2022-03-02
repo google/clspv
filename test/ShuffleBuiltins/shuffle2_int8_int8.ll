@@ -118,81 +118,89 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv8_iS_Dv8_j(<8 x i32> noundef, <8 x i32
 
 ; CHECK: [[mask0:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 0
 ; CHECK: [[mask0mod:%[^ ]+]] = urem i32 [[mask0]], 8
-; CHECK: [[srcAGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask0]]
+; CHECK: [[srcAGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask0mod]]
 ; CHECK: [[srcA0:%[^ ]+]] = load i32, i32* [[srcAGepi0]], align 4
 ; CHECK: [[srcBGepi0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask0mod]]
 ; CHECK: [[srcB0:%[^ ]+]] = load i32, i32* [[srcBGepi0]], align 4
-; CHECK: [[cmp0:%[^ ]+]] = icmp sge i32 [[mask0]], 8
+; CHECK: [[mask0mod2:%[^ ]+]] = urem i32 [[mask0]], 16
+; CHECK: [[cmp0:%[^ ]+]] = icmp sge i32 [[mask0mod2]], 8
 ; CHECK: [[val0:%[^ ]+]] = select i1 [[cmp0]], i32 [[srcB0]], i32 [[srcA0]]
 ; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[val0]], 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 1
 ; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 8
-; CHECK: [[srcAGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask1]]
+; CHECK: [[srcAGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask1mod]]
 ; CHECK: [[srcA1:%[^ ]+]] = load i32, i32* [[srcAGepi1]], align 4
 ; CHECK: [[srcBGepi1:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask1mod]]
 ; CHECK: [[srcB1:%[^ ]+]] = load i32, i32* [[srcBGepi1]], align 4
-; CHECK: [[cmp1:%[^ ]+]] = icmp sge i32 [[mask1]], 8
+; CHECK: [[mask1mod2:%[^ ]+]] = urem i32 [[mask1]], 16
+; CHECK: [[cmp1:%[^ ]+]] = icmp sge i32 [[mask1mod2]], 8
 ; CHECK: [[val1:%[^ ]+]] = select i1 [[cmp1]], i32 [[srcB1]], i32 [[srcA1]]
 ; CHECK: [[res1:%[^ ]+]] = insertvalue [8 x i32] [[res0]], i32 [[val1]], 1
 
 ; CHECK: [[mask2:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 2
 ; CHECK: [[mask2mod:%[^ ]+]] = urem i32 [[mask2]], 8
-; CHECK: [[srcAGepi2:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask2]]
+; CHECK: [[srcAGepi2:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask2mod]]
 ; CHECK: [[srcA2:%[^ ]+]] = load i32, i32* [[srcAGepi2]], align 4
 ; CHECK: [[srcBGepi2:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask2mod]]
 ; CHECK: [[srcB2:%[^ ]+]] = load i32, i32* [[srcBGepi2]], align 4
-; CHECK: [[cmp2:%[^ ]+]] = icmp sge i32 [[mask2]], 8
+; CHECK: [[mask2mod2:%[^ ]+]] = urem i32 [[mask2]], 16
+; CHECK: [[cmp2:%[^ ]+]] = icmp sge i32 [[mask2mod2]], 8
 ; CHECK: [[val2:%[^ ]+]] = select i1 [[cmp2]], i32 [[srcB2]], i32 [[srcA2]]
 ; CHECK: [[res2:%[^ ]+]] = insertvalue [8 x i32] [[res1]], i32 [[val2]], 2
 
 ; CHECK: [[mask3:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 3
 ; CHECK: [[mask3mod:%[^ ]+]] = urem i32 [[mask3]], 8
-; CHECK: [[srcAGepi3:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask3]]
+; CHECK: [[srcAGepi3:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask3mod]]
 ; CHECK: [[srcA3:%[^ ]+]] = load i32, i32* [[srcAGepi3]], align 4
 ; CHECK: [[srcBGepi3:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask3mod]]
 ; CHECK: [[srcB3:%[^ ]+]] = load i32, i32* [[srcBGepi3]], align 4
-; CHECK: [[cmp3:%[^ ]+]] = icmp sge i32 [[mask3]], 8
+; CHECK: [[mask3mod2:%[^ ]+]] = urem i32 [[mask3]], 16
+; CHECK: [[cmp3:%[^ ]+]] = icmp sge i32 [[mask3mod2]], 8
 ; CHECK: [[val3:%[^ ]+]] = select i1 [[cmp3]], i32 [[srcB3]], i32 [[srcA3]]
 ; CHECK: [[res3:%[^ ]+]] = insertvalue [8 x i32] [[res2]], i32 [[val3]], 3
 
 ; CHECK: [[mask4:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 4
 ; CHECK: [[mask4mod:%[^ ]+]] = urem i32 [[mask4]], 8
-; CHECK: [[srcAGepi4:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask4]]
+; CHECK: [[srcAGepi4:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask4mod]]
 ; CHECK: [[srcA4:%[^ ]+]] = load i32, i32* [[srcAGepi4]], align 4
 ; CHECK: [[srcBGepi4:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask4mod]]
 ; CHECK: [[srcB4:%[^ ]+]] = load i32, i32* [[srcBGepi4]], align 4
-; CHECK: [[cmp4:%[^ ]+]] = icmp sge i32 [[mask4]], 8
+; CHECK: [[mask4mod2:%[^ ]+]] = urem i32 [[mask4]], 16
+; CHECK: [[cmp4:%[^ ]+]] = icmp sge i32 [[mask4mod2]], 8
 ; CHECK: [[val4:%[^ ]+]] = select i1 [[cmp4]], i32 [[srcB4]], i32 [[srcA4]]
 ; CHECK: [[res4:%[^ ]+]] = insertvalue [8 x i32] [[res3]], i32 [[val4]], 4
 
 ; CHECK: [[mask5:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 5
 ; CHECK: [[mask5mod:%[^ ]+]] = urem i32 [[mask5]], 8
-; CHECK: [[srcAGepi5:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask5]]
+; CHECK: [[srcAGepi5:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask5mod]]
 ; CHECK: [[srcA5:%[^ ]+]] = load i32, i32* [[srcAGepi5]], align 4
 ; CHECK: [[srcBGepi5:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask5mod]]
 ; CHECK: [[srcB5:%[^ ]+]] = load i32, i32* [[srcBGepi5]], align 4
-; CHECK: [[cmp5:%[^ ]+]] = icmp sge i32 [[mask5]], 8
+; CHECK: [[mask5mod2:%[^ ]+]] = urem i32 [[mask5]], 16
+; CHECK: [[cmp5:%[^ ]+]] = icmp sge i32 [[mask5mod2]], 8
 ; CHECK: [[val5:%[^ ]+]] = select i1 [[cmp5]], i32 [[srcB5]], i32 [[srcA5]]
 ; CHECK: [[res5:%[^ ]+]] = insertvalue [8 x i32] [[res4]], i32 [[val5]], 5
 
 ; CHECK: [[mask6:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 6
 ; CHECK: [[mask6mod:%[^ ]+]] = urem i32 [[mask6]], 8
-; CHECK: [[srcAGepi6:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask6]]
+; CHECK: [[srcAGepi6:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask6mod]]
 ; CHECK: [[srcA6:%[^ ]+]] = load i32, i32* [[srcAGepi6]], align 4
 ; CHECK: [[srcBGepi6:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask6mod]]
 ; CHECK: [[srcB6:%[^ ]+]] = load i32, i32* [[srcBGepi6]], align 4
-; CHECK: [[cmp6:%[^ ]+]] = icmp sge i32 [[mask6]], 8
+; CHECK: [[mask6mod2:%[^ ]+]] = urem i32 [[mask6]], 16
+; CHECK: [[cmp6:%[^ ]+]] = icmp sge i32 [[mask6mod2]], 8
 ; CHECK: [[val6:%[^ ]+]] = select i1 [[cmp6]], i32 [[srcB6]], i32 [[srcA6]]
 ; CHECK: [[res6:%[^ ]+]] = insertvalue [8 x i32] [[res5]], i32 [[val6]], 6
 
 ; CHECK: [[mask7:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 7
 ; CHECK: [[mask7mod:%[^ ]+]] = urem i32 [[mask7]], 8
-; CHECK: [[srcAGepi7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask7]]
+; CHECK: [[srcAGepi7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 [[mask7mod]]
 ; CHECK: [[srcA7:%[^ ]+]] = load i32, i32* [[srcAGepi7]], align 4
 ; CHECK: [[srcBGepi7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 [[mask7mod]]
 ; CHECK: [[srcB7:%[^ ]+]] = load i32, i32* [[srcBGepi7]], align 4
-; CHECK: [[cmp7:%[^ ]+]] = icmp sge i32 [[mask7]], 8
+; CHECK: [[mask7mod2:%[^ ]+]] = urem i32 [[mask7]], 16
+; CHECK: [[cmp7:%[^ ]+]] = icmp sge i32 [[mask7mod2]], 8
 ; CHECK: [[val7:%[^ ]+]] = select i1 [[cmp7]], i32 [[srcB7]], i32 [[srcA7]]
 ; CHECK: [[res7:%[^ ]+]] = insertvalue [8 x i32] [[res6]], i32 [[val7]], 7
 
