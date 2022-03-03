@@ -1598,6 +1598,7 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
   }
 
   IRBuilder<> B(&CI);
+  IRBuilder<> BFront(&CI.getFunction()->front().front());
 
   bool isShuffle2 = SrcA != SrcB;
 
@@ -1612,7 +1613,7 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
     // Because we cannot ExtractValue at a variable index from an array, we need
     // to copy it to something where we will be able to load from a variable
     // index
-    Value *alloca = B.CreateAlloca(SrcTy);
+    Value *alloca = BFront.CreateAlloca(SrcTy);
     auto SrcArity = cast<ArrayType>(SrcTy)->getArrayNumElements();
     for (uint64_t i = 0; i < SrcArity; i++) {
       auto Val = B.CreateExtractValue(SrcA, i);
@@ -1626,7 +1627,7 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
       // Because we cannot ExtractValue at a variable index from an array, we
       // need to copy it to something where we will be able to load from a
       // variable index
-      alloca = B.CreateAlloca(SrcTy);
+      alloca = BFront.CreateAlloca(SrcTy);
       for (uint64_t i = 0; i < SrcArity; i++) {
         auto Val = B.CreateExtractValue(SrcB, i);
         auto Gep = B.CreateGEP(alloca->getType()->getPointerElementType(),

@@ -13,6 +13,8 @@ entry:
 
 declare spir_func <8 x i32> @_Z7shuffleDv8_iDv8_j(<8 x i32> noundef, <8 x i32> noundef)
 
+; CHECK: [[src_alloca:%[^ ]+]] = alloca [8 x i32], align 4
+
 ; CHECK: [[_src0:%[^ ]+]] = extractvalue [8 x i32] %src, 0
 ; CHECK: [[_srci0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_src0]], 0
 ; CHECK: [[_src1:%[^ ]+]] = extractvalue [8 x i32] %src, 1
@@ -47,7 +49,6 @@ declare spir_func <8 x i32> @_Z7shuffleDv8_iDv8_j(<8 x i32> noundef, <8 x i32> n
 ; CHECK: [[_mask7:%[^ ]+]] = extractvalue [8 x i32] %mask, 7
 ; CHECK: [[mask:%[^ ]+]] = insertvalue [8 x i32] [[_maski6]], i32 [[_mask7]], 7
 
-; CHECK: [[src_alloca:%[^ ]+]] = alloca [8 x i32], align 4
 ; CHECK: [[_srcii0:%[^ ]+]] = extractvalue [8 x i32] [[_srci7]], 0
 ; CHECK: [[srcGep0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[src_alloca]], i32 0, i32 0
 ; CHECK: store i32 [[_srcii0]], i32* [[srcGep0]], align 4

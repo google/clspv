@@ -13,6 +13,9 @@ entry:
 
 declare spir_func <2 x i32> @_Z8shuffle2Dv8_iS_Dv2_j(<8 x i32> noundef, <8 x i32> noundef, <2 x i32> noundef)
 
+; CHECK: [[srcA_alloca:%[^ ]+]] = alloca [8 x i32], align 4
+; CHECK: [[srcB_alloca:%[^ ]+]] = alloca [8 x i32], align 4
+
 ; CHECK: [[_srcA0:%[^ ]+]] = extractvalue [8 x i32] %srcA, 0
 ; CHECK: [[_srcAi0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_srcA0]], 0
 ; CHECK: [[_srcA1:%[^ ]+]] = extractvalue [8 x i32] %srcA, 1
@@ -47,7 +50,6 @@ declare spir_func <2 x i32> @_Z8shuffle2Dv8_iS_Dv2_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[_srcB7:%[^ ]+]] = extractvalue [8 x i32] %srcB, 7
 ; CHECK: [[_srcBi7:%[^ ]+]] = insertvalue [8 x i32] [[_srcBi6]], i32 [[_srcB7]], 7
 
-; CHECK: [[srcA_alloca:%[^ ]+]] = alloca [8 x i32], align 4
 ; CHECK: [[_srcAii0:%[^ ]+]] = extractvalue [8 x i32] [[_srcAi7]], 0
 ; CHECK: [[srcAGep0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 0
 ; CHECK: store i32 [[_srcAii0]], i32* [[srcAGep0]], align 4
@@ -73,7 +75,6 @@ declare spir_func <2 x i32> @_Z8shuffle2Dv8_iS_Dv2_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[srcAGep7:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcA_alloca]], i32 0, i32 7
 ; CHECK: store i32 [[_srcAii7]], i32* [[srcAGep7]], align 4
 
-; CHECK: [[srcB_alloca:%[^ ]+]] = alloca [8 x i32], align 4
 ; CHECK: [[_srcBii0:%[^ ]+]] = extractvalue [8 x i32] [[_srcBi7]], 0
 ; CHECK: [[srcBGep0:%[^ ]+]] = getelementptr [8 x i32], [8 x i32]* [[srcB_alloca]], i32 0, i32 0
 ; CHECK: store i32 [[_srcBii0]], i32* [[srcBGep0]], align 4
