@@ -387,6 +387,8 @@ struct SPIRVProducerPass final : public ModulePass {
   SPIRVID GenerateSubgroupInstruction(CallInst *Call,
                                       const FunctionInfo &FuncInfo);
   SPIRVID GenerateInstructionFromCall(CallInst *Call);
+  SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
+                                   Value *Mask);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -3755,6 +3757,87 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
   return addSPIRVInst(op, Operands);
 }
 
+SPIRVID SPIRVProducerPass::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
+                                                    Value *SrcB, Value *Mask) {
+  assert(Ty->isVectorTy());
+  assert(SrcA->getType() == SrcB->getType());
+  auto MaskTy = Mask->getType();
+  assert(MaskTy->isVectorTy());
+  auto MaskVTy = cast<FixedVectorType>(MaskTy);
+  auto MaskNumElements = MaskVTy->getNumElements();
+  SPIRVID RID;
+
+  if (auto CstMask = dyn_cast<ConstantDataVector>(Mask)) {
+    SPIRVOperandVec Ops;
+    Ops << Ty << SrcA << SrcB;
+    for (unsigned int each = 0; each < MaskNumElements; each++) {
+      auto CstInt = dyn_cast<ConstantInt>(CstMask->getAggregateElement(each));
+      assert(CstInt);
+      Ops << (unsigned)CstInt->getZExtValue();
+    }
+    RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+  } else {
+    auto VTy = cast<FixedVectorType>(Ty);
+    auto ScalarTy = VTy->getScalarType();
+    auto MaskScalarTy = MaskVTy->getScalarType();
+    auto NumElements =
+        (cast<FixedVectorType>(SrcA->getType()))->getNumElements();
+
+    SPIRVOperandVec Ops;
+    Ops << VTy;
+    RID = addSPIRVInst(spv::OpUndef, Ops);
+
+    bool isShuffle2 = SrcA != SrcB;
+
+    auto CstNumElements = getSPIRVValue(
+        ConstantInt::get(Type::getIntNTy(module->getContext(),
+                                         MaskScalarTy->getScalarSizeInBits()),
+                         NumElements));
+
+    for (unsigned each = 0; each < MaskNumElements; each++) {
+      Ops.clear();
+      Ops << MaskScalarTy << Mask << each;
+      auto Index = addSPIRVInst(spv::OpCompositeExtract, Ops);
+
+      Ops.clear();
+      Ops << MaskScalarTy << Index << CstNumElements;
+      auto IndexMod = addSPIRVInst(spv::OpUMod, Ops);
+
+      Ops.clear();
+      Ops << ScalarTy << SrcA << IndexMod;
+      auto Value = addSPIRVInst(spv::OpVectorExtractDynamic, Ops);
+
+      if (isShuffle2) {
+        Ops.clear();
+        Ops << ScalarTy << SrcB << IndexMod;
+        auto ValueB = addSPIRVInst(spv::OpVectorExtractDynamic, Ops);
+
+        Ops.clear();
+        Ops << MaskScalarTy << Index
+            << getSPIRVValue(ConstantInt::get(
+                   Type::getIntNTy(module->getContext(),
+                                   MaskScalarTy->getScalarSizeInBits()),
+                   NumElements * 2));
+        auto IndexMod2 = addSPIRVInst(spv::OpUMod, Ops);
+
+        Ops.clear();
+        Ops << Type::getInt1Ty(module->getContext()) << IndexMod2
+            << CstNumElements;
+        auto Cmp = addSPIRVInst(spv::OpUGreaterThanEqual, Ops);
+
+        Ops.clear();
+        Ops << ScalarTy << Cmp << ValueB << Value;
+        Value = addSPIRVInst(spv::OpSelect, Ops);
+      }
+
+      Ops.clear();
+      Ops << VTy << Value << RID << each;
+      RID = addSPIRVInst(spv::OpCompositeInsert, Ops);
+    }
+  }
+  return RID;
+}
+
 SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
@@ -3875,6 +3958,23 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
     } else {
       llvm_unreachable("Unsupported type width for kpopcount");
     }
+    break;
+  }
+  case Builtins::kShuffle: {
+    auto Src = Call->getOperand(0);
+    auto Mask = Call->getOperand(1);
+    auto Ty = Call->getType();
+
+    RID = GenerateShuffle2FromCall(Ty, Src, Src, Mask);
+    break;
+  }
+  case Builtins::kShuffle2: {
+    auto SrcA = Call->getOperand(0);
+    auto SrcB = Call->getOperand(1);
+    auto Mask = Call->getOperand(2);
+    auto Ty = Call->getType();
+
+    RID = GenerateShuffle2FromCall(Ty, SrcA, SrcB, Mask);
     break;
   }
   default: {

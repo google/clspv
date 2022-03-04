@@ -144,6 +144,15 @@ private:
   Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
                             ArrayRef<Value *> EquivalentArgs);
 
+  /// Either call convertBuiltinCall for easy to map call, or specific routine
+  /// for more particular builtin (shuffle, shuffle2).
+  Value *convertAllBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
+                               ArrayRef<Value *> EquivalentArgs);
+
+  /// Perform the Shuffle2 operation element per element
+  Value *convertBuiltinShuffle2(CallInst &CI, Type *EquivalentReturnTy,
+                                Value *SrcA, Value *SrcB, Value *Mask);
+
   // Map calls of Spirv Operators builtin that cannot be convert using
   // convertBuiltinCall
   Value *convertSpirvOpBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
@@ -929,7 +938,7 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
 
   Value *V = nullptr;
   if (Builtin && F->isDeclaration() && !SpirvOpBuiltin) {
-    V = convertBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
+    V = convertAllBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
   } else if (SpirvOpBuiltin && F->isDeclaration()) {
     V = convertSpirvOpBuiltinCall(I, EquivalentReturnTy, EquivalentArgs);
   } else {
@@ -1544,6 +1553,149 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
 
   return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
                                 ScalarFactory);
+}
+
+Value *LongVectorLoweringPass::convertAllBuiltinCall(
+    CallInst &CI, Type *EquivalentReturnTy, ArrayRef<Value *> EquivalentArgs) {
+  Function *Builtin = CI.getCalledFunction();
+  assert(Builtin);
+  const auto &Info = clspv::Builtins::Lookup(Builtin);
+
+  switch (Info.getType()) {
+  default:
+    return convertBuiltinCall(CI, EquivalentReturnTy, EquivalentArgs);
+  case clspv::Builtins::kShuffle: {
+    auto Src = EquivalentArgs[0];
+    auto Mask = EquivalentArgs[1];
+    return convertBuiltinShuffle2(CI, EquivalentReturnTy, Src, Src, Mask);
+  }
+  case clspv::Builtins::kShuffle2: {
+    auto SrcA = EquivalentArgs[0];
+    auto SrcB = EquivalentArgs[1];
+    auto Mask = EquivalentArgs[2];
+    return convertBuiltinShuffle2(CI, EquivalentReturnTy, SrcA, SrcB, Mask);
+  }
+  }
+}
+
+Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
+                                                      Type *EquivalentReturnTy,
+                                                      Value *SrcA, Value *SrcB,
+                                                      Value *Mask) {
+  auto MaskTy = Mask->getType();
+  unsigned MaskArity;
+  unsigned MaskElementSizeInBits;
+  if (MaskTy->isVectorTy()) {
+    MaskArity = cast<FixedVectorType>(MaskTy)->getNumElements();
+    MaskElementSizeInBits =
+        cast<FixedVectorType>(MaskTy)->getScalarSizeInBits();
+  } else if (MaskTy->isArrayTy()) {
+    MaskArity = cast<ArrayType>(MaskTy)->getArrayNumElements();
+    MaskElementSizeInBits =
+        cast<ArrayType>(MaskTy)->getElementType()->getScalarSizeInBits();
+  } else {
+    llvm_unreachable("unexpected Type for Mask in Shuffle");
+  }
+
+  IRBuilder<> B(&CI);
+  IRBuilder<> BFront(&CI.getFunction()->front().front());
+
+  bool isShuffle2 = SrcA != SrcB;
+
+  assert(SrcA->getType() == SrcB->getType());
+  auto SrcTy = SrcA->getType();
+  Type *ScalarTy;
+  unsigned NumElements;
+  if (SrcTy->isArrayTy()) {
+    auto SrcArrayTy = cast<ArrayType>(SrcTy);
+    ScalarTy = SrcArrayTy->getElementType();
+
+    // Because we cannot ExtractValue at a variable index from an array, we need
+    // to copy it to something where we will be able to load from a variable
+    // index
+    Value *alloca = BFront.CreateAlloca(SrcTy);
+    auto SrcArity = cast<ArrayType>(SrcTy)->getArrayNumElements();
+    for (uint64_t i = 0; i < SrcArity; i++) {
+      auto Val = B.CreateExtractValue(SrcA, i);
+      auto Gep = B.CreateGEP(alloca->getType()->getPointerElementType(), alloca,
+                             {B.getInt32(0), B.getInt32(i)});
+      B.CreateStore(Val, Gep);
+    }
+    SrcA = alloca;
+
+    if (isShuffle2) {
+      // Because we cannot ExtractValue at a variable index from an array, we
+      // need to copy it to something where we will be able to load from a
+      // variable index
+      alloca = BFront.CreateAlloca(SrcTy);
+      for (uint64_t i = 0; i < SrcArity; i++) {
+        auto Val = B.CreateExtractValue(SrcB, i);
+        auto Gep = B.CreateGEP(alloca->getType()->getPointerElementType(),
+                               alloca, {B.getInt32(0), B.getInt32(i)});
+        B.CreateStore(Val, Gep);
+      }
+      SrcB = alloca;
+    }
+    NumElements = SrcTy->getArrayNumElements();
+  } else {
+    assert(SrcTy->isVectorTy());
+    ScalarTy = SrcTy->getScalarType();
+    NumElements = cast<FixedVectorType>(SrcTy)->getNumElements();
+  }
+
+  auto getScalar = [&B](Value *Vector, unsigned Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateExtractElement(Vector, Index);
+    } else {
+      assert(Vector->getType()->isArrayTy());
+      return B.CreateExtractValue(Vector, Index);
+    }
+  };
+
+  auto getScalarWithIdValue = [&B, &ScalarTy](Value *Vector, Value *Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateExtractElement(Vector, Index);
+    } else {
+      assert(Vector->getType()->isPointerTy());
+      auto gep = B.CreateGEP(Vector->getType()->getPointerElementType(), Vector,
+                             {B.getInt32(0), Index});
+      return (Value *)B.CreateLoad(ScalarTy, gep);
+    }
+  };
+
+  auto setScalar = [&B](Value *Vector, Value *Scalar, unsigned Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateInsertElement(Vector, Scalar, Index);
+    } else {
+      assert(Vector->getType()->isArrayTy());
+      return B.CreateInsertValue(Vector, Scalar, Index);
+    }
+  };
+
+  Value *Res = UndefValue::get(EquivalentReturnTy);
+  for (unsigned i = 0; i < MaskArity; ++i) {
+
+    Value *NumElementsVal = B.getIntN(MaskElementSizeInBits, NumElements);
+    Value *Maski = getScalar(Mask, i);
+    Value *Maskimod = B.CreateURem(Maski, NumElementsVal);
+
+    Value *ScalarA = getScalarWithIdValue(SrcA, Maskimod);
+    Value *Scalar;
+    if (isShuffle2) {
+      Value *ScalarB = getScalarWithIdValue(SrcB, Maskimod);
+
+      Value *NumElementsValTimes2 =
+          B.getIntN(MaskElementSizeInBits, NumElements * 2);
+      Value *Maskimod2 = B.CreateURem(Maski, NumElementsValTimes2);
+      Value *Cmp = B.CreateCmp(CmpInst::ICMP_SGE, Maskimod2, NumElementsVal);
+      Scalar = B.CreateSelect(Cmp, ScalarB, ScalarA);
+    } else {
+      Scalar = ScalarA;
+    }
+
+    Res = setScalar(Res, Scalar, i);
+  }
+  return Res;
 }
 
 Value *LongVectorLoweringPass::convertSpirvOpBuiltinCall(
