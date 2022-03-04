@@ -387,7 +387,8 @@ struct SPIRVProducerPass final : public ModulePass {
   SPIRVID GenerateSubgroupInstruction(CallInst *Call,
                                       const FunctionInfo &FuncInfo);
   SPIRVID GenerateInstructionFromCall(CallInst *Call);
-  SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB, Value *Mask);
+  SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
+                                   Value *Mask);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -3756,8 +3757,8 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
   return addSPIRVInst(op, Operands);
 }
 
-SPIRVID SPIRVProducerPass::GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
-                                            Value *Mask) {
+SPIRVID SPIRVProducerPass::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
+                                                    Value *SrcB, Value *Mask) {
   assert(Ty->isVectorTy());
   assert(SrcA->getType() == SrcB->getType());
   auto MaskTy = Mask->getType();
