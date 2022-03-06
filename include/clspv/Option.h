@@ -162,6 +162,7 @@ enum class SPIRVVersion : uint32_t {
   SPIRV_1_3,
   SPIRV_1_4,
   SPIRV_1_5,
+  SPIRV_1_6,
 };
 
 SPIRVVersion SpvVersion();
