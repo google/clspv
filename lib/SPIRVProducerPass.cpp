@@ -868,6 +868,9 @@ void SPIRVProducerPass::outputHeader() {
   case SPIRVVersion::SPIRV_1_5:
     minor = 5;
     break;
+  case SPIRVVersion::SPIRV_1_6:
+    minor = 6;
+    break;
   default:
     llvm_unreachable("unhandled spir-v version");
     break;
@@ -6076,7 +6079,9 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps() {
 
 SPIRVID SPIRVProducerPass::getReflectionImport() {
   if (!ReflectionID.isValid()) {
-    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
+    if (SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_6) {
+      addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
+    }
     ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport,
                                           "NonSemantic.ClspvReflection.2");
   }
