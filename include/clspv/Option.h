@@ -70,6 +70,10 @@ bool HackBlockOrder();
 // operations. Works around a driver bug.
 bool HackClampWidth();
 
+// Returns true if OpSMulExtended and OpUMulExtended should be avoided. Works
+// around a driver bug.
+bool HackMulExtended();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.

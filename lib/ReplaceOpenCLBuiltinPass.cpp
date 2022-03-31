@@ -311,6 +311,9 @@ private:
   // identical contents.
   Type *GetPairStruct(Type *type);
 
+  Value *InsertOpMulExtended(Instruction *InsertPoint, Value *a, Value *b,
+                                   bool IsSigned);
+
   DenseMap<Type *, Type *> PairStructMap;
 };
 
@@ -676,6 +679,166 @@ Type *ReplaceOpenCLBuiltinPass::GetPairStruct(Type *type) {
   auto new_struct = StructType::get(type->getContext(), {type, type});
   PairStructMap[type] = new_struct;
   return new_struct;
+}
+
+Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
+                                                     Value *a, Value *b,
+                                                     bool IsSigned) {
+
+  Type *Ty = a->getType();
+  Type *RetTy = GetPairStruct(a->getType());
+  assert(Ty == b->getType());
+
+  if (!Option::HackMulExtended()) {
+    spv::Op opcode = IsSigned ? spv::OpSMulExtended : spv::OpUMulExtended;
+
+    return clspv::InsertSPIRVOp(InsertPoint, opcode, {Attribute::ReadNone},
+                                RetTy, {a, b});
+  }
+
+  unsigned int ScalarSizeInBits = Ty->getScalarSizeInBits();
+  bool IsVector = Ty->isVectorTy();
+
+  IRBuilder<> Builder(InsertPoint);
+
+  if (ScalarSizeInBits <= 32) {
+    /*
+     * {mul_lo, mul_hi} = OpMulExtended(a, b, IsSigned) {
+     *    S = SizeInBits(a)
+     *    a_ext = ext2S(a, IsSigned)
+     *    b_ext = ext2S(b, IsSigned)
+     *    mul = a_ext * b_ext
+     *    mul_lo = truncS(mul)
+     *    mul_hi = truncS(mul >> S)
+     *    return {mul_lo, mul_hi}
+     * }
+     */
+    Type *TyTimes2 =
+        Ty->getIntNTy(InsertPoint->getContext(), ScalarSizeInBits * 2);
+    if (IsVector) {
+      TyTimes2 = VectorType::get(TyTimes2, dyn_cast<VectorType>(Ty));
+    }
+    Value *aExtended, *bExtended;
+    if (IsSigned) {
+      aExtended = Builder.CreateSExt(a, TyTimes2);
+      bExtended = Builder.CreateSExt(b, TyTimes2);
+    } else {
+      aExtended = Builder.CreateZExt(a, TyTimes2);
+      bExtended = Builder.CreateZExt(b, TyTimes2);
+    }
+    auto mul = Builder.CreateMul(aExtended, bExtended);
+    auto mul_lo = Builder.CreateTrunc(mul, Ty);
+    auto mul_hi =
+        Builder.CreateTrunc(Builder.CreateLShr(mul, ScalarSizeInBits), Ty);
+
+    return Builder.CreateInsertValue(
+        Builder.CreateInsertValue(UndefValue::get(RetTy), mul_lo, {0}), mul_hi,
+        {1});
+  } else if (ScalarSizeInBits == 64) {
+    /*
+     * {mul_lo, mul_hi} = OpMulExtended(a, b, IsSigned) {
+     *   if (IsSigned) {
+     *     res_neg = (a > 0) ^ (b > 0)
+     *     a = abs(a)
+     *     b = abs(b)
+     *   }
+     *   a0 = trunc32(a)
+     *   a1 = trunc32(a >> 32)
+     *   b0 = trunc32(b)
+     *   b1 = trunc32(b >> 32)
+     *   {a0b0_0, a0b0_1} = zext64(OpUMulExtended(a0, b0))
+     *   {a1b0_0, a1b0_1} = zext64(OpUMulExtended(a1, b0))
+     *   {a0b1_0, a0b1_1} = zext64(OpUMulExtended(a0, b1))
+     *   {a1b1_0, a1b1_1} = zext64(OpUMulExtended(a1, b1))
+     *
+     *   mul_lo_hi = a0b0_1 + a1b0_0 + a0b1_0
+     *   carry_mul_lo_hi = mul_lo_hi >> 32
+     *   mul_hi_lo = a1b1_0 + a1b0_1 + a0b1_1 + carry_mul_lo_hi
+     *   mul_lo = a0b0_0 + mul_lo_hi << 32
+     *   mul_hi = mul_hi_lo + a1b1_1 << 32
+     *
+     *   if (IsSigned) {
+     *     mul_lo_xor = mul_lo ^ -1
+     *     {mul_lo_inv, carry} = OpIAddCarry(mul_lo_xor, 1)
+     *     mul_hi_inv = mul_hi ^ -1 + carry
+     *     mul_lo = res_neg ? mul_lo_inv : mul_lo
+     *     mul_hi = res_neg ? mul_hi_inv : mul_hi
+     *   }
+     *   return {mul_lo, mul_hi}
+     * }
+     */
+    Type *Ty32 = Ty->getInt32Ty(InsertPoint->getContext());
+    if (IsVector) {
+      Ty32 = VectorType::get(Ty32, dyn_cast<VectorType>(Ty));
+    }
+
+    Value *res_neg;
+    if (IsSigned) {
+      // We want to work with unsigned value.
+      // Convert everything to unsigned and remember the signed of the end
+      // result.
+      auto a_pos = Builder.CreateICmpSGE(a, ConstantInt::get(Ty, 0, true));
+      auto b_pos = Builder.CreateICmpSGE(b, ConstantInt::get(Ty, 0, true));
+      res_neg = Builder.CreateXor(a_pos, b_pos);
+
+      auto a_inv =
+          Builder.CreateAdd(Builder.CreateXor(a, Constant::getAllOnesValue(Ty)),
+                            ConstantInt::get(Ty, 1));
+      auto b_inv =
+          Builder.CreateAdd(Builder.CreateXor(b, Constant::getAllOnesValue(Ty)),
+                            ConstantInt::get(Ty, 1));
+      a = Builder.CreateSelect(a_pos, a, a_inv);
+      b = Builder.CreateSelect(b_pos, b, b_inv);
+    }
+
+    auto a0 = Builder.CreateTrunc(a, Ty32);
+    auto a1 = Builder.CreateTrunc(Builder.CreateLShr(a, 32), Ty32);
+    auto b0 = Builder.CreateTrunc(b, Ty32);
+    auto b1 = Builder.CreateTrunc(Builder.CreateLShr(b, 32), Ty32);
+
+    auto a0b0 = InsertOpMulExtended(InsertPoint, a0, b0, false);
+    auto a1b0 = InsertOpMulExtended(InsertPoint, a1, b0, false);
+    auto a0b1 = InsertOpMulExtended(InsertPoint, a0, b1, false);
+    auto a1b1 = InsertOpMulExtended(InsertPoint, a1, b1, false);
+    auto a0b0_0 = Builder.CreateZExt(Builder.CreateExtractValue(a0b0, {0}), Ty);
+    auto a0b0_1 = Builder.CreateZExt(Builder.CreateExtractValue(a0b0, {1}), Ty);
+    auto a1b0_0 = Builder.CreateZExt(Builder.CreateExtractValue(a1b0, {0}), Ty);
+    auto a1b0_1 = Builder.CreateZExt(Builder.CreateExtractValue(a1b0, {1}), Ty);
+    auto a0b1_0 = Builder.CreateZExt(Builder.CreateExtractValue(a0b1, {0}), Ty);
+    auto a0b1_1 = Builder.CreateZExt(Builder.CreateExtractValue(a0b1, {1}), Ty);
+    auto a1b1_0 = Builder.CreateZExt(Builder.CreateExtractValue(a1b1, {0}), Ty);
+    auto a1b1_1 = Builder.CreateZExt(Builder.CreateExtractValue(a1b1, {1}), Ty);
+
+    auto mul_lo_hi =
+        Builder.CreateAdd(Builder.CreateAdd(a0b0_1, a1b0_0), a0b1_0);
+    auto carry_mul_lo_hi = Builder.CreateLShr(mul_lo_hi, 32);
+    auto mul_hi_lo = Builder.CreateAdd(
+        Builder.CreateAdd(Builder.CreateAdd(a1b1_0, a1b0_1), a0b1_1),
+        carry_mul_lo_hi);
+    auto mul_lo = Builder.CreateAdd(a0b0_0, Builder.CreateShl(mul_lo_hi, 32));
+    auto mul_hi = Builder.CreateAdd(mul_hi_lo, Builder.CreateShl(a1b1_1, 32));
+
+    if (IsSigned) {
+      // Apply the signed that we got from the previous if statement setting res_neg.
+      auto mul_lo_xor =
+          Builder.CreateXor(mul_lo, Constant::getAllOnesValue(Ty));
+      auto mul_lo_xor_add =
+          InsertSPIRVOp(InsertPoint, spv::OpIAddCarry, {Attribute::ReadNone},
+                        RetTy, {mul_lo_xor, ConstantInt::get(Ty, 1)});
+      auto mul_lo_inv = Builder.CreateExtractValue(mul_lo_xor_add, {0});
+      auto carry = Builder.CreateExtractValue(mul_lo_xor_add, {1});
+      auto mul_hi_inv = Builder.CreateAdd(
+          carry, Builder.CreateXor(mul_hi, Constant::getAllOnesValue(Ty)));
+      mul_lo = Builder.CreateSelect(res_neg, mul_lo_inv, mul_lo);
+      mul_hi = Builder.CreateSelect(res_neg, mul_hi_inv, mul_hi);
+    }
+
+    return Builder.CreateInsertValue(
+        Builder.CreateInsertValue(UndefValue::get(RetTy), mul_lo, {0}), mul_hi,
+        {1});
+  } else {
+    llvm_unreachable("Unexpected type for InsertOpMulExtended");
+  }
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
@@ -1580,15 +1743,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
       }
     }
 
-    // Our SPIR-V op returns a struct, create a type for it
-    auto ExMulRetType = GetPairStruct(AType);
-
-    // Select the appropriate signed/unsigned SPIR-V op
-    spv::Op opcode = is_signed ? spv::OpSMulExtended : spv::OpUMulExtended;
-
-    // Call the SPIR-V op
-    auto Call = clspv::InsertSPIRVOp(CI, opcode, {Attribute::ReadNone},
-                                     ExMulRetType, {AValue, BValue});
+    auto Call = InsertOpMulExtended(CI, AValue, BValue, is_signed);
 
     // Get the high part of the result
     unsigned Idxs[] = {1};
@@ -3096,12 +3251,11 @@ bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
         auto clamp = builder.CreateCall(callee, {add, min, max});
         return builder.CreateTrunc(clamp, ty);
       } else {
-        auto struct_ty = GetPairStruct(ty);
         // Compute
         // {hi, lo} = smul_extended(a, b)
         // add = lo + c
-        auto mul_ext = InsertSPIRVOp(Call, spv::OpSMulExtended,
-                                     {Attribute::ReadNone}, struct_ty, {a, b});
+        auto mul_ext = InsertOpMulExtended(Call, a, b, true);
+
         auto mul_lo = builder.CreateExtractValue(mul_ext, {0});
         auto mul_hi = builder.CreateExtractValue(mul_ext, {1});
         auto add = builder.CreateAdd(mul_lo, c);
@@ -3167,8 +3321,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
       // cmp = (mul_hi | carry) == 0
       // mad_sat = cmp ? add : MAX
       auto struct_ty = GetPairStruct(ty);
-      auto mul_ext = InsertSPIRVOp(Call, spv::OpUMulExtended,
-                                   {Attribute::ReadNone}, struct_ty, {a, b});
+      auto mul_ext = InsertOpMulExtended(Call, a, b, false);
       auto mul_lo = builder.CreateExtractValue(mul_ext, {0});
       auto mul_hi = builder.CreateExtractValue(mul_ext, {1});
       auto add_carry =

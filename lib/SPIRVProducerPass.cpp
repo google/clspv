@@ -3999,8 +3999,17 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
 
       Ops << Call->getType() << ExtInstImportID << EInst;
 
-      for (auto &use : Call->args()) {
-        Ops << use.get();
+      switch (EInst) {
+      case glsl::ExtInst::ExtInstSAbs:
+        // llvm.abs has a second argument that will not translate to the spirv
+        // code.
+        Ops << Call->getOperand(0);
+        break;
+      default:
+        for (auto &use : Call->args()) {
+          Ops << use.get();
+        }
+        break;
       }
 
       RID = addSPIRVInst(spv::OpExtInst, Ops);
@@ -4180,7 +4189,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         //
         // Let's implement signed modulus like that:
         // SRem(x, y) {
-        //   return (abs(x) % abs(y)) * (x > 0 ? 1 : -1);
+        //   rem = (abs(x) % abs(y))
+        //   return (x > 0 ? rem : ((rem ^ -1) + 1)); // (x > 0 ? rem : rem * -1);
         // }
 
         SPIRVOperandVec Ops;
@@ -4215,18 +4225,17 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         Ops << boolTy << X << Cst0;
         auto Cmp = addSPIRVInst(spv::OpSGreaterThan, Ops);
 
-        // x > 0 ? 1 : -1
         Ops.clear();
-        Ops << Ty << Cmp << Cst1 << Cstm1;
-        auto Select = addSPIRVInst(spv::OpSelect, Ops);
+        Ops << Ty << Mod << Cstm1;
+        auto Xor = addSPIRVInst(spv::OpBitwiseXor, Ops);
 
         Ops.clear();
-        Ops << StructType::get(Ty, Ty) << Mod << Select;
-        auto Mul = addSPIRVInst(spv::OpSMulExtended, Ops);
+        Ops << Ty << Xor << Cst1;
+        auto Modm1 = addSPIRVInst(spv::OpIAdd, Ops);
 
         Ops.clear();
-        Ops << Ty << Mul << 0;
-        RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
+        Ops << Ty << Cmp << Mod << Modm1;
+        RID = addSPIRVInst(spv::OpSelect, Ops);
       } else {
         // Ops[0] = Result Type ID
         // Ops[1] = Operand 0
@@ -5373,6 +5382,9 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   }
   if (func_info.getName().find("llvm.fabs.") == 0) {
     return glsl::ExtInst::ExtInstFAbs;
+  }
+  if (func_info.getName().find("llvm.abs.") == 0) {
+    return glsl::ExtInst::ExtInstSAbs;
   }
   if (func_info.getName().find("llvm.floor.") == 0) {
     return glsl::ExtInst::ExtInstFloor;
