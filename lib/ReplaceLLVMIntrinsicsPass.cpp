@@ -154,6 +154,13 @@ bool ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
     // Shift the two arguments and OR the results together.
     auto hi_bits = builder.CreateShl(arg_hi, shift_amount);
     auto lo_bits = builder.CreateLShr(arg_lo, down_amount);
+
+    // "The resulting value is undefined if Shift is greater than or equal to
+    // the bit width of the components of Base."
+    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#Bit
+    auto cmp = builder.CreateICmpUGE(down_amount, scalar_size);
+    lo_bits = builder.CreateSelect(cmp, ConstantInt::get(type, 0), lo_bits);
+
     return builder.CreateOr(lo_bits, hi_bits);
   });
 }
