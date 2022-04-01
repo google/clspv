@@ -25,5 +25,7 @@ kernel void foo(global S* data, float f) {
 // CHECK-DAG:  [[_float_1:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 1
 // CHECK-DAG:  [[_float_2:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 2
 // CHECK-DAG:  [[_float_3:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 3
-// CHECK-DAG:  [[_23:%[0-9a-zA-Z_]+]] = OpConstantComposite [[__struct_2]] [[_float_0]] [[_float_1]] [[_float_2]] [[_float_3]]
-// CHECK:  OpReturnValue [[_23]]
+// CHECK-DAG:  OpStore {{.*}} [[_float_0]]
+// CHECK-DAG:  OpStore {{.*}} [[_float_1]]
+// CHECK-DAG:  OpStore {{.*}} [[_float_2]]
+// CHECK-DAG:  OpStore {{.*}} [[_float_3]]

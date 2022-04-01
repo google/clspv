@@ -709,23 +709,21 @@ int PopulatePassManager(
     pm->add(clspv::createInlineFuncWithSingleCallSitePass());
   }
 
+  // Mem2Reg pass should be run early because O0 level optimization leaves
+  // redundant alloca, load and store instructions from function arguments.
+  // clspv needs to remove them ahead of transformation.
+  pm->add(llvm::createPromoteMemoryToRegisterPass());
+
+  // SROA pass is run because it will fold structs/unions that are problematic
+  // on Vulkan SPIR-V away.
+  pm->add(llvm::createSROAPass());
+
+  // InstructionCombining pass folds bitcast and gep instructions which are
+  // not supported by Vulkan SPIR-V.
+  pm->add(llvm::createInstructionCombiningPass());
+
   if (clspv::Option::LanguageUsesGenericAddressSpace()) {
     pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
-  }
-
-  if (0 == pmBuilder.OptLevel) {
-    // Mem2Reg pass should be run early because O0 level optimization leaves
-    // redundant alloca, load and store instructions from function arguments.
-    // clspv needs to remove them ahead of transformation.
-    pm->add(llvm::createPromoteMemoryToRegisterPass());
-
-    // SROA pass is run because it will fold structs/unions that are problematic
-    // on Vulkan SPIR-V away.
-    pm->add(llvm::createSROAPass());
-
-    // InstructionCombining pass folds bitcast and gep instructions which are
-    // not supported by Vulkan SPIR-V.
-    pm->add(llvm::createInstructionCombiningPass());
   }
 
   // Now we add any of the LLVM optimizations we wanted
