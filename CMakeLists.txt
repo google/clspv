@@ -15,6 +15,11 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
+# Enable universal binaries on modern Apple platforms.
+IF(APPLE)
+  SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+ENDIF(APPLE)
+
 if(NOT COMMAND find_host_package)
   macro(find_host_package)
     find_package(${ARGN})
