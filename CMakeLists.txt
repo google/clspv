@@ -15,6 +15,13 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
+# Enable ccache if installed. Use all default options currently:
+# https://ccache.dev/manual/latest.html#_configuration_options
+find_program(CCACHE_FOUND ccache)
+if(CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+endif(CCACHE_FOUND)
+
 if(NOT COMMAND find_host_package)
   macro(find_host_package)
     find_package(${ARGN})
