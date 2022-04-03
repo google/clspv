@@ -91,6 +91,7 @@ bool InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
                   // We found a call instruction which needs to be inlined!
                   WorkList.insert(cast<CallInst>(Inst));
                   // Fall-through
+                  [[clang::fallthrough]];
                 case Instruction::PHI:
                   // If we previously checked this phi...
                   if (0 < CheckedPhis.count(Inst)) {
@@ -100,7 +101,9 @@ bool InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
 
                   CheckedPhis.insert(Inst);
                   // Fall-through
+                  [[clang::fallthrough]];
                 case Instruction::GetElementPtr:
+                  [[clang::fallthrough]];
                 case Instruction::BitCast:
                   // These pointer users could have a call user, and so we
                   // must check them also.

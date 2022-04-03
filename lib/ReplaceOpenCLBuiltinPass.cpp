@@ -1933,6 +1933,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F,
       return replaceVloadHalf(F);
     }
     // Fall-through
+    [[clang::fallthrough]];
   default:
     llvm_unreachable("Unsupported vload_half vector size");
     break;
@@ -3240,7 +3241,7 @@ bool ReplaceOpenCLBuiltinPass::replaceOrdered(Function &F, bool is_ordered) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
-  return replaceCallsWithValue(F, [this](CallInst *Call) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
     auto ty = Call->getType();
     auto x = Call->getArgOperand(0);
     unsigned width = x->getType()->getScalarSizeInBits();
