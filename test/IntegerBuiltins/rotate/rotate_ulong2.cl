@@ -10,7 +10,8 @@
 // CHECK-DAG: %[[scalarsize:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 64
 // CHECK-DAG: %[[vecscalarbits:[0-9]+]] = OpConstantComposite %[[v2ulong]] %[[scalarsize]] %[[scalarsize]]
 // CHECK:     %[[rotamount:[0-9]+]] = OpBitwiseAnd %[[v2ulong]] {{.*}} %[[vecmodmask]]
-// CHECK:     %[[downamount:[0-9]+]] = OpISub %[[v2ulong]] %[[vecscalarbits]] %[[rotamount]]
+// CHECK:     %[[downamountraw:[0-9]+]] = OpISub %[[v2ulong]] %[[vecscalarbits]] %[[rotamount]]
+// CHECK:     %[[downamount:[0-9]+]] = OpBitwiseAnd %[[v2ulong]] %[[downamountraw]] %[[vecmodmask]]
 // CHECK:     %[[hibits:[0-9]+]] = OpShiftLeftLogical %[[v2ulong]] {{.*}} %[[rotamount]]
 // CHECK:     %[[lobits:[0-9]+]] = OpShiftRightLogical %[[v2ulong]] {{.*}} %[[downamount]]
 // CHECK:     OpBitwiseOr %[[v2ulong]] %[[lobits]] %[[hibits]]

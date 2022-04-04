@@ -7,7 +7,8 @@
 // CHECK-DAG: %[[modmask:[0-9a-zA-Z_]+]] = OpConstant %[[ushort]] 15
 // CHECK-DAG: %[[scalarsize:[0-9a-zA-Z_]+]] = OpConstant %[[ushort]] 16
 // CHECK:     %[[rotamount:[0-9]+]] = OpBitwiseAnd %[[ushort]] {{.*}} %[[modmask]]
-// CHECK:     %[[downamount:[0-9]+]] = OpISub %[[ushort]] %[[scalarsize]] %[[rotamount]]
+// CHECK:     %[[downamountraw:[0-9]+]] = OpISub %[[ushort]] %[[scalarsize]] %[[rotamount]]
+// CHECK:     %[[downamount:[0-9]+]] = OpBitwiseAnd %[[ushort]] %[[downamountraw]] %[[modmask]]
 // CHECK:     %[[hibits:[0-9]+]] = OpShiftLeftLogical %[[ushort]] {{.*}} %[[rotamount]]
 // CHECK:     %[[lobits:[0-9]+]] = OpShiftRightLogical %[[ushort]] {{.*}} %[[downamount]]
 // CHECK:     OpBitwiseOr %[[ushort]] %[[lobits]] %[[hibits]]

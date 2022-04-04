@@ -16,8 +16,9 @@ declare i8 @llvm.fshl.i8(i8, i8, i8)
 ; CHECK-NOT: llvm.fshl
 ; CHECK: [[and:%[0-9a-zA-Z_.]+]] = and i8 %c, 7
 ; CHECK: [[sub:%[0-9a-zA-Z_.]+]] = sub i8 8, [[and]]
+; CHECK: [[and2:%[0-9a-zA-Z_.]+]] = and i8 [[sub]], 7
 ; CHECK: [[shl:%[0-9a-zA-Z_.]+]] = shl i8 %a, [[and]]
-; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i8 %b, [[sub]]
+; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i8 %b, [[and2]]
 ; CHECK: [[or:%[0-9a-zA-Z_.]+]] = or i8 [[lshr]], [[shl]]
 ; CHECK: store i8 [[or]], i8 addrspace(1)* %out
 
@@ -35,8 +36,9 @@ declare i16 @llvm.fshl.i16(i16, i16, i16)
 ; CHECK-NOT: llvm.fshl
 ; CHECK: [[and:%[0-9a-zA-Z_.]+]] = and i16 %c, 15
 ; CHECK: [[sub:%[0-9a-zA-Z_.]+]] = sub i16 16, [[and]]
+; CHECK: [[and2:%[0-9a-zA-Z_.]+]] = and i16 [[sub]], 15
 ; CHECK: [[shl:%[0-9a-zA-Z_.]+]] = shl i16 %a, [[and]]
-; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i16 %b, [[sub]]
+; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i16 %b, [[and2]]
 ; CHECK: [[or:%[0-9a-zA-Z_.]+]] = or i16 [[lshr]], [[shl]]
 ; CHECK: store i16 [[or]], i16 addrspace(1)* %out
 
@@ -54,8 +56,9 @@ declare i32 @llvm.fshl.i32(i32, i32, i32)
 ; CHECK-NOT: llvm.fshl
 ; CHECK: [[and:%[0-9a-zA-Z_.]+]] = and i32 %c, 31
 ; CHECK: [[sub:%[0-9a-zA-Z_.]+]] = sub i32 32, [[and]]
+; CHECK: [[and2:%[0-9a-zA-Z_.]+]] = and i32 [[sub]], 31
 ; CHECK: [[shl:%[0-9a-zA-Z_.]+]] = shl i32 %a, [[and]]
-; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i32 %b, [[sub]]
+; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i32 %b, [[and2]]
 ; CHECK: [[or:%[0-9a-zA-Z_.]+]] = or i32 [[lshr]], [[shl]]
 ; CHECK: store i32 [[or]], i32 addrspace(1)* %out
 
@@ -73,7 +76,8 @@ declare i64 @llvm.fshl.i64(i64, i64, i64)
 ; CHECK-NOT: llvm.fshl
 ; CHECK: [[and:%[0-9a-zA-Z_.]+]] = and i64 %c, 63
 ; CHECK: [[sub:%[0-9a-zA-Z_.]+]] = sub i64 64, [[and]]
+; CHECK: [[and2:%[0-9a-zA-Z_.]+]] = and i64 [[sub]], 63
 ; CHECK: [[shl:%[0-9a-zA-Z_.]+]] = shl i64 %a, [[and]]
-; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i64 %b, [[sub]]
+; CHECK: [[lshr:%[0-9a-zA-Z_.]+]] = lshr i64 %b, [[and2]]
 ; CHECK: [[or:%[0-9a-zA-Z_.]+]] = or i64 [[lshr]], [[shl]]
 ; CHECK: store i64 [[or]], i64 addrspace(1)* %out
