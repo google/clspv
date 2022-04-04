@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -hack-initializers -no-inline-single
+// RUN: clspv %s -o %t.spv -hack-initializers -no-inline-single -uniform-workgroup-size
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

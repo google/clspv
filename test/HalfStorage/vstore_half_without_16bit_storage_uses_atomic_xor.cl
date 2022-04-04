@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo
+// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo -uniform-workgroup-size
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

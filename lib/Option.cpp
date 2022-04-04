@@ -264,7 +264,8 @@ static llvm::cl::opt<bool>
 
 static llvm::cl::opt<bool> uniform_workgroup_size(
     "uniform-workgroup-size", llvm::cl::init(false),
-    llvm::cl::desc("Assume all workgroups are uniformly sized."));
+    llvm::cl::desc("Assume all workgroups are uniformly sized and the "
+                   "size will not exceed device limits"));
 
 static llvm::cl::opt<bool>
     cl_kernel_arg_info("cl-kernel-arg-info", llvm::cl::init(false),
@@ -322,11 +323,7 @@ bool WorkDim() { return work_dim; }
 bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool NonUniformNDRangeSupported() {
-  return ((Language() == SourceLanguage::OpenCL_CPP) ||
-          (Language() == SourceLanguage::OpenCL_C_20) ||
-          (Language() == SourceLanguage::OpenCL_C_30) ||
-          ArmNonUniformWorkGroupSize()) &&
-         !UniformWorkgroupSize();
+  return !UniformWorkgroupSize();
 }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 

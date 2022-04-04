@@ -1,4 +1,4 @@
-// RUN: clspv -global-offset %s -o %t.spv
+// RUN: clspv -uniform-workgroup-size -global-offset %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.dmap
