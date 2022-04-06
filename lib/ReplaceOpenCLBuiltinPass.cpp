@@ -738,7 +738,7 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
     /*
      * {mul_lo, mul_hi} = OpMulExtended(a, b, IsSigned) {
      *   if (IsSigned) {
-     *     res_neg = (a > 0) ^ (b > 0)
+     *     res_neg = (a > 0) ^ (b > 0) = (a ^ b) < 0
      *     a = abs(a)
      *     b = abs(b)
      *   }
@@ -777,18 +777,13 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
       // We want to work with unsigned value.
       // Convert everything to unsigned and remember the signed of the end
       // result.
-      auto a_pos = Builder.CreateICmpSGE(a, ConstantInt::get(Ty, 0, true));
-      auto b_pos = Builder.CreateICmpSGE(b, ConstantInt::get(Ty, 0, true));
-      res_neg = Builder.CreateXor(a_pos, b_pos);
+      auto a_b_xor = Builder.CreateXor(a, b);
+      res_neg = Builder.CreateICmpSLT(a_b_xor, ConstantInt::get(Ty, 0, true));
 
-      auto a_inv =
-          Builder.CreateAdd(Builder.CreateXor(a, Constant::getAllOnesValue(Ty)),
-                            ConstantInt::get(Ty, 1));
-      auto b_inv =
-          Builder.CreateAdd(Builder.CreateXor(b, Constant::getAllOnesValue(Ty)),
-                            ConstantInt::get(Ty, 1));
-      a = Builder.CreateSelect(a_pos, a, a_inv);
-      b = Builder.CreateSelect(b_pos, b, b_inv);
+      auto F = InsertPoint->getFunction();
+      auto abs = Intrinsic::getDeclaration(F->getParent(), Intrinsic::abs, Ty);
+      a = Builder.CreateCall(abs, {a, Builder.getInt1(false)});
+      b = Builder.CreateCall(abs, {b, Builder.getInt1(false)});
     }
 
     auto a0 = Builder.CreateTrunc(a, Ty32);
