@@ -151,9 +151,17 @@ bool ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
     auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
     auto down_amount = builder.CreateSub(scalar_size, shift_amount);
 
+    // "The resulting value is undefined if Shift is greater than or equal to
+    // the bit width of the components of Base."
+    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#Bit
+    if (!dyn_cast<ConstantInt>(arg_shift)) {
+      down_amount = builder.CreateAnd(down_amount, mod_mask);
+    }
+
     // Shift the two arguments and OR the results together.
     auto hi_bits = builder.CreateShl(arg_hi, shift_amount);
     auto lo_bits = builder.CreateLShr(arg_lo, down_amount);
+
     return builder.CreateOr(lo_bits, hi_bits);
   });
 }
