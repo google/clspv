@@ -4208,7 +4208,7 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // abs(x) % abs(y)
         Ops.clear();
         Ops << Ty << AbsX << AbsY;
-        auto Mod = addSPIRVInst(spv::OpSRem, Ops);
+        auto Mod = addSPIRVInst(spv::OpUMod, Ops);
 
         // x > 0
         Ops.clear();

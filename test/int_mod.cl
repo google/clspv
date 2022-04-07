@@ -16,7 +16,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int* a, gl
 // CHECK: %[[LOADA_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
 // CHECK: %[[ABSA_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] %[[GLSL]] SAbs %[[LOADA_ID]]
 // CHECK: %[[ABSB_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] %[[GLSL]] SAbs %[[LOADB_ID]]
-// CHECK: %[[SREM_ID:[a-zA-Z0-9_]*]] = OpSRem %[[UINT_TYPE_ID]] %[[ABSA_ID]] %[[ABSB_ID]]
+// CHECK: %[[SREM_ID:[a-zA-Z0-9_]*]] = OpUMod %[[UINT_TYPE_ID]] %[[ABSA_ID]] %[[ABSB_ID]]
 // CHECK: %[[A_POS_ID:[a-zA-Z0-9_]*]] = OpSGreaterThan %[[BOOL_TYPE_ID]] %[[LOADA_ID]] %[[UINT0]]
 // CHECK: %[[SELECT_ID:[a-zA-Z0-9_]*]] = OpSelect %[[UINT_TYPE_ID]] %[[A_POS_ID]] %[[UINT1]] %[[UINTM1]]
 // CHECK: %[[MUL_ID:[a-zA-Z0-9_]*]] = OpSMulExtended %[[MUL_STRUCT_TYPE_ID]] %[[SREM_ID]] %[[SELECT_ID]]
