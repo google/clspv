@@ -312,7 +312,7 @@ private:
   Type *GetPairStruct(Type *type);
 
   Value *InsertOpMulExtended(Instruction *InsertPoint, Value *a, Value *b,
-                                   bool IsSigned);
+                             bool IsSigned, bool Int64 = false);
 
   DenseMap<Type *, Type *> PairStructMap;
 };
@@ -683,7 +683,7 @@ Type *ReplaceOpenCLBuiltinPass::GetPairStruct(Type *type) {
 
 Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
                                                      Value *a, Value *b,
-                                                     bool IsSigned) {
+                                                     bool IsSigned, bool Int64) {
 
   Type *Ty = a->getType();
   Type *RetTy = GetPairStruct(a->getType());
@@ -701,7 +701,7 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
 
   IRBuilder<> Builder(InsertPoint);
 
-  if (ScalarSizeInBits <= 32) {
+  if (ScalarSizeInBits < 32 || (ScalarSizeInBits == 32 && Int64)) {
     /*
      * {mul_lo, mul_hi} = OpMulExtended(a, b, IsSigned) {
      *    S = SizeInBits(a)
@@ -734,28 +734,30 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
     return Builder.CreateInsertValue(
         Builder.CreateInsertValue(UndefValue::get(RetTy), mul_lo, {0}), mul_hi,
         {1});
-  } else if (ScalarSizeInBits == 64) {
+  } else if (ScalarSizeInBits == 64 || (ScalarSizeInBits == 32 && !Int64)) {
     /*
      * {mul_lo, mul_hi} = OpMulExtended(a, b, IsSigned) {
+     *   S = SizeInBits(a)
+     *   hS = S / 2
      *   if (IsSigned) {
      *     res_neg = (a > 0) ^ (b > 0) = (a ^ b) < 0
      *     a = abs(a)
      *     b = abs(b)
      *   }
-     *   a0 = trunc32(a)
-     *   a1 = trunc32(a >> 32)
-     *   b0 = trunc32(b)
-     *   b1 = trunc32(b >> 32)
-     *   {a0b0_0, a0b0_1} = zext64(OpUMulExtended(a0, b0))
-     *   {a1b0_0, a1b0_1} = zext64(OpUMulExtended(a1, b0))
-     *   {a0b1_0, a0b1_1} = zext64(OpUMulExtended(a0, b1))
-     *   {a1b1_0, a1b1_1} = zext64(OpUMulExtended(a1, b1))
+     *   a0 = trunchS(a)
+     *   a1 = trunchS(a >> hS)
+     *   b0 = trunchS(b)
+     *   b1 = trunchS(b >> hS)
+     *   {a0b0_0, a0b0_1} = zextS(OpUMulExtended(a0, b0))
+     *   {a1b0_0, a1b0_1} = zextS(OpUMulExtended(a1, b0))
+     *   {a0b1_0, a0b1_1} = zextS(OpUMulExtended(a0, b1))
+     *   {a1b1_0, a1b1_1} = zextS(OpUMulExtended(a1, b1))
      *
      *   mul_lo_hi = a0b0_1 + a1b0_0 + a0b1_0
-     *   carry_mul_lo_hi = mul_lo_hi >> 32
+     *   carry_mul_lo_hi = mul_lo_hi >> hS
      *   mul_hi_lo = a1b1_0 + a1b0_1 + a0b1_1 + carry_mul_lo_hi
-     *   mul_lo = a0b0_0 + mul_lo_hi << 32
-     *   mul_hi = mul_hi_lo + a1b1_1 << 32
+     *   mul_lo = a0b0_0 + mul_lo_hi << hS
+     *   mul_hi = mul_hi_lo + a1b1_1 << hS
      *
      *   if (IsSigned) {
      *     mul_lo_xor = mul_lo ^ -1
@@ -767,9 +769,10 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
      *   return {mul_lo, mul_hi}
      * }
      */
-    Type *Ty32 = Ty->getInt32Ty(InsertPoint->getContext());
+    Type *TyDiv2 =
+        Ty->getIntNTy(InsertPoint->getContext(), ScalarSizeInBits / 2);
     if (IsVector) {
-      Ty32 = VectorType::get(Ty32, dyn_cast<VectorType>(Ty));
+      TyDiv2 = VectorType::get(TyDiv2, dyn_cast<VectorType>(Ty));
     }
 
     Value *res_neg;
@@ -786,15 +789,17 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
       b = Builder.CreateCall(abs, {b, Builder.getInt1(false)});
     }
 
-    auto a0 = Builder.CreateTrunc(a, Ty32);
-    auto a1 = Builder.CreateTrunc(Builder.CreateLShr(a, 32), Ty32);
-    auto b0 = Builder.CreateTrunc(b, Ty32);
-    auto b1 = Builder.CreateTrunc(Builder.CreateLShr(b, 32), Ty32);
+    auto a0 = Builder.CreateTrunc(a, TyDiv2);
+    auto a1 = Builder.CreateTrunc(Builder.CreateLShr(a, ScalarSizeInBits / 2),
+                                  TyDiv2);
+    auto b0 = Builder.CreateTrunc(b, TyDiv2);
+    auto b1 = Builder.CreateTrunc(Builder.CreateLShr(b, ScalarSizeInBits / 2),
+                                  TyDiv2);
 
-    auto a0b0 = InsertOpMulExtended(InsertPoint, a0, b0, false);
-    auto a1b0 = InsertOpMulExtended(InsertPoint, a1, b0, false);
-    auto a0b1 = InsertOpMulExtended(InsertPoint, a0, b1, false);
-    auto a1b1 = InsertOpMulExtended(InsertPoint, a1, b1, false);
+    auto a0b0 = InsertOpMulExtended(InsertPoint, a0, b0, false, true);
+    auto a1b0 = InsertOpMulExtended(InsertPoint, a1, b0, false, true);
+    auto a0b1 = InsertOpMulExtended(InsertPoint, a0, b1, false, true);
+    auto a1b1 = InsertOpMulExtended(InsertPoint, a1, b1, false, true);
     auto a0b0_0 = Builder.CreateZExt(Builder.CreateExtractValue(a0b0, {0}), Ty);
     auto a0b0_1 = Builder.CreateZExt(Builder.CreateExtractValue(a0b0, {1}), Ty);
     auto a1b0_0 = Builder.CreateZExt(Builder.CreateExtractValue(a1b0, {0}), Ty);
@@ -806,15 +811,18 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
 
     auto mul_lo_hi =
         Builder.CreateAdd(Builder.CreateAdd(a0b0_1, a1b0_0), a0b1_0);
-    auto carry_mul_lo_hi = Builder.CreateLShr(mul_lo_hi, 32);
+    auto carry_mul_lo_hi = Builder.CreateLShr(mul_lo_hi, ScalarSizeInBits / 2);
     auto mul_hi_lo = Builder.CreateAdd(
         Builder.CreateAdd(Builder.CreateAdd(a1b1_0, a1b0_1), a0b1_1),
         carry_mul_lo_hi);
-    auto mul_lo = Builder.CreateAdd(a0b0_0, Builder.CreateShl(mul_lo_hi, 32));
-    auto mul_hi = Builder.CreateAdd(mul_hi_lo, Builder.CreateShl(a1b1_1, 32));
+    auto mul_lo = Builder.CreateAdd(
+        a0b0_0, Builder.CreateShl(mul_lo_hi, ScalarSizeInBits / 2));
+    auto mul_hi = Builder.CreateAdd(
+        mul_hi_lo, Builder.CreateShl(a1b1_1, ScalarSizeInBits / 2));
 
     if (IsSigned) {
-      // Apply the signed that we got from the previous if statement setting res_neg.
+      // Apply the sign that we got from the previous if statement setting
+      // res_neg.
       auto mul_lo_xor =
           Builder.CreateXor(mul_lo, Constant::getAllOnesValue(Ty));
       auto mul_lo_xor_add =
