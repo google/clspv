@@ -103,6 +103,10 @@ llvm::cl::opt<bool> hack_clamp_width(
     llvm::cl::desc("Force clamp to be on 32bit elements at least when "
                    "performing staturating operations"));
 
+llvm::cl::opt<bool> hack_mul_extended(
+    "hack-mul-extended", llvm::cl::init(false),
+    llvm::cl::desc("Avoid usage of OpSMulExtended and OpUMulExtended"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -298,6 +302,7 @@ bool HackUndef() { return hack_undef; }
 bool HackPhis() { return hack_phis; }
 bool HackBlockOrder() { return hack_block_order; }
 bool HackClampWidth() { return hack_clamp_width; }
+bool HackMulExtended() { return hack_mul_extended; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }
