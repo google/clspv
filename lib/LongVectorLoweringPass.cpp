@@ -242,6 +242,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     llvm_unreachable("Missing support for intrinsic.");
     break;
 
+  case Intrinsic::abs:
   case Intrinsic::ceil:
   case Intrinsic::copysign:
   case Intrinsic::cos:
