@@ -179,8 +179,7 @@ bool clspv::IsStorageImageType(Type *type) {
   if (IsImageType(type, &ty)) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
       if (struct_ty->getName().contains("_wo_t") ||
-          struct_ty->getName().contains("_rw_t") ||
-          struct_ty->getName().contains("image1d_buffer")) {
+          struct_ty->getName().contains("_rw_t")) {
         return true;
       }
     }
