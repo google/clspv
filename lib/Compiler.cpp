@@ -527,9 +527,8 @@ int SetCompilerInstanceOptions(
   // We manually include the OpenCL headers below, so this vector is unused.
   std::vector<std::string> includes;
 
-  instance.getInvocation().setLangDefaults(
-      instance.getLangOpts(), clang::InputKind(clang::Language::OpenCL), triple,
-      includes, standard);
+  LangOptions::setLangDefaults(instance.getLangOpts(), clang::Language::OpenCL,
+                               triple, includes, standard);
 
   // Override the C99 inline semantics to accommodate for more OpenCL C
   // programs in the wild.
