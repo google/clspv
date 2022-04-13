@@ -36,7 +36,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   project(clspv)
 endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
@@ -166,7 +166,7 @@ endif()
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=unused-variable -Werror=switch")
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable -Werror-switch")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=unused-variable -Werror=switch -Werror=implicit-fallthrough")
 endif()
 
 # Bring in our cmake folder

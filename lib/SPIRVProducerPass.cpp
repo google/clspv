@@ -871,9 +871,11 @@ void SPIRVProducerPass::outputHeader() {
   case SPIRVVersion::SPIRV_1_6:
     minor = 6;
     break;
+  #if !defined(__clang__)
   default:
     llvm_unreachable("unhandled spir-v version");
     break;
+  #endif
   }
   uint32_t version = (1 << 16) | (minor << 8);
   binaryOut->write(reinterpret_cast<const char *>(&version), sizeof(version));
@@ -1216,6 +1218,7 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
       for (auto *elem_ty : cast<StructType>(type)->elements()) {
         work_list.push_back(elem_ty);
       }
+      break;
     default:
       // This type and its contained types don't get layout.
       break;
@@ -1330,8 +1333,10 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
     return spv::StorageClassUniformConstant;
+  #if !defined(__clang__)
   default:
     llvm_unreachable("Unsupported storage class for argument kind");
+  #endif
   }
 }
 
@@ -3323,8 +3328,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
                                             const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
-  auto GetExtendMask = [this](Type *sample_type,
-                              bool is_int_image) -> uint32_t {
+  auto GetExtendMask = [](Type *sample_type,
+                          bool is_int_image) -> uint32_t {
     if (SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
         sample_type->getScalarType()->isIntegerTy()) {
       if (is_int_image)
@@ -4019,7 +4024,7 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
         // Generate one more instruction that uses the result of the extended
         // instruction.  Its result id is one more than the id of the
         // extended instruction.
-        auto generate_extra_inst = [this, &Context, &Call,
+        auto generate_extra_inst = [this, &Call,
                                     &RID](spv::Op opcode, Constant *constant) {
           //
           // Generate instruction like:
@@ -4983,7 +4988,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
     SPIRVInstruction *Placeholder = DeferredInsts[i].second;
     SPIRVOperandVec Operands;
 
-    auto nextDeferred = [&i, &Inst, &DeferredInsts, &Placeholder]() {
+    auto nextDeferred = [&i, &DeferredInsts, &Placeholder]() {
       ++i;
       assert(DeferredInsts.size() > i);
       assert(Inst == DeferredInsts[i].first);
@@ -5468,10 +5473,12 @@ void SPIRVProducerPass::WriteWordCountAndOpcode(const SPIRVInstruction &Inst) {
 void SPIRVProducerPass::WriteOperand(const SPIRVOperand &Op) {
   SPIRVOperandType OpTy = Op.getType();
   switch (OpTy) {
+  #if !defined(__clang__)
   default: {
     llvm_unreachable("Unsupported SPIRV Operand Type???");
     break;
   }
+  #endif
   case SPIRVOperandType::NUMBERID: {
     WriteOneWord(Op.getNumID());
     break;
@@ -6513,9 +6520,11 @@ void SPIRVProducerPass::AddArgumentReflection(
   case clspv::ArgKind::Sampler:
     ext_inst = reflection::ExtInstArgumentSampler;
     break;
+  #if !defined(__clang__)
   default:
     llvm_unreachable("Unhandled argument reflection");
     break;
+  #endif
   }
   Ops << ext_inst << kernel_decl << getSPIRVInt32Constant(ordinal);
 

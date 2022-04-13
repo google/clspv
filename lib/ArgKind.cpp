@@ -35,9 +35,6 @@ using namespace llvm;
 
 namespace {
 
-// Maps an LLVM type for a kernel argument to an argument kind.
-clspv::ArgKind GetArgKindForType(Type *type);
-
 // Maps an LLVM type for a kernel argument to an argument
 // kind suitable for embedded reflection. The result is one of:
 //   buffer     - storage buffer
@@ -48,10 +45,6 @@ clspv::ArgKind GetArgKindForType(Type *type);
 //   ro_image   - sampled image
 //   wo_image   - storage image
 //   sampler    - sampler
-inline const char *GetArgKindNameForType(llvm::Type *type) {
-  return GetArgKindName(GetArgKindForType(type));
-}
-
 clspv::ArgKind GetArgKindForType(Type *type) {
   if (type->isPointerTy()) {
     if (clspv::IsSamplerType(type)) {
@@ -89,8 +82,8 @@ clspv::ArgKind GetArgKindForType(Type *type) {
     else
       return clspv::ArgKind::Pod;
   }
-  errs() << "Unhandled case in clspv::GetArgKindNameForType: " << *type << "\n";
-  llvm_unreachable("Unhandled case in clspv::GetArgKindNameForType");
+  errs() << "Unhandled case in clspv::GetArgKindForType: " << *type << "\n";
+  llvm_unreachable("Unhandled case in clspv::GetArgKindForType");
   return clspv::ArgKind::Buffer;
 }
 } // namespace
