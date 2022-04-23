@@ -36,6 +36,7 @@ void initializeInlineEntryPointsPassPass(PassRegistry &);
 void initializeInlineFuncWithPointerBitCastArgPassPass(PassRegistry &);
 void initializeInlineFuncWithPointerToFunctionArgPassPass(PassRegistry &);
 void initializeInlineFuncWithSingleCallSitePassPass(PassRegistry &);
+void initializeGEPLoopVariablePass(PassRegistry &);
 void initializeLongVectorLoweringPassPass(PassRegistry &);
 void initializeMultiVersionUBOFunctionsPassPass(PassRegistry &);
 void initializeNativeMathPassPass(PassRegistry &);

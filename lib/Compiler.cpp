@@ -725,6 +725,9 @@ int PopulatePassManager(
     pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
   }
 
+  // Any GEPs used as Loop variables need to be adjusted.
+  // This can generate chain GEPs which can be combined with InstCombine.
+  pm->add(clspv::createGEPVarPass());
   // Now we add any of the LLVM optimizations we wanted
   pmBuilder.populateModulePassManager(*pm);
 

@@ -33,6 +33,7 @@ void initializeClspvPasses(PassRegistry &r) {
   initializeInlineFuncWithPointerBitCastArgPassPass(r);
   initializeInlineFuncWithPointerToFunctionArgPassPass(r);
   initializeInlineFuncWithSingleCallSitePassPass(r);
+  initializeGEPLoopVariablePass(r);
   initializeLongVectorLoweringPassPass(r);
   initializeMultiVersionUBOFunctionsPassPass(r);
   initializeNativeMathPassPass(r);
