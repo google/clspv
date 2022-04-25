@@ -4,6 +4,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // Passing SSBO to function call requires VariablePointersStorageBuffer.
+__attribute__((noinline))
 int bar(global int* x) { return *x; }
 
 kernel void foo(global int* in, global int* out) {

@@ -3,10 +3,12 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 static float foo(__global float* data) {
   return data[0];
 }
 
+__attribute__((noinline))
 static float bar(__constant float* data) {
   return data[0];
 }

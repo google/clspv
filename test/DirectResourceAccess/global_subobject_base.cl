@@ -16,8 +16,10 @@ typedef struct {
 } S;
 
 
+__attribute__((noinline))
 void core(global int *A, int n, global int *B) { A[n] = B[n + 2]; }
 
+__attribute__((noinline))
 void apple(global int *B, global int *A, int n) { core(A, n + 1, B); }
 
 kernel void foo(global S *A, int n, global int *B) { apple(B, &(A->arr[0]), n); }

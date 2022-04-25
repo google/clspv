@@ -6,10 +6,12 @@
 
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 
+__attribute__((noinline))
 void core(float4 a, write_only image3d_t im, int4 coord) {
   write_imagef(im, coord, a);
 }
 
+__attribute__((noinline))
 void apple(write_only image3d_t im, int4 coord, float4 a) {
    core(a, im, coord);
 }

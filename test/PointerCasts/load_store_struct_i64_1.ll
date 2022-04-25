@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t -ReplacePointerBitcast
+; RUN: clspv-opt %s -o %t --passes=replace-pointer-bitcast
 ; RUN: FileCheck %s < %t
 
 ; CHECK: [[struct:%[a-zA-Z0-9_.]+]] = type { [2 x i32] }

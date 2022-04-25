@@ -13,7 +13,7 @@ struct Thing {
   float y;
 };
 
-// CHECK: %[[A_ID:[a-zA-Z0-9_]*]] = OpFunction %[[THING_TYPE_ID]] Const
+// CHECK: %[[A_ID:[a-zA-Z0-9_]*]] = OpFunction %[[THING_TYPE_ID]]
 // CHECK: [[param:%[a-zA-Z0-9_]+]] = OpFunctionParameter %[[FLOAT_TYPE_ID]]
 // CHECK: %[[A_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: [[add1:%[a-zA-Z0-9_]+]] = OpFAdd %[[FLOAT_TYPE_ID]] [[param]] %[[CONSTANT_42_ID]]
@@ -21,6 +21,7 @@ struct Thing {
 // CHECK: [[construct:%[a-zA-Z0-9_]+]] = OpCompositeConstruct %[[THING_TYPE_ID]] [[add1]] [[add2]]
 // CHECK: OpReturnValue [[construct]]
 
+__attribute__((noinline))
 struct Thing a(float y) {
   struct Thing x;
   x.x = y + 42.0f;
@@ -28,7 +29,7 @@ struct Thing a(float y) {
   return x;
 }
 
-// CHECK: %[[B_ID:[a-zA-Z0-9_]*]] = OpFunction %[[FLOAT_TYPE_ID]] Const
+// CHECK: %[[B_ID:[a-zA-Z0-9_]*]] = OpFunction %[[FLOAT_TYPE_ID]]
 // CHECK: [[param:%[a-zA-Z0-9_]+]] = OpFunctionParameter %[[FLOAT_TYPE_ID]]
 // CHECK: %[[B_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[CALL_A_ID:[a-zA-Z0-9_]*]] = OpFunctionCall %[[THING_TYPE_ID]] %[[A_ID]] [[param]]
@@ -37,6 +38,7 @@ struct Thing a(float y) {
 // CHECK: %[[MUL_ID:[a-zA-Z0-9_]*]] = OpFMul %[[FLOAT_TYPE_ID]] %[[X_ID]] %[[Y_ID]]
 // CHECK: OpReturnValue %[[MUL_ID]]
 
+__attribute__((noinline))
 float b(float y) {
   return a(y).x * a(y).y;
 }

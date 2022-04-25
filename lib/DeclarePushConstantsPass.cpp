@@ -24,36 +24,14 @@
 #include "clspv/PushConstant.h"
 
 #include "Constants.h"
-#include "Passes.h"
+#include "DeclarePushConstantsPass.h"
 #include "PushConstant.h"
 
 using namespace llvm;
 
-#define DEBUG_TYPE "declarepushconstants"
-
-namespace {
-struct DeclarePushConstantsPass : public ModulePass {
-  static char ID;
-  DeclarePushConstantsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char DeclarePushConstantsPass::ID = 0;
-INITIALIZE_PASS(DeclarePushConstantsPass, "DeclarePushConstants",
-                "Declare push constants", false, false)
-
-namespace clspv {
-ModulePass *createDeclarePushConstantsPass() {
-  return new DeclarePushConstantsPass();
-}
-} // namespace clspv
-
-bool DeclarePushConstantsPass::runOnModule(Module &M) {
-
-  bool changed = false;
-
+PreservedAnalyses
+clspv::DeclarePushConstantsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   std::vector<clspv::PushConstant> PushConstants;
 
   auto &C = M.getContext();
@@ -83,7 +61,6 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
   }
 
   if (PushConstants.size() > 0) {
-    changed = true;
 
     std::vector<Type *> Members;
 
@@ -112,5 +89,5 @@ bool DeclarePushConstantsPass::runOnModule(Module &M) {
                     llvm::MDNode::get(C, MDArgs));
   }
 
-  return changed;
+  return PA;
 }

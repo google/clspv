@@ -15,56 +15,49 @@
 #ifndef _CLSPV_LIB_PASSES_H
 #define _CLSPV_LIB_PASSES_H
 
-namespace llvm {
-class PassRegistry;
-
-// Individual pass initializers.  See the documentation for
-// initializeClspvPasses() in include/clspv/Passes.h.
-void initializeAddFunctionAttributesPassPass(PassRegistry &);
-void initializeAutoPodArgsPassPass(PassRegistry &);
-void initializeAllocateDescriptorsPassPass(PassRegistry &);
-void initializeClusterModuleScopeConstantVarsPass(PassRegistry &);
-void initializeClusterPodKernelArgumentsPassPass(PassRegistry &);
-void initializeDeclarePushConstantsPassPass(PassRegistry &);
-void initializeDefineOpenCLWorkItemBuiltinsPassPass(PassRegistry &);
-void initializeDirectResourceAccessPassPass(PassRegistry &);
-void initializeFixupStructuredCFGPassPass(PassRegistry &);
-void initializeFunctionInternalizerPassPass(PassRegistry &);
-void initializeHideConstantLoadsPassPass(PassRegistry &);
-void initializeUnhideConstantLoadsPassPass(PassRegistry &);
-void initializeInlineEntryPointsPassPass(PassRegistry &);
-void initializeInlineFuncWithPointerBitCastArgPassPass(PassRegistry &);
-void initializeInlineFuncWithPointerToFunctionArgPassPass(PassRegistry &);
-void initializeInlineFuncWithSingleCallSitePassPass(PassRegistry &);
-void initializeLongVectorLoweringPassPass(PassRegistry &);
-void initializeMultiVersionUBOFunctionsPassPass(PassRegistry &);
-void initializeNativeMathPassPass(PassRegistry &);
-void initializeOpenCLInlinerPassPass(PassRegistry &);
-void initializeRemoveUnusedArgumentsPass(PassRegistry &);
-void initializeReorderBasicBlocksPassPass(PassRegistry &);
-void initializeReplaceLLVMIntrinsicsPassPass(PassRegistry &);
-void initializeReplaceOpenCLBuiltinPassPass(PassRegistry &);
-void initializeReplacePointerBitcastPassPass(PassRegistry &);
-void initializeRewriteInsertsPassPass(PassRegistry &);
-void initializeScalarizePassPass(PassRegistry &);
-void initializeShareModuleScopeVariablesPassPass(PassRegistry &);
-void initializeSignedCompareFixupPassPass(PassRegistry &);
-void initializeSimplifyPointerBitcastPassPass(PassRegistry &);
-void initializeSPIRVProducerPassPass(PassRegistry &);
-void initializeSplatArgPassPass(PassRegistry &);
-void initializeSplatSelectConditionPassPass(PassRegistry &);
-void initializeSpecializeImageTypesPassPass(PassRegistry &);
-void initializeStripFreezePassPass(PassRegistry &);
-void initializeThreeElementVectorLoweringPassPass(PassRegistry &);
-void initializeUBOTypeTransformPassPass(PassRegistry &);
-void initializeUndoBoolPassPass(PassRegistry &);
-void initializeUndoByvalPassPass(PassRegistry &);
-void initializeUndoGetElementPtrConstantExprPassPass(PassRegistry &);
-void initializeUndoInstCombinePassPass(PassRegistry &);
-void initializeUndoSRetPassPass(PassRegistry &);
-void initializeUndoTranslateSamplerFoldPassPass(PassRegistry &);
-void initializeUndoTruncateToOddIntegerPassPass(PassRegistry &);
-void initializeZeroInitializeAllocasPassPass(PassRegistry &);
-} // namespace llvm
+#include "AddFunctionAttributesPass.h"
+#include "AllocateDescriptorsPass.h"
+#include "AutoPodArgsPass.h"
+#include "ClusterConstants.h"
+#include "ClusterPodKernelArgumentsPass.h"
+#include "DeclarePushConstantsPass.h"
+#include "DefineOpenCLWorkItemBuiltinsPass.h"
+#include "DirectResourceAccessPass.h"
+#include "FixupStructuredCFGPass.h"
+#include "FunctionInternalizerPass.h"
+#include "HideConstantLoadsPass.h"
+#include "InlineEntryPointsPass.h"
+#include "InlineFuncWithPointerBitCastArgPass.h"
+#include "InlineFuncWithPointerToFunctionArgPass.h"
+#include "InlineFuncWithSingleCallSitePass.h"
+#include "LongVectorLoweringPass.h"
+#include "MultiVersionUBOFunctionsPass.h"
+#include "NativeMathPass.h"
+#include "OpenCLInlinerPass.h"
+#include "RemoveUnusedArguments.h"
+#include "ReorderBasicBlocksPass.h"
+#include "ReplaceLLVMIntrinsicsPass.h"
+#include "ReplaceOpenCLBuiltinPass.h"
+#include "ReplacePointerBitcastPass.h"
+#include "RewriteInsertsPass.h"
+#include "SPIRVProducerPass.h"
+#include "ScalarizePass.h"
+#include "ShareModuleScopeVariables.h"
+#include "SignedCompareFixupPass.h"
+#include "SimplifyPointerBitcastPass.h"
+#include "SpecializeImageTypes.h"
+#include "SplatArgPass.h"
+#include "SplatSelectCondition.h"
+#include "StripFreezePass.h"
+#include "ThreeElementVectorLoweringPass.h"
+#include "UBOTypeTransformPass.h"
+#include "UndoBoolPass.h"
+#include "UndoByvalPass.h"
+#include "UndoGetElementPtrConstantExprPass.h"
+#include "UndoInstCombinePass.h"
+#include "UndoSRetPass.h"
+#include "UndoTranslateSamplerFoldPass.h"
+#include "UndoTruncateToOddIntegerPass.h"
+#include "ZeroInitializeAllocasPass.h"
 
 #endif

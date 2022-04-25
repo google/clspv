@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 float4 bar(read_only image2d_t image, sampler_t sampler) {
   return read_imagef(image, sampler, (float2)(0.0));
 }

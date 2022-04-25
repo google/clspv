@@ -24,7 +24,7 @@
 
 #include "Builtins.h"
 #include "Constants.h"
-#include "Passes.h"
+#include "SpecializeImageTypes.h"
 #include "Types.h"
 #include "clspv/Option.h"
 
@@ -32,58 +32,9 @@ using namespace clspv;
 using namespace clspv::Builtins;
 using namespace llvm;
 
-namespace {
-
-class SpecializeImageTypesPass : public ModulePass {
-public:
-  static char ID;
-  SpecializeImageTypesPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  // Returns the specialized image type for |arg|.
-  Type *RemapType(Argument *arg);
-
-  // Returns the specialized image type for operand |operand_no| in |value|.
-  Type *RemapUse(Value *value, unsigned operand_no);
-
-  // Specializes |arg| as |new_type|. Recursively updates the use chain.
-  void SpecializeArg(Function *f, Argument *arg, Type *new_type);
-
-  // Returns a replacement image builtin function for the specialized type
-  // |type|.
-  Function *ReplaceImageBuiltin(Function *f, Type *type);
-
-  // Rewrites |f| using the |remapped_args_| to determine to updated types.
-  void RewriteFunction(Function *f);
-
-  // Tracks the generation of specialized types so they are not further
-  // specialized.
-  DenseSet<Type *> specialized_images_;
-
-  // Maps an argument to a specialized type.
-  DenseMap<Argument *, Type *> remapped_args_;
-
-  // Tracks which functions need rewritten due to modified arguments.
-  DenseSet<Function *> functions_to_modify_;
-};
-
-} // namespace
-
-char SpecializeImageTypesPass::ID = 0;
-INITIALIZE_PASS(SpecializeImageTypesPass, "SpecializeImageTypesPass",
-                "Specialize image types", false, false)
-
-namespace clspv {
-ModulePass *createSpecializeImageTypesPass() {
-  return new SpecializeImageTypesPass();
-}
-} // namespace clspv
-
-namespace {
-
-bool SpecializeImageTypesPass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
+                                                ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   SmallVector<Function *, 8> kernels;
   for (auto &F : M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
@@ -122,7 +73,6 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
                                       Arg.getType()->getPointerAddressSpace());
         }
         specialized_images_.insert(new_type);
-        changed = true;
         SpecializeArg(f, &Arg, new_type);
       }
     }
@@ -138,7 +88,7 @@ bool SpecializeImageTypesPass::runOnModule(Module &M) {
     RewriteFunction(f);
   }
 
-  return changed;
+  return PA;
 }
 
 Type *SpecializeImageTypesPass::RemapType(Argument *arg) {
@@ -363,5 +313,3 @@ void SpecializeImageTypesPass::RewriteFunction(Function *f) {
   }
   delete f;
 }
-
-} // namespace

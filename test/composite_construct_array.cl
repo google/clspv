@@ -8,6 +8,7 @@
 
 struct S { int arr[5]; };
 
+__attribute__((noinline))
 struct S bar(int n) {
   struct S s;
   if (n > 0) {

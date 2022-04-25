@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val %t.spv --target-env vulkan1.0
 
+__attribute__((noinline))
 int4 bar(constant int4* in1, constant int4* in2) {
   return in1[0] + in2[0];
 }

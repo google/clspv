@@ -5,6 +5,7 @@
 
 // Passing SSBO to function call requires VariablePointersStorageBuffer.
 // SSBO args do not require memory object declarations.
+__attribute__((noinline))
 int bar(global int* x) { return *x; }
 
 kernel void foo(global int* in, global int* out) {

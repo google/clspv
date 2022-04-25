@@ -17,52 +17,20 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Passes.h"
+#include "FixupStructuredCFGPass.h"
 
 using namespace llvm;
 
-namespace {
-struct FixupStructuredCFGPass : public FunctionPass {
-  static char ID;
-  FixupStructuredCFGPass() : FunctionPass(ID) {}
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<LoopInfoWrapperPass>();
-  }
-
-  bool runOnFunction(Function &F) override;
-
-private:
-  bool FixLoopMerges(Function &F);
-};
-} // namespace
-
-char FixupStructuredCFGPass::ID = 0;
-INITIALIZE_PASS(FixupStructuredCFGPass, "FixupStructuredCFG",
-                "Fixup structured cfg", false, false)
-
-namespace clspv {
-FunctionPass *createFixupStructuredCFGPass() {
-  return new FixupStructuredCFGPass();
-}
-} // namespace clspv
-
-bool FixupStructuredCFGPass::runOnFunction(Function &F) {
-  bool Changed = FixLoopMerges(F);
-
-  return Changed;
-}
-
-bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
+PreservedAnalyses
+clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
   // Assumes CFG has been structurized.
-  const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+  auto &LI = FAM.getResult<LoopAnalysis>(F);
 
   SmallVector<Loop *, 16> loops;
   for (auto loop : LI) {
     loops.push_back(loop);
   }
 
-  bool Changed = false;
   DenseSet<Loop *> visited;
   while (!loops.empty()) {
     auto loop = loops.back();
@@ -127,12 +95,11 @@ bool FixupStructuredCFGPass::FixLoopMerges(Function &F) {
             exit_block->removePredecessor(&*pred);
             pred->getTerminator()->replaceUsesOfWith(exit_block, new_exit);
           }
-
-          Changed = true;
         }
       }
     }
   }
 
-  return Changed;
+  PreservedAnalyses PA;
+  return PA;
 }

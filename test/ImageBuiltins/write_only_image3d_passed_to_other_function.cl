@@ -5,6 +5,7 @@
 
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 
+__attribute__((noinline))
 void bar(write_only image3d_t i, int4 c, float4 a)
 {
   write_imagef(i, c, a);

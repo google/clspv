@@ -46,59 +46,22 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "ClusterPodKernelArgumentsPass.h"
 #include "Constants.h"
-#include "Passes.h"
 #include "PushConstant.h"
 
 using namespace llvm;
 
-#define DEBUG_TYPE "clusterpodkernelargs"
-
 namespace {
 const uint64_t kIntBytes = 4;
-
-struct ClusterPodKernelArgumentsPass : public ModulePass {
-  static char ID;
-  ClusterPodKernelArgumentsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  // Returns the type-mangled struct for global pod args. Only generates
-  // unpacked structs currently. The type conversion code does not handle
-  // packed structs propoerly. AutoPodArgsPass would also need updates to
-  // support packed structs.
-  StructType *GetTypeMangledPodArgsStruct(Module &M);
-
-  // (Re-)Declares the global push constant variable with |mangled_struct_ty|
-  // as the last member.
-  void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty);
-
-  // Converts the corresponding elements of the global push constants for pod
-  // args in member |index| of |pod_struct|.
-  Value *ConvertToType(Module &M, StructType *pod_struct, unsigned index,
-                       IRBuilder<> &builder);
-
-  // Builds |dst_type| from |elements|, where |elements| is a vector i32 loads.
-  Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
-                           uint64_t base_offset, uint64_t base_index,
-                           const std::vector<Value *> &elements);
-};
-
 } // namespace
 
-char ClusterPodKernelArgumentsPass::ID = 0;
-INITIALIZE_PASS(ClusterPodKernelArgumentsPass, "ClusterPodKernelArgumentsPass",
-                "Cluster POD Kernel Arguments Pass", false, false)
+PreservedAnalyses
+clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+  if (!clspv::Option::ClusterPodKernelArgs())
+    return PA;
 
-namespace clspv {
-llvm::ModulePass *createClusterPodKernelArgumentsPass() {
-  return new ClusterPodKernelArgumentsPass();
-}
-} // namespace clspv
-
-bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
-  bool Changed = false;
   LLVMContext &Context = M.getContext();
 
   SmallVector<Function *, 8> WorkList;
@@ -128,8 +91,6 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
   }
 
   for (Function *F : WorkList) {
-    Changed = true;
-
     auto pod_arg_impl = clspv::GetPodArgsImpl(*F);
     auto pod_arg_kind = clspv::GetArgKindForPodArgs(*F);
     // An ArgMapping describes how a kernel argument is remapped.
@@ -405,14 +366,14 @@ bool ClusterPodKernelArgumentsPass::runOnModule(Module &M) {
   // Inline the inner function.  It's cleaner to do this.
   for (CallInst *C : CallList) {
     InlineFunctionInfo info;
-    Changed |= InlineFunction(*C, info).isSuccess();
+    InlineFunction(*C, info).isSuccess();
   }
 
-  return Changed;
+  return PA;
 }
 
 StructType *
-ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
+clspv::ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
   // If we are using global type-mangled push constants for any kernel we need
   // to figure out what the shared representation will be. Calculate the max
   // number of integers needed to satisfy all kernels.
@@ -451,7 +412,7 @@ ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
   return nullptr;
 }
 
-void ClusterPodKernelArgumentsPass::RedeclareGlobalPushConstants(
+void clspv::ClusterPodKernelArgumentsPass::RedeclareGlobalPushConstants(
     Module &M, StructType *mangled_struct_ty) {
   auto old_GV = M.getGlobalVariable(clspv::PushConstantsVariableName());
 
@@ -521,10 +482,8 @@ void ClusterPodKernelArgumentsPass::RedeclareGlobalPushConstants(
                       MDNode::get(M.getContext(), md_args));
 }
 
-Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
-                                                    StructType *pod_struct,
-                                                    unsigned index,
-                                                    IRBuilder<> &builder) {
+Value *clspv::ClusterPodKernelArgumentsPass::ConvertToType(
+    Module &M, StructType *pod_struct, unsigned index, IRBuilder<> &builder) {
   auto int32_ty = IntegerType::get(M.getContext(), 32);
   const auto &DL = M.getDataLayout();
   const auto struct_layout = DL.getStructLayout(pod_struct);
@@ -552,7 +511,7 @@ Value *ClusterPodKernelArgumentsPass::ConvertToType(Module &M,
                            int_elements);
 }
 
-Value *ClusterPodKernelArgumentsPass::BuildFromElements(
+Value *clspv::ClusterPodKernelArgumentsPass::BuildFromElements(
     Module &M, IRBuilder<> &builder, Type *dst_type, uint64_t base_offset,
     uint64_t base_index, const std::vector<Value *> &elements) {
   auto int32_ty = IntegerType::get(M.getContext(), 32);

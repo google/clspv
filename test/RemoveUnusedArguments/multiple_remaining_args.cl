@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 int bar(float a, int b, float c, int d) { return b + d; }
 void kernel foo(global int* x, global float* y) { x[0] = bar(1.0f, x[1], 1.0f, x[2]); }
 

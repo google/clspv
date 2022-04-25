@@ -22,90 +22,18 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 
-#include "Passes.h"
+#include "UndoInstCombinePass.h"
 
 #define DEBUG_TYPE "undoinstcombine"
 
 using namespace llvm;
 
-namespace {
-class UndoInstCombinePass : public ModulePass {
-public:
-  static char ID;
-  UndoInstCombinePass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  bool runOnFunction(Function &F);
-
-  // Undoes wide vector casts that are used in an extract, for example:
-  //  %cast = bitcast <4 x i32> %src to <16 x i8>
-  //  %extract = extractelement <16 x i8> %cast, i32 4
-  //
-  // With:
-  //  %extract = extractelement <4 x i32> %src, i32 1
-  //  %trunc = trunc i32 %extract to i8
-  //
-  // Also handles casts that get loaded, for example:
-  //  %cast = bitcast <3 x i32>* %src to <6 x i16>*
-  //  %load = load <6 x i16>, <6 x i16>* %cast
-  //  %extract = extractelement <6 x i16> %load, i32 0
-  //
-  // With:
-  //  %load = load <3 x i32>, <3 x i32>* %src
-  //  %extract = extractelement <3 x i32> %load, i32 0
-  //  %trunc = trunc i32 %extract to i16
-  bool UndoWideVectorExtractCast(Instruction *inst);
-
-  // Undoes wide vector casts that are used in a shuffle, for example:
-  //  %cast = bitcast <4 x i32> %src to <16 x i8>
-  //  %s = shufflevector <16 x i8> %cast, <16 x i8> undef,
-  //                       <2 x i8> <i32 4, i32 8>
-  //
-  // With:
-  //  %extract0 = <4 x i32> %src, i32 1
-  //  %trunc0 = trunc i32 %extract0 to i8
-  //  %insert0 = insertelement <2 x i8> zeroinitializer, i8 %trunc0, i32 0
-  //  %extract1 = <4 x i32> %src, i32 2
-  //  %trunc1 = trunc i32 %extract1 to i8
-  //  %insert1 = insertelement <2 x i8> %insert0, i8 %trunc1, i32 1
-  //
-  // Also handles shuffles casted through a load, for example:
-  //  %cast = bitcast <3 x i32>* %src to <6 x i16>
-  //  %load = load <6 x i16>* %cast
-  //  %shuffle = shufflevector <6 x i16> %load, <6 x i16> undef,
-  //                            <2 x i32> <i32 2, i32 4>
-  //
-  // With:
-  //  %load = load <3 x i32>, <3 x i32>* %src
-  //  %ex0 = extractelement <3 x i32> %load, i32 1
-  //  %trunc0 = trunc i32 %ex0 to i16
-  //  %in0 = insertelement <2 x i16> zeroinitializer, i16 %trunc0, i32 0
-  //  %ex1 = extractelement <3 x i32> %load, i32 2
-  //  %trunc1 = trunc i32 %ex1 to i16
-  //  %in1 = insertelement <2 x i16> %in0, i16 %trunc1, i32 1
-  bool UndoWideVectorShuffleCast(Instruction *inst);
-
-  UniqueVector<Value *> potentially_dead_;
-  std::vector<Instruction *> dead_;
-};
-} // namespace
-
-char UndoInstCombinePass::ID = 0;
-INITIALIZE_PASS(UndoInstCombinePass, "UndoInstCombine",
-                "Undo specific harmful instcombine transformations", false,
-                false)
-
-namespace clspv {
-ModulePass *createUndoInstCombinePass() { return new UndoInstCombinePass(); }
-} // namespace clspv
-
-bool UndoInstCombinePass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses clspv::UndoInstCombinePass::run(Module &M,
+                                                  ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   for (auto &F : M) {
-    changed |= runOnFunction(F);
+    runOnFunction(F);
   }
 
   // Cleanup.
@@ -122,10 +50,10 @@ bool UndoInstCombinePass::runOnModule(Module &M) {
     }
   }
 
-  return changed;
+  return PA;
 }
 
-bool UndoInstCombinePass::runOnFunction(Function &F) {
+bool clspv::UndoInstCombinePass::runOnFunction(Function &F) {
   bool changed = false;
 
   for (auto &BB : F) {
@@ -138,7 +66,7 @@ bool UndoInstCombinePass::runOnFunction(Function &F) {
   return changed;
 }
 
-bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
+bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
   auto extract = dyn_cast<ExtractElementInst>(inst);
   if (!extract)
     return false;
@@ -208,7 +136,7 @@ bool UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
   return true;
 }
 
-bool UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
+bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   auto shuffle = dyn_cast<ShuffleVectorInst>(inst);
   if (!shuffle)
     return false;

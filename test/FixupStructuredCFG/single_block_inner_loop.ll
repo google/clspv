@@ -1,4 +1,4 @@
-; RUN: clspv-opt -FixupStructuredCFG %s -o %t
+; RUN: clspv-opt --passes=fixup-structured-cfg %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK-LABEL: @foo

@@ -1,4 +1,4 @@
-; RUN: clspv-opt -AddFunctionAttributes %s -o %t.ll
+; RUN: clspv-opt --passes=add-function-attributes %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: declare %opencl.sampler_t addrspace(2)* @__translate_sampler_initializer(i32) [[ATTR:#[0-9]+]]

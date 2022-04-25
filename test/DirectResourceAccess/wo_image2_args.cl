@@ -5,10 +5,12 @@
 
 // Just for fun, swap arguments in the helpers.
 
+__attribute__((noinline))
 void core(float4 a, write_only image2d_t im, int2 coord) {
   write_imagef(im, coord, a);
 }
 
+__attribute__((noinline))
 void apple(write_only image2d_t im, int2 coord, float4 a) {
    core(a, im, coord);
 }

@@ -1,4 +1,4 @@
-; RUN: clspv-opt -ReplaceOpenCLBuiltin %s -o %t
+; RUN: clspv-opt --passes=replace-opencl-builtin %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %0 = sitofp <2 x i32> <i32 3, i32 7> to <2 x float>

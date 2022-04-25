@@ -19,30 +19,14 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "Passes.h"
+#include "UndoBoolPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "undobool"
 
-namespace {
-struct UndoBoolPass : public ModulePass {
-  static char ID;
-  UndoBoolPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char UndoBoolPass::ID = 0;
-INITIALIZE_PASS(UndoBoolPass, "UndoBool", "Undo Bool Pass", false, false)
-
-namespace clspv {
-ModulePass *createUndoBoolPass() { return new UndoBoolPass(); }
-} // namespace clspv
-
-bool UndoBoolPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::UndoBoolPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   SmallVector<Instruction *, 8> WorkList;
   for (Function &F : M) {
@@ -90,5 +74,5 @@ bool UndoBoolPass::runOnModule(Module &M) {
     }
   }
 
-  return Changed;
+  return PA;
 }

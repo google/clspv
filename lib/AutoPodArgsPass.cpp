@@ -24,59 +24,22 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "AutoPodArgsPass.h"
 #include "Constants.h"
 #include "Layout.h"
-#include "Passes.h"
 #include "PushConstant.h"
-
-#define DEBUG_TYPE "autopodargs"
 
 using namespace llvm;
 
-namespace {
-class AutoPodArgsPass : public ModulePass {
-public:
-  static char ID;
-  AutoPodArgsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  // Decides the pod args implementation for each kernel individually.
-  void runOnFunction(Function &F);
-
-  // Makes all kernels use |impl| for pod args.
-  void AnnotateAllKernels(Module &M, clspv::PodArgImpl impl);
-
-  // Makes kernel |F| use |impl| as the pod arg implementation.
-  void AddMetadata(Function &F, clspv::PodArgImpl impl);
-
-  // Returns true if |type| contains an array. Does not look through pointers
-  // since we are dealing with pod args.
-  bool ContainsArrayType(Type *type) const;
-
-  // Returns true if |type| contains a |width|-bit integer or floating-point
-  // type. Does not look through pointer since we are dealing with pod args.
-  bool ContainsSizedType(Type *type, uint32_t width) const;
-};
-} // namespace
-
-char AutoPodArgsPass::ID = 0;
-INITIALIZE_PASS(AutoPodArgsPass, "AutoPodArgs",
-                "Mark pod arg implementation as metadata on kernels", false,
-                false)
-
-namespace clspv {
-ModulePass *createAutoPodArgsPass() { return new AutoPodArgsPass(); }
-} // namespace clspv
-
-bool AutoPodArgsPass::runOnModule(Module &M) {
+PreservedAnalyses clspv::AutoPodArgsPass::run(Module &M,
+                                              ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (clspv::Option::PodArgsInUniformBuffer()) {
     AnnotateAllKernels(M, clspv::PodArgImpl::kUBO);
-    return true;
+    return PA;
   } else if (clspv::Option::PodArgsInPushConstants()) {
     AnnotateAllKernels(M, clspv::PodArgImpl::kPushConstant);
-    return true;
+    return PA;
   }
 
   for (auto &F : M) {
@@ -86,10 +49,10 @@ bool AutoPodArgsPass::runOnModule(Module &M) {
     runOnFunction(F);
   }
 
-  return true;
+  return PA;
 }
 
-void AutoPodArgsPass::runOnFunction(Function &F) {
+void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   auto &M = *F.getParent();
   const auto &DL = M.getDataLayout();
   SmallVector<Type *, 8> pod_types;
@@ -190,7 +153,8 @@ void AutoPodArgsPass::runOnFunction(Function &F) {
   AddMetadata(F, impl);
 }
 
-void AutoPodArgsPass::AnnotateAllKernels(Module &M, clspv::PodArgImpl impl) {
+void clspv::AutoPodArgsPass::AnnotateAllKernels(Module &M,
+                                                clspv::PodArgImpl impl) {
   for (auto &F : M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
       continue;
@@ -199,7 +163,7 @@ void AutoPodArgsPass::AnnotateAllKernels(Module &M, clspv::PodArgImpl impl) {
   }
 }
 
-void AutoPodArgsPass::AddMetadata(Function &F, clspv::PodArgImpl impl) {
+void clspv::AutoPodArgsPass::AddMetadata(Function &F, clspv::PodArgImpl impl) {
   auto md = MDTuple::get(
       F.getContext(),
       ConstantAsMetadata::get(ConstantInt::get(
@@ -207,7 +171,7 @@ void AutoPodArgsPass::AddMetadata(Function &F, clspv::PodArgImpl impl) {
   F.setMetadata(clspv::PodArgsImplMetadataName(), md);
 }
 
-bool AutoPodArgsPass::ContainsArrayType(Type *type) const {
+bool clspv::AutoPodArgsPass::ContainsArrayType(Type *type) const {
   if (isa<ArrayType>(type)) {
     return true;
   } else if (auto struct_ty = dyn_cast<StructType>(type)) {
@@ -220,7 +184,8 @@ bool AutoPodArgsPass::ContainsArrayType(Type *type) const {
   return false;
 }
 
-bool AutoPodArgsPass::ContainsSizedType(Type *type, uint32_t width) const {
+bool clspv::AutoPodArgsPass::ContainsSizedType(Type *type,
+                                               uint32_t width) const {
   if (auto int_ty = dyn_cast<IntegerType>(type)) {
     return int_ty->getBitWidth() == width;
   } else if (type->isHalfTy()) {

@@ -21,42 +21,18 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Builtins.h"
-#include "Passes.h"
+#include "SplatArgPass.h"
 
 using namespace clspv;
 using namespace llvm;
 
 #define DEBUG_TYPE "splatarg"
 
-namespace {
-
-struct SplatArgPass : public ModulePass {
-  static char ID;
-  SplatArgPass() : ModulePass(ID) {}
-
-  std::string getSplatName(const Builtins::FunctionInfo &func_info,
-                           const Builtins::ParamTypeInfo &param_info,
-                           bool three_params);
-  Function *getReplacementFunction(Function &F, const std::string &NewCallName);
-  void replaceCall(Function *NewCallee, CallInst *Call);
-
-  bool runOnModule(Module &M) override;
-};
-
-} // namespace
-
-char SplatArgPass::ID = 0;
-INITIALIZE_PASS(SplatArgPass, "SplatArg", "Splat Argument Pass", false, false)
-
-namespace clspv {
-llvm::ModulePass *createSplatArgPass() { return new SplatArgPass(); }
-} // namespace clspv
-
 // Programmatically convert mangled_name to vectorized version
 std::string
-SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
-                           const Builtins::ParamTypeInfo &param_info,
-                           bool three_params) {
+clspv::SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
+                                  const Builtins::ParamTypeInfo &param_info,
+                                  bool three_params) {
   const char *type_code = "f";
   uint32_t index = Log2_32(param_info.byte_len);
   assert(index <= 3);
@@ -83,8 +59,9 @@ SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
 }
 
 // Create replacement function once
-Function *SplatArgPass::getReplacementFunction(Function &F,
-                                               const std::string &NewCallName) {
+Function *
+clspv::SplatArgPass::getReplacementFunction(Function &F,
+                                            const std::string &NewCallName) {
   Module *M = F.getParent();
 
   // Create new callee function type with vector type.
@@ -112,7 +89,7 @@ Function *SplatArgPass::getReplacementFunction(Function &F,
 
 // Replace each callee to vectorized version
 //  - also vectorize parameters
-void SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
+void clspv::SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
   Function *Callee = Call->getCalledFunction();
   FunctionType *CalleeTy = Callee->getFunctionType();
   VectorType *VTy = cast<VectorType>(Call->getType());
@@ -134,7 +111,7 @@ void SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
   Call->setCallingConv(CallingConv::SPIR_FUNC);
 }
 
-bool SplatArgPass::runOnModule(Module &M) {
+PreservedAnalyses SplatArgPass::run(Module &M, ModuleAnalysisManager &) {
   std::list<std::pair<Function *, const Builtins::FunctionInfo &>> func_list;
   // Collect candidates
   for (auto &F : M.getFunctionList()) {
@@ -182,5 +159,6 @@ bool SplatArgPass::runOnModule(Module &M) {
       F->eraseFromParent();
     }
   }
-  return func_list.size() != 0;
+  PreservedAnalyses PA;
+  return PA;
 }

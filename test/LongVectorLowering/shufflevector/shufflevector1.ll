@@ -1,4 +1,4 @@
-; RUN: clspv-opt --LongVectorLowering %s -o %t
+; RUN: clspv-opt --passes=long-vector-lowering %s -o %t
 ; RUN: FileCheck %s < %t
 ;
 ; This test doesn't involve long-vectors, the pass should not modify the IR.

@@ -20,34 +20,15 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "Builtins.h"
-#include "Passes.h"
+#include "OpenCLInlinerPass.h"
 
 #include <unordered_set>
 
 using namespace llvm;
 using namespace clspv;
 
-#define DEBUG_TYPE "openclinliner"
-
-namespace {
-struct OpenCLInlinerPass : public ModulePass {
-  static char ID;
-  OpenCLInlinerPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char OpenCLInlinerPass::ID = 0;
-INITIALIZE_PASS(OpenCLInlinerPass, "OpenCLInliner", "OpenCL Inliner Pass",
-                false, false)
-
-namespace clspv {
-ModulePass *createOpenCLInlinerPass() { return new OpenCLInlinerPass(); }
-} // namespace clspv
-
-bool OpenCLInlinerPass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses OpenCLInlinerPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   std::list<Function *> func_list;
   const std::unordered_set<Builtins::BuiltinType> inlinedBuiltins = {
       Builtins::kGetEnqueuedNumSubGroups,
@@ -75,7 +56,7 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
 
       for (CallInst *CI : Calls) {
         InlineFunctionInfo info;
-        changed |= InlineFunction(*CI, info).isSuccess();
+        InlineFunction(*CI, info).isSuccess();
       }
       func_list.push_front(&F);
     }
@@ -88,5 +69,5 @@ bool OpenCLInlinerPass::runOnModule(Module &M) {
       }
     }
   }
-  return changed;
+  return PA;
 }

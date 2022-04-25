@@ -20,36 +20,19 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "Constants.h"
-#include "Passes.h"
+#include "UndoTranslateSamplerFoldPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "UndoTranslateSamplerFold"
 
-namespace {
-struct UndoTranslateSamplerFoldPass : public ModulePass {
-  static char ID;
-  UndoTranslateSamplerFoldPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char UndoTranslateSamplerFoldPass::ID = 0;
-INITIALIZE_PASS(UndoTranslateSamplerFoldPass, "UndoTranslateSamplerFold",
-                "Undo Transplate Sampler Fold Pass", false, false)
-
-namespace clspv {
-ModulePass *createUndoTranslateSamplerFoldPass() {
-  return new UndoTranslateSamplerFoldPass();
-}
-} // namespace clspv
-
-bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
+PreservedAnalyses
+clspv::UndoTranslateSamplerFoldPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction());
 
   if (!F) {
-    return false;
+    return PA;
   }
 
   SmallVector<CallInst *, 1> BadCalls;
@@ -73,7 +56,7 @@ bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
   }
 
   if (0 == BadCalls.size()) {
-    return false;
+    return PA;
   }
 
   for (auto CI : BadCalls) {
@@ -94,5 +77,5 @@ bool UndoTranslateSamplerFoldPass::runOnModule(Module &M) {
     }
   }
 
-  return true;
+  return PA;
 }

@@ -19,36 +19,16 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "Passes.h"
+#include "UndoGetElementPtrConstantExprPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "UndoGetElementPtrConstantExpr"
 
-namespace {
-struct UndoGetElementPtrConstantExprPass : public ModulePass {
-  static char ID;
-  UndoGetElementPtrConstantExprPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-  bool replaceGetElementPtrConstantExpr(ConstantExpr *CE);
-};
-} // namespace
-
-char UndoGetElementPtrConstantExprPass::ID = 0;
-INITIALIZE_PASS(UndoGetElementPtrConstantExprPass,
-                "UndoGetElementPtrConstantExpr", "Undo GEP Constant Expr Pass",
-                false, false)
-
-namespace clspv {
-ModulePass *createUndoGetElementPtrConstantExprPass() {
-  return new UndoGetElementPtrConstantExprPass();
-}
-} // namespace clspv
-
-bool UndoGetElementPtrConstantExprPass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses
+clspv::UndoGetElementPtrConstantExprPass::run(Module &M,
+                                              ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   for (GlobalVariable &GV : M.globals()) {
     // Walk the users of the global variable.
@@ -56,16 +36,16 @@ bool UndoGetElementPtrConstantExprPass::runOnModule(Module &M) {
     for (User *U : GVUsers) {
       if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U)) {
         if (Instruction::GetElementPtr == CE->getOpcode()) {
-          changed |= replaceGetElementPtrConstantExpr(CE);
+          replaceGetElementPtrConstantExpr(CE);
         }
       }
     }
   }
 
-  return changed;
+  return PA;
 }
 
-bool UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
+bool clspv::UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
     ConstantExpr *CE) {
   SmallVector<Instruction *, 8> WorkList;
 

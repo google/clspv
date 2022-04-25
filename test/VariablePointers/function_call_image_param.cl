@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 void bar(write_only image2d_t image) {
   write_imagef(image, (int2)(0, 0), (float4)(0.0));
 }

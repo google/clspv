@@ -27,74 +27,26 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
-#include "Passes.h"
+#include "ShareModuleScopeVariables.h"
 
 using namespace llvm;
-
-namespace {
 
 cl::opt<bool> ShowSMSV("show-smsv", cl::init(false), cl::Hidden,
                        cl::desc("Show share module scope variables details"));
 
-class ShareModuleScopeVariablesPass final : public ModulePass {
-public:
-  typedef DenseMap<Function *, UniqueVector<Function *>> EntryPointMap;
-
-  static char ID;
-  ShareModuleScopeVariablesPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  // Maps functions to entry points that can call them including themselves.
-  void MapEntryPoints(Module &M);
-
-  // Traces the callable functions from |function| and maps them to
-  // |entry_point|.
-  void TraceFunction(Function *function, Function *entry_point);
-
-  // Attempts to share module scope variables. Returns true if any variables are
-  // shared.  Shares variables of the same type that are used by
-  // non-intersecting sets of kernels.
-  bool ShareModuleScopeVariables(Module &M);
-
-  // Collects the entry points that can reach |value| into |user_entry_points|.
-  void CollectUserEntryPoints(Value *value,
-                              UniqueVector<Function *> *user_entry_points);
-
-  // Returns true if there is an intersection between the |user_functions| and
-  // |other_entry_points|.
-  bool HasSharedEntryPoints(const DenseSet<Function *> &user_functions,
-                            const UniqueVector<Function *> &other_entry_points);
-
-  EntryPointMap function_to_entry_points_;
-};
-
-} // namespace
-
-char ShareModuleScopeVariablesPass::ID = 0;
-INITIALIZE_PASS(ShareModuleScopeVariablesPass, "ShareModuleScopeVariablesPass",
-                "Share module scope variables", false, false)
-
-namespace clspv {
-ModulePass *createShareModuleScopeVariablesPass() {
-  return new ShareModuleScopeVariablesPass();
-}
-} // namespace clspv
-
-namespace {
-
-bool ShareModuleScopeVariablesPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::ShareModuleScopeVariablesPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   if (clspv::Option::ShareModuleScopeVariables()) {
     MapEntryPoints(M);
-    Changed = ShareModuleScopeVariables(M);
+    ShareModuleScopeVariables(M);
   }
 
-  return Changed;
+  return PA;
 }
 
-void ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
+void clspv::ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
   // TODO: this could be more efficient if it memoized results for non-kernel
   // functions.
   for (auto &func : M) {
@@ -106,8 +58,8 @@ void ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
   }
 }
 
-void ShareModuleScopeVariablesPass::TraceFunction(Function *function,
-                                                  Function *entry_point) {
+void clspv::ShareModuleScopeVariablesPass::TraceFunction(
+    Function *function, Function *entry_point) {
   function_to_entry_points_[function].insert(entry_point);
 
   for (auto &BB : *function) {
@@ -121,7 +73,8 @@ void ShareModuleScopeVariablesPass::TraceFunction(Function *function,
   }
 }
 
-bool ShareModuleScopeVariablesPass::ShareModuleScopeVariables(Module &M) {
+bool clspv::ShareModuleScopeVariablesPass::ShareModuleScopeVariables(
+    Module &M) {
   // Greedily attempts to share global variables.
   // TODO: this should be analysis driven to aid direct resource access more
   // directly.
@@ -184,7 +137,7 @@ bool ShareModuleScopeVariablesPass::ShareModuleScopeVariables(Module &M) {
   return Changed;
 }
 
-void ShareModuleScopeVariablesPass::CollectUserEntryPoints(
+void clspv::ShareModuleScopeVariablesPass::CollectUserEntryPoints(
     Value *value, UniqueVector<Function *> *user_entry_points) {
   if (auto I = dyn_cast<Instruction>(value)) {
     Function *function = I->getParent()->getParent();
@@ -204,7 +157,7 @@ void ShareModuleScopeVariablesPass::CollectUserEntryPoints(
   }
 }
 
-bool ShareModuleScopeVariablesPass::HasSharedEntryPoints(
+bool clspv::ShareModuleScopeVariablesPass::HasSharedEntryPoints(
     const DenseSet<Function *> &user_functions,
     const UniqueVector<Function *> &other_entry_points) {
   for (auto fn : other_entry_points) {
@@ -214,4 +167,3 @@ bool ShareModuleScopeVariablesPass::HasSharedEntryPoints(
 
   return false;
 }
-} // namespace

@@ -1,4 +1,4 @@
-; RUN: clspv-opt -SPIRVProducerPass %s -o %t.ll -producer-out-file %t.spv -spv-version=1.4 -max-pushconstant-size=8
+; RUN: clspv-opt --passes=spirv-producer %s -o %t.ll -producer-out-file %t.spv -spv-version=1.4 -max-pushconstant-size=8
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.1spv1.4 %t.spv

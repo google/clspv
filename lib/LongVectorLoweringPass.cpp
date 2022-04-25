@@ -31,7 +31,7 @@
 #include "clspv/Passes.h"
 
 #include "Builtins.h"
-#include "Passes.h"
+#include "LongVectorLoweringPass.h"
 
 #include <array>
 #include <functional>
@@ -42,170 +42,6 @@ using namespace llvm;
 #define DEBUG_TYPE "LongVectorLowering"
 
 namespace {
-
-class LongVectorLoweringPass final
-    : public ModulePass,
-      public InstVisitor<LongVectorLoweringPass, Value *> {
-public:
-  static char ID;
-
-public:
-  LongVectorLoweringPass() : ModulePass(ID) {}
-
-  /// Lower the content of the given module @p M.
-  bool runOnModule(Module &M) override;
-
-private:
-  // Implementation details for InstVisitor.
-
-  using Visitor = InstVisitor<LongVectorLoweringPass, Value *>;
-  using Visitor::visit;
-  friend Visitor;
-
-  /// Higher-level dispatcher. This is not provided by InstVisitor.
-  /// Returns nullptr if no lowering is required.
-  Value *visit(Value *V);
-
-  /// Visit Constant. This is not provided by InstVisitor.
-  Value *visitConstant(Constant &Cst);
-
-  /// Visit Unary or Binary Operator. This is not provided by InstVisitor.
-  Value *visitNAryOperator(Instruction &I);
-
-  /// InstVisitor impl, general "catch-all" function.
-  Value *visitInstruction(Instruction &I);
-
-  // InstVisitor impl, specific cases.
-  Value *visitAllocaInst(AllocaInst &I);
-  Value *visitBinaryOperator(BinaryOperator &I);
-  Value *visitCallInst(CallInst &I);
-  Value *visitCastInst(CastInst &I);
-  Value *visitCmpInst(CmpInst &I);
-  Value *visitExtractElementInst(ExtractElementInst &I);
-  Value *visitExtractValueInst(ExtractValueInst &I);
-  Value *visitGetElementPtrInst(GetElementPtrInst &I);
-  Value *visitInsertElementInst(InsertElementInst &I);
-  Value *visitInsertValueInst(InsertValueInst &I);
-  Value *visitLoadInst(LoadInst &I);
-  Value *visitPHINode(PHINode &I);
-  Value *visitSelectInst(SelectInst &I);
-  Value *visitShuffleVectorInst(ShuffleVectorInst &I);
-  Value *visitStoreInst(StoreInst &I);
-  Value *visitUnaryOperator(UnaryOperator &I);
-
-private:
-  // Helpers for lowering values.
-
-  /// Return true if the given @p U needs to be lowered.
-  ///
-  /// This only looks at the types involved, not the opcodes or anything else.
-  bool handlingRequired(User &U);
-
-  /// Return the lowered version of @p U or @p U itself when no lowering is
-  /// required.
-  Value *visitOrSelf(Value *U) {
-    auto *V = visit(U);
-    return V ? V : U;
-  }
-
-  /// Register the replacement of @p U with @p V.
-  ///
-  /// If @p U and @p V have the same type, replace the relevant usages as well
-  /// to ensure the rest of the program is using the new instructions.
-  void registerReplacement(Value &U, Value &V);
-
-private:
-  // Helpers for lowering types.
-
-  /// Get a array equivalent for this type, if it uses a long vector.
-  /// Returns nullptr if no lowering is required.
-  Type *getEquivalentType(Type *Ty);
-
-  /// Implementation details of getEquivalentType.
-  Type *getEquivalentTypeImpl(Type *Ty);
-
-  /// Return the equivalent type for @p Ty or @p Ty if no lowering is needed.
-  Type *getEquivalentTypeOrSelf(Type *Ty) {
-    auto *EquivalentTy = getEquivalentType(Ty);
-    return EquivalentTy ? EquivalentTy : Ty;
-  }
-
-private:
-  // Hight-level implementation details of runOnModule.
-
-  /// Lower all global variables in the module.
-  bool runOnGlobals(Module &M);
-
-  /// Lower the given function.
-  bool runOnFunction(Function &F);
-
-  /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
-  /// calls to its scalar version.
-  Value *convertBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
-                            ArrayRef<Value *> EquivalentArgs);
-
-  /// Either call convertBuiltinCall for easy to map call, or specific routine
-  /// for more particular builtin (shuffle, shuffle2).
-  Value *convertAllBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
-                               ArrayRef<Value *> EquivalentArgs);
-
-  /// Perform the Shuffle2 operation element per element
-  Value *convertBuiltinShuffle2(CallInst &CI, Type *EquivalentReturnTy,
-                                Value *SrcA, Value *SrcB, Value *Mask);
-
-  // Map calls of Spirv Operators builtin that cannot be convert using
-  // convertBuiltinCall
-  Value *convertSpirvOpBuiltinCall(CallInst &CI, Type *EquivalentReturnTy,
-                                   ArrayRef<Value *> EquivalentArgs);
-
-  /// Create an alternative version of @p F that doesn't have long vectors as
-  /// parameter or return types.
-  /// Returns nullptr if no lowering is required.
-  Function *convertUserDefinedFunction(Function &F);
-
-  /// Create (and insert) a call to the equivalent user-defined function.
-  CallInst *convertUserDefinedFunctionCall(CallInst &CI,
-                                           ArrayRef<Value *> EquivalentArgs);
-
-  /// Clears the dead instructions and others that might be rendered dead
-  /// by their removal.
-  void cleanDeadInstructions();
-
-  /// Remove all long-vector functions that were lowered.
-  void cleanDeadFunctions();
-
-  /// Remove all long-vector globals that were lowered.
-  void cleanDeadGlobals();
-
-private:
-  /// A map between long-vector types and their equivalent representation.
-  DenseMap<Type *, Type *> TypeMap;
-
-  /// A map between original values and their replacement.
-  ///
-  /// The content of this mapping is valid only for the function being visited
-  /// at a given time. The keys in this mapping should be removed from the
-  /// function once all instructions in the current function have been visited
-  /// and transformed. Instructions are not removed from the function as they
-  /// are visited because this would invalidate iterators.
-  DenseMap<Value *, Value *> ValueMap;
-
-  /// A map between functions and their replacement. This includes OpenCL
-  /// builtin declarations.
-  ///
-  /// The keys in this mapping should be deleted when finishing processing the
-  /// module.
-  DenseMap<Function *, Function *> FunctionMap;
-
-  /// A map between global variables and their replacement.
-  ///
-  /// The map is filled before any functions are visited, yet the original
-  /// globals are not removed from the module. Their removal is deferred once
-  /// all functions have been visited.
-  DenseMap<GlobalVariable *, GlobalVariable *> GlobalVariableMap;
-};
-
-char LongVectorLoweringPass::ID = 0;
 
 using PartitionCallback = std::function<void(Instruction *)>;
 
@@ -744,20 +580,24 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
   return ReturnValue;
 }
 
-bool LongVectorLoweringPass::runOnModule(Module &M) {
-  bool Modified = runOnGlobals(M);
+} // namespace
+
+PreservedAnalyses clspv::LongVectorLoweringPass::run(Module &M,
+                                                     ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+  runOnGlobals(M);
 
   for (auto &F : M.functions()) {
-    Modified |= runOnFunction(F);
+    runOnFunction(F);
   }
 
   cleanDeadFunctions();
   cleanDeadGlobals();
 
-  return Modified;
+  return PA;
 }
 
-Value *LongVectorLoweringPass::visit(Value *V) {
+Value *clspv::LongVectorLoweringPass::visit(Value *V) {
   // Already handled?
   auto it = ValueMap.find(V);
   if (it != ValueMap.end()) {
@@ -790,7 +630,7 @@ Value *LongVectorLoweringPass::visit(Value *V) {
   llvm_unreachable("Kind of value not handled yet.");
 }
 
-Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
+Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
   auto *EquivalentTy = getEquivalentType(Cst.getType());
   assert(EquivalentTy && "Nothing to lower.");
 
@@ -861,7 +701,7 @@ Value *LongVectorLoweringPass::visitConstant(Constant &Cst) {
   llvm_unreachable("Unsupported kind of constant");
 }
 
-Value *LongVectorLoweringPass::visitNAryOperator(Instruction &I) {
+Value *clspv::LongVectorLoweringPass::visitNAryOperator(Instruction &I) {
   SmallVector<Value *, 16> EquivalentArgs;
   for (auto &Operand : I.operands()) {
     Value *EquivalentOperand = visit(Operand.get());
@@ -881,14 +721,14 @@ Value *LongVectorLoweringPass::visitNAryOperator(Instruction &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitInstruction(Instruction &I) {
+Value *clspv::LongVectorLoweringPass::visitInstruction(Instruction &I) {
 #ifndef NDEBUG
   dbgs() << "Instruction not handled: " << I << '\n';
 #endif
   llvm_unreachable("Missing support for instruction");
 }
 
-Value *LongVectorLoweringPass::visitAllocaInst(AllocaInst &I) {
+Value *clspv::LongVectorLoweringPass::visitAllocaInst(AllocaInst &I) {
   auto *EquivalentTy = getEquivalentType(I.getAllocatedType());
   assert(EquivalentTy && "type not lowered");
 
@@ -903,11 +743,11 @@ Value *LongVectorLoweringPass::visitAllocaInst(AllocaInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
+Value *clspv::LongVectorLoweringPass::visitBinaryOperator(BinaryOperator &I) {
   return visitNAryOperator(I);
 }
 
-Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
+Value *clspv::LongVectorLoweringPass::visitCallInst(CallInst &I) {
   SmallVector<Value *, 16> EquivalentArgs;
   for (auto &ArgUse : I.args()) {
     Value *Arg = ArgUse.get();
@@ -950,7 +790,7 @@ Value *LongVectorLoweringPass::visitCallInst(CallInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
+Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
   auto *OriginalValue = I.getOperand(0);
   auto *EquivalentValue = visitOrSelf(OriginalValue);
   auto *OriginalDestTy = I.getDestTy();
@@ -1009,7 +849,7 @@ Value *LongVectorLoweringPass::visitCastInst(CastInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitCmpInst(CmpInst &I) {
+Value *clspv::LongVectorLoweringPass::visitCmpInst(CmpInst &I) {
   auto *EquivalentType = getEquivalentType(I.getType());
   assert(EquivalentType && "type not lowered");
 
@@ -1034,7 +874,8 @@ Value *LongVectorLoweringPass::visitCmpInst(CmpInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
+Value *
+clspv::LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   assert(EquivalentValue && "value not lowered");
 
@@ -1049,7 +890,8 @@ Value *LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
+Value *
+clspv::LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   if (!EquivalentValue)
     return nullptr;
@@ -1062,7 +904,8 @@ Value *LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
+Value *
+clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   auto *EquivalentPointer = visit(I.getPointerOperand());
   if (!EquivalentPointer)
     return nullptr;
@@ -1081,7 +924,8 @@ Value *LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
+Value *
+clspv::LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   assert(EquivalentValue && "value not lowered");
 
@@ -1100,7 +944,7 @@ Value *LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
+Value *clspv::LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
   Value *EquivalentAggregate = visitOrSelf(I.getOperand(0));
   Value *EquivalentInsertValue = visitOrSelf(I.getOperand(1));
 
@@ -1118,7 +962,7 @@ Value *LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
+Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   Value *EquivalentPointer = visit(I.getPointerOperand());
   assert(EquivalentPointer && "pointer not lowered");
   Type *EquivalentTy = getEquivalentType(I.getType());
@@ -1131,7 +975,7 @@ Value *LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitPHINode(PHINode &I) {
+Value *clspv::LongVectorLoweringPass::visitPHINode(PHINode &I) {
   static std::map<PHINode *, Value *> PHIMap;
   if (PHIMap.count(&I) > 0) {
     return PHIMap[&I];
@@ -1156,7 +1000,7 @@ Value *LongVectorLoweringPass::visitPHINode(PHINode &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
+Value *clspv::LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
   auto *EquivalentCondition = visitOrSelf(I.getCondition());
   auto *EquivalentTrueValue = visitOrSelf(I.getTrueValue());
   auto *EquivalentFalseValue = visitOrSelf(I.getFalseValue());
@@ -1215,7 +1059,8 @@ Value *LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
+Value *
+clspv::LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   assert(isa<FixedVectorType>(I.getType()) &&
          "shufflevector on scalable vectors is not supported.");
 
@@ -1282,7 +1127,7 @@ Value *LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
+Value *clspv::LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   Value *EquivalentValue = visit(I.getValueOperand());
   assert(EquivalentValue && "value not lowered");
   Value *EquivalentPointer = visit(I.getPointerOperand());
@@ -1295,11 +1140,11 @@ Value *LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   return V;
 }
 
-Value *LongVectorLoweringPass::visitUnaryOperator(UnaryOperator &I) {
+Value *clspv::LongVectorLoweringPass::visitUnaryOperator(UnaryOperator &I) {
   return visitNAryOperator(I);
 }
 
-bool LongVectorLoweringPass::handlingRequired(User &U) {
+bool clspv::LongVectorLoweringPass::handlingRequired(User &U) {
   if (getEquivalentType(U.getType()) != nullptr) {
     return true;
   }
@@ -1314,7 +1159,7 @@ bool LongVectorLoweringPass::handlingRequired(User &U) {
   return false;
 }
 
-void LongVectorLoweringPass::registerReplacement(Value &U, Value &V) {
+void clspv::LongVectorLoweringPass::registerReplacement(Value &U, Value &V) {
   LLVM_DEBUG(dbgs() << "Replacement for " << U << ": " << V << '\n');
   assert(ValueMap.count(&U) == 0 && "Value already registered");
   ValueMap.insert({&U, &V});
@@ -1335,7 +1180,7 @@ void LongVectorLoweringPass::registerReplacement(Value &U, Value &V) {
   }
 }
 
-Type *LongVectorLoweringPass::getEquivalentType(Type *Ty) {
+Type *clspv::LongVectorLoweringPass::getEquivalentType(Type *Ty) {
   auto it = TypeMap.find(Ty);
   if (it != TypeMap.end()) {
     return it->second;
@@ -1353,7 +1198,7 @@ Type *LongVectorLoweringPass::getEquivalentType(Type *Ty) {
   return EquivalentTy;
 }
 
-Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
+Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
       Ty->isLabelTy() || Ty->isMetadataTy()) {
     // No lowering required.
@@ -1455,7 +1300,7 @@ Type *LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   llvm_unreachable("Unsupported kind of Type.");
 }
 
-bool LongVectorLoweringPass::runOnGlobals(Module &M) {
+bool clspv::LongVectorLoweringPass::runOnGlobals(Module &M) {
   assert(GlobalVariableMap.empty());
 
   // Iterate over the globals, generate equivalent ones when needed. Insert the
@@ -1492,7 +1337,7 @@ bool LongVectorLoweringPass::runOnGlobals(Module &M) {
   return Modified;
 }
 
-bool LongVectorLoweringPass::runOnFunction(Function &F) {
+bool clspv::LongVectorLoweringPass::runOnFunction(Function &F) {
   LLVM_DEBUG(dbgs() << "Processing " << F.getName() << '\n');
 
   // Skip declarations.
@@ -1525,10 +1370,9 @@ bool LongVectorLoweringPass::runOnFunction(Function &F) {
   return Modified;
 }
 
-Value *
-LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
-                                           Type *EquivalentReturnTy,
-                                           ArrayRef<Value *> EquivalentArgs) {
+Value *clspv::LongVectorLoweringPass::convertBuiltinCall(
+    CallInst &VectorCall, Type *EquivalentReturnTy,
+    ArrayRef<Value *> EquivalentArgs) {
   Function *VectorFunction = VectorCall.getCalledFunction();
   assert(VectorFunction);
 
@@ -1556,7 +1400,7 @@ LongVectorLoweringPass::convertBuiltinCall(CallInst &VectorCall,
                                 ScalarFactory);
 }
 
-Value *LongVectorLoweringPass::convertAllBuiltinCall(
+Value *clspv::LongVectorLoweringPass::convertAllBuiltinCall(
     CallInst &CI, Type *EquivalentReturnTy, ArrayRef<Value *> EquivalentArgs) {
   Function *Builtin = CI.getCalledFunction();
   assert(Builtin);
@@ -1579,10 +1423,9 @@ Value *LongVectorLoweringPass::convertAllBuiltinCall(
   }
 }
 
-Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
-                                                      Type *EquivalentReturnTy,
-                                                      Value *SrcA, Value *SrcB,
-                                                      Value *Mask) {
+Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
+    CallInst &CI, Type *EquivalentReturnTy, Value *SrcA, Value *SrcB,
+    Value *Mask) {
   auto MaskTy = Mask->getType();
   unsigned MaskArity;
   unsigned MaskElementSizeInBits;
@@ -1699,7 +1542,7 @@ Value *LongVectorLoweringPass::convertBuiltinShuffle2(CallInst &CI,
   return Res;
 }
 
-Value *LongVectorLoweringPass::convertSpirvOpBuiltinCall(
+Value *clspv::LongVectorLoweringPass::convertSpirvOpBuiltinCall(
     CallInst &VectorCall, Type *EquivalentReturnTy,
     ArrayRef<Value *> EquivalentArgs) {
   if (auto *SpirvIdValue = dyn_cast<ConstantInt>(VectorCall.getOperand(0))) {
@@ -1725,7 +1568,8 @@ Value *LongVectorLoweringPass::convertSpirvOpBuiltinCall(
   return convertBuiltinCall(VectorCall, EquivalentReturnTy, EquivalentArgs);
 }
 
-Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
+Function *
+clspv::LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   auto it = FunctionMap.find(&F);
   if (it != FunctionMap.end()) {
     return it->second;
@@ -1758,7 +1602,7 @@ Function *LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   return EquivalentFunction;
 }
 
-CallInst *LongVectorLoweringPass::convertUserDefinedFunctionCall(
+CallInst *clspv::LongVectorLoweringPass::convertUserDefinedFunctionCall(
     CallInst &Call, ArrayRef<Value *> EquivalentArgs) {
   Function *Callee = Call.getCalledFunction();
   assert(Callee);
@@ -1776,7 +1620,7 @@ CallInst *LongVectorLoweringPass::convertUserDefinedFunctionCall(
   return NewCall;
 }
 
-void LongVectorLoweringPass::cleanDeadInstructions() {
+void clspv::LongVectorLoweringPass::cleanDeadInstructions() {
   // Collect all instructions that have been replaced by another one, and remove
   // them from the function. To address dependencies, use a fixed-point
   // algorithm:
@@ -1847,7 +1691,7 @@ void LongVectorLoweringPass::cleanDeadInstructions() {
 #endif
 }
 
-void LongVectorLoweringPass::cleanDeadFunctions() {
+void clspv::LongVectorLoweringPass::cleanDeadFunctions() {
   // Take into account dependencies between functions when removing them.
   // First collect all dead functions.
   using Functions = SmallVector<Function *, 32>;
@@ -1886,18 +1730,9 @@ void LongVectorLoweringPass::cleanDeadFunctions() {
          "Not all supposedly-dead functions were removed!");
 }
 
-void LongVectorLoweringPass::cleanDeadGlobals() {
+void clspv::LongVectorLoweringPass::cleanDeadGlobals() {
   for (auto const &Mapping : GlobalVariableMap) {
     auto *GV = Mapping.first;
     GV->eraseFromParent();
   }
-}
-
-} // namespace
-
-INITIALIZE_PASS(LongVectorLoweringPass, "LongVectorLowering",
-                "Long Vector Lowering Pass", false, false)
-
-llvm::ModulePass *clspv::createLongVectorLoweringPass() {
-  return new LongVectorLoweringPass();
 }

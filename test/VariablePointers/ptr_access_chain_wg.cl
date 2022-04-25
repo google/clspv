@@ -5,6 +5,7 @@
 
 // The OpPtrAccessChain requires VariablePointers for Workgorup. So does passing
 // the of the argument though...
+__attribute__((noinline))
 int bar(local int* x) { return x[1]; }
 kernel void foo(local int* in, global int* out) {
   *out = bar(in);

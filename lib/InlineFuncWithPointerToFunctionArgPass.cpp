@@ -21,20 +21,13 @@
 
 #include "clspv/AddressSpace.h"
 
-#include "Passes.h"
+#include "InlineFuncWithPointerToFunctionArgPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithpointerfunctionarg"
 
 namespace {
-struct InlineFuncWithPointerToFunctionArgPass : public ModulePass {
-  static char ID;
-  InlineFuncWithPointerToFunctionArgPass() : ModulePass(ID) {}
-
-  bool InlineFunctions(Module &M);
-  bool runOnModule(Module &M) override;
-};
 
 // Returns true if |type| is a pointer to Function storage class.
 bool IsPointerToFunctionStorage(Type *type) {
@@ -61,33 +54,21 @@ bool IsProblematicFunctionType(Type *type) {
 }
 } // namespace
 
-char InlineFuncWithPointerToFunctionArgPass::ID = 0;
-INITIALIZE_PASS(
-    InlineFuncWithPointerToFunctionArgPass,
-    "InlineFuncWithPointerToFunctionArgPass",
-    "Inline Function with Pointer-to-Function storage Argument Pass", false,
-    false)
-
-namespace clspv {
-llvm::ModulePass *createInlineFuncWithPointerToFunctionArgPass() {
-  return new InlineFuncWithPointerToFunctionArgPass();
-}
-} // namespace clspv
-
-bool InlineFuncWithPointerToFunctionArgPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::InlineFuncWithPointerToFunctionArgPass::run(Module &M,
+                                                   ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Loop through our inline pass until they stop changing thing.
-  for (bool localChanged = true; localChanged; Changed |= localChanged) {
-    localChanged = false;
-
-    localChanged |= InlineFunctions(M);
+  bool changed = true;
+  while (changed) {
+    changed &= InlineFunctions(M);
   }
 
-  return Changed;
+  return PA;
 }
 
-bool InlineFuncWithPointerToFunctionArgPass::InlineFunctions(Module &M) {
+bool clspv::InlineFuncWithPointerToFunctionArgPass::InlineFunctions(Module &M) {
   bool Changed = false;
 
   UniqueVector<CallInst *> WorkList;

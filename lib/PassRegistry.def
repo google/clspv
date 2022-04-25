@@ -1,0 +1,68 @@
+// Copyright 2022 The Clspv Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// INTENTIONALLY NO HEADER GUARDS
+
+#ifndef MODULE_PASS
+#define MODULE_PASS(NAME, CREATE_PASS)
+#endif // MODULE_PASS
+MODULE_PASS("add-function-attributes", clspv::AddFunctionAttributesPass)
+MODULE_PASS("allocate-descriptors", clspv::AllocateDescriptorsPass)
+MODULE_PASS("auto-pod-args", clspv::AutoPodArgsPass)
+MODULE_PASS("cluster-constants", clspv::ClusterModuleScopeConstantVars)
+MODULE_PASS("cluster-pod-kernel-args-pass", clspv::ClusterPodKernelArgumentsPass)
+MODULE_PASS("declare-push-constants", clspv::DeclarePushConstantsPass)
+MODULE_PASS("define-opencl-workitem-builtins", clspv::DefineOpenCLWorkItemBuiltinsPass)
+MODULE_PASS("direct-resource-access", clspv::DirectResourceAccessPass)
+MODULE_PASS("function-internalizer", clspv::FunctionInternalizerPass)
+MODULE_PASS("hide-constant-loads", clspv::HideConstantLoadsPass)
+MODULE_PASS("inline-entry-points-pass", clspv::InlineEntryPointsPass)
+MODULE_PASS("inline-func-with-pointer-cast-arg", clspv::InlineFuncWithPointerBitCastArgPass)
+MODULE_PASS("inline-func-with-pointer-function-arg", clspv::InlineFuncWithPointerToFunctionArgPass)
+MODULE_PASS("inline-func-with-single-call-site", clspv::InlineFuncWithSingleCallSitePass)
+MODULE_PASS("long-vector-lowering", clspv::LongVectorLoweringPass)
+MODULE_PASS("multi-version-ubo-functions", clspv::MultiVersionUBOFunctionsPass)
+MODULE_PASS("native-math", clspv::NativeMathPass)
+MODULE_PASS("opencl-inliner", clspv::OpenCLInlinerPass)
+MODULE_PASS("remove-unused-arguments", clspv::RemoveUnusedArguments)
+MODULE_PASS("replace-llvm-intrinsics", clspv::ReplaceLLVMIntrinsicsPass)
+MODULE_PASS("replace-opencl-builtin", clspv::ReplaceOpenCLBuiltinPass)
+MODULE_PASS("replace-pointer-bitcast", clspv::ReplacePointerBitcastPass)
+MODULE_PASS("rewrite-inserts-pass", clspv::RewriteInsertsPass)
+MODULE_PASS("scalarize", clspv::ScalarizePass)
+MODULE_PASS("share-module-scope-vars", clspv::ShareModuleScopeVariablesPass)
+MODULE_PASS("signed-compare-fixup", clspv::SignedCompareFixupPass)
+MODULE_PASS("simplify-pointer-bitcast", clspv::SimplifyPointerBitcastPass)
+MODULE_PASS("spirv-producer", clspv::SPIRVProducerPass)
+MODULE_PASS("splat-arg", clspv::SplatArgPass)
+MODULE_PASS("splat-selection-condition", clspv::SplatSelectConditionPass)
+MODULE_PASS("specialize-image-types", clspv::SpecializeImageTypesPass)
+MODULE_PASS("strip-freeze", clspv::StripFreezePass)
+MODULE_PASS("three-element-vector-lowering", clspv::ThreeElementVectorLoweringPass)
+MODULE_PASS("ubo-type-transform", clspv::UBOTypeTransformPass)
+MODULE_PASS("undo-bool", clspv::UndoBoolPass)
+MODULE_PASS("undo-byval", clspv::UndoByvalPass)
+MODULE_PASS("undo-gep-constantexpr", clspv::UndoGetElementPtrConstantExprPass)
+MODULE_PASS("undo-instcombine", clspv::UndoInstCombinePass)
+MODULE_PASS("undo-sret", clspv::UndoSRetPass)
+MODULE_PASS("undo-translate-sampler-fold", clspv::UndoTranslateSamplerFoldPass)
+MODULE_PASS("undo-truncate-to-odd-integer", clspv::UndoTruncateToOddIntegerPass)
+MODULE_PASS("unhide-constant-loads", clspv::UnhideConstantLoadsPass)
+MODULE_PASS("zero-initialize-allocas", clspv::ZeroInitializeAllocasPass)
+
+#ifndef FUNCTION_PASS
+#define FUNCTION_PASS(NAME, CREATE_PASS)
+#endif // FUNCTION_PASS
+FUNCTION_PASS("fixup-structured-cfg", clspv::FixupStructuredCFGPass)
+FUNCTION_PASS("reorder-basic-blocks", clspv::ReorderBasicBlocksPass)

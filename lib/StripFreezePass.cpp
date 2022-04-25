@@ -18,32 +18,15 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
-#include "Passes.h"
+#include "StripFreezePass.h"
 
 #define DEBUG_TYPE "stripfreeze"
 
 using namespace llvm;
 
-namespace {
-class StripFreezePass : public ModulePass {
-public:
-  static char ID;
-  StripFreezePass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char StripFreezePass::ID = 0;
-INITIALIZE_PASS(StripFreezePass, "StripFreeze",
-                "Strip freeze instructions from the IR", false, false)
-
-namespace clspv {
-ModulePass *createStripFreezePass() { return new StripFreezePass(); }
-} // namespace clspv
-
-bool StripFreezePass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses clspv::StripFreezePass::run(Module &M,
+                                              ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   std::vector<Instruction *> dead;
   for (auto &F : M) {
@@ -52,7 +35,6 @@ bool StripFreezePass::runOnModule(Module &M) {
         if (auto freeze = dyn_cast<FreezeInst>(&I)) {
           freeze->replaceAllUsesWith(freeze->getOperand(0));
           dead.push_back(freeze);
-          changed = true;
         }
       }
     }
@@ -61,5 +43,5 @@ bool StripFreezePass::runOnModule(Module &M) {
   for (auto inst : dead)
     inst->eraseFromParent();
 
-  return changed;
+  return PA;
 }

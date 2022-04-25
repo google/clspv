@@ -8,6 +8,7 @@
 // RUN: FileCheck --check-prefix=CLUSTER %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t2.spv
 
+__attribute__((noinline))
 void apple(global int *B, global int *A, int n) { A[n] = B[n + 2]; }
 
 kernel void foo(global int *A, global int *B, int n) { apple(B, A, n); }

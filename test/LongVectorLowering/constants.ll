@@ -1,4 +1,4 @@
-; RUN: clspv-opt --LongVectorLowering --instcombine %s -o %t
+; RUN: clspv-opt --passes=long-vector-lowering,instcombine %s -o %t
 ; RUN: FileCheck %s < %t
 ;
 ; This tests covers UndefValue, ConstantAggregateZero and ConstantDataVector.

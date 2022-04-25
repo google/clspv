@@ -4,6 +4,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // Both x's should be coherent. y should not be coherent because it is not read.
+__attribute__((noinline))
 void bar(global int* x, int y) { *x = y; }
 
 kernel void foo(global int* x, global int* y, int c) {

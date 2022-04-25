@@ -39,6 +39,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MathExtras.h"
@@ -232,8 +233,7 @@ private:
   SPIRVOperandVec Operands;
 };
 
-struct SPIRVProducerPass final : public ModulePass {
-  static char ID;
+struct SPIRVProducerPassImpl {
 
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
   typedef DenseMap<Type *, SmallVector<SPIRVID, 2>> LayoutTypeMapType;
@@ -252,22 +252,22 @@ struct SPIRVProducerPass final : public ModulePass {
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
 
-  SPIRVProducerPass(
+  SPIRVProducerPassImpl(
       raw_pwrite_stream *out,
       SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
-      bool outputCInitList)
-      : ModulePass(ID), module(nullptr), samplerMap(samplerMap), out(out),
+      bool outputCInitList, ModuleAnalysisManager &MAM)
+      : module(nullptr), MAM(&MAM), samplerMap(samplerMap), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), TestOutput(false) {
+        WorkgroupSizeVarID(0), TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
 
-  SPIRVProducerPass()
-      : ModulePass(ID), module(nullptr), samplerMap(nullptr), out(nullptr),
+  SPIRVProducerPassImpl()
+      : module(nullptr), samplerMap(nullptr), out(nullptr),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
@@ -277,15 +277,7 @@ struct SPIRVProducerPass final : public ModulePass {
     Ptr = this;
   }
 
-  virtual ~SPIRVProducerPass() {
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<DominatorTreeWrapperPass>();
-    AU.addRequired<LoopInfoWrapperPass>();
-  }
-
-  virtual bool runOnModule(Module &module) override;
+  bool runOnModule(Module &module);
 
   // output the SPIR-V header block
   void outputHeader();
@@ -521,7 +513,6 @@ struct SPIRVProducerPass final : public ModulePass {
                              uint32_t spec_id, uint32_t elem_size);
 
 private:
-
   Module *module;
 
   // Set of Capabilities required
@@ -530,6 +521,7 @@ private:
   // Map from clspv::BuiltinType to SPIRV Global Variable
   BuiltinConstantMapType BuiltinConstantMap;
 
+  ModuleAnalysisManager *MAM;
   SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap;
   raw_pwrite_stream *out;
 
@@ -680,28 +672,15 @@ private:
   DenseMap<Function *, SPIRVID> KernelDeclarations;
 
 public:
-  static SPIRVProducerPass *Ptr;
+  static SPIRVProducerPassImpl *Ptr;
 };
 
 } // namespace
 
-char SPIRVProducerPass::ID = 0;
-SPIRVProducerPass *SPIRVProducerPass::Ptr = nullptr;
-INITIALIZE_PASS(SPIRVProducerPass, "SPIRVProducerPass", "SPIR-V output pass",
-                false, false)
-
-namespace clspv {
-ModulePass *createSPIRVProducerPass(
-    raw_pwrite_stream *out,
-    SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
-    bool outputCInitList) {
-  return new SPIRVProducerPass(out, samplerMap, outputCInitList);
-}
-
-ModulePass *createSPIRVProducerPass() { return new SPIRVProducerPass(); }
-} // namespace clspv
+SPIRVProducerPassImpl *SPIRVProducerPassImpl::Ptr = nullptr;
 
 namespace {
+
 SPIRVOperandVec &operator<<(SPIRVOperandVec &list, uint32_t num) {
   list.emplace_back(LITERAL_WORD, num);
   return list;
@@ -723,12 +702,14 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, StringRef str) {
 }
 
 SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Type *t) {
-  list.emplace_back(NUMBERID, SPIRVProducerPass::Ptr->getSPIRVType(t).get());
+  list.emplace_back(NUMBERID,
+                    SPIRVProducerPassImpl::Ptr->getSPIRVType(t).get());
   return list;
 }
 
 SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Value *v) {
-  list.emplace_back(NUMBERID, SPIRVProducerPass::Ptr->getSPIRVValue(v).get());
+  list.emplace_back(NUMBERID,
+                    SPIRVProducerPassImpl::Ptr->getSPIRVValue(v).get());
   return list;
 }
 
@@ -738,7 +719,15 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, const SPIRVID &v) {
 }
 } // namespace
 
-bool SPIRVProducerPass::runOnModule(Module &M) {
+PreservedAnalyses SPIRVProducerPass::run(Module &M,
+                                         ModuleAnalysisManager &MAM) {
+  SPIRVProducerPassImpl impl(out, nullptr, outputCInitList, MAM);
+  impl.runOnModule(M);
+  PreservedAnalyses PA;
+  return PA;
+}
+
+bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   // TODO(sjw): Need to reset all data members for each Module, or better
   // yet create a new SPIRVProducer for every module.. For now only
   // allow 1 call.
@@ -851,7 +840,7 @@ bool SPIRVProducerPass::runOnModule(Module &M) {
   return false;
 }
 
-void SPIRVProducerPass::outputHeader() {
+void SPIRVProducerPassImpl::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&spv::MagicNumber),
                    sizeof(spv::MagicNumber));
   uint32_t minor = 0;
@@ -893,13 +882,13 @@ void SPIRVProducerPass::outputHeader() {
   binaryOut->write(reinterpret_cast<const char *>(&schema), sizeof(schema));
 }
 
-void SPIRVProducerPass::patchHeader() {
+void SPIRVProducerPassImpl::patchHeader() {
   // for a binary we just write the value of nextID over bound
   binaryOut->pwrite(reinterpret_cast<char *>(&nextID), sizeof(nextID),
                     patchBoundOffset);
 }
 
-void SPIRVProducerPass::GenerateLLVMIRInfo() {
+void SPIRVProducerPassImpl::GenerateLLVMIRInfo() {
   // This function generates LLVM IR for function such as global variable for
   // argument, constant and pointer type for argument access. These information
   // is artificial one because we need Vulkan SPIR-V output. This function is
@@ -913,7 +902,7 @@ void SPIRVProducerPass::GenerateLLVMIRInfo() {
   FindTypesForResourceVars();
 }
 
-void SPIRVProducerPass::FindGlobalConstVars() {
+void SPIRVProducerPassImpl::FindGlobalConstVars() {
   clspv::NormalizeGlobalVariables(*module);
   const DataLayout &DL = module->getDataLayout();
 
@@ -1009,7 +998,7 @@ void SPIRVProducerPass::FindGlobalConstVars() {
   }
 }
 
-void SPIRVProducerPass::FindResourceVars() {
+void SPIRVProducerPassImpl::FindResourceVars() {
   ResourceVarInfoList.clear();
   FunctionToResourceVarsMap.clear();
   ModuleOrderedResourceVars.reset();
@@ -1115,7 +1104,7 @@ void SPIRVProducerPass::FindResourceVars() {
   }
 }
 
-void SPIRVProducerPass::FindTypesForSamplerMap() {
+void SPIRVProducerPassImpl::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (module->getFunction(clspv::LiteralSamplerFunction()) ||
       (getSamplerMap() && !getSamplerMap()->empty())) {
@@ -1129,7 +1118,7 @@ void SPIRVProducerPass::FindTypesForSamplerMap() {
   }
 }
 
-void SPIRVProducerPass::FindTypesForResourceVars() {
+void SPIRVProducerPassImpl::FindTypesForResourceVars() {
   // Record types so they are generated.
   TypesNeedingLayout.reset();
   StructTypesNeedingBlock.reset();
@@ -1223,7 +1212,7 @@ void SPIRVProducerPass::FindTypesForResourceVars() {
   }
 }
 
-void SPIRVProducerPass::GenerateWorkgroupVars() {
+void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
   // The SpecId assignment for pointer-to-local arguments is recorded in
   // module-level metadata. Translate that information into local argument
   // information.
@@ -1284,7 +1273,8 @@ void SPIRVProducerPass::GenerateWorkgroupVars() {
   }
 }
 
-spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
+spv::StorageClass
+SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
   switch (AddrSpace) {
   default:
     llvm_unreachable("Unsupported OpenCL address space");
@@ -1311,8 +1301,8 @@ spv::StorageClass SPIRVProducerPass::GetStorageClass(unsigned AddrSpace) const {
   }
 }
 
-spv::StorageClass
-SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
+spv::StorageClass SPIRVProducerPassImpl::GetStorageClassForArgKind(
+    clspv::ArgKind arg_kind) const {
   switch (arg_kind) {
   case clspv::ArgKind::Buffer:
     return spv::StorageClassStorageBuffer;
@@ -1335,7 +1325,7 @@ SPIRVProducerPass::GetStorageClassForArgKind(clspv::ArgKind arg_kind) const {
   }
 }
 
-spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
+spv::BuiltIn SPIRVProducerPassImpl::GetBuiltin(StringRef Name) const {
   return StringSwitch<spv::BuiltIn>(Name)
       .Case("__spirv_GlobalInvocationId", spv::BuiltInGlobalInvocationId)
       .Case("__spirv_LocalInvocationId", spv::BuiltInLocalInvocationId)
@@ -1348,7 +1338,7 @@ spv::BuiltIn SPIRVProducerPass::GetBuiltin(StringRef Name) const {
       .Default(spv::BuiltInMax);
 }
 
-SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
+SPIRVID SPIRVProducerPassImpl::getOpExtInstImportID() {
   if (OpExtInstImportID == 0) {
     //
     // Generate OpExtInstImport.
@@ -1361,10 +1351,10 @@ SPIRVID SPIRVProducerPass::getOpExtInstImportID() {
   return OpExtInstImportID;
 }
 
-SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
-                                                  spv::StorageClass SC,
-                                                  const SPIRVID &InitID,
-                                                  bool add_interface) {
+SPIRVID SPIRVProducerPassImpl::addSPIRVGlobalVariable(const SPIRVID &TypeID,
+                                                      spv::StorageClass SC,
+                                                      const SPIRVID &InitID,
+                                                      bool add_interface) {
   // Generate OpVariable.
   //
   // Ops[0] : Result Type ID
@@ -1387,7 +1377,7 @@ SPIRVID SPIRVProducerPass::addSPIRVGlobalVariable(const SPIRVID &TypeID,
   return VID;
 }
 
-Type *SPIRVProducerPass::CanonicalType(Type *type) {
+Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
   if (type->getNumContainedTypes() != 0) {
     switch (type->getTypeID()) {
     case Type::PointerTyID: {
@@ -1449,7 +1439,7 @@ Type *SPIRVProducerPass::CanonicalType(Type *type) {
   return type;
 }
 
-bool SPIRVProducerPass::PointerRequiresLayout(unsigned aspace) {
+bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
   if (Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
     switch (aspace) {
     case AddressSpace::PushConstant:
@@ -1464,7 +1454,7 @@ bool SPIRVProducerPass::PointerRequiresLayout(unsigned aspace) {
   return false;
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty) {
   // Prior to 1.4, layout decorations are more relaxed so we can reuse a laid
   // out type in non-laid out storage classes.
   bool needs_layout = false;
@@ -1474,7 +1464,7 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty) {
   return getSPIRVType(Ty, needs_layout);
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
   // Only pointers, non-opaque structs and arrays should have layout
   // decorations.
   if (!(isa<PointerType>(Ty) || isa<ArrayType>(Ty) || isa<StructType>(Ty))) {
@@ -1916,13 +1906,13 @@ SPIRVID SPIRVProducerPass::getSPIRVType(Type *Ty, bool needs_layout) {
   return RID;
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVInt32Constant(uint32_t CstVal) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVInt32Constant(uint32_t CstVal) {
   Type *i32 = Type::getInt32Ty(module->getContext());
   Constant *Cst = ConstantInt::get(i32, CstVal);
   return getSPIRVValue(Cst);
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *C) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
   ValueMapType &VMap = getValueMap();
   const bool hack_undef = clspv::Option::HackUndef();
 
@@ -2083,7 +2073,7 @@ SPIRVID SPIRVProducerPass::getSPIRVConstant(Constant *C) {
   return RID;
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVValue(Value *V) {
   auto II = ValueMap.find(V);
   if (II != ValueMap.end()) {
     assert(II->second.isValid());
@@ -2096,7 +2086,7 @@ SPIRVID SPIRVProducerPass::getSPIRVValue(Value *V) {
   }
 }
 
-void SPIRVProducerPass::GenerateSamplers() {
+void SPIRVProducerPassImpl::GenerateSamplers() {
   SamplerLiteralToIDMap.clear();
   DenseMap<unsigned, unsigned> SamplerLiteralToDescriptorSetMap;
   DenseMap<unsigned, unsigned> SamplerLiteralToBindingMap;
@@ -2212,7 +2202,7 @@ void SPIRVProducerPass::GenerateSamplers() {
   }
 }
 
-void SPIRVProducerPass::GenerateResourceVars() {
+void SPIRVProducerPassImpl::GenerateResourceVars() {
   ValueMapType &VMap = getValueMap();
 
   // Generate variables.  Make one for each of resource var info object.
@@ -2317,7 +2307,7 @@ void SPIRVProducerPass::GenerateResourceVars() {
   }
 }
 
-void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
+void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   ValueMapType &VMap = getValueMap();
   std::vector<SPIRVID> &BuiltinDimVec = getBuiltinDimVec();
   const DataLayout &DL = GV.getParent()->getDataLayout();
@@ -2637,7 +2627,7 @@ void SPIRVProducerPass::GenerateGlobalVar(GlobalVariable &GV) {
   }
 }
 
-void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
+void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
@@ -2748,7 +2738,7 @@ void SPIRVProducerPass::GenerateFuncPrologue(Function &F) {
   }
 }
 
-void SPIRVProducerPass::GenerateModuleInfo() {
+void SPIRVProducerPassImpl::GenerateModuleInfo() {
   EntryPointVecType &EntryPoints = getEntryPointVec();
   auto &EntryPointInterfaces = getEntryPointInterfacesList();
   std::vector<SPIRVID> &BuiltinDimVec = getBuiltinDimVec();
@@ -2964,7 +2954,7 @@ void SPIRVProducerPass::GenerateModuleInfo() {
   }
 }
 
-void SPIRVProducerPass::GenerateEntryPointInitialStores() {
+void SPIRVProducerPassImpl::GenerateEntryPointInitialStores() {
   // Work around a driver bug.  Initializers on Private variables might not
   // work. So the start of the kernel should store the initializer value to the
   // variables.  Yes, *every* entry point pays this cost if *any* entry point
@@ -2982,7 +2972,7 @@ void SPIRVProducerPass::GenerateEntryPointInitialStores() {
   }
 }
 
-void SPIRVProducerPass::GenerateFuncBody(Function &F) {
+void SPIRVProducerPassImpl::GenerateFuncBody(Function &F) {
   ValueMapType &VMap = getValueMap();
 
   const bool IsKernel = F.getCallingConv() == CallingConv::SPIR_KERNEL;
@@ -3021,7 +3011,7 @@ void SPIRVProducerPass::GenerateFuncBody(Function &F) {
   }
 }
 
-spv::Op SPIRVProducerPass::GetSPIRVCmpOpcode(CmpInst *I) {
+spv::Op SPIRVProducerPassImpl::GetSPIRVCmpOpcode(CmpInst *I) {
   const std::map<CmpInst::Predicate, spv::Op> Map = {
       {CmpInst::ICMP_EQ, spv::OpIEqual},
       {CmpInst::ICMP_NE, spv::OpINotEqual},
@@ -3051,7 +3041,7 @@ spv::Op SPIRVProducerPass::GetSPIRVCmpOpcode(CmpInst *I) {
   return Map.at(I->getPredicate());
 }
 
-spv::Op SPIRVProducerPass::GetSPIRVPointerCmpOpcode(CmpInst *I) {
+spv::Op SPIRVProducerPassImpl::GetSPIRVPointerCmpOpcode(CmpInst *I) {
   const std::map<CmpInst::Predicate, spv::Op> Map = {
       {CmpInst::ICMP_UGT, spv::OpSGreaterThan},
       {CmpInst::ICMP_UGE, spv::OpSGreaterThanEqual},
@@ -3063,7 +3053,7 @@ spv::Op SPIRVProducerPass::GetSPIRVPointerCmpOpcode(CmpInst *I) {
   return Map.at(I->getPredicate());
 }
 
-spv::Op SPIRVProducerPass::GetSPIRVCastOpcode(Instruction &I) {
+spv::Op SPIRVProducerPassImpl::GetSPIRVCastOpcode(Instruction &I) {
   const std::map<unsigned, spv::Op> Map{
       {Instruction::Trunc, spv::OpUConvert},
       {Instruction::ZExt, spv::OpUConvert},
@@ -3081,7 +3071,7 @@ spv::Op SPIRVProducerPass::GetSPIRVCastOpcode(Instruction &I) {
   return Map.at(I.getOpcode());
 }
 
-spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
+spv::Op SPIRVProducerPassImpl::GetSPIRVBinaryOpcode(Instruction &I) {
   if (I.getType()->isIntOrIntVectorTy(1)) {
     switch (I.getOpcode()) {
     default:
@@ -3119,8 +3109,8 @@ spv::Op SPIRVProducerPass::GetSPIRVBinaryOpcode(Instruction &I) {
   return Map.at(I.getOpcode());
 }
 
-SPIRVID SPIRVProducerPass::getSPIRVBuiltin(spv::BuiltIn BID,
-                                           spv::Capability Cap) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
+                                               spv::Capability Cap) {
   SPIRVID RID;
 
   auto ii = BuiltinConstantMap.find(BID);
@@ -3153,8 +3143,8 @@ SPIRVID SPIRVProducerPass::getSPIRVBuiltin(spv::BuiltIn BID,
 }
 
 SPIRVID
-SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
-                                            const FunctionInfo &FuncInfo) {
+SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
+                                                const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
   switch (FuncInfo.getType()) {
@@ -3319,8 +3309,8 @@ SPIRVProducerPass::GenerateClspvInstruction(CallInst *Call,
 }
 
 SPIRVID
-SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
-                                            const FunctionInfo &FuncInfo) {
+SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
+                                                const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
   auto GetExtendMask = [this](Type *sample_type,
@@ -3614,8 +3604,8 @@ SPIRVProducerPass::GenerateImageInstruction(CallInst *Call,
 }
 
 SPIRVID
-SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
-                                               const FunctionInfo &FuncInfo) {
+SPIRVProducerPassImpl::GenerateSubgroupInstruction(
+    CallInst *Call, const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
   // requires SPIRV version 1.3 or greater
@@ -3760,8 +3750,9 @@ SPIRVProducerPass::GenerateSubgroupInstruction(CallInst *Call,
   return addSPIRVInst(op, Operands);
 }
 
-SPIRVID SPIRVProducerPass::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
-                                                    Value *SrcB, Value *Mask) {
+SPIRVID SPIRVProducerPassImpl::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
+                                                        Value *SrcB,
+                                                        Value *Mask) {
   assert(Ty->isVectorTy());
   assert(SrcA->getType() == SrcB->getType());
   auto MaskTy = Mask->getType();
@@ -3841,7 +3832,7 @@ SPIRVID SPIRVProducerPass::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
   return RID;
 }
 
-SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
+SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
   auto &func_info = Builtins::Lookup(Call->getCalledFunction());
@@ -4076,7 +4067,7 @@ SPIRVID SPIRVProducerPass::GenerateInstructionFromCall(CallInst *Call) {
   return RID;
 }
 
-void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
+void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
   ValueMapType &VMap = getValueMap();
   LLVMContext &Context = module->getContext();
 
@@ -4190,7 +4181,8 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
         // Let's implement signed modulus like that:
         // SRem(x, y) {
         //   rem = (abs(x) % abs(y))
-        //   return (x > 0 ? rem : ((rem ^ -1) + 1)); // (x > 0 ? rem : rem * -1);
+        //   return (x > 0 ? rem : ((rem ^ -1) + 1)); // (x > 0 ? rem : rem *
+        //   -1);
         // }
 
         SPIRVOperandVec Ops;
@@ -4952,14 +4944,14 @@ void SPIRVProducerPass::GenerateInstruction(Instruction &I) {
   }
 }
 
-void SPIRVProducerPass::GenerateFuncEpilogue() {
+void SPIRVProducerPassImpl::GenerateFuncEpilogue() {
   //
   // Generate OpFunctionEnd
   //
   addSPIRVInst(spv::OpFunctionEnd);
 }
 
-bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
+bool SPIRVProducerPassImpl::is4xi8vec(Type *Ty) const {
   // Don't specialize <4 x i8> if i8 is generally supported.
   if (clspv::Option::Int8Support())
     return false;
@@ -4975,7 +4967,7 @@ bool SPIRVProducerPass::is4xi8vec(Type *Ty) const {
   return false;
 }
 
-void SPIRVProducerPass::HandleDeferredInstruction() {
+void SPIRVProducerPassImpl::HandleDeferredInstruction() {
   DeferredInstVecType &DeferredInsts = getDeferredInstVec();
 
   for (size_t i = 0; i < DeferredInsts.size(); ++i) {
@@ -5161,7 +5153,7 @@ void SPIRVProducerPass::HandleDeferredInstruction() {
   }
 }
 
-void SPIRVProducerPass::HandleDeferredDecorations() {
+void SPIRVProducerPassImpl::HandleDeferredDecorations() {
   const auto &DL = module->getDataLayout();
   if (getTypesNeedingArrayStride().empty()) {
     return;
@@ -5209,7 +5201,7 @@ void SPIRVProducerPass::HandleDeferredDecorations() {
 }
 
 glsl::ExtInst
-SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
+SPIRVProducerPassImpl::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   switch (func_info.getType()) {
   case Builtins::kClamp: {
     auto param_type = func_info.getParameter(0);
@@ -5419,7 +5411,7 @@ SPIRVProducerPass::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   return kGlslExtInstBad;
 }
 
-glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(
+glsl::ExtInst SPIRVProducerPassImpl::getIndirectExtInstEnum(
     const Builtins::FunctionInfo &func_info) {
   switch (func_info.getType()) {
   case Builtins::kAcospi:
@@ -5436,7 +5428,7 @@ glsl::ExtInst SPIRVProducerPass::getIndirectExtInstEnum(
   return kGlslExtInstBad;
 }
 
-glsl::ExtInst SPIRVProducerPass::getDirectOrIndirectExtInstEnum(
+glsl::ExtInst SPIRVProducerPassImpl::getDirectOrIndirectExtInstEnum(
     const Builtins::FunctionInfo &func_info) {
   auto direct = getExtInstEnum(func_info);
   if (direct != kGlslExtInstBad)
@@ -5444,15 +5436,16 @@ glsl::ExtInst SPIRVProducerPass::getDirectOrIndirectExtInstEnum(
   return getIndirectExtInstEnum(func_info);
 }
 
-void SPIRVProducerPass::WriteOneWord(uint32_t Word) {
+void SPIRVProducerPassImpl::WriteOneWord(uint32_t Word) {
   binaryOut->write(reinterpret_cast<const char *>(&Word), sizeof(uint32_t));
 }
 
-void SPIRVProducerPass::WriteResultID(const SPIRVInstruction &Inst) {
+void SPIRVProducerPassImpl::WriteResultID(const SPIRVInstruction &Inst) {
   WriteOneWord(Inst.getResultID().get());
 }
 
-void SPIRVProducerPass::WriteWordCountAndOpcode(const SPIRVInstruction &Inst) {
+void SPIRVProducerPassImpl::WriteWordCountAndOpcode(
+    const SPIRVInstruction &Inst) {
   // High 16 bit : Word Count
   // Low 16 bit  : Opcode
   uint32_t Word = Inst.getOpcode();
@@ -5465,7 +5458,7 @@ void SPIRVProducerPass::WriteWordCountAndOpcode(const SPIRVInstruction &Inst) {
   WriteOneWord(Word);
 }
 
-void SPIRVProducerPass::WriteOperand(const SPIRVOperand &Op) {
+void SPIRVProducerPassImpl::WriteOperand(const SPIRVOperand &Op) {
   SPIRVOperandType OpTy = Op.getType();
   switch (OpTy) {
   default: {
@@ -5507,13 +5500,14 @@ void SPIRVProducerPass::WriteOperand(const SPIRVOperand &Op) {
   }
 }
 
-void SPIRVProducerPass::WriteSPIRVBinary() {
+void SPIRVProducerPassImpl::WriteSPIRVBinary() {
   for (int i = 0; i < kSectionCount; ++i) {
     WriteSPIRVBinary(SPIRVSections[i]);
   }
 }
 
-void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
+void SPIRVProducerPassImpl::WriteSPIRVBinary(
+    SPIRVInstructionList &SPIRVInstList) {
   for (const auto &Inst : SPIRVInstList) {
     const auto &Ops = Inst.getOperands();
     spv::Op Opcode = static_cast<spv::Op>(Inst.getOpcode());
@@ -5714,7 +5708,7 @@ void SPIRVProducerPass::WriteSPIRVBinary(SPIRVInstructionList &SPIRVInstList) {
   }
 }
 
-bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
+bool SPIRVProducerPassImpl::IsTypeNullable(const Type *type) const {
   switch (type->getTypeID()) {
   case Type::HalfTyID:
   case Type::FloatTyID:
@@ -5753,7 +5747,7 @@ bool SPIRVProducerPass::IsTypeNullable(const Type *type) const {
   }
 }
 
-void SPIRVProducerPass::PopulateUBOTypeMaps() {
+void SPIRVProducerPassImpl::PopulateUBOTypeMaps() {
   if (auto *offsets_md =
           module->getNamedMetadata(clspv::RemappedTypeOffsetMetadataName())) {
     // Metdata is stored as key-value pair operands. The first element of each
@@ -5802,8 +5796,8 @@ void SPIRVProducerPass::PopulateUBOTypeMaps() {
   }
 }
 
-uint64_t SPIRVProducerPass::GetTypeSizeInBits(Type *type,
-                                              const DataLayout &DL) {
+uint64_t SPIRVProducerPassImpl::GetTypeSizeInBits(Type *type,
+                                                  const DataLayout &DL) {
   auto iter = RemappedUBOTypeSizes.find(type);
   if (iter != RemappedUBOTypeSizes.end()) {
     return std::get<0>(iter->second);
@@ -5812,7 +5806,8 @@ uint64_t SPIRVProducerPass::GetTypeSizeInBits(Type *type,
   return DL.getTypeSizeInBits(type);
 }
 
-uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
+uint64_t SPIRVProducerPassImpl::GetTypeAllocSize(Type *type,
+                                                 const DataLayout &DL) {
   auto iter = RemappedUBOTypeSizes.find(type);
   if (iter != RemappedUBOTypeSizes.end()) {
     return std::get<2>(iter->second);
@@ -5821,7 +5816,7 @@ uint64_t SPIRVProducerPass::GetTypeAllocSize(Type *type, const DataLayout &DL) {
   return DL.getTypeAllocSize(type);
 }
 
-uint32_t SPIRVProducerPass::GetExplicitLayoutStructMemberOffset(
+uint32_t SPIRVProducerPassImpl::GetExplicitLayoutStructMemberOffset(
     StructType *type, unsigned member, const DataLayout &DL) {
   const auto StructLayout = DL.getStructLayout(type);
   // Search for the correct offsets if this type was remapped.
@@ -5839,7 +5834,7 @@ uint32_t SPIRVProducerPass::GetExplicitLayoutStructMemberOffset(
   return ByteOffset;
 }
 
-void SPIRVProducerPass::setVariablePointersCapabilities(
+void SPIRVProducerPassImpl::setVariablePointersCapabilities(
     unsigned address_space) {
   if (GetStorageClass(address_space) == spv::StorageClassStorageBuffer) {
     setVariablePointersStorageBuffer();
@@ -5848,7 +5843,7 @@ void SPIRVProducerPass::setVariablePointersCapabilities(
   }
 }
 
-Value *SPIRVProducerPass::GetBasePointer(Value *v) {
+Value *SPIRVProducerPassImpl::GetBasePointer(Value *v) {
   if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
     return GetBasePointer(gep->getPointerOperand());
   }
@@ -5857,7 +5852,7 @@ Value *SPIRVProducerPass::GetBasePointer(Value *v) {
   return v;
 }
 
-bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
+bool SPIRVProducerPassImpl::sameResource(Value *lhs, Value *rhs) const {
   if (auto *lhs_call = dyn_cast<CallInst>(lhs)) {
     if (auto *rhs_call = dyn_cast<CallInst>(rhs)) {
       const auto &lhs_func_info =
@@ -5882,7 +5877,7 @@ bool SPIRVProducerPass::sameResource(Value *lhs, Value *rhs) const {
   return false;
 }
 
-bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
+bool SPIRVProducerPassImpl::selectFromSameObject(Instruction *inst) {
   assert(inst->getType()->isPointerTy());
   assert(GetStorageClass(inst->getType()->getPointerAddressSpace()) ==
          spv::StorageClassStorageBuffer);
@@ -5944,7 +5939,7 @@ bool SPIRVProducerPass::selectFromSameObject(Instruction *inst) {
   return false;
 }
 
-bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
+bool SPIRVProducerPassImpl::CalledWithCoherentResource(Argument &Arg) {
   if (!Arg.getType()->isPointerTy() ||
       Arg.getType()->getPointerAddressSpace() != clspv::AddressSpace::Global) {
     // Only SSBOs need to be annotated as coherent.
@@ -6002,15 +5997,17 @@ bool SPIRVProducerPass::CalledWithCoherentResource(Argument &Arg) {
   return false;
 }
 
-void SPIRVProducerPass::PopulateStructuredCFGMaps() {
+void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
   // First, track loop merges and continues.
   DenseSet<BasicBlock *> LoopMergesAndContinues;
   for (auto &F : *module) {
     if (F.isDeclaration())
       continue;
 
-    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
-    const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>(F).getLoopInfo();
+    auto &FAM = MAM->getResult<FunctionAnalysisManagerModuleProxy>(*module)
+                    .getManager();
+    auto &DT = FAM.getResult<DominatorTreeAnalysis>(F);
+    auto &LI = FAM.getResult<LoopAnalysis>(F);
     std::deque<BasicBlock *> order;
     DenseSet<BasicBlock *> visited;
     clspv::ComputeStructuredOrder(&*F.begin(), &DT, LI, &order, &visited);
@@ -6089,7 +6086,7 @@ void SPIRVProducerPass::PopulateStructuredCFGMaps() {
   }
 }
 
-SPIRVID SPIRVProducerPass::getReflectionImport() {
+SPIRVID SPIRVProducerPassImpl::getReflectionImport() {
   if (!ReflectionID.isValid()) {
     if (SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_6) {
       addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
@@ -6100,13 +6097,13 @@ SPIRVID SPIRVProducerPass::getReflectionImport() {
   return ReflectionID;
 }
 
-void SPIRVProducerPass::GenerateReflection() {
+void SPIRVProducerPassImpl::GenerateReflection() {
   GenerateKernelReflection();
   GeneratePushConstantReflection();
   GenerateSpecConstantReflection();
 }
 
-void SPIRVProducerPass::GeneratePushConstantReflection() {
+void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
   if (auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName())) {
     auto const &DL = module->getDataLayout();
     auto MD = GV->getMetadata(clspv::PushConstantsMetadataName());
@@ -6166,7 +6163,7 @@ void SPIRVProducerPass::GeneratePushConstantReflection() {
   }
 }
 
-void SPIRVProducerPass::GenerateSpecConstantReflection() {
+void SPIRVProducerPassImpl::GenerateSpecConstantReflection() {
   const uint32_t kMax = std::numeric_limits<uint32_t>::max();
   uint32_t wgsize_id[3] = {kMax, kMax, kMax};
   uint32_t global_offset_id[3] = {kMax, kMax, kMax};
@@ -6248,7 +6245,7 @@ void SPIRVProducerPass::GenerateSpecConstantReflection() {
   }
 }
 
-void SPIRVProducerPass::GenerateKernelReflection() {
+void SPIRVProducerPassImpl::GenerateKernelReflection() {
   const auto &DL = module->getDataLayout();
   auto import_id = getReflectionImport();
   auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
@@ -6407,7 +6404,7 @@ void SPIRVProducerPass::GenerateKernelReflection() {
   }
 }
 
-void SPIRVProducerPass::AddArgumentReflection(
+void SPIRVProducerPassImpl::AddArgumentReflection(
     const Function &kernelFn, SPIRVID kernel_decl, const std::string &name,
     clspv::ArgKind arg_kind, uint32_t ordinal, uint32_t descriptor_set,
     uint32_t binding, uint32_t offset, uint32_t size, uint32_t spec_id,

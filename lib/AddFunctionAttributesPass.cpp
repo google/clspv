@@ -16,43 +16,21 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
+#include "AddFunctionAttributesPass.h"
 #include "Constants.h"
-#include "Passes.h"
-
-#define DEBUG_TYPE "addfunctionattributes"
 
 using namespace llvm;
 
-namespace {
-class AddFunctionAttributesPass : public ModulePass {
-public:
-  static char ID;
-  AddFunctionAttributesPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char AddFunctionAttributesPass::ID = 0;
-INITIALIZE_PASS(AddFunctionAttributesPass, "AddFunctionAttributes",
-                "Add function attributes to builtin functions", false, false)
-
-namespace clspv {
-ModulePass *createAddFunctionAttributesPass() {
-  return new AddFunctionAttributesPass();
-}
-} // namespace clspv
-
-bool AddFunctionAttributesPass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses
+clspv::AddFunctionAttributesPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Add ReadNone and Speculatable to literal sampler functions to avoid loop
   // optimizations producing phis with them.
   if (auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction())) {
     F->addFnAttr(Attribute::AttrKind::ReadNone);
     F->addFnAttr(Attribute::AttrKind::Speculatable);
-    changed = true;
   }
 
-  return changed;
+  return PA;
 }

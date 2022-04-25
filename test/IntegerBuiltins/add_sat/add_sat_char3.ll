@@ -1,5 +1,5 @@
 
-; RUN: clspv-opt -ReplaceOpenCLBuiltin %s -o %t.ll
+; RUN: clspv-opt --passes=replace-opencl-builtin %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; AUTO-GENERATED TEST FILE

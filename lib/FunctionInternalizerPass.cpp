@@ -15,32 +15,14 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
-#include "Passes.h"
+#include "FunctionInternalizerPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "FunctionInternalizer"
 
-namespace {
-struct FunctionInternalizerPass : public ModulePass {
-  static char ID;
-  FunctionInternalizerPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char FunctionInternalizerPass::ID = 0;
-INITIALIZE_PASS(FunctionInternalizerPass, "FunctionInternalizer",
-                "Function Internalizer Pass", false, false)
-
-namespace clspv {
-ModulePass *createFunctionInternalizerPass() {
-  return new FunctionInternalizerPass();
-}
-} // namespace clspv
-
-bool FunctionInternalizerPass::runOnModule(Module &M) {
+PreservedAnalyses
+clspv::FunctionInternalizerPass::run(Module &M, ModuleAnalysisManager &) {
   SmallVector<Function *, 8> ToRemoves;
 
   for (auto &F : M) {
@@ -53,5 +35,6 @@ bool FunctionInternalizerPass::runOnModule(Module &M) {
     F->eraseFromParent();
   }
 
-  return !ToRemoves.empty();
+  PreservedAnalyses PA;
+  return PA;
 }

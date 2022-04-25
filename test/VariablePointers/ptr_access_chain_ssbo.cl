@@ -5,6 +5,7 @@
 
 // The OpPtrAccessChain requires VariablePointersStorageBuffer. So does passing
 // the of the argument though...
+__attribute__((noinline))
 int bar(global int* x) { return x[1]; }
 kernel void foo(global int* in, global int* out) {
   *out = bar(in);

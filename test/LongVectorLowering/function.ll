@@ -1,4 +1,4 @@
-; RUN: clspv-opt --LongVectorLowering --early-cse --instcombine %s -o %t
+; RUN: clspv-opt --passes=long-vector-lowering,early-cse,instcombine %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; Test that function arguments and return types can be lowered;

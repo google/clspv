@@ -1,4 +1,4 @@
-; RUN: clspv-opt --ThreeElementVectorLowering --vec3-to-vec4 %s -o %t
+; RUN: clspv-opt --passes=three-element-vector-lowering --vec3-to-vec4 %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK: phi <4 x i32>

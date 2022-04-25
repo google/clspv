@@ -31,11 +31,11 @@
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
+#include "AllocateDescriptorsPass.h"
 #include "ArgKind.h"
 #include "Builtins.h"
 #include "Constants.h"
 #include "DescriptorCounter.h"
-#include "Passes.h"
 #include "SpecConstant.h"
 
 using namespace llvm;
@@ -52,145 +52,25 @@ const uint32_t kMemorySemanticsUniformMemory = 0x40;
 // SPIR-V. Used to test barrier semantics.
 const uint32_t kMemorySemanticsImageMemory = 0x800;
 
+} // namespace
+
 cl::opt<bool> ShowDescriptors("show-desc", cl::init(false), cl::Hidden,
                               cl::desc("Show descriptors"));
 
-using SamplerMapType = llvm::ArrayRef<std::pair<unsigned, std::string>>;
-
-class AllocateDescriptorsPass final : public ModulePass {
-public:
-  static char ID;
-  AllocateDescriptorsPass()
-      : ModulePass(ID), sampler_map_(), descriptor_set_(0), binding_(0) {}
-  bool runOnModule(Module &M) override;
-
-  SamplerMapType &sampler_map() { return sampler_map_; }
-
-private:
-  // Allocates descriptors for all samplers and kernel arguments that have uses.
-  // Replace their uses with calls to a special compiler builtin.  Returns true
-  // if we changed the module.
-  bool AllocateDescriptors(Module &M);
-
-  // Allocate descriptor for literal samplers.  Returns true if we changed the
-  // module.
-  bool AllocateLiteralSamplerDescriptors(Module &M);
-
-  // Allocate descriptor for kernel arguments with uses.  Returns true if we
-  // changed the module.
-  bool AllocateKernelArgDescriptors(Module &M);
-
-  bool AllocateLocalKernelArgSpecIds(Module &M);
-
-  // Allocates the next descriptor set and resets the tracked binding number to
-  // 0.
-  unsigned StartNewDescriptorSet(Module &M) {
-    // Allocate the descriptor set we used.
-    binding_ = 0;
-    const auto set = clspv::TakeDescriptorIndex(&M);
-    assert(set == descriptor_set_);
-    descriptor_set_++;
-    return set;
-  }
-
-  // Returns true if |F| or call function |F| calls contains a global barrier.
-  // Specifically, it checks that the memory semantics operand contains
-  // UniformMemory memory semantics.
-  //
-  // The compiler targets OpenCL 1.2, which only provides support for relaxed
-  // atomics which means they cannot be used as synchronization primitives.
-  // That is why the pass does not consider them for the addition of coherence.
-  bool CallTreeContainsGlobalBarrier(Function *F);
-
-  // Returns a pair indicating if |V| is read and/or written to.
-  // Traces the use chain looking for loads and stores and proceeding through
-  // function calls until a non-pointer value is encountered.
-  //
-  // This function assumes loads, stores and function calls are the only
-  // instructions that can read or write to memory.
-  std::pair<bool, bool> HasReadsAndWrites(Value *V);
-
-  // Cache for which functions' call trees contain a global barrier.
-  DenseMap<Function *, bool> barrier_map_;
-
-  // The sampler map, which is an array ref of pairs, each of which is the
-  // sampler constant as an integer, followed by the string expression for
-  // the sampler.
-  SamplerMapType sampler_map_;
-
-  // Which descriptor set are we using?
-  int descriptor_set_;
-  // The next binding number to use.
-  int binding_;
-
-  // What makes a kernel argument require a new descriptor?
-  struct KernelArgDiscriminant {
-    KernelArgDiscriminant(Type *the_type = nullptr, int the_arg_index = 0,
-                          int the_separation_token = 0, int is_coherent = 0)
-        : type(the_type), arg_index(the_arg_index),
-          separation_token(the_separation_token), coherent(is_coherent) {}
-    // Different argument type requires different descriptor since logical
-    // addressing requires strongly typed storage buffer variables.
-    Type *type;
-    // If we have multiple arguments of the same type to the same kernel,
-    // then we have to use distinct descriptors because the user could
-    // bind different storage buffers for them.  Use argument index
-    // as a proxy for distinctness.  This might overcount, but we
-    // don't worry about yet.
-    int arg_index;
-    // An extra bit of data that can be used to separate resource
-    // variables that otherwise share the same type and argument index.
-    // By default this will be zero, and so it won't force any separation.
-    int separation_token;
-    // An extra bit that marks whether the variable is coherent. This means
-    // coherent and non-coherent variables will not share a binding.
-    int coherent;
-  };
-  struct KADDenseMapInfo {
-    static KernelArgDiscriminant getEmptyKey() {
-      return KernelArgDiscriminant(nullptr, 0, 0);
-    }
-    static KernelArgDiscriminant getTombstoneKey() {
-      return KernelArgDiscriminant(nullptr, -1, 0);
-    }
-    static unsigned getHashValue(const KernelArgDiscriminant &key) {
-      return unsigned(uintptr_t(key.type)) ^ key.arg_index ^
-             key.separation_token ^ key.coherent;
-    }
-    static bool isEqual(const KernelArgDiscriminant &lhs,
-                        const KernelArgDiscriminant &rhs) {
-      return lhs.type == rhs.type && lhs.arg_index == rhs.arg_index &&
-             lhs.separation_token == rhs.separation_token &&
-             lhs.coherent == rhs.coherent;
-    }
-  };
-};
-} // namespace
-
-char AllocateDescriptorsPass::ID = 0;
-INITIALIZE_PASS(AllocateDescriptorsPass, "AllocateDescriptorsPass",
-                "Allocate resource descriptors", false, false)
-
-namespace clspv {
-ModulePass *createAllocateDescriptorsPass(SamplerMapType sampler_map) {
-  auto *result = new AllocateDescriptorsPass();
-  result->sampler_map() = sampler_map;
-  return result;
-}
-} // namespace clspv
-
-bool AllocateDescriptorsPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::AllocateDescriptorsPass::run(Module &M,
+                                                      ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Samplers from the sampler map always grab descriptor set 0.
-  Changed |= AllocateLiteralSamplerDescriptors(M);
-  Changed |= AllocateKernelArgDescriptors(M);
-  Changed |= AllocateLocalKernelArgSpecIds(M);
+  AllocateLiteralSamplerDescriptors(M);
+  AllocateKernelArgDescriptors(M);
+  AllocateLocalKernelArgSpecIds(M);
 
-  return Changed;
+  return PA;
 }
 
-bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
+bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
+    Module &M) {
   if (ShowDescriptors) {
     outs() << "Allocate literal sampler descriptors\n";
   }
@@ -339,7 +219,7 @@ bool AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(Module &M) {
   return Changed;
 }
 
-bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
+bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
   bool Changed = false;
   if (ShowDescriptors) {
     outs() << "Allocate kernel arg descriptors\n";
@@ -848,7 +728,7 @@ bool AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
   return Changed;
 }
 
-bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
+bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   bool Changed = false;
   if (ShowDescriptors) {
     outs() << "Allocate local kernel arg spec ids\n";
@@ -972,7 +852,8 @@ bool AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   return Changed;
 }
 
-bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
+bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
+    Function *F) {
   auto iter = barrier_map_.find(F);
   if (iter != barrier_map_.end()) {
     return iter->second;
@@ -1028,7 +909,8 @@ bool AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(Function *F) {
   return uses_barrier;
 }
 
-std::pair<bool, bool> AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
+std::pair<bool, bool>
+clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
   // Atomics and OpenCL builtins modf and frexp are all represented as function
   // calls.
   //

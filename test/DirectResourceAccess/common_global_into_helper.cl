@@ -11,10 +11,12 @@
 //      MAP: kernel,bar,arg,m,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4
 // MAP-NONE: kernel
 
+__attribute__((noinline))
 float core(global float *arr, int n) {
   return arr[n];
 }
 
+__attribute__((noinline))
 float apple(global float *arr, int n) {
   return core(arr, n) + core(arr, n+1);
 }

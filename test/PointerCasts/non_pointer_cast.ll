@@ -1,4 +1,4 @@
-; RUN: clspv-opt --SimplifyPointerBitcast %s -o %t
+; RUN: clspv-opt --passes=simplify-pointer-bitcast %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; Ensure the pass doesn't crash on this input and properly simplifies the cast.

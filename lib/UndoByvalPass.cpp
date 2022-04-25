@@ -19,30 +19,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "Passes.h"
+#include "UndoByvalPass.h"
 
 using namespace llvm;
 
-#define DEBUG_TYPE "undobyval"
-
-namespace {
-struct UndoByvalPass : public ModulePass {
-  static char ID;
-  UndoByvalPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char UndoByvalPass::ID = 0;
-INITIALIZE_PASS(UndoByvalPass, "UndoByval", "Undo Byval Pass", false, false)
-
-namespace clspv {
-llvm::ModulePass *createUndoByvalPass() { return new UndoByvalPass(); }
-} // namespace clspv
-
-bool UndoByvalPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
+                                            ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   SmallVector<Function *, 8> WorkList;
   for (Function &F : M) {
@@ -56,7 +39,6 @@ bool UndoByvalPass::runOnModule(Module &M) {
       // Check byval attribute and build new function's parameter type.
       if (Arg.hasByValAttr()) {
         WorkList.push_back(&F);
-        Changed = true;
         break;
       }
     }
@@ -173,5 +155,5 @@ bool UndoByvalPass::runOnModule(Module &M) {
     }
   }
 
-  return Changed;
+  return PA;
 }

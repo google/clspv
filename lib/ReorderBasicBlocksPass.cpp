@@ -23,46 +23,21 @@
 #include "clspv/Option.h"
 
 #include "ComputeStructuredOrder.h"
-#include "Passes.h"
+#include "ReorderBasicBlocksPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "reorderbbs"
 
-namespace {
-struct ReorderBasicBlocksPass : public FunctionPass {
-  static char ID;
-  ReorderBasicBlocksPass() : FunctionPass(ID) {}
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<DominatorTreeWrapperPass>();
-    AU.addRequired<LoopInfoWrapperPass>();
-  }
-
-  bool runOnFunction(Function &F) override;
-};
-} // namespace
-
-char ReorderBasicBlocksPass::ID = 0;
-INITIALIZE_PASS(ReorderBasicBlocksPass, "ReorderBasicBlocks",
-                "Reorder Basic Blocks Pass", false, false)
-
-namespace clspv {
-FunctionPass *createReorderBasicBlocksPass() {
-  return new ReorderBasicBlocksPass();
-}
-} // namespace clspv
-
-bool ReorderBasicBlocksPass::runOnFunction(Function &F) {
-  bool Changed = false;
-
-  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+PreservedAnalyses
+clspv::ReorderBasicBlocksPass::run(Function &F, FunctionAnalysisManager &FAM) {
+  auto &DT = FAM.getResult<DominatorTreeAnalysis>(F);
   if (clspv::Option::HackBlockOrder()) {
     // Order basic blocks according to structured order. Structured subgraphs
     // will be ordered contiguously within the binary.
     //
     // Assumes CFG has been structurized.
-    const LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+    auto &LI = FAM.getResult<LoopAnalysis>(F);
     std::deque<BasicBlock *> order;
     DenseSet<BasicBlock *> visited;
     clspv::ComputeStructuredOrder(&*F.begin(), &DT, LI, &order, &visited);
@@ -83,5 +58,6 @@ bool ReorderBasicBlocksPass::runOnFunction(Function &F) {
     }
   }
 
-  return Changed;
+  PreservedAnalyses PA;
+  return PA;
 }

@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t -ReplacePointerBitcast
+; RUN: clspv-opt %s -o %t --passes=replace-pointer-bitcast
 ; RUN: FileCheck %s < %t
 
 ; CHECK-DAG: [[out:%[a-zA-Z0-9_.]+]] = type { { i32 }, { i32 } }

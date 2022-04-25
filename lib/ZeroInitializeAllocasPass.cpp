@@ -23,7 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Passes.h"
+#include "ZeroInitializeAllocasPass.h"
 
 using namespace llvm;
 
@@ -35,28 +35,13 @@ llvm::cl::opt<bool>
     no_zero_allocas("no-zero-allocas", llvm::cl::init(false),
                     llvm::cl::desc("Don't zero-initialize stack variables"));
 
-struct ZeroInitializeAllocasPass : public ModulePass {
-  static char ID;
-  ZeroInitializeAllocasPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
 } // namespace
 
-char ZeroInitializeAllocasPass::ID = 0;
-INITIALIZE_PASS(ZeroInitializeAllocasPass, "ZeroInitializeAllocasPass",
-                "Zero-initialize stack variables", false, false)
-
-namespace clspv {
-llvm::ModulePass *createZeroInitializeAllocasPass() {
-  return new ZeroInitializeAllocasPass();
-}
-} // namespace clspv
-
-bool ZeroInitializeAllocasPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::ZeroInitializeAllocasPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (no_zero_allocas)
-    return Changed;
+    return PA;
 
   SmallVector<AllocaInst *, 8> WorkList;
   for (Function &F : M) {
@@ -76,5 +61,5 @@ bool ZeroInitializeAllocasPass::runOnModule(Module &M) {
     store->insertAfter(alloca);
   }
 
-  return Changed;
+  return PA;
 }

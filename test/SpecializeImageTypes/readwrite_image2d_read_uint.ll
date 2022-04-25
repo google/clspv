@@ -1,4 +1,4 @@
-; RUN: clspv-opt -SpecializeImageTypesPass %s -o %t -cl-std=CL2.0
+; RUN: clspv-opt --passes=specialize-image-types %s -o %t -cl-std=CL2.0
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image2d_rw_t.uint]] = type opaque

@@ -1,4 +1,4 @@
-; RUN: clspv-opt --LongVectorLowering %s -o %t
+; RUN: clspv-opt --passes=long-vector-lowering %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK: phi [8 x i32]

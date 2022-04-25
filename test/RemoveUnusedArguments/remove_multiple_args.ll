@@ -1,4 +1,4 @@
-; RUN: clspv-opt --RemoveUnusedArguments %s -o %t.ll
+; RUN: clspv-opt --passes=remove-unused-arguments %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: @bar(float [[y:%[a-zA-Z0-9_.]+]]) {

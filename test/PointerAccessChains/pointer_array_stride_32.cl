@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 static double4 bar(global double4* in, int n) {
   return in[n];
 }

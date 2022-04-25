@@ -28,7 +28,7 @@
 #include "clspv/Option.h"
 
 #include "Builtins.h"
-#include "Passes.h"
+#include "SignedCompareFixupPass.h"
 
 using namespace clspv;
 using namespace llvm;
@@ -40,51 +40,13 @@ namespace {
 cl::opt<bool> ShowSCF("show-scf", cl::init(false), cl::Hidden,
                       cl::desc("Show signed compare fixup"));
 
-class SignedCompareFixupPass final : public ModulePass {
-public:
-  static char ID;
-  SignedCompareFixupPass() : ModulePass(ID) {}
-
-  // Rewrite the module to avoid signed integer comparisons.
-  bool runOnModule(Module &M) override;
-
-private:
-  // Returns true if the given predicate is a signed integer comparison.
-  bool IsSignedRelational(CmpInst::Predicate pred) {
-    switch (pred) {
-    case CmpInst::ICMP_SGT:
-    case CmpInst::ICMP_SGE:
-    case CmpInst::ICMP_SLT:
-    case CmpInst::ICMP_SLE:
-      return true;
-    default:
-      break;
-    }
-    return false;
-  }
-
-  // Replaces |call| which is a smin, smax or sclamp call with an equivalent
-  // instruction stream. Also adds the comparisons introduced to |work_list|.
-  void ReplaceBuiltin(CallInst *call, Builtins::BuiltinType type,
-                      SmallVectorImpl<ICmpInst *> *work_list);
-};
 } // namespace
 
-char SignedCompareFixupPass::ID = 0;
-INITIALIZE_PASS(SignedCompareFixupPass, "SignedCompareFixupPass",
-                "Signed Integer Compare Fixup", false, false)
-
-namespace clspv {
-ModulePass *createSignedCompareFixupPass() {
-  return new SignedCompareFixupPass();
-}
-} // namespace clspv
-
-namespace {
-bool SignedCompareFixupPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses SignedCompareFixupPass::run(Module &M,
+                                              ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (!clspv::Option::HackSignedCompareFixup()) {
-    return Changed;
+    return PA;
   }
 
   SmallVector<Instruction *, 16> to_remove;
@@ -112,7 +74,6 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
                 outs() << "SCF: Replace " << *call << "\n";
               }
               ReplaceBuiltin(call, info.getType(), &work_list);
-              Changed = true;
               to_remove.push_back(call);
             }
             break;
@@ -132,7 +93,6 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
                                ? Builtins::kMax
                                : Builtins::kMin,
                            &work_list);
-            Changed = true;
             to_remove.push_back(call);
             break;
           default:
@@ -153,8 +113,6 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
   // First break up any vector cases in to scalar cases.
   SmallVector<ICmpInst *, 16> scalar_work_list;
   for (auto *icmp : work_list) {
-    Changed = true;
-
     auto *x = icmp->getOperand(0);
     auto *y = icmp->getOperand(1);
     auto *x_type = x->getType();
@@ -250,7 +208,7 @@ bool SignedCompareFixupPass::runOnModule(Module &M) {
     outs() << "\n\nSCF:  DONE\n";
   }
 
-  return Changed;
+  return PA;
 }
 
 void SignedCompareFixupPass::ReplaceBuiltin(
@@ -288,5 +246,3 @@ void SignedCompareFixupPass::ReplaceBuiltin(
   }
   call->replaceAllUsesWith(out);
 }
-
-} // namespace

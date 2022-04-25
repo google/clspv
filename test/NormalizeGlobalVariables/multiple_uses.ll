@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t -ClusterModuleScopeConstantVars
+; RUN: clspv-opt %s -o %t --passes=cluster-constants
 ; RUN: FileCheck %s < %t
 
 ; Cluster the original variable and the rewritten version.

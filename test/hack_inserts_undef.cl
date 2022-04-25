@@ -10,6 +10,7 @@
 
 typedef struct { float a, b, c, d; } S;
 
+__attribute__((noinline))
 S boo(float a) {
   S result;
   result.a = a;

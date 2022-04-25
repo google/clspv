@@ -3,10 +3,12 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 void write_local(__global int* in, __local int* tmp, unsigned int id) {
   tmp[id] = in[id];
 }
 
+__attribute__((noinline))
 void read_local(__global int* out, __local int* tmp, unsigned int id) {
   out[id] = tmp[id];
 }

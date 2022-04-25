@@ -13,6 +13,7 @@
 
 typedef struct { float a, b, c, d; } S;
 
+__attribute__((noinline))
 S boo(float a) {
   S result = {10.0f, 11.0f, 12.0f, 13.0f};
   result.c = a+2.0f;

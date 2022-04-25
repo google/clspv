@@ -2,9 +2,7 @@
 ; check any specific transformation.  It just makes sure that the options
 ; are accepted.
 
-; RUN: clspv-opt %s -o %t.ll -AllocateDescriptorsPass -ClusterModuleScopeConstantVars -ClusterPodKernelArgumentsPass -DefineOpenCLWorkItemBuiltins -DirectResourceAccessPass -FunctionInternalizer -HideConstantLoads -InlineEntryPointsPass -InlineFuncWithPointerBitCastArg -InlineFuncWithPointerToFunctionArgPass -InlineFuncWithSingleCallSite -instcombine -LongVectorLowering -MultiVersionUBOFunctionsPass -OpenCLInliner -RemoveUnusedArguments -ReorderBasicBlocks -ReplaceLLVMIntrinsics -ReplaceOpenCLBuiltin -ReplacePointerBitcast -RewriteInserts -Scalarize -ShareModuleScopeVariablesPass -SignedCompareFixupPass -SimplifyPointerBitcast -SplatArg -SplatSelectCond -UBOTypeTransformPass -UndoBool -UndoByval -UndoGetElementPtrConstantExpr -UndoSRet -UndoTranslateSamplerFold -UndoTruncateToOddInteger -UnhideConstantLoads -ZeroInitializeAllocasPass
-; RUN: FileCheck %s < %t.ll
-; CHECK: @__spirv_WorkgroupSize =
+; RUN: clspv-opt %s -o %t.ll --passes=native-math,opencl-inliner,remove-unused-arguments,replace-llvm-intrinsics,replace-opencl-builtin,replace-pointer-bitcast,rewrite-inserts-pass,scalarize,share-module-scope-vars,signed-compare-fixup,simplify-pointer-bitcast,splat-arg,splat-selection-condition,specialize-image-types,strip-freeze,three-element-vector-lowering,ubo-type-transform,undo-bool,undo-byval,undo-gep-constantexpr,undo-instcombine,undo-sret,undo-translate-sampler-fold,undo-truncate-to-odd-integer,unhide-constant-loads,zero-initialize-allocas,fixup-structured-cfg,reorder-basic-blocks,verify
 
 define spir_kernel void @foo() local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !3 !kernel_arg_type !3 !kernel_arg_base_type !3 !kernel_arg_type_qual !3 !clspv.pod_args_impl !4 {
 entry:

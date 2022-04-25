@@ -7,6 +7,7 @@
 // CHECK: [[entry]] = OpFunction
 // CHECK: OpFunctionCall
 
+__attribute__((noinline))
 int func_1(global int *in, int n) { return in[n]; }
 kernel void func_0(global int *in, global int *out, int n) {
   out[n] = func_1(in, n);

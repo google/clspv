@@ -37,7 +37,7 @@
 #include "Builtins.h"
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
-#include "Passes.h"
+#include "DirectResourceAccessPass.h"
 
 using namespace llvm;
 
@@ -48,42 +48,11 @@ namespace {
 cl::opt<bool> ShowDRA("show-dra", cl::init(false), cl::Hidden,
                       cl::desc("Show direct resource access details"));
 
-using SamplerMapType = llvm::ArrayRef<std::pair<unsigned, std::string>>;
-
-class DirectResourceAccessPass final : public ModulePass {
-public:
-  static char ID;
-  DirectResourceAccessPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  // For each kernel argument that will map to a resource variable (descriptor),
-  // try to rewrite the uses of the argument as a direct access of the resource.
-  // We can only do this if all the callees of the function use the same
-  // resource access value for that argument.  Returns true if the module
-  // changed.
-  bool RewriteResourceAccesses(Function *fn);
-
-  // Rewrite uses of this resrouce-based arg if all the callers pass in the
-  // same resource access.  Returns true if the module changed.
-  bool RewriteAccessesForArg(Function *fn, int arg_index, Argument &arg);
-};
-
 } // namespace
 
-char DirectResourceAccessPass::ID = 0;
-INITIALIZE_PASS(DirectResourceAccessPass, "DirectResourceAccessPass",
-                "Direct resource access", false, false)
-
-namespace clspv {
-ModulePass *createDirectResourceAccessPass() {
-  return new DirectResourceAccessPass();
-}
-} // namespace clspv
-
-namespace {
-bool DirectResourceAccessPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::DirectResourceAccessPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   if (clspv::Option::DirectResourceAccess()) {
     auto ordered_functions = clspv::CallGraphOrderedFunctions(M);
@@ -95,14 +64,14 @@ bool DirectResourceAccessPass::runOnModule(Module &M) {
     }
 
     for (auto *fn : ordered_functions) {
-      Changed |= RewriteResourceAccesses(fn);
+      RewriteResourceAccesses(fn);
     }
   }
 
-  return Changed;
+  return PA;
 }
 
-bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
+bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   bool Changed = false;
   int arg_index = 0;
   for (Argument &arg : fn->args()) {
@@ -124,9 +93,9 @@ bool DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   return Changed;
 }
 
-bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
-                                                     int arg_index,
-                                                     Argument &arg) {
+bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
+                                                            int arg_index,
+                                                            Argument &arg) {
   bool Changed = false;
   if (fn->use_empty()) {
     return false;
@@ -269,5 +238,3 @@ bool DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
 
   return Changed;
 }
-
-} // namespace

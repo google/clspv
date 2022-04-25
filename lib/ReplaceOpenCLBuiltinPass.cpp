@@ -36,14 +36,12 @@
 
 #include "Builtins.h"
 #include "Constants.h"
-#include "Passes.h"
+#include "ReplaceOpenCLBuiltinPass.h"
 #include "SPIRVOp.h"
 #include "Types.h"
 
 using namespace clspv;
 using namespace llvm;
-
-#define DEBUG_TYPE "ReplaceOpenCLBuiltin"
 
 namespace {
 
@@ -224,112 +222,11 @@ bool replaceCallsWithValue(Function &F,
   return Changed;
 }
 
-struct ReplaceOpenCLBuiltinPass final : public ModulePass {
-  static char ID;
-  ReplaceOpenCLBuiltinPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  bool runOnFunction(Function &F);
-  bool replaceAbs(Function &F);
-  bool replaceAbsDiff(Function &F, bool is_signed);
-  bool replaceCopysign(Function &F);
-  bool replaceRecip(Function &F);
-  bool replaceDivide(Function &F);
-  bool replaceDot(Function &F);
-  bool replaceFmod(Function &F);
-  bool replaceExp10(Function &F, const std::string &basename);
-  bool replaceLog10(Function &F, const std::string &basename);
-  bool replaceLog1p(Function &F);
-  bool replaceBarrier(Function &F, bool subgroup = false);
-  bool replaceMemFence(Function &F, spv::MemorySemanticsMask semantics);
-  bool replacePrefetch(Function &F);
-  bool replaceRelational(Function &F, CmpInst::Predicate P);
-  bool replaceIsInfAndIsNan(Function &F, spv::Op SPIRVOp, int32_t isvec);
-  bool replaceIsFinite(Function &F);
-  bool replaceAllAndAny(Function &F, spv::Op SPIRVOp);
-  bool replaceUpsample(Function &F);
-  bool replaceRotate(Function &F);
-  bool replaceConvert(Function &F, bool SrcIsSigned, bool DstIsSigned);
-  bool replaceMulHi(Function &F, bool is_signed, bool is_mad = false);
-  bool replaceSelect(Function &F);
-  bool replaceBitSelect(Function &F);
-  bool replaceStep(Function &F, bool is_smooth);
-  bool replaceSignbit(Function &F, bool is_vec);
-  bool replaceMul(Function &F, bool is_float, bool is_mad);
-  bool replaceVloadHalf(Function &F, const std::string &name, int vec_size);
-  bool replaceVloadHalf(Function &F);
-  bool replaceVloadHalf2(Function &F);
-  bool replaceVloadHalf4(Function &F);
-  bool replaceClspvVloadaHalf2(Function &F);
-  bool replaceClspvVloadaHalf4(Function &F);
-  bool replaceVstoreHalf(Function &F, int vec_size);
-  bool replaceVstoreHalf(Function &F);
-  bool replaceVstoreHalf2(Function &F);
-  bool replaceVstoreHalf4(Function &F);
-  bool replaceHalfReadImage(Function &F);
-  bool replaceHalfWriteImage(Function &F);
-  bool replaceSampledReadImageWithIntCoords(Function &F);
-  bool replaceAtomics(Function &F, spv::Op Op);
-  bool replaceAtomics(Function &F, llvm::AtomicRMWInst::BinOp Op);
-  bool replaceAtomicLoad(Function &F);
-  bool replaceExplicitAtomics(Function &F, spv::Op Op,
-                              spv::MemorySemanticsMask semantics =
-                                  spv::MemorySemanticsAcquireReleaseMask);
-  bool replaceAtomicCompareExchange(Function &);
-  bool replaceCross(Function &F);
-  bool replaceFract(Function &F, int vec_size);
-  bool replaceVload(Function &F);
-  bool replaceVstore(Function &F);
-  bool replaceAddSubSat(Function &F, bool is_signed, bool is_add);
-  bool replaceHadd(Function &F, bool is_signed,
-                   Instruction::BinaryOps join_opcode);
-  bool replaceCountZeroes(Function &F, bool leading);
-  bool replaceMadSat(Function &F, bool is_signed);
-  bool replaceOrdered(Function &F, bool is_ordered);
-  bool replaceIsNormal(Function &F);
-  bool replaceFDim(Function &F);
-  bool replaceRound(Function &F);
-  bool replaceTrigPi(Function &F, Builtins::BuiltinType type);
-  bool replaceSincos(Function &F);
-  bool replaceExpm1(Function &F);
-  bool replacePown(Function &F);
-
-  bool replaceWaitGroupEvents(Function &F);
-  GlobalVariable *
-  getOrCreateGlobalVariable(Module &M, std::string VariableName,
-                            AddressSpace::Type VariableAddressSpace);
-  Value *replaceAsyncWorkGroupCopies(Module &M, CallInst *CI, Value *Dst,
-                                     Value *Src, Value *NumGentypes,
-                                     Value *Stride, Value *Event);
-  bool replaceAsyncWorkGroupCopy(Function &F);
-  bool replaceAsyncWorkGroupStridedCopy(Function &F);
-
-  // Caches struct types for { |type|, |type| }. This prevents
-  // getOrInsertFunction from introducing a bitcasts between structs with
-  // identical contents.
-  Type *GetPairStruct(Type *type);
-
-  Value *InsertOpMulExtended(Instruction *InsertPoint, Value *a, Value *b,
-                             bool IsSigned, bool Int64 = false);
-
-  DenseMap<Type *, Type *> PairStructMap;
-};
-
 } // namespace
 
-char ReplaceOpenCLBuiltinPass::ID = 0;
-INITIALIZE_PASS(ReplaceOpenCLBuiltinPass, "ReplaceOpenCLBuiltin",
-                "Replace OpenCL Builtins Pass", false, false)
-
-namespace clspv {
-ModulePass *createReplaceOpenCLBuiltinPass() {
-  return new ReplaceOpenCLBuiltinPass();
-}
-} // namespace clspv
-
-bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
+PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
+                                                ModuleAnalysisManager &MPM) {
+  PreservedAnalyses PA;
   std::list<Function *> func_list;
   for (auto &F : M.getFunctionList()) {
     // process only function declarations
@@ -344,10 +241,10 @@ bool ReplaceOpenCLBuiltinPass::runOnModule(Module &M) {
         F->eraseFromParent();
       }
     }
-    runOnModule(M);
-    return true;
+    PA = run(M, MPM);
+    return PA;
   }
-  return false;
+  return PA;
 }
 
 bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
@@ -683,7 +580,8 @@ Type *ReplaceOpenCLBuiltinPass::GetPairStruct(Type *type) {
 
 Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
                                                      Value *a, Value *b,
-                                                     bool IsSigned, bool Int64) {
+                                                     bool IsSigned,
+                                                     bool Int64) {
 
   Type *Ty = a->getType();
   Type *RetTy = GetPairStruct(a->getType());
@@ -2863,7 +2761,6 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
 
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
-
     // This is either float or a float vector.  All the float-like
     // types are this type.
     auto result_ty = F.getReturnType();

@@ -23,47 +23,19 @@
 
 #include "clspv/Option.h"
 
-#include "Passes.h"
+#include "ScalarizePass.h"
 
 using namespace llvm;
 
-namespace {
-class ScalarizePass : public ModulePass {
-public:
-  static char ID;
-  ScalarizePass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  // Breaks a struct type phi down into its constituent elements. It does this
-  // recursively in the event the subtypes are also structs. Returns the
-  // replacement value. Returns the replacment value for the phi.
-  Value *ScalarizePhi(PHINode *phi);
-
-  // Phi nodes that need to be deleted.
-  std::vector<PHINode *> to_delete_;
-};
-} // namespace
-
-namespace clspv {
-ModulePass *createScalarizePass() { return new ScalarizePass(); }
-} // namespace clspv
-
-char ScalarizePass::ID = 0;
-INITIALIZE_PASS(ScalarizePass, "Scalarize",
-                "Scalarizes some instructions with composite returns", false,
-                false)
-
-bool ScalarizePass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::ScalarizePass::run(Module &M,
+                                            ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         if (auto *phi = dyn_cast<PHINode>(&I)) {
           if (clspv::Option::HackPhis() && phi->getType()->isStructTy()) {
             ScalarizePhi(phi);
-            Changed = true;
           }
         }
       }
@@ -73,10 +45,10 @@ bool ScalarizePass::runOnModule(Module &M) {
   for (auto *phi : to_delete_)
     phi->eraseFromParent();
 
-  return Changed;
+  return PA;
 }
 
-Value *ScalarizePass::ScalarizePhi(PHINode *phi) {
+Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
   // Break down all the struct elements of the phi into individual elements and
   // create new phis for them. Recombine the new phis into a single struct
   // after the phi instructions.

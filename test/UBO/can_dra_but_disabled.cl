@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val %t.spv --target-env vulkan1.0
 
+__attribute__((noinline))
 int4 bar(constant int4* data) { return data[0]; }
 
 kernel void foo(global int4* out, constant int4* in) {

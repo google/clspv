@@ -1,4 +1,4 @@
-; RUN: clspv-opt -SpecializeImageTypesPass %s -o %t
+; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image1d_array_wo_t.uint]] = type opaque

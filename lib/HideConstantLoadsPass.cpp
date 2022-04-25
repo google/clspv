@@ -25,7 +25,7 @@
 
 #include "clspv/AddressSpace.h"
 
-#include "Passes.h"
+#include "HideConstantLoadsPass.h"
 
 using namespace llvm;
 using std::string;
@@ -33,49 +33,24 @@ using std::string;
 #define DEBUG_TYPE "hideconstantloads"
 
 namespace {
-
 const char *kWrapFunctionPrefix = "clspv.wrap_constant_load.";
-
-class HideConstantLoadsPass : public ModulePass {
-public:
-  static char ID;
-  HideConstantLoadsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  // Return the name for the wrap function for the given type.
-  string &WrapFunctionNameForType(Type *type) {
-    auto where = function_for_type_.find(type);
-    if (where == function_for_type_.end()) {
-      // Insert it.
-      auto &result = function_for_type_[type] =
-          string(kWrapFunctionPrefix) +
-          std::to_string(function_for_type_.size());
-      return result;
-    } else {
-      return where->second;
-    }
-  }
-
-  // Maps a loaded type to the name of the wrap function for that type.
-  DenseMap<Type *, string> function_for_type_;
-};
 } // namespace
 
-char HideConstantLoadsPass::ID = 0;
-INITIALIZE_PASS(HideConstantLoadsPass, "HideConstantLoads",
-                "Hide loads from __constant and push constant memory", false,
-                false)
-
-namespace clspv {
-llvm::ModulePass *createHideConstantLoadsPass() {
-  return new HideConstantLoadsPass();
+string &clspv::HideConstantLoadsPass::WrapFunctionNameForType(Type *type) {
+  auto where = function_for_type_.find(type);
+  if (where == function_for_type_.end()) {
+    // Insert it.
+    auto &result = function_for_type_[type] =
+        string(kWrapFunctionPrefix) + std::to_string(function_for_type_.size());
+    return result;
+  } else {
+    return where->second;
+  }
 }
-} // namespace clspv
 
-bool HideConstantLoadsPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::HideConstantLoadsPass::run(Module &M,
+                                                    ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   SmallVector<LoadInst *, 16> WorkList;
   for (Function &F : M) {
@@ -93,12 +68,10 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
   }
 
   if (WorkList.size() == 0) {
-    return Changed;
+    return PA;
   }
 
   for (LoadInst *load : WorkList) {
-    Changed = true;
-
     auto loadedTy = load->getType();
 
     // The wrap function conceptually maps the loaded value to itself.
@@ -131,37 +104,12 @@ bool HideConstantLoadsPass::runOnModule(Module &M) {
     }
   }
 
-  return Changed;
+  return PA;
 }
 
-namespace {
-class UnhideConstantLoadsPass : public ModulePass {
-public:
-  static char ID;
-  UnhideConstantLoadsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  // Maps a loaded type to the name of the wrap function for that type.
-  DenseMap<Type *, string> function_for_type_;
-};
-
-} // namespace
-
-char UnhideConstantLoadsPass::ID = 0;
-INITIALIZE_PASS(UnhideConstantLoadsPass, "UnhideConstantLoads",
-                "Unhide loads from __constant and push constant memory", false,
-                false)
-
-namespace clspv {
-llvm::ModulePass *createUnhideConstantLoadsPass() {
-  return new UnhideConstantLoadsPass();
-}
-} // namespace clspv
-
-bool UnhideConstantLoadsPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::UnhideConstantLoadsPass::run(Module &M,
+                                                      ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   SmallVector<Function *, 16> WorkList;
   for (auto &F : M.getFunctionList()) {
@@ -171,7 +119,7 @@ bool UnhideConstantLoadsPass::runOnModule(Module &M) {
   }
 
   if (WorkList.size() == 0)
-    return Changed;
+    return PA;
 
   SmallVector<CallInst *, 16> RemoveList;
   for (auto *F : WorkList) {
@@ -191,5 +139,5 @@ bool UnhideConstantLoadsPass::runOnModule(Module &M) {
     F->eraseFromParent();
   }
 
-  return Changed;
+  return PA;
 }

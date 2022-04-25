@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -ReplaceLLVMIntrinsics -o %t.ll 2> %t.err
+; RUN: clspv-opt %s --passes=replace-llvm-intrinsics -o %t.ll 2> %t.err
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK-NOT: bitcast i32 addrspace(1)* %arrayidx to i8 addrspace(1)*

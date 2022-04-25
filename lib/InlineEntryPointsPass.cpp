@@ -22,43 +22,22 @@
 
 #include "clspv/Option.h"
 
-#include "Passes.h"
+#include "InlineEntryPointsPass.h"
 
 using namespace llvm;
 
-namespace {
-class InlineEntryPointsPass : public ModulePass {
-public:
-  static char ID;
-  InlineEntryPointsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  bool InlineFunctions(Module &M);
-};
-} // namespace
-
-namespace clspv {
-ModulePass *createInlineEntryPointsPass() {
-  return new InlineEntryPointsPass();
-}
-} // namespace clspv
-
-char InlineEntryPointsPass::ID = 0;
-INITIALIZE_PASS(InlineEntryPointsPass, "InlineEntryPointsPass",
-                "Exhaustively inline entry points", false, false)
-
-bool InlineEntryPointsPass::runOnModule(Module &M) {
-  bool Changed = false;
-  for (bool local_changed = true; local_changed; Changed |= local_changed) {
-    local_changed = InlineFunctions(M);
+PreservedAnalyses clspv::InlineEntryPointsPass::run(Module &M,
+                                                    ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+  bool changed = true;
+  while (changed) {
+    changed &= InlineFunctions(M);
   }
 
-  return Changed;
+  return PA;
 }
 
-bool InlineEntryPointsPass::InlineFunctions(Module &M) {
+bool clspv::InlineEntryPointsPass::InlineFunctions(Module &M) {
   bool Changed = false;
   std::vector<CallInst *> to_inline;
   for (auto &F : M) {

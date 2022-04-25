@@ -10,6 +10,7 @@
 
 typedef struct { float a, b, c, d; } S;
 
+__attribute__((noinline))
 S boo(float a) {
   S result = {0.0f}; // Produces const-aggregate-zero
   result.a = a;

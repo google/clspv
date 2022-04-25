@@ -1,4 +1,4 @@
-; RUN: clspv-opt -hack-scf -SignedCompareFixupPass %s -o %t.ll
+; RUN: clspv-opt -hack-scf --passes=signed-compare-fixup %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK-LABEL: smin

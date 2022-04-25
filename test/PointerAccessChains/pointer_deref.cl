@@ -8,6 +8,7 @@ struct Thing
   float a[128];
 };
 
+__attribute__((noinline))
 float bar(global struct Thing* a)
 {
   return (*a).a[5];
