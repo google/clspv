@@ -108,6 +108,7 @@ set(CLSPV_LLVM_COMPONENTS
   LLVMInstCombine
   LLVMInstrumentation
   LLVMObjCARCOpts
+  LLVMPasses
   LLVMScalarOpts
   LLVMSupport
   LLVMTransformUtils

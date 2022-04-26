@@ -6,6 +6,7 @@
 typedef struct { int arr[2]; } S1;
 typedef struct { S1 s1; int a; S1 s2; } S2;
 
+__attribute__((noinline))
 S2 make_s2(int n) {
   S2 s2;
   s2.s1.arr[0] = n;
@@ -16,6 +17,7 @@ S2 make_s2(int n) {
   return s2;
 }
 
+__attribute__((noinline))
 S2 choose(int n) {
   if (n > 0) return make_s2(n - 5);
   return make_s2(n + 10);

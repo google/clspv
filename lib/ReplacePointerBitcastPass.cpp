@@ -20,37 +20,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
 
-#include "Passes.h"
+#include "ReplacePointerBitcastPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "replacepointerbitcast"
-
-namespace {
-struct ReplacePointerBitcastPass : public ModulePass {
-  static char ID;
-  ReplacePointerBitcastPass() : ModulePass(ID) {}
-
-  // Returns the number of chunks of source data required to exactly
-  // cover the destination data, if the source and destination types are
-  // different sizes.  Otherwise returns 0.
-  unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth);
-  Value *CalculateNewGEPIdx(unsigned SrcTyBitWidth, unsigned DstTyBitWidth,
-                            GetElementPtrInst *GEP);
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char ReplacePointerBitcastPass::ID = 0;
-INITIALIZE_PASS(ReplacePointerBitcastPass, "ReplacePointerBitcast",
-                "Replace Pointer Bitcast Pass", false, false)
-
-namespace clspv {
-ModulePass *createReplacePointerBitcastPass() {
-  return new ReplacePointerBitcastPass();
-}
-} // namespace clspv
 
 namespace {
 
@@ -236,8 +210,9 @@ Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
 
 } // namespace
 
-unsigned ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
-                                                     unsigned DstTyBitWidth) {
+unsigned
+clspv::ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
+                                                   unsigned DstTyBitWidth) {
   unsigned NumIter = 0;
   if (SrcTyBitWidth > DstTyBitWidth) {
     if (SrcTyBitWidth % DstTyBitWidth) {
@@ -258,9 +233,8 @@ unsigned ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
   return NumIter;
 }
 
-Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(unsigned SrcTyBitWidth,
-                                                     unsigned DstTyBitWidth,
-                                                     GetElementPtrInst *GEP) {
+Value *clspv::ReplacePointerBitcastPass::CalculateNewGEPIdx(
+    unsigned SrcTyBitWidth, unsigned DstTyBitWidth, GetElementPtrInst *GEP) {
   Value *NewGEPIdx = GEP->getOperand(1);
   IRBuilder<> Builder(GEP);
 
@@ -285,8 +259,9 @@ Value *ReplacePointerBitcastPass::CalculateNewGEPIdx(unsigned SrcTyBitWidth,
   return NewGEPIdx;
 }
 
-bool ReplacePointerBitcastPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   const DataLayout &DL = M.getDataLayout();
 
@@ -380,7 +355,6 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
               ScalarWorkList.push_back(&I);
             }
 
-            Changed = true;
           } else {
             llvm_unreachable("Unsupported bitcast");
           }
@@ -1064,8 +1038,6 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
       continue;
     }
 
-    Changed = true;
-
     // If we detect a private memory, the first index of the GEP will need to be
     // zero (meaning that we are not explicitly trying to access private memory
     // out-of-bounds).
@@ -1293,5 +1265,5 @@ bool ReplacePointerBitcastPass::runOnModule(Module &M) {
 
   assert(ToBeDeleted.empty() && "Some instructions were not deleted.");
 
-  return Changed;
+  return PA;
 }

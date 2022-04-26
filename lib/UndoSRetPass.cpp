@@ -19,30 +19,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "Passes.h"
+#include "UndoSRetPass.h"
 
 using namespace llvm;
 
-#define DEBUG_TYPE "undosret"
-
-namespace {
-struct UndoSRetPass : public ModulePass {
-  static char ID;
-  UndoSRetPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char UndoSRetPass::ID = 0;
-INITIALIZE_PASS(UndoSRetPass, "UndoSRet", "Undo SRet Pass", false, false)
-
-namespace clspv {
-llvm::ModulePass *createUndoSRetPass() { return new UndoSRetPass(); }
-} // namespace clspv
-
-bool UndoSRetPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   LLVMContext &Context = M.getContext();
 
   SmallVector<Function *, 8> WorkList;
@@ -57,7 +39,6 @@ bool UndoSRetPass::runOnModule(Module &M) {
         if (Arg.hasStructRetAttr()) {
           // We found a function that needs to be modified!
           WorkList.push_back(&F);
-          Changed = true;
         }
       }
     }
@@ -193,5 +174,5 @@ bool UndoSRetPass::runOnModule(Module &M) {
     F->eraseFromParent();
   }
 
-  return Changed;
+  return PA;
 }

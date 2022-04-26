@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t -ReplaceOpenCLBuiltin
+; RUN: clspv-opt %s -o %t --passes=replace-opencl-builtin
 ; RUN: FileCheck %s < %t
 
 ; CHECK: noduplicate

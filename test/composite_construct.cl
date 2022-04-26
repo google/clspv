@@ -9,6 +9,7 @@
 
 typedef struct { float a, b, c, d; } S;
 
+__attribute__((noinline))
 S boo(float a) {
   S result;
   // This entire chain of insertions is replaced by a single 

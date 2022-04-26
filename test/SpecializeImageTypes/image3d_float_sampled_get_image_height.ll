@@ -1,4 +1,4 @@
-; RUN: clspv-opt -SpecializeImageTypesPass %s -o %t
+; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image3d_ro_t.float.sampled]] = type opaque

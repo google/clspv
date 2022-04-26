@@ -11,6 +11,7 @@ struct B {
   struct A a[4];
 };
 
+__attribute__((noinline))
 static float4 bar(global struct A* in, int n) {
   return in[n].x;
 }

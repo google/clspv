@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll -UndoInstCombine
+; RUN: clspv-opt %s -o %t.ll --passes=undo-instcombine
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load <3 x i32>, <3 x i32>* %alloca

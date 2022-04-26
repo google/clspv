@@ -10,6 +10,7 @@
 // This function takes an image argument but does not use it.
 // The optimizer is smart enough to have the call pass an undef
 // image operand.
+__attribute__((noinline))
 float2 bar(float2 coord, read_only image2d_t im) {
   return coord + (float2)(2.5, 2.5);
 }

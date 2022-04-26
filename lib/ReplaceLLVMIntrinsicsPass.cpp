@@ -25,66 +25,34 @@
 #include "spirv/unified1/spirv.hpp"
 
 #include "Constants.h"
-#include "Passes.h"
+#include "ReplaceLLVMIntrinsicsPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "ReplaceLLVMIntrinsics"
 
-namespace {
-struct ReplaceLLVMIntrinsicsPass final : public ModulePass {
-  static char ID;
-  ReplaceLLVMIntrinsicsPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-  // TODO: update module-based funtions to work like function-based ones.
-  // Except maybe lifetime intrinsics.
-  bool runOnFunction(Function &F);
-  bool replaceMemset(Module &M);
-  bool replaceMemcpy(Module &M);
-  bool removeLifetimeDeclarations(Module &M);
-  bool replaceFshl(Function &F);
-  bool replaceCountZeroes(Function &F, bool leading);
-  bool replaceCopysign(Function &F);
-
-  bool replaceCallsWithValue(Function &F,
-                             std::function<Value *(CallInst *)> Replacer);
-
-  SmallVector<Function *, 16> DeadFunctions;
-};
-} // namespace
-
-char ReplaceLLVMIntrinsicsPass::ID = 0;
-INITIALIZE_PASS(ReplaceLLVMIntrinsicsPass, "ReplaceLLVMIntrinsics",
-                "Replace LLVM intrinsics Pass", false, false)
-
-namespace clspv {
-ModulePass *createReplaceLLVMIntrinsicsPass() {
-  return new ReplaceLLVMIntrinsicsPass();
-}
-} // namespace clspv
-
-bool ReplaceLLVMIntrinsicsPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Remove lifetime annotations first.  They could be using memset
   // and memcpy calls.
-  Changed |= removeLifetimeDeclarations(M);
-  Changed |= replaceMemset(M);
-  Changed |= replaceMemcpy(M);
+  removeLifetimeDeclarations(M);
+  replaceMemset(M);
+  replaceMemcpy(M);
 
   for (auto &F : M) {
-    Changed |= runOnFunction(F);
+    runOnFunction(F);
   }
 
   for (auto F : DeadFunctions) {
     F->eraseFromParent();
   }
 
-  return Changed;
+  return PA;
 }
 
-bool ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
+bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   switch (F.getIntrinsicID()) {
   case Intrinsic::fshl:
     return replaceFshl(F);
@@ -102,7 +70,7 @@ bool ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   return false;
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
     Function &F, std::function<Value *(CallInst *)> Replacer) {
   SmallVector<Instruction *, 8> ToRemove;
   for (auto &U : F.uses()) {
@@ -124,7 +92,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   return !ToRemove.empty();
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
   return replaceCallsWithValue(F, [](CallInst *call) {
     auto arg_hi = call->getArgOperand(0);
     auto arg_lo = call->getArgOperand(1);
@@ -166,7 +134,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
   });
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
   bool Changed = false;
   auto Layout = M.getDataLayout();
 
@@ -233,7 +201,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
   return Changed;
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   bool Changed = false;
   auto Layout = M.getDataLayout();
 
@@ -470,7 +438,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   return Changed;
 }
 
-bool ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
+bool clspv::ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
   // SPIR-V OpLifetimeStart and OpLifetimeEnd require Kernel capability.
   // Vulkan doesn't support that, so remove all lifteime bounds declarations.
 
@@ -498,7 +466,8 @@ bool ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
   return Changed;
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F,
+                                                          bool leading) {
   if (!isa<IntegerType>(F.getReturnType()->getScalarType()))
     return false;
 
@@ -562,7 +531,7 @@ bool ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F, bool leading) {
   });
 }
 
-bool ReplaceLLVMIntrinsicsPass::replaceCopysign(Function &F) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceCopysign(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *CI) {
     auto XValue = CI->getOperand(0);
     auto YValue = CI->getOperand(1);

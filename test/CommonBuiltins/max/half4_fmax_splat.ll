@@ -1,4 +1,4 @@
-; RUN: clspv-opt -SplatArg %s -o %t.ll
+; RUN: clspv-opt --passes=splat-arg %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[x_in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x half> {{.*}}, half %x, i32 0

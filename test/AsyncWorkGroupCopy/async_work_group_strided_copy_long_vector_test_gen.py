@@ -18,7 +18,7 @@ from string import Template
 import os
 
 TEMPLATE=Template("""
-; RUN: clspv-opt -ReplaceOpenCLBuiltin -LongVectorLowering %s -o %t.ll
+; RUN: clspv-opt --passes=replace-opencl-builtin,long-vector-lowering %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; AUTO-GENERATED TEST FILE

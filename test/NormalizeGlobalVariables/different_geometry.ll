@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t -ClusterModuleScopeConstantVars
+; RUN: clspv-opt %s -o %t --passes=cluster-constants
 ; RUN: FileCheck %s < %t
 
 ; Checks are split up due to problems with parsing regexs in FileCheck.

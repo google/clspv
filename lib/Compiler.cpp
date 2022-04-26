@@ -21,10 +21,11 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Linker/Linker.h"
@@ -35,7 +36,14 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar/InferAddressSpaces.h"
+#include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/StructurizeCFG.h"
+#include "llvm/Transforms/Utils/LowerSwitch.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
@@ -220,8 +228,10 @@ int ParseSamplerMap(const std::string &sampler_map,
   }
 
   if (clspv::Option::UseSamplerMap()) {
-    llvm::outs()
-        << "Warning: use of the sampler map is deprecated and unnecessary\n";
+    // TODO(alan-baker): Remove all APIs dealing the sampler map after landing
+    // the transition to the new pass manager.
+    llvm::errs() << "Error: use of a sampler map is no longer supported\n";
+    return -1;
   }
 
   // No sampler map to parse.
@@ -604,12 +614,23 @@ int SetCompilerInstanceOptions(
   return 0;
 }
 
-// Populates |pm| with necessary passes to optimize and legalize the IR.
-int PopulatePassManager(
-    llvm::legacy::PassManager *pm, llvm::raw_svector_ostream *binaryStream,
-    llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
-        *SamplerMapEntries) {
-  llvm::PassManagerBuilder pmBuilder;
+int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
+  llvm::LoopAnalysisManager lam;
+  llvm::FunctionAnalysisManager fam;
+  llvm::CGSCCAnalysisManager cgam;
+  llvm::ModuleAnalysisManager mam;
+  llvm::PassInstrumentationCallbacks PIC;
+  clspv::RegisterClspvPasses(&PIC);
+  llvm::PassBuilder pb(nullptr, llvm::PipelineTuningOptions(), llvm::None,
+                       &PIC);
+  pb.registerModuleAnalyses(mam);
+  pb.registerCGSCCAnalyses(cgam);
+  pb.registerFunctionAnalyses(fam);
+  pb.registerLoopAnalyses(lam);
+  pb.crossRegisterProxies(lam, fam, cgam, mam);
+
+  llvm::ModulePassManager pm;
+  llvm::FunctionPassManager fpm;
 
   switch (OptimizationLevel) {
   case '0':
@@ -625,188 +646,208 @@ int PopulatePassManager(
     return -1;
   }
 
+  llvm::OptimizationLevel level;
   switch (OptimizationLevel) {
   case '0':
-    pmBuilder.OptLevel = 0;
+    level = llvm::OptimizationLevel::O0;
     break;
   case '1':
-    pmBuilder.OptLevel = 1;
+    level = llvm::OptimizationLevel::O1;
     break;
   case '2':
-    pmBuilder.OptLevel = 2;
+    level = llvm::OptimizationLevel::O2;
     break;
   case '3':
-    pmBuilder.OptLevel = 3;
+    level = llvm::OptimizationLevel::O3;
     break;
   case 's':
-    pmBuilder.SizeLevel = 1;
+    level = llvm::OptimizationLevel::Os;
     break;
   case 'z':
-    pmBuilder.SizeLevel = 2;
+    level = llvm::OptimizationLevel::Oz;
     break;
   default:
     break;
   }
 
-  pm->add(clspv::createNativeMathPass());
-  pm->add(clspv::createZeroInitializeAllocasPass());
-  pm->add(clspv::createAddFunctionAttributesPass());
-  pm->add(clspv::createAutoPodArgsPass());
-  pm->add(clspv::createDeclarePushConstantsPass());
-  pm->add(clspv::createDefineOpenCLWorkItemBuiltinsPass());
+  // Run the following optimizations prior to the standard LLVM pass pipeline.
+  pb.registerPipelineStartEPCallback([](llvm::ModulePassManager &pm,
+                                        llvm::OptimizationLevel level) {
+    pm.addPass(clspv::NativeMathPass());
+    pm.addPass(clspv::ZeroInitializeAllocasPass());
+    pm.addPass(clspv::AddFunctionAttributesPass());
+    pm.addPass(clspv::AutoPodArgsPass());
+    pm.addPass(clspv::DeclarePushConstantsPass());
+    pm.addPass(clspv::DefineOpenCLWorkItemBuiltinsPass());
 
-  if (0 < pmBuilder.OptLevel) {
-    pm->add(clspv::createOpenCLInlinerPass());
-  }
+    if (level.getSpeedupLevel() > 0) {
+      pm.addPass(clspv::OpenCLInlinerPass());
+    }
 
-  pm->add(clspv::createUndoByvalPass());
-  pm->add(clspv::createUndoSRetPass());
-  if (clspv::Option::ClusterPodKernelArgs()) {
-    pm->add(clspv::createClusterPodKernelArgumentsPass());
-  }
-  pm->add(clspv::createReplaceOpenCLBuiltinPass());
+    pm.addPass(clspv::UndoByvalPass());
+    pm.addPass(clspv::UndoSRetPass());
+    pm.addPass(clspv::ClusterPodKernelArgumentsPass());
+    pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
+    pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
-  pm->add(clspv::createThreeElementVectorLoweringPass());
+    // Lower longer vectors when requested. Note that this pass depends on
+    // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
+    // afterwards.
+    if (clspv::Option::LongVectorSupport()) {
+      pm.addPass(clspv::LongVectorLoweringPass());
+    }
 
-  // Lower longer vectors when requested. Note that this pass depends on
-  // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
-  // afterwards.
-  if (clspv::Option::LongVectorSupport()) {
-    pm->add(clspv::createLongVectorLoweringPass());
-  }
+    // We need to run mem2reg and inst combine early because our
+    // createInlineFuncWithPointerBitCastArgPass pass cannot handle the pattern
+    //   %1 = alloca i32 1
+    //        store <something> %1
+    //   %2 = bitcast float* %1
+    //   %3 = load float %2
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
 
-  // We need to run mem2reg and inst combine early because our
-  // createInlineFuncWithPointerBitCastArgPass pass cannot handle the pattern
-  //   %1 = alloca i32 1
-  //        store <something> %1
-  //   %2 = bitcast float* %1
-  //   %3 = load float %2
-  pm->add(llvm::createPromoteMemoryToRegisterPass());
+    // Try to deal with pointer bitcasts early. This can prevent problems like
+    // issue #409 where LLVM is looser about access chain addressing than
+    // SPIR-V. This needs to happen before instcombine and after replacing
+    // OpenCL builtins.  This run of the pass will not handle all pointer
+    // bitcasts that could be handled. It should be run again after other
+    // optimizations (e.g InlineFuncWithPointerBitCastArgPass).
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+    pm.addPass(clspv::ReplacePointerBitcastPass());
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
 
-  // Try to deal with pointer bitcasts early. This can prevent problems like
-  // issue #409 where LLVM is looser about access chain addressing than SPIR-V.
-  // This needs to happen before instcombine and after replacing OpenCL
-  // builtins.  This run of the pass will not handle all pointer bitcasts that
-  // could be handled. It should be run again after other optimizations (e.g
-  // InlineFuncWithPointerBitCastArgPass).
-  pm->add(clspv::createSimplifyPointerBitcastPass());
-  pm->add(clspv::createReplacePointerBitcastPass());
-  pm->add(llvm::createDeadCodeEliminationPass());
+    // Hide loads from __constant address space away from instcombine.
+    // This prevents us from generating select between pointers-to-__constant.
+    // See https://github.com/google/clspv/issues/71
+    pm.addPass(clspv::HideConstantLoadsPass());
 
-  // Hide loads from __constant address space away from instcombine.
-  // This prevents us from generating select between pointers-to-__constant.
-  // See https://github.com/google/clspv/issues/71
-  pm->add(clspv::createHideConstantLoadsPass());
+    pm.addPass(
+        llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-  pm->add(llvm::createInstructionCombiningPass());
+    if (clspv::Option::InlineEntryPoints()) {
+      pm.addPass(clspv::InlineEntryPointsPass());
+    } else {
+      pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
+      pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
+      pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
+    }
 
-  if (clspv::Option::InlineEntryPoints()) {
-    pm->add(clspv::createInlineEntryPointsPass());
+    // Mem2Reg pass should be run early because O0 level optimization leaves
+    // redundant alloca, load and store instructions from function arguments.
+    // clspv needs to remove them ahead of transformation.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+
+    // SROA pass is run because it will fold structs/unions that are problematic
+    // on Vulkan SPIR-V away.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::SROAPass()));
+
+    // InstructionCombining pass folds bitcast and gep instructions which are
+    // not supported by Vulkan SPIR-V.
+    pm.addPass(
+        llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
+
+    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
+      pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+          llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+    }
+  });
+
+  // Run the following passes after the default LLVM pass pipeline.
+  pb.registerOptimizerLastEPCallback([binaryStream](llvm::ModulePassManager &pm,
+                                                    llvm::OptimizationLevel) {
+    // No point attempting to handle freeze currently so strip them from the IR.
+    pm.addPass(clspv::StripFreezePass());
+
+    // Unhide loads from __constant address space.  Undoes the action of
+    // HideConstantLoadsPass.
+    pm.addPass(clspv::UnhideConstantLoadsPass());
+
+    pm.addPass(clspv::UndoInstCombinePass());
+    pm.addPass(clspv::FunctionInternalizerPass());
+    pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
+    // Replace LLVM intrinsics can leave dead code around.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
+    pm.addPass(clspv::UndoBoolPass());
+    pm.addPass(clspv::UndoTruncateToOddIntegerPass());
+    // StructurizeCFG requires LowerSwitch to run first.
+    pm.addPass(
+        llvm::createModuleToFunctionPassAdaptor(llvm::LowerSwitchPass()));
+    pm.addPass(
+        llvm::createModuleToFunctionPassAdaptor(llvm::StructurizeCFGPass()));
+    // Must be run after structurize cfg.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        clspv::FixupStructuredCFGPass()));
+    // Must be run after structured cfg fixup.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        clspv::ReorderBasicBlocksPass()));
+    pm.addPass(clspv::UndoGetElementPtrConstantExprPass());
+    pm.addPass(clspv::SplatArgPass());
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+    pm.addPass(clspv::ReplacePointerBitcastPass());
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
+
+    pm.addPass(clspv::UndoTranslateSamplerFoldPass());
+
+    if (clspv::Option::ModuleConstantsInStorageBuffer()) {
+      pm.addPass(clspv::ClusterModuleScopeConstantVars());
+    }
+
+    pm.addPass(clspv::ShareModuleScopeVariablesPass());
+    // Specialize images before assigning descriptors to disambiguate the
+    // various types.
+    pm.addPass(clspv::SpecializeImageTypesPass());
+    // This should be run after LLVM and OpenCL intrinsics are replaced.
+    pm.addPass(clspv::AllocateDescriptorsPass());
+    pm.addPass(llvm::VerifierPass());
+    pm.addPass(clspv::DirectResourceAccessPass());
+    // Replacing pointer bitcasts can leave some trivial GEPs
+    // that are easy to remove.  Also replace GEPs of GEPS
+    // left by replacing indirect buffer accesses.
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+    // Run after DRA to clean up parameters and help reduce the need for
+    // variable pointers.
+    pm.addPass(clspv::RemoveUnusedArguments());
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
+
+    // SPIR-V 1.4 and higher do not need to splat scalar conditions for vector
+    // data.
+    if (clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_4) {
+      pm.addPass(clspv::SplatSelectConditionPass());
+    }
+    pm.addPass(clspv::SignedCompareFixupPass());
+    // This pass generates insertions that need to be rewritten.
+    pm.addPass(clspv::ScalarizePass());
+    pm.addPass(clspv::RewriteInsertsPass());
+    // UBO Transformations
+    if (clspv::Option::ConstantArgsInUniformBuffer() &&
+        !clspv::Option::InlineEntryPoints()) {
+      // MultiVersionUBOFunctionsPass will examine non-kernel functions with UBO
+      // arguments and either multi-version them as necessary or inline them if
+      // multi-versioning cannot be accomplished.
+      pm.addPass(clspv::MultiVersionUBOFunctionsPass());
+      // Cleanup passes.
+      // Specialization can blindly generate GEP chains that are easily cleaned
+      // up by SimplifyPointerBitcastPass.
+      pm.addPass(clspv::SimplifyPointerBitcastPass());
+      // RemoveUnusedArgumentsPass removes the actual UBO arguments that were
+      // problematic to begin with now that they have no uses.
+      pm.addPass(clspv::RemoveUnusedArguments());
+      // DCE cleans up callers of the specialized functions.
+      pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
+    }
+    // This pass mucks with types to point where you shouldn't rely on
+    // DataLayout anymore so leave this right before SPIR-V generation.
+    pm.addPass(clspv::UBOTypeTransformPass());
+    pm.addPass(clspv::SPIRVProducerPass(binaryStream, OutputFormat == "c"));
+  });
+
+  // Add the default optimizations for the requested optimization level.
+  if (level.getSpeedupLevel() > 0) {
+    auto mpm = pb.buildPerModuleDefaultPipeline(level);
+    mpm.run(M, mam);
   } else {
-    pm->add(clspv::createInlineFuncWithPointerBitCastArgPass());
-    pm->add(clspv::createInlineFuncWithPointerToFunctionArgPass());
-    pm->add(clspv::createInlineFuncWithSingleCallSitePass());
+    auto mpm = pb.buildO0DefaultPipeline(level);
+    mpm.run(M, mam);
   }
-
-  // Mem2Reg pass should be run early because O0 level optimization leaves
-  // redundant alloca, load and store instructions from function arguments.
-  // clspv needs to remove them ahead of transformation.
-  pm->add(llvm::createPromoteMemoryToRegisterPass());
-
-  // SROA pass is run because it will fold structs/unions that are problematic
-  // on Vulkan SPIR-V away.
-  pm->add(llvm::createSROAPass());
-
-  // InstructionCombining pass folds bitcast and gep instructions which are
-  // not supported by Vulkan SPIR-V.
-  pm->add(llvm::createInstructionCombiningPass());
-
-  if (clspv::Option::LanguageUsesGenericAddressSpace()) {
-    pm->add(llvm::createInferAddressSpacesPass(clspv::AddressSpace::Generic));
-  }
-
-  // Now we add any of the LLVM optimizations we wanted
-  pmBuilder.populateModulePassManager(*pm);
-
-  // No point attempting to handle freeze currently so strip them from the IR.
-  pm->add(clspv::createStripFreezePass());
-
-  // Unhide loads from __constant address space.  Undoes the action of
-  // HideConstantLoadsPass.
-  pm->add(clspv::createUnhideConstantLoadsPass());
-
-  pm->add(clspv::createUndoInstCombinePass());
-  pm->add(clspv::createFunctionInternalizerPass());
-  pm->add(clspv::createReplaceLLVMIntrinsicsPass());
-  // Replace LLVM intrinsics can leave dead code around.
-  pm->add(llvm::createDeadCodeEliminationPass());
-  pm->add(clspv::createUndoBoolPass());
-  pm->add(clspv::createUndoTruncateToOddIntegerPass());
-  pm->add(llvm::createStructurizeCFGPass(false));
-  // Must be run after structurize cfg.
-  pm->add(clspv::createFixupStructuredCFGPass());
-  // Must be run after structured cfg fixup.
-  pm->add(clspv::createReorderBasicBlocksPass());
-  pm->add(clspv::createUndoGetElementPtrConstantExprPass());
-  pm->add(clspv::createSplatArgPass());
-  pm->add(clspv::createSimplifyPointerBitcastPass());
-  pm->add(clspv::createReplacePointerBitcastPass());
-  pm->add(llvm::createDeadCodeEliminationPass());
-
-  pm->add(clspv::createUndoTranslateSamplerFoldPass());
-
-  if (clspv::Option::ModuleConstantsInStorageBuffer()) {
-    pm->add(clspv::createClusterModuleScopeConstantVars());
-  }
-
-  pm->add(clspv::createShareModuleScopeVariablesPass());
-  // Specialize images before assigning descriptors to disambiguate the various
-  // types.
-  pm->add(clspv::createSpecializeImageTypesPass());
-  // This should be run after LLVM and OpenCL intrinsics are replaced.
-  pm->add(clspv::createAllocateDescriptorsPass(*SamplerMapEntries));
-  pm->add(llvm::createVerifierPass());
-  pm->add(clspv::createDirectResourceAccessPass());
-  // Replacing pointer bitcasts can leave some trivial GEPs
-  // that are easy to remove.  Also replace GEPs of GEPS
-  // left by replacing indirect buffer accesses.
-  pm->add(clspv::createSimplifyPointerBitcastPass());
-  // Run after DRA to clean up parameters and help reduce the need for variable
-  // pointers.
-  pm->add(clspv::createRemoveUnusedArgumentsPass());
-  pm->add(llvm::createDeadCodeEliminationPass());
-
-  // SPIR-V 1.4 and higher do not need to splat scalar conditions for vector
-  // data.
-  if (clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_4) {
-    pm->add(clspv::createSplatSelectConditionPass());
-  }
-  pm->add(clspv::createSignedCompareFixupPass());
-  // This pass generates insertions that need to be rewritten.
-  pm->add(clspv::createScalarizePass());
-  pm->add(clspv::createRewriteInsertsPass());
-  // UBO Transformations
-  if (clspv::Option::ConstantArgsInUniformBuffer() &&
-      !clspv::Option::InlineEntryPoints()) {
-    // MultiVersionUBOFunctionsPass will examine non-kernel functions with UBO
-    // arguments and either multi-version them as necessary or inline them if
-    // multi-versioning cannot be accomplished.
-    pm->add(clspv::createMultiVersionUBOFunctionsPass());
-    // Cleanup passes.
-    // Specialization can blindly generate GEP chains that are easily cleaned up
-    // by SimplifyPointerBitcastPass.
-    pm->add(clspv::createSimplifyPointerBitcastPass());
-    // RemoveUnusedArgumentsPass removes the actual UBO arguments that were
-    // problematic to begin with now that they have no uses.
-    pm->add(clspv::createRemoveUnusedArgumentsPass());
-    // DCE cleans up callers of the specialized functions.
-    pm->add(llvm::createDeadCodeEliminationPass());
-  }
-  // This pass mucks with types to point where you shouldn't rely on DataLayout
-  // anymore so leave this right before SPIR-V generation.
-  pm->add(clspv::createUBOTypeTransformPass());
-  pm->add(clspv::createSPIRVProducerPass(binaryStream, SamplerMapEntries,
-                                         OutputFormat == "c"));
 
   return 0;
 }
@@ -901,8 +942,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
   return 0;
 }
 
-int GenerateIRFile(llvm::legacy::PassManager *pm, llvm::Module &module,
-                   std::string output) {
+int GenerateIRFile(llvm::Module &module, std::string output) {
   std::error_code ec;
   std::unique_ptr<llvm::ToolOutputFile> out(
       new llvm::ToolOutputFile(output, ec, llvm::sys::fs::OF_None));
@@ -910,8 +950,13 @@ int GenerateIRFile(llvm::legacy::PassManager *pm, llvm::Module &module,
     llvm::errs() << output << ": " << ec.message() << '\n';
     return -1;
   }
-  pm->add(llvm::createPrintModulePass(out->os(), "", false));
-  pm->run(module);
+
+  llvm::ModuleAnalysisManager mam;
+  llvm::ModulePassManager pm;
+  llvm::PassBuilder pb;
+  pb.registerModuleAnalyses(mam);
+  pm.addPass(llvm::PrintModulePass(out->os(), "", false));
+  pm.run(module, mam);
   out->keep();
   return 0;
 }
@@ -995,32 +1040,26 @@ int Compile(const llvm::StringRef &input_filename, const std::string &program,
     return 0;
   }
 
-  llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
-  llvm::initializeCore(Registry);
-  llvm::initializeScalarOpts(Registry);
-  llvm::initializeClspvPasses(Registry);
-
   std::unique_ptr<llvm::Module> module(action.takeModule());
 
   // Optimize.
   // Create a memory buffer for temporarily writing the result.
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
-  llvm::legacy::PassManager pm;
 
   // If --emit-ir was requested, emit the initial LLVM IR and stop compilation.
   if (!IROutputFile.empty()) {
-    return GenerateIRFile(&pm, *module, IROutputFile);
+    return GenerateIRFile(*module, IROutputFile);
   }
 
   if (!LinkBuiltinLibrary(module.get())) {
     return -1;
   }
 
-  // Otherwise, populate the pass manager and run the regular passes.
-  if (auto error = PopulatePassManager(&pm, &binaryStream, &SamplerMapEntries))
-    return error;
-  pm.run(*module);
+  // Run the passes to produce SPIR-V.
+  if (RunPassPipeline(*module, &binaryStream) != 0) {
+    return -1;
+  }
 
   // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on

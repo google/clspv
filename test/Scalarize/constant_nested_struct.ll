@@ -1,6 +1,6 @@
-; RUN: clspv-opt %s -Scalarize -o %t.ll -hack-phis
+; RUN: clspv-opt %s --passes=scalarize -o %t.ll -hack-phis
 ; RUN: FileCheck %s < %t.ll
-; RUN: clspv-opt %s -Scalarize -RewriteInserts -hack-phis -o %t2.ll
+; RUN: clspv-opt %s --passes=scalarize,rewrite-inserts-pass -hack-phis -o %t2.ll
 ; RUN: FileCheck --check-prefix=CONSTRUCT %s < %t2.ll
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

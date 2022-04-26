@@ -11,13 +11,14 @@
 
 
 // CHECK-DAG: %[[CONSTANT_42_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 42
-// CHECK: %[[REFERENCED_ID:[a-zA-Z0-9_]*]] = OpFunction %[[UINT_TYPE_ID]] Const %[[REFERENCED_TYPE_ID]]
+// CHECK: %[[REFERENCED_ID:[a-zA-Z0-9_]*]] = OpFunction %[[UINT_TYPE_ID]] {{.*}} %[[REFERENCED_TYPE_ID]]
 // CHECK: %[[REFERENCED_A_ID:[a-zA-Z0-9_]*]] = OpFunctionParameter %[[UINT_TYPE_ID]]
 // CHECK: %[[REFERENCED_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[REFERENCED_OP_ID:[a-zA-Z0-9_]*]] = OpIAdd %[[UINT_TYPE_ID]] %[[REFERENCED_A_ID]] %[[CONSTANT_42_ID]]
 // CHECK: OpReturnValue %[[REFERENCED_OP_ID]]
 // CHECK: OpFunctionEnd
 
+__attribute__((noinline))
 int referenced(int a) {
   return a + 42;
 }

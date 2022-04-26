@@ -33,104 +33,17 @@
 
 #include "ArgKind.h"
 #include "Constants.h"
-#include "Passes.h"
+#include "UBOTypeTransformPass.h"
 
 using namespace llvm;
 
-namespace {
-
-class UBOTypeTransformPass final : public ModulePass {
-public:
-  static char ID;
-  UBOTypeTransformPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  // Returns the remapped version of |type| that satisfies UBO requirements.
-  // |rewrite| indicates whether the type can be rewritten or just rebuilt.
-  Type *MapType(Type *type, Module &M, bool rewrite);
-  Type *RebuildType(Type *type, Module &M) { return MapType(type, M, false); }
-
-  // Returns the remapped version of |type| that satisfies UBO requirements.
-  // |rewrite| indicates whether the type can be rewritten or just rebuilt.
-  StructType *MapStructType(StructType *struct_ty, Module &M, bool rewrite);
-
-  // Performs type mutation on |M|. Returns true if |M| was modified.
-  bool RemapTypes(Module &M);
-
-  // Performs type mutation for functions that require it. Returns true if the
-  // module is modified.
-  //
-  // If a function requires type mutation it will be replaced by a new
-  // function. The function's basic blocks are moved into the new function and
-  // all metadata is copied.
-  bool RemapFunctions(SmallVectorImpl<Function *> *functions_to_modify,
-                      Module &M);
-
-  // Rebuilds global variables if their types require transformation. Returns
-  // true if the module is modified.
-  bool
-  RemapGlobalVariables(SmallVectorImpl<GlobalVariable *> *variables_to_modify,
-                       Module &M);
-
-  // Performs type mutation on |user|. Recursively fixes operands of |user|.
-  // Returns true if the module is modified.
-  bool RemapUser(User *user, Module &M);
-
-  // Mutates the type of |value|. Returns true if the module is modified.
-  bool RemapValue(Value *value, Module &M);
-
-  // Maps and rebuilds |constant| to match its mapped type. Returns true if the
-  // module if modified.
-  bool RemapConstant(Constant *constant, Module &M);
-
-  // Rebuild |constant| as a constant with |remapped_ty| type. Returns the
-  // rebuilt constant.
-  Constant *RebuildConstant(Constant *constant, Type *remapped_ty, Module &M);
-
-  // Performs final modifications on functions that were replaced. Fixes names
-  // and use-def chains.
-  void FixupFunctions(const ArrayRef<Function *> &functions_to_modify,
-                      Module &M);
-
-  // Replaces and deletes modified global variables.
-  void
-  FixupGlobalVariables(const ArrayRef<GlobalVariable *> &variables_to_modify);
-
-  // Maps a type to its UBO type.
-  DenseMap<Type *, Type *> remapped_types_;
-
-  // Prevents infinite recusion.
-  DenseSet<Type *> deferred_types_;
-
-  // Maps a function to its replacement.
-  DenseMap<Function *, Function *> function_replacements_;
-
-  // Maps a global value to its replacement.
-  DenseMap<Constant *, Constant *> remapped_globals_;
-
-  // Whether char arrays are supported in UBOs.
-  bool support_int8_array_;
-};
-
-} // namespace
-
-char UBOTypeTransformPass::ID = 0;
-INITIALIZE_PASS(UBOTypeTransformPass, "UBOTypeTransformPass",
-                "Transform UBO types", false, false)
-
-namespace clspv {
-ModulePass *createUBOTypeTransformPass() { return new UBOTypeTransformPass(); }
-} // namespace clspv
-
-namespace {
-
-bool UBOTypeTransformPass::runOnModule(Module &M) {
+PreservedAnalyses clspv::UBOTypeTransformPass::run(Module &M,
+                                                   ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   // Record whether char arrays are supported.
   support_int8_array_ = clspv::Option::Int8Support() &&
                         clspv::Option::Std430UniformBufferLayout();
 
-  bool changed = false;
   for (auto &F : M) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
       continue;
@@ -150,13 +63,14 @@ bool UBOTypeTransformPass::runOnModule(Module &M) {
   }
 
   if (!remapped_types_.empty()) {
-    changed |= RemapTypes(M);
+    RemapTypes(M);
   }
 
-  return changed;
+  return PA;
 }
 
-Type *UBOTypeTransformPass::MapType(Type *type, Module &M, bool rewrite) {
+Type *clspv::UBOTypeTransformPass::MapType(Type *type, Module &M,
+                                           bool rewrite) {
   // Check the cache to see if we've fixed this type.
   auto iter = remapped_types_.find(type);
   if (iter != remapped_types_.end()) {
@@ -228,8 +142,9 @@ Type *UBOTypeTransformPass::MapType(Type *type, Module &M, bool rewrite) {
   return remapped;
 }
 
-StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
-                                                Module &M, bool rewrite) {
+StructType *clspv::UBOTypeTransformPass::MapStructType(StructType *struct_ty,
+                                                       Module &M,
+                                                       bool rewrite) {
   // We'll never have to remap an opaque struct.
   if (struct_ty->isOpaque())
     return struct_ty;
@@ -288,7 +203,7 @@ StructType *UBOTypeTransformPass::MapStructType(StructType *struct_ty,
   }
 }
 
-bool UBOTypeTransformPass::RemapTypes(Module &M) {
+bool clspv::UBOTypeTransformPass::RemapTypes(Module &M) {
   bool changed = false;
 
   // Functions with transformed types require rebuilding.
@@ -333,7 +248,7 @@ bool UBOTypeTransformPass::RemapTypes(Module &M) {
   return changed;
 }
 
-bool UBOTypeTransformPass::RemapFunctions(
+bool clspv::UBOTypeTransformPass::RemapFunctions(
     SmallVectorImpl<Function *> *functions_to_modify, Module &M) {
   bool changed = false;
   for (auto &F : M) {
@@ -376,7 +291,7 @@ bool UBOTypeTransformPass::RemapFunctions(
   return changed;
 }
 
-bool UBOTypeTransformPass::RemapGlobalVariables(
+bool clspv::UBOTypeTransformPass::RemapGlobalVariables(
     SmallVectorImpl<GlobalVariable *> *variables_to_modify, Module &M) {
   bool changed = false;
   for (auto &GV : M.globals()) {
@@ -409,7 +324,7 @@ bool UBOTypeTransformPass::RemapGlobalVariables(
   return changed;
 }
 
-bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
+bool clspv::UBOTypeTransformPass::RemapUser(User *user, Module &M) {
   if (isa<ConstantData>(user) || isa<ConstantAggregate>(user)) {
     return RemapConstant(cast<Constant>(user), M);
   }
@@ -439,7 +354,7 @@ bool UBOTypeTransformPass::RemapUser(User *user, Module &M) {
   return changed;
 }
 
-bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
+bool clspv::UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
   Type *remapped = RebuildType(value->getType(), M);
   if (remapped == value->getType())
     return false;
@@ -448,7 +363,7 @@ bool UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
   return true;
 }
 
-bool UBOTypeTransformPass::RemapConstant(Constant *constant, Module &M) {
+bool clspv::UBOTypeTransformPass::RemapConstant(Constant *constant, Module &M) {
   // Rebuild the constant.
   Type *remapped = RebuildType(constant->getType(), M);
   if (remapped == constant->getType())
@@ -458,8 +373,9 @@ bool UBOTypeTransformPass::RemapConstant(Constant *constant, Module &M) {
   return true;
 }
 
-Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
-                                                Type *remapped_ty, Module &M) {
+Constant *clspv::UBOTypeTransformPass::RebuildConstant(Constant *constant,
+                                                       Type *remapped_ty,
+                                                       Module &M) {
   if (constant->getType() == remapped_ty)
     return constant;
 
@@ -525,7 +441,7 @@ Constant *UBOTypeTransformPass::RebuildConstant(Constant *constant,
   return constant;
 }
 
-void UBOTypeTransformPass::FixupFunctions(
+void clspv::UBOTypeTransformPass::FixupFunctions(
     const ArrayRef<Function *> &functions_to_modify, Module &M) {
   // If functions were replaced, we have some final fixup to do:
   // * Rename arguments to maintain descriptor mapping
@@ -547,7 +463,7 @@ void UBOTypeTransformPass::FixupFunctions(
   }
 }
 
-void UBOTypeTransformPass::FixupGlobalVariables(
+void clspv::UBOTypeTransformPass::FixupGlobalVariables(
     const ArrayRef<GlobalVariable *> &variables_to_modify) {
   for (auto *var : variables_to_modify) {
     // Mutate type to satisfy RAUW requirements.
@@ -557,4 +473,3 @@ void UBOTypeTransformPass::FixupGlobalVariables(
     delete var;
   }
 }
-} // namespace

@@ -7,6 +7,7 @@
 
 constant uint b[4] = {42, 13, 0, 5};
 
+__attribute__((noinline))
 uint bar(constant uint* a)
 {
   return a[get_local_id(0)];
@@ -27,7 +28,7 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK-DAG:  [[_uint_5:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 5
 // CHECK-DAG:  [[_20:%[0-9a-zA-Z_]+]] = OpConstantComposite [[__arr_uint_uint_4]] [[_uint_42]] [[_uint_13]] [[_uint_0]] [[_uint_5]]
 // CHECK-DAG:  [[_22:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Private__arr_uint_uint_4]] Private [[_20]]
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunction [[_uint]] Pure
+// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunction [[_uint]] 
 // CHECK:  = OpFunction
 // CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Private_uint]] [[_22]] [[_uint_0]]
 // CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[_24]] [[_34]]

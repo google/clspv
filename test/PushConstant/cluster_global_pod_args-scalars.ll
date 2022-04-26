@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll -ClusterPodKernelArgumentsPass
+; RUN: clspv-opt %s -o %t.ll --passes=cluster-pod-kernel-args-pass
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[outer:%[a-zA-Z0-9_.]+]] = type { <3 x i32>, <3 x i32>, [[inner:%[a-zA-Z0-9_.]+]] }

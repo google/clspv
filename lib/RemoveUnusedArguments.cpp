@@ -22,62 +22,25 @@
 
 #include "clspv/Option.h"
 
-#include "Passes.h"
+#include "RemoveUnusedArguments.h"
 
 using namespace llvm;
 
-namespace {
-
-class RemoveUnusedArguments final : public ModulePass {
-public:
-  static char ID;
-  RemoveUnusedArguments() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  struct Candidate {
-    Function *function;
-    SmallVector<Value *, 8> args;
-  };
-
-  // Populate |candidates| with non-kernel functions that have unused function
-  // parameters. Returns true if any such functions are found.
-  bool findCandidates(Module &M, std::vector<Candidate> *candidates);
-
-  // Remove unused parameters in |candidates|. Rebuilds the functions without
-  // the unused parameters. Updates calls and metadata to use the new function.
-  void removeUnusedParameters(Module &M,
-                              const std::vector<Candidate> &candidates);
-};
-
-} // namespace
-
-char RemoveUnusedArguments::ID = 0;
-INITIALIZE_PASS(RemoveUnusedArguments, "RemoveUnusedArguments",
-                "Remove unused arguments from non-kernel functions", false,
-                false)
-
-namespace clspv {
-ModulePass *createRemoveUnusedArgumentsPass() {
-  return new RemoveUnusedArguments();
-}
-} // namespace clspv
-
-namespace {
-
-bool RemoveUnusedArguments::runOnModule(Module &M) {
+PreservedAnalyses clspv::RemoveUnusedArguments::run(Module &M,
+                                                    ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (clspv::Option::KeepUnusedArguments())
-    return false;
+    return PA;
 
   std::vector<Candidate> candidates;
-  bool changed = findCandidates(M, &candidates);
+  findCandidates(M, &candidates);
   removeUnusedParameters(M, candidates);
 
-  return changed;
+  return PA;
 }
 
-bool RemoveUnusedArguments::findCandidates(Module &M,
-                                           std::vector<Candidate> *candidates) {
+bool clspv::RemoveUnusedArguments::findCandidates(
+    Module &M, std::vector<Candidate> *candidates) {
   bool changed = false;
   for (auto &F : M) {
     // Don't modify kernel functions.
@@ -109,7 +72,7 @@ bool RemoveUnusedArguments::findCandidates(Module &M,
   return changed;
 }
 
-void RemoveUnusedArguments::removeUnusedParameters(
+void clspv::RemoveUnusedArguments::removeUnusedParameters(
     Module &M, const std::vector<Candidate> &candidates) {
   for (auto &candidate : candidates) {
     Function *f = candidate.function;
@@ -182,5 +145,3 @@ void RemoveUnusedArguments::removeUnusedParameters(
     delete f;
   }
 }
-
-} // namespace

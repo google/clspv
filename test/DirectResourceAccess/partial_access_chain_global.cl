@@ -5,6 +5,7 @@
 
 // Kernel |bar| does a non-trivial access chain before calling the helper.
 
+__attribute__((noinline))
 void apple(global int *A, global int *B, int n) { A[n] = B[n + 2]; }
 
 kernel void foo(global int *A, global int *B, int n) { apple(A, B, n); }

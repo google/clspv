@@ -3,10 +3,13 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val %t.spv --target-env vulkan1.0
 
+__attribute__((noinline))
 int4 c(constant int4* data) { return data[0]; }
 
+__attribute__((noinline))
 int4 b(constant int4* data) { return c(data); }
 
+__attribute__((noinline))
 int4 a(constant int4* data) { return b(data); }
 
 kernel void k1(global int4* out, constant int4* in) {

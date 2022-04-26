@@ -20,7 +20,10 @@ The following subjects are covered:
 
 ## Deprecation Notice
 
-The sampler map is deprecated. It is no longer necessary to specify a sampler
+Use of the sampler map is now an error. The API entry points will be removed
+shortly.
+
+It is no longer necessary to specify a sampler
 map for literal samplers. Refer to the bindings generated for the literal
 samplers in descriptor map. The -samplermap option is still accepted, but
 support will be removed at later date. A single sampler binding is generated

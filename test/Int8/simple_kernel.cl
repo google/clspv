@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 char bar(char a, char b) { return a + b; }
 
 kernel void foo(global char* in, global char* out, int idx) {

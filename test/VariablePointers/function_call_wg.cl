@@ -6,6 +6,7 @@
 // Pass base workgroup object to a function shouldn't require variable
 // pointers, but the representation inserts an OpAccessChain so we require
 // VariablePointers because it is NOT a memory object declaration.
+__attribute__((noinline))
 int bar(local int* x) { return *x; }
 
 kernel void foo(local int* in, global int* out) {

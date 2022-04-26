@@ -15,28 +15,29 @@
 // passes on LLVM IR.  It only implements enough functionality to execute LLVM
 // scalar optimizations and the clspv transformations defined in clspv/Passes.h.
 
+#include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/LegacyPassNameParser.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Utils/Debugify.h"
 
 // Necessary to initialize options and passes.
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 
 using namespace llvm;
-
-static llvm::cl::list<const PassInfo *, bool, PassNameParser>
-    PassList(llvm::cl::desc("Transformations available:"));
 
 static llvm::cl::opt<std::string>
     InputFile(llvm::cl::Positional, llvm::cl::desc("<input LLVM IR file>"),
@@ -50,17 +51,10 @@ static llvm::cl::opt<bool>
     PrintEachXForm("p",
                    llvm::cl::desc("Print module after each transformation"));
 
+static llvm::cl::opt<std::string> Passes("passes", llvm::cl::desc("Passes"));
+
 int main(int argc, char **argv) {
   llvm::InitLLVM c(argc, argv);
-
-  // Initialize passes.
-  PassRegistry &registry = *llvm::PassRegistry::getPassRegistry();
-  llvm::initializeCore(registry);
-  llvm::initializeScalarOpts(registry);
-  llvm::initializeInstCombine(registry);
-
-  // Initialize clspv passes.
-  llvm::initializeClspvPasses(registry);
 
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "clspv IR to IR modular optimizer\n");
@@ -94,35 +88,43 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Add a pass for each pass requested on the command-line.
-  llvm::legacy::PassManager passes;
-  for (unsigned i = 0; i < PassList.size(); ++i) {
-    const llvm::PassInfo *pinfo = PassList[i];
-    if (pinfo->getNormalCtor()) {
-      llvm::Pass *pass = pinfo->getNormalCtor()();
-      passes.add(pass);
-    } else {
-      errs() << argv[0] << ": cannot create pass: " << pinfo->getPassName()
-             << "\n";
-    }
-
-    if (PrintEachXForm)
-      passes.add(llvm::createPrintModulePass(errs(), "", true));
+  if (Passes.empty()) {
+    errs() << "No passes specified to run!\n";
+    return 1;
   }
 
-  // Verify after all transformations have executed.
-  passes.add(llvm::createVerifierPass());
+  llvm::LoopAnalysisManager LAM;
+  llvm::FunctionAnalysisManager FAM;
+  llvm::CGSCCAnalysisManager CGAM;
+  llvm::ModuleAnalysisManager MAM;
 
-  // Add a pass to print the module at the end.
-  assert(out);
-  passes.add(llvm::createPrintModulePass(out->os(), "", false));
+  llvm::PassInstrumentationCallbacks PIC;
+  clspv::RegisterClspvPasses(&PIC);
+  llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), llvm::None,
+                       &PIC);
+  clspv::RegisterClspvPassBuilderCallback(&PB);
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  llvm::ModulePassManager MPM;
+  MPM.addPass(VerifierPass());
+  if (auto Err = PB.parsePassPipeline(MPM, Passes)) {
+    errs() << toString(std::move(Err)) << "\n";
+    return 1;
+  }
+  MPM.addPass(VerifierPass());
+  MPM.addPass(PrintModulePass(out->os(), "", false));
 
   // Print command-line options (this handles -print-options and
   // -print-all-options).
   llvm::cl::PrintOptionValues();
 
-  // Run all the scheduled passes.
-  passes.run(*module);
+  MPM.run(*module, MAM);
+
   out->keep();
 
   return 0;

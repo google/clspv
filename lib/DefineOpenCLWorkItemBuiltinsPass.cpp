@@ -22,75 +22,35 @@
 #include "clspv/Option.h"
 
 #include "Constants.h"
-#include "Passes.h"
+#include "DefineOpenCLWorkItemBuiltinsPass.h"
 #include "PushConstant.h"
 
 using namespace llvm;
 using namespace clspv;
 
-#define DEBUG_TYPE "defineopenclworkitembuiltins"
+PreservedAnalyses
+DefineOpenCLWorkItemBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
-namespace {
-struct DefineOpenCLWorkItemBuiltinsPass final : public ModulePass {
-  static char ID;
-  DefineOpenCLWorkItemBuiltinsPass() : ModulePass(ID) {}
+  defineGlobalOffsetBuiltin(M);
+  defineGlobalIDBuiltin(M);
 
-  bool runOnModule(Module &M) override;
+  defineMappedBuiltin(M, "_Z14get_local_sizej",
+                      clspv::WorkgroupSizeVariableName(), 1,
+                      clspv::WorkgroupSizeAddressSpace());
+  defineMappedBuiltin(M, "_Z12get_local_idj",
+                      clspv::LocalInvocationIdVariableName(), 0,
+                      clspv::LocalInvocationIdAddressSpace());
+  defineNumGroupsBuiltin(M);
+  defineGroupIDBuiltin(M);
+  defineGlobalSizeBuiltin(M);
+  defineWorkDimBuiltin(M);
+  defineEnqueuedLocalSizeBuiltin(M);
+  defineMaxSubGroupSizeBuiltin(M);
+  defineEnqueuedNumSubGroupsBuiltin(M);
+  addWorkgroupSizeIfRequired(M);
 
-  GlobalVariable *createGlobalVariable(Module &M, StringRef GlobalVarName,
-                                       Type *Ty, AddressSpace::Type AddrSpace);
-
-  bool defineMappedBuiltin(Module &M, StringRef FuncName,
-                           StringRef GlobalVarName, unsigned DefaultValue,
-                           AddressSpace::Type AddrSpace);
-
-  bool defineGlobalIDBuiltin(Module &M);
-  bool defineNumGroupsBuiltin(Module &M);
-  bool defineGroupIDBuiltin(Module &M);
-  bool defineGlobalSizeBuiltin(Module &M);
-  bool defineGlobalOffsetBuiltin(Module &M);
-  bool defineWorkDimBuiltin(Module &M);
-  bool defineEnqueuedLocalSizeBuiltin(Module &M);
-  bool defineMaxSubGroupSizeBuiltin(Module &M);
-  bool defineEnqueuedNumSubGroupsBuiltin(Module &M);
-
-  bool addWorkgroupSizeIfRequired(Module &M);
-};
-} // namespace
-
-char DefineOpenCLWorkItemBuiltinsPass::ID = 0;
-INITIALIZE_PASS(DefineOpenCLWorkItemBuiltinsPass,
-                "DefineOpenCLWorkItemBuiltins",
-                "Define OpenCL Work-Item Builtins Pass", false, false)
-
-namespace clspv {
-ModulePass *createDefineOpenCLWorkItemBuiltinsPass() {
-  return new DefineOpenCLWorkItemBuiltinsPass();
-}
-} // namespace clspv
-
-bool DefineOpenCLWorkItemBuiltinsPass::runOnModule(Module &M) {
-  bool changed = false;
-
-  changed |= defineGlobalOffsetBuiltin(M);
-  changed |= defineGlobalIDBuiltin(M);
-
-  changed |= defineMappedBuiltin(M, "_Z14get_local_sizej",
-                                 clspv::WorkgroupSizeVariableName(), 1,
-                                 clspv::WorkgroupSizeAddressSpace());
-  changed |= defineMappedBuiltin(M, "_Z12get_local_idj",
-                                 clspv::LocalInvocationIdVariableName(), 0,
-                                 clspv::LocalInvocationIdAddressSpace());
-  changed |= defineNumGroupsBuiltin(M);
-  changed |= defineGroupIDBuiltin(M);
-  changed |= defineGlobalSizeBuiltin(M);
-  changed |= defineWorkDimBuiltin(M);
-  changed |= defineEnqueuedLocalSizeBuiltin(M);
-  changed |= defineMaxSubGroupSizeBuiltin(M);
-  changed |= defineEnqueuedNumSubGroupsBuiltin(M);
-  changed |= addWorkgroupSizeIfRequired(M);
-
-  return changed;
+  return PA;
 }
 
 GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(

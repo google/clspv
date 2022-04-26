@@ -23,41 +23,20 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
-#include "Passes.h"
+#include "InlineFuncWithSingleCallSitePass.h"
 
 using namespace llvm;
 
-namespace {
-class InlineFuncWithSingleCallSitePass : public ModulePass {
-public:
-  static char ID;
-  InlineFuncWithSingleCallSitePass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-private:
-  bool InlineFunctions(Module &M);
-};
-} // namespace
-
-namespace clspv {
-ModulePass *createInlineFuncWithSingleCallSitePass() {
-  return new InlineFuncWithSingleCallSitePass();
-}
-} // namespace clspv
-
-char InlineFuncWithSingleCallSitePass::ID = 0;
-INITIALIZE_PASS(InlineFuncWithSingleCallSitePass,
-                "InlineFuncWithSingleCallSite",
-                "Inline functions with a single call site pass", false, false)
-
-bool InlineFuncWithSingleCallSitePass::runOnModule(Module &M) {
+PreservedAnalyses
+clspv::InlineFuncWithSingleCallSitePass::run(Module &M,
+                                             ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (!clspv::Option::InlineSingleCallSite())
-    return false;
+    return PA;
 
-  bool Changed = false;
-  for (bool local_changed = true; local_changed; Changed |= local_changed) {
-    local_changed = InlineFunctions(M);
+  bool changed = true;
+  while (changed) {
+    changed = InlineFunctions(M);
   }
 
   // Clean up dead functions. This done here to avoid ordering requirements on
@@ -74,10 +53,10 @@ bool InlineFuncWithSingleCallSitePass::runOnModule(Module &M) {
     func->eraseFromParent();
   }
 
-  return Changed;
+  return PA;
 }
 
-bool InlineFuncWithSingleCallSitePass::InlineFunctions(Module &M) {
+bool clspv::InlineFuncWithSingleCallSitePass::InlineFunctions(Module &M) {
   bool Changed = false;
   std::vector<CallInst *> to_inline;
   for (auto &F : M) {

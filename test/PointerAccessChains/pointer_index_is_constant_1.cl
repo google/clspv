@@ -14,6 +14,7 @@ struct Thing
 };
 
 
+__attribute__((noinline))
 float bar(global struct Thing* a)
 {
   return a[1].a[5];

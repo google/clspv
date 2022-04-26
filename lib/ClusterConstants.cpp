@@ -33,37 +33,17 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "ClusterConstants.h"
 #include "Constants.h"
 #include "NormalizeGlobalVariable.h"
-#include "Passes.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "clusterconstants"
 
-namespace {
-struct ClusterModuleScopeConstantVars : public ModulePass {
-  static char ID;
-  ClusterModuleScopeConstantVars() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-
-} // namespace
-
-char ClusterModuleScopeConstantVars::ID = 0;
-INITIALIZE_PASS(ClusterModuleScopeConstantVars,
-                "ClusterModuleScopeConstantVars",
-                "Cluster module-scope __constant variables", false, false)
-
-namespace clspv {
-llvm::ModulePass *createClusterModuleScopeConstantVars() {
-  return new ClusterModuleScopeConstantVars();
-}
-} // namespace clspv
-
-bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   LLVMContext &Context = M.getContext();
 
   clspv::NormalizeGlobalVariables(M);
@@ -85,16 +65,12 @@ bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
   }
 
   for (GlobalVariable *GV : dead_global_constants) {
-    Changed = true;
     GV->eraseFromParent();
   }
 
   if (global_constants.size() > 1 ||
       (global_constants.size() == 1 &&
        !global_constants[0]->getType()->isStructTy())) {
-
-    Changed = true;
-
     // Make the struct type.
     SmallVector<Type *, 8> types;
     types.reserve(initializers.size());
@@ -145,5 +121,5 @@ bool ClusterModuleScopeConstantVars::runOnModule(Module &M) {
     }
   }
 
-  return Changed;
+  return PA;
 }

@@ -1,5 +1,5 @@
 // RUN: clspv %s --long-vector --emit-ir %t.ll
-// RUN: clspv-opt %t.ll -LongVectorLowering -o %t.out.ll
+// RUN: clspv-opt %t.ll --passes=long-vector-lowering -o %t.out.ll
 // RUN: FileCheck %s < %t.out.ll
 
 // CHECK: phi [8 x float]

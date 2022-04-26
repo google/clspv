@@ -12,56 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Passes/PassBuilder.h"
+
 #include "Passes.h"
 
-namespace llvm {
+namespace clspv {
 
-void initializeClspvPasses(PassRegistry &r) {
-  initializeAddFunctionAttributesPassPass(r);
-  initializeAutoPodArgsPassPass(r);
-  initializeAllocateDescriptorsPassPass(r);
-  initializeClusterModuleScopeConstantVarsPass(r);
-  initializeClusterPodKernelArgumentsPassPass(r);
-  initializeDirectResourceAccessPassPass(r);
-  initializeDeclarePushConstantsPassPass(r);
-  initializeDefineOpenCLWorkItemBuiltinsPassPass(r);
-  initializeFixupStructuredCFGPassPass(r);
-  initializeFunctionInternalizerPassPass(r);
-  initializeHideConstantLoadsPassPass(r);
-  initializeUnhideConstantLoadsPassPass(r);
-  initializeInlineEntryPointsPassPass(r);
-  initializeInlineFuncWithPointerBitCastArgPassPass(r);
-  initializeInlineFuncWithPointerToFunctionArgPassPass(r);
-  initializeInlineFuncWithSingleCallSitePassPass(r);
-  initializeLongVectorLoweringPassPass(r);
-  initializeMultiVersionUBOFunctionsPassPass(r);
-  initializeNativeMathPassPass(r);
-  initializeOpenCLInlinerPassPass(r);
-  initializeRemoveUnusedArgumentsPass(r);
-  initializeReorderBasicBlocksPassPass(r);
-  initializeReplaceLLVMIntrinsicsPassPass(r);
-  initializeReplaceOpenCLBuiltinPassPass(r);
-  initializeReplacePointerBitcastPassPass(r);
-  initializeRewriteInsertsPassPass(r);
-  initializeScalarizePassPass(r);
-  initializeShareModuleScopeVariablesPassPass(r);
-  initializeSignedCompareFixupPassPass(r);
-  initializeSimplifyPointerBitcastPassPass(r);
-  initializeSPIRVProducerPassPass(r);
-  initializeSplatArgPassPass(r);
-  initializeSplatSelectConditionPassPass(r);
-  initializeSpecializeImageTypesPassPass(r);
-  initializeStripFreezePassPass(r);
-  initializeThreeElementVectorLoweringPassPass(r);
-  initializeUBOTypeTransformPassPass(r);
-  initializeUndoBoolPassPass(r);
-  initializeUndoByvalPassPass(r);
-  initializeUndoGetElementPtrConstantExprPassPass(r);
-  initializeUndoInstCombinePassPass(r);
-  initializeUndoSRetPassPass(r);
-  initializeUndoTranslateSamplerFoldPassPass(r);
-  initializeUndoTruncateToOddIntegerPassPass(r);
-  initializeZeroInitializeAllocasPassPass(r);
+void RegisterClspvPassBuilderCallback(llvm::PassBuilder *PB) {
+  PB->registerPipelineParsingCallback(
+      [](llvm::StringRef Name, llvm::ModulePassManager &MPM,
+         llvm::ArrayRef<llvm::PassBuilder::PipelineElement>) {
+#define MODULE_PASS(NAME, CREATE_PASS)                                         \
+  if (NAME == Name) {                                                          \
+    MPM.addPass(CREATE_PASS());                                                \
+    return true;                                                               \
+  }
+#define FUNCTION_PASS(NAME, CREATE_PASS)                                       \
+  if (NAME == Name) {                                                          \
+    MPM.addPass(llvm::createModuleToFunctionPassAdaptor(CREATE_PASS()));       \
+    return true;                                                               \
+  }
+#include "PassRegistry.def"
+#undef FUNCTION_PASS
+#undef MODULE_PASS
+        return false;
+      });
 }
 
-} // namespace llvm
+void RegisterClspvPasses(llvm::PassInstrumentationCallbacks *PIC) {
+#define MODULE_PASS(NAME, CREATE_PASS)                                         \
+  PIC->addClassToPassName(CREATE_PASS::name(), NAME);
+#define FUNCTION_PASS(NAME, CREATE_PASS)                                       \
+  PIC->addClassToPassName(CREATE_PASS::name(), NAME);
+#include "PassRegistry.def"
+#undef FUNCTION_PASS
+#undef MODULE_PASS
+}
+
+} // namespace clspv

@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -AllocateDescriptorsPass -o %t.ll 2> %t.out.txt
+; RUN: clspv-opt %s --passes=allocate-descriptors -o %t.ll 2> %t.out.txt
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)

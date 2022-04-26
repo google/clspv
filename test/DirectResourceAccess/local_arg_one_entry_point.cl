@@ -3,10 +3,12 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+__attribute__((noinline))
 void write_local(__global int* in, __local int* tmp, unsigned int id) {
   tmp[id] = in[id];
 }
 
+__attribute__((noinline))
 void read_local(__global int* out, __local int* tmp, unsigned int id) {
   out[id] = tmp[id];
 }
@@ -29,10 +31,10 @@ __kernel void local_memory(__global int* in, __global int* out, __local int* tem
 // CHECK:     [[_30:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
 // CHECK:     [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]]
 // CHECK:     [[_37:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
-// CHECK:     [[_38:%[0-9a-zA-Z_]+]] = OpFunction [[_void]] None
+// CHECK:     [[_38:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
 // CHECK:     [[_43:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
 // CHECK:     [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]]
-// CHECK:     [[_46:%[0-9a-zA-Z_]+]] = OpFunction [[_void]] None
+// CHECK:     [[_46:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
 // CHECK:     [[_48:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
 // CHECK:     [[_49:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]]
 // CHECK:     [[_50:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]]

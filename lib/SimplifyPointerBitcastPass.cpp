@@ -18,54 +18,32 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Passes.h"
+#include "SimplifyPointerBitcastPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "SimplifyPointerBitcast"
 
-namespace {
-struct SimplifyPointerBitcastPass : public ModulePass {
-  static char ID;
-  SimplifyPointerBitcastPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-
-  bool runOnTrivialBitcast(Module &M) const;
-  bool runOnBitcastFromBitcast(Module &M) const;
-  bool runOnBitcastFromGEP(Module &M) const;
-  bool runOnGEPFromGEP(Module &M) const;
-};
-} // namespace
-
-char SimplifyPointerBitcastPass::ID = 0;
-INITIALIZE_PASS(SimplifyPointerBitcastPass, "SimplifyPointerBitcast",
-                "Simplify Pointer Bitcast Pass", false, false)
-
-namespace clspv {
-llvm::ModulePass *createSimplifyPointerBitcastPass() {
-  return new SimplifyPointerBitcastPass();
-}
-} // namespace clspv
-
-bool SimplifyPointerBitcastPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Loop through our individual simplification passes until they stop changing
   // things.
-  for (bool localChanged = true; localChanged; Changed |= localChanged) {
-    localChanged = false;
+  bool changed = true;
+  while (changed) {
+    changed = false;
 
-    localChanged |= runOnTrivialBitcast(M);
-    localChanged |= runOnBitcastFromGEP(M);
-    localChanged |= runOnBitcastFromBitcast(M);
-    localChanged |= runOnGEPFromGEP(M);
+    changed |= runOnTrivialBitcast(M);
+    changed |= runOnBitcastFromGEP(M);
+    changed |= runOnBitcastFromBitcast(M);
+    changed |= runOnGEPFromGEP(M);
   }
 
-  return Changed;
+  return PA;
 }
 
-bool SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
   // Remove things like:
   //  bitcast i32 addrspace(1)* %ptr to i32 addrspace(1)*
 
@@ -107,7 +85,7 @@ bool SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
   return Changed;
 }
 
-bool SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
   SmallVector<BitCastInst *, 16> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -190,7 +168,8 @@ bool SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
   return Changed;
 }
 
-bool SimplifyPointerBitcastPass::runOnBitcastFromBitcast(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
+    Module &M) const {
   SmallVector<BitCastInst *, 16> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -237,7 +216,7 @@ bool SimplifyPointerBitcastPass::runOnBitcastFromBitcast(Module &M) const {
   return Changed;
 }
 
-bool SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
   SmallVector<GetElementPtrInst *, 16> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {

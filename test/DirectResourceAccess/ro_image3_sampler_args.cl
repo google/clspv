@@ -5,10 +5,12 @@
 
 // Just for fun, swap arguments in the helpers.
 
+__attribute__((noinline))
 float4 core(read_only image3d_t im, float4 coord, sampler_t s) {
   return read_imagef(im, s, coord);
 }
 
+__attribute__((noinline))
 void apple(read_only image3d_t im, sampler_t s, float4 coord, global float4 *A) {
     *A = core(im, coord, s); }
 

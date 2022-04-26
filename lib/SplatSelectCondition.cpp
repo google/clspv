@@ -24,27 +24,9 @@ using namespace llvm;
 
 #define DEBUG_TYPE "splatselectcond"
 
-namespace {
-struct SplatSelectConditionPass : public ModulePass {
-  static char ID;
-  SplatSelectConditionPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char SplatSelectConditionPass::ID = 0;
-INITIALIZE_PASS(SplatSelectConditionPass, "SplatSelectCond",
-                "Splat Select Condition Pass", false, false)
-
-namespace clspv {
-llvm::ModulePass *createSplatSelectConditionPass() {
-  return new SplatSelectConditionPass();
-}
-} // namespace clspv
-
-bool SplatSelectConditionPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::SplatSelectConditionPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   SmallVector<SelectInst *, 16> WorkList;
   for (Function &F : M) {
@@ -64,12 +46,11 @@ bool SplatSelectConditionPass::runOnModule(Module &M) {
   }
 
   if (WorkList.size() == 0)
-    return Changed;
+    return PA;
 
   IRBuilder<> Builder(WorkList.front());
 
   for (SelectInst *sel : WorkList) {
-    Changed = true;
     auto cond = sel->getCondition();
     auto numElems = cast<VectorType>(sel->getTrueValue()->getType())
                         ->getElementCount()
@@ -79,5 +60,5 @@ bool SplatSelectConditionPass::runOnModule(Module &M) {
     sel->setCondition(splat);
   }
 
-  return Changed;
+  return PA;
 }

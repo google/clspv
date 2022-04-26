@@ -8,6 +8,7 @@
 
 constant uint b[4] = {42, 13, 0, 5};
 
+__attribute__((noinline))
 uint bar(constant uint* a)
 {
   return a[get_local_id(0)];

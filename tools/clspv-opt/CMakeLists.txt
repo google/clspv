@@ -19,11 +19,19 @@ endif()
 add_executable(clspv-opt ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
 set(CLSPV_LLVM_COMPONENTS
+  LLVMAggressiveInstCombine
+  LLVMAnalysis
+  LLVMCodeGen
   LLVMCore
   LLVMInstCombine
-  LLVMIRReader
+  LLVMInstrumentation
+  LLVMObjCARCOpts
+  LLVMPasses
   LLVMScalarOpts
   LLVMSupport
+  LLVMTransformUtils
+  LLVMVectorize
+  LLVMipo
 )
 
 add_dependencies(clspv-opt intrinsics_gen)

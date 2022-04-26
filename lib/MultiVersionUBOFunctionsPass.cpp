@@ -36,64 +36,13 @@
 #include "Builtins.h"
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
-#include "Passes.h"
+#include "MultiVersionUBOFunctionsPass.h"
 
 using namespace llvm;
 
-namespace {
-
-class MultiVersionUBOFunctionsPass final : public ModulePass {
-public:
-  static char ID;
-  MultiVersionUBOFunctionsPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override;
-
-private:
-  // Struct for tracking specialization information.
-  struct ResourceInfo {
-    // The specific argument.
-    Argument *arg;
-    // The resource var base call.
-    CallInst *base;
-    // Series of GEPs that operate on |base|.
-    std::vector<GetElementPtrInst *> indices;
-  };
-
-  // Analyzes the call, |user|, to |fn| in terms of its UBO arguments. Returns
-  // true if |user| can be transformed into a specialized function.
-  //
-  // Currently, this function is only successful in analyzing GEP chains to a
-  // resource variable.
-  bool AnalyzeCall(Function *fn, CallInst *user,
-                   std::vector<ResourceInfo> *resources);
-
-  // Inlines |call|.
-  void InlineCallSite(CallInst *call);
-
-  // Transforms the call to |fn| into a specialized call based on |resources|.
-  // Replaces |call| with a call to the specialized version.
-  void SpecializeCall(Function *fn, CallInst *call,
-                      const std::vector<ResourceInfo> &resources, size_t id);
-
-  // Adds extra arguments to |fn| by rebuilding the entire function.
-  Function *AddExtraArguments(Function *fn,
-                              const std::vector<Value *> &extra_args);
-};
-
-} // namespace
-
-char MultiVersionUBOFunctionsPass::ID = 0;
-INITIALIZE_PASS(MultiVersionUBOFunctionsPass, "MultiVersionUBOFunctionsPass",
-                "Multi-version functions with UBO params", false, false)
-
-namespace clspv {
-ModulePass *createMultiVersionUBOFunctionsPass() {
-  return new MultiVersionUBOFunctionsPass();
-}
-} // namespace clspv
-
-bool MultiVersionUBOFunctionsPass::runOnModule(Module &M) {
-  bool changed = false;
+PreservedAnalyses
+clspv::MultiVersionUBOFunctionsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   UniqueVector<Function *> ordered_functions =
       clspv::CallGraphOrderedFunctions(M);
 
@@ -125,13 +74,12 @@ bool MultiVersionUBOFunctionsPass::runOnModule(Module &M) {
       // All calls to this function were either specialized or inlined.
       fn->eraseFromParent();
     }
-    changed |= local_changed;
   }
 
-  return changed;
+  return PA;
 }
 
-bool MultiVersionUBOFunctionsPass::AnalyzeCall(
+bool clspv::MultiVersionUBOFunctionsPass::AnalyzeCall(
     Function *fn, CallInst *user, std::vector<ResourceInfo> *resources) {
   for (auto &arg : fn->args()) {
     if (clspv::GetArgKind(arg) != clspv::ArgKind::BufferUBO)
@@ -176,12 +124,12 @@ bool MultiVersionUBOFunctionsPass::AnalyzeCall(
   return true;
 }
 
-void MultiVersionUBOFunctionsPass::InlineCallSite(CallInst *call) {
+void clspv::MultiVersionUBOFunctionsPass::InlineCallSite(CallInst *call) {
   InlineFunctionInfo IFI;
   InlineFunction(*call, IFI, nullptr, false);
 }
 
-void MultiVersionUBOFunctionsPass::SpecializeCall(
+void clspv::MultiVersionUBOFunctionsPass::SpecializeCall(
     Function *fn, CallInst *call, const std::vector<ResourceInfo> &resources,
     size_t id) {
 
@@ -274,7 +222,7 @@ void MultiVersionUBOFunctionsPass::SpecializeCall(
   call->eraseFromParent();
 }
 
-Function *MultiVersionUBOFunctionsPass::AddExtraArguments(
+Function *clspv::MultiVersionUBOFunctionsPass::AddExtraArguments(
     Function *fn, const std::vector<Value *> &extra_args) {
   // Generate the new function type.
   SmallVector<Type *, 8> arg_types;

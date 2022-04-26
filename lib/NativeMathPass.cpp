@@ -16,58 +16,38 @@
 #include "llvm/Pass.h"
 
 #include "Builtins.h"
-#include "Passes.h"
+#include "NativeMathPass.h"
 #include "clspv/Option.h"
 
 using namespace llvm;
 
-namespace {
-class NativeMathPass : public ModulePass {
-public:
-  static char ID;
-  NativeMathPass() : ModulePass(ID) {}
-
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char NativeMathPass::ID = 0;
-INITIALIZE_PASS(NativeMathPass, "NativeMath",
-                "Replace some builtin library functions for faster, lower "
-                "precision alternatives",
-                false, false)
-
-namespace clspv {
-ModulePass *createNativeMathPass() { return new NativeMathPass(); }
-} // namespace clspv
-
-bool NativeMathPass::runOnModule(Module &M) {
+PreservedAnalyses clspv::NativeMathPass::run(Module &M,
+                                             ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
   if (!clspv::Option::NativeMath())
-    return false;
+    return PA;
 
-  bool changed = false;
   for (auto &F : M) {
     auto info = clspv::Builtins::Lookup(F.getName());
     switch (info.getType()) {
-    case clspv::Builtins::kDistance:
-    case clspv::Builtins::kLength:
-    case clspv::Builtins::kFma:
-    case clspv::Builtins::kAcosh:
-    case clspv::Builtins::kAsinh:
-    case clspv::Builtins::kAtan:
-    case clspv::Builtins::kAtan2:
-    case clspv::Builtins::kAtanpi:
-    case clspv::Builtins::kAtan2pi:
-    case clspv::Builtins::kAtanh:
-    case clspv::Builtins::kFmod:
-    case clspv::Builtins::kFract:
-    case clspv::Builtins::kLdexp:
-    case clspv::Builtins::kRsqrt:
-    case clspv::Builtins::kHalfSqrt:
-    case clspv::Builtins::kSqrt:
-    case clspv::Builtins::kTanh:
+    case Builtins::kDistance:
+    case Builtins::kLength:
+    case Builtins::kFma:
+    case Builtins::kAcosh:
+    case Builtins::kAsinh:
+    case Builtins::kAtan:
+    case Builtins::kAtan2:
+    case Builtins::kAtanpi:
+    case Builtins::kAtan2pi:
+    case Builtins::kAtanh:
+    case Builtins::kFmod:
+    case Builtins::kFract:
+    case Builtins::kLdexp:
+    case Builtins::kRsqrt:
+    case Builtins::kHalfSqrt:
+    case Builtins::kSqrt:
+    case Builtins::kTanh:
       // Strip the definition of the function leaving only the declaration.
-      changed = true;
       F.deleteBody();
       break;
     default:
@@ -75,5 +55,5 @@ bool NativeMathPass::runOnModule(Module &M) {
     }
   }
 
-  return changed;
+  return PA;
 }

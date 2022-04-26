@@ -4,6 +4,7 @@
 
 // This test is not validated because it uses a selection between Uniform
 // pointers, which is disallowed by SPIR-V.
+__attribute__((noinline))
 int4 bar(constant int4* data) { return data[0]; }
 
 kernel void k1(global int4* out, constant int4* in1, constant int4* in2, int a) {

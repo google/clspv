@@ -12,6 +12,7 @@ typedef struct {
   float x[12];
 } Thing;
 
+__attribute__((noinline))
 float bar(global Thing* a, int n) {
   return a[n].x[7];
 }

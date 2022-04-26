@@ -21,48 +21,27 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "Passes.h"
+#include "InlineFuncWithPointerBitCastArgPass.h"
 
 using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithpointerbitcastarg"
 
-namespace {
-struct InlineFuncWithPointerBitCastArgPass : public ModulePass {
-  static char ID;
-  InlineFuncWithPointerBitCastArgPass() : ModulePass(ID) {}
-
-  bool InlineFunctions(Module &M);
-  bool runOnModule(Module &M) override;
-};
-} // namespace
-
-char InlineFuncWithPointerBitCastArgPass::ID = 0;
-INITIALIZE_PASS(InlineFuncWithPointerBitCastArgPass,
-                "InlineFuncWithPointerBitCastArg",
-                "Inline Function with Pointer Bitcast Argument Pass", false,
-                false)
-
-namespace clspv {
-llvm::ModulePass *createInlineFuncWithPointerBitCastArgPass() {
-  return new InlineFuncWithPointerBitCastArgPass();
-}
-} // namespace clspv
-
-bool InlineFuncWithPointerBitCastArgPass::runOnModule(Module &M) {
-  bool Changed = false;
+PreservedAnalyses
+clspv::InlineFuncWithPointerBitCastArgPass::run(Module &M,
+                                                ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
 
   // Loop through our inline pass until they stop changing thing.
-  for (bool localChanged = true; localChanged; Changed |= localChanged) {
-    localChanged = false;
-
-    localChanged |= InlineFunctions(M);
+  bool changed = true;
+  while (changed) {
+    changed &= InlineFunctions(M);
   }
 
-  return Changed;
+  return PA;
 }
 
-bool InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
+bool clspv::InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
   bool Changed = false;
 
   UniqueVector<CallInst *> WorkList;
