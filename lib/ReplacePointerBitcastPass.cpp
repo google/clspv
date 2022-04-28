@@ -504,6 +504,10 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
               // Generate stores.
               Value *SrcAddrIdx = NewAddrIdx;
               Value *BaseAddr = BitCastSrc;
+              if (VIdx != 0) {
+                SrcAddrIdx =
+                    Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(4 * VIdx));
+              }
               for (unsigned i = 0; i < NumElement; i++) {
                 // Calculate store address.
                 Value *DstAddr =
@@ -1135,7 +1139,13 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
               Value *TmpVal = Builder.CreateBitCast(STVal, TmpTy);
               TmpVal = Builder.CreateLShr(
                   TmpVal, Builder.getIntN(DstTyBitWidth, i * SrcTyBitWidth));
-              TmpVal = Builder.CreateTrunc(TmpVal, SrcTy);
+              if (SrcTy->isHalfTy()) {
+                auto Tmpi16 = Builder.CreateTrunc(
+                    TmpVal, Type::getInt16Ty(M.getContext()));
+                TmpVal = Builder.CreateBitCast(Tmpi16, SrcTy);
+              } else {
+                  TmpVal = Builder.CreateTrunc(TmpVal, SrcTy);
+              }
               STValues.push_back(TmpVal);
             }
 

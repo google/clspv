@@ -504,15 +504,19 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceVload(F);
 
   case Builtins::kVloadaHalf:
+    return replaceVloadHalf(F, FI.getName(), FI.getParameter(0).vector_size,
+                            true);
   case Builtins::kVloadHalf:
-    return replaceVloadHalf(F, FI.getName(), FI.getParameter(0).vector_size);
+    return replaceVloadHalf(F, FI.getName(), FI.getParameter(0).vector_size,
+                            false);
 
   case Builtins::kVstore:
     return replaceVstore(F);
 
-  case Builtins::kVstoreHalf:
   case Builtins::kVstoreaHalf:
-    return replaceVstoreHalf(F, FI.getParameter(0).vector_size);
+    return replaceVstoreHalf(F, FI.getParameter(0).vector_size, true);
+  case Builtins::kVstoreHalf:
+    return replaceVstoreHalf(F, FI.getParameter(0).vector_size, false);
 
   case Builtins::kSmoothstep: {
     int vec_size = FI.getLastParameter().vector_size;
@@ -1973,27 +1977,41 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
 
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F,
                                                 const std::string &name,
-                                                int vec_size) {
+                                                int vec_size, bool aligned) {
   bool is_clspv_version = !name.compare(0, 8, "__clspv_");
   if (!vec_size) {
-    // deduce vec_size from last character of name (e.g. vload_half4)
-    vec_size = std::atoi(&name.back());
+    // deduce vec_size from last characters of name (e.g. vload_half4)
+    std::string half = "half";
+    vec_size = std::atoi(
+        name.substr(name.find(half) + half.size(), std::string::npos).c_str());
   }
   switch (vec_size) {
   case 2:
     return is_clspv_version ? replaceClspvVloadaHalf2(F) : replaceVloadHalf2(F);
+  case 3:
+    if (!is_clspv_version) {
+      return aligned ? replaceVloadaHalf3(F) : replaceVloadHalf3(F);
+    }
+    break;
   case 4:
     return is_clspv_version ? replaceClspvVloadaHalf4(F) : replaceVloadHalf4(F);
+  case 8:
+    if (!is_clspv_version) {
+      return replaceVloadHalf8(F);
+    }
+    break;
+  case 16:
+    if (!is_clspv_version) {
+      return replaceVloadHalf16(F);
+    }
+    break;
   case 0:
     if (!is_clspv_version) {
       return replaceVloadHalf(F);
     }
-    // Fall-through
-  default:
-    llvm_unreachable("Unsupported vload_half vector size");
     break;
   }
-  return false;
+  llvm_unreachable("Unsupported vload_half vector size");
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
@@ -2137,6 +2155,131 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
   });
 }
 
+bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
+
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto ShortTy = Type::getInt16Ty(M.getContext());
+    auto FloatTy = Type::getFloatTy(M.getContext());
+    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
+    auto Float3Ty = FixedVectorType::get(FloatTy, 3);
+    auto NewPointerTy =
+        PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+    auto Int0 = ConstantInt::get(IntTy, 0);
+    auto Int1 = ConstantInt::get(IntTy, 1);
+    auto Int2 = ConstantInt::get(IntTy, 2);
+
+    // Cast the half* pointer to short*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+
+    // Load the first element
+    auto Index0 = BinaryOperator::Create(
+        Instruction::Add,
+        BinaryOperator::Create(Instruction::Shl, Arg0, Int1, "", CI), Arg0, "",
+        CI);
+    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
+    auto Load0 = new LoadInst(ShortTy, GEP0, "", CI);
+
+    // Load the second element
+    auto Index1 =
+        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
+    auto Load1 = new LoadInst(ShortTy, GEP1, "", CI);
+
+    // Load the third element
+    auto Index2 =
+        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
+    auto Load2 = new LoadInst(ShortTy, GEP2, "", CI);
+
+    // Extend each short to int.
+    auto X0 = CastInst::Create(Instruction::ZExt, Load0, IntTy, "", CI);
+    auto X1 = CastInst::Create(Instruction::ZExt, Load1, IntTy, "", CI);
+    auto X2 = CastInst::Create(Instruction::ZExt, Load2, IntTy, "", CI);
+
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Convert int to float2 and extract the uniq meaningful float
+    auto Y0 = ExtractElementInst::Create(CallInst::Create(NewF, X0, "", CI),
+                                         Int0, "", CI);
+    auto Y1 = ExtractElementInst::Create(CallInst::Create(NewF, X1, "", CI),
+                                         Int0, "", CI);
+    auto Y2 = ExtractElementInst::Create(CallInst::Create(NewF, X2, "", CI),
+                                         Int0, "", CI);
+
+    // Create the final float3 to be returned
+    auto Combine =
+        InsertElementInst::Create(UndefValue::get(Float3Ty), Y0, Int0, "", CI);
+    Combine = InsertElementInst::Create(Combine, Y1, Int1, "", CI);
+    Combine = InsertElementInst::Create(Combine, Y2, Int2, "", CI);
+
+    return Combine;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
+
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int2Ty = FixedVectorType::get(IntTy, 2);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy =
+        PointerType::get(Int2Ty, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+    // Cast the half* pointer to int2*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
+
+    // Load from the int2* we casted to.
+    auto Load = new LoadInst(Int2Ty, Index, "", CI);
+
+    // Extract each element from the loaded int2.
+    auto X =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
+    auto Y =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
+
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Get the lower (x & y) components of our final float4.
+    auto Lo = CallInst::Create(NewF, X, "", CI);
+
+    // Get the higher (z & w) components of our final float4.
+    auto Hi = CallInst::Create(NewF, Y, "", CI);
+
+    Constant *ShuffleMask[3] = {ConstantInt::get(IntTy, 0),
+                                ConstantInt::get(IntTy, 1),
+                                ConstantInt::get(IntTy, 2)};
+
+    // Combine our two float2's into one float4.
+    return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask), "",
+                                 CI);
+  });
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -2189,13 +2332,182 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
   });
 }
 
+bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
+
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int4Ty = FixedVectorType::get(IntTy, 4);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy =
+        PointerType::get(Int4Ty, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+    // Cast the half* pointer to int4*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg0, "", CI);
+
+    // Load from the int4* we casted to.
+    auto Load = new LoadInst(Int4Ty, Index, "", CI);
+
+    // Extract each element from the loaded int4.
+    auto X1 =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
+    auto X2 =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
+    auto X3 =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 2), "", CI);
+    auto X4 =
+        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 3), "", CI);
+
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Convert the 4 int into 4 float2
+    auto Y1 = CallInst::Create(NewF, X1, "", CI);
+    auto Y2 = CallInst::Create(NewF, X2, "", CI);
+    auto Y3 = CallInst::Create(NewF, X3, "", CI);
+    auto Y4 = CallInst::Create(NewF, X4, "", CI);
+
+    Constant *ShuffleMask4[4] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
+
+    // Combine our two float2's into one float4.
+    auto Z1 = new ShuffleVectorInst(Y1, Y2, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+    auto Z2 = new ShuffleVectorInst(Y3, Y4, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+
+    Constant *ShuffleMask8[8] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3),
+        ConstantInt::get(IntTy, 4), ConstantInt::get(IntTy, 5),
+        ConstantInt::get(IntTy, 6), ConstantInt::get(IntTy, 7)};
+
+    // Combine our two float4's into one float8.
+    return new ShuffleVectorInst(Z1, Z2, ConstantVector::get(ShuffleMask8), "",
+                                 CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The index argument from vload_half.
+    auto Arg0 = CI->getOperand(0);
+
+    // The pointer argument from vload_half.
+    auto Arg1 = CI->getOperand(1);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int4Ty = FixedVectorType::get(IntTy, 4);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy =
+        PointerType::get(Int4Ty, Arg1->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+    // Cast the half* pointer to int4*.
+    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0, ConstantInt::get(IntTy, 1), "", CI);
+    auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2, "", CI);
+    auto Arg0x2p1 = BinaryOperator::Create(Instruction::Add, Arg0x2, ConstantInt::get(IntTy, 1), "", CI);
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2p1, "", CI);
+
+    // Load from the int4* we casted to.
+    auto Load1 = new LoadInst(Int4Ty, Index1, "", CI);
+    auto Load2 = new LoadInst(Int4Ty, Index2, "", CI);
+
+    // Extract each element from the two loaded int4.
+    auto X1 =
+        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 0), "", CI);
+    auto X2 =
+        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 1), "", CI);
+    auto X3 =
+        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 2), "", CI);
+    auto X4 =
+        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 3), "", CI);
+    auto X5 =
+        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 0), "", CI);
+    auto X6 =
+        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 1), "", CI);
+    auto X7 =
+        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 2), "", CI);
+    auto X8 =
+        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 3), "", CI);
+
+    // Our intrinsic to unpack a float2 from an int.
+    auto SPIRVIntrinsic = clspv::UnpackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Convert the eight int into float2
+    auto Y1 = CallInst::Create(NewF, X1, "", CI);
+    auto Y2 = CallInst::Create(NewF, X2, "", CI);
+    auto Y3 = CallInst::Create(NewF, X3, "", CI);
+    auto Y4 = CallInst::Create(NewF, X4, "", CI);
+    auto Y5 = CallInst::Create(NewF, X5, "", CI);
+    auto Y6 = CallInst::Create(NewF, X6, "", CI);
+    auto Y7 = CallInst::Create(NewF, X7, "", CI);
+    auto Y8 = CallInst::Create(NewF, X8, "", CI);
+
+    Constant *ShuffleMask4[4] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
+
+    // Combine our two float2's into one float4.
+    auto Z1 = new ShuffleVectorInst(Y1, Y2, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+    auto Z2 = new ShuffleVectorInst(Y3, Y4, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+    auto Z3 = new ShuffleVectorInst(Y5, Y6, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+    auto Z4 = new ShuffleVectorInst(Y7, Y8, ConstantVector::get(ShuffleMask4),
+                                    "", CI);
+
+    Constant *ShuffleMask8[8] = {
+        ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3),
+        ConstantInt::get(IntTy, 4), ConstantInt::get(IntTy, 5),
+        ConstantInt::get(IntTy, 6), ConstantInt::get(IntTy, 7)};
+
+    // Combine our two float4's into one float8.
+    auto Z5 = new ShuffleVectorInst(Z1, Z2, ConstantVector::get(ShuffleMask8),
+                                    "", CI);
+    auto Z6 = new ShuffleVectorInst(Z3, Z4, ConstantVector::get(ShuffleMask8),
+                                    "", CI);
+    Constant *ShuffleMask16[16] = {
+        ConstantInt::get(IntTy, 0),  ConstantInt::get(IntTy, 1),
+        ConstantInt::get(IntTy, 2),  ConstantInt::get(IntTy, 3),
+        ConstantInt::get(IntTy, 4),  ConstantInt::get(IntTy, 5),
+        ConstantInt::get(IntTy, 6),  ConstantInt::get(IntTy, 7),
+        ConstantInt::get(IntTy, 8),  ConstantInt::get(IntTy, 9),
+        ConstantInt::get(IntTy, 10), ConstantInt::get(IntTy, 11),
+        ConstantInt::get(IntTy, 12), ConstantInt::get(IntTy, 13),
+        ConstantInt::get(IntTy, 14), ConstantInt::get(IntTy, 15)};
+    // Combine our two float8's into one float16.
+    return new ShuffleVectorInst(Z5, Z6, ConstantVector::get(ShuffleMask16), "",
+                                 CI);
+  });
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
 
   // Replace __clspv_vloada_half2(uint Index, global uint* Ptr) with:
   //
   //    %u = load i32 %ptr
-  //    %fxy = call <2 x float> Unpack2xHalf(u)
-  //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
+  //    %result = call <2 x float> Unpack2xHalf(u)
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     auto Index = CI->getOperand(0);
@@ -2227,7 +2539,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
   //    %u2zw = extractelement %u2, 1
   //    %fxy = call <2 x float> Unpack2xHalf(uint)
   //    %fzw = call <2 x float> Unpack2xHalf(uint)
-  //    %result = shufflevector %fxy %fzw <4 x i32> <0, 1, 2, 3>
+  //    %result = shufflevector %fxy %fzw <4 x float> <0, 1, 2, 3>
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     auto Index = CI->getOperand(0);
@@ -2268,14 +2580,20 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F, int vec_size) {
+bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F, int vec_size, bool aligned) {
   switch (vec_size) {
   case 0:
     return replaceVstoreHalf(F);
   case 2:
     return replaceVstoreHalf2(F);
+  case 3:
+    return aligned ? replaceVstoreaHalf3(F) : replaceVstoreHalf3(F);
   case 4:
     return replaceVstoreHalf4(F);
+  case 8:
+    return replaceVstoreHalf8(F);
+  case 16:
+    return replaceVstoreHalf16(F);
   default:
     llvm_unreachable("Unsupported vstore_half vector size");
     break;
@@ -2473,6 +2791,149 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
   });
 }
 
+bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
+
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
+
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto ShortTy = Type::getInt16Ty(M.getContext());
+    auto FloatTy = Type::getFloatTy(M.getContext());
+    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
+    auto NewPointerTy =
+        PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+
+    auto Int0 = ConstantInt::get(IntTy, 0);
+    auto Int1 = ConstantInt::get(IntTy, 1);
+    auto Int2 = ConstantInt::get(IntTy, 2);
+
+    auto X0 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
+    auto X1 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
+    auto X2 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
+
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = clspv::PackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Convert float2 into int and trunc to short to keep only the meaningful
+    // part of it
+    auto Y0 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X0, "", CI),
+                         ShortTy, "", CI);
+    auto Y1 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X1, "", CI),
+                         ShortTy, "", CI);
+    auto Y2 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X2, "", CI),
+                         ShortTy, "", CI);
+
+    // Cast the half* pointer to short*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+
+    auto Index0 = BinaryOperator::Create(
+        Instruction::Add,
+        BinaryOperator::Create(Instruction::Shl, Arg1, Int1, "", CI), Arg1, "",
+        CI);
+    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
+    new StoreInst(Y0, GEP0, CI);
+
+    auto Index1 =
+        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
+    new StoreInst(Y1, GEP1, CI);
+
+    auto Index2 =
+        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
+    return new StoreInst(Y2, GEP2, CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
+
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
+
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto ShortTy = Type::getInt16Ty(M.getContext());
+    auto FloatTy = Type::getFloatTy(M.getContext());
+    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
+    auto NewPointerTy =
+        PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+
+    auto Int0 = ConstantInt::get(IntTy, 0);
+    auto Int1 = ConstantInt::get(IntTy, 1);
+    auto Int2 = ConstantInt::get(IntTy, 2);
+
+    auto X0 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
+    auto X1 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
+    auto X2 = InsertElementInst::Create(
+        UndefValue::get(Float2Ty),
+        ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
+
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = clspv::PackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    // Convert float2 into int and trunc to short to keep only the meaningful
+    // part of it
+    auto Y0 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X0, "", CI),
+                         ShortTy, "", CI);
+    auto Y1 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X1, "", CI),
+                         ShortTy, "", CI);
+    auto Y2 =
+        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X2, "", CI),
+                         ShortTy, "", CI);
+
+    // Cast the half* pointer to short*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+
+    auto Index0 = BinaryOperator::Create(Instruction::Shl, Arg1, Int2, "", CI);
+    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
+    new StoreInst(Y0, GEP0, CI);
+
+    auto Index1 =
+        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
+    new StoreInst(Y1, GEP1, CI);
+
+    auto Index2 =
+        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
+    return new StoreInst(Y2, GEP2, CI);
+  });
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -2530,6 +2991,181 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
 
     // Store to the int2* we casted to.
     return new StoreInst(Combine, Index, CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
+
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
+
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int4Ty = FixedVectorType::get(IntTy, 4);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy =
+        PointerType::get(Int4Ty, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+
+    Constant *ShuffleMask01[2] = {ConstantInt::get(IntTy, 0),
+                                  ConstantInt::get(IntTy, 1)};
+    auto X01 =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(ShuffleMask01), "", CI);
+    Constant *ShuffleMask23[2] = {ConstantInt::get(IntTy, 2),
+                                  ConstantInt::get(IntTy, 3)};
+    auto X23 =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(ShuffleMask23), "", CI);
+    Constant *ShuffleMask45[2] = {ConstantInt::get(IntTy, 4),
+                                  ConstantInt::get(IntTy, 5)};
+    auto X45 =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(ShuffleMask45), "", CI);
+    Constant *ShuffleMask67[2] = {ConstantInt::get(IntTy, 6),
+                                  ConstantInt::get(IntTy, 7)};
+    auto X67 =
+        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                              ConstantVector::get(ShuffleMask67), "", CI);
+
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = clspv::PackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    auto Y01 = CallInst::Create(NewF, X01, "", CI);
+    auto Y23 = CallInst::Create(NewF, X23, "", CI);
+    auto Y45 = CallInst::Create(NewF, X45, "", CI);
+    auto Y67 = CallInst::Create(NewF, X67, "", CI);
+
+    auto Combine = InsertElementInst::Create(
+        UndefValue::get(Int4Ty), Y01, ConstantInt::get(IntTy, 0), "", CI);
+    Combine = InsertElementInst::Create(Combine, Y23,
+                                        ConstantInt::get(IntTy, 1), "", CI);
+    Combine = InsertElementInst::Create(Combine, Y45,
+                                        ConstantInt::get(IntTy, 2), "", CI);
+    Combine = InsertElementInst::Create(Combine, Y67,
+                                        ConstantInt::get(IntTy, 3), "", CI);
+
+    // Cast the half* pointer to int4*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg1, "", CI);
+
+    // Store to the int4* we casted to.
+    return new StoreInst(Combine, Index, CI);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    // The value to store.
+    auto Arg0 = CI->getOperand(0);
+
+    // The index argument from vstore_half.
+    auto Arg1 = CI->getOperand(1);
+
+    // The pointer argument from vstore_half.
+    auto Arg2 = CI->getOperand(2);
+
+    auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int4Ty = FixedVectorType::get(IntTy, 4);
+    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+    auto NewPointerTy =
+        PointerType::get(Int4Ty, Arg2->getType()->getPointerAddressSpace());
+    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+
+    Constant *ShuffleMask0[2] = {ConstantInt::get(IntTy, 0),
+                                 ConstantInt::get(IntTy, 1)};
+    auto X0 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask0), "", CI);
+    Constant *ShuffleMask1[2] = {ConstantInt::get(IntTy, 2),
+                                 ConstantInt::get(IntTy, 3)};
+    auto X1 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask1), "", CI);
+    Constant *ShuffleMask2[2] = {ConstantInt::get(IntTy, 4),
+                                 ConstantInt::get(IntTy, 5)};
+    auto X2 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask2), "", CI);
+    Constant *ShuffleMask3[2] = {ConstantInt::get(IntTy, 6),
+                                 ConstantInt::get(IntTy, 7)};
+    auto X3 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask3), "", CI);
+    Constant *ShuffleMask4[2] = {ConstantInt::get(IntTy, 8),
+                                 ConstantInt::get(IntTy, 9)};
+    auto X4 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask4), "", CI);
+    Constant *ShuffleMask5[2] = {ConstantInt::get(IntTy, 10),
+                                 ConstantInt::get(IntTy, 11)};
+    auto X5 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask5), "", CI);
+    Constant *ShuffleMask6[2] = {ConstantInt::get(IntTy, 12),
+                                 ConstantInt::get(IntTy, 13)};
+    auto X6 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask6), "", CI);
+    Constant *ShuffleMask7[2] = {ConstantInt::get(IntTy, 14),
+                                 ConstantInt::get(IntTy, 15)};
+    auto X7 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+                                    ConstantVector::get(ShuffleMask7), "", CI);
+
+    // Our intrinsic to pack a float2 to an int.
+    auto SPIRVIntrinsic = clspv::PackFunction();
+
+    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+    auto Y0 = CallInst::Create(NewF, X0, "", CI);
+    auto Y1 = CallInst::Create(NewF, X1, "", CI);
+    auto Y2 = CallInst::Create(NewF, X2, "", CI);
+    auto Y3 = CallInst::Create(NewF, X3, "", CI);
+    auto Y4 = CallInst::Create(NewF, X4, "", CI);
+    auto Y5 = CallInst::Create(NewF, X5, "", CI);
+    auto Y6 = CallInst::Create(NewF, X6, "", CI);
+    auto Y7 = CallInst::Create(NewF, X7, "", CI);
+
+    auto Combine1 = InsertElementInst::Create(
+        UndefValue::get(Int4Ty), Y0, ConstantInt::get(IntTy, 0), "", CI);
+    Combine1 = InsertElementInst::Create(Combine1, Y1,
+                                         ConstantInt::get(IntTy, 1), "", CI);
+    Combine1 = InsertElementInst::Create(Combine1, Y2,
+                                         ConstantInt::get(IntTy, 2), "", CI);
+    Combine1 = InsertElementInst::Create(Combine1, Y3,
+                                         ConstantInt::get(IntTy, 3), "", CI);
+
+    auto Combine2 = InsertElementInst::Create(
+        UndefValue::get(Int4Ty), Y4, ConstantInt::get(IntTy, 0), "", CI);
+    Combine2 = InsertElementInst::Create(Combine2, Y5,
+                                         ConstantInt::get(IntTy, 1), "", CI);
+    Combine2 = InsertElementInst::Create(Combine2, Y6,
+                                         ConstantInt::get(IntTy, 2), "", CI);
+    Combine2 = InsertElementInst::Create(Combine2, Y7,
+                                         ConstantInt::get(IntTy, 3), "", CI);
+
+    // Cast the half* pointer to int4*.
+    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Arg1x2 = BinaryOperator::Create(Instruction::Shl, Arg1,
+                                         ConstantInt::get(IntTy, 1), "", CI);
+    auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1x2, "", CI);
+
+    // Store to the int4* we casted to.
+    new StoreInst(Combine1, Index1, CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Arg1Plus1 = BinaryOperator::Create(Instruction::Add, Arg1x2,
+                                            ConstantInt::get(IntTy, 1), "", CI);
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1Plus1, "", CI);
+
+    // Store to the int4* we casted to.
+    return new StoreInst(Combine2, Index2, CI);
   });
 }
 

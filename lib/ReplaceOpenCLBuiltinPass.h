@@ -59,16 +59,24 @@ private:
   bool replaceSignbit(llvm::Function &F, bool is_vec);
   bool replaceMul(llvm::Function &F, bool is_float, bool is_mad);
   bool replaceVloadHalf(llvm::Function &F, const std::string &name,
-                        int vec_size);
+                        int vec_size, bool aligned);
   bool replaceVloadHalf(llvm::Function &F);
   bool replaceVloadHalf2(llvm::Function &F);
+  bool replaceVloadHalf3(llvm::Function &F);
+  bool replaceVloadaHalf3(llvm::Function &F);
   bool replaceVloadHalf4(llvm::Function &F);
+  bool replaceVloadHalf8(llvm::Function &F);
+  bool replaceVloadHalf16(llvm::Function &F);
   bool replaceClspvVloadaHalf2(llvm::Function &F);
   bool replaceClspvVloadaHalf4(llvm::Function &F);
-  bool replaceVstoreHalf(llvm::Function &F, int vec_size);
+  bool replaceVstoreHalf(llvm::Function &F, int vec_size, bool aligned);
   bool replaceVstoreHalf(llvm::Function &F);
   bool replaceVstoreHalf2(llvm::Function &F);
+  bool replaceVstoreHalf3(llvm::Function &F);
+  bool replaceVstoreaHalf3(llvm::Function &F);
   bool replaceVstoreHalf4(llvm::Function &F);
+  bool replaceVstoreHalf8(llvm::Function &F);
+  bool replaceVstoreHalf16(llvm::Function &F);
   bool replaceHalfReadImage(llvm::Function &F);
   bool replaceHalfWriteImage(llvm::Function &F);
   bool replaceSampledReadImageWithIntCoords(llvm::Function &F);
