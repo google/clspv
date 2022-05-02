@@ -26,7 +26,64 @@ using namespace llvm;
 
 #define DEBUG_TYPE "replacepointerbitcast"
 
+#define DEBUG_FCT_TY_VALUES(Ty, Values)                                        \
+  do {                                                                         \
+    LLVM_DEBUG(fprintf(stderr, "%s: ", __func__); Ty->dump();                  \
+               fprintf(stderr, "\tValues[0/%lu] = ", Values.size());           \
+               Values[0]->dump());                                             \
+  } while (0)
+#define DEBUG_FCT_VALUES(Values)                                               \
+  do {                                                                         \
+    LLVM_DEBUG(                                                                \
+        fprintf(stderr, "%s: Values[0/%lu] = ", __func__, Values.size());      \
+        Values[0]->dump());                                                    \
+  } while (0)
+
+using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
+
 namespace {
+
+// Returns the size in bits of 'Ty'
+// In the case of a vector of 3 elements, return the size of the same vector of
+// 4 elements as vec3 has padding between 2 vectors.
+size_t SizeInBits(const DataLayout &DL, Type *Ty) {
+  if (auto VecTy = dyn_cast<FixedVectorType>(Ty)) {
+    if (VecTy->getNumElements() == 3) {
+      return 4 * SizeInBits(DL, VecTy->getElementType());
+    }
+  }
+  return DL.getTypeStoreSizeInBits(Ty);
+}
+
+// Same as above with different arguments
+size_t SizeInBits(IRBuilder<> &builder, Type *Ty) {
+  return SizeInBits(
+      builder.GetInsertBlock()->getParent()->getParent()->getDataLayout(), Ty);
+}
+
+// Returns the element type when 'Ty' is a vector or an array, otherwise returns
+// 'Ty'.
+Type *GetEleType(Type *Ty) {
+  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
+    return VecTy->getElementType();
+  } else if (auto ArrTy = dyn_cast<ArrayType>(Ty)) {
+    return ArrTy->getElementType();
+  } else {
+    return Ty;
+  }
+}
+
+// Returns the number of elements when 'Ty' is a vector or an array, otherwise
+// returns 1.
+unsigned GetNumEle(Type *Ty) {
+  if (auto VecTy = dyn_cast<FixedVectorType>(Ty)) {
+    return VecTy->getNumElements();
+  } else if (auto ArrTy = dyn_cast<ArrayType>(Ty)) {
+    return ArrTy->getNumElements();
+  } else {
+    return 1;
+  }
+}
 
 // Gathers the scalar values of |v| into |elements|. Generates new instructions
 // to extract the values.
@@ -208,56 +265,823 @@ Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
   return nullptr;
 }
 
-} // namespace
+void InsertInArray(IRBuilder<> &Builder, ArrayType *Ty,
+                   SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  unsigned ArrayNumEles = Ty->getNumElements();
+  assert(Values.size() % ArrayNumEles == 0);
+  unsigned NumArrays = Values.size() / ArrayNumEles;
+  for (unsigned i = 0; i < NumArrays; i++) {
+    Value *Ret = UndefValue::get(Ty);
+    for (unsigned j = 0; j < ArrayNumEles; j++) {
+      Ret = Builder.CreateInsertValue(Ret, Values[i * ArrayNumEles + j], {j});
+    }
+    Values[i] = Ret;
+  }
+  Values.resize(NumArrays);
+}
 
-unsigned
-clspv::ReplacePointerBitcastPass::CalculateNumIter(unsigned SrcTyBitWidth,
-                                                   unsigned DstTyBitWidth) {
-  unsigned NumIter = 0;
-  if (SrcTyBitWidth > DstTyBitWidth) {
-    if (SrcTyBitWidth % DstTyBitWidth) {
-      llvm_unreachable(
-          "Src type bitwidth should be multiple of Dest type bitwidth");
+void ExtractFromVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_VALUES(Values);
+  SmallVector<Value *, 8> ScalarValues;
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+  for (unsigned i = 0; i < Values.size(); i++) {
+    for (unsigned j = 0; j < cast<FixedVectorType>(ValueTy)->getNumElements();
+         j++) {
+      ScalarValues.push_back(Builder.CreateExtractElement(Values[i], j));
     }
-    NumIter = 1;
-  } else if (SrcTyBitWidth < DstTyBitWidth) {
-    if (DstTyBitWidth % SrcTyBitWidth) {
-      llvm_unreachable(
-          "Dest type bitwidth should be multiple of Src type bitwidth");
+  }
+  Values.clear();
+  Values = std::move(ScalarValues);
+}
+
+void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_VALUES(Values);
+  SmallVector<Value *, 8> ScalarValues;
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isArrayTy());
+  for (unsigned i = 0; i < Values.size(); i++) {
+    for (unsigned j = 0; j < cast<ArrayType>(ValueTy)->getNumElements(); j++) {
+      ScalarValues.push_back(Builder.CreateExtractValue(Values[i], j));
     }
-    NumIter = DstTyBitWidth / SrcTyBitWidth;
+  }
+  Values.clear();
+  Values = std::move(ScalarValues);
+}
+
+// Return a scalar type of size 'N' matching the 'TargetTy' if possible.
+Type *getNTy(IRBuilder<> &Builder, unsigned N, Type *TargetTy) {
+  if (GetEleType(TargetTy)->isFloatTy() && N == 32) {
+    return Builder.getFloatTy();
+  } else if (GetEleType(TargetTy)->isHalfTy() && N == 16) {
+    return Builder.getHalfTy();
   } else {
-    NumIter = 0;
+    return Builder.getIntNTy(N);
+  }
+}
+
+// Convert all elements of 'Values' into 'Ty' using 'ConvertValue'.
+// Expect all values to have the same type;
+void BitcastValues(IRBuilder<> &Builder, Type *Ty,
+                   SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(SizeInBits(Builder, ValueTy) == SizeInBits(Builder, Ty));
+
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  for (unsigned i = 0; i < Values.size(); i++) {
+    Values[i] = ConvertValue(Values[i], Ty, Builder);
+  }
+}
+
+// Bitcast 'Values' into a vector type with 'NumElePerVec' elements, but with
+// the same global size as before.
+void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
+                       unsigned NumElePerVec, Type *Ty) {
+  DEBUG_FCT_VALUES(Values);
+  Type *SrcTy = Values[0]->getType();
+  unsigned SrcSize = SizeInBits(Builder, SrcTy);
+  assert(SrcSize % NumElePerVec == 0);
+  unsigned SrcEleSize = SrcSize / NumElePerVec;
+  VectorType *DstTy = FixedVectorType::get(
+      getNTy(Builder, SrcEleSize, GetEleType(Ty)), NumElePerVec);
+  BitcastValues(Builder, DstTy, Values);
+}
+
+// 'Values' is expected to contain scalar values.
+// Group those values in vector of size 'NumElePerVec'.
+void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
+                                 SmallVector<Value *, 8> &Values,
+                                 unsigned NumElePerVec) {
+  DEBUG_FCT_VALUES(Values);
+  Type *SrcTy = Values[0]->getType();
+  assert(!SrcTy->isVectorTy() && !SrcTy->isArrayTy());
+  VectorType *DstTy = FixedVectorType::get(SrcTy, NumElePerVec);
+  assert(Values.size() % NumElePerVec == 0);
+  unsigned int NumVector = Values.size() / NumElePerVec;
+  for (unsigned i = 0; i < NumVector; i++) {
+    unsigned idx = i * NumElePerVec;
+    Value *Vec = UndefValue::get(DstTy);
+    for (unsigned j = 0; j < NumElePerVec; j++) {
+      Vec = Builder.CreateInsertElement(Vec, Values[idx + j],
+                                        Builder.getInt32(j));
+    }
+    Values[i] = Vec;
+  }
+  Values.resize(NumVector);
+}
+
+// 'Values' is expected to contain an even number of vectors of 2 elements.
+// Group them into vectors of 4 elements using shuffles.
+void GroupVectorValuesInPair(IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_VALUES(Values);
+  assert(Values[0]->getType()->isVectorTy() &&
+         cast<FixedVectorType>(Values[0]->getType())->getNumElements() == 2);
+  assert(Values.size() % 2 == 0);
+  unsigned NewValuesSize = Values.size() / 2;
+
+  for (unsigned i = 0; i < NewValuesSize; i++) {
+    unsigned idx = 2 * i;
+    Values[i] =
+        Builder.CreateShuffleVector(Values[idx], Values[idx + 1], {0, 1, 2, 3});
+  }
+  Values.resize(NewValuesSize);
+}
+
+// 'Values' is expected to contain vectors of 4 elements.
+// Split them into vectors of 2 elements using shuffles.
+void SplitVectorValuesInPair(IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values, Type *Ty) {
+  DEBUG_FCT_VALUES(Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+  auto ValueVecTy = cast<FixedVectorType>(ValueTy);
+  assert(ValueVecTy->getNumElements() == 4);
+
+  // Bitcast before splitting to have less bitcast
+  BitcastIntoVector(Builder, Values, 4, Ty);
+
+  SmallVector<Value *, 8> DstValues;
+  for (unsigned i = 0; i < Values.size(); i++) {
+    DstValues.push_back(Builder.CreateShuffleVector(Values[i], {0, 1}));
+    DstValues.push_back(Builder.CreateShuffleVector(Values[i], {2, 3}));
+  }
+  Values.clear();
+  Values = std::move(DstValues);
+}
+
+// Split 'Values' until the element size of the vector is equal to the size of
+// 'Ty'.
+// 'Values' is expected to contains vectors.
+void SplitVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
+                                   SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned TySize = SizeInBits(Builder, Ty);
+  while (ValueEleSize > TySize) {
+    if (TySize * 4 == ValueEleSize) {
+      // Ty: i8 - ValueTy: <4 x i32>
+      // <4 x i32> -> i32 -> <4 x i8>
+      ExtractFromVector(Builder, Values);
+      BitcastIntoVector(Builder, Values, 4, Ty);
+    } else if (ValueNumEle == 2) {
+      // <2 x i32> -> <4 x i16>
+      BitcastIntoVector(Builder, Values, 4, Ty);
+    } else if (ValueNumEle == 4) {
+      // <4 x i32> -> <2 x i32>
+      SplitVectorValuesInPair(Builder, Values, Ty);
+    } else {
+      llvm_unreachable("ConvertVectorIntoVector internal error");
+    }
+    Type *Tmp = Values[0]->getType();
+    ValueEleSize = SizeInBits(Builder, GetEleType(Tmp));
+    ValueNumEle = GetNumEle(Tmp);
+  }
+}
+
+// Split 'Values' until the size of the vector is equal to the size of 'Ty'.
+// 'Values' is expected to contains vectors.
+void SplitVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
+                                SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned TySize = SizeInBits(Builder, Ty);
+
+  while ((ValueEleSize * ValueNumEle) > TySize) {
+    if (ValueNumEle == 2) {
+      // <2 x i32> -> <4 x i16>
+      BitcastIntoVector(Builder, Values, 4, Ty);
+    } else if (ValueNumEle == 4) {
+      // <4 x i32> -> <2 x i32>
+      SplitVectorValuesInPair(Builder, Values, Ty);
+    } else {
+      llvm_unreachable("ConvertVectorIntoVector internal error");
+    }
+    Type *Tmp = Values[0]->getType();
+    ValueEleSize = SizeInBits(Builder, GetEleType(Tmp));
+    ValueNumEle = GetNumEle(Tmp);
+  }
+}
+
+// Group 'Values' until the element size of the vector is equal to the size of
+// 'Ty'.
+// 'Values' is expected to contains vectors.
+void GroupVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
+                                   SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_VALUES(Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned TySize = SizeInBits(Builder, Ty);
+  while (ValueEleSize < TySize) {
+    if (ValueNumEle == 2) {
+      // <2 x i16> -> <4 x i16>
+      GroupVectorValuesInPair(Builder, Values);
+    } else if (ValueNumEle == 4) {
+      // <4 x i16> -> <2 x i32>
+      BitcastIntoVector(Builder, Values, 2, Ty);
+    } else {
+      llvm_unreachable("ConvertVectorIntoVector internal error");
+    }
+    Type *Tmp = Values[0]->getType();
+    ValueEleSize = SizeInBits(Builder, GetEleType(Tmp));
+    ValueNumEle = GetNumEle(Tmp);
+  }
+}
+
+// Group 'Values' until the size of the vector is equal to the size of 'Ty'.
+// 'Values' is expected to contains vectors.
+void GroupVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
+                                SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_VALUES(Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned TySize = SizeInBits(Builder, Ty);
+  while ((ValueEleSize * ValueNumEle) < TySize) {
+    if (ValueNumEle == 2) {
+      // <2 x i16> -> <4 x i16>
+      GroupVectorValuesInPair(Builder, Values);
+    } else if (ValueNumEle == 4) {
+      // <4 x i16> -> <2 x i32>
+      BitcastIntoVector(Builder, Values, 2, Ty);
+    } else {
+      llvm_unreachable("ConvertVectorIntoVector internal error");
+    }
+    Type *Tmp = Values[0]->getType();
+    ValueEleSize = SizeInBits(Builder, GetEleType(Tmp));
+    ValueNumEle = GetNumEle(Tmp);
+  }
+}
+
+void ConvertVectorIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  Type *TyEle = GetEleType(Ty);
+
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned TyEleSize = SizeInBits(Builder, GetEleType(Ty));
+
+  // Adjust the size of the vector element
+  if (ValueEleSize < TyEleSize) {
+    GroupVectorUntilEleSizeEquals(TyEle, Builder, Values);
+  } else if (ValueEleSize > TyEleSize) {
+    SplitVectorUntilEleSizeEquals(TyEle, Builder, Values);
+  }
+
+  ValueTy = Values[0]->getType();
+  assert(ValueTy->isVectorTy());
+
+  // Adjust the number of element per vector
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned TyNumEle = GetNumEle(Ty);
+  if (ValueNumEle > TyNumEle) {
+    assert(ValueNumEle == 4 && TyNumEle == 2);
+    SplitVectorValuesInPair(Builder, Values, TyEle);
+  } else if (ValueNumEle < TyNumEle) {
+    assert(ValueNumEle == 2 && TyNumEle == 4);
+    GroupVectorValuesInPair(Builder, Values);
+  }
+
+  BitcastValues(Builder, Ty, Values);
+}
+
+void ConvertVectorIntoScalar(Type *Ty, IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(!Ty->isVectorTy() && !Ty->isArrayTy() && ValueTy->isVectorTy());
+
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  unsigned TySize = SizeInBits(Builder, Ty);
+  unsigned ValueEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned ValueNumEle = GetNumEle(ValueTy);
+  unsigned ValueSize = SizeInBits(Builder, ValueTy);
+
+  if (ValueEleSize > TySize) {
+    SplitVectorUntilEleSizeEquals(Ty, Builder, Values);
+    BitcastIntoVector(Builder, Values, GetNumEle(Values[0]->getType()), Ty);
+    ExtractFromVector(Builder, Values);
+  } else if (ValueEleSize == TySize) {
+    BitcastIntoVector(Builder, Values, ValueNumEle, Ty);
+    ExtractFromVector(Builder, Values);
+  } else {
+    // ValueEleSize < TySize
+    if (ValueSize > TySize) {
+      assert(ValueNumEle == 4 && ValueEleSize * 2 == TySize);
+      SplitVectorValuesInPair(Builder, Values, Ty);
+    } else if (ValueSize < TySize) {
+      GroupVectorUntilSizeEquals(Ty, Builder, Values);
+    }
+  }
+
+  BitcastValues(Builder, Ty, Values);
+}
+
+void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(!ValueTy->isVectorTy() && !ValueTy->isArrayTy());
+
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  unsigned TySize = SizeInBits(Builder, Ty);
+  unsigned ValueSize = SizeInBits(Builder, ValueTy);
+  if (TySize > ValueSize) {
+    assert(TySize % ValueSize == 0);
+    unsigned NumElements = std::min(TySize / ValueSize, (unsigned)4);
+    GroupScalarValuesIntoVector(Builder, Values, NumElements);
+    GroupVectorUntilSizeEquals(Ty, Builder, Values);
+  } else if (TySize < ValueSize) {
+    assert(ValueSize % TySize == 0);
+    unsigned NumElements = std::min(ValueSize / TySize, (unsigned)4);
+    BitcastIntoVector(Builder, Values, NumElements, Ty);
+    SplitVectorUntilSizeEquals(Ty, Builder, Values);
+  }
+
+  BitcastValues(Builder, Ty, Values);
+}
+
+void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+  assert(!Ty->isVectorTy() && !Ty->isArrayTy() && !ValueTy->isVectorTy() &&
+         !ValueTy->isArrayTy());
+
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  unsigned ValueSize = SizeInBits(Builder, ValueTy);
+  unsigned TySize = SizeInBits(Builder, Ty);
+  if (ValueSize > TySize) {
+    assert(ValueSize % TySize == 0);
+    unsigned NumElements = std::min(ValueSize / TySize, (unsigned)4);
+    BitcastIntoVector(Builder, Values, NumElements, Ty);
+    SplitVectorUntilEleSizeEquals(Ty, Builder, Values);
+    ExtractFromVector(Builder, Values);
+  } else if (ValueSize < TySize) {
+    assert(TySize % ValueSize == 0);
+    unsigned NumElements = std::min(TySize / ValueSize, (unsigned)4);
+    GroupScalarValuesIntoVector(Builder, Values, NumElements);
+    GroupVectorUntilSizeEquals(Ty, Builder, Values);
+  }
+
+  BitcastValues(Builder, Ty, Values);
+}
+
+void ConvertInto(Type *Ty, IRBuilder<> &Builder,
+                 SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  Type *ValueTy = Values[0]->getType();
+
+  if (Ty == ValueTy) {
+    return;
+  }
+  if (auto VecTy = dyn_cast<FixedVectorType>(Ty)) {
+    if (ValueTy->isVectorTy()) {
+      ConvertVectorIntoVector(VecTy, Builder, Values);
+    } else {
+      ConvertScalarIntoVector(VecTy, Builder, Values);
+    }
+  } else {
+    Type *EleTy = GetEleType(Ty);
+    if (ValueTy->isVectorTy()) {
+      ConvertVectorIntoScalar(EleTy, Builder, Values);
+    } else {
+      ConvertScalarIntoScalar(EleTy, Builder, Values);
+    }
+    if (auto DstArrTy = dyn_cast<ArrayType>(Ty)) {
+      InsertInArray(Builder, DstArrTy, Values);
+    }
+  }
+}
+
+bool IsPowerOfTwo(unsigned x) { return (x & (x - 1)) == 0; }
+
+Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val) {
+  if (div == 1) {
+    return Val;
+  }
+  if (IsPowerOfTwo(div)) {
+    return Builder.CreateLShr(Val, Builder.getInt32(std::log2(div)));
+  } else {
+    return Builder.CreateUDiv(Val, Builder.getInt32(div));
+  }
+}
+
+Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val) {
+  if (mul == 1){
+    return Val;
+  }
+  if (IsPowerOfTwo(mul)) {
+    return Builder.CreateShl(Val, Builder.getInt32(std::log2(mul)));
+  } else {
+    return Builder.CreateMul(Val, Builder.getInt32(mul));
+  }
+}
+
+Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
+  if (rem == 1) {
+    return Builder.getInt32(0);
+  }
+  if (IsPowerOfTwo(rem)) {
+    return Builder.CreateAnd(Val, Builder.getInt32(rem - 1));
+  } else {
+    return Builder.CreateURem(Val, Builder.getInt32(rem));
+  }
+}
+
+// 'Val' is expected to be a vector.
+// 'Idx' is the index where to extract the subvector, but in the casted type
+// coordinate. If null, just extract from the origin of the vector.
+Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
+                        unsigned DstSize) {
+  LLVM_DEBUG(
+      fprintf(stderr, "%s: ", __func__); Val->dump();
+      fprintf(stderr, "\tIdx: ");
+      if (Idx != NULL) { Idx->dump(); } else { fprintf(stderr, "nullptr\n"); });
+
+  Type *ValueTy = Val->getType();
+  assert(ValueTy->isVectorTy() && GetNumEle(ValueTy) == 4);
+
+  if (Idx == NULL) {
+    Val = Builder.CreateShuffleVector(Val, {0, 1});
+  } else {
+    // Compute with subvector to keep ({0, 1} or {2, 3}) and update Idx.
+    unsigned SrcSize = SizeInBits(Builder, ValueTy);
+    assert((SrcSize / 2) % DstSize == 0);
+    unsigned NumDstInHalfSrc = SrcSize / (2 * DstSize);
+    auto ValIdx = CreateDiv(Builder, NumDstInHalfSrc, Idx);
+    Idx = CreateRem(Builder, NumDstInHalfSrc, Idx);
+
+    // Select the appropriate subvector
+    Value *Val0 = Builder.CreateShuffleVector(Val, {0, 1});
+    Value *Val1 = Builder.CreateShuffleVector(Val, {2, 3});
+    Value *Cmp = Builder.CreateICmpEQ(ValIdx, Builder.getInt32(0));
+    Val = Builder.CreateSelect(Cmp, Val0, Val1);
+  }
+  return Val;
+}
+
+void ExtractSubElementUntilEleSizeLE(Type *Ty, IRBuilder<> &Builder,
+                                     SmallVector<Value *, 8> &Values,
+                                     Value *&Idx) {
+  Type *ValueTy = Values[0]->getType();
+
+  unsigned SrcSize = SizeInBits(Builder, ValueTy);
+  unsigned SrcEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  unsigned SrcNumEle = GetNumEle(ValueTy);
+
+  unsigned DstSize = SizeInBits(Builder, Ty);
+  unsigned DstEleSize = SizeInBits(Builder, GetEleType(Ty));
+
+  while (SrcEleSize > DstSize) {
+    if (!ValueTy->isVectorTy()) {
+      // ValueTy: i32 - Ty: i8
+      // i32 -> <4 x i8>
+      assert(SrcSize % DstSize == 0);
+      BitcastIntoVector(Builder, Values,
+                        std::min(SrcSize / DstEleSize, (unsigned)4), Ty);
+    } else {
+      // ValueTy->isVectorTy()
+      if (SrcNumEle == 2) {
+        // <2 x i32> -> <4 x i16>
+        BitcastIntoVector(Builder, Values, 4, Ty);
+      } else if (SrcNumEle == 4) {
+        // <4 x i32> -> {<2 x i32>, <2 x i32>}[Idx] -> <2 x i32>
+        Values[0] = ExtractSubVector(Builder, Idx, Values[0], DstSize);
+      } else {
+        llvm_unreachable("ExtractSubElement internal error");
+      }
+    }
+    ValueTy = Values[0]->getType();
+    SrcNumEle = GetNumEle(ValueTy);
+    SrcEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+    SrcSize = SizeInBits(Builder, ValueTy);
+  }
+}
+
+Value *ExtractElementOrSubVector(Type *Ty, IRBuilder<> &Builder, Value *Val,
+                                 Value *&Idx) {
+  Type *ValueTy = Val->getType();
+  unsigned DstSize = SizeInBits(Builder, Ty);
+  unsigned SrcEleSize = SizeInBits(Builder, GetEleType(ValueTy));
+  assert(DstSize % SrcEleSize == 0);
+  unsigned NumElements = DstSize / SrcEleSize;
+  assert(NumElements <= 4);
+  if (NumElements == 1) {
+    // ValueTy: <4 x i32> - Ty: <2 x i16>
+    // <4 x i32> -> <4 x i32>[Idx] -> i32
+    assert(SrcEleSize == DstSize);
+    return Builder.CreateExtractElement(Val, Idx);
+  } else if (NumElements == 2) {
+    // ValueTy: <4 x i32> - Ty: <4 x i16>
+    // <4 x i32> -> {<2 x i32>, <2 x i32>}[Idx] -> <2 x i32>
+    return ExtractSubVector(Builder, Idx, Val, DstSize);
+  }
+  return Val;
+}
+
+void ExtractSubElement(Type *Ty, IRBuilder<> &Builder, Value *Idx,
+                       SmallVector<Value *, 8> &Values) {
+  LLVM_DEBUG(
+      fprintf(stderr, "%s:", __func__); Ty->dump(); fprintf(stderr, "\tSrc: ");
+      Values[0]->dump(); fprintf(stderr, "\tIdx: ");
+      if (Idx != NULL) { Idx->dump(); } else { fprintf(stderr, "nullptr\n"); });
+  assert(Values.size() == 1);
+  Type *ValueTy = Values[0]->getType();
+
+  if (Ty == ValueTy) {
+    return;
+  }
+
+  // Consider only the index for the size that has been loaded (the rest has
+  // already been consider during the load).
+  if (Idx != NULL) {
+    unsigned SrcSize = SizeInBits(Builder, ValueTy);
+    unsigned DstSize = SizeInBits(Builder, Ty);
+    assert(SrcSize % DstSize == 0);
+    Idx = CreateRem(Builder, SrcSize / DstSize, Idx);
+  }
+
+  // Reduce Src until SrcEleSize is smaller or equal to Ty.
+  ExtractSubElementUntilEleSizeLE(Ty, Builder, Values, Idx);
+  assert(Values[0]->getType()->isVectorTy());
+
+  // extract proper element(s)
+  Values[0] = ExtractElementOrSubVector(Ty, Builder, Values[0], Idx);
+  assert(SizeInBits(Builder, Values[0]->getType()) == SizeInBits(Builder, Ty));
+
+  // Convert into 'Ty'
+  ConvertInto(Ty, Builder, Values);
+}
+
+// Reduce SrcTy to do as less load/store operation as possible while not loading
+// unneeded data.
+// Return the appropriate AddIdxs that will need to be used in 'OutAddrIdxs'.
+void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
+                Type *&SrcTy, unsigned DstTyBitWidth,
+                SmallVector<Value *, 4> &InAddrIdxs,
+                SmallVector<Value *, 4> &OutAddrIdxs,
+                WeakInstructions &ToBeDeleted) {
+  Type *SrcEleTy = GetEleType(SrcTy);
+  unsigned SrcTyBitWidth = SizeInBits(Builder, SrcTy);
+  unsigned SrcEleTyBitWidth = SizeInBits(Builder, SrcEleTy);
+
+  unsigned InIdx = 0;
+  if (!IsGEPUser) {
+    while (true) {
+      OutAddrIdxs.push_back(Builder.getInt32(0));
+      if ((SrcTy->isArrayTy() || SrcTy->isVectorTy()) &&
+          SrcTyBitWidth > DstTyBitWidth && SrcEleTyBitWidth >= DstTyBitWidth) {
+        SrcTy = GetEleType(SrcTy);
+        SrcTyBitWidth = SrcEleTyBitWidth;
+        SrcEleTy = GetEleType(SrcTy);
+        SrcEleTyBitWidth = SizeInBits(Builder, SrcEleTy);
+      } else {
+        break;
+      }
+    }
+  } else {
+    if (SrcTyBitWidth == DstTyBitWidth) {
+      OutAddrIdxs.push_back(OrgGEPIdx);
+    } else {
+      OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
+      while ((SrcTy->isVectorTy() || SrcTy->isArrayTy()) &&
+             SrcTyBitWidth > DstTyBitWidth) {
+        SrcTy = GetEleType(SrcTy);
+        SrcTyBitWidth = SrcEleTyBitWidth;
+        SrcEleTy = GetEleType(SrcTy);
+        SrcEleTyBitWidth = SizeInBits(Builder, SrcEleTy);
+        OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
+      }
+    }
+  }
+  // Make sure we will delete all the addridxs as we will not use them.
+  for (; InIdx < InAddrIdxs.size(); InIdx++) {
+    ToBeDeleted.push_back(InAddrIdxs[InIdx]);
+  }
+}
+
+unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth) {
+  unsigned NumIter = 1;
+  if (SrcTyBitWidth < DstTyBitWidth) {
+    NumIter = (SrcTyBitWidth - 1 + DstTyBitWidth) / SrcTyBitWidth;
   }
 
   return NumIter;
 }
 
-Value *clspv::ReplacePointerBitcastPass::CalculateNewGEPIdx(
-    unsigned SrcTyBitWidth, unsigned DstTyBitWidth, GetElementPtrInst *GEP) {
-  Value *NewGEPIdx = GEP->getOperand(1);
-  IRBuilder<> Builder(GEP);
+Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
+                   Value *Src, Type *SrcTy, Type *DstTy,
+                   SmallVector<Value *, 4> &NewAddrIdxs,
+                   WeakInstructions &ToBeDeleted) {
+  Type *DstEleTy = GetEleType(DstTy);
+  unsigned DstTyBitWidth = SizeInBits(Builder, DstTy);
+  unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
 
-  if (SrcTyBitWidth > DstTyBitWidth) {
-    if (GEP->getNumOperands() > 2) {
-      GEP->print(errs());
-      llvm_unreachable("Support above GEP on PointerBitcastPass");
+  SmallVector<Value *, 4> AddrIdxs;
+  ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
+             AddrIdxs, ToBeDeleted);
+
+  Type *SrcEleTy = GetEleType(SrcTy);
+  unsigned SrcTyBitWidth = SizeInBits(Builder, SrcTy);
+  unsigned SrcEleTyBitWidth = SizeInBits(Builder, SrcEleTy);
+
+  // Load the values
+  SmallVector<Value *, 8> LDValues;
+  for (unsigned i = 0; i < CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
+       i++) {
+    if (i > 0) {
+      Value *LastAddrIdx = AddrIdxs.pop_back_val();
+      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+      AddrIdxs.push_back(LastAddrIdx);
     }
-
-    NewGEPIdx = Builder.CreateLShr(
-        NewGEPIdx, Builder.getInt32(std::log2(SrcTyBitWidth / DstTyBitWidth)));
-  } else if (DstTyBitWidth > SrcTyBitWidth) {
-    if (GEP->getNumOperands() > 2) {
-      GEP->print(errs());
-      llvm_unreachable("Support above GEP on PointerBitcastPass");
-    }
-
-    NewGEPIdx = Builder.CreateShl(
-        NewGEPIdx, Builder.getInt32(std::log2(DstTyBitWidth / SrcTyBitWidth)));
+    Value *SrcAddr = Builder.CreateGEP(
+        GetEleType(Src->getType())->getNonOpaquePointerElementType(), Src,
+        AddrIdxs);
+    LoadInst *SrcVal = Builder.CreateLoad(
+        SrcAddr->getType()->getNonOpaquePointerElementType(), SrcAddr);
+    LDValues.push_back(SrcVal);
   }
 
-  return NewGEPIdx;
+  // If load values are array, extract scalar elements from them.
+  if (SrcTy->isArrayTy()) {
+    ExtractFromArray(Builder, LDValues);
+    SrcTy = SrcEleTy;
+    SrcTyBitWidth = SrcEleTyBitWidth;
+  }
+
+  // If the output is a vec3 let's consider that the output is a vec4.
+  bool IsVec3 = DstTy->isVectorTy() && GetNumEle(DstTy) == 3;
+
+  // Because the vec3 to vec4 pass is before this one, we should not have a vec3
+  // src. But it seems that some llvm passes after vec3 to vec4 can produce new
+  // vec3. At the moment the only case known is to produce vec3 that will be
+  // bitcast to another vec3 which element has the same time as the src vec3. In
+  // that particular case, just keep the vec3 as we only need to bitcast them,
+  // which will be handled correctly by this pass.
+  IsVec3 &= !(SrcTy->isVectorTy() && GetNumEle(SrcTy) == 3 &&
+              SrcEleTyBitWidth == DstEleTyBitWidth);
+
+  if (IsVec3) {
+    DstTy = FixedVectorType::get(DstEleTy, 4);
+  }
+
+  if (SrcTyBitWidth > DstTyBitWidth) {
+    assert(LDValues.size() == 1);
+    ExtractSubElement(DstTy, Builder, OrgGEPIdx, LDValues);
+  } else {
+    ConvertInto(DstTy, Builder, LDValues);
+  }
+
+  // recreate the vec3 from the vec4
+  if (IsVec3) {
+    assert(LDValues.size() == 1);
+    LDValues[0] = Builder.CreateShuffleVector(LDValues[0], {0, 1, 2});
+  }
+
+  return LDValues[0];
 }
+
+void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
+                  bool IsGEPUser, Value *Src, Type *SrcTy, Type *DstTy,
+                  SmallVector<Value *, 4> &NewAddrIdxs,
+                  WeakInstructions &ToBeDeleted) {
+  // Careful with srcty and dstty concept in store.
+  // The usual pattern is:
+  //
+  // %bt = bitcast srcty* %src to dsty*
+  // %gep = gep dstty*, dstty* %bt, %i
+  // store dstty %stval, dstty* %gep
+  //
+  // Which convert to:
+  //
+  // %stval_converted = convert dstty %stval into srcty, at f(%i)
+  // %gep = gep srcty*, srcty* %src, g(%i)
+  // store srcty %stval_converted, srcty* %gep
+  //
+  // Which means that what we need to do is to convert stval from dstty to
+  // srcty. Thus, while srcty is the source of the bitcast, it is the
+  // destination/target type of stval.
+  Type *DstEleTy = GetEleType(DstTy);
+  unsigned DstTyBitWidth = SizeInBits(Builder, DstTy);
+  unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
+
+  SmallVector<Value *, 4> AddrIdxs;
+  ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
+             AddrIdxs, ToBeDeleted);
+
+  Type *SrcEleTy = GetEleType(SrcTy);
+  unsigned SrcTyBitWidth = SizeInBits(Builder, SrcTy);
+  unsigned SrcEleTyBitWidth = SizeInBits(Builder, SrcEleTy);
+
+  SmallVector<Value *, 8> STValues;
+  Value *STVal = ST->getValueOperand();
+  STValues.push_back(STVal);
+
+  // If the output is a vec3, let's extract those 3 elements.
+  bool IsVec3 = DstTy->isVectorTy() && GetNumEle(DstTy) == 3;
+
+  // Because the vec3 to vec4 pass is before this one, we should not have a vec3
+  // src. But it seems that some llvm passes after vec3 to vec4 can produce new
+  // vec3. At the moment the only case known is to produce vec3 that will be
+  // bitcast to another vec3 which element has the same time as the src vec3. In
+  // that particular case, just keep the vec3 as we only need to bitcast them,
+  // which will be handled correctly by this pass.
+  IsVec3 &= !(SrcTy->isVectorTy() && GetNumEle(SrcTy) == 3 &&
+              SrcEleTyBitWidth == DstEleTyBitWidth);
+  if (IsVec3) {
+    ExtractFromVector(Builder, STValues);
+    DstTy = DstEleTy;
+    DstTyBitWidth = DstEleTyBitWidth;
+  }
+
+  if (SrcTyBitWidth > DstTyBitWidth) {
+    if (SrcEleTyBitWidth > DstTyBitWidth) {
+      // float -> <2 x i8>
+      // In this example, we cannot store 2 bytes into a object only accessible
+      // by group of 4.
+      SrcTy->print(errs());
+      DstTy->print(errs());
+      llvm_unreachable("Cannot handle above src/dst types.");
+    }
+    // SrcTy: <N x s> - DstTy: <M x d>
+    // we have: N*s > M*d && s <= M*d
+    // thus: N > 1, which means that source is either a vector or an array.
+    assert(SrcTy->isVectorTy() || SrcTy->isArrayTy());
+
+    // SrcTy: <4 x i32> - DstTy: i64
+    // Let's convert i64 into the element type (i32) as we could not store a
+    // <2 x i32> into SrcTy.
+    ConvertInto(SrcEleTy, Builder, STValues);
+
+    // Reduce should have given the Idxs to access the vector (or array).
+    // Because we know we want to access the element here, let's add the
+    // appropriate Idx to 'AddrIdxs'.
+    if (IsGEPUser) {
+      AddrIdxs.push_back(NewAddrIdxs[AddrIdxs.size()]);
+    } else {
+      AddrIdxs.push_back(Builder.getInt32(0));
+    }
+  } else {
+    if (DstTy->isArrayTy()) {
+      ExtractFromArray(Builder, STValues);
+    }
+
+    ConvertInto(SrcTy, Builder, STValues);
+  }
+
+  // Generate stores.
+  unsigned NumSTElement = STValues.size();
+  for (unsigned i = 0; i < NumSTElement; i++) {
+    if (i > 0) {
+      // Calculate next store address
+      Value *LastAddrIdx = AddrIdxs.pop_back_val();
+      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+      AddrIdxs.push_back(LastAddrIdx);
+    }
+
+    Value *DstAddr = Builder.CreateGEP(
+        GetEleType(Src->getType())->getNonOpaquePointerElementType(), Src,
+        AddrIdxs);
+
+    Builder.CreateStore(STValues[i], DstAddr);
+  }
+}
+
+} // namespace
 
 PreservedAnalyses
 clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
@@ -265,10 +1089,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
   const DataLayout &DL = M.getDataLayout();
 
-  using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
   WeakInstructions ToBeDeleted;
-  SmallVector<Instruction *, 16> VectorWorkList;
-  SmallVector<Instruction *, 16> ScalarWorkList;
+  SmallVector<Instruction *, 16> WorkList;
   SmallVector<User *, 16> UserWorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -306,54 +1128,12 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
             }
 
             auto inst = &I;
-            Type *SrcEleTy =
-                inst->getOperand(0)->getType()->getPointerElementType();
-            Type *DstEleTy = inst->getType()->getPointerElementType();
-
-            if (SrcEleTy->isVectorTy() || DstEleTy->isVectorTy()) {
-              // De-"canonicalize" the input pointer.
-              // If Src is an array, LLVM has likely canonicalized all GEPs to
-              // the first element away as the following addresses are all
-              // equivalent:
-              // * %in = alloca [4 x [4 x float]]
-              // * %gep0 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-              //   %in
-              // * %gep1 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-              //   %in, i32 0
-              // * %gep2 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-              //   %in, i32 0, i32 0
-              // * %gep3 = getelementptr [4 x [4 x float]]*, [4 x [4 x [float]]*
-              //   %in, i32 0, i32 0, i32 0
-              //
-              // Note: count initialized to 1 to account for the first gep
-              // index.
-              uint32_t count = 1;
-              while (auto ArrayTy = dyn_cast<ArrayType>(SrcEleTy)) {
-                ++count;
-                SrcEleTy = ArrayTy->getElementType();
-              }
-
-              if (count > 1) {
-                // Create a cast of the pointer. Replace the original cast with
-                // it and mark the original cast for deletion.
-                SmallVector<Value *, 4> indices(
-                    count,
-                    ConstantInt::get(IntegerType::get(M.getContext(), 32), 0));
-                auto gep = GetElementPtrInst::CreateInBounds(
-                    inst->getOperand(0)->getType()->getPointerElementType(),
-                    inst->getOperand(0), indices, "", inst);
-                ToBeDeleted.push_back(&I);
-                auto cast = new BitCastInst(gep, inst->getType(), "", inst);
-                inst->replaceAllUsesWith(cast);
-                inst = cast;
-              }
-
-              // Handle case either operand is vector type like char4* -> int4*.
-              VectorWorkList.push_back(inst);
-            } else {
-              // Handle case all operands are scalar type like char* -> int*.
-              ScalarWorkList.push_back(&I);
+            if (inst->use_empty()) {
+              ToBeDeleted.push_back(inst);
+              continue;
             }
+
+            WorkList.push_back(inst);
 
           } else {
             llvm_unreachable("Unsupported bitcast");
@@ -363,683 +1143,18 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
-  for (Instruction *Inst : VectorWorkList) {
+  for (Instruction *Inst : WorkList) {
+    LLVM_DEBUG(dbgs() << "## Inst: "; Inst->dump());
     Value *Src = Inst->getOperand(0);
-    Type *SrcTy = Src->getType()->getPointerElementType();
-    Type *DstTy = Inst->getType()->getPointerElementType();
-    VectorType *SrcVecTy = dyn_cast<VectorType>(SrcTy);
-    VectorType *DstVecTy = dyn_cast<VectorType>(DstTy);
-    Type *SrcEleTy = SrcTy->isVectorTy() ? SrcVecTy->getElementType() : SrcTy;
-    Type *DstEleTy = DstTy->isVectorTy() ? DstVecTy->getElementType() : DstTy;
-    // These are bit widths of the source and destination types, even
-    // if they are vector types.  E.g. bit width of float4 is 128.
-    unsigned SrcTyBitWidth = DL.getTypeStoreSizeInBits(SrcTy);
-    unsigned DstTyBitWidth = DL.getTypeStoreSizeInBits(DstTy);
-    unsigned SrcEleTyBitWidth = DL.getTypeStoreSizeInBits(SrcEleTy);
-    unsigned DstEleTyBitWidth = DL.getTypeStoreSizeInBits(DstEleTy);
-    unsigned NumIter = CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
+    Type *SrcTy = Src->getType()->getNonOpaquePointerElementType();
+    Type *DstTy = Inst->getType()->getNonOpaquePointerElementType();
 
-    // Investigate pointer bitcast's users.
-    for (User *BitCastUser : Inst->users()) {
-      Value *BitCastSrc = Inst->getOperand(0);
-      Value *NewAddrIdx = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-
-      // It consist of User* and bool whether user is gep or not.
-      SmallVector<std::pair<User *, bool>, 32> Users;
-
-      GetElementPtrInst *GEP = nullptr;
-      Value *OrgGEPIdx = nullptr;
-      if ((GEP = dyn_cast<GetElementPtrInst>(BitCastUser))) {
-        OrgGEPIdx = GEP->getOperand(1);
-
-        // Build new src/dst address index.
-        NewAddrIdx = CalculateNewGEPIdx(SrcTyBitWidth, DstTyBitWidth, GEP);
-
-        // Record gep's users.
-        for (User *GEPUser : GEP->users()) {
-          Users.push_back(std::make_pair(GEPUser, true));
-        }
-      } else {
-        // Record bitcast's users.
-        Users.push_back(std::make_pair(BitCastUser, false));
-      }
-
-      // Handle users.
-      bool IsGEPUser = false;
-      for (auto UserIter : Users) {
-        User *U = UserIter.first;
-        IsGEPUser = UserIter.second;
-
-        IRBuilder<> Builder(cast<Instruction>(U));
-
-        if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-          if (SrcTyBitWidth < DstTyBitWidth) {
-            //
-            // Consider below case.
-            //
-            // Original IR (float2* --> float4*)
-            // 1. val = load (float4*) src_addr
-            // 2. dst_addr = bitcast float2*, float4*
-            // 3. dst_addr = gep (float4*) dst_addr, idx
-            // 4. store (float4*) dst_addr
-            //
-            // Transformed IR
-            // 1. val(float4) = load (float4*) src_addr
-            // 2. val1(float2) = shufflevector (float4)val, (float4)undef,
-            //                                 (float2)<0, 1>
-            // 3. val2(float2) = shufflevector (float4)val, (float4)undef,
-            //                                 (float2)<2, 3>
-            // 4. dst_addr1(float2*) = gep (float2*)dst_addr, idx * 2
-            // 5. dst_addr2(float2*) = gep (float2*)dst_addr, idx * 2 + 1
-            // 6. store (float2)val1, (float2*)dst_addr1
-            // 7. store (float2)val2, (float2*)dst_addr2
-            //
-
-            unsigned NumElement = DstTyBitWidth / SrcTyBitWidth;
-            unsigned NumVector = 1;
-            // Vulkan SPIR-V does not support over 4 components for
-            // TypeVector.
-            if (NumElement > 4) {
-              NumVector = NumElement >> 2;
-              NumElement = 4;
-            }
-
-            // Create store values.
-            Type *TmpValTy = SrcTy;
-            if (DstTy->isVectorTy()) {
-              if (SrcEleTyBitWidth == DstEleTyBitWidth) {
-                TmpValTy = FixedVectorType::get(
-                    SrcEleTy, DstVecTy->getElementCount().getKnownMinValue());
-              } else {
-                TmpValTy = FixedVectorType::get(SrcEleTy, NumElement);
-              }
-            }
-
-            Value *STVal = ST->getValueOperand();
-            for (unsigned VIdx = 0; VIdx < NumVector; VIdx++) {
-              Value *TmpSTVal = nullptr;
-              if (NumVector == 1) {
-                TmpSTVal = Builder.CreateBitCast(STVal, TmpValTy);
-              } else {
-                unsigned DstVecTyNumElement =
-                    DstVecTy->getElementCount().getKnownMinValue() / NumVector;
-                SmallVector<int32_t, 4> Idxs;
-                for (unsigned i = 0; i < DstVecTyNumElement; i++) {
-                  Idxs.push_back(i + (DstVecTyNumElement * VIdx));
-                }
-                Value *UndefVal = UndefValue::get(DstTy);
-                TmpSTVal = Builder.CreateShuffleVector(STVal, UndefVal, Idxs);
-                TmpSTVal = Builder.CreateBitCast(TmpSTVal, TmpValTy);
-              }
-
-              SmallVector<Value *, 8> STValues;
-              if (!SrcTy->isVectorTy()) {
-                // Handle scalar type.
-                for (unsigned i = 0; i < NumElement; i++) {
-                  Value *TmpVal = Builder.CreateExtractElement(
-                      TmpSTVal, Builder.getInt32(i));
-                  STValues.push_back(TmpVal);
-                }
-              } else {
-                // Handle vector type.
-                unsigned SrcNumElement =
-                    SrcVecTy->getElementCount().getKnownMinValue();
-                unsigned DstNumElement =
-                    DstVecTy->getElementCount().getKnownMinValue();
-                for (unsigned i = 0; i < NumElement; i++) {
-                  SmallVector<int32_t, 4> Idxs;
-                  for (unsigned j = 0; j < SrcNumElement; j++) {
-                    Idxs.push_back(i * SrcNumElement + j);
-                  }
-
-                  VectorType *TmpVecTy =
-                      FixedVectorType::get(SrcEleTy, DstNumElement);
-                  Value *UndefVal = UndefValue::get(TmpVecTy);
-                  Value *TmpVal =
-                      Builder.CreateShuffleVector(TmpSTVal, UndefVal, Idxs);
-                  STValues.push_back(TmpVal);
-                }
-              }
-
-              // Generate stores.
-              Value *SrcAddrIdx = NewAddrIdx;
-              Value *BaseAddr = BitCastSrc;
-              if (VIdx != 0) {
-                SrcAddrIdx =
-                    Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(4 * VIdx));
-              }
-              for (unsigned i = 0; i < NumElement; i++) {
-                // Calculate store address.
-                Value *DstAddr =
-                    Builder.CreateGEP(BaseAddr->getType()
-                                          ->getScalarType()
-                                          ->getPointerElementType(),
-                                      BaseAddr, SrcAddrIdx);
-                Builder.CreateStore(STValues[i], DstAddr);
-
-                if (i + 1 < NumElement) {
-                  // Calculate next store address
-                  SrcAddrIdx =
-                      Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(1));
-                }
-              }
-            }
-          } else if (SrcTyBitWidth > DstTyBitWidth) {
-            //
-            // Consider below case.
-            //
-            // Original IR (float4* --> float2*)
-            // 1. val = load (float2*) src_addr
-            // 2. dst_addr = bitcast float4*, float2*
-            // 3. dst_addr = gep (float2*) dst_addr, idx
-            // 4. store (float2) val, (float2*) dst_addr
-            //
-            // Transformed IR: Decompose the source vector into elements, then
-            // write them one at a time.
-            // 1. val = load (float2*) src_addr
-            // 2. val1 = (float)extract_element val, 0
-            // 3. val2 = (float)extract_element val, 1
-            // // Source component k maps to destination component k * idxscale
-            // 3a. idxscale = sizeof(float4)/sizeof(float2)
-            // 3b. idxbase = idx / idxscale
-            // 3c. newarrayidx = idxbase * idxscale
-            // 4. dst_addr1 = gep (float4*) dst, newarrayidx
-            // 5. dst_addr2 = gep (float4*) dst, newarrayidx + 1
-            // 6. store (float)val1, (float*) dst_addr1
-            // 7. store (float)val2, (float*) dst_addr2
-            //
-
-            if (SrcTyBitWidth <= DstEleTyBitWidth) {
-              SrcTy->print(errs());
-              DstTy->print(errs());
-              llvm_unreachable("Handle above src/dst type.");
-            }
-
-            // Create store values.
-            Value *STVal = ST->getValueOperand();
-
-            if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
-              VectorType *TmpVecTy = FixedVectorType::get(
-                  SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
-              STVal = Builder.CreateBitCast(STVal, TmpVecTy);
-            }
-
-            SmallVector<Value *, 8> STValues;
-            // How many destination writes are required?
-            unsigned DstNumElement = 1;
-            if (!DstTy->isVectorTy() || SrcEleTyBitWidth == DstTyBitWidth) {
-              // Handle scalar type.
-              STValues.push_back(STVal);
-            } else {
-              // Handle vector type.
-              DstNumElement = DstVecTy->getElementCount().getKnownMinValue();
-              for (unsigned i = 0; i < DstNumElement; i++) {
-                Value *Idx = Builder.getInt32(i);
-                Value *TmpVal = Builder.CreateExtractElement(STVal, Idx);
-                STValues.push_back(TmpVal);
-              }
-            }
-
-            // Generate stores.
-            Value *BaseAddr = BitCastSrc;
-            Value *SubEleIdx = Builder.getInt32(0);
-            if (IsGEPUser) {
-              // Compute SubNumElement = idxscale
-              unsigned SubNumElement =
-                  SrcVecTy->getElementCount().getKnownMinValue();
-              if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
-                // Same condition under which DstNumElements > 1
-                SubNumElement = SrcVecTy->getElementCount().getKnownMinValue() /
-                                DstVecTy->getElementCount().getKnownMinValue();
-              }
-
-              // Compute SubEleIdx = idxbase * idxscale
-              SubEleIdx = Builder.CreateAnd(
-                  OrgGEPIdx, Builder.getInt32(SubNumElement - 1));
-              if (DstTy->isVectorTy() && (SrcEleTyBitWidth != DstTyBitWidth)) {
-                SubEleIdx = Builder.CreateShl(
-                    SubEleIdx, Builder.getInt32(std::log2(SubNumElement)));
-              }
-            }
-
-            for (unsigned i = 0; i < DstNumElement; i++) {
-              // Calculate address.
-              if (i > 0) {
-                SubEleIdx = Builder.CreateAdd(SubEleIdx, Builder.getInt32(i));
-              }
-
-              Value *Idxs[] = {NewAddrIdx, SubEleIdx};
-              Value *DstAddr = Builder.CreateGEP(
-                  BaseAddr->getType()->getScalarType()->getPointerElementType(),
-                  BaseAddr, Idxs);
-              Type *TmpSrcTy = SrcEleTy;
-              if (auto TmpSrcVecTy = dyn_cast<VectorType>(TmpSrcTy)) {
-                TmpSrcTy = TmpSrcVecTy->getElementType();
-              }
-              Value *TmpVal = Builder.CreateBitCast(STValues[i], TmpSrcTy);
-
-              Builder.CreateStore(TmpVal, DstAddr);
-            }
-          } else {
-            // if SrcTyBitWidth == DstTyBitWidth
-            Type *TmpSrcTy = SrcTy;
-            Value *DstAddr = Src;
-
-            if (IsGEPUser) {
-              SmallVector<Value *, 4> Idxs;
-              for (unsigned i = 1; i < GEP->getNumOperands(); i++) {
-                Idxs.push_back(GEP->getOperand(i));
-              }
-              DstAddr = Builder.CreateGEP(BitCastSrc->getType()
-                                              ->getScalarType()
-                                              ->getPointerElementType(),
-                                          BitCastSrc, Idxs);
-
-              if (GEP->getNumOperands() > 2) {
-                TmpSrcTy = SrcEleTy;
-              }
-            }
-
-            Value *TmpVal =
-                Builder.CreateBitCast(ST->getValueOperand(), TmpSrcTy);
-            Builder.CreateStore(TmpVal, DstAddr);
-          }
-        } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
-          Value *SrcAddrIdx = Builder.getInt32(0);
-          if (IsGEPUser) {
-            SrcAddrIdx = NewAddrIdx;
-          }
-
-          // Load value from src.
-          SmallVector<Value *, 8> LDValues;
-
-          for (unsigned i = 1; i <= NumIter; i++) {
-            Value *SrcAddr = Builder.CreateGEP(
-                Src->getType()->getScalarType()->getPointerElementType(), Src,
-                SrcAddrIdx);
-            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
-            LDValues.push_back(SrcVal);
-
-            if (i + 1 <= NumIter) {
-              // Calculate next SrcAddrIdx.
-              SrcAddrIdx = Builder.CreateAdd(SrcAddrIdx, Builder.getInt32(1));
-            }
-          }
-
-          Value *DstVal = nullptr;
-          if (SrcTyBitWidth > DstTyBitWidth) {
-            unsigned NumElement = SrcTyBitWidth / DstTyBitWidth;
-
-            if (SrcEleTyBitWidth == DstTyBitWidth) {
-              //
-              // Consider below case.
-              //
-              // Original IR (int4* --> char4*)
-              // 1. src_addr = bitcast int4*, char4*
-              // 2. element_addr = gep (char4*) src_addr, idx
-              // 3. load (char4*) element_addr
-              //
-              // Transformed IR
-              // 1. src_addr = gep (int4*) src, idx / 4
-              // 2. src_val(int4) = load (int4*) src_addr
-              // 3. tmp_val(int4) = extractelement src_val, idx % 4
-              // 4. dst_val(char4) = bitcast tmp_val, (char4)
-              //
-              Value *EleIdx = Builder.getInt32(0);
-              if (IsGEPUser) {
-                EleIdx = Builder.CreateAnd(OrgGEPIdx,
-                                           Builder.getInt32(NumElement - 1));
-              }
-              Value *TmpVal =
-                  Builder.CreateExtractElement(LDValues[0], EleIdx, "tmp_val");
-              DstVal = Builder.CreateBitCast(TmpVal, DstTy);
-            } else if (SrcEleTyBitWidth < DstTyBitWidth) {
-              if (IsGEPUser) {
-                //
-                // Consider below case.
-                //
-                // Original IR (float4* --> float2*)
-                // 1. src_addr = bitcast float4*, float2*
-                // 2. element_addr = gep (float2*) src_addr, idx
-                // 3. load (float2*) element_addr
-                //
-                // Transformed IR
-                // 1. src_addr = gep (float4*) src, idx / 2
-                // 2. src_val(float4) = load (float4*) src_addr
-                // 3. tmp_val1(float) = extractelement (idx % 2) * 2
-                // 4. tmp_val2(float) = extractelement (idx % 2) * 2 + 1
-                // 5. dst_val(float2) = insertelement undef(float2), tmp_val1, 0
-                // 6. dst_val(float2) = insertelement undef(float2), tmp_val2, 1
-                // 7. dst_val(float2) = bitcast dst_val, (float2)
-                // ==> if types are same between src and dst, it will be
-                // igonored
-                //
-                VectorType *TmpVecTy = FixedVectorType::get(
-                    SrcEleTy, DstTyBitWidth / SrcEleTyBitWidth);
-                DstVal = UndefValue::get(TmpVecTy);
-                Value *EleIdx = Builder.CreateAnd(
-                    OrgGEPIdx, Builder.getInt32(NumElement - 1));
-                EleIdx = Builder.CreateShl(
-                    EleIdx, Builder.getInt32(
-                                std::log2(DstTyBitWidth / SrcEleTyBitWidth)));
-                Value *TmpOrgGEPIdx = EleIdx;
-                for (unsigned i = 0; i < NumElement; i++) {
-                  Value *TmpVal = Builder.CreateExtractElement(
-                      LDValues[0], TmpOrgGEPIdx, "tmp_val");
-                  DstVal = Builder.CreateInsertElement(DstVal, TmpVal,
-                                                       Builder.getInt32(i));
-
-                  if (i + 1 < NumElement) {
-                    TmpOrgGEPIdx =
-                        Builder.CreateAdd(TmpOrgGEPIdx, Builder.getInt32(1));
-                  }
-                }
-              } else {
-                //
-                // Consider below case.
-                //
-                // Original IR (float4* --> int2*)
-                // 1. src_addr = bitcast float4*, int2*
-                // 2. load (int2*) src_addr
-                //
-                // Transformed IR
-                // 1. src_val(float4) = load (float4*) src_addr
-                // 2. tmp_val(float2) = shufflevector (float4)src_val,
-                //                                    (float4)undef,
-                //                                    (float2)<0, 1>
-                // 3. dst_val(int2) = bitcast (float2)tmp_val, (int2)
-                //
-                unsigned NumElement = DstTyBitWidth / SrcEleTyBitWidth;
-                Value *Undef = UndefValue::get(SrcTy);
-
-                SmallVector<int32_t, 4> Idxs;
-                for (unsigned i = 0; i < NumElement; i++) {
-                  Idxs.push_back(i);
-                }
-                DstVal = Builder.CreateShuffleVector(LDValues[0], Undef, Idxs);
-
-                DstVal = Builder.CreateBitCast(DstVal, DstTy);
-              }
-
-              DstVal = Builder.CreateBitCast(DstVal, DstTy);
-            } else {
-              if (IsGEPUser) {
-                //
-                // Consider below case.
-                //
-                // Original IR (int4* --> char2*)
-                // 1. src_addr = bitcast int4*, char2*
-                // 2. element_addr = gep (char2*) src_addr, idx
-                // 3. load (char2*) element_addr
-                //
-                // Transformed IR
-                // 1. src_addr = gep (int4*) src, idx / 8
-                // 2. src_val(int4) = load (int4*) src_addr
-                // 3. tmp_val(int) = extractelement idx / 2
-                // 4. tmp_val(<i16 x 2>) = bitcast tmp_val(int), (<i16 x 2>)
-                // 5. tmp_val(i16) = extractelement idx % 2
-                // 6. dst_val(char2) = bitcast tmp_val, (char2)
-                // ==> if types are same between src and dst, it will be
-                // igonored
-                //
-                unsigned SubNumElement = SrcEleTyBitWidth / DstTyBitWidth;
-                if (SubNumElement != 2 && SubNumElement != 4) {
-                  llvm_unreachable("Unsupported SubNumElement");
-                }
-
-                Value *TmpOrgGEPIdx = Builder.CreateLShr(
-                    OrgGEPIdx, Builder.getInt32(std::log2(SubNumElement)));
-                Value *TmpVal = Builder.CreateExtractElement(
-                    LDValues[0], TmpOrgGEPIdx, "tmp_val");
-                TmpVal = Builder.CreateBitCast(
-                    TmpVal,
-                    FixedVectorType::get(
-                        IntegerType::get(DstTy->getContext(), DstTyBitWidth),
-                        SubNumElement));
-                TmpOrgGEPIdx = Builder.CreateAnd(
-                    OrgGEPIdx, Builder.getInt32(SubNumElement - 1));
-                TmpVal = Builder.CreateExtractElement(TmpVal, TmpOrgGEPIdx,
-                                                      "tmp_val");
-                DstVal = Builder.CreateBitCast(TmpVal, DstTy);
-              } else {
-                Inst->print(errs());
-                llvm_unreachable("Handle this bitcast");
-              }
-            }
-          } else if (SrcTyBitWidth < DstTyBitWidth) {
-            //
-            // Consider below case.
-            //
-            // Original IR (float2* --> float4*)
-            // 1. src_addr = bitcast float2*, float4*
-            // 2. element_addr = gep (float4*) src_addr, idx
-            // 3. load (float4*) element_addr
-            //
-            // Transformed IR
-            // 1. src_addr = gep (float2*) src, idx * 2
-            // 2. src_val1(float2) = load (float2*) src_addr
-            // 3. src_addr2 = gep (float2*) src_addr, 1
-            // 4. src_val2(float2) = load (float2*) src_addr2
-            // 5. dst_val(float4) = shufflevector src_val1, src_val2, <0, 1>
-            // 6. dst_val(float4) = bitcast dst_val, (float4)
-            // ==> if types are same between src and dst, it will be igonored
-            //
-            unsigned NumElement = 1;
-            if (SrcTy->isVectorTy()) {
-              NumElement = SrcVecTy->getElementCount().getKnownMinValue() * 2;
-            }
-
-            // Handle scalar type.
-            if (NumElement == 1) {
-              if (SrcTyBitWidth * 4 <= DstTyBitWidth) {
-                unsigned NumVecElement = DstTyBitWidth / SrcTyBitWidth;
-                unsigned NumVector = 1;
-                if (NumVecElement > 4) {
-                  NumVector = NumVecElement >> 2;
-                  NumVecElement = 4;
-                }
-
-                SmallVector<Value *, 4> Values;
-                for (unsigned VIdx = 0; VIdx < NumVector; VIdx++) {
-                  // In this case, generate only insert element. It generates
-                  // less instructions than using shuffle vector.
-                  VectorType *TmpVecTy =
-                      FixedVectorType::get(SrcTy, NumVecElement);
-                  Value *TmpVal = UndefValue::get(TmpVecTy);
-                  for (unsigned i = 0; i < NumVecElement; i++) {
-                    TmpVal = Builder.CreateInsertElement(
-                        TmpVal, LDValues[i + (VIdx * 4)], Builder.getInt32(i));
-                  }
-                  Values.push_back(TmpVal);
-                }
-
-                if (Values.size() > 2) {
-                  Inst->print(errs());
-                  llvm_unreachable("Support above bitcast");
-                }
-
-                if (Values.size() > 1) {
-                  Type *TmpEleTy =
-                      Type::getIntNTy(M.getContext(), SrcEleTyBitWidth * 2);
-                  VectorType *TmpVecTy =
-                      FixedVectorType::get(TmpEleTy, NumVector);
-                  for (unsigned i = 0; i < Values.size(); i++) {
-                    Values[i] = Builder.CreateBitCast(Values[i], TmpVecTy);
-                  }
-                  SmallVector<int32_t, 4> Idxs;
-                  for (unsigned i = 0; i < (NumVector * 2); i++) {
-                    Idxs.push_back(i);
-                  }
-                  for (unsigned i = 0; i < Values.size(); i = i + 2) {
-                    Values[i] = Builder.CreateShuffleVector(
-                        Values[i], Values[i + 1], Idxs);
-                  }
-                }
-
-                LDValues.clear();
-                LDValues.push_back(Values[0]);
-              } else {
-                SmallVector<Value *, 4> TmpLDValues;
-                for (unsigned i = 0; i < LDValues.size(); i = i + 2) {
-                  VectorType *TmpVecTy = FixedVectorType::get(SrcTy, 2);
-                  Value *TmpVal = UndefValue::get(TmpVecTy);
-                  TmpVal = Builder.CreateInsertElement(TmpVal, LDValues[i],
-                                                       Builder.getInt32(0));
-                  TmpVal = Builder.CreateInsertElement(TmpVal, LDValues[i + 1],
-                                                       Builder.getInt32(1));
-                  TmpLDValues.push_back(TmpVal);
-                }
-                LDValues.clear();
-                LDValues = std::move(TmpLDValues);
-                NumElement = 4;
-              }
-            }
-
-            // Handle vector type.
-            while (LDValues.size() != 1) {
-              SmallVector<Value *, 4> TmpLDValues;
-              for (unsigned i = 0; i < LDValues.size(); i = i + 2) {
-                SmallVector<int32_t, 4> Idxs;
-                for (unsigned j = 0; j < NumElement; j++) {
-                  Idxs.push_back(j);
-                }
-                Value *TmpVal = Builder.CreateShuffleVector(
-                    LDValues[i], LDValues[i + 1], Idxs);
-                TmpLDValues.push_back(TmpVal);
-              }
-              LDValues.clear();
-              LDValues = std::move(TmpLDValues);
-              NumElement *= 2;
-            }
-
-            DstVal = Builder.CreateBitCast(LDValues[0], DstTy);
-          } else {
-            //
-            // Consider below case.
-            //
-            // Original IR (float4* --> int4*)
-            // 1. src_addr = bitcast float4*, int4*
-            // 2. element_addr = gep (int4*) src_addr, idx, 0
-            // 3. load (int) element_addr
-            //
-            // Transformed IR
-            // 1. element_addr = gep (float4*) src_addr, idx, 0
-            // 2. src_val = load (float*) element_addr
-            // 3. val = bitcast (float) src_val to (int)
-            //
-            Value *SrcAddr = Src;
-            if (IsGEPUser) {
-              SmallVector<Value *, 4> Idxs;
-              for (unsigned i = 1; i < GEP->getNumOperands(); i++) {
-                Idxs.push_back(GEP->getOperand(i));
-              }
-              SrcAddr = Builder.CreateGEP(
-                  Src->getType()->getScalarType()->getPointerElementType(), Src,
-                  Idxs);
-            }
-            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
-
-            Type *TmpDstTy = DstTy;
-            if (IsGEPUser) {
-              if (GEP->getNumOperands() > 2) {
-                TmpDstTy = DstEleTy;
-              }
-            }
-            DstVal = Builder.CreateBitCast(SrcVal, TmpDstTy);
-          }
-
-          // Update LD's users with DstVal.
-          LD->replaceAllUsesWith(DstVal);
-        } else {
-          U->print(errs());
-          llvm_unreachable(
-              "Handle above user of gep on ReplacePointerBitcastPass");
-        }
-
-        ToBeDeleted.push_back(cast<Instruction>(U));
-      }
-
-      if (IsGEPUser) {
-        ToBeDeleted.push_back(GEP);
-      }
-    }
-
-    // Schedule for removal only if Inst has no users. If all its users are
-    // later also replaced in the module, Inst will be remove by transitivity.
-    if (Inst->user_empty()) {
-      ToBeDeleted.push_back(Inst);
-    }
-  }
-
-  for (Instruction *Inst : ScalarWorkList) {
-    // Some tests have a stray bitcast from pointer-to-array to
-    // pointer to i8*, but the bitcast has no uses.  Exit early
-    // but be sure to delete it later.
-    //
-    // Example:
-    //   %1 = bitcast [25 x float]* %dst to i8*
-
-    // errs () << " Scalar bitcast is " << *Inst << "\n";
-
-    if (Inst->use_empty()) {
-      ToBeDeleted.push_back(Inst);
-      continue;
-    }
-
-    Value *Src = Inst->getOperand(0);
-    Type *SrcTy; // Original type
-    Type *DstTy; // Type that SrcTy is cast to.
-
-    bool BailOut = false;
-    SrcTy = Src->getType()->getPointerElementType();
-    DstTy = Inst->getType()->getPointerElementType();
-    unsigned SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
-    unsigned DstTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(DstTy));
-
-    SmallVector<unsigned, 4> SrcTyBitWidths;
-    int iter_count = 0;
-    while (++iter_count) {
-#if 0
-      errs() << "  Try Src " << *Src << "\n";
-      errs() << "  SrcTy elem " << *SrcTy << " bit width " << SrcTyBitWidth
-             << "\n";
-      errs() << "  DstTy elem " << *DstTy << " bit width " << DstTyBitWidth
-             << "\n";
-#endif
-
-      SrcTyBitWidths.push_back(SrcTyBitWidth);
-
-      // The normal case that we can handle is source type is smaller than
-      // the dest type.
-      if (SrcTyBitWidth <= DstTyBitWidth)
-        break;
-
-      // The Source type is bigger than the destination type.
-      // Walk into the source type to break it down.
-      if (SrcTy->isArrayTy()) {
-        SrcTy = SrcTy->getArrayElementType();
-        SrcTyBitWidth = unsigned(DL.getTypeStoreSizeInBits(SrcTy));
-      } else {
-        BailOut = true;
-        break;
-      }
-      if (iter_count > 1000) {
-        llvm_unreachable("ReplacePointerBitcastPass: Too many iterations!");
-      }
-    }
-#if 0
-    errs() << " Src is " << *Src << "\n";
-    errs() << " Dst is " << *Inst << "\n";
-    errs() << "  SrcTy elem " << *SrcTy << " bit width " << SrcTyBitWidth
-           << "\n";
-    errs() << "  DstTy elem " << *DstTy << " bit width " << DstTyBitWidth
-           << "\n";
-#endif
-
-    // Only dead code has been generated up to this point so it is safe to bail
-    // out.
-    if (BailOut) {
-      continue;
+    SmallVector<size_t, 4> SrcTyBitWidths;
+    Type *TmpTy = SrcTy;
+    SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
+    while (TmpTy->isArrayTy() || TmpTy->isVectorTy()) {
+      TmpTy = GetEleType(TmpTy);
+      SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
     }
 
     // If we detect a private memory, the first index of the GEP will need to be
@@ -1049,65 +1164,53 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     // at runtime (see https://github.com/KhronosGroup/SPIRV-Tools/issues/1585).
     bool isPrivateMemory = isa<AllocaInst>(Src);
 
+    // Investigate pointer bitcast's users.
     for (User *BitCastUser : Inst->users()) {
+      LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
       SmallVector<Value *, 4> NewAddrIdxs;
 
       // It consist of User* and bool whether user is gep or not.
       SmallVector<std::pair<User *, bool>, 32> Users;
 
-      GetElementPtrInst *GEP = nullptr;
-      if ((GEP = dyn_cast<GetElementPtrInst>(BitCastUser))) {
+      Value *OrgGEPIdx = nullptr;
+      if (auto GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
         IRBuilder<> Builder(GEP);
+        unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
 
         // Build new src/dst address.
-        Value *GEPIdx = GEP->getOperand(1);
-        if (SrcTyBitWidths.size() > 0) {
-          unsigned SmallerSrcBitWidth =
-              SrcTyBitWidths[SrcTyBitWidths.size() - 1];
-          if (SmallerSrcBitWidth > DstTyBitWidth) {
-            GEPIdx = Builder.CreateUDiv(
-                GEPIdx, Builder.getInt32(SmallerSrcBitWidth / DstTyBitWidth));
-          } else if (SmallerSrcBitWidth < DstTyBitWidth) {
-            GEPIdx = Builder.CreateMul(
-                GEPIdx, Builder.getInt32(DstTyBitWidth / SmallerSrcBitWidth));
-          }
-          for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
-            unsigned TyBitWidth = SrcTyBitWidths[i];
-            if (isPrivateMemory && i == 0) {
-              NewAddrIdxs.push_back(Builder.getInt32(0));
-              continue;
-            }
-            Value *Idx;
-            unsigned div = TyBitWidth / SmallerSrcBitWidth;
-            if (div <= 1) {
-              Idx = GEPIdx;
-            } else {
-              Value *divInt = Builder.getInt32(div);
-              Idx = Builder.CreateUDiv(GEPIdx, divInt);
-              GEPIdx = Builder.CreateURem(GEPIdx, divInt);
-            }
-            NewAddrIdxs.push_back(Idx);
-          }
+        Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);
+        unsigned SmallerSrcBitWidth = SrcTyBitWidths[SrcTyBitWidths.size() - 1];
+        if (SmallerSrcBitWidth > DstTyBitWidth) {
+          GEPIdx =
+              CreateDiv(Builder, SmallerSrcBitWidth / DstTyBitWidth, GEPIdx);
+        } else if (SmallerSrcBitWidth < DstTyBitWidth) {
+          GEPIdx =
+              CreateMul(Builder, DstTyBitWidth / SmallerSrcBitWidth, GEPIdx);
         }
-        if (NewAddrIdxs.size() == 0) {
-          NewAddrIdxs.push_back(
-              CalculateNewGEPIdx(SrcTyBitWidth, DstTyBitWidth, GEP));
+        for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
+          if (isPrivateMemory && i == 0) {
+            NewAddrIdxs.push_back(Builder.getInt32(0));
+            continue;
+          }
+          Value *Idx;
+          unsigned div = SrcTyBitWidths[i] / SmallerSrcBitWidth;
+          if (div <= 1) {
+            Idx = GEPIdx;
+          } else {
+            Idx = CreateDiv(Builder, div, GEPIdx);
+            GEPIdx = CreateRem(Builder, div, GEPIdx);
+          }
+          NewAddrIdxs.push_back(Idx);
         }
 
         // If bitcast's user is gep, investigate gep's users too.
         for (User *GEPUser : GEP->users()) {
           Users.push_back(std::make_pair(GEPUser, true));
         }
-      } else {
-        NewAddrIdxs.push_back(
-            ConstantInt::get(Type::getInt32Ty(M.getContext()), 0));
-        Type *SrcEleTy =
-            Inst->getOperand(0)->getType()->getPointerElementType();
-        while (SrcEleTy->isArrayTy()) {
-          NewAddrIdxs.push_back(
-              ConstantInt::get(Type::getInt32Ty(M.getContext()), 0));
-          SrcEleTy = SrcEleTy->getArrayElementType();
+        if (!GEP->users().empty()) {
+          ToBeDeleted.push_back(GEP);
         }
+      } else {
         Users.push_back(std::make_pair(BitCastUser, false));
       }
 
@@ -1116,121 +1219,26 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       for (auto UserIter : Users) {
         User *U = UserIter.first;
         IsGEPUser = UserIter.second;
+        LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";
+                   U->dump());
 
         IRBuilder<> Builder(cast<Instruction>(U));
 
-        // Handle store instruction with gep.
         if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-          // errs() << " store is " << *ST << "\n";
-          if (SrcTyBitWidth == DstTyBitWidth) {
-            auto STVal = ConvertValue(ST->getValueOperand(), SrcTy, Builder);
-            Value *DstAddr = Builder.CreateGEP(
-                Src->getType()->getScalarType()->getPointerElementType(), Src,
-                NewAddrIdxs);
-            Builder.CreateStore(STVal, DstAddr);
-          } else if (SrcTyBitWidth < DstTyBitWidth) {
-            unsigned NumElement = DstTyBitWidth / SrcTyBitWidth;
-
-            // Create store values.
-            Value *STVal = ST->getValueOperand();
-            SmallVector<Value *, 8> STValues;
-            for (unsigned i = 0; i < NumElement; i++) {
-              Type *TmpTy = Type::getIntNTy(M.getContext(), DstTyBitWidth);
-              Value *TmpVal = Builder.CreateBitCast(STVal, TmpTy);
-              TmpVal = Builder.CreateLShr(
-                  TmpVal, Builder.getIntN(DstTyBitWidth, i * SrcTyBitWidth));
-              if (SrcTy->isHalfTy()) {
-                auto Tmpi16 = Builder.CreateTrunc(
-                    TmpVal, Type::getInt16Ty(M.getContext()));
-                TmpVal = Builder.CreateBitCast(Tmpi16, SrcTy);
-              } else {
-                  TmpVal = Builder.CreateTrunc(TmpVal, SrcTy);
-              }
-              STValues.push_back(TmpVal);
-            }
-
-            // Generate stores.
-            for (unsigned i = 0; i < NumElement; i++) {
-              // Calculate store address.
-              Value *DstAddr = Builder.CreateGEP(
-                  Src->getType()->getScalarType()->getPointerElementType(), Src,
-                  NewAddrIdxs);
-              Builder.CreateStore(STValues[i], DstAddr);
-
-              if (i + 1 < NumElement) {
-                // Calculate next store address
-                Value *LastAddrIdx = NewAddrIdxs.pop_back_val();
-                LastAddrIdx =
-                    Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
-                NewAddrIdxs.push_back(LastAddrIdx);
-              }
-            }
-
-          } else {
-            Inst->print(errs());
-            llvm_unreachable("Handle different size store with scalar "
-                             "bitcast on ReplacePointerBitcastPass");
-          }
+          ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy, DstTy,
+                       NewAddrIdxs, ToBeDeleted);
         } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
-          if (SrcTyBitWidth == DstTyBitWidth) {
-            Value *SrcAddr = Builder.CreateGEP(
-                Src->getType()->getScalarType()->getPointerElementType(), Src,
-                NewAddrIdxs);
-            LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
-            LD->replaceAllUsesWith(ConvertValue(SrcVal, DstTy, Builder));
-          } else if (SrcTyBitWidth < DstTyBitWidth) {
-
-            // Load value from src.
-            unsigned NumIter = CalculateNumIter(SrcTyBitWidth, DstTyBitWidth);
-            SmallVector<Value *, 8> LDValues;
-            for (unsigned i = 1; i <= NumIter; i++) {
-              Value *SrcAddr = Builder.CreateGEP(
-                  Src->getType()->getScalarType()->getPointerElementType(), Src,
-                  NewAddrIdxs);
-              LoadInst *SrcVal = Builder.CreateLoad(SrcTy, SrcAddr, "src_val");
-              LDValues.push_back(SrcVal);
-
-              if (i + 1 <= NumIter) {
-                // Calculate next SrcAddrIdx.
-                Value *LastAddrIdx = NewAddrIdxs.pop_back_val();
-                LastAddrIdx =
-                    Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
-                NewAddrIdxs.push_back(LastAddrIdx);
-              }
-            }
-
-            // Merge Load.
-            Type *TmpSrcTy = Type::getIntNTy(M.getContext(), SrcTyBitWidth);
-            Value *DstVal = Builder.CreateBitCast(LDValues[0], TmpSrcTy);
-            Type *TmpDstTy = Type::getIntNTy(M.getContext(), DstTyBitWidth);
-            DstVal = Builder.CreateZExt(DstVal, TmpDstTy);
-            for (unsigned i = 1; i < LDValues.size(); i++) {
-              Value *TmpVal = Builder.CreateBitCast(LDValues[i], TmpSrcTy);
-              TmpVal = Builder.CreateZExt(TmpVal, TmpDstTy);
-              TmpVal = Builder.CreateShl(
-                  TmpVal, Builder.getIntN(DstTyBitWidth, i * SrcTyBitWidth));
-              DstVal = Builder.CreateOr(DstVal, TmpVal);
-            }
-
-            DstVal = Builder.CreateBitCast(DstVal, DstTy);
-            LD->replaceAllUsesWith(DstVal);
-
-          } else {
-            Inst->print(errs());
-            llvm_unreachable("Handle different size load with scalar "
-                             "bitcast on ReplacePointerBitcastPass");
-          }
+          Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
+                                      DstTy, NewAddrIdxs, ToBeDeleted);
+          // Update LD's users with DstVal.
+          LD->replaceAllUsesWith(DstVal);
         } else {
-          Inst->print(errs());
-          llvm_unreachable("Handle above user of scalar bitcast with gep on "
-                           "ReplacePointerBitcastPass");
+          U->print(errs());
+          llvm_unreachable(
+              "Handle above user of gep on ReplacePointerBitcastPass");
         }
 
         ToBeDeleted.push_back(cast<Instruction>(U));
-      }
-
-      if (IsGEPUser) {
-        ToBeDeleted.push_back(GEP);
       }
     }
 
@@ -1249,7 +1257,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     WeakInstructions Deads;
     WeakInstructions NextBatch;
     for (WeakTrackingVH Handle : ToBeDeleted) {
-      if (!Handle.pointsToAliveValue())
+      if (!Handle.pointsToAliveValue() || !isa<Instruction>(Handle))
         continue;
 
       auto *Inst = cast<Instruction>(Handle);
@@ -1272,8 +1280,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     ToBeDeleted = std::move(NextBatch);
     Progress = (ToBeDeleted.size() < PreviousSize);
   }
-
-  assert(ToBeDeleted.empty() && "Some instructions were not deleted.");
 
   return PA;
 }

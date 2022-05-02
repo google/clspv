@@ -23,6 +23,7 @@ struct SimplifyPointerBitcastPass
     : llvm::PassInfoMixin<SimplifyPointerBitcastPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
+  bool runOnGEPFromBitcastCstExpr(llvm::Module &M) const;
   bool runOnTrivialBitcast(llvm::Module &M) const;
   bool runOnBitcastFromBitcast(llvm::Module &M) const;
   bool runOnBitcastFromGEP(llvm::Module &M) const;

@@ -9,53 +9,42 @@ target triple = "spir-unknown-unknown"
 define spir_kernel void @foo(float addrspace(1)* nocapture readonly %input, <4 x float> addrspace(1)* nocapture %output)  {
 entry:
   %in = alloca [4 x [4 x float]], align 16
-  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr inbounds [4 x [4 x float]], [4 x [4 x float]]* %in, i32 0, i32 0, i32 0
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 0
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 1
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 2
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 3
-  ; CHECK: load float, float* [[gep]]
+  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %in, i32 0, i32 0
+  ; CHECK: [[load4:%[a-zA-Z0-9_.]+]] = load [4 x float], [4 x float]* [[base]]
+  ; CHECK: extractvalue [4 x float] [[load4]], 0
+  ; CHECK: extractvalue [4 x float] [[load4]], 1
+  ; CHECK: extractvalue [4 x float] [[load4]], 2
+  ; CHECK: extractvalue [4 x float] [[load4]], 3
   %bc0 = bitcast [4 x [4 x float]]* %in to <4 x float>*
   %ld0 = load <4 x float>, <4 x float>* %bc0
 
-  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr inbounds [4 x [4 x float]], [4 x [4 x float]]* %gep1, i32 0, i32 0, i32 0
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 0
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 1
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 2
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 3
-  ; CHECK: load float, float* [[gep]]
+  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %gep1, i32 0, i32 0
+  ; CHECK: [[load4:%[a-zA-Z0-9_.]+]] = load [4 x float], [4 x float]* [[base]]
+  ; CHECK: extractvalue [4 x float] [[load4]], 0
+  ; CHECK: extractvalue [4 x float] [[load4]], 1
+  ; CHECK: extractvalue [4 x float] [[load4]], 2
+  ; CHECK: extractvalue [4 x float] [[load4]], 3
   %gep1 = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %in
   %bc1 = bitcast [4 x [4 x float]]* %gep1 to <4 x float>*
   %ld1 = load <4 x float>, <4 x float>* %bc1
 
-  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr inbounds [4 x [4 x float]], [4 x [4 x float]]* %gep2, i32 0, i32 0, i32 0
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 0
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 1
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 2
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 3
-  ; CHECK: load float, float* [[gep]]
+  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %gep2, i32 0, i32 0
+  ; CHECK: [[load4:%[a-zA-Z0-9_.]+]] = load [4 x float], [4 x float]* [[base]]
+  ; CHECK: extractvalue [4 x float] [[load4]], 0
+  ; CHECK: extractvalue [4 x float] [[load4]], 1
+  ; CHECK: extractvalue [4 x float] [[load4]], 2
+  ; CHECK: extractvalue [4 x float] [[load4]], 3
   %gep2 = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %in, i32 0
   %bc2 = bitcast [4 x [4 x float]]* %gep2 to <4 x float>*
   %ld2 = load <4 x float>, <4 x float>* %bc2
 
-  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr inbounds [4 x float], [4 x float]* %gep3, i32 0, i32 0
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 0
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 1
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 2
-  ; CHECK: load float, float* [[gep]]
-  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float* [[base]], i32 3
-  ; CHECK: load float, float* [[gep]]
+  ; CHECK: [[base:%[a-zA-Z0-9_.]+]] = getelementptr [4 x float], [4 x float]* %gep3, i32 0
+  ; CHECK: [[load4:%[a-zA-Z0-9_.]+]] = load [4 x float], [4 x float]* [[base]]
+  ; CHECK: extractvalue [4 x float] [[load4]], 0
+  ; CHECK: extractvalue [4 x float] [[load4]], 1
+  ; CHECK: extractvalue [4 x float] [[load4]], 2
+  ; CHECK: extractvalue [4 x float] [[load4]], 3
+
   %gep3 = getelementptr [4 x [4 x float]], [4 x [4 x float]]* %in, i32 0, i32 0
   %bc3 = bitcast [4 x float]* %gep3 to <4 x float>*
   %ld3 = load <4 x float>, <4 x float>* %bc3

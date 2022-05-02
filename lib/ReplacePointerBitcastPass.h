@@ -23,14 +23,6 @@ namespace clspv {
 struct ReplacePointerBitcastPass
     : llvm::PassInfoMixin<ReplacePointerBitcastPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
-
-  // Returns the number of chunks of source data required to exactly
-  // cover the destination data, if the source and destination types are
-  // different sizes.  Otherwise returns 0.
-  unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth);
-  llvm::Value *CalculateNewGEPIdx(unsigned SrcTyBitWidth,
-                                  unsigned DstTyBitWidth,
-                                  llvm::GetElementPtrInst *GEP);
 };
 } // namespace clspv
 

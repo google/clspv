@@ -9,27 +9,23 @@
 // CHECK-DAG: [[uint_2:%[0-9a-zA-Z_]*]] = OpConstant [[uint]] 2
 // CHECK-DAG: [[uint_3:%[0-9a-zA-Z_]*]] = OpConstant [[uint]] 3
 // CHECK-DAG: [[float:%[0-9a-zA-Z_]*]] = OpTypeFloat 32
-// CHECK-DAG: [[float4:%[0-9a-zA-Z_]*]] = OpTypeVector [[float]] 4
 // CHECK: [[in_mul:%[0-9a-zA-Z_]*]] = OpIMul [[uint]] {{.*}} [[uint_3]]
 // CHECK: [[load0_shift:%[0-9a-zA-Z_]*]] = OpShiftRightLogical [[uint]] [[in_mul]] [[uint_2]]
-// CHECK: [[load0_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load0_shift]]
-// CHECK: [[load0:%[0-9a-zA-Z_]*]] = OpLoad [[float4]] [[load0_addr]]
 // CHECK: [[load0_idx:%[0-9a-zA-Z_]*]] = OpBitwiseAnd [[uint]] [[in_mul]] [[uint_3]]
-// CHECK: [[x0:%[0-9a-zA-Z_]*]] = OpVectorExtractDynamic [[float]] [[load0]] [[load0_idx]]
+// CHECK: [[load0_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load0_shift]] [[load0_idx]]
+// CHECK: [[x0:%[0-9a-zA-Z_]*]] = OpLoad [[float]] [[load0_addr]]
 // CHECK: [[load1_offset:%[0-9a-zA-Z_]*]] = OpIAdd [[uint]] [[in_mul]] [[uint_1]]
 // CHECK: [[load1_shift:%[0-9a-zA-Z_]*]] = OpShiftRightLogical [[uint]] [[load1_offset]] [[uint_2]]
-// CHECK: [[load1_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load1_shift]]
-// CHECK: [[load1:%[0-9a-zA-Z_]*]] = OpLoad [[float4]] [[load1_addr]]
 // CHECK: [[load1_idx:%[0-9a-zA-Z_]*]] = OpBitwiseAnd [[uint]] [[load1_offset]] [[uint_3]]
-// CHECK: [[x1:%[0-9a-zA-Z_]*]] = OpVectorExtractDynamic [[float]] [[load1]] [[load1_idx]]
+// CHECK: [[load1_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load1_shift]] [[load1_idx]]
+// CHECK: [[x1:%[0-9a-zA-Z_]*]] = OpLoad [[float]] [[load1_addr]]
 // CHECK: [[load2_offset:%[0-9a-zA-Z_]*]] = OpIAdd [[uint]] [[in_mul]] [[uint_2]]
 // CHECK: [[load2_shift:%[0-9a-zA-Z_]*]] = OpShiftRightLogical [[uint]] [[load2_offset]] [[uint_2]]
-// CHECK: [[load2_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load2_shift]]
-// CHECK: [[load2:%[0-9a-zA-Z_]*]] = OpLoad [[float4]] [[load2_addr]]
 // CHECK: [[load2_idx:%[0-9a-zA-Z_]*]] = OpBitwiseAnd [[uint]] [[load2_offset]] [[uint_3]]
-// CHECK: [[x2:%[0-9a-zA-Z_]*]] = OpVectorExtractDynamic [[float]] [[load2]] [[load2_idx]]
+// CHECK: [[load2_addr:%[0-9a-zA-Z_]*]] = OpAccessChain {{.*}} [[uint_0]] [[load2_shift]] [[load2_idx]]
+// CHECK: [[x2:%[0-9a-zA-Z_]*]] = OpLoad [[float]] [[load2_addr]]
 // CHECK: [[x10:%[0-9a-zA-Z_]*]] = OpFAdd [[float]] [[x0]] [[x1]]
-// CHECK: [[StoreVal:%[0-9a-zA-Z_]*]] = OpFAdd [[float]] [[x2]] [[x10]]
+// CHECK: [[StoreVal:%[0-9a-zA-Z_]*]] = OpFAdd [[float]] [[x10]] [[x2]]
 // CHECK: [[StoreAddr:%[0-9a-zA-Z_]*]] = OpAccessChain
 // CHECK: OpStore [[StoreAddr]] [[StoreVal]]
 
