@@ -198,6 +198,26 @@ bool Supports16BitStorageClass(StorageClass sc);
 // Returns true if |sc| supports 8-bit storage.
 bool Supports8BitStorageClass(StorageClass sc);
 
+// Returns true if unsafe math optimizations are allowed.
+// The following options imply this flag:
+// * -cl-unsafe-math-optimizations
+// * -cl-fast-relaxed-math
+// * -cl-native-math
+bool UnsafeMath();
+
+// Returns true if finite math is assumed.
+// The following options imply this flag:
+// * -cl-finite-math-only
+// * -cl-fast-relaxed-math
+// * -cl-native-math
+bool FiniteMath();
+
+// Returns true if fast relaxed math is enabled.
+// The following options imply this flag:
+// * -cl-fast-relaxed-math
+// * -cl-native-math
+bool FastRelaxedMath();
+
 // Returns true if -cl-native-math is enabled.
 bool NativeMath();
 

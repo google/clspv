@@ -251,6 +251,26 @@ static llvm::cl::list<clspv::Option::StorageClass> no_8bit_storage(
         clEnumValN(clspv::Option::StorageClass::kPushConstant, "pushconstant",
                    "Disallow 8-bit types in push constant interfaces")));
 
+static llvm::cl::opt<bool> cl_unsafe_math_optimizations(
+    "cl-unsafe-math-optimizations", llvm::cl::init(false),
+    llvm::cl::desc("Allow optimizations for floating-point arithmetic that (a) "
+                   "assume that arguments and results are valid, (b) may "
+                   "violate IEEE 754 standard and (c) may violate the OpenCL "
+                   "numerical compliance requirements. This option includes "
+                   "the -cl-no-signed-zeros and -cl-mad-enable options."));
+
+static llvm::cl::opt<bool> cl_finite_math_only(
+    "cl-finite-math-only", llvm::cl::init(false),
+    llvm::cl::desc("Allow optimizations for floating-point arithmetic that "
+                   "assume that arguments and results are not NaNs or INFs."));
+
+static llvm::cl::opt<bool> cl_fast_relaxed_math(
+    "cl-fast-relaxed-math", llvm::cl::init(false),
+    llvm::cl::desc("This option causes the preprocessor macro "
+                   "__FAST_RELAXED_MATH__ to be defined. Sets the optimization "
+                   "options -cl-finite-math-only and "
+                   "-cl-unsafe-math-optimizations."));
+
 static llvm::cl::opt<bool> cl_native_math(
     "cl-native-math", llvm::cl::init(false),
     llvm::cl::desc("Perform all math as fast as possible. This option does not "
@@ -355,6 +375,13 @@ bool Supports8BitStorageClass(StorageClass sc) {
   return true;
 }
 
+bool UnsafeMath() {
+  return cl_unsafe_math_optimizations || FastRelaxedMath() || NativeMath();
+}
+bool FiniteMath() {
+  return cl_finite_math_only || FastRelaxedMath() || NativeMath();
+}
+bool FastRelaxedMath() { return cl_fast_relaxed_math || NativeMath(); }
 bool NativeMath() { return cl_native_math; }
 
 bool FP16() { return fp16; }

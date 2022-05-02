@@ -100,26 +100,6 @@ static llvm::cl::opt<bool> cl_no_signed_zeros(
     llvm::cl::desc("Allow optimizations for floating-point arithmetic that "
                    "ignore the signedness of zero."));
 
-static llvm::cl::opt<bool> cl_unsafe_math_optimizations(
-    "cl-unsafe-math-optimizations", llvm::cl::init(false),
-    llvm::cl::desc("Allow optimizations for floating-point arithmetic that (a) "
-                   "assume that arguments and results are valid, (b) may "
-                   "violate IEEE 754 standard and (c) may violate the OpenCL "
-                   "numerical compliance requirements. This option includes "
-                   "the -cl-no-signed-zeros and -cl-mad-enable options."));
-
-static llvm::cl::opt<bool> cl_finite_math_only(
-    "cl-finite-math-only", llvm::cl::init(false),
-    llvm::cl::desc("Allow optimizations for floating-point arithmetic that "
-                   "assume that arguments and results are not NaNs or INFs."));
-
-static llvm::cl::opt<bool> cl_fast_relaxed_math(
-    "cl-fast-relaxed-math", llvm::cl::init(false),
-    llvm::cl::desc("This option causes the preprocessor macro "
-                   "__FAST_RELAXED_MATH__ to be defined. Sets the optimization "
-                   "options -cl-finite-math-only and "
-                   "-cl-unsafe-math-optimizations."));
-
 static llvm::cl::list<std::string>
     Includes(llvm::cl::Prefix, "I",
              llvm::cl::desc("Add a directory to the list of directories "
@@ -492,22 +472,17 @@ int SetCompilerInstanceOptions(
   // cl_denorms_are_zero ignored for now!
   // cl_fp32_correctly_rounded_divide_sqrt ignored for now!
   instance.getCodeGenOpts().LessPreciseFPMAD =
-      cl_mad_enable || cl_unsafe_math_optimizations;
+      cl_mad_enable || clspv::Option::UnsafeMath();
   // cl_no_signed_zeros ignored for now!
-  instance.getLangOpts().UnsafeFPMath = cl_unsafe_math_optimizations ||
-                                        cl_fast_relaxed_math ||
-                                        clspv::Option::NativeMath();
-  instance.getLangOpts().FiniteMathOnly = cl_finite_math_only ||
-                                          cl_fast_relaxed_math ||
-                                          clspv::Option::NativeMath();
-  instance.getLangOpts().FastRelaxedMath =
-      cl_fast_relaxed_math || clspv::Option::NativeMath();
+  instance.getLangOpts().UnsafeFPMath = clspv::Option::UnsafeMath();
+  instance.getLangOpts().FiniteMathOnly = clspv::Option::FiniteMath();
+  instance.getLangOpts().FastRelaxedMath = clspv::Option::FastRelaxedMath();
 
   // Preprocessor options
   if (!clspv::Option::ImageSupport()) {
     instance.getPreprocessorOpts().addMacroUndef("__IMAGE_SUPPORT__");
   }
-  if (cl_fast_relaxed_math || clspv::Option::NativeMath()) {
+  if (clspv::Option::FastRelaxedMath()) {
     instance.getPreprocessorOpts().addMacroDef("__FAST_RELAXED_MATH__");
   }
 
