@@ -4236,7 +4236,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
         Ops << I.getType() << I.getOperand(0) << I.getOperand(1);
 
-        RID = addSPIRVInst(GetSPIRVBinaryOpcode(I), Ops);
+        auto opcode = GetSPIRVBinaryOpcode(I);
+        RID = addSPIRVInst(opcode, Ops);
+
+        // Disallow contraction on floating-point multiply unless unsafe math
+        // optimizations are enabled.
+        if (opcode == spv::OpFMul && !Option::UnsafeMath()) {
+          Ops.clear();
+          Ops << RID << spv::DecorationNoContraction;
+          addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+        }
       }
     } else if (I.getOpcode() == Instruction::FNeg) {
       // The only unary operator.
