@@ -181,6 +181,13 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
             // ... record the bitcast as something we need to process.
             WorkList.push_back(Bitcast);
           }
+          // ... whose source is a bitcast constant expression
+          if (const auto CE = dyn_cast<ConstantExpr>(Bitcast->getOperand(0))) {
+            if (CE->getOpcode() == Instruction::BitCast) {
+              // ... record the bitcast as something we need to process.
+              WorkList.push_back(Bitcast);
+            }
+          }
         }
       }
     }
@@ -189,7 +196,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
   const bool Changed = !WorkList.empty();
 
   for (auto Bitcast : WorkList) {
-    auto OtherBitcast = cast<BitCastInst>(Bitcast->getOperand(0));
+    Instruction *OtherBitcast = dyn_cast<BitCastInst>(Bitcast->getOperand(0));
+    if (!OtherBitcast) {
+      auto CE = dyn_cast<ConstantExpr>(Bitcast->getOperand(0));
+      assert(CE && CE->getOpcode() == Instruction::BitCast);
+      OtherBitcast = CE->getAsInstruction(Bitcast);
+    }
 
     if (OtherBitcast->getType() == Bitcast->getType()) {
       Bitcast->replaceAllUsesWith(OtherBitcast);
