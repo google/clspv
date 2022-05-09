@@ -559,9 +559,11 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   // Asynchronous copies
   case Builtins::kAsyncWorkGroupCopy:
-    return replaceAsyncWorkGroupCopy(F);
+    return replaceAsyncWorkGroupCopy(
+        F, FI.getParameter(0).DataType(F.getParent()->getContext()));
   case Builtins::kAsyncWorkGroupStridedCopy:
-    return replaceAsyncWorkGroupStridedCopy(F);
+    return replaceAsyncWorkGroupStridedCopy(
+        F, FI.getParameter(0).DataType(F.getParent()->getContext()));
   case Builtins::kWaitGroupEvents:
     return replaceWaitGroupEvents(F);
 
@@ -802,8 +804,8 @@ GlobalVariable *ReplaceOpenCLBuiltinPass::getOrCreateGlobalVariable(
 }
 
 Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
-    Module &M, CallInst *CI, Value *Dst, Value *Src, Value *NumGentypes,
-    Value *Stride, Value *Event) {
+    Module &M, CallInst *CI, Value *Dst, Value *Src, Type *GenType,
+    Value *NumGentypes, Value *Stride, Value *Event) {
   /*
    * event_t *async_work_group_strided_copy(T *dst, T *src, size_t num_gentypes,
    *                                        size_t stride, event_t event) {
@@ -853,27 +855,25 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto Cst1 = Builder.getInt32(1);
   auto Cst2 = Builder.getInt32(2);
 
+  auto *IT = IntegerType::get(M.getContext(), 32);
+  auto *VT = FixedVectorType::get(IT, 3);
+
   // get_local_id({0, 1, 2});
   GlobalVariable *GVId =
       getOrCreateGlobalVariable(M, clspv::LocalInvocationIdVariableName(),
                                 clspv::LocalInvocationIdAddressSpace());
-  Type *GVIdElTy = GVId->getType()->getScalarType()->getPointerElementType();
-  Value *GEP0 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst0});
-  Value *LocalId0 =
-      Builder.CreateLoad(GEP0->getType()->getPointerElementType(), GEP0);
-  Value *GEP1 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst1});
-  Value *LocalId1 =
-      Builder.CreateLoad(GEP1->getType()->getPointerElementType(), GEP1);
-  Value *GEP2 = Builder.CreateGEP(GVIdElTy, GVId, {Cst0, Cst2});
-  Value *LocalId2 =
-      Builder.CreateLoad(GEP2->getType()->getPointerElementType(), GEP2);
+  Value *GEP0 = Builder.CreateGEP(VT, GVId, {Cst0, Cst0});
+  Value *LocalId0 = Builder.CreateLoad(IT, GEP0);
+  Value *GEP1 = Builder.CreateGEP(VT, GVId, {Cst0, Cst1});
+  Value *LocalId1 = Builder.CreateLoad(IT, GEP1);
+  Value *GEP2 = Builder.CreateGEP(VT, GVId, {Cst0, Cst2});
+  Value *LocalId2 = Builder.CreateLoad(IT, GEP2);
 
   // get_local_size({0, 1, 2});
   GlobalVariable *GVSize =
       getOrCreateGlobalVariable(M, clspv::WorkgroupSizeVariableName(),
                                 clspv::WorkgroupSizeAddressSpace());
-  auto LocalSize =
-      Builder.CreateLoad(GVSize->getType()->getPointerElementType(), GVSize);
+  auto LocalSize = Builder.CreateLoad(VT, GVSize);
   auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
   auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);
   auto LocalSize2 = Builder.CreateExtractElement(LocalSize, Cst2);
@@ -921,12 +921,8 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
     // async_work_group_strided_copy global to local case
     SrcIterator = Builder.CreateMul(PHIIterator, Stride);
   }
-  auto DstI = Builder.CreateGEP(
-      Dst->getType()->getScalarType()->getPointerElementType(), Dst,
-      DstIterator);
-  auto SrcI = Builder.CreateGEP(
-      Src->getType()->getScalarType()->getPointerElementType(), Src,
-      SrcIterator);
+  auto DstI = Builder.CreateGEP(GenType, Dst, DstIterator);
+  auto SrcI = Builder.CreateGEP(GenType, Src, SrcIterator);
   auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
   auto Br = Builder.CreateBr(CmpBB);
   clspv::InsertSPIRVOp(Br, spv::OpCopyMemory, {}, Builder.getVoidTy(),
@@ -939,8 +935,8 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   return Event;
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F) {
-  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F, Type *ty) {
+  return replaceCallsWithValue(F, [&F, ty, this](CallInst *CI) {
     Module &M = *F.getParent();
 
     auto Dst = CI->getOperand(0);
@@ -948,13 +944,13 @@ bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F) {
     auto NumGentypes = CI->getOperand(2);
     auto Event = CI->getOperand(3);
 
-    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, NumGentypes, nullptr,
-                                       Event);
+    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, ty, NumGentypes,
+                                       nullptr, Event);
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F) {
-  return replaceCallsWithValue(F, [&F, this](CallInst *CI) {
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F, Type *ty) {
+  return replaceCallsWithValue(F, [&F, ty, this](CallInst *CI) {
     Module &M = *F.getParent();
 
     auto Dst = CI->getOperand(0);
@@ -963,7 +959,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F) {
     auto Stride = CI->getOperand(3);
     auto Event = CI->getOperand(4);
 
-    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, NumGentypes, Stride,
+    return replaceAsyncWorkGroupCopies(M, CI, Dst, Src, ty, NumGentypes, Stride,
                                        Event);
   });
 }
@@ -1914,10 +1910,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
 
     auto offset = CI->getOperand(1);
     auto ptr = CI->getOperand(2);
-    auto ptr_type = ptr->getType();
-    auto pointee_type = ptr_type->getPointerElementType();
-    if (pointee_type != vec_data_type->getElementType())
-      return V;
 
     // Avoid pointer casts. Instead generate the correct number of stores
     // and rely on drivers to coalesce appropriately.
@@ -1927,8 +1919,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     for (size_t i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(
-          ptr->getType()->getScalarType()->getPointerElementType(), ptr, add);
+      auto gep = builder.CreateGEP(vec_data_type->getScalarType(), ptr, add);
       auto extract = builder.CreateExtractElement(data, i);
       V = builder.CreateStore(extract, gep);
     }
@@ -1951,10 +1942,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
 
     auto offset = CI->getOperand(0);
     auto ptr = CI->getOperand(1);
-    auto ptr_type = ptr->getType();
-    auto pointee_type = ptr_type->getPointerElementType();
-    if (pointee_type != vec_ret_type->getElementType())
-      return V;
 
     // Avoid pointer casts. Instead generate the correct number of loads
     // and rely on drivers to coalesce appropriately.
@@ -1965,10 +1952,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     for (unsigned i = 0; i < elems; ++i) {
       auto idx = builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(
-          ptr_type->getScalarType()->getPointerElementType(), ptr, add);
-      auto load =
-          builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
+      auto gep = builder.CreateGEP(vec_ret_type->getScalarType(), ptr, add);
+      auto load = builder.CreateLoad(vec_ret_type->getScalarType(), gep);
       V = builder.CreateInsertElement(V, load, i);
     }
     return V;
@@ -3698,8 +3683,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     // performed in the |then| block. The condition is the inversion of the
     // comparison result.
     IRBuilder<> builder(Call);
-    auto load = builder.CreateLoad(expected->getType()->getPointerElementType(),
-                                   expected);
+    auto load = builder.CreateLoad(value->getType(), expected);
     auto cmp_xchg = InsertSPIRVOp(
         Call, spv::OpAtomicCompareExchange, {Attribute::Convergent},
         value->getType(), {pointer, scope, success, failure, value, load});
@@ -3929,7 +3913,7 @@ bool ReplaceOpenCLBuiltinPass::replaceOrdered(Function &F, bool is_ordered) {
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceIsNormal(Function &F) {
-  return replaceCallsWithValue(F, [this](CallInst *Call) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
     auto ty = Call->getType();
     auto x = Call->getArgOperand(0);
     unsigned width = x->getType()->getScalarSizeInBits();

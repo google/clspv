@@ -38,6 +38,10 @@ struct ParamTypeInfo {
   std::string name;    // struct name
 
   bool isSampler() const;
+
+  // Returns the LLVM type conveyed by mangling.
+  // Currently only supports gentypes from the OpenCL C spec.
+  llvm::Type *DataType(llvm::LLVMContext &context) const;
 };
 
 class FunctionInfo {

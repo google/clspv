@@ -268,6 +268,37 @@ bool Builtins::ParamTypeInfo::isSampler() const {
          (name == "ocl_sampler" || name == "opencl.sampler_t");
 }
 
+llvm::Type *Builtins::ParamTypeInfo::DataType(LLVMContext &context) const {
+  if (isSampler()) {
+    llvm_unreachable("sampler is unhandled");
+  }
+
+  Type *ty = nullptr;
+  switch (type_id) {
+    case llvm::Type::IntegerTyID:
+      ty = llvm::IntegerType::get(context, byte_len * 8);
+      break;
+    case llvm::Type::HalfTyID:
+      ty = llvm::Type::getHalfTy(context);
+      break;
+    case llvm::Type::FloatTyID:
+      ty = llvm::Type::getFloatTy(context);
+      break;
+    case llvm::Type::DoubleTyID:
+      ty = llvm::Type::getDoubleTy(context);
+      break;
+    default:
+      llvm_unreachable("unsupported type");
+      break;
+  }
+
+  if (vector_size > 0) {
+    ty = FixedVectorType::get(ty, vector_size);
+  }
+
+  return ty;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ////  Lookup interface
 ////   - only demangle once for any name encountered

@@ -137,8 +137,8 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
           auto param = Call->getArgOperand(i);
 
           if (Arg->hasByValAttr()) {
-            Args.push_back(new LoadInst(Arg->getType()->getPointerElementType(),
-                                        param, "", Call));
+            Args.push_back(
+                new LoadInst(Arg->getParamByValType(), param, "", Call));
           } else {
             Args.push_back(param);
           }

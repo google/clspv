@@ -111,11 +111,12 @@ private:
                             AddressSpace::Type VariableAddressSpace);
   llvm::Value *replaceAsyncWorkGroupCopies(llvm::Module &M, llvm::CallInst *CI,
                                            llvm::Value *Dst, llvm::Value *Src,
+                                           llvm::Type *GenType,
                                            llvm::Value *NumGentypes,
                                            llvm::Value *Stride,
                                            llvm::Value *Event);
-  bool replaceAsyncWorkGroupCopy(llvm::Function &F);
-  bool replaceAsyncWorkGroupStridedCopy(llvm::Function &F);
+  bool replaceAsyncWorkGroupCopy(llvm::Function &F, llvm::Type *ty);
+  bool replaceAsyncWorkGroupStridedCopy(llvm::Function &F, llvm::Type *ty);
 
   // Caches struct types for { |type|, |type| }. This prevents
   // getOrInsertllvm::Function from introducing a bitcasts between structs with
