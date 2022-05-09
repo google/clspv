@@ -50,8 +50,7 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
     for (Argument &Arg : F->args()) {
       // Check sret attribute.
       if (Arg.hasStructRetAttr()) {
-        PointerType *PTy = cast<PointerType>(Arg.getType());
-        Type *RetTy = PTy->getNonOpaquePointerElementType();
+        Type *RetTy = Arg.getParamStructRetType();
         // Create alloca instruction for return value on function's entry
         // block.
         AllocaInst *RetVal =

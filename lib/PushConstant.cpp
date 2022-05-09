@@ -168,8 +168,7 @@ bool ShouldDeclareRegionGroupOffsetPushConstant(Module &M) {
 uint64_t GlobalPushConstantsSize(Module &M) {
   const auto &DL = M.getDataLayout();
   if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
-    auto ptr_ty = GV->getType();
-    auto block_ty = ptr_ty->getPointerElementType();
+    auto block_ty = GV->getValueType();
     return DL.getTypeStoreSize(block_ty).getKnownMinSize();
   } else {
     SmallVector<Type *, 8> types;

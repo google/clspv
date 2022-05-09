@@ -61,7 +61,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
     auto arg_type = Arg.getType();
     if (Arg.hasByValAttr()) {
       // Byval arguments end up as POD arguments.
-      arg_type = arg_type->getPointerElementType();
+      arg_type = Arg.getParamByValType();
     }
 
     if (isa<PointerType>(arg_type))

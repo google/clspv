@@ -116,8 +116,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     Result = Builder.CreateExtractElement(LoadVec, InBoundsDim);
   } else {
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-    Value *GEP = Builder.CreateGEP(GV->getValueType(), GV, Indices);
-    Result = Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
+    Value *GEP = Builder.CreateGEP(VT, GV, Indices);
+    Result = Builder.CreateLoad(IT, GEP);
   }
 
   Value *Select2 =
@@ -151,17 +151,15 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
   Value *Result = nullptr;
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
   Value *GEP = Builder.CreateGEP(GV->getValueType(), GV, Indices);
-  Result = Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
+  Result = Builder.CreateLoad(IT, GEP);
 
   auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
 
   Value *Ret = GidBase;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::RegionOffset);
-    auto DimPtr = Builder.CreateInBoundsGEP(
-        Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
-    auto Size =
-        Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
+    auto DimPtr = Builder.CreateInBoundsGEP(VT, Ptr, Indices);
+    auto Size = Builder.CreateLoad(IT, DimPtr);
     auto RegOff = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 0);
     Ret = Builder.CreateAdd(Ret, RegOff);
   } else {
@@ -198,10 +196,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   Value *GlobalSize;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::GlobalSize);
-    auto DimPtr = Builder.CreateInBoundsGEP(
-        Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
-    GlobalSize =
-        Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
+    auto Ty = GetPushConstantType(M, clspv::PushConstant::GlobalSize);
+    auto DimPtr = Builder.CreateInBoundsGEP(Ty, Ptr, Indices);
+    GlobalSize = Builder.CreateLoad(Ty->getScalarType(), DimPtr);
   } else {
     IntegerType *IT = IntegerType::get(M.getContext(), 32);
     VectorType *VT = FixedVectorType::get(IT, 3);
@@ -227,16 +224,12 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
     }
 
     // Load the workgroup size.
-    Value *GEP = Builder.CreateGEP(
-        WGS->getType()->getScalarType()->getPointerElementType(), WGS, Indices);
-    Value *LoadWGS =
-        Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
+    Value *GEP = Builder.CreateGEP(VT, WGS, Indices);
+    Value *LoadWGS = Builder.CreateLoad(IT, GEP);
 
     // And the number of workgroups.
-    GEP = Builder.CreateGEP(
-        NWG->getType()->getScalarType()->getPointerElementType(), NWG, Indices);
-    Value *LoadNWG =
-        Builder.CreateLoad(GEP->getType()->getPointerElementType(), GEP);
+    GEP = Builder.CreateGEP(VT, NWG, Indices);
+    Value *LoadNWG = Builder.CreateLoad(IT, GEP);
 
     // We multiply the workgroup size by the number of workgroups to calculate
     // the global size.
@@ -264,23 +257,20 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
   Value *NumGroupsVarPtr;
   auto Dim = &*F->arg_begin();
   auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  VectorType *VT = FixedVectorType::get(IT, 3);
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
 
   if (clspv::Option::NonUniformNDRangeSupported()) {
     NumGroupsVarPtr =
         GetPushConstantPointer(BB, clspv::PushConstant::NumWorkgroups);
   } else {
-    IntegerType *IT = IntegerType::get(M.getContext(), 32);
-    VectorType *VT = FixedVectorType::get(IT, 3);
     NumGroupsVarPtr = createGlobalVariable(M, "__spirv_NumWorkgroups", VT,
                                            AddressSpace::Input);
   }
 
-  auto NumGroupsPtr = Builder.CreateInBoundsGEP(
-      NumGroupsVarPtr->getType()->getScalarType()->getPointerElementType(),
-      NumGroupsVarPtr, Indices);
-  auto NumGroups = Builder.CreateLoad(
-      NumGroupsPtr->getType()->getPointerElementType(), NumGroupsPtr);
+  auto NumGroupsPtr = Builder.CreateInBoundsGEP(VT, NumGroupsVarPtr, Indices);
+  auto NumGroups = Builder.CreateLoad(IT, NumGroupsPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, NumGroups, 1);
   Builder.CreateRet(Ret);
 
@@ -310,21 +300,15 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
 
   auto RegionGroupIDPtr =
       Builder.CreateInBoundsGEP(VT, RegionGroupIDVarPtr, Indices);
-  auto RegionGroupID = Builder.CreateLoad(
-      RegionGroupIDPtr->getType()->getPointerElementType(), RegionGroupIDPtr);
+  auto RegionGroupID = Builder.CreateLoad(IT, RegionGroupIDPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupID, 0);
 
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto RegionGroupOffsetVarPtr =
         GetPushConstantPointer(BB, clspv::PushConstant::RegionGroupOffset);
     auto RegionGroupOffsetPtr =
-        Builder.CreateInBoundsGEP(RegionGroupOffsetVarPtr->getType()
-                                      ->getScalarType()
-                                      ->getPointerElementType(),
-                                  RegionGroupOffsetVarPtr, Indices);
-    auto RegionGroupOffsetVal = Builder.CreateLoad(
-        RegionGroupOffsetPtr->getType()->getPointerElementType(),
-        RegionGroupOffsetPtr);
+        Builder.CreateInBoundsGEP(VT, RegionGroupOffsetVarPtr, Indices);
+    auto RegionGroupOffsetVal = Builder.CreateLoad(IT, RegionGroupOffsetPtr);
     auto RegionGroupOffset =
         inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupOffsetVal, 0);
 
@@ -369,23 +353,20 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
     Value *gep = nullptr;
+    auto *VecTy = FixedVectorType::get(Int32Ty, 3);
     const bool uses_push_constant =
         clspv::ShouldDeclareGlobalOffsetPushConstant(M);
     if (uses_push_constant) {
       auto GoffPtr =
           GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
-      gep = Builder.CreateInBoundsGEP(
-          GoffPtr->getType()->getScalarType()->getPointerElementType(), GoffPtr,
-          Indices);
+      gep = Builder.CreateInBoundsGEP(VecTy, GoffPtr, Indices);
     } else {
-      auto VecTy = FixedVectorType::get(Int32Ty, 3);
       StringRef name = "__spirv_GlobalOffset";
       auto offset_var = createGlobalVariable(M, name, VecTy,
                                              AddressSpace::ModuleScopePrivate);
       gep = Builder.CreateInBoundsGEP(VecTy, offset_var, Indices);
     }
-    auto load = Builder.CreateLoad(
-        gep->getType()->getScalarType()->getPointerElementType(), gep);
+    auto load = Builder.CreateLoad(Int32Ty, gep);
     auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
     Builder.CreateRet(Ret);
   } else {
@@ -455,10 +436,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
   auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
   auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::EnqueuedLocalSize);
-  auto DimPtr = Builder.CreateInBoundsGEP(
-      Ptr->getType()->getScalarType()->getPointerElementType(), Ptr, Indices);
-  auto Size =
-      Builder.CreateLoad(DimPtr->getType()->getPointerElementType(), DimPtr);
+  auto *Ty = GetPushConstantType(M, clspv::PushConstant::EnqueuedLocalSize);
+  auto DimPtr = Builder.CreateInBoundsGEP(Ty, Ptr, Indices);
+  auto Size = Builder.CreateLoad(Ty->getScalarType(), DimPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
   Builder.CreateRet(Ret);
 

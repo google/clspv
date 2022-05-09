@@ -55,7 +55,7 @@ clspv::ZeroInitializeAllocasPass::run(Module &M, ModuleAnalysisManager &) {
   }
 
   for (AllocaInst *alloca : WorkList) {
-    auto *valueTy = alloca->getType()->getPointerElementType();
+    auto *valueTy = alloca->getAllocatedType();
     auto *store = new StoreInst(Constant::getNullValue(valueTy), alloca, false,
                                 Align(alloca->getAlignment()));
     store->insertAfter(alloca);
