@@ -32,6 +32,7 @@ struct ReplaceLLVMIntrinsicsPass
   bool replaceFshl(llvm::Function &F);
   bool replaceCountZeroes(llvm::Function &F, bool leading);
   bool replaceCopysign(llvm::Function &F);
+  bool replaceAddSubSat(llvm::Function &F, bool is_signed, bool is_add);
 
   bool replaceCallsWithValue(
       llvm::Function &F,
