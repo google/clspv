@@ -16,6 +16,7 @@
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -138,19 +139,21 @@ Constant *TranslateConstant(Constant *init, Type *new_type) {
 // the sole contained type in |GV|.
 bool VariableNeedsNormalized(GlobalVariable *GV, Type *gv_contained_ty,
                              Type *to_type) {
-  auto gv_pointee = GV->getType()->getPointerElementType();
+  auto gv_pointee = GV->getValueType();
+  if (gv_pointee == to_type)
+    return false;
+
   if (!gv_pointee->isStructTy() && !gv_pointee->isArrayTy())
     return false;
 
-  auto ce_pointee = to_type->getPointerElementType();
-  if (!ce_pointee->isStructTy() && !ce_pointee->isArrayTy())
+  if (!to_type->isStructTy() && !to_type->isArrayTy())
     return false;
 
   const auto &DL = GV->getParent()->getDataLayout();
-  if (DL.getTypeStoreSize(gv_pointee) != DL.getTypeStoreSize(ce_pointee))
+  if (DL.getTypeStoreSize(gv_pointee) != DL.getTypeStoreSize(to_type))
     return false;
 
-  auto *ce_contained_ty = SoleContainedType(ce_pointee);
+  auto *ce_contained_ty = SoleContainedType(to_type);
   if (gv_contained_ty == ce_contained_ty)
     return true;
 
@@ -159,20 +162,23 @@ bool VariableNeedsNormalized(GlobalVariable *GV, Type *gv_contained_ty,
 
 // Normalize the user |user| of |GV|. Generates a global variable with
 // appropriate initializer and replaces uses of |user| with the new variable.
-GlobalVariable *NormalizeVariable(GlobalVariable *GV, Value *user) {
-  auto *new_type = user->getType()->getPointerElementType();
+GlobalVariable *NormalizeVariable(GlobalVariable *GV, User *user, Type *to_type) {
   Constant *new_initializer = nullptr;
   if (GV->hasInitializer()) {
     auto *initializer = GV->getInitializer();
-    new_initializer = TranslateConstant(initializer, new_type);
+    new_initializer = TranslateConstant(initializer, to_type);
   }
 
   GlobalVariable *new_gv = new GlobalVariable(
-      *GV->getParent(), new_type, GV->isConstant(), GV->getLinkage(),
+      *GV->getParent(), to_type, GV->isConstant(), GV->getLinkage(),
       new_initializer, "", nullptr, GV->getThreadLocalMode(),
       GV->getType()->getPointerAddressSpace(), GV->isExternallyInitialized());
   new_gv->takeName(GV);
-  user->replaceAllUsesWith(new_gv);
+  if (user->getType()->isOpaquePointerTy()) {
+    user->replaceUsesOfWith(GV, new_gv);
+  } else {
+    user->replaceAllUsesWith(new_gv);
+  }
 
   return new_gv;
 }
@@ -180,19 +186,35 @@ GlobalVariable *NormalizeVariable(GlobalVariable *GV, Value *user) {
 // Normalize the users of |GV|.
 void NormalizeVariableUsers(GlobalVariable *GV) {
   for (auto *user : GV->users()) {
-    auto *bitcast = dyn_cast<ConstantExpr>(user);
-    if (!bitcast || bitcast->getOpcode() != Instruction::BitCast)
-      continue;
+    Type *to_type = nullptr;
+    if (user->getType()->isOpaquePointerTy()) {
+      auto *gep = dyn_cast<GEPOperator>(user);
+      if (!gep)
+        continue;
 
-    Type *gv_contained_ty =
-        SoleContainedType(GV->getType()->getPointerElementType());
-    if (!gv_contained_ty)
-      continue;
+      Type *gv_contained_ty = SoleContainedType(GV->getValueType());
+      if (!gv_contained_ty)
+        continue;
 
-    if (!VariableNeedsNormalized(GV, gv_contained_ty, bitcast->getType()))
-      continue;
+      to_type = gep->getSourceElementType();
+      if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
+        continue;
+    } else {
+      auto *bitcast = dyn_cast<ConstantExpr>(user);
+      if (!bitcast || bitcast->getOpcode() != Instruction::BitCast)
+        continue;
 
-    NormalizeVariable(GV, bitcast);
+      Type *gv_contained_ty = SoleContainedType(GV->getValueType());
+      if (!gv_contained_ty)
+        continue;
+
+      to_type = bitcast->getType()->getNonOpaquePointerElementType();
+      if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
+        continue;
+    }
+
+    if (to_type)
+      NormalizeVariable(GV, user, to_type);
   }
 
   GV->removeDeadConstantUsers();

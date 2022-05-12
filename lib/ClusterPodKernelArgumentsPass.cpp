@@ -418,8 +418,7 @@ void clspv::ClusterPodKernelArgumentsPass::RedeclareGlobalPushConstants(
 
   std::vector<Type *> push_constant_tys;
   if (old_GV) {
-    auto block_ty =
-        cast<StructType>(old_GV->getType()->getPointerElementType());
+    auto block_ty = cast<StructType>(old_GV->getValueType());
     for (auto ele : block_ty->elements())
       push_constant_tys.push_back(ele);
   }
