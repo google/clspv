@@ -3500,112 +3500,15 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
                                                 bool is_add) {
   return replaceCallsWithValue(F, [&F, this, is_signed,
                                    is_add](CallInst *Call) {
-    auto ty = Call->getType();
+    auto intrinsic_type =
+        is_signed ? (is_add ? Intrinsic::sadd_sat : Intrinsic::ssub_sat)
+                  : (is_add ? Intrinsic::uadd_sat : Intrinsic::usub_sat);
     auto a = Call->getArgOperand(0);
     auto b = Call->getArgOperand(1);
-    IRBuilder<> builder(Call);
-    if (is_signed) {
-      unsigned bitwidth = ty->getScalarSizeInBits();
-      if (bitwidth < 32) {
-        unsigned extended_width = bitwidth << 1;
-        if (clspv::Option::HackClampWidth() && extended_width < 32) {
-          extended_width = 32;
-        }
-        Type *extended_ty =
-            IntegerType::get(Call->getContext(), extended_width);
-        Constant *min = ConstantInt::get(
-            Call->getContext(),
-            APInt::getSignedMinValue(bitwidth).sext(extended_width));
-        Constant *max = ConstantInt::get(
-            Call->getContext(),
-            APInt::getSignedMaxValue(bitwidth).sext(extended_width));
-        // Don't use the type in GetMangledFunctionName to ensure we get
-        // signed parameters.
-        std::string sclamp_name = Builtins::GetMangledFunctionName("clamp");
-        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          extended_ty = VectorType::get(extended_ty, vec_ty->getElementCount());
-          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
-          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
-          unsigned vec_width = vec_ty->getElementCount().getKnownMinValue();
-          if (extended_width == 32) {
-            sclamp_name += "Dv" + std::to_string(vec_width) + "_iS_S_";
-          } else {
-            sclamp_name += "Dv" + std::to_string(vec_width) + "_sS_S_";
-          }
-        } else {
-          if (extended_width == 32) {
-            sclamp_name += "iii";
-          } else {
-            sclamp_name += "sss";
-          }
-        }
-
-        auto sext_a = builder.CreateSExt(a, extended_ty);
-        auto sext_b = builder.CreateSExt(b, extended_ty);
-        Value *op = nullptr;
-        // Extended operations won't wrap.
-        if (is_add)
-          op = builder.CreateAdd(sext_a, sext_b, "", true, true);
-        else
-          op = builder.CreateSub(sext_a, sext_b, "", true, true);
-        auto clamp_ty = FunctionType::get(
-            extended_ty, {extended_ty, extended_ty, extended_ty}, false);
-        auto callee = F.getParent()->getOrInsertFunction(sclamp_name, clamp_ty);
-        auto clamp = builder.CreateCall(callee, {op, min, max});
-        return builder.CreateTrunc(clamp, ty);
-      } else {
-        // Add:
-        // c = a + b
-        // if (b < 0)
-        //   c = c > a ? min : c;
-        // else
-        //   c  = c < a ? max : c;
-        //
-        // Sub:
-        // c = a - b;
-        // if (b < 0)
-        //   c = c < a ? max : c;
-        // else
-        //   c = c > a ? min : c;
-        Constant *min = ConstantInt::get(Call->getContext(),
-                                         APInt::getSignedMinValue(bitwidth));
-        Constant *max = ConstantInt::get(Call->getContext(),
-                                         APInt::getSignedMaxValue(bitwidth));
-        if (auto vec_ty = dyn_cast<VectorType>(ty)) {
-          min = ConstantVector::getSplat(vec_ty->getElementCount(), min);
-          max = ConstantVector::getSplat(vec_ty->getElementCount(), max);
-        }
-        Value *op = nullptr;
-        if (is_add) {
-          op = builder.CreateAdd(a, b);
-        } else {
-          op = builder.CreateSub(a, b);
-        }
-        auto b_lt_0 = builder.CreateICmpSLT(b, Constant::getNullValue(ty));
-        auto op_gt_a = builder.CreateICmpSGT(op, a);
-        auto op_lt_a = builder.CreateICmpSLT(op, a);
-        auto neg_cmp = is_add ? op_gt_a : op_lt_a;
-        auto pos_cmp = is_add ? op_lt_a : op_gt_a;
-        auto neg_value = is_add ? min : max;
-        auto pos_value = is_add ? max : min;
-        auto neg_clamp = builder.CreateSelect(neg_cmp, neg_value, op);
-        auto pos_clamp = builder.CreateSelect(pos_cmp, pos_value, op);
-        return builder.CreateSelect(b_lt_0, neg_clamp, pos_clamp);
-      }
-    } else {
-      // Replace with OpIAddCarry/OpISubBorrow and clamp to max/0 on a
-      // carr/borrow.
-      spv::Op op = is_add ? spv::OpIAddCarry : spv::OpISubBorrow;
-      auto clamp_value =
-          is_add ? Constant::getAllOnesValue(ty) : Constant::getNullValue(ty);
-      auto struct_ty = GetPairStruct(ty);
-      auto call =
-          InsertSPIRVOp(Call, op, {Attribute::ReadNone}, struct_ty, {a, b});
-      auto add_sub = builder.CreateExtractValue(call, {0});
-      auto carry_borrow = builder.CreateExtractValue(call, {1});
-      auto cmp = builder.CreateICmpEQ(carry_borrow, Constant::getNullValue(ty));
-      return builder.CreateSelect(cmp, add_sub, clamp_value);
-    }
+    auto intrinsic = Intrinsic::getDeclaration(F.getParent(), intrinsic_type,
+                                               Call->getType());
+    return CallInst::Create(intrinsic->getFunctionType(), intrinsic, {a, b}, "",
+                            Call);
   });
 }
 
