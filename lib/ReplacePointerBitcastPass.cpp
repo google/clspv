@@ -400,8 +400,7 @@ void SplitVectorValuesInPair(IRBuilder<> &Builder,
   DEBUG_FCT_VALUES(Values);
   Type *ValueTy = Values[0]->getType();
   assert(ValueTy->isVectorTy());
-  auto ValueVecTy = cast<FixedVectorType>(ValueTy);
-  assert(ValueVecTy->getNumElements() == 4);
+  assert(cast<FixedVectorType>(ValueTy)->getNumElements() == 4);
 
   // Bitcast before splitting to have less bitcast
   BitcastIntoVector(Builder, Values, 4, Ty);
@@ -888,7 +887,7 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
       }
     }
   }
-  // Make sure we will delete all the addridxs as we will not use them.
+  // Make sure we will delete all unused addridxs.
   for (; InIdx < InAddrIdxs.size(); InIdx++) {
     ToBeDeleted.push_back(InAddrIdxs[InIdx]);
   }
