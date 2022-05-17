@@ -398,9 +398,8 @@ void GroupVectorValuesInPair(IRBuilder<> &Builder,
 void SplitVectorValuesInPair(IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values, Type *Ty) {
   DEBUG_FCT_VALUES(Values);
-  Type *ValueTy = Values[0]->getType();
-  assert(ValueTy->isVectorTy());
-  assert(cast<FixedVectorType>(ValueTy)->getNumElements() == 4);
+  assert(Values[0]->getType()->isVectorTy());
+  assert(GetNumEle(Values[0]->getType()) == 4);
 
   // Bitcast before splitting to have less bitcast
   BitcastIntoVector(Builder, Values, 4, Ty);
