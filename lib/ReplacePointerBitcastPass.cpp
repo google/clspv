@@ -944,10 +944,10 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
   // If the output is a vec3 let's consider that the output is a vec4.
   bool IsVec3 = DstTy->isVectorTy() && GetNumEle(DstTy) == 3;
 
-  // Because the vec3 to vec4 pass is before this one, we should not have a vec3
-  // src. But it seems that some llvm passes after vec3 to vec4 can produce new
-  // vec3. At the moment the only case known is to produce vec3 that will be
-  // bitcast to another vec3 which element has the same time as the src vec3. In
+  // Because the vec3 lowering pass is run before this one, we should not have a vec3
+  // src; however, it seems that some llvm passes after vec3 lowering can produce a new
+  // vec3. At the moment the only case known is to produce a vec3 that will be
+  // bitcast to another vec3 whose elements have the same size as the src vec3. In
   // that particular case, just keep the vec3 as we only need to bitcast them,
   // which will be handled correctly by this pass.
   IsVec3 &= !(SrcTy->isVectorTy() && GetNumEle(SrcTy) == 3 &&
