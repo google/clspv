@@ -845,7 +845,7 @@ void ExtractSubElement(Type *Ty, IRBuilder<> &Builder, Value *Idx,
   ConvertInto(Ty, Builder, Values);
 }
 
-// Reduce SrcTy to do as less load/store operation as possible while not loading
+// Reduce SrcTy to do as few load/store operations as possible while not loading
 // unneeded data.
 // Return the appropriate AddIdxs that will need to be used in 'OutAddrIdxs'.
 void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
