@@ -824,8 +824,8 @@ void ExtractSubElement(Type *Ty, IRBuilder<> &Builder, Value *Idx,
     return;
   }
 
-  // Consider only the index for the size that has been loaded (the rest has
-  // already been consider during the load).
+  // Consider only the index for the size that has been loaded (the rest have
+  // already been considered during the load).
   if (Idx != NULL) {
     unsigned SrcSize = SizeInBits(Builder, ValueTy);
     unsigned DstSize = SizeInBits(Builder, Ty);
