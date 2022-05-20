@@ -15,12 +15,20 @@
 #ifndef CLSPV_LIB_TYPES_H
 #define CLSPV_LIB_TYPES_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
 
 #include "spirv/unified1/spirv.hpp"
 
 namespace clspv {
+
+// Returns the inferred type of |v|.
+//
+// If the type of |v\ is an opaque pointer, this function traverses the uses of
+// |v| to determine the appropriate type.
+llvm::Type *InferType(llvm::Value *v, llvm::LLVMContext &context,
+                      llvm::DenseMap<llvm::Value *, llvm::Type *> *cache);
 
 // Returns true if the given struct type is a sampler type.
 bool IsSamplerType(llvm::StructType *type);

@@ -37,6 +37,7 @@
 #include "Constants.h"
 #include "DescriptorCounter.h"
 #include "SpecConstant.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -60,7 +61,6 @@ cl::opt<bool> ShowDescriptors("show-desc", cl::init(false), cl::Hidden,
 PreservedAnalyses clspv::AllocateDescriptorsPass::run(Module &M,
                                                       ModuleAnalysisManager &) {
   PreservedAnalyses PA;
-
   // Samplers from the sampler map always grab descriptor set 0.
   AllocateLiteralSamplerDescriptors(M);
   AllocateKernelArgDescriptors(M);
@@ -122,10 +122,15 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   if (!sampler_struct_ty) {
     sampler_struct_ty = StructType::create(M.getContext(), "opencl.sampler_t");
   }
-  auto *sampler_ty =
-      sampler_struct_ty->getPointerTo(clspv::AddressSpace::Constant);
+  // TODO: #816 remove after final switch.
+  Type *sampler_ty = nullptr;
+  if (init_fn->getType()->isOpaquePointerTy()) {
+    sampler_ty = PointerType::get(M.getContext(), clspv::AddressSpace::Constant);
+  } else {
+    sampler_ty = sampler_struct_ty->getPointerTo(clspv::AddressSpace::Constant);
+  }
   Type *i32 = Builder.getInt32Ty();
-  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32}, false);
+  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32, sampler_struct_ty}, false);
 
   auto var_fn = M.getOrInsertFunction(clspv::LiteralSamplerFunction(), fn_ty);
 
@@ -189,15 +194,18 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
           third_param = index_for_value[value];
         }
 
-        SmallVector<Value *, 3> args = {Builder.getInt32(descriptor_set),
-                                        Builder.getInt32(binding),
-                                        Builder.getInt32(third_param)};
+        SmallVector<Value *, 3> args = {
+            Builder.getInt32(descriptor_set), Builder.getInt32(binding),
+            Builder.getInt32(third_param),
+            Constant::getNullValue(sampler_struct_ty)};
         if (ShowDescriptors) {
           outs() << "  translate literal sampler " << *const_val << " to ("
                  << descriptor_set << "," << binding << ")\n";
         }
         auto *new_call =
             CallInst::Create(var_fn, args, "", dyn_cast<Instruction>(call));
+        assert(clspv::InferType(new_call, M.getContext(), &type_cache_) ==
+               sampler_struct_ty);
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();
       }
@@ -306,8 +314,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
+      auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKind(Arg);
+      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
 
       int separation_token = 0;
       switch (arg_kind) {
@@ -320,6 +329,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         num_image_sampler_arguments++;
         break;
       default:
+        if (isa<PointerType>(argTy)) {
+          separation_token = argTy->getPointerAddressSpace();
+        }
         break;
       }
 
@@ -334,7 +346,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         coherent = (reads && writes) ? 1 : 0;
       }
 
-      KernelArgDiscriminant key(argTy, arg_index, separation_token, coherent);
+      KernelArgDiscriminant key(inferred_ty, arg_index, separation_token, coherent);
 
       // First assume no descriptor is required.
       discriminants_list.push_back(DiscriminantInfo{-1, key});
@@ -399,9 +411,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       unsigned binding = 0;
       int arg_index = 0;
       for (Argument &Arg : f_ptr->args()) {
+        auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg) != clspv::ArgKind::PodPushConstant) {
+          if (clspv::GetArgKind(Arg, inferred_ty) != clspv::ArgKind::PodPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }
@@ -427,8 +440,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
+          auto *inferred_ty = clspv::InferType(&*f_ptr->getArg(arg_index), M.getContext(), &type_cache_);
           const bool is_push_constant_arg =
-              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
               clspv::ArgKind::PodPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
@@ -503,6 +517,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     int arg_index = 0;
     for (Argument &Arg : f_ptr->args()) {
+      auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       if (discriminants_list[arg_index].index >= 0) {
         Changed = true;
         // This argument needs to be rewritten.
@@ -527,10 +542,13 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
                  << " type " << *argTy << "\n";
         }
 
-        const auto arg_kind = clspv::GetArgKind(Arg);
+        const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
 
         Type *resource_type = nullptr;
         unsigned addr_space = kUnallocated;
+        if (isa<PointerType>(Arg.getType())) {
+          addr_space = Arg.getType()->getPointerAddressSpace();
+        }
 
         // TODO(dneto): Describe opaque case.
         // For pointer-to-global and POD arguments, we will remap this
@@ -566,12 +584,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // Use unnamed struct types so we generate less SPIR-V code.
 
           // Create the type only once.
-          auto *arr_type = ArrayType::get(argTy->getPointerElementType(), 0);
+          auto *arr_type = ArrayType::get(argTy, 0);
           resource_type = StructType::get(arr_type);
-          // Preserve the address space in case the pointer is passed into a
-          // helper function: we don't want to change the type of the helper
-          // function parameter.
-          addr_space = argTy->getPointerAddressSpace();
           break;
         }
         case clspv::ArgKind::BufferUBO: {
@@ -586,19 +600,14 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
           // Max UBO size can be specified on the command line. Size the array
           // to pretend we are using that space.
-          uint64_t struct_size = M.getDataLayout().getTypeAllocSize(
-              argTy->getPointerElementType());
+          uint64_t struct_size =
+              M.getDataLayout().getTypeAllocSize(inferred_ty);
           uint64_t num_elements =
               clspv::Option::MaxUniformBufferSize() / struct_size;
 
           // Create the type only once.
-          auto *arr_type =
-              ArrayType::get(argTy->getPointerElementType(), num_elements);
+          auto *arr_type = ArrayType::get(argTy, num_elements);
           resource_type = StructType::get(arr_type);
-          // Preserve the address space in case the pointer is passed into a
-          // helper function: we don't want to change the type of the helper
-          // function parameter.
-          addr_space = argTy->getPointerAddressSpace();
           break;
         }
         case clspv::ArgKind::Pod:
@@ -625,8 +634,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::StorageImage:
           // We won't be translating the value here.  Keep the type the same.
           // since calls using these values need to keep the same type.
-          resource_type = argTy->getPointerElementType();
-          addr_space = argTy->getPointerAddressSpace();
+          resource_type = inferred_ty;
           break;
         default:
           errs() << "Unhandled type " << *argTy << "\n";
@@ -642,7 +650,13 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         if (!var_fn) {
           // Make the function
-          PointerType *ptrTy = PointerType::get(resource_type, addr_space);
+          // TODO: #816 remove after final transition.
+          PointerType *ptrTy = nullptr;
+          if (Arg.getType()->isOpaquePointerTy()) {
+            ptrTy = PointerType::get(M.getContext(), addr_space);
+          } else {
+            ptrTy = resource_type->getPointerTo(addr_space);
+          }
           // The parameters are:
           //  descriptor set
           //  binding
@@ -650,9 +664,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //  arg index
           //  discriminant index
           //  coherent
+          //  data_type
           Type *i32 = Builder.getInt32Ty();
           FunctionType *fnTy =
-              FunctionType::get(ptrTy, {i32, i32, i32, i32, i32, i32}, false);
+              FunctionType::get(ptrTy, {i32, i32, i32, i32, i32, i32, resource_type}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
         }
@@ -667,9 +682,11 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
             Builder.getInt32(discriminants_list[arg_index].index);
         auto *coherent_arg = Builder.getInt32(
             discriminants_list[arg_index].discriminant.coherent);
+        auto *resource_type_arg = Constant::getNullValue(resource_type);
         auto *call = Builder.CreateCall(
             var_fn, {set_arg, binding_arg, arg_kind_arg, arg_index_arg,
-                     discriminant_index_arg, coherent_arg});
+                     discriminant_index_arg, coherent_arg, resource_type_arg});
+        assert(clspv::InferType(call, M.getContext(), &type_cache_) == resource_type);
 
         Value *replacement = nullptr;
         Value *zero = Builder.getInt32(0);
@@ -679,7 +696,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // Return a GEP to the first element
           // in the runtime array we'll make.
           replacement = Builder.CreateGEP(
-              call->getType()->getScalarType()->getPointerElementType(), call,
+              resource_type, call,
               {zero, zero, zero});
           break;
         case clspv::ArgKind::Pod:
@@ -687,10 +704,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::PodPushConstant: {
           // Replace with a load of the start of the (virtual) variable.
           auto *gep = Builder.CreateGEP(
-              call->getType()->getScalarType()->getPointerElementType(), call,
+              resource_type, call,
               {zero, zero});
           replacement =
-              Builder.CreateLoad(gep->getType()->getPointerElementType(), gep);
+              Builder.CreateLoad(inferred_ty, gep);
         } break;
         case clspv::ArgKind::SampledImage:
         case clspv::ArgKind::StorageImage:
@@ -783,10 +800,11 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKind(Arg);
+      auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
+      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
       if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
-        int spec_id = GetSpecId(Arg.getType());
+        int spec_id = GetSpecId(inferred_ty);
 
         if (ShowDescriptors) {
           outs() << "DBA: " << F.getName() << " arg " << arg_index << " " << Arg
@@ -801,26 +819,30 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
             clspv::WorkgroupAccessorFunction() + "." + std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
-        auto *array_ty = ArrayType::get(argTy->getPointerElementType(), 0);
-        auto *ptr_ty =
-            PointerType::get(array_ty, argTy->getPointerAddressSpace());
+        auto *array_ty = ArrayType::get(inferred_ty, 0);
+        PointerType *ptr_ty = nullptr;
+        if (argTy->isOpaquePointerTy()) {
+          ptr_ty = PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
+        } else {
+          ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
+        }
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fn_ty = FunctionType::get(ptr_ty, i32, false);
+          FunctionType *fn_ty = FunctionType::get(ptr_ty, {i32, array_ty}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fn_ty).getCallee());
         }
 
         // Generate an accessor call.
         auto *spec_id_arg = Builder.getInt32(spec_id);
-        auto *call = Builder.CreateCall(var_fn, {spec_id_arg});
+        auto *type_arg = Constant::getNullValue(array_ty);
+        auto *call = Builder.CreateCall(var_fn, {spec_id_arg, type_arg});
+        assert(clspv::InferType(call, M.getContext(), &type_cache_) == array_ty);
 
         // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
         // addrspace(3)*, generate two zero indices for the gep.
-        auto *replacement = Builder.CreateGEP(
-            call->getType()->getScalarType()->getPointerElementType(), call,
-            {zero, zero});
+        auto *replacement = Builder.CreateGEP(array_ty, call, {zero, zero});
         Arg.replaceAllUsesWith(replacement);
 
         // We record the assignment of the spec id for this particular argument

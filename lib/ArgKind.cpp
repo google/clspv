@@ -52,20 +52,24 @@ inline const char *GetArgKindNameForType(llvm::Type *type) {
   return GetArgKindName(GetArgKindForType(type));
 }
 
-clspv::ArgKind GetArgKindForType(Type *type) {
-  if (type->isPointerTy()) {
-    if (clspv::IsSamplerType(type)) {
+clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
+  if (auto ptrTy = dyn_cast<PointerType>(type)) {
+    // TODO: #816 remove after final transition
+    Type *inner_type = ptrTy->isOpaquePointerTy()
+                           ? data_type
+                           : ptrTy->getNonOpaquePointerElementType();
+    StructType *struct_ty = dyn_cast<StructType>(inner_type);
+    if (clspv::IsSamplerType(struct_ty)) {
       return clspv::ArgKind::Sampler;
     }
-    llvm::Type *image_type = nullptr;
-    if (clspv::IsImageType(type, &image_type)) {
-      StringRef name = dyn_cast<StructType>(image_type)->getName();
+    if (clspv::IsImageType(struct_ty)) {
+      StringRef name = struct_ty->getName();
       // OpenCL 1.2 only has read-only and write-only images.
       // OpenCL 2.0 (and later) also has read-write images.
       // Read-only images are translated to sampled images, while write-only
       // and read-write images are translated as storage images.
-      return name.contains("_ro_t") ? clspv::ArgKind::SampledImage
-                                    : clspv::ArgKind::StorageImage;
+      return name.contains("_ro") ? clspv::ArgKind::SampledImage
+                                  : clspv::ArgKind::StorageImage;
     }
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
@@ -121,13 +125,13 @@ ArgKind GetArgKindForPodArgs(Function &F) {
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
-ArgKind GetArgKind(Argument &Arg) {
+ArgKind GetArgKind(Argument &Arg, Type *data_type) {
   if (!isa<PointerType>(Arg.getType()) &&
       Arg.getParent()->getCallingConv() == CallingConv::SPIR_KERNEL) {
     return GetArgKindForPodArgs(*Arg.getParent());
   }
 
-  return GetArgKindForType(Arg.getType());
+  return GetArgKindForType(Arg.getType(), data_type);
 }
 
 const char *GetArgKindName(ArgKind kind) {

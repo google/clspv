@@ -85,6 +85,8 @@ private:
   // The next binding number to use.
   int binding_;
 
+  llvm::DenseMap<llvm::Value *, llvm::Type *> type_cache_;
+
   // What makes a kernel argument require a new descriptor?
   struct KernelArgDiscriminant {
     KernelArgDiscriminant(llvm::Type *the_type = nullptr, int the_arg_index = 0,
@@ -103,6 +105,7 @@ private:
     // An extra bit of data that can be used to separate resource
     // variables that otherwise share the same type and argument index.
     // By default this will be zero, and so it won't force any separation.
+    // For buffer arguments, the address space is used as the separation token.
     int separation_token;
     // An extra bit that marks whether the variable is coherent. This means
     // coherent and non-coherent variables will not share a binding.
