@@ -44,15 +44,8 @@ using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
 namespace {
 
 // Returns the size in bits of 'Ty'
-// In the case of a vector of 3 elements, return the size of the same vector of
-// 4 elements as vec3 has padding between 2 vectors.
 size_t SizeInBits(const DataLayout &DL, Type *Ty) {
-  if (auto VecTy = dyn_cast<FixedVectorType>(Ty)) {
-    if (VecTy->getNumElements() == 3) {
-      return 4 * SizeInBits(DL, VecTy->getElementType());
-    }
-  }
-  return DL.getTypeStoreSizeInBits(Ty);
+  return DL.getTypeAllocSizeInBits(Ty);
 }
 
 // Same as above with different arguments
