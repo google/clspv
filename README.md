@@ -131,7 +131,7 @@ Or if you are using Ninja:
 Clspv includes an LLVM IR library (cmake/clspv--.bc) containing implementations
 of some OpenCL builtin functions. This file is distributed under the LLVM
 license (included in LICENSE) as it is generated from the LLVM sub-project
-[libclc](libclc.llvm.org). Refer to the source for the relevant copyrights.
+[libclc](https://libclc.llvm.org). Refer to the source for the relevant copyrights.
 
 ### Rebuilding the Library
 
