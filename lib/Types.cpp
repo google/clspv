@@ -144,8 +144,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         break;
       default:
         // Handle entire ranges of builtins here.
-        if (info.getType() >= clspv::Builtins::kType_Image_Start &&
-            info.getType() <= clspv::Builtins::kType_Image_End) {
+        if (BUILTIN_IN_GROUP(info.getType(), Image)) {
           // Data type is inferred through the mangling of the operand.
           auto param = info.getParameter(operand);
           assert(param.type_id == Type::StructTyID);
@@ -154,14 +153,12 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
             struct_ty = StructType::create(context, param.name);
           }
           return CacheType(struct_ty);
-        } else if ((info.getType() >= clspv::Builtins::kType_Atomic_Start &&
-                    info.getType() <= clspv::Builtins::kType_Atomic_End) ||
+        } else if (BUILTIN_IN_GROUP(info.getType(), Atomic) ||
                    info.getType() == clspv::Builtins::kSpirvAtomicXor) {
           // TODO: handle atomic flag functions properly.
           // Data type is the same as the return type.
           return CacheType(call->getType());
-        } else if (info.getType() >= clspv::Builtins::kType_Async_Start &&
-                   info.getType() <= clspv::Builtins::kType_Async_End) {
+        } else if (BUILTIN_IN_GROUP(info.getType(), Async)) {
           // Data type is inferred through the mangling of the operand.
           auto param = info.getParameter(operand);
           return CacheType(param.DataType(context));
