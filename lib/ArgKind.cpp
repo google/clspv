@@ -36,22 +36,6 @@ using namespace llvm;
 namespace {
 
 // Maps an LLVM type for a kernel argument to an argument kind.
-clspv::ArgKind GetArgKindForType(Type *type);
-
-// Maps an LLVM type for a kernel argument to an argument
-// kind suitable for embedded reflection. The result is one of:
-//   buffer     - storage buffer
-//   buffer_ubo - uniform buffer
-//   local      - array in Workgroup storage, number of elements given by
-//                a specialization constant
-//   pod        - plain-old-data
-//   ro_image   - sampled image
-//   wo_image   - storage image
-//   sampler    - sampler
-inline const char *GetArgKindNameForType(llvm::Type *type) {
-  return GetArgKindName(GetArgKindForType(type));
-}
-
 clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
   if (auto ptrTy = dyn_cast<PointerType>(type)) {
     // TODO: #816 remove after final transition
