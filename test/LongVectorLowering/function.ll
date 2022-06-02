@@ -1,4 +1,5 @@
-; RUN: clspv-opt --passes=long-vector-lowering,early-cse,instcombine %s -o %t
+; TODO(#816): remove opaque pointers disable
+; RUN: clspv-opt --passes=long-vector-lowering,early-cse,instcombine %s -o %t -opaque-pointers=0
 ; RUN: FileCheck %s < %t
 
 ; Test that function arguments and return types can be lowered;
