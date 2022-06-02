@@ -23,6 +23,9 @@ using namespace llvm;
 using namespace clspv;
 
 namespace {
+
+const std::string kPreviousParam = "__clspv_previous_param";
+
 ////////////////////////////////////////////////////////////////////////////////
 ////  Convert Builtin function name to a Type enum
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +90,18 @@ size_t GetParameterType(const std::string &mangled_name,
     (void)GetUnmangledName(mangled_name, &pos);
     return GetParameterType(mangled_name, type_info, pos);
   }
+  case 'A': { // Atomic type
+    if (mangled_name.substr(pos, 5) == "tomic")
+      return GetParameterType(mangled_name, type_info, pos + 5);
+    return 0;
+  }
+  case 'S':
+    // same as previous parameter
+    if (mangled_name[pos] != '_') {
+      return 0;
+    }
+    type_info->name = kPreviousParam;
+    return pos + 1;
     // OCL types
   case 'D':
     type_code = mangled_name[pos++];
@@ -228,7 +243,18 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
       }
       params_.push_back(params_.back());
     } else if ((pos = GetParameterType(mangled_name, &type_info, pos))) {
-      params_.push_back(type_info);
+      if (type_info.type_id == llvm::Type::VoidTyID &&
+          type_info.name == kPreviousParam) {
+        // After additional demangling, the underlying data type is the same as
+        // the previous parameter.
+        if (!params_.empty()) {
+          params_.push_back(params_.back());
+        } else {
+          return false;
+        }
+      } else {
+        params_.push_back(type_info);
+      }
     } else {
       return false;
     }
