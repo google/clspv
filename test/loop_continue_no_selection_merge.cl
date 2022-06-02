@@ -3,14 +3,18 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: OpLoopMerge {{.*}} [[CONT:%[a-zA-Z0-9_]+]] None
-// CHECK-NEXT: OpBranchConditional {{%[a-zA-Z0-9_]+}} {{%[a-zA-Z0-9_]+}} [[FALSE:%[a-zA-Z0-9_]+]]
-// CHECK: [[FALSE]] = OpLabel
-// CHECK-NEXT: OpControlBarrier
-// No selection merge is necessary because this is effectively a continue
-// statement.
-// CHECK-NOT: OpSelectionMerge
-// CHECK: OpBranchConditional {{.*}} {{.*}} [[CONT]]
+// CHECK: OpControlBarrier
+// CHECK: [[LOOP:%[a-zA-Z0-9_]+]] = OpLabel
+// CHECK: OpLoopMerge [[MERGE:%[a-zA-Z0-9_]+]] [[CONT:%[a-zA-Z0-9_]+]] None
+// CHECK-NEXT: OpBranchConditional {{%[a-zA-Z0-9_]+}} [[TRUE:%[a-zA-Z0-9_]+]] [[CONT]]
+// CHECK: [[TRUE]] = OpLabel
+// CHECK-NOT: OpLabel
+// CHECK: OpBranch [[CONT]]
+// CHECK: [[CONT]] = OpLabel
+// CHECK-NOT: OpLabel
+// CHECK: OpControlBarrier
+// CHECK-NOT: OpLabel
+// CHECK: OpBranchConditional {{.*}} [[MERGE]] [[LOOP]]
 
 __kernel void
 top_scan(__global uint * isums,
