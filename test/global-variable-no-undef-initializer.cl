@@ -3,7 +3,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: OpUndef
 // CHECK-NOT: OpVariable {{.*}} Workgroup %
 // CHECK: OpVariable {{.*}} Workgroup
 // CHECK-NOT: OpVariable {{.*}} Workgroup %
