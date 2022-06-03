@@ -77,8 +77,8 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
     else
       return clspv::ArgKind::Pod;
   }
-  errs() << "Unhandled case in clspv::GetArgKindNameForType: " << *type << "\n";
-  llvm_unreachable("Unhandled case in clspv::GetArgKindNameForType");
+  errs() << "Unhandled case in clspv::GetArgKindForType: " << *type << "\n";
+  llvm_unreachable("Unhandled case in clspv::GetArgKindForType");
   return clspv::ArgKind::Buffer;
 }
 } // namespace
