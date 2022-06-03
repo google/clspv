@@ -93,14 +93,14 @@ private:
                           int the_separation_token = 0, int is_coherent = 0)
         : type(the_type), arg_index(the_arg_index),
           separation_token(the_separation_token), coherent(is_coherent) {}
-    // Different argument type requires different descriptor since logical
+    // Different argument types require different descriptors since logical
     // addressing requires strongly typed storage buffer variables.
     llvm::Type *type;
     // If we have multiple arguments of the same type to the same kernel,
     // then we have to use distinct descriptors because the user could
     // bind different storage buffers for them.  Use argument index
     // as a proxy for distinctness.  This might overcount, but we
-    // don't worry about yet.
+    // don't worry about that yet.
     int arg_index;
     // An extra bit of data that can be used to separate resource
     // variables that otherwise share the same type and argument index.
