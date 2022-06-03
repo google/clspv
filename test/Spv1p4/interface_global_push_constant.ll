@@ -1,4 +1,5 @@
-; RUN: clspv-opt --passes=spirv-producer %s -o %t.ll -producer-out-file %t.spv -spv-version=1.4
+; TODO(#816): remove opaque pointers disable
+; RUN: clspv-opt --passes=spirv-producer %s -o %t.ll -producer-out-file %t.spv -spv-version=1.4 -opaque-pointers=0
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.1spv1.4 %t.spv

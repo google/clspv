@@ -834,21 +834,26 @@ int ParseOptions(const int argc, const char *const argv[]) {
   // ParseCommandLineOptions with the specific options.
   bool has_pre = false;
   bool has_load_pre = false;
+  bool has_opaque_pointers = false;
   const std::string pre = "-enable-pre";
   const std::string load_pre = "-enable-load-pre";
+  const std::string opaque = "-opaque-pointers";
   for (int i = 1; i < argc; ++i) {
     std::string option(argv[i]);
     auto pre_pos = option.find(pre);
     auto load_pos = option.find(load_pre);
+    auto opaque_pos = option.find(opaque);
     if (pre_pos == 0 || (pre_pos == 1 && option[0] == '-')) {
       has_pre = true;
     } else if (load_pos == 0 || (load_pos == 1 && option[0] == '-')) {
       has_load_pre = true;
+    } else if (opaque_pos == 0 || (opaque_pos == 1 && option[0] == '-')) {
+      has_opaque_pointers = true;
     }
   }
 
   int llvmArgc = 3;
-  const char *llvmArgv[5];
+  const char *llvmArgv[6];
   llvmArgv[0] = argv[0];
   llvmArgv[1] = "-simplifycfg-sink-common=false";
   // TODO(#738): find a better solution to this.
@@ -858,6 +863,10 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
   if (!has_load_pre) {
     llvmArgv[llvmArgc++] = "-enable-load-pre=0";
+  }
+  // TODO(#816): remove this after final transition.
+  if (!has_opaque_pointers) {
+    llvmArgv[llvmArgc++] = "-opaque-pointers=0";
   }
 
   llvm::cl::ResetAllOptionOccurrences();
