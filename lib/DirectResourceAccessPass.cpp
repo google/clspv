@@ -84,8 +84,18 @@ bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
     case clspv::ArgKind::Local:
       Changed |= RewriteAccessesForArg(fn, arg_index, arg);
       break;
+    case clspv::ArgKind::Pod:
+    case clspv::ArgKind::PodUBO:
+    case clspv::ArgKind::PodPushConstant:
+      // These are represented by structs. Don't rewrite them.
+      break;
     default:
-      // Should not happen
+      errs() << "Unhandled ArgKind in "
+                "clspv::DirectResourceAccessPass::RewriteResourceAccesses: "
+             << int(clspv::GetArgKind(arg)) << "\n";
+      llvm_unreachable(
+          "Unhandled ArgKind in "
+          "clspv::DirectResourceAccessPass::RewriteResourceAccesses");
       break;
     }
     arg_index++;
