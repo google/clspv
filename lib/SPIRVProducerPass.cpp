@@ -1478,23 +1478,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
   // stores a laid out and non-laid out version of the type.
   const unsigned layout = needs_layout ? 1 : 0;
 
-  if (dyn_cast<StructType>(Ty) && IsImageType(dyn_cast<StructType>(Ty))) {
-    // %opencl.image1d_buffer_ro.t, %opencl.image1d_buffer_wo.t and
-    // %opencl.image1d_buffer_rw.t needs to be rework as they will map on the
-    // same SPIRV type.
-    const char *bufferString = "_buffer_";
-    StringRef CanonicalName = Ty->getStructName();
-    size_t bufferPos = CanonicalName.find(bufferString);
-    if (bufferPos != std::string::npos) {
-      std::string NewName = CanonicalName.str().replace(
-          bufferPos + strlen(bufferString), 2, "rw");
-      Ty = StructType::getTypeByName(module->getContext(), NewName);
-      if (!Ty) {
-        Ty = StructType::create(module->getContext(), NewName);
-      }
-    }
-  }
-
   auto TI = TypeMap.find(Ty);
   if (TI != TypeMap.end()) {
     assert(layout < TI->second.size());
@@ -3451,11 +3434,12 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       } else {
         result_type = getSPIRVType(Call->getType());
       }
-
-      uint32_t mask = spv::ImageOperandsLodMask |
-                      GetExtendMask(Call->getType(), is_int_image);
-      Ops << result_type << Image << Coordinate << mask
-          << getSPIRVInt32Constant(0);
+      Ops << result_type << Image << Coordinate;
+      if (ImageDimensionality(image_ty) != spv::DimBuffer) {
+        uint32_t mask = spv::ImageOperandsLodMask |
+                        GetExtendMask(Call->getType(), is_int_image);
+        Ops << mask << getSPIRVInt32Constant(0);
+      }
 
       RID = addSPIRVInst(spv::OpImageFetch, Ops);
 
@@ -3543,7 +3527,8 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     }
     Ops << SizesTypeID << Image;
     spv::Op query_opcode = spv::OpImageQuerySize;
-    if (IsSampledImageType(Image->getType())) {
+    if (IsSampledImageType(Image->getType()) &&
+        ImageDimensionality(Image->getType()) != spv::DimBuffer) {
       query_opcode = spv::OpImageQuerySizeLod;
       // Need explicit 0 for Lod operand.
       Ops << getSPIRVInt32Constant(0);

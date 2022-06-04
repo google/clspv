@@ -1,7 +1,7 @@
 ; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
-; CHECK: %[[IMAGE:opencl.image1d_buffer_ro_t.uint]] = type opaque
+; CHECK: %[[IMAGE:opencl.image1d_buffer_ro_t.uint.sampled]] = type opaque
 ; CHECK: declare spir_func <4 x i32> @_Z12read_imageui21ocl_image1d_buffer_roi.[[IMAGE]](%[[IMAGE]] addrspace(1)*, i32) [[ATTRS:#[0-9]+]]
 ; CHECK: define spir_kernel void @read_uint
 ; CHECK: call spir_func <4 x i32> @_Z12read_imageui21ocl_image1d_buffer_roi.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
