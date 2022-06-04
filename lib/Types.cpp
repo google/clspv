@@ -323,7 +323,11 @@ bool clspv::IsArrayImageType(Type *type) {
         if (STy->getName().startswith("opencl.image1d_array_ro_t") ||
             STy->getName().startswith("opencl.image1d_array_wo_t") ||
             STy->getName().startswith("opencl.image2d_array_ro_t") ||
-            STy->getName().startswith("opencl.image2d_array_wo_t")) {
+            STy->getName().startswith("opencl.image2d_array_wo_t") ||
+            STy->getName().startswith("ocl_image1d_array_ro") ||
+            STy->getName().startswith("ocl_image1d_array_wo") ||
+            STy->getName().startswith("ocl_image2d_array_ro") ||
+            STy->getName().startswith("ocl_image2d_array_wo")) {
           isArrayImageType = true;
         }
       }
@@ -355,8 +359,8 @@ bool clspv::IsStorageImageType(Type *type) {
   Type *ty = nullptr;
   if (IsImageType(type, &ty)) {
     if (auto struct_ty = dyn_cast_or_null<StructType>(ty)) {
-      if (struct_ty->getName().contains("_wo_t") ||
-          struct_ty->getName().contains("_rw_t")) {
+      if (struct_ty->getName().contains("_wo") ||
+          struct_ty->getName().contains("_rw")) {
         return true;
       }
     }

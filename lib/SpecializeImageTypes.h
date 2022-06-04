@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <utility>
+
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+
+#include "Builtins.h"
 
 #ifndef _CLSPV_LIB_SPECIALIZE_IMAGE_TYPES_PASS_H
 #define _CLSPV_LIB_SPECIALIZE_IMAGE_TYPES_PASS_H
@@ -23,12 +27,15 @@ struct SpecializeImageTypesPass
     : llvm::PassInfoMixin<SpecializeImageTypesPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
+  enum ResultType { kNotImage, kNotSpecialized, kSpecialized };
+
 private:
   // Returns the specialized image type for |arg|.
-  llvm::Type *RemapType(llvm::Argument *arg);
+  std::pair<ResultType, llvm::Type *> RemapType(llvm::Argument *arg);
 
   // Returns the specialized image type for operand |operand_no| in |value|.
-  llvm::Type *RemapUse(llvm::Value *value, unsigned operand_no);
+  std::pair<ResultType, llvm::Type *> RemapUse(llvm::Value *value,
+                                               unsigned operand_no);
 
   // Specializes |arg| as |new_type|. Recursively updates the use chain.
   void SpecializeArg(llvm::Function *f, llvm::Argument *arg,
@@ -36,7 +43,9 @@ private:
 
   // Returns a replacement image builtin function for the specialized type
   // |type|.
-  llvm::Function *ReplaceImageBuiltin(llvm::Function *f, llvm::Type *type);
+  llvm::Function *ReplaceImageBuiltin(llvm::Function *f,
+                                      Builtins::FunctionInfo info,
+                                      llvm::StructType *type);
 
   // Rewrites |f| using the |remapped_args_| to determine to updated types.
   void RewriteFunction(llvm::Function *f);

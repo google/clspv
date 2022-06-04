@@ -27,6 +27,7 @@ namespace clspv {
 //
 // If the type of |v\ is an opaque pointer, this function traverses the uses of
 // |v| to determine the appropriate type.
+// Returns nullptr if a type cannot be inferred.
 llvm::Type *InferType(llvm::Value *v, llvm::LLVMContext &context,
                       llvm::DenseMap<llvm::Value *, llvm::Type *> *cache);
 

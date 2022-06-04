@@ -2,9 +2,9 @@
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image1d_array_wo_t.float]] = type opaque
-; CHECK: declare spir_func void @_Z12write_imagef20ocl_image1d_array_woDv2_iDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)*, <2 x i32>, <4 x float>) [[ATTRS:#[0-9]+]]
+; CHECK: declare spir_func void @_Z12write_imagef31[[IMAGE]]Dv2_iDv4_f(%[[IMAGE]] addrspace(1)*, <2 x i32>, <4 x float>) [[ATTRS:#[0-9]+]]
 ; CHECK: define spir_kernel void @write_float
-; CHECK: call spir_func void @_Z12write_imagef20ocl_image1d_array_woDv2_iDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func void @_Z12write_imagef31[[IMAGE]]Dv2_iDv4_f(%[[IMAGE]] addrspace(1)* %image
 ; CHECK: attributes [[ATTRS]] = { convergent nounwind }
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

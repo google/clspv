@@ -157,6 +157,10 @@ static llvm::cl::opt<std::string> IROutputFile(
         "Emit LLVM IR to the given file after parsing and stop compilation."),
     llvm::cl::value_desc("filename"));
 
+static llvm::cl::opt<bool> OpaquePointers("enable-opaque-pointers",
+                                          llvm::cl::desc("Use opaque pointers"),
+                                          llvm::cl::init(false));
+
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
   OpenCLBuiltinMemoryBuffer(const void *data, uint64_t data_length) {
@@ -465,6 +469,7 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
+  instance.getCodeGenOpts().OpaquePointers = OpaquePointers;
   instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
 
   instance.getLangOpts().SinglePrecisionConstants =
@@ -834,21 +839,16 @@ int ParseOptions(const int argc, const char *const argv[]) {
   // ParseCommandLineOptions with the specific options.
   bool has_pre = false;
   bool has_load_pre = false;
-  bool has_opaque_pointers = false;
   const std::string pre = "-enable-pre";
   const std::string load_pre = "-enable-load-pre";
-  const std::string opaque = "-opaque-pointers";
   for (int i = 1; i < argc; ++i) {
     std::string option(argv[i]);
     auto pre_pos = option.find(pre);
     auto load_pos = option.find(load_pre);
-    auto opaque_pos = option.find(opaque);
     if (pre_pos == 0 || (pre_pos == 1 && option[0] == '-')) {
       has_pre = true;
     } else if (load_pos == 0 || (load_pos == 1 && option[0] == '-')) {
       has_load_pre = true;
-    } else if (opaque_pos == 0 || (opaque_pos == 1 && option[0] == '-')) {
-      has_opaque_pointers = true;
     }
   }
 
@@ -863,10 +863,6 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
   if (!has_load_pre) {
     llvmArgv[llvmArgc++] = "-enable-load-pre=0";
-  }
-  // TODO(#816): remove this after final transition.
-  if (!has_opaque_pointers) {
-    llvmArgv[llvmArgc++] = "-opaque-pointers=0";
   }
 
   llvm::cl::ResetAllOptionOccurrences();
