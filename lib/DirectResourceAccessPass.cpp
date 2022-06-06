@@ -111,8 +111,7 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   // such a thing (where the GEP can only have zero indices).
   struct ParamInfo {
     // The base value. It is either a global variable or a resource-access
-    // builtin function. In the global variable case it is either
-    // @clspv.resource.var.* or @clspv.local.var.*
+    // builtin function (clspv.resource.var.* or clspv.local.var.*).
     Value *base;
     // The descriptor set.
     uint32_t set;
@@ -131,7 +130,7 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
     CallInst *sample_call;
   };
 
-  // The common valid parameter info across all the callers seen soo far.
+  // The common valid parameter info across all the callers seen so far.
   ParamInfo common;
   bool seen_one = false;
 
