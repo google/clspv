@@ -258,10 +258,14 @@ Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
   return nullptr;
 }
 
+// 'Values' is expected to contain elements that will compose arrays of type
+// 'Ty'.
+// 'Values' is also the output of this function, containing arrays of type 'Ty'.
 void InsertInArray(IRBuilder<> &Builder, ArrayType *Ty,
                    SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
   unsigned ArrayNumEles = Ty->getNumElements();
+  assert(Ty->getElementType() == Values[0]->getType());
   assert(Values.size() % ArrayNumEles == 0);
   unsigned NumArrays = Values.size() / ArrayNumEles;
   for (unsigned i = 0; i < NumArrays; i++) {
@@ -274,14 +278,16 @@ void InsertInArray(IRBuilder<> &Builder, ArrayType *Ty,
   Values.resize(NumArrays);
 }
 
+// 'Values' is expected to contain vectors.
+// 'Values is also the output of this function, containing all the elements of
+// the input vectors.
 void ExtractFromVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_VALUES(Values);
   SmallVector<Value *, 8> ScalarValues;
   Type *ValueTy = Values[0]->getType();
   assert(ValueTy->isVectorTy());
   for (unsigned i = 0; i < Values.size(); i++) {
-    for (unsigned j = 0; j < cast<FixedVectorType>(ValueTy)->getNumElements();
-         j++) {
+    for (unsigned j = 0; j < GetNumEle(ValueTy); j++) {
       ScalarValues.push_back(Builder.CreateExtractElement(Values[i], j));
     }
   }
@@ -289,13 +295,16 @@ void ExtractFromVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
   Values = std::move(ScalarValues);
 }
 
+// 'Values' is expected to contain arrays.
+// 'Values is also the output of this function, containing all the elements of
+// the input arrays.
 void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_VALUES(Values);
   SmallVector<Value *, 8> ScalarValues;
   Type *ValueTy = Values[0]->getType();
   assert(ValueTy->isArrayTy());
   for (unsigned i = 0; i < Values.size(); i++) {
-    for (unsigned j = 0; j < cast<ArrayType>(ValueTy)->getNumElements(); j++) {
+    for (unsigned j = 0; j < GetNumEle(ValueTy); j++) {
       ScalarValues.push_back(Builder.CreateExtractValue(Values[i], j));
     }
   }
@@ -316,6 +325,8 @@ Type *getNTy(IRBuilder<> &Builder, unsigned N, Type *TargetTy) {
 
 // Convert all elements of 'Values' into 'Ty' using 'ConvertValue'.
 // Expect all values to have the same type;
+// 'Values' is also the output of this function, containing all bitcasted
+// values.
 void BitcastValues(IRBuilder<> &Builder, Type *Ty,
                    SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -333,6 +344,8 @@ void BitcastValues(IRBuilder<> &Builder, Type *Ty,
 
 // Bitcast 'Values' into a vector type with 'NumElePerVec' elements, but with
 // the same global size as before.
+// 'Values' is also the output of this function, containing all bitcasted
+// values.
 void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
                        unsigned NumElePerVec, Type *Ty) {
   DEBUG_FCT_VALUES(Values);
@@ -340,13 +353,14 @@ void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
   unsigned SrcSize = SizeInBits(Builder, SrcTy);
   assert(SrcSize % NumElePerVec == 0);
   unsigned SrcEleSize = SrcSize / NumElePerVec;
-  VectorType *DstTy = FixedVectorType::get(
-      getNTy(Builder, SrcEleSize, GetEleType(Ty)), NumElePerVec);
+  VectorType *DstTy =
+      FixedVectorType::get(getNTy(Builder, SrcEleSize, Ty), NumElePerVec);
   BitcastValues(Builder, DstTy, Values);
 }
 
 // 'Values' is expected to contain scalar values.
 // Group those values in vector of size 'NumElePerVec'.
+// Return the vectors into 'Values'.
 void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
                                  SmallVector<Value *, 8> &Values,
                                  unsigned NumElePerVec) {
@@ -370,11 +384,12 @@ void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
 
 // 'Values' is expected to contain an even number of vectors of 2 elements.
 // Group them into vectors of 4 elements using shuffles.
+// Return the vectors into 'Values'.
 void GroupVectorValuesInPair(IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_VALUES(Values);
   assert(Values[0]->getType()->isVectorTy() &&
-         cast<FixedVectorType>(Values[0]->getType())->getNumElements() == 2);
+         GetNumEle(Values[0]->getType()) == 2);
   assert(Values.size() % 2 == 0);
   unsigned NewValuesSize = Values.size() / 2;
 
@@ -388,6 +403,7 @@ void GroupVectorValuesInPair(IRBuilder<> &Builder,
 
 // 'Values' is expected to contain vectors of 4 elements.
 // Split them into vectors of 2 elements using shuffles.
+// Return the splitted values into 'Values'.
 void SplitVectorValuesInPair(IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values, Type *Ty) {
   DEBUG_FCT_VALUES(Values);
@@ -408,7 +424,8 @@ void SplitVectorValuesInPair(IRBuilder<> &Builder,
 
 // Split 'Values' until the element size of the vector is equal to the size of
 // 'Ty'.
-// 'Values' is expected to contains vectors.
+// 'Values' is expected to contain vectors.
+// Return the splitted values into 'Values'.
 void SplitVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
                                    SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -440,7 +457,8 @@ void SplitVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
 }
 
 // Split 'Values' until the size of the vector is equal to the size of 'Ty'.
-// 'Values' is expected to contains vectors.
+// 'Values' is expected to contain vectors.
+// Return the splitted values into 'Values'.
 void SplitVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
                                 SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -469,7 +487,8 @@ void SplitVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
 
 // Group 'Values' until the element size of the vector is equal to the size of
 // 'Ty'.
-// 'Values' is expected to contains vectors.
+// 'Values' is expected to contain vectors.
+// Return the grouped values into 'Values'.
 void GroupVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
                                    SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_VALUES(Values);
@@ -496,7 +515,8 @@ void GroupVectorUntilEleSizeEquals(Type *Ty, IRBuilder<> &Builder,
 }
 
 // Group 'Values' until the size of the vector is equal to the size of 'Ty'.
-// 'Values' is expected to contains vectors.
+// 'Values' is expected to contain vectors.
+// Return the grouped values into 'Values'.
 void GroupVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
                                 SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_VALUES(Values);
@@ -522,6 +542,8 @@ void GroupVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
+// 'Values' is expected to contain vectors.
+// Return the converted vectors of type 'Ty' into 'Values'.
 void ConvertVectorIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -560,6 +582,8 @@ void ConvertVectorIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
   BitcastValues(Builder, Ty, Values);
 }
 
+// 'Values' is expected to contain vectors.
+// Return the scalar values of type 'Ty' into 'Values'.
 void ConvertVectorIntoScalar(Type *Ty, IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -577,9 +601,11 @@ void ConvertVectorIntoScalar(Type *Ty, IRBuilder<> &Builder,
 
   if (ValueEleSize > TySize) {
     SplitVectorUntilEleSizeEquals(Ty, Builder, Values);
+    // Bitcasting before the extraction reduces the number of bitcast
     BitcastIntoVector(Builder, Values, GetNumEle(Values[0]->getType()), Ty);
     ExtractFromVector(Builder, Values);
   } else if (ValueEleSize == TySize) {
+    // Bitcasting before the extraction reduces the number of bitcast
     BitcastIntoVector(Builder, Values, ValueNumEle, Ty);
     ExtractFromVector(Builder, Values);
   } else {
@@ -595,6 +621,8 @@ void ConvertVectorIntoScalar(Type *Ty, IRBuilder<> &Builder,
   BitcastValues(Builder, Ty, Values);
 }
 
+// 'Values' is expected to contain scalar elements.
+// Return the vectors values of type 'Ty' into 'Values'.
 void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -615,6 +643,7 @@ void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
   } else if (TySize < ValueSize) {
     assert(ValueSize % TySize == 0);
     unsigned NumElements = std::min(ValueSize / TySize, (unsigned)4);
+    // Bitcasting before splitting reduces the number of bitcast
     BitcastIntoVector(Builder, Values, NumElements, Ty);
     SplitVectorUntilSizeEquals(Ty, Builder, Values);
   }
@@ -622,6 +651,8 @@ void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
   BitcastValues(Builder, Ty, Values);
 }
 
+// 'Values' is expected to contain scalar elements.
+// Return the scalar values of type 'Ty' into 'Values'.
 void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -651,6 +682,10 @@ void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
   BitcastValues(Builder, Ty, Values);
 }
 
+// Convert values contained in 'Values' into values of type 'Ty'.
+// Input values are expected to be either vectors or scalars.
+// 'Ty' is expected to be either a vector, an array or a scalar type.
+// Return the converted values into 'Values'.
 void ConvertInto(Type *Ty, IRBuilder<> &Builder,
                  SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
@@ -692,7 +727,7 @@ Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val) {
 }
 
 Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val) {
-  if (mul == 1){
+  if (mul == 1) {
     return Val;
   }
   if (IsPowerOfTwo(mul)) {
@@ -716,6 +751,8 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
 // 'Val' is expected to be a vector.
 // 'Idx' is the index where to extract the subvector, but in the casted type
 // coordinate. If null, just extract from the origin of the vector.
+// At the end of the function, 'Idx' has been updated with the potential
+// reminder of the index to get to the expected element.
 Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
                         unsigned DstSize) {
   LLVM_DEBUG(
@@ -745,6 +782,10 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
   return Val;
 }
 
+// 'Values' is expected to contain either vectors or scalars.
+// At the end of the function, 'Idx' has been updated with the potential
+// reminder of the index to get to the expected element.
+// Return the sub element into the first element of 'Values'.
 void ExtractSubElementUntilEleSizeLE(Type *Ty, IRBuilder<> &Builder,
                                      SmallVector<Value *, 8> &Values,
                                      Value *&Idx) {
@@ -783,6 +824,9 @@ void ExtractSubElementUntilEleSizeLE(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
+// 'Val' is expected to be a vector.
+// At the end of the function, 'Idx' has been updated with the potential
+// reminder of the index to get to the expected element.
 Value *ExtractElementOrSubVector(Type *Ty, IRBuilder<> &Builder, Value *Val,
                                  Value *&Idx) {
   Type *ValueTy = Val->getType();
@@ -804,6 +848,9 @@ Value *ExtractElementOrSubVector(Type *Ty, IRBuilder<> &Builder, Value *Val,
   return Val;
 }
 
+// 'Values' is expected to contain only 1 element.
+// This element should either be a vector or a scalar.
+// Return the sub element of type 'Ty' into the first element of 'Values'.
 void ExtractSubElement(Type *Ty, IRBuilder<> &Builder, Value *Idx,
                        SmallVector<Value *, 8> &Values) {
   LLVM_DEBUG(
@@ -937,12 +984,12 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
   // If the output is a vec3 let's consider that the output is a vec4.
   bool IsVec3 = DstTy->isVectorTy() && GetNumEle(DstTy) == 3;
 
-  // Because the vec3 lowering pass is run before this one, we should not have a vec3
-  // src; however, it seems that some llvm passes after vec3 lowering can produce a new
-  // vec3. At the moment the only case known is to produce a vec3 that will be
-  // bitcast to another vec3 whose elements have the same size as the src vec3. In
-  // that particular case, just keep the vec3 as we only need to bitcast them,
-  // which will be handled correctly by this pass.
+  // Because the vec3 lowering pass is run before this one, we should not have a
+  // vec3 src; however, it seems that some llvm passes after vec3 lowering can
+  // produce a new vec3. At the moment the only case known is to produce a vec3
+  // that will be bitcast to another vec3 whose elements have the same size as
+  // the src vec3. In that particular case, just keep the vec3 as we only need
+  // to bitcast them, which will be handled correctly by this pass.
   IsVec3 &= !(SrcTy->isVectorTy() && GetNumEle(SrcTy) == 3 &&
               SrcEleTyBitWidth == DstEleTyBitWidth);
 
