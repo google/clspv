@@ -236,8 +236,7 @@ bool Builtins::FunctionInfo::GetFromMangledNameCheck(
       // handle duplicate param_type. Comes in two flavours:
       // S_ and S#_.
       char p1 = mangled_name[pos + 1];
-      char p2 = mangled_name[pos + 2];
-      if (p1 != '_' && p2 != '_') {
+      if (p1 != '_' && (mangled_name[pos + 2] != '_')) {
         return false;
       }
       pos += p1 == '_' ? 2 : 3;

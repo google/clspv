@@ -222,6 +222,7 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       break;
     }
   } else if (value->getType()->isPointerTy()) {
+    // This can occur for instructions such as address space cast.
     ResultType final_res = ResultType::kNotImage;
     Type *new_ty = nullptr;
     for (auto &U : value->uses()) {
