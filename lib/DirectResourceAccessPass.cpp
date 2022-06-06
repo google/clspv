@@ -103,6 +103,11 @@ bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   return Changed;
 }
 
+// Rewrites, if possible, all the arg_index'th arg to all callers to 'fn',
+// to replace passing the resource by pointer argument to directly accessing
+// the underlying global variable for the resource.  This is only possible
+// when all callers call 'fn' with the same underlying resource variable.
+// Returns true if a change was made.
 bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
                                                             int arg_index,
                                                             Argument &arg) {
@@ -116,22 +121,29 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   // such a thing (where the GEP can only have zero indices).
   struct ParamInfo {
     // The base value. It is either a global variable or a resource-access
-    // builtin function. (@clspv.resource.var.* or @clspv.local.var.*)
+    // builtin function (clspv.resource.var.* or clspv.local.var.*).
     Value *base;
     // The descriptor set.
     uint32_t set;
     // The binding.
     uint32_t binding;
-    // If the parameter is a GEP, then this is the number of zero-indices
+    // If base is a resource, then this is the resource type.
+    // If base is a pointer-to-local, then this is the array type.
+    // If base is a global value, then this is the value type (the type stored
+    // in the global value).
+    Type *pointee_type;
+    // If the call parameter is a GEP, then this is the number of zero-indices
     // the GEP used.
     unsigned num_gep_zeroes;
-    // An example call fitting
+    // A sample call using this function argument as the resource described
+    // above.
     CallInst *sample_call;
   };
-  // The common valid parameter info across all the callers seen soo far.
 
-  bool seen_one = false;
+  // The common valid parameter info across all the callers seen so far.
   ParamInfo common;
+  bool seen_one = false;
+
   // Tries to merge the given parameter info into |common|.  If it is the first
   // time we've tried, then save it.  Returns true if there is no conflict.
   auto merge_param_info = [&seen_one, &common](const ParamInfo &pi) {
@@ -151,6 +163,8 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
       // We care about two cases:
       //     - a direct call to clspv.resource.var.*
       //     - a GEP with only zero indices, where the base pointer is
+      //       direct call to @clspv.resource.var.* or clspv.local.var.*,
+      //       or is a global value for a workgroup variable.
 
       // Unpack GEPs with zeros, if we can.  Rewrite |value| as we go along.
       unsigned num_gep_zeroes = 0;
@@ -177,19 +191,26 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
           const auto binding = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          if (!merge_param_info({callee, set, binding, num_gep_zeroes, call}))
+          auto *resource_type = call->getOperand(6)->getType();
+          if (!merge_param_info(
+                  {callee, set, binding, resource_type, num_gep_zeroes, call}))
             return false;
         } else if (func_info.getType() == clspv::Builtins::kClspvLocal) {
           const uint32_t spec_id = uint32_t(
               dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          if (!merge_param_info({callee, spec_id, 0, num_gep_zeroes, call}))
+          auto *array_ty = call->getOperand(1)->getType();
+          if (!merge_param_info(
+                  {callee, spec_id, 0, array_ty, num_gep_zeroes, call}))
             return false;
         } else {
           // A call but not to a resource access builtin function.
           return false;
         }
-      } else if (isa<GlobalValue>(value)) {
-        if (!merge_param_info({value, 0, 0, num_gep_zeroes, nullptr}))
+      } else if (auto *gv = dyn_cast<GlobalValue>(value)) {
+        // This occurs when there a __local variable is declared inside a
+        // function. (Are there other times?)
+        if (!merge_param_info(
+                {value, 0, 0, gv->getValueType(), num_gep_zeroes, nullptr}))
           return false;
       } else {
         // Not a call.
@@ -237,8 +258,8 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
     }
     // Builder.CreateGEP is not used to avoid creating a GEPConstantExpr in the
     // case of global variables.
-    replacement = GetElementPtrInst::Create(
-        replacement->getType()->getPointerElementType(), replacement, zeroes);
+    replacement =
+        GetElementPtrInst::Create(common.pointee_type, replacement, zeroes);
     Builder.Insert(cast<Instruction>(replacement));
     if (ShowDRA) {
       outs() << "DRA:    Replace: gep  " << *replacement << "\n";
