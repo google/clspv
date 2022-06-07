@@ -2,11 +2,11 @@
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image2d_array_ro_t.float.sampled]] = type opaque
-; CHECK-DAG: declare spir_func <4 x float> @_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, <4 x float>) [[ATTRS1:#[0-9]+]]
-; CHECK-DAG: declare spir_func i32 @_Z15get_image_width20ocl_image2d_array_ro.[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
+; CHECK-DAG: declare spir_func <4 x float> @_Z11read_imagef39[[IMAGE]]11ocl_samplerDv4_f(%[[IMAGE]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, <4 x float>) [[ATTRS1:#[0-9]+]]
+; CHECK-DAG: declare spir_func i32 @_Z15get_image_width39[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
 ; CHECK: define spir_kernel void @read_float
-; CHECK: call spir_func <4 x float> @_Z11read_imagef20ocl_image2d_array_ro11ocl_samplerDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
-; CHECK: call spir_func i32 @_Z15get_image_width20ocl_image2d_array_ro.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func <4 x float> @_Z11read_imagef39[[IMAGE]]11ocl_samplerDv4_f(%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func i32 @_Z15get_image_width39[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
 ; CHECK-DAG: attributes [[ATTRS1]] = { convergent nounwind }
 ; CHECK-DAG: attributes [[ATTRS2]] = { nounwind }
 

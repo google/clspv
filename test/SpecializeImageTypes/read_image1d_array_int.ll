@@ -2,9 +2,9 @@
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image1d_array_ro_t.int.sampled]] = type opaque
-; CHECK: declare spir_func <4 x i32> @_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_f.[[IMAGE]](%[[IMAGE]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, <2 x float>) [[ATTRS:#[0-9]+]]
+; CHECK: declare spir_func <4 x i32> @_Z11read_imagei37[[IMAGE]]11ocl_samplerDv2_f(%[[IMAGE]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, <2 x float>) [[ATTRS:#[0-9]+]]
 ; CHECK: define spir_kernel void @read_int
-; CHECK: call spir_func <4 x i32> @_Z11read_imagei20ocl_image1d_array_ro11ocl_samplerDv2_f.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func <4 x i32> @_Z11read_imagei37[[IMAGE]]11ocl_samplerDv2_f(%[[IMAGE]] addrspace(1)* %image
 ; CHECK: attributes [[ATTRS]] = { convergent nounwind }
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

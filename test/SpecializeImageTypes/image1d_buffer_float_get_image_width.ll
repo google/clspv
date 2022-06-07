@@ -2,11 +2,11 @@
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image1d_buffer_wo_t.float]] = type opaque
-; CHECK-DAG: declare spir_func void @_Z12write_imagef21ocl_image1d_buffer_woiDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)*, i32, <4 x float>) [[ATTRS1:#[0-9]+]]
-; CHECK-DAG: declare spir_func i32 @_Z15get_image_width21ocl_image1d_buffer_wo.[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
+; CHECK-DAG: declare spir_func void @_Z12write_imagef32[[IMAGE]]iDv4_f(%[[IMAGE]] addrspace(1)*, i32, <4 x float>) [[ATTRS1:#[0-9]+]]
+; CHECK-DAG: declare spir_func i32 @_Z15get_image_width32[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
 ; CHECK: define spir_kernel void @write_float
-; CHECK: call spir_func void @_Z12write_imagef21ocl_image1d_buffer_woiDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
-; CHECK: call spir_func i32 @_Z15get_image_width21ocl_image1d_buffer_wo.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image)
+; CHECK: call spir_func void @_Z12write_imagef32[[IMAGE]]iDv4_f(%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func i32 @_Z15get_image_width32[[IMAGE]](%[[IMAGE]] addrspace(1)* %image)
 ; CHECK-DAG: attributes [[ATTRS1]] = { convergent nounwind }
 ; CHECK-DAG: attributes [[ATTRS2]] = { convergent nobuiltin nounwind readonly }
 

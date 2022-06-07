@@ -2,11 +2,11 @@
 ; RUN: FileCheck %s < %t
 
 ; CHECK: %[[IMAGE:opencl.image3d_wo_t.float]] = type opaque
-; CHECK: declare spir_func i32 @_Z16get_image_height14ocl_image3d_wo.[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS:#[0-9]+]]
-; CHECK: declare spir_func void @_Z12write_imagef14ocl_image3d_woDv4_iDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)*, <4 x i32>, <4 x float>) [[ATTRS]]
+; CHECK: declare spir_func i32 @_Z16get_image_height25[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS:#[0-9]+]]
+; CHECK: declare spir_func void @_Z12write_imagef25[[IMAGE]]Dv4_iDv4_f(%[[IMAGE]] addrspace(1)*, <4 x i32>, <4 x float>) [[ATTRS]]
 ; CHECK: define spir_kernel void @write_float
-; CHECK: call spir_func void @_Z12write_imagef14ocl_image3d_woDv4_iDv4_f.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
-; CHECK: call spir_func i32 @_Z16get_image_height14ocl_image3d_wo.[[IMAGE]](%[[IMAGE]] addrspace(1)* %image)
+; CHECK: call spir_func void @_Z12write_imagef25[[IMAGE]]Dv4_iDv4_f(%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func i32 @_Z16get_image_height25[[IMAGE]](%[[IMAGE]] addrspace(1)* %image)
 ; CHECK: attributes [[ATTRS]] = { convergent nounwind }
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
