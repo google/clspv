@@ -188,7 +188,13 @@ if(ENABLE_CLSPV_TOOLS_INSTALL)
   install(
     FILES
       ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/AddressSpace.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/ArgKind.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Compiler.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Option.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Passes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/PushConstant.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Sampler.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/SpecConstant.h
     DESTINATION
       ${CMAKE_INSTALL_INCLUDEDIR}/clspv/)
 endif(ENABLE_CLSPV_TOOLS_INSTALL)
