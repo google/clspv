@@ -12,16 +12,16 @@ target triple = "spir-unknown-unknown"
 
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
-declare spir_func void @_Z12write_imagei14ocl_image2d_woDv2_iDv4_j.opencl.image2d_wo_t.int(%opencl.image2d_wo_t.int addrspace(1)*, <2 x i32>, <4 x i32>)
+declare spir_func void @_Z12write_imagei23opencl.image2d_wo_t.intDv2_iDv4_j(%opencl.image2d_wo_t.int addrspace(1)*, <2 x i32>, <4 x i32>)
 
 define spir_kernel void @foo(%opencl.image2d_wo_t.int addrspace(1)* %i)!clspv.pod_args_impl !8 {
 entry:
-  %0 = call %opencl.image2d_wo_t.int addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 7, i32 0, i32 0, i32 0)
-  tail call spir_func void @_Z12write_imagei14ocl_image2d_woDv2_iDv4_j.opencl.image2d_wo_t.int(%opencl.image2d_wo_t.int addrspace(1)* %0, <2 x i32> zeroinitializer, <4 x i32> zeroinitializer)
+  %0 = call %opencl.image2d_wo_t.int addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 7, i32 0, i32 0, i32 0, %opencl.image2d_wo_t.int zeroinitializer)
+  tail call spir_func void @_Z12write_imagei23opencl.image2d_wo_t.intDv2_iDv4_j(%opencl.image2d_wo_t.int addrspace(1)* %0, <2 x i32> zeroinitializer, <4 x i32> zeroinitializer)
   ret void
 }
 
-declare %opencl.image2d_wo_t.int addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare %opencl.image2d_wo_t.int addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, %opencl.image2d_wo_t.int)
 
 !8 = !{i32 2}
 

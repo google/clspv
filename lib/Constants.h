@@ -23,6 +23,27 @@ namespace clspv {
 // Name for module level metadata storing workgroup argument spec ids.
 const std::string &LocalSpecIdMetadataName();
 
+enum ClspvOperand {
+  // Operands for workgroup variables.
+  kWorkgroupSpecId = 0,
+  kWorkgroupDataType = 1,
+
+  // Operands for resource variables.
+  kResourceDescriptorSet = 0,
+  kResourceBinding = 1,
+  kResourceArgKind = 2,
+  kResourceArgIndex = 3,
+  kResourceDiscriminantIndex = 4,
+  kResourceCoherent = 5,
+  kResourceDataType = 6,
+
+  // Operands for literal samplers.
+  kSamplerDescriptorSet = 0,
+  kSamplerBinding = 1,
+  kSamplerParams = 2,
+  kSamplerDataType = 3,
+};
+
 // Base name for workgroup variable accessor function.
 const std::string &WorkgroupAccessorFunction();
 

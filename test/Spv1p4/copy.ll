@@ -27,14 +27,14 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo(%struct.S addrspace(1)* %out) !clspv.pod_args_impl !1 {
 entry:
-  %res = call { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1)
+  %res = call { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, { [0 x %struct.S] } zeroinitializer)
   %gep_out = getelementptr { [0 x %struct.S] }, { [0 x %struct.S] } addrspace(1)* %res, i32 0, i32 0, i32 0
   %gep_mem = getelementptr [16 x %struct.S], [16 x %struct.S] addrspace(3)* @foo.mem, i32 0, i32 0
   call void @_Z17spirv.copy_memory.1(%struct.S addrspace(1)* %gep_out, %struct.S addrspace(3)* %gep_mem, i32 16, i32 16, i32 0)
   ret void
 }
 
-declare { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x %struct.S] })
 
 declare void @_Z17spirv.copy_memory.1(%struct.S addrspace(1)*, %struct.S addrspace(3)*, i32, i32, i32)
 

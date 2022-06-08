@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "Builtins.h"
+#include "Constants.h"
 #include "Types.h"
 #include "spirv/unified1/spirv.hpp"
 
@@ -57,9 +58,17 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     switch (info.getType()) {
     case clspv::Builtins::kClspvSamplerVarLiteral:
+      return CacheType(
+          call->getArgOperand(clspv::ClspvOperand::kSamplerDataType)
+              ->getType());
     case clspv::Builtins::kClspvResource:
+      return CacheType(
+          call->getArgOperand(clspv::ClspvOperand::kResourceDataType)
+              ->getType());
     case clspv::Builtins::kClspvLocal:
-      return CacheType(call->getArgOperand(call->arg_size() - 1)->getType());
+      return CacheType(
+          call->getArgOperand(clspv::ClspvOperand::kWorkgroupDataType)
+              ->getType());
     default:
       break;
     }

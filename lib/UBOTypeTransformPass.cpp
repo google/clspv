@@ -295,18 +295,15 @@ bool clspv::UBOTypeTransformPass::RemapGlobalVariables(
     SmallVectorImpl<GlobalVariable *> *variables_to_modify, Module &M) {
   bool changed = false;
   for (auto &GV : M.globals()) {
-    if (auto *ptr_ty = dyn_cast<PointerType>(GV.getType())) {
-      auto *remapped = RebuildType(ptr_ty->getNonOpaquePointerElementType(), M);
-      if (ptr_ty->getNonOpaquePointerElementType() != remapped) {
-        changed = true;
-        variables_to_modify->push_back(&GV);
-      }
+    auto *remapped = RebuildType(GV.getValueType(), M);
+    if (remapped != GV.getValueType()) {
+      changed = true;
+      variables_to_modify->push_back(&GV);
     }
   }
   for (auto *GV : *variables_to_modify) {
     GV->removeFromParent();
-    auto *replacement_type =
-        RebuildType(GV->getType()->getPointerElementType(), M);
+    auto *replacement_type = RebuildType(GV->getValueType(), M);
 
     Constant *initializer = nullptr;
     if (auto old_init = GV->getInitializer()) {
@@ -332,7 +329,7 @@ bool clspv::UBOTypeTransformPass::RemapUser(User *user, Module &M) {
   bool changed = RemapValue(user, M);
 
   for (Use &use : user->operands()) {
-    User *operand_user = use.getUser();
+    User *operand_user = dyn_cast<User>(use.get());
     if (!operand_user) {
       changed |= RemapValue(use.get(), M);
     } else if (!isa<Instruction>(operand_user) &&

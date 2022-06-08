@@ -12,21 +12,21 @@ target triple = "spir-unknown-unknown"
 
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
-declare spir_func <4 x i32> @_Z12read_imageui14ocl_image2d_rwDv2_i.opencl.image2d_rw_t.uint(%opencl.image2d_rw_t.uint addrspace(1)*, <2 x i32>)
+declare spir_func <4 x i32> @_Z12read_imageui24opencl.image2d_rw_t.uintDv2_i(%opencl.image2d_rw_t.uint addrspace(1)*, <2 x i32>)
 
 define spir_kernel void @foo(<4 x i32> addrspace(1)* nocapture %out, %opencl.image2d_rw_t.uint addrspace(1)* %i) !clspv.pod_args_impl !11 {
 entry:
-  %0 = call { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %0 = call { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x <4 x i32>] } zeroinitializer)
   %1 = getelementptr { [0 x <4 x i32>] }, { [0 x <4 x i32>] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call %opencl.image2d_rw_t.uint addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0)
-  %call = tail call spir_func <4 x i32> @_Z12read_imageui14ocl_image2d_rwDv2_i.opencl.image2d_rw_t.uint(%opencl.image2d_rw_t.uint addrspace(1)* %2, <2 x i32> zeroinitializer)
+  %2 = call %opencl.image2d_rw_t.uint addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, %opencl.image2d_rw_t.uint zeroinitializer)
+  %call = tail call spir_func <4 x i32> @_Z12read_imageui24opencl.image2d_rw_t.uintDv2_i(%opencl.image2d_rw_t.uint addrspace(1)* %2, <2 x i32> zeroinitializer)
   store <4 x i32> %call, <4 x i32> addrspace(1)* %1, align 16
   ret void
 }
 
-declare { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x <4 x i32>] })
 
-declare %opencl.image2d_rw_t.uint addrspace(1)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32)
+declare %opencl.image2d_rw_t.uint addrspace(1)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, %opencl.image2d_rw_t.uint)
 
 !11 = !{i32 2}
 

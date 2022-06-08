@@ -18,9 +18,9 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @sample_test(i64 addrspace(1)* nocapture %result, { i64, i64 } %podargs) !clspv.pod_args_impl !4 !kernel_arg_map !9 {
 entry:
-  %0 = call { [0 x i64] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %0 = call { [0 x i64] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i64] } zeroinitializer)
   %1 = getelementptr { [0 x i64] }, { [0 x i64] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call { { i64, i64 } } addrspace(6)* @_Z14clspv.resource.1(i32 0, i32 1, i32 4, i32 1, i32 1, i32 0)
+  %2 = call { { i64, i64 } } addrspace(6)* @_Z14clspv.resource.1(i32 0, i32 1, i32 4, i32 1, i32 1, i32 0, { { i64, i64 } } zeroinitializer)
   %3 = getelementptr { { i64, i64 } }, { { i64, i64 } } addrspace(6)* %2, i32 0, i32 0
   %4 = load { i64, i64 }, { i64, i64 } addrspace(6)* %3, align 8
   %arg0 = extractvalue { i64, i64 } %4, 0
@@ -30,9 +30,9 @@ entry:
   ret void
 }
 
-declare { [0 x i64] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x i64] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i64] })
 
-declare { { i64, i64 } } addrspace(6)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32)
+declare { { i64, i64 } } addrspace(6)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, { { i64, i64 } })
 
 !clspv.descriptor.index = !{!4}
 

@@ -19,13 +19,13 @@ entry:
 
 define dso_local spir_kernel void @test(i32 addrspace(1)* nocapture %out) local_unnamed_addr !clspv.pod_args_impl !8 {
 entry:
-  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0)
+  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %0, i32 0, i32 0, i32 3
   tail call spir_func void @func(i32 addrspace(1)* %1)
   ret void
 }
 
-declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
 
 !clspv.descriptor.index = !{!4}
 

@@ -13,20 +13,20 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo(i32 addrspace(3)* %data) !clspv.pod_args_impl !1 !reqd_work_group_size !2 {
 entry:
-  %0 = call [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32 3)
+  %0 = call [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32 3, [0 x i32] zeroinitializer)
   %gep = getelementptr [0 x i32], [0 x i32] addrspace(3)* %0, i32 0, i32 0
   ret void
 }
 
 define spir_kernel void @bar(float addrspace(3)* %data) !clspv.pod_args_impl !1 !reqd_work_group_size !2 {
 entry:
-  %0 = call [0 x float] addrspace(3)* @_Z11clspv.local.4(i32 4)
+  %0 = call [0 x float] addrspace(3)* @_Z11clspv.local.4(i32 4, [0 x float] zeroinitializer)
   %gep = getelementptr [0 x float], [0 x float] addrspace(3)* %0, i32 0, i32 0
   ret void
 }
 
-declare [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32)
-declare [0 x float] addrspace(3)* @_Z11clspv.local.4(i32)
+declare [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32, [0 x i32])
+declare [0 x float] addrspace(3)* @_Z11clspv.local.4(i32, [0 x float])
 
 !_Z20clspv.local_spec_ids = !{!3, !4}
 !clspv.next_spec_constant_id = !{!5}
