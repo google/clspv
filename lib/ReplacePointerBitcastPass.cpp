@@ -784,7 +784,7 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
 
 // 'Values' is expected to contain either vectors or scalars.
 // At the end of the function, 'Idx' has been updated with the potential
-// reminder of the index to get to the expected element.
+// remainder of the index to get to the expected element.
 // Return the sub element into the first element of 'Values'.
 void ExtractSubElementUntilEleSizeLE(Type *Ty, IRBuilder<> &Builder,
                                      SmallVector<Value *, 8> &Values,
