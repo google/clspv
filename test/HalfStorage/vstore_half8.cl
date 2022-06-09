@@ -51,10 +51,15 @@ __kernel void test(__global half *a, float8 b, int c) {
 // CHECK: [[cx8:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[c]] [[uint_3]]
 
 // CHECK: [[b0123h:%[^ ]+]] = OpBitcast [[half4]] [[b0123f]]
+// CHECK: [[b4567h:%[^ ]+]] = OpBitcast [[half4]] [[b4567f]]
 // CHECK: [[b0h:%[^ ]+]] = OpCompositeExtract [[half]] [[b0123h]] 0
 // CHECK: [[b1h:%[^ ]+]] = OpCompositeExtract [[half]] [[b0123h]] 1
 // CHECK: [[b2h:%[^ ]+]] = OpCompositeExtract [[half]] [[b0123h]] 2
 // CHECK: [[b3h:%[^ ]+]] = OpCompositeExtract [[half]] [[b0123h]] 3
+// CHECK: [[b4h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 0
+// CHECK: [[b5h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 1
+// CHECK: [[b6h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 2
+// CHECK: [[b7h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 3
 
 // CHECK: [[addr0:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint_0]] [[cx8]]
 // CHECK: OpStore [[addr0]] [[b0h]]
@@ -67,13 +72,6 @@ __kernel void test(__global half *a, float8 b, int c) {
 // CHECK: [[idx3:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx8]] [[uint_3]]
 // CHECK: [[addr3:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint_0]] [[idx3]]
 // CHECK: OpStore [[addr3]] [[b3h]]
-
-// CHECK: [[b4567h:%[^ ]+]] = OpBitcast [[half4]] [[b4567f]]
-// CHECK: [[b4h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 0
-// CHECK: [[b5h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 1
-// CHECK: [[b6h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 2
-// CHECK: [[b7h:%[^ ]+]] = OpCompositeExtract [[half]] [[b4567h]] 3
-
 // CHECK: [[idx4:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx8]] [[uint_4]]
 // CHECK: [[addr4:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint_0]] [[idx4]]
 // CHECK: OpStore [[addr4]] [[b4h]]

@@ -30,12 +30,12 @@ __kernel void test(__global half *a, float4 b, int c) {
 
 // CHECK: [[val_int2:%[^ ]+]] = OpCompositeConstruct [[uint2]] [[val1_int]] [[val2_int]]
 // CHECK: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[c]] [[uint_2]]
-// CHECK: [[val_half4:%[^ ]+]] = OpBitcast [[half4]] [[val_int2]]
+// CHECK: [[bitcast:%[^ ]+]] = OpBitcast [[half4]] [[val_int2]]
 
-// CHECK: [[val1:%[^ ]+]] = OpCompositeExtract [[half]] [[val_half4]] 0
-// CHECK: [[val2:%[^ ]+]] = OpCompositeExtract [[half]] [[val_half4]] 1
-// CHECK: [[val3:%[^ ]+]] = OpCompositeExtract [[half]] [[val_half4]] 2
-// CHECK: [[val4:%[^ ]+]] = OpCompositeExtract [[half]] [[val_half4]] 3
+// CHECK: [[val1:%[^ ]+]] = OpCompositeExtract [[half]] [[bitcast]] 0
+// CHECK: [[val2:%[^ ]+]] = OpCompositeExtract [[half]] [[bitcast]] 1
+// CHECK: [[val3:%[^ ]+]] = OpCompositeExtract [[half]] [[bitcast]] 2
+// CHECK: [[val4:%[^ ]+]] = OpCompositeExtract [[half]] [[bitcast]] 3
 
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint_0]] [[cx4]]
 // CHECK: OpStore [[addr1]] [[val1]]

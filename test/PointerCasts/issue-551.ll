@@ -13,10 +13,9 @@ entry:
   ; CHECK: [[val1:%[a-zA-Z0-9_]+]] = load i8, i8 addrspace(1)* [[gep1]]
   ; CHECK: [[gep2:%[a-zA-Z0-9_]+]] = getelementptr i8, i8 addrspace(1)* %in, i32 1
   ; CHECK: [[val2:%[a-zA-Z0-9_]+]] = load i8, i8 addrspace(1)* [[gep2]]
-  ; CHECK: [[extval1:%[a-zA-Z0-9_]+]] = zext i8 [[val1]] to i16
-  ; CHECK: [[extval2:%[a-zA-Z0-9_]+]] = zext i8 [[val2]] to i16
-  ; CHECK: [[shiftedval2:%[a-zA-Z0-9_]+]] = shl i16 [[extval2]], 8
-  ; CHECK: [[combinedval:%[a-zA-Z0-9_]+]] = or i16 [[extval1]], [[shiftedval2]]
-  ; CHECK: store i16 [[combinedval]], i16 addrspace(1)* %out, align 2
+  ; CHECK: [[insert1:%[^ ]+]] = insertelement <2 x i8> undef, i8 [[val1]], i32 0
+  ; CHECK: [[insert2:%[^ ]+]] = insertelement <2 x i8> [[insert1]], i8 [[val2]], i32 1
+  ; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x i8> [[insert2]] to i16
+  ; CHECK: store i16 [[bitcast]], i16 addrspace(1)* %out, align 2
   ret void
 }

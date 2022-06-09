@@ -13,10 +13,10 @@ entry:
   ret void
 }
 
-; CHECK: [[div32:%[^ ]+]] = udiv i32 %n, 32
-; CHECK: [[rem32:%[^ ]+]] = urem i32 %n, 32
-; CHECK: [[div8:%[^ ]+]] = udiv i32 [[rem32]], 8
-; CHECK: [[rem8:%[^ ]+]] = urem i32 [[rem32]], 8
+; CHECK: [[div32:%[^ ]+]] = lshr i32 %n, 5
+; CHECK: [[rem32:%[^ ]+]] = and i32 %n, 31
+; CHECK: [[div8:%[^ ]+]] = lshr i32 [[rem32]], 3
+; CHECK: [[rem8:%[^ ]+]] = and i32 [[rem32]], 7
 ; CHECK: [[gep:%[^ ]+]] = getelementptr [4 x [8 x i32]], [4 x [8 x i32]] addrspace(3)* %b, i32 [[div32]], i32 [[div8]], i32 [[rem8]]
 ; CHECK: [[ld:%[^ ]+]] = load i32, i32 addrspace(3)* [[gep]], align 4
 ; CHECK: store i32 [[ld]], i32 addrspace(1)* %a, align 4

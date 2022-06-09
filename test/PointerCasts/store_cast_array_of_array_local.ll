@@ -14,8 +14,8 @@ entry:
   ret void
 }
 
-; CHECK: [[div8:%[^ ]+]] = udiv i32 %n, 8
-; CHECK: [[rem8:%[^ ]+]] = urem i32 %n, 8
+; CHECK: [[div8:%[^ ]+]] = lshr i32 %n, 3
+; CHECK: [[rem8:%[^ ]+]] = and i32 %n, 7
 ; CHECK: [[ld:%[^ ]+]] = load i32, i32 addrspace(1)* %a, align 4
 ; CHECK: [[gep:%[^ ]+]] = getelementptr [4 x [8 x i32]], [4 x [8 x i32]]* %local, i32 0, i32 [[div8]], i32 [[rem8]]
 ; CHECK: store i32 [[ld]], i32* [[gep]], align 4

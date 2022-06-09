@@ -13,18 +13,17 @@ entry:
   ret void
 }
 
-; CHECK: [[mul_n:%[^ ]+]] = mul i32 %n, 2
-; CHECK: [[div32:%[^ ]+]] = udiv i32 [[mul_n]], 32
-; CHECK: [[rem32:%[^ ]+]] = urem i32 [[mul_n]], 32
-; CHECK: [[div8:%[^ ]+]] = udiv i32 [[rem32]], 8
-; CHECK: [[rem8:%[^ ]+]] = urem i32 [[rem32]], 8
+; CHECK: [[mul_n:%[^ ]+]] = shl i32 %n, 1
+; CHECK: [[div32:%[^ ]+]] = lshr i32 [[mul_n]], 5
+; CHECK: [[rem32:%[^ ]+]] = and i32 [[mul_n]], 31
+; CHECK: [[div8:%[^ ]+]] = lshr i32 [[rem32]], 3
+; CHECK: [[rem8:%[^ ]+]] = and i32 [[rem32]], 7
 ; CHECK: [[gep1:%[^ ]+]] = getelementptr [4 x [8 x i32]], [4 x [8 x i32]] addrspace(3)* %b, i32 [[div32]], i32 [[div8]], i32 [[rem8]]
 ; CHECK: [[ld1:%[^ ]+]] = load i32, i32 addrspace(3)* [[gep1]], align 4
 ; CHECK: [[rem8p:%[^ ]+]] = add i32 [[rem8]], 1
 ; CHECK: [[gep2:%[^ ]+]] = getelementptr [4 x [8 x i32]], [4 x [8 x i32]] addrspace(3)* %b, i32 [[div32]], i32 [[div8]], i32 [[rem8p]]
 ; CHECK: [[ld2:%[^ ]+]] = load i32, i32 addrspace(3)* [[gep2]], align 4
-; CHECK: [[zext1:%[^ ]+]] = zext i32 [[ld1]] to i64
-; CHECK: [[zext2:%[^ ]+]] = zext i32 [[ld2]] to i64
-; CHECK: [[shl:%[^ ]+]] = shl i64 [[zext2]], 32
-; CHECK: [[or:%[^ ]+]] = or i64 [[zext1]], [[shl]]
-; CHECK: store i64 [[or]], i64 addrspace(1)* %a, align 8
+; CHECK: [[ins0:%[^ ]+]] = insertelement <2 x i32> undef, i32 [[ld1]], i32 0
+; CHECK: [[ins1:%[^ ]+]] = insertelement <2 x i32> [[ins0]], i32 [[ld2]], i32 1
+; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x i32> [[ins1]] to i64
+; CHECK: store i64 [[bitcast]], i64 addrspace(1)* %a, align 8
