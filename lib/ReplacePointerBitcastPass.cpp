@@ -752,7 +752,7 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
 // 'Idx' is the index where to extract the subvector, but in the casted type
 // coordinate. If null, just extract from the origin of the vector.
 // At the end of the function, 'Idx' has been updated with the potential
-// reminder of the index to get to the expected element.
+// remainder of the index to get to the expected element.
 Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
                         unsigned DstSize) {
   LLVM_DEBUG(
