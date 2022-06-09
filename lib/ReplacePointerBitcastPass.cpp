@@ -826,7 +826,7 @@ void ExtractSubElementUntilEleSizeLE(Type *Ty, IRBuilder<> &Builder,
 
 // 'Val' is expected to be a vector.
 // At the end of the function, 'Idx' has been updated with the potential
-// reminder of the index to get to the expected element.
+// remainder of the index to get to the expected element.
 Value *ExtractElementOrSubVector(Type *Ty, IRBuilder<> &Builder, Value *Val,
                                  Value *&Idx) {
   Type *ValueTy = Val->getType();
