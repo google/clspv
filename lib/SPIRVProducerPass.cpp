@@ -2111,10 +2111,13 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
     //       @clspv.sampler.var.literal(
     //          i32 descriptor,
     //          i32 binding,
-    //          i32 (index-into-sampler-map|sampler_mask))
+    //          i32 sampler_mask,
+    //          <sampler type> zeroinitializer)
     if (auto *call = dyn_cast<CallInst>(user)) {
       const auto third_param = static_cast<unsigned>(
-          dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
+          dyn_cast<ConstantInt>(
+              call->getArgOperand(ClspvOperand::kSamplerParams))
+              ->getZExtValue());
       auto sampler_value = third_param;
       if (clspv::Option::UseSamplerMap()) {
         auto &sampler_map = *getSamplerMap();
@@ -2126,9 +2129,13 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
       }
 
       const auto descriptor_set = static_cast<unsigned>(
-          dyn_cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
+          dyn_cast<ConstantInt>(
+              call->getArgOperand(ClspvOperand::kSamplerDescriptorSet))
+              ->getZExtValue());
       const auto binding = static_cast<unsigned>(
-          dyn_cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
+          dyn_cast<ConstantInt>(
+              call->getArgOperand(ClspvOperand::kSamplerBinding))
+              ->getZExtValue());
 
       SamplerLiteralToDescriptorSetMap[sampler_value] = descriptor_set;
       SamplerLiteralToBindingMap[sampler_value] = binding;
@@ -2143,7 +2150,8 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
 
     auto call = cast<CallInst>(user);
     const unsigned third_param = static_cast<unsigned>(
-        dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
+        dyn_cast<ConstantInt>(call->getArgOperand(ClspvOperand::kSamplerParams))
+            ->getZExtValue());
 
     // Already allocated a variable for this value.
     if (!seen.insert(third_param).second)
@@ -3170,7 +3178,8 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     // Don't codegen an instruction here, but instead map this call directly
     // to the workgroup variable id.
     int spec_id = static_cast<int>(
-        cast<ConstantInt>(Call->getOperand(0))->getSExtValue());
+        cast<ConstantInt>(Call->getOperand(ClspvOperand::kWorkgroupSpecId))
+            ->getSExtValue());
     const auto &info = LocalSpecIdInfoMap[spec_id];
     RID = info.variable_id;
     break;
@@ -3179,7 +3188,8 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     // Sampler initializers become a load of the corresponding sampler.
     // Map this to a load from the variable.
     const auto third_param = static_cast<unsigned>(
-        dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue());
+        dyn_cast<ConstantInt>(Call->getArgOperand(ClspvOperand::kSamplerParams))
+            ->getZExtValue());
     auto sampler_value = third_param;
     if (clspv::Option::UseSamplerMap()) {
       sampler_value = (*getSamplerMap())[third_param].first;
@@ -5864,13 +5874,16 @@ bool SPIRVProducerPassImpl::sameResource(Value *lhs, Value *rhs) const {
       if (lhs_func_info.getType() == Builtins::kClspvResource &&
           rhs_func_info.getType() == Builtins::kClspvResource) {
         // For resource accessors, match descriptor set and binding.
-        if (lhs_call->getOperand(0) == rhs_call->getOperand(0) &&
-            lhs_call->getOperand(1) == rhs_call->getOperand(1))
+        if (lhs_call->getOperand(ClspvOperand::kResourceDescriptorSet) ==
+                rhs_call->getOperand(ClspvOperand::kResourceDescriptorSet) &&
+            lhs_call->getOperand(ClspvOperand::kResourceBinding) ==
+                rhs_call->getOperand(ClspvOperand::kResourceBinding))
           return true;
       } else if (lhs_func_info.getType() == Builtins::kClspvLocal &&
                  rhs_func_info.getType() == Builtins::kClspvLocal) {
         // For workgroup resources, match spec id.
-        if (lhs_call->getOperand(0) == rhs_call->getOperand(0))
+        if (lhs_call->getOperand(ClspvOperand::kWorkgroupSpecId) ==
+            rhs_call->getOperand(ClspvOperand::kWorkgroupSpecId))
           return true;
       }
     }
@@ -5970,7 +5983,8 @@ bool SPIRVProducerPassImpl::CalledWithCoherentResource(Argument &Arg) {
       // If this is a resource accessor function, check if the coherent operand
       // is set.
       const auto coherent =
-          unsigned(dyn_cast<ConstantInt>(resource_call->getArgOperand(5))
+          unsigned(dyn_cast<ConstantInt>(resource_call->getArgOperand(
+                                             ClspvOperand::kResourceCoherent))
                        ->getZExtValue());
       if (coherent == 1)
         return true;
