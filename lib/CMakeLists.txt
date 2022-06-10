@@ -28,6 +28,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/AllocateDescriptorsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ArgKind.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/AutoPodArgsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/BitcastUtils.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Builtins.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/CallGraphOrderedFunctions.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ClusterPodKernelArgumentsPass.cpp
