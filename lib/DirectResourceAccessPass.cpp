@@ -188,17 +188,27 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
         auto &func_info = clspv::Builtins::Lookup(callee);
         if (func_info.getType() == clspv::Builtins::kClspvResource) {
           const auto set = uint32_t(
-              dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
+              dyn_cast<ConstantInt>(
+                  call->getOperand(clspv::ClspvOperand::kResourceDescriptorSet))
+                  ->getZExtValue());
           const auto binding = uint32_t(
-              dyn_cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          auto *resource_type = call->getOperand(6)->getType();
+              dyn_cast<ConstantInt>(
+                  call->getOperand(clspv::ClspvOperand::kResourceBinding))
+                  ->getZExtValue());
+          auto *resource_type =
+              call->getOperand(clspv::ClspvOperand::kResourceDataType)
+                  ->getType();
           if (!merge_param_info(
                   {callee, set, binding, resource_type, num_gep_zeroes, call}))
             return false;
         } else if (func_info.getType() == clspv::Builtins::kClspvLocal) {
           const uint32_t spec_id = uint32_t(
-              dyn_cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          auto *array_ty = call->getOperand(1)->getType();
+              dyn_cast<ConstantInt>(
+                  call->getOperand(clspv::ClspvOperand::kWorkgroupSpecId))
+                  ->getZExtValue());
+          auto *array_ty =
+              call->getOperand(clspv::ClspvOperand::kWorkgroupDataType)
+                  ->getType();
           if (!merge_param_info(
                   {callee, spec_id, 0, array_ty, num_gep_zeroes, call}))
             return false;

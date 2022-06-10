@@ -11,13 +11,13 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo({ float, float } %podargs)!reqd_work_group_size !8 !clspv.pod_args_impl !9 !kernel_arg_map !10 {
 entry:
-  %0 = call { { float, float } } addrspace(9)* @_Z14clspv.resource.0(i32 -1, i32 0, i32 5, i32 0, i32 0, i32 0)
+  %0 = call { { float, float } } addrspace(9)* @_Z14clspv.resource.0(i32 -1, i32 0, i32 5, i32 0, i32 0, i32 0, { { float, float } } zeroinitializer)
   %1 = getelementptr { { float, float } }, { { float, float } } addrspace(9)* %0, i32 0, i32 0
   %2 = load { float, float }, { float, float } addrspace(9)* %1, align 4
   ret void
 }
 
-declare { { float, float } } addrspace(9)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { { float, float } } addrspace(9)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { { float, float } })
 
 !8 = !{i32 1, i32 1, i32 1}
 !9 = !{i32 2}

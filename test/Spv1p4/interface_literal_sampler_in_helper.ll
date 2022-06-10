@@ -17,25 +17,25 @@ target triple = "spir-unknown-unknown"
 
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
-declare <4 x float> @_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f.opencl.image2d_ro_t.float.sampled(%opencl.image2d_ro_t.float.sampled addrspace(1)*, %opencl.sampler_t addrspace(2)*, <2 x float>)
+declare <4 x float> @_Z11read_imagef33opencl.image2d_ro_t.float.sampled11ocl_samplerDv2_f(%opencl.image2d_ro_t.float.sampled addrspace(1)*, %opencl.sampler_t addrspace(2)*, <2 x float>)
 
 define void @bar(%opencl.image2d_ro_t.float.sampled addrspace(1)* %img) {
 entry:
-  %0 = call %opencl.sampler_t addrspace(2)* @_Z25clspv.sampler_var_literal(i32 0, i32 0, i32 18)
-  %1 = tail call <4 x float> @_Z11read_imagef14ocl_image2d_ro11ocl_samplerDv2_f.opencl.image2d_ro_t.float.sampled(%opencl.image2d_ro_t.float.sampled addrspace(1)* %img, %opencl.sampler_t addrspace(2)* %0, <2 x float> <float 1.000000e+00, float 2.000000e+00>)
+  %0 = call %opencl.sampler_t addrspace(2)* @_Z25clspv.sampler_var_literal(i32 0, i32 0, i32 18, %opencl.sampler_t zeroinitializer)
+  %1 = tail call <4 x float> @_Z11read_imagef33opencl.image2d_ro_t.float.sampled11ocl_samplerDv2_f(%opencl.image2d_ro_t.float.sampled addrspace(1)* %img, %opencl.sampler_t addrspace(2)* %0, <2 x float> <float 1.000000e+00, float 2.000000e+00>)
   ret void
 }
 
 define spir_kernel void @foo(%opencl.image2d_ro_t.float.sampled addrspace(1)* %img) !clspv.pod_args_impl !0 {
 entry:
-  %0 = call %opencl.image2d_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0)
+  %0 = call %opencl.image2d_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0, %opencl.image2d_ro_t.float.sampled zeroinitializer)
   call void @bar(%opencl.image2d_ro_t.float.sampled addrspace(1)* %0)
   ret void
 }
 
-declare %opencl.sampler_t addrspace(2)* @_Z25clspv.sampler_var_literal(i32, i32, i32)
+declare %opencl.sampler_t addrspace(2)* @_Z25clspv.sampler_var_literal(i32, i32, i32, %opencl.sampler_t)
 
-declare %opencl.image2d_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare %opencl.image2d_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, %opencl.image2d_ro_t.float.sampled)
 
 !0 = !{i32 2}
 

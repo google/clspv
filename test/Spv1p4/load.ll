@@ -25,13 +25,13 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo(%struct.S addrspace(1)* %in) !clspv.pod_args_impl !1 {
 entry:
-  %res = call { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1)
+  %res = call { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, { [0 x %struct.S] } zeroinitializer)
   %gep = getelementptr { [0 x %struct.S] }, { [0 x %struct.S] } addrspace(1)* %res, i32 0, i32 0, i32 0
   %ld = load %struct.S, %struct.S addrspace(1)* %gep
   ret void
 }
 
-declare { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x %struct.S] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x %struct.S] })
 
 !1 = !{i32 2}
 

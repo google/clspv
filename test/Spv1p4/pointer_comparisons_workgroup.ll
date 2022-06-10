@@ -32,12 +32,12 @@ target triple = "spir-unknown-unknown"
 
 define dso_local spir_kernel void @test(i32 addrspace(3)* readnone %ptr0, i32 addrspace(3)* readnone %ptr1, i32 addrspace(1)* nocapture %out) local_unnamed_addr !clspv.pod_args_impl !17 {
 entry:
-  %0 = call [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32 3)
+  %0 = call [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32 3, [0 x i32] zeroinitializer)
   %arg0ptr = getelementptr [0 x i32], [0 x i32] addrspace(3)* %0, i32 0, i32 0
   %arg0ptr2 = getelementptr [0 x i32], [0 x i32] addrspace(3)* %0, i32 0, i32 13
-  %1 = call [0 x i32] addrspace(3)* @_Z11clspv.local.4(i32 4)
+  %1 = call [0 x i32] addrspace(3)* @_Z11clspv.local.4(i32 4, [0 x i32] zeroinitializer)
   %arg1ptr = getelementptr [0 x i32], [0 x i32] addrspace(3)* %1, i32 0, i32 0
-  %2 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 2, i32 0, i32 0)
+  %2 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 2, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %3 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %2, i32 0, i32 0, i32 0
   %cmp = icmp ne i32 addrspace(3)* %arg0ptr, %arg1ptr
   %conv = zext i1 %cmp to i32
@@ -65,11 +65,11 @@ entry:
   ret void
 }
 
-declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32)
+declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
 
-declare [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32)
+declare [0 x i32] addrspace(3)* @_Z11clspv.local.3(i32, [0 x i32])
 
-declare [0 x i32] addrspace(3)* @_Z11clspv.local.4(i32)
+declare [0 x i32] addrspace(3)* @_Z11clspv.local.4(i32, [0 x i32])
 
 !clspv.descriptor.index = !{!4}
 !clspv.next_spec_constant_id = !{!5}

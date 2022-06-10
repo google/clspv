@@ -260,8 +260,9 @@ struct SPIRVProducerPassImpl {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), TestOutput(out == nullptr) {
+        HasVariablePointers(false), SamplerPointerTy(nullptr),
+        SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
+        TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -271,8 +272,9 @@ struct SPIRVProducerPassImpl {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(false), SamplerTy(nullptr), WorkgroupSizeValueID(0),
-        WorkgroupSizeVarID(0), TestOutput(true) {
+        HasVariablePointers(false), SamplerPointerTy(nullptr),
+        SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
+        TestOutput(true) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -565,7 +567,8 @@ private:
   std::vector<SPIRVID> BuiltinDimensionVec;
   bool HasVariablePointersStorageBuffer;
   bool HasVariablePointers;
-  Type *SamplerTy;
+  Type *SamplerPointerTy;
+  Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
 
   // If a function F has a pointer-to-__constant parameter, then this variable
@@ -598,9 +601,11 @@ private:
   // Bookkeeping for mapping kernel arguments to resource variables.
   struct ResourceVarInfo {
     ResourceVarInfo(int index_arg, unsigned set_arg, unsigned binding_arg,
-                    Function *fn, clspv::ArgKind arg_kind_arg, int coherent_arg)
+                    Function *fn, clspv::ArgKind arg_kind_arg, int coherent_arg,
+                    Type *type)
         : index(index_arg), descriptor_set(set_arg), binding(binding_arg),
           var_fn(fn), arg_kind(arg_kind_arg), coherent(coherent_arg),
+          data_type(type),
           addr_space(fn->getReturnType()->getPointerAddressSpace()) {}
     const int index; // Index into ResourceVarInfoList
     const unsigned descriptor_set;
@@ -608,6 +613,7 @@ private:
     Function *const var_fn; // The @clspv.resource.var.* function.
     const clspv::ArgKind arg_kind;
     const int coherent;
+    Type *data_type;
     const unsigned addr_space; // The LLVM address space
     // The SPIR-V ID of the OpVariable.  Not populated at construction time.
     SPIRVID var_id;
@@ -943,7 +949,7 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
     auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
     for (auto GV : GVList) {
       // Create new gv with ModuleScopePrivate address space.
-      Type *NewGVTy = GV->getType()->getPointerElementType();
+      Type *NewGVTy = GV->getValueType();
       GlobalVariable *NewGV = new GlobalVariable(
           *module, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
           nullptr, GV->getThreadLocalMode(), AddressSpace::ModuleScopePrivate);
@@ -1031,16 +1037,30 @@ void SPIRVProducerPassImpl::FindResourceVars() {
       bool first_use = true;
       for (auto &U : F.uses()) {
         if (auto *call = dyn_cast<CallInst>(U.getUser())) {
-          const auto set = unsigned(
-              dyn_cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
+          const auto set =
+              unsigned(dyn_cast<ConstantInt>(
+                           call->getArgOperand(
+                               clspv::ClspvOperand::kResourceDescriptorSet))
+                           ->getZExtValue());
           const auto binding = unsigned(
-              dyn_cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
+              dyn_cast<ConstantInt>(
+                  call->getArgOperand(clspv::ClspvOperand::kResourceBinding))
+                  ->getZExtValue());
           const auto arg_kind = clspv::ArgKind(
-              dyn_cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
+              dyn_cast<ConstantInt>(
+                  call->getArgOperand(clspv::ClspvOperand::kResourceArgKind))
+                  ->getZExtValue());
           const auto arg_index = unsigned(
-              dyn_cast<ConstantInt>(call->getArgOperand(3))->getZExtValue());
+              dyn_cast<ConstantInt>(
+                  call->getArgOperand(clspv::ClspvOperand::kResourceArgIndex))
+                  ->getZExtValue());
           const auto coherent = unsigned(
-              dyn_cast<ConstantInt>(call->getArgOperand(5))->getZExtValue());
+              dyn_cast<ConstantInt>(
+                  call->getArgOperand(clspv::ClspvOperand::kResourceCoherent))
+                  ->getZExtValue());
+          const auto data_type =
+              call->getArgOperand(clspv::ClspvOperand::kResourceDataType)
+                  ->getType();
 
           // Find or make the resource var info for this combination.
           ResourceVarInfo *rv = nullptr;
@@ -1052,7 +1072,7 @@ void SPIRVProducerPassImpl::FindResourceVars() {
             if (where == set_and_binding_map.end()) {
               rv = new ResourceVarInfo(
                   static_cast<int>(ResourceVarInfoList.size()), set, binding,
-                  &F, arg_kind, coherent);
+                  &F, arg_kind, coherent, data_type);
               ResourceVarInfoList.emplace_back(rv);
               set_and_binding_map[key] = rv;
             } else {
@@ -1065,7 +1085,7 @@ void SPIRVProducerPassImpl::FindResourceVars() {
               first_use = false;
               rv = new ResourceVarInfo(
                   static_cast<int>(ResourceVarInfoList.size()), set, binding,
-                  &F, arg_kind, coherent);
+                  &F, arg_kind, coherent, data_type);
               ResourceVarInfoList.emplace_back(rv);
             } else {
               rv = ResourceVarInfoList.back().get();
@@ -1099,6 +1119,7 @@ void SPIRVProducerPassImpl::FindResourceVars() {
     for (auto *info : ModuleOrderedResourceVars) {
       outs() << "MORV index " << info->index << " (" << info->descriptor_set
              << "," << info->binding << ") " << *(info->var_fn->getReturnType())
+             << " (" << *(info->data_type) << ")"
              << "\n";
     }
   }
@@ -1106,15 +1127,16 @@ void SPIRVProducerPassImpl::FindResourceVars() {
 
 void SPIRVProducerPassImpl::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
-  if (module->getFunction(clspv::LiteralSamplerFunction()) ||
-      (getSamplerMap() && !getSamplerMap()->empty())) {
-    auto SamplerStructTy =
-        StructType::getTypeByName(module->getContext(), "opencl.sampler_t");
-    if (!SamplerStructTy) {
-      SamplerStructTy =
-          StructType::create(module->getContext(), "opencl.sampler_t");
+  if (auto *F = module->getFunction(clspv::LiteralSamplerFunction())) {
+    SamplerDataTy = F->getArg(ClspvOperand::kSamplerDataType)->getType();
+    // TODO(#816): remove after final transition
+    if (F->getType()->isOpaquePointerTy()) {
+      SamplerPointerTy =
+          PointerType::get(module->getContext(), AddressSpace::UniformConstant);
+    } else {
+      SamplerPointerTy =
+          PointerType::get(SamplerDataTy, AddressSpace::UniformConstant);
     }
-    SamplerTy = SamplerStructTy->getPointerTo(AddressSpace::UniformConstant);
   }
 }
 
@@ -1129,7 +1151,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     switch (info->arg_kind) {
     case clspv::ArgKind::Buffer:
     case clspv::ArgKind::BufferUBO:
-      if (auto *sty = dyn_cast<StructType>(type->getPointerElementType())) {
+      if (auto *sty = dyn_cast<StructType>(info->data_type)) {
         StructTypesNeedingBlock.insert(sty);
       } else {
         errs() << *type << "\n";
@@ -1139,7 +1161,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     case clspv::ArgKind::Pod:
     case clspv::ArgKind::PodUBO:
     case clspv::ArgKind::PodPushConstant:
-      if (auto *sty = dyn_cast<StructType>(type->getPointerElementType())) {
+      if (auto *sty = dyn_cast<StructType>(info->data_type)) {
         StructTypesNeedingBlock.insert(sty);
       } else {
         errs() << *type << "\n";
@@ -1149,10 +1171,6 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     case clspv::ArgKind::SampledImage:
     case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::Sampler:
-      // Sampler and image types map to the pointee type but
-      // in the uniform constant address space.
-      type = PointerType::get(type->getPointerElementType(),
-                              clspv::AddressSpace::UniformConstant);
       break;
     default:
       break;
@@ -1171,14 +1189,14 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       if (module_scope_constant_external_init &&
           spv::BuiltInMax == BuiltinType) {
         StructTypesNeedingBlock.insert(
-            cast<StructType>(PTy->getPointerElementType()));
+            cast<StructType>(GV.getValueType()));
       }
     }
   }
 
   for (const GlobalVariable &GV : module->globals()) {
     if (GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
-      auto Ty = cast<PointerType>(GV.getType())->getPointerElementType();
+      auto Ty = GV.getValueType();
       assert(Ty->isStructTy() && "Push constants have to be structures.");
       auto STy = cast<StructType>(Ty);
       StructTypesNeedingBlock.insert(STy);
@@ -2139,7 +2157,7 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
     // Add literal samplers to each entry point interface as an
     // over-approximation.
     auto sampler_var_id = addSPIRVGlobalVariable(
-        getSPIRVType(SamplerTy), spv::StorageClassUniformConstant,
+        getSPIRVType(SamplerPointerTy), spv::StorageClassUniformConstant,
         /* InitId = */ SPIRVID(0), /* add_interface = */ true);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
@@ -2273,8 +2291,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
       }
       break;
     case clspv::ArgKind::StorageImage: {
-      auto *type = info->var_fn->getReturnType();
-      auto *struct_ty = cast<StructType>(type->getPointerElementType());
+      auto *struct_ty = cast<StructType>(info->data_type);
       // TODO(alan-baker): This is conservative. If compiling for OpenCL 2.0 or
       // above, the compiler treats all write_only images as read_write images.
       if (struct_ty->getName().contains("_wo_t")) {
@@ -2355,7 +2372,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
         SPIRVID ZDimCstID =
             getSPIRVValue(mdconst::extract<ConstantInt>(MD->getOperand(2)));
 
-        Ops << Ty->getPointerElementType() << XDimCstID << YDimCstID
+        Ops << GV.getValueType() << XDimCstID << YDimCstID
             << ZDimCstID;
 
         InitializerID =
@@ -2379,7 +2396,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
 
       SPIRVOperandVec Ops;
       SPIRVID result_type_id = getSPIRVType(
-          dyn_cast<VectorType>(Ty->getPointerElementType())->getElementType());
+          dyn_cast<VectorType>(GV.getValueType())->getElementType());
 
       // X Dimension
       Ops << result_type_id << 1;
@@ -2407,7 +2424,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       // Ops[2] : Constant size for y dimension.
       // Ops[3] : Constant size for z dimension.
       Ops.clear();
-      Ops << Ty->getPointerElementType() << XDimCstID << YDimCstID << ZDimCstID;
+      Ops << GV.getValueType() << XDimCstID << YDimCstID << ZDimCstID;
 
       InitializerID =
           addSPIRVInst<kConstants>(spv::OpSpecConstantComposite, Ops);
@@ -2491,7 +2508,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[1..n-1] : elements
     //
     Ops.clear();
-    Ops << GV.getType()->getPointerElementType() << x_id << y_id << z_id;
+    Ops << GV.getValueType() << x_id << y_id << z_id;
     InitializerID = addSPIRVInst<kConstants>(spv::OpSpecConstantComposite, Ops);
   } else if (BuiltinType == spv::BuiltInSubgroupMaxSize) {
     // 1. Generate a specialization constant with a default of 1.
@@ -2694,9 +2711,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
       if (PointerType *PTy = dyn_cast<PointerType>(Arg.getType())) {
         if (GlobalConstFuncTyMap.count(FTy)) {
           if (ArgIdx == GlobalConstFuncTyMap[FTy].second) {
-            Type *EleTy = PTy->getPointerElementType();
-            Type *ArgTy =
-                PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
+            Type *ArgTy = PointerType::getWithSamePointeeType(
+                PTy, AddressSpace::ModuleScopePrivate);
             ParamTyID = getSPIRVType(ArgTy);
             GlobalConstArgSet.insert(&Arg);
           }
@@ -3139,7 +3155,7 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
       // Generate an OpLoad
       SPIRVOperandVec Ops;
 
-      Ops << Call->getType()->getPointerElementType()
+      Ops << Call->getArgOperand(ClspvOperand::kResourceDataType)->getType()
           << ResourceVarDeferredLoadCalls[Call];
 
       RID = addSPIRVInst(spv::OpLoad, Ops);
@@ -3172,8 +3188,7 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     // Generate an OpLoad
     SPIRVOperandVec Ops;
 
-    Ops << SamplerTy->getPointerElementType()
-        << SamplerLiteralToIDMap[sampler_value];
+    Ops << SamplerDataTy << SamplerLiteralToIDMap[sampler_value];
 
     RID = addSPIRVInst(spv::OpLoad, Ops);
     break;
@@ -3296,8 +3311,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
                                                 const FunctionInfo &FuncInfo) {
   SPIRVID RID;
 
-  auto GetExtendMask = [this](Type *sample_type,
-                              bool is_int_image) -> uint32_t {
+  auto GetExtendMask = [](Type *sample_type, bool is_int_image) -> uint32_t {
     if (SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
         sample_type->getScalarType()->isIntegerTy()) {
       if (is_int_image)
@@ -3995,8 +4009,8 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
         // Generate one more instruction that uses the result of the extended
         // instruction.  Its result id is one more than the id of the
         // extended instruction.
-        auto generate_extra_inst = [this, &Context, &Call,
-                                    &RID](spv::Op opcode, Constant *constant) {
+        auto generate_extra_inst = [this, &Call, &RID](spv::Op opcode,
+                                                       Constant *constant) {
           //
           // Generate instruction like:
           //   result = opcode constant <extinst-result>
@@ -4270,8 +4284,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     if (GEP->getPointerAddressSpace() == AddressSpace::ModuleScopePrivate ||
         GlobalConstArgSet.count(GEP->getPointerOperand())) {
       // Use pointer type with private address space for global constant.
-      Type *EleTy = I.getType()->getPointerElementType();
-      ResultType = PointerType::get(EleTy, AddressSpace::ModuleScopePrivate);
+      ResultType = PointerType::getWithSamePointeeType(
+          ResultType, AddressSpace::ModuleScopePrivate);
     }
 
     Ops << ResultType;
@@ -4383,16 +4397,10 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // Find SPIRV instruction for parameter type.
     auto Ty = I.getType();
     if (Ty->isPointerTy()) {
-      auto PointeeTy = Ty->getPointerElementType();
-      if (PointeeTy->isStructTy() &&
-          dyn_cast<StructType>(PointeeTy)->isOpaque()) {
-        Ty = PointeeTy;
-      } else {
-        // Selecting between pointers requires variable pointers.
-        setVariablePointersCapabilities(Ty->getPointerAddressSpace());
-        if (!hasVariablePointers() && !selectFromSameObject(&I)) {
-          setVariablePointers();
-        }
+      // Selecting between pointers requires variable pointers.
+      setVariablePointersCapabilities(Ty->getPointerAddressSpace());
+      if (!hasVariablePointers() && !selectFromSameObject(&I)) {
+        setVariablePointers();
       }
     }
 
