@@ -252,11 +252,9 @@ struct SPIRVProducerPassImpl {
   typedef DenseMap<FunctionType *, std::pair<FunctionType *, uint32_t>>
       GlobalConstFuncMapType;
 
-  SPIRVProducerPassImpl(
-      raw_pwrite_stream *out,
-      SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap,
-      bool outputCInitList, ModuleAnalysisManager &MAM)
-      : module(nullptr), MAM(&MAM), samplerMap(samplerMap), out(out),
+  SPIRVProducerPassImpl(raw_pwrite_stream *out, bool outputCInitList,
+                        ModuleAnalysisManager &MAM)
+      : module(nullptr), MAM(&MAM), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
@@ -268,7 +266,7 @@ struct SPIRVProducerPassImpl {
   }
 
   SPIRVProducerPassImpl()
-      : module(nullptr), samplerMap(nullptr), out(nullptr),
+      : module(nullptr), out(nullptr),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
@@ -316,9 +314,6 @@ struct SPIRVProducerPassImpl {
       addCapability(spv::CapabilityVariablePointers);
       HasVariablePointers = true;
     }
-  }
-  SmallVectorImpl<std::pair<unsigned, std::string>> *getSamplerMap() {
-    return samplerMap;
   }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
     return GlobalConstFuncTypeMap;
@@ -524,7 +519,6 @@ private:
   BuiltinConstantMapType BuiltinConstantMap;
 
   ModuleAnalysisManager *MAM;
-  SmallVectorImpl<std::pair<unsigned, std::string>> *samplerMap;
   raw_pwrite_stream *out;
 
   // TODO(dneto): Wouldn't it be better to always just emit a binary, and then
@@ -727,7 +721,7 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, const SPIRVID &v) {
 
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
-  SPIRVProducerPassImpl impl(out, nullptr, outputCInitList, MAM);
+  SPIRVProducerPassImpl impl(out, outputCInitList, MAM);
   impl.runOnModule(M);
   PreservedAnalyses PA;
   return PA;
@@ -2114,20 +2108,10 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
     //          i32 sampler_mask,
     //          <sampler type> zeroinitializer)
     if (auto *call = dyn_cast<CallInst>(user)) {
-      const auto third_param = static_cast<unsigned>(
+      const auto sampler_value = static_cast<unsigned>(
           dyn_cast<ConstantInt>(
               call->getArgOperand(ClspvOperand::kSamplerParams))
               ->getZExtValue());
-      auto sampler_value = third_param;
-      if (clspv::Option::UseSamplerMap()) {
-        auto &sampler_map = *getSamplerMap();
-        if (third_param >= sampler_map.size()) {
-          errs() << "Out of bounds index to sampler map: " << third_param;
-          llvm_unreachable("bad sampler init: out of bounds");
-        }
-        sampler_value = sampler_map[third_param].first;
-      }
-
       const auto descriptor_set = static_cast<unsigned>(
           dyn_cast<ConstantInt>(
               call->getArgOperand(ClspvOperand::kSamplerDescriptorSet))
@@ -2149,18 +2133,13 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
       continue;
 
     auto call = cast<CallInst>(user);
-    const unsigned third_param = static_cast<unsigned>(
+    const unsigned sampler_value = static_cast<unsigned>(
         dyn_cast<ConstantInt>(call->getArgOperand(ClspvOperand::kSamplerParams))
             ->getZExtValue());
 
     // Already allocated a variable for this value.
-    if (!seen.insert(third_param).second)
+    if (!seen.insert(sampler_value).second)
       continue;
-
-    auto sampler_value = third_param;
-    if (clspv::Option::UseSamplerMap()) {
-      sampler_value = (*getSamplerMap())[third_param].first;
-    }
 
     // Add literal samplers to each entry point interface as an
     // over-approximation.
@@ -3187,13 +3166,9 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
   case Builtins::kClspvSamplerVarLiteral: {
     // Sampler initializers become a load of the corresponding sampler.
     // Map this to a load from the variable.
-    const auto third_param = static_cast<unsigned>(
+    const auto sampler_value = static_cast<unsigned>(
         dyn_cast<ConstantInt>(Call->getArgOperand(ClspvOperand::kSamplerParams))
             ->getZExtValue());
-    auto sampler_value = third_param;
-    if (clspv::Option::UseSamplerMap()) {
-      sampler_value = (*getSamplerMap())[third_param].first;
-    }
 
     // Generate an OpLoad
     SPIRVOperandVec Ops;

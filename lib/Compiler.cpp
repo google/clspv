@@ -136,10 +136,6 @@ static llvm::cl::opt<std::string> OutputFormat(
         "Specify special output format. 'c' is as a C initializer list"),
     llvm::cl::value_desc("format"));
 
-static llvm::cl::opt<std::string>
-    SamplerMap("samplermap", llvm::cl::desc("DEPRECATED - Literal sampler map"),
-               llvm::cl::value_desc("filename"));
-
 static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
                                   llvm::cl::desc("Verify diagnostic outputs"));
 
@@ -175,196 +171,6 @@ struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
   virtual ~OpenCLBuiltinMemoryBuffer() override {}
 };
 } // namespace
-
-// Populates |SamplerMapEntries| with data from the input sampler map. Returns 0
-// if successful.
-int ParseSamplerMap(const std::string &sampler_map,
-                    llvm::SmallVectorImpl<std::pair<unsigned, std::string>>
-                        *SamplerMapEntries) {
-  std::unique_ptr<llvm::MemoryBuffer> samplerMapBuffer(nullptr);
-  if (!sampler_map.empty()) {
-    // Parse the sampler map from the provided string.
-    samplerMapBuffer = llvm::MemoryBuffer::getMemBuffer(sampler_map);
-
-    clspv::Option::SetUseSamplerMap(true);
-    if (!SamplerMap.empty()) {
-      llvm::outs() << "Warning: -samplermap is ignored when the sampler map is "
-                      "provided through a string.\n";
-    }
-  } else if (!SamplerMap.empty()) {
-    // Parse the sampler map from the option provided file.
-    auto errorOrSamplerMapFile =
-        llvm::MemoryBuffer::getFile(SamplerMap.getValue());
-
-    // If there was an error in getting the sampler map file.
-    if (!errorOrSamplerMapFile) {
-      llvm::errs() << "Error: " << errorOrSamplerMapFile.getError().message()
-                   << " '" << SamplerMap.getValue() << "'\n";
-      return -1;
-    }
-
-    clspv::Option::SetUseSamplerMap(true);
-    samplerMapBuffer = std::move(errorOrSamplerMapFile.get());
-    if (0 == samplerMapBuffer->getBufferSize()) {
-      llvm::errs() << "Error: Sampler map was an empty file!\n";
-      return -1;
-    }
-  }
-
-  if (clspv::Option::UseSamplerMap()) {
-    // TODO(alan-baker): Remove all APIs dealing the sampler map after landing
-    // the transition to the new pass manager.
-    llvm::errs() << "Error: use of a sampler map is no longer supported\n";
-    return -1;
-  }
-
-  // No sampler map to parse.
-  if (!samplerMapBuffer || 0 == samplerMapBuffer->getBufferSize())
-    return 0;
-
-  llvm::SmallVector<llvm::StringRef, 3> samplerStrings;
-
-  // We need to keep track of the beginning of the current entry.
-  const char *b = samplerMapBuffer->getBufferStart();
-  for (const char *i = b, *e = samplerMapBuffer->getBufferEnd();; i++) {
-    // If we have a separator between declarations.
-    if ((*i == '|') || (*i == ',') || (i == e)) {
-      if (i == b) {
-        llvm::errs() << "Error: Sampler map contained an empty entry!\n";
-        return -1;
-      }
-
-      samplerStrings.push_back(llvm::StringRef(b, i - b).trim());
-
-      // And set b the next character after i.
-      b = i + 1;
-    }
-
-    // If we have a separator between declarations within a single sampler.
-    if ((*i == ',') || (i == e)) {
-
-      clspv::SamplerNormalizedCoords NormalizedCoord =
-          clspv::CLK_NORMALIZED_COORDS_NOT_SET;
-      clspv::SamplerAddressingMode AddressingMode = clspv::CLK_ADDRESS_NOT_SET;
-      clspv::SamplerFilterMode FilterMode = clspv::CLK_FILTER_NOT_SET;
-
-      for (auto str : samplerStrings) {
-        if ("CLK_NORMALIZED_COORDS_FALSE" == str) {
-          if (clspv::CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
-            llvm::errs() << "Error: Sampler map normalized coordinates was "
-                            "previously set!\n";
-            return -1;
-          }
-          NormalizedCoord = clspv::CLK_NORMALIZED_COORDS_FALSE;
-        } else if ("CLK_NORMALIZED_COORDS_TRUE" == str) {
-          if (clspv::CLK_NORMALIZED_COORDS_NOT_SET != NormalizedCoord) {
-            llvm::errs() << "Error: Sampler map normalized coordinates was "
-                            "previously set!\n";
-            return -1;
-          }
-          NormalizedCoord = clspv::CLK_NORMALIZED_COORDS_TRUE;
-        } else if ("CLK_ADDRESS_NONE" == str) {
-          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
-            llvm::errs()
-                << "Error: Sampler map addressing mode was previously set!\n";
-            return -1;
-          }
-          AddressingMode = clspv::CLK_ADDRESS_NONE;
-        } else if ("CLK_ADDRESS_CLAMP_TO_EDGE" == str) {
-          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
-            llvm::errs()
-                << "Error: Sampler map addressing mode was previously set!\n";
-            return -1;
-          }
-          AddressingMode = clspv::CLK_ADDRESS_CLAMP_TO_EDGE;
-        } else if ("CLK_ADDRESS_CLAMP" == str) {
-          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
-            llvm::errs()
-                << "Error: Sampler map addressing mode was previously set!\n";
-            return -1;
-          }
-          AddressingMode = clspv::CLK_ADDRESS_CLAMP;
-        } else if ("CLK_ADDRESS_MIRRORED_REPEAT" == str) {
-          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
-            llvm::errs()
-                << "Error: Sampler map addressing mode was previously set!\n";
-            return -1;
-          }
-          AddressingMode = clspv::CLK_ADDRESS_MIRRORED_REPEAT;
-        } else if ("CLK_ADDRESS_REPEAT" == str) {
-          if (clspv::CLK_ADDRESS_NOT_SET != AddressingMode) {
-            llvm::errs()
-                << "Error: Sampler map addressing mode was previously set!\n";
-            return -1;
-          }
-          AddressingMode = clspv::CLK_ADDRESS_REPEAT;
-        } else if ("CLK_FILTER_NEAREST" == str) {
-          if (clspv::CLK_FILTER_NOT_SET != FilterMode) {
-            llvm::errs()
-                << "Error: Sampler map filtering mode was previously set!\n";
-            return -1;
-          }
-          FilterMode = clspv::CLK_FILTER_NEAREST;
-        } else if ("CLK_FILTER_LINEAR" == str) {
-          if (clspv::CLK_FILTER_NOT_SET != FilterMode) {
-            llvm::errs()
-                << "Error: Sampler map filtering mode was previously set!\n";
-            return -1;
-          }
-          FilterMode = clspv::CLK_FILTER_LINEAR;
-        } else {
-          llvm::errs() << "Error: Unknown sampler string '" << str
-                       << "' found!\n";
-          return -1;
-        }
-      }
-
-      if (clspv::CLK_NORMALIZED_COORDS_NOT_SET == NormalizedCoord) {
-        llvm::errs() << "Error: Sampler map entry did not contain normalized "
-                        "coordinates entry!\n";
-        return -1;
-      }
-
-      if (clspv::CLK_ADDRESS_NOT_SET == AddressingMode) {
-        llvm::errs() << "Error: Sampler map entry did not contain addressing "
-                        "mode entry!\n";
-        return -1;
-      }
-
-      if (clspv::CLK_FILTER_NOT_SET == FilterMode) {
-        llvm::errs()
-            << "Error: Sampler map entry did not contain filer mode entry!\n";
-        return -1;
-      }
-
-      // Generate an equivalent expression in string form.  Sort the
-      // strings to get a canonical ordering.
-      std::sort(samplerStrings.begin(), samplerStrings.end(),
-                std::less<StringRef>());
-      const auto samplerExpr = std::accumulate(
-          samplerStrings.begin(), samplerStrings.end(), std::string(),
-          [](llvm::StringRef left, llvm::StringRef right) {
-            return left.str() + std::string(left.empty() ? "" : "|") +
-                   right.str();
-          });
-
-      // SamplerMapEntries->push_back(std::make_pair(
-      //    NormalizedCoord | AddressingMode | FilterMode, samplerExpr));
-      SamplerMapEntries->emplace_back(
-          NormalizedCoord | AddressingMode | FilterMode, samplerExpr);
-
-      // And reset the sampler strings for the next sampler in the map.
-      samplerStrings.clear();
-    }
-
-    // And lastly, if we are at the end of the file
-    if (i == e) {
-      break;
-    }
-  }
-
-  return 0;
-}
 
 clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   // Create target info
@@ -969,12 +775,7 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
 
 namespace clspv {
 int Compile(const llvm::StringRef &input_filename, const std::string &program,
-            const std::string &sampler_map,
             std::vector<uint32_t> *output_binary, std::string *output_log) {
-  llvm::SmallVector<std::pair<unsigned, std::string>, 8> SamplerMapEntries;
-  if (auto error = ParseSamplerMap(sampler_map, &SamplerMapEntries))
-    return error;
-
   llvm::StringRef overiddenInputFilename = input_filename;
 
   clang::CompilerInstance instance;
@@ -1099,11 +900,10 @@ int Compile(const int argc, const char *const argv[]) {
     }
   }
 
-  return Compile(overiddenInputFilename, "", "", nullptr, nullptr);
+  return Compile(overiddenInputFilename, "", nullptr, nullptr);
 }
 
 int CompileFromSourceString(const std::string &program,
-                            const std::string &sampler_map,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::string *output_log) {
@@ -1118,6 +918,6 @@ int CompileFromSourceString(const std::string &program,
   if (auto error = ParseOptions(argc, &argv[0]))
     return error;
 
-  return Compile("source", program, sampler_map, output_binary, output_log);
+  return Compile("source", program, output_binary, output_log);
 }
 } // namespace clspv

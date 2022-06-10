@@ -20,15 +20,6 @@ The following subjects are covered:
 
 ## Deprecation Notice
 
-Use of the sampler map is now an error. The API entry points will be removed
-shortly.
-
-It is no longer necessary to specify a sampler
-map for literal samplers. Refer to the bindings generated for the literal
-samplers in descriptor map. The -samplermap option is still accepted, but
-support will be removed at later date. A single sampler binding is generated
-for each unique literal sampler in the program.
-
 The descriptor map and it's C++ API are deprecated. Clspv is transitioning to
 embedding equivalent information directly into the SPIR-V binary via a
 [non-semantic instruction
@@ -177,11 +168,9 @@ denote that the shaders can interact with their data.
 The default way to map an OpenCL C language kernel to a Vulkan SPIR-V compute
 shader is as follows:
 
-- If a sampler map file is specified, all literal samplers use descriptor set _0_.
+- All literal samplers use descriptor set _0_.
 - By default, all kernels in the translation unit use the same descriptor set
-  number, either _0_, _1_, or _2_.  (The particular value depends on whether
-  a sampler map is used, and how `__constant` variables are mapped.)
-  **This is new default behaviour**.
+  number, either _0_, _1_, or _2_.
   - Use option `-distinct-kernel-descriptor-sets` to get the old behaviour,
   where each kernel is assigned its own descriptor set number, such that the first
   kernel has descriptor set _0_, and each subsequent kernel is an increment of
@@ -229,8 +218,8 @@ The reflection instructions replace the descriptor map.
 
 #### Descriptor map (DEPRECATED)
 
-The compiler can report the descriptor set and bindings used for samplers
-in the sampler map and for the kernel arguments, and also array sizing information for
+The compiler can report the descriptor set and bindings used for literal
+samplers and for the kernel arguments, and also array sizing information for
 pointer-to-local arguments.
 Run `clspv-reflection <spirv> -o <descriptor map>` to produce the descriptor map.
 
@@ -238,7 +227,7 @@ The descriptor map is a text file with comma-separated values.
 
 Consider this example:
 
-    // First kernel in the translation unit, and no sampler map is used.
+    // First kernel in the translation unit.
     kernel void foo(global int* a, float f, global float* b, uint c) {...}
 
 It generates the following descriptor map:
@@ -336,26 +325,6 @@ Notes: Each pointer-to-local argument is assigned its own array type and
 specialization constant to size the array.  Unless you override the
 array size specialization constant at pipeline creation time, the array will
 only have one element.
-
-If a sampler map is used, then samplers use descriptor set 0 and kernel descriptor
-set numbers start at 1.  For example, if the sampler map file is `mysamplermap`
-containing:
-
-    CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST,
-    CLK_NORMALIZED_COORDS_TRUE  | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR
-
-Then compiling with:
-
-    clspv foo.cl -samplermap=mysamplermap -descriptormap=mydescriptormap
-
-Then `mydescriptormap` will contain:
-
-    sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
-    sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,1,offset,0,argKind,pod,argSize,4
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,2,offset,0,argKind,buffer
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,3,offset,0,argKind,pod,argSize,4
 
 #### Sending in plain-old-data kernel arguments in uniform buffers
 
@@ -456,20 +425,6 @@ would also use descriptor set 0.
 If `foo` were the second kernel in the translation unit _and_ option
 `-distinct-kernel-descriptor-sets` is used, then its arguments would
 use descriptor set 1.
-
-Compiling with the same sampler map from before:
-
-    clspv foo.cl -descriptormap=myclusteredmap -samplermap=mysamplermap
-
-produces the following descriptor map:
-
-    sampler,18,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_NEAREST|CLK_NORMALIZED_COORDS_FALSE",descriptorSet,0,binding,0
-    sampler,35,samplerExpr,"CLK_ADDRESS_CLAMP_TO_EDGE|CLK_FILTER_LINEAR|CLK_NORMALIZED_COORDS_TRUE",descriptorSet,0,binding,1
-    kernel,foo,arg,a,argOrdinal,0,descriptorSet,1,binding,0,offset,0,argKind,buffer
-    kernel,foo,arg,b,argOrdinal,2,descriptorSet,1,binding,1,offset,0,argKind,buffer
-    kernel,foo,arg,f,argOrdinal,1,descriptorSet,1,binding,2,offset,0,argKind,pod,argSize,4
-    kernel,foo,arg,c,argOrdinal,3,descriptorSet,1,binding,2,offset,4,argKind,pod,argSize,4
-
 
 TODO(dneto): Give an example using images.
 

@@ -134,12 +134,6 @@ bool LongVectorSupport();
 // Returns true when images are supported.
 bool ImageSupport();
 
-// Returns true when using a sampler map.
-bool UseSamplerMap();
-
-// Sets whether or not to use the sampler map.
-void SetUseSamplerMap(bool use);
-
 // Returns the source language.
 enum class SourceLanguage {
   Unknown,
