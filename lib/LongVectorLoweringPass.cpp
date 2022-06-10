@@ -32,6 +32,7 @@
 
 #include "Builtins.h"
 #include "LongVectorLoweringPass.h"
+#include "BitcastUtils.h"
 
 #include <array>
 #include <functional>
@@ -813,11 +814,17 @@ Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
       assert(EquivalentDestTy->isPointerTy());
       IRBuilder<> B(&I);
       V = B.CreateBitCast(EquivalentValue, EquivalentDestTy, I.getName());
-      break;
+    } else {
+      IRBuilder<> B(&I);
+      SmallVector<Value *, 8> Values;
+      Values.push_back(EquivalentValue);
+      if (EquivalentValue->getType()->isArrayTy()) {
+        BitcastUtils::ExtractFromArray(B, Values);
+      }
+      BitcastUtils::ConvertInto(EquivalentDestTy, B, Values);
+      V = Values[0];
     }
-    // TODO Handle casts between scalars to vectors, vectors to scalars, and
-    // between vectors of different lengths.
-    LLVM_FALLTHROUGH;
+    break;
   }
   case Instruction::Trunc:
   case Instruction::ZExt:
