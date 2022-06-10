@@ -79,41 +79,19 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   if (!init_fn)
     return Changed;
 
-  if (init_fn && clspv::Option::UseSamplerMap() && sampler_map_.size() == 0) {
-    errs() << "error: kernel uses a literal sampler but option -samplermap "
-              "has not been specified\n";
-    llvm_unreachable("Sampler literal in source without sampler map!");
-  }
-
   const unsigned descriptor_set = StartNewDescriptorSet(M);
   Changed = true;
-  if (!sampler_map_.empty()) {
-    if (ShowDescriptors) {
-      outs() << "  Found " << sampler_map_.size()
-             << " samplers in the sampler map\n";
-    }
-  }
 
   // Replace all things that look like
   //  call %opencl.sampler_t addrspace(2)*
   //     @__translate_sampler_initializer(i32 sampler-literal-constant-value)
   //     #2
   //
-  // with (if sampler map is provided):
+  //  with:
   //
   //   call %opencl.sampler_t addrspace(2)*
   //       @clspv.sampler.var.literal(i32 descriptor set, i32 binding, i32
-  //       index-into-sampler-map)
-  //
-  //  or (if no sampler map is provided):
-  //
-  //   call %opencl.sampler_t addrspace(2)*
-  //       @clspv.sampler.var.literal(i32 descriptor set, i32 binding, i32
-  //       sampler-literal-value)
-  //
-  // We need to preserve the index into the sampler map so that later we can
-  // generate the sampler lines in the embedded reflection. That needs both the
-  // literal value and the string expression for the literal.
+  //       sampler-literal-value, <sampler_type> zeroinitializer)
 
   // Generate the function type for clspv::LiteralSamplerFunction()
   IRBuilder<> Builder(M.getContext());
@@ -136,24 +114,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
 
   // Map sampler literal to binding number.
   DenseMap<unsigned, unsigned> binding_for_value;
-  DenseMap<unsigned, unsigned> index_for_value;
   unsigned index = 0;
-  if (!sampler_map_.empty()) {
-    for (auto sampler_info : sampler_map_) {
-      const unsigned value = sampler_info.first;
-      const std::string &expr = sampler_info.second;
-      if (0 == binding_for_value.count(value)) {
-        // Make a new entry.
-        binding_for_value[value] = binding_++;
-        index_for_value[value] = index;
-        if (ShowDescriptors) {
-          outs() << "  Map " << value << " to (" << descriptor_set << ","
-                 << binding_for_value[value] << ") << " << expr << "\n";
-        }
-      }
-      index++;
-    }
-  }
 
   // Now replace calls to __translate_sampler_initializer
   if (init_fn) {
@@ -172,27 +133,17 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
 
         auto where = binding_for_value.find(value);
         if (where == binding_for_value.end()) {
-          if (!sampler_map_.empty()) {
-            errs() << "Sampler literal " << value
-                   << " was not in the sampler map\n";
-            llvm_unreachable("Sampler literal was not found in sampler map!");
-          } else {
-            // Allocate a binding for this sampler value.
-            binding_for_value.insert(std::make_pair(value, index++));
-            if (ShowDescriptors) {
-              outs() << "  Map " << value << " to (" << descriptor_set << ","
-                     << binding_for_value[value] << ")\n";
-            }
+          // Allocate a binding for this sampler value.
+          binding_for_value.insert(std::make_pair(value, index++));
+          if (ShowDescriptors) {
+            outs() << "  Map " << value << " to (" << descriptor_set << ","
+                   << binding_for_value[value] << ")\n";
           }
         }
         const unsigned binding = binding_for_value[value];
         // Third parameter is either the data mask if no sampler map is
         // specified or the index into the sampler map if one is provided.
         unsigned third_param = value;
-        if (!sampler_map_.empty()) {
-          // Use the sampler map index when a sampler map is provided.
-          third_param = index_for_value[value];
-        }
 
         SmallVector<Value *, 3> args = {
             Builder.getInt32(descriptor_set), Builder.getInt32(binding),

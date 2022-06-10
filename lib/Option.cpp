@@ -218,8 +218,6 @@ static llvm::cl::opt<bool> global_offset_push_constant(
     "global-offset-push-constant", llvm::cl::init(false),
     llvm::cl::desc("Enable support for global offsets in push constants"));
 
-static bool use_sampler_map = false;
-
 static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
     "cluster-pod-kernel-args", llvm::cl::init(true),
     llvm::cl::desc("Collect plain-old-data kernel arguments into a struct in "
@@ -338,8 +336,6 @@ bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
 bool LongVectorSupport() { return long_vector_support; }
 bool ImageSupport() { return images; }
-bool UseSamplerMap() { return use_sampler_map; }
-void SetUseSamplerMap(bool use) { use_sampler_map = use; }
 SourceLanguage Language() { return cl_std; }
 SPIRVVersion SpvVersion() { return spv_version; }
 bool ScalarBlockLayout() { return scalar_block_layout; }
