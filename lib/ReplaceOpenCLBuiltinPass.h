@@ -128,6 +128,8 @@ private:
                                    bool IsSigned, bool Int64 = false);
 
   llvm::DenseMap<llvm::Type *, llvm::Type *> PairStructMap;
+
+  llvm::DenseMap<llvm::Value *, llvm::Type *> InferredTypeCache;
 };
 } // namespace clspv
 

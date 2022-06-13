@@ -49,44 +49,32 @@ bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 // image, returns spv::DimMax.
 spv::Dim ImageDimensionality(llvm::StructType *type);
 
-// Returns the dimensionality of the image type. If |type| is not an image,
-// returns spv::DimMax.
-spv::Dim ImageDimensionality(llvm::Type *type);
-
 // Returns the dimensionality of the image struct type. If |type| is not an
 // image, returns 0.
 uint32_t ImageNumDimensions(llvm::StructType *type);
 
-// Returns the dimensionality of the image type. If |type| is not an image,
-// returns 0.
-uint32_t ImageNumDimensions(llvm::Type *type);
-
 // Returns true if the given type is an array image type.
-bool IsArrayImageType(llvm::Type *type);
+bool IsArrayImageType(llvm::StructType *type);
 
 // Returns true if the given struct type is a sampled image type. Can only
 // return true after image specialization.
 bool IsSampledImageType(llvm::StructType *type);
 
-// Returns true if the given type is a sampled image type. Can only return true
-// after image specialization.
-bool IsSampledImageType(llvm::Type *type);
-
 // Returns true if the given type is a storage image type. This is the case
 // for read_write and write_only images.
-bool IsStorageImageType(llvm::Type *type);
+bool IsStorageImageType(llvm::StructType *type);
 
 // Returns true if the given type is a float image type.
 // Before image specialization, all images are considered float images.
-bool IsFloatImageType(llvm::Type *type);
+bool IsFloatImageType(llvm::StructType *type);
 
 // Returns true if the given type is an int image type.
 // Can only return true after image specialization.
-bool IsIntImageType(llvm::Type *type);
+bool IsIntImageType(llvm::StructType *type);
 
 // Returns true if the given type is an uint image type.
 // Can only return true after image specialization.
-bool IsUintImageType(llvm::Type *type);
+bool IsUintImageType(llvm::StructType *type);
 
 } // namespace clspv
 
