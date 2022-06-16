@@ -144,7 +144,7 @@ your system, CMake, and (optionally) Ninja.
 
 To rebuild the library run the following commands:
 
-  cmake -GNinja <libclc dir> -DLIBCLC\_TARGETS\_TO\_BUILD="clspv--" -DLLVM\_CONFIG=<path to llvm-config>
-  ninja
+    cmake -GNinja <libclc dir> -DLIBCLC\_TARGETS\_TO\_BUILD="clspv--" -DLLVM\_CONFIG=<path to llvm-config>
+    ninja
 
 Copy the resulting `clspv--.bc` into the cmake/ directory and rebuild clspv.
