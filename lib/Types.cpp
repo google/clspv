@@ -79,10 +79,15 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
   }
 
+  DenseSet<Value *> seen;
   while (!worklist.empty()) {
     User *user = worklist.back().first;
     unsigned operand = worklist.back().second;
     worklist.pop_back();
+
+    if (!seen.insert(user).second) {
+      continue;
+    }
 
     if (auto *GEP = dyn_cast<GEPOperator>(user)) {
       return CacheType(GEP->getSourceElementType());
