@@ -59,6 +59,8 @@ private:
 
   // Tracks which functions need rewritten due to modified arguments.
   llvm::DenseSet<llvm::Function *> functions_to_modify_;
+
+  llvm::DenseSet<llvm::Value *> visited_;
 };
 } // namespace clspv
 
