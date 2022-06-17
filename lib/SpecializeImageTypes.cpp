@@ -44,6 +44,7 @@ PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
 
   for (auto f : kernels) {
     for (auto &Arg : f->args()) {
+      visited_.clear();
       ResultType res;
       llvm::Type *new_ty = nullptr;
       std::tie(res, new_ty) = RemapType(&Arg);
@@ -123,6 +124,12 @@ SpecializeImageTypesPass::RemapType(Argument *arg) {
 
 std::pair<SpecializeImageTypesPass::ResultType, Type *>
 SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
+  if (!visited_.insert(value).second) {
+    // There is a larger problem if an image is used in a phi loop so if we're
+    // re-looping through instructions, just return not an image.
+    return std::make_pair(ResultType::kNotImage, nullptr);
+  }
+
   if (CallInst *call = dyn_cast<CallInst>(value)) {
     auto *called = call->getCalledFunction();
     auto info = Builtins::Lookup(called);
