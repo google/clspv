@@ -49,6 +49,7 @@
 #include "ClusterPodKernelArgumentsPass.h"
 #include "Constants.h"
 #include "PushConstant.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -90,6 +91,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     RedeclareGlobalPushConstants(M, mangled_struct_ty);
   }
 
+  DenseMap<Value *, Type *> type_cache;
   for (Function *F : WorkList) {
     auto pod_arg_impl = clspv::GetPodArgsImpl(*F);
     auto pod_arg_kind = clspv::GetArgKindForPodArgs(*F);
@@ -125,7 +127,8 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
-        const auto kind = clspv::GetArgKind(Arg);
+        auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache);
+        const auto kind = clspv::GetArgKind(Arg, inferred_ty);
         RemapInfo.push_back(
             {std::string(Arg.getName()), arg_index, new_index++, 0u, 0u, kind});
       } else {
