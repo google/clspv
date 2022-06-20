@@ -340,6 +340,14 @@ struct SPIRVProducerPassImpl {
   // Returns the SPIRVID of the pointer type.
   SPIRVID getSPIRVPointerType(Type *PtrTy, Type *DataTy);
 
+  // Lookup or create function type.
+  //
+  // Returns the SPIRVID of the function type.
+  // Defers to getSPIRVType if the function type doesn't use opaque pointer
+  // types.
+  SPIRVID getSPIRVFunctionType(FunctionType *FTy, Type *RetTy,
+                               ArrayRef<Type *> ParamTys);
+
   // Returns the canonical type of |type|.
   //
   // By default, clspv maps both __constant and __global address space pointers
@@ -552,6 +560,7 @@ private:
 
   DenseMap<Value *, Type *> InferredTypeCache;
   std::unordered_map<unsigned, LayoutTypeMapType> PointerTypeMap;
+  TypeMapType FunctionTypeMap;
 
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   LayoutTypeMapType TypeMap;
@@ -1234,39 +1243,48 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
 }
 
 void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
-  // The SpecId assignment for pointer-to-local arguments is recorded in
-  // module-level metadata. Translate that information into local argument
-  // information.
-  LLVMContext &Context = module->getContext();
-  NamedMDNode *nmd = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
-  if (!nmd)
-    return;
-  for (auto operand : nmd->operands()) {
-    MDTuple *tuple = cast<MDTuple>(operand);
-    ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
-    Function *func = cast<Function>(fn_md->getValue());
-    ConstantAsMetadata *arg_index_md =
-        cast<ConstantAsMetadata>(tuple->getOperand(1));
-    int arg_index = static_cast<int>(
-        cast<ConstantInt>(arg_index_md->getValue())->getSExtValue());
-    Argument *arg = &*(func->arg_begin() + arg_index);
+  // Find the local variable resource calls.
+  // Clspv only shares spec ids if the data types match so we only need to find
+  // one call per spec id.
+  DenseMap<int, CallInst *> local_vars;
+  int max_spec_id = 0;
+  for (auto &F : *module) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *call = dyn_cast<CallInst>(&I)) {
+          if (Builtins::Lookup(call->getCalledFunction()) ==
+              Builtins::kClspvLocal) {
+            int spec_id = static_cast<int>(
+                cast<ConstantInt>(
+                    call->getOperand(ClspvOperand::kWorkgroupSpecId))
+                    ->getSExtValue());
+            if (!local_vars.count(spec_id)) {
+              local_vars[spec_id] = call;
+              max_spec_id = std::max(max_spec_id, spec_id);
+            }
+          }
+        }
+      }
+    }
+  }
 
-    ConstantAsMetadata *spec_id_md =
-        cast<ConstantAsMetadata>(tuple->getOperand(2));
-    int spec_id = static_cast<int>(
-        cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
-
-    LocalArgSpecIds[arg] = spec_id;
-    if (LocalSpecIdInfoMap.count(spec_id))
+  // Generate the variables in order of spec id.
+  for (int spec_id = 0; spec_id <= max_spec_id; ++spec_id) {
+    if (!local_vars.count(spec_id)) {
       continue;
+    }
+
+    auto *call = local_vars[spec_id];
+    auto *ArrayTy =
+        call->getArgOperand(ClspvOperand::kWorkgroupDataType)->getType();
+    auto *ElemTy = cast<ArrayType>(ArrayTy)->getElementType();
 
     // Generate the spec constant.
     SPIRVOperandVec Ops;
-    Ops << Type::getInt32Ty(Context) << 1;
+    Ops << Type::getInt32Ty(module->getContext()) << 1;
     SPIRVID ArraySizeID = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
     // Generate the array type.
-    Type *ElemTy = arg->getType()->getPointerElementType();
     Ops.clear();
     // The element type must have been created.
     Ops << ElemTy << ArraySizeID;
@@ -1291,6 +1309,29 @@ void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
     LocalArgInfo info{VariableID,  ElemTy,         ArraySizeID,
                       ArrayTypeID, PtrArrayTypeID, spec_id};
     LocalSpecIdInfoMap[spec_id] = info;
+  }
+
+  // Record the spec ids for each kernel argument. The arguments can be found in
+  // the metadata.
+  NamedMDNode *nmd = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+  if (!nmd)
+    return;
+  for (auto operand : nmd->operands()) {
+    MDTuple *tuple = cast<MDTuple>(operand);
+    ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
+    Function *func = cast<Function>(fn_md->getValue());
+    ConstantAsMetadata *arg_index_md =
+        cast<ConstantAsMetadata>(tuple->getOperand(1));
+    int arg_index = static_cast<int>(
+        cast<ConstantInt>(arg_index_md->getValue())->getSExtValue());
+    Argument *arg = &*(func->arg_begin() + arg_index);
+
+    ConstantAsMetadata *spec_id_md =
+        cast<ConstantAsMetadata>(tuple->getOperand(2));
+    int spec_id = static_cast<int>(
+        cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
+
+    LocalArgSpecIds[arg] = spec_id;
   }
 }
 
@@ -1412,7 +1453,7 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
           // The canonical type of __constant is __global unless constants are
           // passed in uniform buffers.
           auto *GlobalTy =
-              ptr_ty->getPointerElementType()->getPointerTo(AddrSpace);
+              PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
           return GlobalTy;
         }
       }
@@ -1476,9 +1517,12 @@ bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
-  // TODO(#816): remove after final transition.
+  // TODO(#816): change after final transition.
   if (!PtrTy->isOpaquePointerTy()) {
     return getSPIRVType(PtrTy);
+  }
+  if (!DataTy) {
+    llvm_unreachable("Missing inferred type");
   }
   const auto aspace = PtrTy->getPointerAddressSpace();
   const auto needs_layout = PointerRequiresLayout(aspace);
@@ -1523,6 +1567,71 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
   entry[layout_index] = ptr_id;
 
   return ptr_id;
+}
+
+// TODO(#816): much of this can be reworked after final transition.
+SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
+                                                    Type *RetTy,
+                                                    ArrayRef<Type *> ParamTys) {
+  bool has_pointers = false;
+  if (FTy->getReturnType()->isOpaquePointerTy()) {
+    has_pointers = true;
+  }
+  for (auto *param_ty : FTy->params()) {
+    if (param_ty->isOpaquePointerTy()) {
+      has_pointers = true;
+      break;
+    }
+  }
+
+  // If there are no opaque pointer parameters defer to basic type handler.
+  if (!has_pointers) {
+    return getSPIRVType(FTy);
+  }
+
+  // Create a placeholder function type for use in caching. Pointer parameters
+  // and return are mangled as placeholder parameter types to avoid collisions.
+  // We use arrays for this purpose: [aspace x inferred_ty].
+  SmallVector<Type *, 8> placeholder_param_tys;
+  int i = 0;
+  for (auto *param_ty : FTy->params()) {
+    placeholder_param_tys.push_back(param_ty);
+    if (param_ty->isPointerTy()) {
+      // Generate a representative type for the parameter type.
+      unsigned aspace = param_ty->getPointerAddressSpace();
+      auto *inferred_ty = ParamTys[i];
+      auto *rep_ty = ArrayType::get(inferred_ty, aspace);
+      placeholder_param_tys.push_back(rep_ty);
+    }
+    i++;
+  }
+  if (auto ptr_ty = dyn_cast<PointerType>(FTy->getReturnType())) {
+    // Generate a representative type for the return type.
+    unsigned aspace = ptr_ty->getPointerAddressSpace();
+    auto *rep_ty = ArrayType::get(RetTy, aspace);
+    placeholder_param_tys.push_back(rep_ty);
+  }
+
+  auto *placeholder_ty = FunctionType::get(
+      FTy->getReturnType(), placeholder_param_tys, FTy->isVarArg());
+  auto where = FunctionTypeMap.find(placeholder_ty);
+  if (where != FunctionTypeMap.end()) {
+    return where->second;
+  }
+
+  // Generate OpTypeFunction.
+  // [0] = Result type
+  // [1..n] = Param types
+  SPIRVOperandVec ops;
+  ops << getSPIRVPointerType(FTy->getReturnType(), RetTy);
+  i = 0;
+  for (auto *param_ty : FTy->params()) {
+    auto *inferred_ty = ParamTys[i++];
+    ops << getSPIRVPointerType(param_ty, inferred_ty);
+  }
+  auto id = addSPIRVInst<kTypes>(spv::OpTypeFunction, ops);
+  FunctionTypeMap[placeholder_ty] = id;
+  return id;
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty) {
@@ -1933,8 +2042,9 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     for (unsigned k = 0; k < FTy->getNumParams(); k++) {
       // Find SPIRV instruction for parameter type.
       auto ParamTy = FTy->getParamType(k);
+      // TODO(#816): remove after transition.
       if (ParamTy->isPointerTy()) {
-        auto PointeeTy = ParamTy->getPointerElementType();
+        auto PointeeTy = ParamTy->getNonOpaquePointerElementType();
         if (PointeeTy->isStructTy() &&
             dyn_cast<StructType>(PointeeTy)->isOpaque()) {
           ParamTy = PointeeTy;
@@ -2687,9 +2797,19 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
-  auto &GlobalConstArgSet = getGlobalConstArgSet();
 
   FunctionType *FTy = F.getFunctionType();
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    auto where = GlobalConstFuncTyMap.find(FTy);
+    if (where != GlobalConstFuncTyMap.end()) {
+      FTy = where->second.first;
+    }
+  } else {
+    SmallVector<Type *, 4> NewFuncParamTys;
+    FunctionType *NewFTy =
+        FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
+    FTy = NewFTy;
+  }
 
   //
   // Generate OPFunction.
@@ -2700,8 +2820,30 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
   // FOps[2] : Function Type ID
   SPIRVOperandVec FOps;
 
+  Type *inferred_ret_ty = nullptr;
+  SmallVector<Type *, 8> inferred_param_tys;
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    for (auto *user : F.users()) {
+      if (isa<CallInst>(user)) {
+        inferred_ret_ty =
+            InferType(user, module->getContext(), &InferredTypeCache);
+        if (inferred_ret_ty)
+          break;
+      }
+    }
+    for (auto &Arg : F.args()) {
+      inferred_param_tys.push_back(
+          InferType(&Arg, module->getContext(), &InferredTypeCache));
+    }
+  } else {
+    inferred_ret_ty = FTy->getReturnType();
+  }
+
+  SPIRVID ret_type_id =
+      getSPIRVPointerType(FTy->getReturnType(), inferred_ret_ty);
+
   // Find SPIRV instruction for return type.
-  FOps << FTy->getReturnType();
+  FOps << ret_type_id;
 
   // Check function attributes for SPIRV Function Control.
   uint32_t FuncControl = spv::FunctionControlMaskNone;
@@ -2722,20 +2864,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
 
   FOps << FuncControl;
 
-  SPIRVID FTyID;
-  if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    SmallVector<Type *, 4> NewFuncParamTys;
-    FunctionType *NewFTy =
-        FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
-    FTyID = getSPIRVType(NewFTy);
-  } else {
-    // Handle regular function with global constant parameters.
-    if (GlobalConstFuncTyMap.count(FTy)) {
-      FTyID = getSPIRVType(GlobalConstFuncTyMap[FTy].first);
-    } else {
-      FTyID = getSPIRVType(FTy);
-    }
-  }
+  SPIRVID FTyID =
+      getSPIRVFunctionType(FTy, inferred_ret_ty, inferred_param_tys);
 
   FOps << FTyID;
 
@@ -2763,17 +2893,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
       SPIRVOperandVec Ops;
 
       // Find SPIRV instruction for parameter type.
-      SPIRVID ParamTyID = getSPIRVType(Arg.getType());
-      if (PointerType *PTy = dyn_cast<PointerType>(Arg.getType())) {
-        if (GlobalConstFuncTyMap.count(FTy)) {
-          if (ArgIdx == GlobalConstFuncTyMap[FTy].second) {
-            Type *ArgTy = PointerType::getWithSamePointeeType(
-                PTy, AddressSpace::ModuleScopePrivate);
-            ParamTyID = getSPIRVType(ArgTy);
-            GlobalConstArgSet.insert(&Arg);
-          }
-        }
-      }
+      SPIRVID ParamTyID =
+          getSPIRVPointerType(Arg.getType(), inferred_param_tys[ArgIdx]);
       Ops << ParamTyID;
 
       // Generate SPIRV instruction for parameter.
@@ -5178,10 +5299,13 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
           auto *operand = Call->getOperand(j);
           auto *operand_type = operand->getType();
+          auto *inferred_ty =
+              InferType(operand, module->getContext(), &InferredTypeCache);
+          StructType *struct_ty = dyn_cast_or_null<StructType>(inferred_ty);
           // Images and samplers can be passed as function parameters without
           // variable pointers.
-          if (operand_type->isPointerTy() && !IsImageType(operand_type) &&
-              !IsSamplerType(operand_type)) {
+          if (operand_type->isPointerTy() && !IsImageType(struct_ty) &&
+              !IsSamplerType(struct_ty)) {
             auto sc =
                 GetStorageClass(operand->getType()->getPointerAddressSpace());
             if (sc == spv::StorageClassStorageBuffer) {
@@ -6351,7 +6475,6 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     }
 
     auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
-    auto *func_ty = F.getFunctionType();
 
     // If we've clustered POD arguments, then argument details are in metadata.
     // If an argument maps to a resource variable, then get descriptor set and
@@ -6404,10 +6527,9 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         uint32_t descriptor_set = 0;
         uint32_t binding = 0;
         if (spec_id > 0) {
+          auto &local_arg_info = LocalSpecIdInfoMap[spec_id];
           elem_size = static_cast<uint32_t>(
-              GetTypeAllocSize(func_ty->getParamType(unsigned(new_index))
-                                   ->getPointerElementType(),
-                               DL));
+              GetTypeAllocSize(local_arg_info.elem_type, DL));
         } else if (new_index >= 0) {
           auto *info = resource_var_at_index[new_index];
           assert(info);
