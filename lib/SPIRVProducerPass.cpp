@@ -3324,9 +3324,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
   } else {
     addCapability(Cap);
 
-    //Type *type = PointerType::get(IntegerType::get(module->getContext(), 32),
-    //                              AddressSpace::Input);
-
     auto *data_ty = IntegerType::get(module->getContext(), 32);
     auto *ptr_ty = data_ty->getPointerTo(AddressSpace::Input);
     auto ptr_id = getSPIRVPointerType(ptr_ty, data_ty);
