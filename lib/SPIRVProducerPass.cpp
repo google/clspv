@@ -236,9 +236,37 @@ private:
 
 struct SPIRVProducerPassImpl {
 
+  // Struct to handle generation of ArrayStride decorations.
+  // It supports two styles of stride generation to avoid unnecessarily
+  // perturbing the instruction order generated during the transition to opaque
+  // pointers (see #816).
+  // TODO(#816): remove the type in this struct and update tests as necessary.
+  struct StrideType {
+    Type *type;
+    uint32_t stride;
+    SPIRVID id;
+
+    StrideType(Type *type, uint32_t stride, SPIRVID id)
+        : type(type), stride(stride), id(id) {}
+    StrideType(Type *type) : type(type), stride(0), id(0) {}
+
+    bool operator<(const StrideType &x) const {
+      if (type < x.type)
+        return true;
+      if (x.type < type)
+        return false;
+      if (stride < x.stride)
+        return true;
+      if (x.stride < stride)
+        return false;
+      return id.get() < x.id.get();
+    }
+  };
+
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
   typedef DenseMap<Type *, SmallVector<SPIRVID, 2>> LayoutTypeMapType;
   typedef UniqueVector<Type *> TypeList;
+  typedef UniqueVector<StrideType> StrideTypeList;
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
   typedef std::list<SPIRVID> SPIRVIDListType;
   typedef std::vector<std::pair<Value *, SPIRVID>> EntryPointVecType;
@@ -322,7 +350,7 @@ struct SPIRVProducerPassImpl {
   SmallPtrSet<Value *, 16> &getGlobalConstArgSet() {
     return GlobalConstArgumentSet;
   }
-  TypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
+  StrideTypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
 
   void GenerateLLVMIRInfo();
   // Populate GlobalConstFuncTypeMap. Also, if module-scope __constant will
@@ -594,7 +622,7 @@ private:
   // or array types, and which point into transparent memory (StorageBuffer
   // storage class).  These will require an ArrayStride decoration.
   // See SPV_KHR_variable_pointers rev 13.
-  TypeList TypesNeedingArrayStride;
+  StrideTypeList TypesNeedingArrayStride;
 
   // This is truly ugly, but works around what look like driver bugs.
   // For get_local_size, an earlier part of the flow has created a module-scope
@@ -4505,9 +4533,14 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       setVariablePointersCapabilities(address_space);
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
-        // Save the need to generate an ArrayStride decoration.  But defer
-        // generation until later, so we only make one decoration.
-        getTypesNeedingArrayStride().insert(GEP->getPointerOperandType());
+        // Save the type to generate an ArrayStride decoration later, but
+        // assume opaque pointers may be present so also cache the SPIRVID for
+        // the type and the stride value.
+        getTypesNeedingArrayStride().insert(
+            {GEP->getPointerOperandType(),
+             static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
+                                                    module->getDataLayout())),
+             getSPIRVPointerType(GEP->getType(), GEP->getSourceElementType())});
         break;
       case spv::StorageClassWorkgroup:
         break;
@@ -4582,7 +4615,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       }
     }
 
-    Ops << Ty << I.getOperand(0) << I.getOperand(1) << I.getOperand(2);
+    SPIRVID type_id;
+    if (Ty->isPointerTy()) {
+      auto *inferred_ty =
+          InferType(&I, module->getContext(), &InferredTypeCache);
+      type_id = getSPIRVPointerType(Ty, inferred_ty);
+    } else {
+      type_id = getSPIRVType(Ty);
+    }
+
+    Ops << type_id << I.getOperand(0) << I.getOperand(1) << I.getOperand(2);
 
     RID = addSPIRVInst(spv::OpSelect, Ops);
     break;
@@ -5223,8 +5265,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
-      if (PHI->getType()->isPointerTy() && !IsSamplerType(PHI->getType()) &&
-          !IsImageType(PHI->getType())) {
+      if (PHI->getType()->isPointerTy()) {
         // OpPhi on pointers requires variable pointers.
         setVariablePointersCapabilities(
             PHI->getType()->getPointerAddressSpace());
@@ -5240,7 +5281,13 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       // Ops[1] ... Ops[n] = (Variable ID, Parent ID) pairs
       SPIRVOperandVec Ops;
 
-      Ops << PHI->getType();
+      if (PHI->getType()->isPointerTy()) {
+        auto *inferred_ty =
+            InferType(PHI, module->getContext(), &InferredTypeCache);
+        Ops << getSPIRVPointerType(PHI->getType(), inferred_ty);
+      } else {
+        Ops << PHI->getType();
+      }
 
       for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
         Ops << PHI->getIncomingValue(j) << PHI->getIncomingBlock(j);
@@ -5281,7 +5328,15 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         // Ops[2] ... Ops[n] = Argument 0, ... , Argument n
         SPIRVOperandVec Ops;
 
-        Ops << Call->getType();
+        SPIRVID type_id;
+        if (Call->getType()->isPointerTy()) {
+          auto *inferred_ty =
+              InferType(Call, module->getContext(), &InferredTypeCache);
+          type_id = getSPIRVPointerType(Call->getType(), inferred_ty);
+        } else {
+          type_id = getSPIRVType(Call->getType());
+        }
+        Ops << type_id;
 
         SPIRVID CalleeID = getSPIRVValue(Callee);
         if (!CalleeID.isValid()) {
@@ -5345,21 +5400,33 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
   DenseSet<uint32_t> seen;
-  for (auto *type : getTypesNeedingArrayStride()) {
-    auto TI = TypeMap.find(type);
-    unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
-    assert(TI != TypeMap.end());
-    assert(index < TI->second.size());
-    if (!TI->second[index].isValid())
-      continue;
+  for (auto stride_type : getTypesNeedingArrayStride()) {
+    // Two cases:
+    // 1. We only stored the type and need to get the result id and stride
+    //    size.
+    // 2. We stored the array stride and result id because they are not
+    //    recoverable at this point.
+    auto *type = stride_type.type;
+    auto stride = stride_type.stride;
+    auto id = stride_type.id;
+    if (!id.isValid()) {
+      auto TI = TypeMap.find(type);
+      unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
+      assert(TI != TypeMap.end());
+      assert(index < TI->second.size());
+      if (!TI->second[index].isValid())
+        continue;
 
-    auto id = TI->second[index];
+      id = TI->second[index];
+    }
     if (!seen.insert(id.get()).second)
       continue;
 
     Type *elemTy = nullptr;
     if (auto *ptrTy = dyn_cast<PointerType>(type)) {
-      elemTy = ptrTy->getNonOpaquePointerElementType();
+      if (stride == 0) {
+        llvm_unreachable("missing stride for pointer");
+      }
     } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
       elemTy = arrayTy->getElementType();
     } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
@@ -5375,7 +5442,9 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
     SPIRVOperandVec Ops;
 
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
-    const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
+    if (elemTy) {
+      stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
+    }
 
     Ops << id << spv::DecorationArrayStride << stride;
 

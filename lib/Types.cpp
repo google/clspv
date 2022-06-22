@@ -202,21 +202,6 @@ bool clspv::IsSamplerType(llvm::StructType *STy) {
   return false;
 }
 
-bool clspv::IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr) {
-  bool isSamplerType = false;
-  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy =
-            dyn_cast<StructType>(TmpArgPTy->getNonOpaquePointerElementType())) {
-      if (IsSamplerType(STy)) {
-        isSamplerType = true;
-        if (struct_type_ptr)
-          *struct_type_ptr = STy;
-      }
-    }
-  }
-  return isSamplerType;
-}
-
 bool clspv::IsImageType(llvm::StructType *STy) {
   if (!STy) return false;
   if (STy->isOpaque()) {
@@ -260,21 +245,6 @@ bool clspv::IsImageType(llvm::StructType *STy) {
     }
   }
   return false;
-}
-
-bool clspv::IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr) {
-  bool isImageType = false;
-  if (PointerType *TmpArgPTy = dyn_cast<PointerType>(type)) {
-    if (StructType *STy =
-            dyn_cast<StructType>(TmpArgPTy->getNonOpaquePointerElementType())) {
-      if (IsImageType(STy)) {
-        isImageType = true;
-        if (struct_type_ptr)
-          *struct_type_ptr = STy;
-      }
-    }
-  }
-  return isImageType;
 }
 
 spv::Dim clspv::ImageDimensionality(StructType *STy) {

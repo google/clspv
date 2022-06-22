@@ -34,16 +34,8 @@ llvm::Type *InferType(llvm::Value *v, llvm::LLVMContext &context,
 // Returns true if the given struct type is a sampler type.
 bool IsSamplerType(llvm::StructType *type);
 
-// Returns true if the given type is a sampler type.  If it is, then the
-// struct type is sent back through the ptr argument.
-bool IsSamplerType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
-
 // Returns true if the given struct type is an image type.
 bool IsImageType(llvm::StructType *type);
-
-// Returns true if the given type is a image type.  If it is, then the
-// struct type is sent back through the ptr argument.
-bool IsImageType(llvm::Type *type, llvm::Type **struct_type_ptr = nullptr);
 
 // Returns the dimensionality of the image struct type. If |type| is not an
 // image, returns spv::DimMax.
