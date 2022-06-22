@@ -4537,7 +4537,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
             {GEP->getPointerOperandType(),
              static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
                                                     module->getDataLayout())),
-             getSPIRVPointerType(GEP->getType(), GEP->getSourceElementType())});
+             getSPIRVPointerType(GEP->getPointerOperand()->getType(),
+                                 GEP->getSourceElementType())});
         break;
       case spv::StorageClassWorkgroup:
         break;
