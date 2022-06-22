@@ -5421,7 +5421,7 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
       continue;
 
     Type *elemTy = nullptr;
-    if (auto *ptrTy = dyn_cast<PointerType>(type)) {
+    if (isa<PointerType>(type)) {
       if (stride == 0) {
         llvm_unreachable("missing stride for pointer");
       }
