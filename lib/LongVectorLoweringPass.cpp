@@ -1574,8 +1574,15 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
     }
   };
 
-  auto getScalarWithIdValue = [&B](Value *Vector, Value *Index) {
-    return B.CreateExtractElement(Vector, Index);
+  auto getScalarWithIdValue = [&B, &ScalarTy](Value *Vector, Value *Index) {
+    if (Vector->getType()->isVectorTy()) {
+      return B.CreateExtractElement(Vector, Index);
+    } else {
+      assert(isa<AllocaInst>(Vector));
+      auto gep = B.CreateGEP(cast<AllocaInst>(Vector)->getAllocatedType(),
+                             Vector, {B.getInt32(0), Index});
+      return (Value *)B.CreateLoad(ScalarTy, gep);
+    }
   };
 
   auto setScalar = [&B](Value *Vector, Value *Scalar, unsigned Index) {
