@@ -356,6 +356,13 @@ bool clspv::UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
   if (remapped == value->getType())
     return false;
 
+  if (auto *gep = dyn_cast<GetElementPtrInst>(value)) {
+    auto *remapped_ele_ty = RebuildType(gep->getResultElementType(), M);
+    if (remapped_ele_ty != gep->getResultElementType()) {
+      gep->setResultElementType(remapped->getNonOpaquePointerElementType());
+    }
+  }
+
   value->mutateType(remapped);
   return true;
 }

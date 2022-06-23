@@ -25,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -235,9 +236,37 @@ private:
 
 struct SPIRVProducerPassImpl {
 
+  // Struct to handle generation of ArrayStride decorations.
+  // It supports two styles of stride generation to avoid unnecessarily
+  // perturbing the instruction order generated during the transition to opaque
+  // pointers (see #816).
+  // TODO(#816): remove the type in this struct and update tests as necessary.
+  struct StrideType {
+    Type *type;
+    uint32_t stride;
+    SPIRVID id;
+
+    StrideType(Type *type, uint32_t stride, SPIRVID id)
+        : type(type), stride(stride), id(id) {}
+    StrideType(Type *type) : type(type), stride(0), id(0) {}
+
+    bool operator<(const StrideType &x) const {
+      if (type < x.type)
+        return true;
+      if (x.type < type)
+        return false;
+      if (stride < x.stride)
+        return true;
+      if (x.stride < stride)
+        return false;
+      return id.get() < x.id.get();
+    }
+  };
+
   typedef DenseMap<Type *, SPIRVID> TypeMapType;
   typedef DenseMap<Type *, SmallVector<SPIRVID, 2>> LayoutTypeMapType;
   typedef UniqueVector<Type *> TypeList;
+  typedef UniqueVector<StrideType> StrideTypeList;
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
   typedef std::list<SPIRVID> SPIRVIDListType;
   typedef std::vector<std::pair<Value *, SPIRVID>> EntryPointVecType;
@@ -321,7 +350,7 @@ struct SPIRVProducerPassImpl {
   SmallPtrSet<Value *, 16> &getGlobalConstArgSet() {
     return GlobalConstArgumentSet;
   }
-  TypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
+  StrideTypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
 
   void GenerateLLVMIRInfo();
   // Populate GlobalConstFuncTypeMap. Also, if module-scope __constant will
@@ -333,6 +362,19 @@ struct SPIRVProducerPassImpl {
   void FindResourceVars();
   void FindTypesForSamplerMap();
   void FindTypesForResourceVars();
+
+  // Lookup or create pointer type.
+  //
+  // Returns the SPIRVID of the pointer type.
+  SPIRVID getSPIRVPointerType(Type *PtrTy, Type *DataTy);
+
+  // Lookup or create function type.
+  //
+  // Returns the SPIRVID of the function type.
+  // Defers to getSPIRVType if the function type doesn't use opaque pointer
+  // types.
+  SPIRVID getSPIRVFunctionType(FunctionType *FTy, Type *RetTy,
+                               ArrayRef<Type *> ParamTys);
 
   // Returns the canonical type of |type|.
   //
@@ -544,6 +586,10 @@ private:
   // ID for OpTypeVector %int 4.
   SPIRVID v4int32ID;
 
+  DenseMap<Value *, Type *> InferredTypeCache;
+  std::unordered_map<unsigned, LayoutTypeMapType> PointerTypeMap;
+  TypeMapType FunctionTypeMap;
+
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   LayoutTypeMapType TypeMap;
   // Maps an LLVM image type to its SPIR-V ID.
@@ -576,7 +622,7 @@ private:
   // or array types, and which point into transparent memory (StorageBuffer
   // storage class).  These will require an ArrayStride decoration.
   // See SPV_KHR_variable_pointers rev 13.
-  TypeList TypesNeedingArrayStride;
+  StrideTypeList TypesNeedingArrayStride;
 
   // This is truly ugly, but works around what look like driver bugs.
   // For get_local_size, an earlier part of the flow has created a module-scope
@@ -1225,39 +1271,48 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
 }
 
 void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
-  // The SpecId assignment for pointer-to-local arguments is recorded in
-  // module-level metadata. Translate that information into local argument
-  // information.
-  LLVMContext &Context = module->getContext();
-  NamedMDNode *nmd = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
-  if (!nmd)
-    return;
-  for (auto operand : nmd->operands()) {
-    MDTuple *tuple = cast<MDTuple>(operand);
-    ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
-    Function *func = cast<Function>(fn_md->getValue());
-    ConstantAsMetadata *arg_index_md =
-        cast<ConstantAsMetadata>(tuple->getOperand(1));
-    int arg_index = static_cast<int>(
-        cast<ConstantInt>(arg_index_md->getValue())->getSExtValue());
-    Argument *arg = &*(func->arg_begin() + arg_index);
+  // Find the local variable resource calls.
+  // Clspv only shares spec ids if the data types match so we only need to find
+  // one call per spec id.
+  DenseMap<int, CallInst *> local_vars;
+  int max_spec_id = 0;
+  for (auto &F : *module) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *call = dyn_cast<CallInst>(&I)) {
+          if (Builtins::Lookup(call->getCalledFunction()) ==
+              Builtins::kClspvLocal) {
+            int spec_id = static_cast<int>(
+                cast<ConstantInt>(
+                    call->getOperand(ClspvOperand::kWorkgroupSpecId))
+                    ->getSExtValue());
+            if (!local_vars.count(spec_id)) {
+              local_vars[spec_id] = call;
+              max_spec_id = std::max(max_spec_id, spec_id);
+            }
+          }
+        }
+      }
+    }
+  }
 
-    ConstantAsMetadata *spec_id_md =
-        cast<ConstantAsMetadata>(tuple->getOperand(2));
-    int spec_id = static_cast<int>(
-        cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
-
-    LocalArgSpecIds[arg] = spec_id;
-    if (LocalSpecIdInfoMap.count(spec_id))
+  // Generate the variables in order of spec id.
+  for (int spec_id = 0; spec_id <= max_spec_id; ++spec_id) {
+    if (!local_vars.count(spec_id)) {
       continue;
+    }
+
+    auto *call = local_vars[spec_id];
+    auto *ArrayTy =
+        call->getArgOperand(ClspvOperand::kWorkgroupDataType)->getType();
+    auto *ElemTy = cast<ArrayType>(ArrayTy)->getElementType();
 
     // Generate the spec constant.
     SPIRVOperandVec Ops;
-    Ops << Type::getInt32Ty(Context) << 1;
+    Ops << Type::getInt32Ty(module->getContext()) << 1;
     SPIRVID ArraySizeID = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
     // Generate the array type.
-    Type *ElemTy = arg->getType()->getPointerElementType();
     Ops.clear();
     // The element type must have been created.
     Ops << ElemTy << ArraySizeID;
@@ -1282,6 +1337,29 @@ void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
     LocalArgInfo info{VariableID,  ElemTy,         ArraySizeID,
                       ArrayTypeID, PtrArrayTypeID, spec_id};
     LocalSpecIdInfoMap[spec_id] = info;
+  }
+
+  // Record the spec ids for each kernel argument. The arguments can be found in
+  // the metadata.
+  NamedMDNode *nmd = module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+  if (!nmd)
+    return;
+  for (auto operand : nmd->operands()) {
+    MDTuple *tuple = cast<MDTuple>(operand);
+    ValueAsMetadata *fn_md = cast<ValueAsMetadata>(tuple->getOperand(0));
+    Function *func = cast<Function>(fn_md->getValue());
+    ConstantAsMetadata *arg_index_md =
+        cast<ConstantAsMetadata>(tuple->getOperand(1));
+    int arg_index = static_cast<int>(
+        cast<ConstantInt>(arg_index_md->getValue())->getSExtValue());
+    Argument *arg = &*(func->arg_begin() + arg_index);
+
+    ConstantAsMetadata *spec_id_md =
+        cast<ConstantAsMetadata>(tuple->getOperand(2));
+    int spec_id = static_cast<int>(
+        cast<ConstantInt>(spec_id_md->getValue())->getSExtValue());
+
+    LocalArgSpecIds[arg] = spec_id;
   }
 }
 
@@ -1403,7 +1481,7 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
           // The canonical type of __constant is __global unless constants are
           // passed in uniform buffers.
           auto *GlobalTy =
-              ptr_ty->getPointerElementType()->getPointerTo(AddrSpace);
+              PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
           return GlobalTy;
         }
       }
@@ -1466,6 +1544,124 @@ bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
   return false;
 }
 
+SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
+  // TODO(#816): change after final transition.
+  if (!PtrTy->isOpaquePointerTy()) {
+    return getSPIRVType(PtrTy);
+  }
+  if (!DataTy) {
+    llvm_unreachable("Missing inferred type");
+  }
+  const auto aspace = PtrTy->getPointerAddressSpace();
+  const auto needs_layout = PointerRequiresLayout(aspace);
+
+  // This might still be problematic for structures/arrays of pointers. Clspv
+  // can only support those in private and function storage classes though.
+  auto data_id = getSPIRVType(DataTy, needs_layout);
+
+  // Images and samplers can only be in the UniformConstant address space, so
+  // clspv uses them by value in most parts of the code generation. The initial
+  // generation of the resource variable and uses generate the correct pointer
+  // and load of the type.
+  if (auto struct_ty = dyn_cast<StructType>(DataTy)) {
+    if (struct_ty->isOpaque() && aspace != AddressSpace::UniformConstant) {
+      return data_id;
+    }
+  }
+
+  auto canonical_aspace = aspace;
+  if (aspace == AddressSpace::Constant &&
+      !Option::ConstantArgsInUniformBuffer()) {
+    canonical_aspace = AddressSpace::Global;
+  }
+
+  const unsigned layout_index = needs_layout ? 1 : 0;
+  auto &aspace_map = PointerTypeMap[canonical_aspace];
+  auto where = aspace_map.find(DataTy);
+  if (where != aspace_map.end()) {
+    if (where->second[layout_index].isValid()) {
+      return where->second[layout_index];
+    }
+  }
+
+  // Generate the SPIR-V pointer type.
+  SPIRVOperandVec ops;
+  ops << GetStorageClass(canonical_aspace) << data_id;
+  auto ptr_id = addSPIRVInst<kTypes>(spv::OpTypePointer, ops);
+
+  auto &entry = aspace_map[DataTy];
+  if (entry.empty())
+    entry.resize(2);
+  entry[layout_index] = ptr_id;
+
+  return ptr_id;
+}
+
+// TODO(#816): much of this can be reworked after final transition.
+SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
+                                                    Type *RetTy,
+                                                    ArrayRef<Type *> ParamTys) {
+  bool has_pointers = false;
+  if (FTy->getReturnType()->isOpaquePointerTy()) {
+    has_pointers = true;
+  }
+  for (auto *param_ty : FTy->params()) {
+    if (param_ty->isOpaquePointerTy()) {
+      has_pointers = true;
+      break;
+    }
+  }
+
+  // If there are no opaque pointer parameters defer to basic type handler.
+  if (!has_pointers) {
+    return getSPIRVType(FTy);
+  }
+
+  // Create a placeholder function type for use in caching. Pointer parameters
+  // and return are mangled as placeholder parameter types to avoid collisions.
+  // We use arrays for this purpose: [aspace x inferred_ty].
+  SmallVector<Type *, 8> placeholder_param_tys;
+  int i = 0;
+  for (auto *param_ty : FTy->params()) {
+    placeholder_param_tys.push_back(param_ty);
+    if (param_ty->isPointerTy()) {
+      // Generate a representative type for the parameter type.
+      unsigned aspace = param_ty->getPointerAddressSpace();
+      auto *inferred_ty = ParamTys[i];
+      auto *rep_ty = ArrayType::get(inferred_ty, aspace);
+      placeholder_param_tys.push_back(rep_ty);
+    }
+    i++;
+  }
+  if (auto ptr_ty = dyn_cast<PointerType>(FTy->getReturnType())) {
+    // Generate a representative type for the return type.
+    unsigned aspace = ptr_ty->getPointerAddressSpace();
+    auto *rep_ty = ArrayType::get(RetTy, aspace);
+    placeholder_param_tys.push_back(rep_ty);
+  }
+
+  auto *placeholder_ty = FunctionType::get(
+      FTy->getReturnType(), placeholder_param_tys, FTy->isVarArg());
+  auto where = FunctionTypeMap.find(placeholder_ty);
+  if (where != FunctionTypeMap.end()) {
+    return where->second;
+  }
+
+  // Generate OpTypeFunction.
+  // [0] = Result type
+  // [1..n] = Param types
+  SPIRVOperandVec ops;
+  ops << getSPIRVPointerType(FTy->getReturnType(), RetTy);
+  i = 0;
+  for (auto *param_ty : FTy->params()) {
+    auto *inferred_ty = ParamTys[i++];
+    ops << getSPIRVPointerType(param_ty, inferred_ty);
+  }
+  auto id = addSPIRVInst<kTypes>(spv::OpTypeFunction, ops);
+  FunctionTypeMap[placeholder_ty] = id;
+  return id;
+}
+
 SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty) {
   // Prior to 1.4, layout decorations are more relaxed so we can reuse a laid
   // out type in non-laid out storage classes.
@@ -1477,6 +1673,10 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty) {
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
+  if (Ty->isOpaquePointerTy()) {
+    llvm_unreachable("Unsupported opaque pointer");
+  }
+
   // Only pointers, non-opaque structs and arrays should have layout
   // decorations.
   if (!(isa<PointerType>(Ty) || isa<ArrayType>(Ty) || isa<StructType>(Ty))) {
@@ -1582,7 +1782,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
             addCapability(spv::CapabilityImage1D);
         } break;
         case spv::DimBuffer: {
-          addCapability(spv::CapabilityImageBuffer);
+          if (IsSampledImageType(STy)) {
+            addCapability(spv::CapabilitySampledBuffer);
+          } else {
+            addCapability(spv::CapabilityImageBuffer);
+          }
         } break;
         default:
           break;
@@ -1866,8 +2070,9 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     for (unsigned k = 0; k < FTy->getNumParams(); k++) {
       // Find SPIRV instruction for parameter type.
       auto ParamTy = FTy->getParamType(k);
+      // TODO(#816): remove after transition.
       if (ParamTy->isPointerTy()) {
-        auto PointeeTy = ParamTy->getPointerElementType();
+        auto PointeeTy = ParamTy->getNonOpaquePointerElementType();
         if (PointeeTy->isStructTy() &&
             dyn_cast<StructType>(PointeeTy)->isOpaque()) {
           ParamTy = PointeeTy;
@@ -2143,8 +2348,9 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
 
     // Add literal samplers to each entry point interface as an
     // over-approximation.
+    auto sampler_type_id = getSPIRVPointerType(SamplerPointerTy, SamplerDataTy);
     auto sampler_var_id = addSPIRVGlobalVariable(
-        getSPIRVType(SamplerPointerTy), spv::StorageClassUniformConstant,
+        sampler_type_id, spv::StorageClassUniformConstant,
         /* InitId = */ SPIRVID(0), /* add_interface = */ true);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
@@ -2201,8 +2407,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     case clspv::ArgKind::Sampler:
     case clspv::ArgKind::SampledImage:
     case clspv::ArgKind::StorageImage:
-      type = PointerType::get(type->getPointerElementType(),
-                              clspv::AddressSpace::UniformConstant);
+      type = info->data_type->getPointerTo(AddressSpace::UniformConstant);
       break;
     default:
       break;
@@ -2210,7 +2415,8 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
 
     const auto sc = GetStorageClassForArgKind(info->arg_kind);
 
-    info->var_id = addSPIRVGlobalVariable(getSPIRVType(type), sc);
+    auto type_id = getSPIRVPointerType(type, info->data_type);
+    info->var_id = addSPIRVGlobalVariable(type_id, sc);
 
     // Map calls to the variable-builtin-function.
     for (auto &U : info->var_fn->uses()) {
@@ -2545,8 +2751,9 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   const bool interface =
       (AS == AddressSpace::Private || AS == AddressSpace::ModuleScopePrivate ||
        AS == AddressSpace::Local);
+  auto ptr_id = getSPIRVPointerType(Ty, GV.getValueType());
   SPIRVID var_id =
-      addSPIRVGlobalVariable(getSPIRVType(Ty), spvSC, InitializerID, interface);
+      addSPIRVGlobalVariable(ptr_id, spvSC, InitializerID, interface);
 
   VMap[&GV] = var_id;
 
@@ -2618,9 +2825,19 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
   ValueMapType &VMap = getValueMap();
   EntryPointVecType &EntryPoints = getEntryPointVec();
   auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
-  auto &GlobalConstArgSet = getGlobalConstArgSet();
 
   FunctionType *FTy = F.getFunctionType();
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    auto where = GlobalConstFuncTyMap.find(FTy);
+    if (where != GlobalConstFuncTyMap.end()) {
+      FTy = where->second.first;
+    }
+  } else {
+    SmallVector<Type *, 4> NewFuncParamTys;
+    FunctionType *NewFTy =
+        FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
+    FTy = NewFTy;
+  }
 
   //
   // Generate OPFunction.
@@ -2631,8 +2848,30 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
   // FOps[2] : Function Type ID
   SPIRVOperandVec FOps;
 
+  Type *inferred_ret_ty = nullptr;
+  SmallVector<Type *, 8> inferred_param_tys;
+  if (F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+    for (auto *user : F.users()) {
+      if (isa<CallInst>(user)) {
+        inferred_ret_ty =
+            InferType(user, module->getContext(), &InferredTypeCache);
+        if (inferred_ret_ty)
+          break;
+      }
+    }
+    for (auto &Arg : F.args()) {
+      inferred_param_tys.push_back(
+          InferType(&Arg, module->getContext(), &InferredTypeCache));
+    }
+  } else {
+    inferred_ret_ty = FTy->getReturnType();
+  }
+
+  SPIRVID ret_type_id =
+      getSPIRVPointerType(FTy->getReturnType(), inferred_ret_ty);
+
   // Find SPIRV instruction for return type.
-  FOps << FTy->getReturnType();
+  FOps << ret_type_id;
 
   // Check function attributes for SPIRV Function Control.
   uint32_t FuncControl = spv::FunctionControlMaskNone;
@@ -2653,20 +2892,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
 
   FOps << FuncControl;
 
-  SPIRVID FTyID;
-  if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-    SmallVector<Type *, 4> NewFuncParamTys;
-    FunctionType *NewFTy =
-        FunctionType::get(FTy->getReturnType(), NewFuncParamTys, false);
-    FTyID = getSPIRVType(NewFTy);
-  } else {
-    // Handle regular function with global constant parameters.
-    if (GlobalConstFuncTyMap.count(FTy)) {
-      FTyID = getSPIRVType(GlobalConstFuncTyMap[FTy].first);
-    } else {
-      FTyID = getSPIRVType(FTy);
-    }
-  }
+  SPIRVID FTyID =
+      getSPIRVFunctionType(FTy, inferred_ret_ty, inferred_param_tys);
 
   FOps << FTyID;
 
@@ -2694,17 +2921,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
       SPIRVOperandVec Ops;
 
       // Find SPIRV instruction for parameter type.
-      SPIRVID ParamTyID = getSPIRVType(Arg.getType());
-      if (PointerType *PTy = dyn_cast<PointerType>(Arg.getType())) {
-        if (GlobalConstFuncTyMap.count(FTy)) {
-          if (ArgIdx == GlobalConstFuncTyMap[FTy].second) {
-            Type *ArgTy = PointerType::getWithSamePointeeType(
-                PTy, AddressSpace::ModuleScopePrivate);
-            ParamTyID = getSPIRVType(ArgTy);
-            GlobalConstArgSet.insert(&Arg);
-          }
-        }
-      }
+      SPIRVID ParamTyID =
+          getSPIRVPointerType(Arg.getType(), inferred_param_tys[ArgIdx]);
       Ops << ParamTyID;
 
       // Generate SPIRV instruction for parameter.
@@ -3106,10 +3324,10 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
   } else {
     addCapability(Cap);
 
-    Type *type = PointerType::get(IntegerType::get(module->getContext(), 32),
-                                  AddressSpace::Input);
-
-    RID = addSPIRVGlobalVariable(getSPIRVType(type), spv::StorageClassInput);
+    auto *data_ty = IntegerType::get(module->getContext(), 32);
+    auto *ptr_ty = data_ty->getPointerTo(AddressSpace::Input);
+    auto ptr_id = getSPIRVPointerType(ptr_ty, data_ty);
+    RID = addSPIRVGlobalVariable(ptr_id, spv::StorageClassInput);
 
     BuiltinConstantMap[BID] = RID;
 
@@ -3307,6 +3525,8 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     return 0;
   };
 
+  auto *image_ty = cast<StructType>(InferType(
+      Call->getArgOperand(0), module->getContext(), &InferredTypeCache));
   LLVMContext &Context = module->getContext();
   switch (FuncInfo.getType()) {
   case Builtins::kReadImagef:
@@ -3315,7 +3535,6 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
   case Builtins::kReadImageui: {
     // read_image is converted to OpSampledImage and OpImageSampleExplicitLod.
     // Additionally, OpTypeSampledImage is generated.
-    const auto image_ty = Call->getArgOperand(0)->getType();
     const auto &pi = FuncInfo.getParameter(1);
     if (pi.isSampler()) {
       //
@@ -3332,8 +3551,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       Value *Coordinate = Call->getArgOperand(2);
 
       TypeMapType &OpImageTypeMap = getImageTypeMap();
-      Type *ImageTy = Image->getType()->getPointerElementType();
-      SPIRVID ImageTyID = OpImageTypeMap[ImageTy];
+      SPIRVID ImageTyID = OpImageTypeMap[image_ty];
 
       Ops << ImageTyID << Image << Sampler;
 
@@ -3350,7 +3568,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       //
       Ops.clear();
 
-      const bool is_int_image = IsIntImageType(Image->getType());
+      const bool is_int_image = IsIntImageType(image_ty);
       SPIRVID result_type;
       if (is_int_image) {
         result_type = v4int32ID;
@@ -3386,7 +3604,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       //
       SPIRVOperandVec Ops;
 
-      const bool is_int_image = IsIntImageType(Image->getType());
+      const bool is_int_image = IsIntImageType(image_ty);
       SPIRVID result_type;
       if (is_int_image) {
         result_type = v4int32ID;
@@ -3426,7 +3644,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       //
       SPIRVOperandVec Ops;
 
-      const bool is_int_image = IsIntImageType(Image->getType());
+      const bool is_int_image = IsIntImageType(image_ty);
       SPIRVID result_type;
       if (is_int_image) {
         result_type = v4int32ID;
@@ -3474,7 +3692,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 
     SPIRVID TexelID = getSPIRVValue(Texel);
 
-    const bool is_int_image = IsIntImageType(Image->getType());
+    const bool is_int_image = IsIntImageType(image_ty);
     if (is_int_image) {
       // Generate a bitcast to v4int and use it as the texel value.
       Ops << v4int32ID << TexelID;
@@ -3515,9 +3733,9 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     SPIRVID SizesTypeID;
 
     Value *Image = Call->getArgOperand(0);
-    const uint32_t dim = ImageNumDimensions(Image->getType());
+    const uint32_t dim = ImageNumDimensions(image_ty);
     const uint32_t components =
-        dim + (IsArrayImageType(Image->getType()) ? 1 : 0);
+        dim + (IsArrayImageType(image_ty) ? 1 : 0);
     if (components == 1) {
       SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
     } else {
@@ -3526,8 +3744,8 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     }
     Ops << SizesTypeID << Image;
     spv::Op query_opcode = spv::OpImageQuerySize;
-    if (IsSampledImageType(Image->getType()) &&
-        ImageDimensionality(Image->getType()) != spv::DimBuffer) {
+    if (IsSampledImageType(image_ty) &&
+        ImageDimensionality(image_ty) != spv::DimBuffer) {
       query_opcode = spv::OpImageQuerySizeLod;
       // Need explicit 0 for Lod operand.
       Ops << getSPIRVInt32Constant(0);
@@ -4273,7 +4491,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
           ResultType, AddressSpace::ModuleScopePrivate);
     }
 
-    Ops << ResultType;
+    Ops << getSPIRVPointerType(ResultType, GEP->getResultElementType());
 
     // Generate the base pointer.
     Ops << GEP->getPointerOperand();
@@ -4312,9 +4530,15 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       setVariablePointersCapabilities(address_space);
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
-        // Save the need to generate an ArrayStride decoration.  But defer
-        // generation until later, so we only make one decoration.
-        getTypesNeedingArrayStride().insert(GEP->getPointerOperandType());
+        // Save the type to generate an ArrayStride decoration later, but
+        // assume opaque pointers may be present so also cache the SPIRVID for
+        // the type and the stride value.
+        getTypesNeedingArrayStride().insert(
+            {GEP->getPointerOperandType(),
+             static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
+                                                    module->getDataLayout())),
+             getSPIRVPointerType(GEP->getPointerOperand()->getType(),
+                                 GEP->getSourceElementType())});
         break;
       case spv::StorageClassWorkgroup:
         break;
@@ -4389,7 +4613,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       }
     }
 
-    Ops << Ty << I.getOperand(0) << I.getOperand(1) << I.getOperand(2);
+    SPIRVID type_id;
+    if (Ty->isPointerTy()) {
+      auto *inferred_ty =
+          InferType(&I, module->getContext(), &InferredTypeCache);
+      type_id = getSPIRVPointerType(Ty, inferred_ty);
+    } else {
+      type_id = getSPIRVType(Ty);
+    }
+
+    Ops << type_id << I.getOperand(0) << I.getOperand(1) << I.getOperand(2);
 
     RID = addSPIRVInst(spv::OpSelect, Ops);
     break;
@@ -5030,8 +5263,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
-      if (PHI->getType()->isPointerTy() && !IsSamplerType(PHI->getType()) &&
-          !IsImageType(PHI->getType())) {
+      if (PHI->getType()->isPointerTy()) {
         // OpPhi on pointers requires variable pointers.
         setVariablePointersCapabilities(
             PHI->getType()->getPointerAddressSpace());
@@ -5047,7 +5279,13 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       // Ops[1] ... Ops[n] = (Variable ID, Parent ID) pairs
       SPIRVOperandVec Ops;
 
-      Ops << PHI->getType();
+      if (PHI->getType()->isPointerTy()) {
+        auto *inferred_ty =
+            InferType(PHI, module->getContext(), &InferredTypeCache);
+        Ops << getSPIRVPointerType(PHI->getType(), inferred_ty);
+      } else {
+        Ops << PHI->getType();
+      }
 
       for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
         Ops << PHI->getIncomingValue(j) << PHI->getIncomingBlock(j);
@@ -5088,7 +5326,15 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         // Ops[2] ... Ops[n] = Argument 0, ... , Argument n
         SPIRVOperandVec Ops;
 
-        Ops << Call->getType();
+        SPIRVID type_id;
+        if (Call->getType()->isPointerTy()) {
+          auto *inferred_ty =
+              InferType(Call, module->getContext(), &InferredTypeCache);
+          type_id = getSPIRVPointerType(Call->getType(), inferred_ty);
+        } else {
+          type_id = getSPIRVType(Call->getType());
+        }
+        Ops << type_id;
 
         SPIRVID CalleeID = getSPIRVValue(Callee);
         if (!CalleeID.isValid()) {
@@ -5106,10 +5352,13 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         for (unsigned j = 0; j < CalleeFTy->getNumParams(); j++) {
           auto *operand = Call->getOperand(j);
           auto *operand_type = operand->getType();
+          auto *inferred_ty =
+              InferType(operand, module->getContext(), &InferredTypeCache);
+          StructType *struct_ty = dyn_cast_or_null<StructType>(inferred_ty);
           // Images and samplers can be passed as function parameters without
           // variable pointers.
-          if (operand_type->isPointerTy() && !IsImageType(operand_type) &&
-              !IsSamplerType(operand_type)) {
+          if (operand_type->isPointerTy() && !IsImageType(struct_ty) &&
+              !IsSamplerType(struct_ty)) {
             auto sc =
                 GetStorageClass(operand->getType()->getPointerAddressSpace());
             if (sc == spv::StorageClassStorageBuffer) {
@@ -5149,21 +5398,33 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
   // Insert ArrayStride decorations on pointer types, due to OpPtrAccessChain
   // instructions we generated earlier.
   DenseSet<uint32_t> seen;
-  for (auto *type : getTypesNeedingArrayStride()) {
-    auto TI = TypeMap.find(type);
-    unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
-    assert(TI != TypeMap.end());
-    assert(index < TI->second.size());
-    if (!TI->second[index].isValid())
-      continue;
+  for (auto stride_type : getTypesNeedingArrayStride()) {
+    // Two cases:
+    // 1. We only stored the type and need to get the result id and stride
+    //    size.
+    // 2. We stored the array stride and result id because they are not
+    //    recoverable at this point.
+    auto *type = stride_type.type;
+    auto stride = stride_type.stride;
+    auto id = stride_type.id;
+    if (!id.isValid()) {
+      auto TI = TypeMap.find(type);
+      unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
+      assert(TI != TypeMap.end());
+      assert(index < TI->second.size());
+      if (!TI->second[index].isValid())
+        continue;
 
-    auto id = TI->second[index];
+      id = TI->second[index];
+    }
     if (!seen.insert(id.get()).second)
       continue;
 
     Type *elemTy = nullptr;
-    if (auto *ptrTy = dyn_cast<PointerType>(type)) {
-      elemTy = ptrTy->getNonOpaquePointerElementType();
+    if (isa<PointerType>(type)) {
+      if (stride == 0) {
+        llvm_unreachable("missing stride for pointer");
+      }
     } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
       elemTy = arrayTy->getElementType();
     } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
@@ -5179,7 +5440,9 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
     SPIRVOperandVec Ops;
 
     // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
-    const uint32_t stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
+    if (elemTy) {
+      stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
+    }
 
     Ops << id << spv::DecorationArrayStride << stride;
 
@@ -6279,7 +6542,6 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     }
 
     auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
-    auto *func_ty = F.getFunctionType();
 
     // If we've clustered POD arguments, then argument details are in metadata.
     // If an argument maps to a resource variable, then get descriptor set and
@@ -6332,10 +6594,9 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         uint32_t descriptor_set = 0;
         uint32_t binding = 0;
         if (spec_id > 0) {
+          auto &local_arg_info = LocalSpecIdInfoMap[spec_id];
           elem_size = static_cast<uint32_t>(
-              GetTypeAllocSize(func_ty->getParamType(unsigned(new_index))
-                                   ->getPointerElementType(),
-                               DL));
+              GetTypeAllocSize(local_arg_info.elem_type, DL));
         } else if (new_index >= 0) {
           auto *info = resource_var_at_index[new_index];
           assert(info);

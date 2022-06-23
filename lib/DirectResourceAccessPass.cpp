@@ -75,28 +75,19 @@ bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   bool Changed = false;
   int arg_index = 0;
   for (Argument &arg : fn->args()) {
-    switch (clspv::GetArgKind(arg)) {
-    case clspv::ArgKind::Buffer:
-    case clspv::ArgKind::BufferUBO:
-    case clspv::ArgKind::SampledImage:
-    case clspv::ArgKind::StorageImage:
-    case clspv::ArgKind::Sampler:
-    case clspv::ArgKind::Local:
-      Changed |= RewriteAccessesForArg(fn, arg_index, arg);
-      break;
-    case clspv::ArgKind::Pod:
-    case clspv::ArgKind::PodUBO:
-    case clspv::ArgKind::PodPushConstant:
-      // These are represented by structs. Don't rewrite them.
-      break;
-    default:
-      errs() << "Unhandled ArgKind in "
-                "clspv::DirectResourceAccessPass::RewriteResourceAccesses: "
-             << int(clspv::GetArgKind(arg)) << "\n";
-      llvm_unreachable(
-          "Unhandled ArgKind in "
-          "clspv::DirectResourceAccessPass::RewriteResourceAccesses");
-      break;
+    if (auto PtrTy = dyn_cast<PointerType>(arg.getType())) {
+      // Look for arguments that map to resources. They appear in the following
+      // address spaces.
+      switch (PtrTy->getPointerAddressSpace()) {
+      case clspv::AddressSpace::Global:
+      case clspv::AddressSpace::Constant:
+      case clspv::AddressSpace::Local:
+      case clspv::AddressSpace::UniformConstant:
+        Changed |= RewriteAccessesForArg(fn, arg_index, arg);
+        break;
+      default:
+        break;
+      }
     }
     arg_index++;
   }
