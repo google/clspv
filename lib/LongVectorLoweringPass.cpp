@@ -18,6 +18,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueHandle.h"
@@ -138,6 +139,33 @@ std::string getSpirvCompliantName(const clspv::Builtins::FunctionInfo &IInfo) {
   return clspv::Builtins::GetMangledFunctionName(Info);
 }
 
+Type *getScalarPointerType(Function &Builtin) {
+  const auto &Info = clspv::Builtins::Lookup(&Builtin);
+  switch (Info.getType()) {
+    case clspv::Builtins::kSincos:
+    case clspv::Builtins::kModf:
+    case clspv::Builtins::kFract:
+      return Builtin.getReturnType()->getScalarType();
+    case clspv::Builtins::kFrexp:
+    case clspv::Builtins::kRemquo:
+    case clspv::Builtins::kLgammaR:
+      return Type::getInt32Ty(Builtin.getParent()->getContext());
+    case clspv::Builtins::kVloadHalf:
+    case clspv::Builtins::kVloadaHalf:
+    case clspv::Builtins::kVstoreHalf:
+    case clspv::Builtins::kVstoreaHalf:
+      return Type::getHalfTy(Builtin.getParent()->getContext());
+    case clspv::Builtins::kVstore:
+      return Builtin.getArg(0)->getType()->getScalarType();
+    case clspv::Builtins::kVload:
+      return Builtin.getReturnType()->getScalarType();
+    default:
+      // What about llvm intrinsics (e.g. memcpy) or other OpenCL builtins?
+      return nullptr;
+  }
+}
+
+
 /// Get the scalar overload for the given OpenCL builtin function @p Builtin.
 Function *getBIFScalarVersion(Function &Builtin) {
   assert(!Builtin.isIntrinsic());
@@ -177,6 +205,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kFma:
   case clspv::Builtins::kFmax:
   case clspv::Builtins::kFmin:
+  case clspv::Builtins::kFract:
   case clspv::Builtins::kFrexp:
   case clspv::Builtins::kHalfCos:
   case clspv::Builtins::kHalfExp:
@@ -214,10 +243,15 @@ Function *getBIFScalarVersion(Function &Builtin) {
 
       Type *ScalarParamTy = nullptr;
       if (ParamTy->isPointerTy()) {
-        auto *PointeeTy = ParamTy->getPointerElementType();
-        assert(PointeeTy->isVectorTy() && "Unsupported kind of pointer type.");
-        ScalarParamTy = PointerType::get(PointeeTy->getScalarType(),
-                                         ParamTy->getPointerAddressSpace());
+        ScalarParamTy = ParamTy;
+        // TODO(#816): remove after final transition.
+        if (!ParamTy->isOpaquePointerTy()) {
+          auto *PointeeTy = ParamTy->getNonOpaquePointerElementType();
+          assert(PointeeTy->isVectorTy() &&
+                 "Unsupported kind of pointer type.");
+          ScalarParamTy = PointerType::get(PointeeTy->getScalarType(),
+                                           ParamTy->getPointerAddressSpace());
+        }
       } else {
         assert((ParamTy->isVectorTy() || ParamTy->isFloatingPointTy() ||
                 ParamTy->isIntegerTy()) &&
@@ -332,7 +366,8 @@ using ScalarOperationFactory =
 /// @p ScalarOperation.
 Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
                               ArrayRef<Value *> EquivalentArgs,
-                              ScalarOperationFactory ScalarOperation) {
+                              ScalarOperationFactory ScalarOperation,
+                              Type *pointer_scalar_ty = nullptr) {
   assert(EquivalentReturnTy != nullptr);
 
   unsigned Arity;
@@ -368,11 +403,10 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
     for (unsigned j = 0; j < Args.size(); ++j) {
       auto *ArgTy = EquivalentArgs[j]->getType();
       if (ArgTy->isPointerTy()) {
-        assert(ArgTy->getPointerElementType()->isArrayTy() &&
-               "Unsupported kind of pointer type.");
-        Args[j] = B.CreateInBoundsGEP(
-            ArgTy->getScalarType()->getPointerElementType(), EquivalentArgs[j],
-            {Zero, ConstantInt::get(IntTy, i)});
+        assert(pointer_scalar_ty && "Missing pointer scalar type");
+        Args[j] = B.CreateInBoundsGEP(ArrayType::get(pointer_scalar_ty, Arity),
+                                      EquivalentArgs[j],
+                                      {Zero, ConstantInt::get(IntTy, i)});
       } else if (ArgTy->isArrayTy()) {
         Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
       } else {
@@ -636,6 +670,13 @@ Value *clspv::LongVectorLoweringPass::visit(Value *V) {
 }
 
 Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
+  if (auto *GV = dyn_cast<GlobalVariable>(&Cst)) {
+    auto *EquivalentGV = GlobalVariableMap[GV];
+    assert(EquivalentGV &&
+           "Global variable should have been already processed.");
+    return EquivalentGV;
+  }
+
   auto *EquivalentTy = getEquivalentType(Cst.getType());
   assert(EquivalentTy && "Nothing to lower.");
 
@@ -669,19 +710,17 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
   }
 
-  if (auto *GV = dyn_cast<GlobalVariable>(&Cst)) {
-    auto *EquivalentGV = GlobalVariableMap[GV];
-    assert(EquivalentGV &&
-           "Global variable should have been already processed.");
-    return EquivalentGV;
-  }
-
+  // TODO(#874): this pass needs updated to handle constantexpr more robustly.
   if (auto *CE = dyn_cast<ConstantExpr>(&Cst)) {
     switch (CE->getOpcode()) {
     case Instruction::GetElementPtr: {
       auto *GEP = cast<GEPOperator>(CE);
       auto *EquivalentSourceTy = getEquivalentType(GEP->getSourceElementType());
-      auto *EquivalentPointer = cast<Constant>(visit(GEP->getPointerOperand()));
+      Constant *EquivalentPointer = cast<Constant>(GEP->getPointerOperand());
+      // TODO(#816): remove after final transition, but see also #874.
+      if (!GEP->getType()->isOpaquePointerTy()) {
+        EquivalentPointer = cast<Constant>(visit(GEP->getPointerOperand()));
+      }
       SmallVector<Value *, 4> Indices(GEP->idx_begin(), GEP->idx_end());
 
       auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
@@ -917,15 +956,24 @@ clspv::LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
 
 Value *
 clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
-  auto *EquivalentPointer = visit(I.getPointerOperand());
-  if (!EquivalentPointer)
+  auto *EquivalentPointer = I.getPointerOperand();
+  auto *Type = getEquivalentType(I.getSourceElementType());
+  // TODO(#816): remove after final transition.
+  if (!I.getType()->isOpaquePointerTy()) {
+    EquivalentPointer = visit(I.getPointerOperand());
+    if (!EquivalentPointer)
+      return nullptr;
+
+    Type = EquivalentPointer->getType()
+               ->getScalarType()
+               ->getNonOpaquePointerElementType();
+  } else if (!Type) {
     return nullptr;
+  }
 
   IRBuilder<> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
   Value *V;
-  auto *Type =
-      EquivalentPointer->getType()->getScalarType()->getPointerElementType();
   if (I.isInBounds()) {
     V = B.CreateInBoundsGEP(Type, EquivalentPointer, Indices);
   } else {
@@ -974,10 +1022,14 @@ Value *clspv::LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
 }
 
 Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
-  Value *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
   Type *EquivalentTy = getEquivalentType(I.getType());
   assert(EquivalentTy && "type not lowered");
+  auto *EquivalentPointer = I.getPointerOperand();
+  // TODO(#816): remove after final transition.
+  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
+    EquivalentPointer = visit(I.getPointerOperand());
+    assert(EquivalentPointer && "pointer not lowered");
+  }
 
   IRBuilder<> B(&I);
   auto *V = B.CreateAlignedLoad(EquivalentTy, EquivalentPointer, I.getAlign(),
@@ -1141,8 +1193,12 @@ clspv::LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
 Value *clspv::LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   Value *EquivalentValue = visit(I.getValueOperand());
   assert(EquivalentValue && "value not lowered");
-  Value *EquivalentPointer = visit(I.getPointerOperand());
-  assert(EquivalentPointer && "pointer not lowered");
+  Value *EquivalentPointer = I.getPointerOperand();
+  // TODO(#816): remove after final transition.
+  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
+    EquivalentPointer = visit(I.getPointerOperand());
+    assert(EquivalentPointer && "pointer not lowered");
+  }
 
   IRBuilder<> B(&I);
   auto *V = B.CreateAlignedStore(EquivalentValue, EquivalentPointer,
@@ -1165,6 +1221,15 @@ bool clspv::LongVectorLoweringPass::handlingRequired(User &U) {
     if (getEquivalentType(OperandTy) != nullptr) {
       return true;
     }
+  }
+
+  // With opaque pointers, some users require special examination.
+  if (auto *alloca = dyn_cast<AllocaInst>(&U)) {
+    if (getEquivalentType(alloca->getAllocatedType()) != nullptr)
+      return true;
+  } else if (auto *gep = dyn_cast<GetElementPtrInst>(&U)) {
+    if (getEquivalentType(gep->getSourceElementType()) != nullptr)
+        return true;
   }
 
   return false;
@@ -1211,7 +1276,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy() || Ty->isMetadataTy()) {
+      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy()) {
     // No lowering required.
     return nullptr;
   }
@@ -1236,10 +1301,11 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
     return nullptr;
   }
 
-  if (auto *PointerTy = dyn_cast<PointerType>(Ty)) {
+  // TODO(#816): remove after final transition.
+  if (Ty->isPointerTy()) {
     if (auto *ElementTy =
-            getEquivalentType(PointerTy->getNonOpaquePointerElementType())) {
-      return ElementTy->getPointerTo(PointerTy->getAddressSpace());
+            getEquivalentType(Ty->getNonOpaquePointerElementType())) {
+      return ElementTy->getPointerTo(Ty->getPointerAddressSpace());
     }
 
     return nullptr;
@@ -1407,8 +1473,9 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinCall(
     return ScalarCall;
   };
 
+  auto *ScalarPointerDataTy = getScalarPointerType(*VectorFunction);
   return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
-                                ScalarFactory);
+                                ScalarFactory, ScalarPointerDataTy);
 }
 
 Value *clspv::LongVectorLoweringPass::convertAllBuiltinCall(
@@ -1468,11 +1535,11 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
     // Because we cannot ExtractValue at a variable index from an array, we need
     // to copy it to something where we will be able to load from a variable
     // index
-    Value *alloca = BFront.CreateAlloca(SrcTy);
+    auto *alloca = BFront.CreateAlloca(SrcTy);
     auto SrcArity = cast<ArrayType>(SrcTy)->getArrayNumElements();
     for (uint64_t i = 0; i < SrcArity; i++) {
       auto Val = B.CreateExtractValue(SrcA, i);
-      auto Gep = B.CreateGEP(alloca->getType()->getPointerElementType(), alloca,
+      auto Gep = B.CreateGEP(alloca->getAllocatedType(), alloca,
                              {B.getInt32(0), B.getInt32(i)});
       B.CreateStore(Val, Gep);
     }
@@ -1485,8 +1552,8 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
       alloca = BFront.CreateAlloca(SrcTy);
       for (uint64_t i = 0; i < SrcArity; i++) {
         auto Val = B.CreateExtractValue(SrcB, i);
-        auto Gep = B.CreateGEP(alloca->getType()->getPointerElementType(),
-                               alloca, {B.getInt32(0), B.getInt32(i)});
+        auto Gep = B.CreateGEP(alloca->getAllocatedType(), alloca,
+                               {B.getInt32(0), B.getInt32(i)});
         B.CreateStore(Val, Gep);
       }
       SrcB = alloca;
@@ -1511,9 +1578,9 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
     if (Vector->getType()->isVectorTy()) {
       return B.CreateExtractElement(Vector, Index);
     } else {
-      assert(Vector->getType()->isPointerTy());
-      auto gep = B.CreateGEP(Vector->getType()->getPointerElementType(), Vector,
-                             {B.getInt32(0), Index});
+      assert(isa<AllocaInst>(Vector));
+      auto gep = B.CreateGEP(cast<AllocaInst>(Vector)->getAllocatedType(),
+                             Vector, {B.getInt32(0), Index});
       return (Value *)B.CreateLoad(ScalarTy, gep);
     }
   };
@@ -1744,6 +1811,7 @@ void clspv::LongVectorLoweringPass::cleanDeadFunctions() {
 void clspv::LongVectorLoweringPass::cleanDeadGlobals() {
   for (auto const &Mapping : GlobalVariableMap) {
     auto *GV = Mapping.first;
+    GV->removeDeadConstantUsers();
     GV->eraseFromParent();
   }
 }
