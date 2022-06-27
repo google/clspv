@@ -29,3 +29,16 @@ docker run --rm -i \
   --env BUILD_TYPE="RelWithDebInfo" \
   --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build.sh" \
   "gcr.io/shaderc-build/radial-build:latest"
+
+
+# chown the given directory to the current user, if it exists.
+# Docker creates files with the root user - this can upset the Kokoro artifact copier.
+function chown_dir() {
+  dir=$1
+  if [[ -d "$dir" ]]; then
+    sudo chown -R "$(id -u):$(id -g)" "$dir"
+  fi
+}
+
+chown_dir "${ROOT_DIR}/github/clspv/build"
+chown_dir "${ROOT_DIR}/github/clspv/third_party"
