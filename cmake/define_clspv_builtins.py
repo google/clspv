@@ -18,30 +18,13 @@ import re
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Strip banned OpenCL features')
+    parser = argparse.ArgumentParser(description='Define clspv builtins')
 
-    parser.add_argument('--input-file', metavar='<path>',
-            type=str, required=True,
-            help='input OpenCL C header')
     parser.add_argument('--output-file', metavar='<path>',
             type=str, required=True,
-            help='output stripped OpenCL C header')
+            help='output OpenCL C header')
 
     args = parser.parse_args()
-
-    # Strip invalid features.
-    unsupported_features = '(convert_[a-zA-Z0-9]+(_rt[pn]|_sat))'
-    unsupported_features += '|(reserve_id_t)'
-    unsupported_features += '|(ndrange_t)'
-    unsupported_features += '|(queue_t)'
-    unsupported_features += '|(clk_event_t)'
-    unsupported_features += '|(clk_profiling_info)'
-    regex = re.compile(unsupported_features)
-    with open(args.input_file, "r") as input:
-        with open(args.output_file, "w") as output:
-            for line in input:
-                if re.search(regex, line) is None:
-                    output.write(line)
 
     # Add some customs builtins.
     with open(args.output_file, "a") as output:

@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-__kernel void bitselect(__global float8 *A, __global float8 *B,
+__kernel void test_bitselect(__global float8 *A, __global float8 *B,
                         __global float8 *C, __global float8 *destValue) {
   *destValue = bitselect(*A, *B, *C);
 }
