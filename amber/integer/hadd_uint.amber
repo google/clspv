@@ -40,7 +40,7 @@ BUFFER expected DATA_TYPE uint32 DATA
 END
 
 PIPELINE compute test_pipe
-  ATTACH test ENTRY_POINT hadd
+  ATTACH test ENTRY_POINT test_hadd
   BIND BUFFER out_buf KERNEL ARG_NAME out
   BIND BUFFER a_buf KERNEL ARG_NAME a
   BIND BUFFER b_buf KERNEL ARG_NAME b
