@@ -25,6 +25,7 @@ set(CLSPV_LLVM_COMPONENTS
   LLVMCore
   LLVMInstCombine
   LLVMInstrumentation
+  LLVMIRReader
   LLVMObjCARCOpts
   LLVMPasses
   LLVMScalarOpts
