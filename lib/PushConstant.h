@@ -20,6 +20,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
 
 namespace clspv {
 
@@ -54,6 +56,24 @@ bool ShouldDeclareRegionGroupOffsetPushConstant(llvm::Module &);
 
 // Returns the size of global push constants.
 uint64_t GlobalPushConstantsSize(llvm::Module &);
+
+// (Re-)Declares the global push constant variable with |mangled_struct_ty|
+// as the last member.
+void RedeclareGlobalPushConstants(llvm::Module &M,
+                                  llvm::StructType *mangled_struct_ty,
+                                  int push_constant_type);
+
+// Converts the corresponding elements of the global push constants for pod
+// args in member |index| of |pod_struct|.
+llvm::Value *ConvertToType(llvm::Module &M, llvm::StructType *pod_struct,
+                           unsigned index, llvm::IRBuilder<> &builder);
+
+// Builds |dst_type| from |elements|, where |elements| is a vector i32 loads.
+llvm::Value *BuildFromElements(llvm::Module &M, llvm::IRBuilder<> &builder,
+                               llvm::Type *dst_type, uint64_t base_offset,
+                               uint64_t base_index,
+                               const std::vector<llvm::Value *> &elements);
+
 } // namespace clspv
 
 #endif // #ifndef CLSPV_LIB_PUSH_CONSTANT_H_

@@ -26,6 +26,8 @@ enum class PushConstant : int {
   NumWorkgroups,
   RegionGroupOffset,
   KernelArgument,
+  ChannelOrder,
+  ChannelDataType,
 };
 
 // Returns the name of the push constant from its enum.

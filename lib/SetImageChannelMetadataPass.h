@@ -12,26 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 
-#ifndef _CLSPV_LIB_CLUSTER_POD_KERNEL_ARGUMENTS_PASS_H
-#define _CLSPV_LIB_CLUSTER_POD_KERNEL_ARGUMENTS_PASS_H
+#ifndef _CLSPV_LIB_SET_IMAGE_CHANNEL_METADATA_GETTER_H
+#define _CLSPV_LIB_SET_IMAGE_CHANNEL_METADATA_GETTER_H
 
 namespace clspv {
-struct ClusterPodKernelArgumentsPass
-    : llvm::PassInfoMixin<ClusterPodKernelArgumentsPass> {
+struct SetImageChannelMetadataPass
+    : llvm::PassInfoMixin<SetImageChannelMetadataPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
-
-private:
-  // Returns the type-mangled struct for global pod args. Only generates
-  // unpacked structs currently. The type conversion code does not handle
-  // packed structs propoerly. AutoPodArgsPass would also need updates to
-  // support packed structs.
-  llvm::StructType *GetTypeMangledPodArgsStruct(llvm::Module &M);
-
 };
 } // namespace clspv
 
-#endif // _CLSPV_LIB_CLUSTER_POD_KERNEL_ARGUMENTS_PASS_H
+#endif // _CLSPV_LIB_SET_IMAGE_CHANNEL_METADATA_GETTER_H

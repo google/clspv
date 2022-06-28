@@ -44,11 +44,13 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineEntryPointsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithImageMetadataGetterPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerBitCastArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithPointerToFunctionArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/InlineFuncWithSingleCallSitePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Layout.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/LongVectorLoweringPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/SetImageChannelMetadataPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ThreeElementVectorLoweringPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NativeMathPass.cpp

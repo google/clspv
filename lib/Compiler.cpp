@@ -515,6 +515,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     if (clspv::Option::InlineEntryPoints()) {
       pm.addPass(clspv::InlineEntryPointsPass());
     } else {
+      pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
       pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
       pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
       pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
@@ -626,6 +627,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass mucks with types to point where you shouldn't rely on
     // DataLayout anymore so leave this right before SPIR-V generation.
     pm.addPass(clspv::UBOTypeTransformPass());
+    pm.addPass(clspv::SetImageChannelMetadataPass());
     pm.addPass(clspv::SPIRVProducerPass(binaryStream, OutputFormat == "c"));
   });
 
