@@ -286,12 +286,16 @@ bool clspv::IsArrayImageType(StructType *type) {
     return false;
   if (type->getName().startswith("opencl.image1d_array_ro_t") ||
       type->getName().startswith("opencl.image1d_array_wo_t") ||
+      type->getName().startswith("opencl.image1d_array_rw_t") ||
       type->getName().startswith("opencl.image2d_array_ro_t") ||
       type->getName().startswith("opencl.image2d_array_wo_t") ||
+      type->getName().startswith("opencl.image2d_array_rw_t") ||
       type->getName().startswith("ocl_image1d_array_ro") ||
       type->getName().startswith("ocl_image1d_array_wo") ||
+      type->getName().startswith("ocl_image1d_array_rw") ||
       type->getName().startswith("ocl_image2d_array_ro") ||
-      type->getName().startswith("ocl_image2d_array_wo")) {
+      type->getName().startswith("ocl_image2d_array_wo") ||
+      type->getName().startswith("ocl_image2d_array_rw")) {
     return true;
   }
   return false;
