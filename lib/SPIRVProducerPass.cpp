@@ -3713,6 +3713,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
   case Builtins::kGetImageHeight:
   case Builtins::kGetImageWidth:
   case Builtins::kGetImageDepth:
+  case Builtins::kGetImageArraySize:
   case Builtins::kGetImageDim: {
     // get_image_* is mapped to OpImageQuerySize or OpImageQuerySizeLod
     addCapability(spv::CapabilityImageQuery);
@@ -3792,6 +3793,9 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
         component = 1;
       else if (FuncInfo.getType() == Builtins::kGetImageDepth)
         component = 2;
+      else if (FuncInfo.getType() == Builtins::kGetImageArraySize)
+        component =
+            components - 1; // array size is the last element of the vector
       Ops << component;
 
       RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
