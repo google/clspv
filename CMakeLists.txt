@@ -52,6 +52,11 @@ if(NOT IS_DIRECTORY ${path})
 endif()
 endmacro()
 
+option(SKIP_CLSPV_INSTALL "Skip installation" ${SKIP_CLSPV_INSTALL})
+if(NOT ${SKIP_CLSPV_INSTALL})
+  set(ENABLE_CLSPV_INSTALL ON)
+endif()
+
 option(SKIP_CLSPV_TOOLS_INSTALL "Skip installation" ${SKIP_CLSPV_TOOLS_INSTALL})
 if(NOT ${SKIP_CLSPV_TOOLS_INSTALL})
   set(ENABLE_CLSPV_TOOLS_INSTALL ON)
@@ -182,19 +187,3 @@ if (CLSPV_BUILD_TESTS)
   # Bring in our test folder
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
 endif()
-
-
-if(ENABLE_CLSPV_TOOLS_INSTALL)
-  install(
-    FILES
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/AddressSpace.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/ArgKind.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Compiler.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Option.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Passes.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/PushConstant.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/Sampler.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/clspv/SpecConstant.h
-    DESTINATION
-      ${CMAKE_INSTALL_INCLUDEDIR}/clspv/)
-endif(ENABLE_CLSPV_TOOLS_INSTALL)

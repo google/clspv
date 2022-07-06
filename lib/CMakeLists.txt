@@ -150,10 +150,41 @@ if (MSVC)
   )
 endif()
 
-if(ENABLE_CLSPV_TOOLS_INSTALL)
+if (ENABLE_CLSPV_INSTALL)
+  include(../cmake/util.cmake)
+  clspv_combine_static_lib(clspv_combined clspv_core)
+
+  install(
+    FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/AddressSpace.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/ArgKind.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Compiler.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Option.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Passes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/PushConstant.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Sampler.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/SpecConstant.h
+    DESTINATION
+      ${CMAKE_INSTALL_INCLUDEDIR}/clspv/)
+
   install(
     TARGETS clspv_core clspv_passes
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
-endif(ENABLE_CLSPV_TOOLS_INSTALL)
+
+  # Since clspv_combined is defined as an imported library, we cannot use the
+  # install() directive to install it. Install it like a normal file.
+  get_target_property(generated_location clspv_combined LOCATION)
+  string(REGEX MATCH "Visual Studio .*" vs_generator "${CMAKE_GENERATOR}")
+  if (NOT "${vs_generator}" STREQUAL "")
+    # With Visual Studio generators, the LOCATION property is not properly
+    # expanded according to the current build configuration. We need to work
+    # around this problem by manually substitution.
+    string(REPLACE "$(Configuration)" "\${CMAKE_INSTALL_CONFIG_NAME}"
+      install_location "${generated_location}")
+    install(FILES ${install_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  else()
+    install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  endif()
+endif()
