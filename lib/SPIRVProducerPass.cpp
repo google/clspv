@@ -1927,6 +1927,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     uint32_t bit_width =
         static_cast<uint32_t>(Canonical->getPrimitiveSizeInBits());
 
+    if (bit_width > 1) {
+      // round up bit_width to a multiple of 8
+      bit_width = ((bit_width + 7) / 8) * 8;
+    }
+
     if (clspv::Option::Int8Support() && bit_width == 8) {
       addCapability(spv::CapabilityInt8);
     } else if (bit_width == 16) {
