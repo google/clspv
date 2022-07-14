@@ -15,6 +15,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
+#include <map>
+
 #include "Builtins.h"
 #include "Constants.h"
 #include "PushConstant.h"
@@ -27,8 +29,7 @@ using namespace llvm;
 namespace {
 
 using ImageGetterMap =
-    DenseMap<std::pair<Function *, Value *>, SmallVector<CallInst *, 1>>;
-using OffsetMap = DenseMap<Function *, unsigned>;
+    std::map<std::pair<Value *, unsigned>, SmallVector<CallInst *, 1>>;
 using MetadataVector = SmallVector<Metadata *, 3>;
 
 unsigned getImageOrdinal(Value *Image) {
@@ -41,13 +42,6 @@ unsigned getImageOrdinal(Value *Image) {
       ->getZExtValue();
 }
 
-unsigned getFunctionNextOffset(OffsetMap &off_map, Function *F) {
-  if (off_map.find(F) == off_map.end()) {
-    off_map[F] = 0;
-  }
-  return off_map[F]++;
-}
-
 void concatWithFunctionMetadata(Function *F, MetadataVector &MDs) {
   auto fct_md = F->getMetadata(clspv::PushConstantsMetadataImageChannelName());
   if (fct_md != nullptr) {
@@ -57,14 +51,15 @@ void concatWithFunctionMetadata(Function *F, MetadataVector &MDs) {
   }
 }
 
-void setMetadata(Module &M, ImageGetterMap &map, OffsetMap &off_map, int pc) {
+unsigned setMetadata(Module &M, Function *F, ImageGetterMap &map) {
   auto i32 = IntegerType::get(M.getContext(), 32);
 
-  for (auto order : map) {
-    auto F = order.first.first;
-    auto image = order.first.second;
+  unsigned int count = 0;
+  for (auto elem : map) {
+    auto image = elem.first.first;
+    auto pc = elem.first.second;
 
-    unsigned offset = getFunctionNextOffset(off_map, F);
+    unsigned offset = count++;
     unsigned ordinal = getImageOrdinal(image);
 
     MetadataVector MDs = {
@@ -80,37 +75,23 @@ void setMetadata(Module &M, ImageGetterMap &map, OffsetMap &off_map, int pc) {
     auto call_md =
         MDNode::get(M.getContext(),
                     {ConstantAsMetadata::get(ConstantInt::get(i32, offset))});
-    for (auto call : order.second) {
+    for (auto call : elem.second) {
       // Set metadata for the call to be able to generate the appropriate gep
       // with the correct offset from it
       call->setMetadata(clspv::ImageGetterPushConstantOffsetName(), call_md);
     }
   }
+  return count;
 }
 
-unsigned getMaxElementIn(OffsetMap &map) {
-  unsigned max = 0;
-  for (auto element : map) {
-    unsigned local_max = element.second;
-    max = std::max(max, local_max);
-  }
-  return max;
-}
-
-void updatePushConstant(Module &M, OffsetMap &off_map) {
-  unsigned max_elements = getMaxElementIn(off_map);
-  if (max_elements == 0)
-    return;
-
+void updatePushConstant(Module &M, unsigned max_elements) {
   // Create and return the structure that will contains the needed values
   std::vector<Type *> orderTypes(max_elements,
                                  IntegerType::get(M.getContext(), 32));
   StructType *Ty = StructType::get(M.getContext(), orderTypes);
 
-  // All of them are not ChannelOrder, but it does not matter, as it will just
-  // be used to be skipped in spirvproducer.
   clspv::RedeclareGlobalPushConstants(M, Ty,
-                                      (int)clspv::PushConstant::ChannelOrder);
+                                      (int)clspv::PushConstant::ImageMetadata);
 }
 } // namespace
 
@@ -118,8 +99,7 @@ PreservedAnalyses
 clspv::SetImageChannelMetadataPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
-  ImageGetterMap MapOrder, MapDataType;
-  OffsetMap off_map;
+  unsigned max_elements = 0;
 
   // Go through function and instruction to look for image metadata getter
   // function
@@ -127,27 +107,30 @@ clspv::SetImageChannelMetadataPass::run(Module &M, ModuleAnalysisManager &) {
     if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL) {
       continue;
     }
+    ImageGetterMap Map;
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (auto call = dyn_cast<CallInst>(&I)) {
           auto Name = call->getCalledFunction()->getName();
           if (Name.contains("get_image_channel_order")) {
             Value *Image = call->getArgOperand(0);
-            MapOrder[std::make_pair(&F, Image)].push_back(call);
+            Map[std::make_pair(Image,
+                               (unsigned)clspv::ImageMetadata::ChannelOrder)]
+                .push_back(call);
           } else if (Name.contains("get_image_channel_data_type")) {
             Value *Image = call->getArgOperand(0);
-            MapDataType[std::make_pair(&F, Image)].push_back(call);
+            Map[std::make_pair(Image,
+                               (unsigned)clspv::ImageMetadata::ChannelDataType)]
+                .push_back(call);
           }
         }
       }
     }
+    max_elements = std::max(max_elements, setMetadata(M, &F, Map));
   }
 
-  setMetadata(M, MapOrder, off_map, (int)clspv::PushConstant::ChannelOrder);
-  setMetadata(M, MapDataType, off_map,
-               (int)clspv::PushConstant::ChannelDataType);
-
-  updatePushConstant(M, off_map);
+  if (max_elements > 0)
+    updatePushConstant(M, max_elements);
 
   return PA;
 }

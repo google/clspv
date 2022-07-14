@@ -627,7 +627,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass mucks with types to point where you shouldn't rely on
     // DataLayout anymore so leave this right before SPIR-V generation.
     pm.addPass(clspv::UBOTypeTransformPass());
+
+    // This pass depends on the inlining of the image metadata getter from
+    // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
+
     pm.addPass(clspv::SPIRVProducerPass(binaryStream, OutputFormat == "c"));
   });
 

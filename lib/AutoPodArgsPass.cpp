@@ -57,7 +57,6 @@ bool FunctionContainsImageChannelGetter(Function *F) {
   std::set<Function *> visited_fct;
   SmallVector<Function *, 1> fcts_to_visit;
   SmallVector<Function *, 1> next_fcts_to_visit;
-  auto &M = *F->getParent();
   fcts_to_visit.push_back(F);
   while (!fcts_to_visit.empty()) {
     for (auto *fct : fcts_to_visit) {

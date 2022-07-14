@@ -28,9 +28,11 @@ entry:
 }
 
 ; CHECK:  define dso_local spir_func i32 @bar
-; CHECK:  call spir_func i32 @_Z23get_image_channel_order14ocl_image2d_ro
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:  call spir_func i32 @_Z23get_image_channel_order14ocl_image2d_ro
 ; CHECK:  ret i32
 
 ; CHECK:  define dso_local spir_kernel void @foo
-; CHECK:  call spir_func i32 @_Z23get_image_channel_order14ocl_image2d_ro
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:  call spir_func i32 @_Z23get_image_channel_order14ocl_image2d_ro
 ; CHECK:  ret void

@@ -48,10 +48,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "region_group_offset";
   case PushConstant::KernelArgument:
     return "kernel_argument";
-  case PushConstant::ChannelOrder:
-    return "channel_order";
-  case PushConstant::ChannelDataType:
-    return "channel_data_type";
+  case PushConstant::ImageMetadata:
+    return "image_metadata";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -74,9 +72,7 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
     return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::RegionGroupOffset:
     return FixedVectorType::get(IntegerType::get(C, 32), 3);
-  case PushConstant::ChannelOrder:
-    return IntegerType::get(C, 32);
-  case PushConstant::ChannelDataType:
+  case PushConstant::ImageMetadata:
     return IntegerType::get(C, 32);
   default:
     break;

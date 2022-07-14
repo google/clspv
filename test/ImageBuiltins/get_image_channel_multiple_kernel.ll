@@ -89,7 +89,7 @@ declare { { i32 } } addrspace(9)* @_Z14clspv.resource.4(i32 %0, i32 %1, i32 %2, 
 ; CHECK-DAG: tail call spir_func i32 @_Z27get_image_channel_data_type33opencl.image1d_ro_t.float.sampled(%opencl.image1d_ro_t.float.sampled addrspace(1)* %2), !image_getter_push_constant_offset [[call2:![^ ]+]]
 ; CHECK-DAG: tail call spir_func i32 @_Z27get_image_channel_data_type33opencl.image1d_ro_t.float.sampled(%opencl.image1d_ro_t.float.sampled addrspace(1)* %3), !image_getter_push_constant_offset [[call3:![^ ]+]]
 
-; CHECK-DAG: [[pc]] = !{i32 [[order_pc:[^ ]+]]}
-; CHECK-DAG: [[fct0_kernel]] = !{i32 1, i32 0, i32 [[order_pc]]}
-; CHECK-DAG: [[fct1_kernel]] = !{i32 1, i32 0, i32 [[data_type_pc:[^ ]+]]}
-; CHECK-DAG: [[fct2_kernel]] = !{i32 {{.*}}, i32 3, i32 [[data_type_pc]], i32 {{.*}}, i32 2, i32 [[data_type_pc]], i32 {{.*}}, i32 1, i32 [[order_pc]], i32 {{.*}}, i32 0, i32 [[order_pc]]
+; CHECK-DAG: [[pc]] = !{i32 8}
+; CHECK-DAG: [[fct0_kernel]] = !{i32 1, i32 0, i32 0}
+; CHECK-DAG: [[fct1_kernel]] = !{i32 1, i32 0, i32 1}
+; CHECK-DAG: [[fct2_kernel]] = !{i32 {{.*}}, i32 3, i32 1, i32 {{.*}}, i32 2, i32 0, i32 {{.*}}, i32 1, i32 1, i32 {{.*}}, i32 0, i32 0

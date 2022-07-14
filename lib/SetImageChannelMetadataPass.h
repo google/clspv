@@ -18,6 +18,11 @@
 #ifndef _CLSPV_LIB_SET_IMAGE_CHANNEL_METADATA_GETTER_H
 #define _CLSPV_LIB_SET_IMAGE_CHANNEL_METADATA_GETTER_H
 
+// This pass depends in the fact that image metadata getter need to have been
+// inlining into kernels to be able to get the image passed to those getter
+// functions.
+// This is done by the InlineFuncWithImageMetadataGetterPass
+
 namespace clspv {
 struct SetImageChannelMetadataPass
     : llvm::PassInfoMixin<SetImageChannelMetadataPass> {

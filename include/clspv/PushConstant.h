@@ -26,6 +26,10 @@ enum class PushConstant : int {
   NumWorkgroups,
   RegionGroupOffset,
   KernelArgument,
+  ImageMetadata,
+};
+
+enum class ImageMetadata : int {
   ChannelOrder,
   ChannelDataType,
 };

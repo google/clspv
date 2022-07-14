@@ -6391,8 +6391,7 @@ void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
       auto pc = static_cast<clspv::PushConstant>(
           mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
       if (pc == PushConstant::KernelArgument ||
-          pc == PushConstant::ChannelOrder ||
-          pc == PushConstant::ChannelDataType)
+          pc == PushConstant::ImageMetadata)
         continue;
 
       auto memberType = STy->getElementType(i);
@@ -6695,7 +6694,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         auto index =
             mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 1))
                 ->getZExtValue();
-        auto pc = static_cast<clspv::PushConstant>(
+        auto pc = static_cast<clspv::ImageMetadata>(
             mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 2))
                 ->getZExtValue());
         auto offset = GetExplicitLayoutStructMemberOffset(
@@ -6707,11 +6706,11 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
 
         reflection::ExtInst pc_inst = reflection::ExtInstMax;
         switch (pc) {
-        case PushConstant::ChannelOrder:
+        case ImageMetadata::ChannelOrder:
           pc_inst =
               reflection::ExtInstImageArgumentInfoChannelOrderPushConstant;
           break;
-        case PushConstant::ChannelDataType:
+        case ImageMetadata::ChannelDataType:
           pc_inst =
               reflection::ExtInstImageArgumentInfoChannelDataTypePushConstant;
           break;
