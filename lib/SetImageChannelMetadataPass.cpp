@@ -48,7 +48,7 @@ unsigned getFunctionNextOffset(OffsetMap &off_map, Function *F) {
   return off_map[F]++;
 }
 
-void concatWithFunctionMetadatas(Function *F, MetadataVector &MDs) {
+void concatWithFunctionMetadata(Function *F, MetadataVector &MDs) {
   auto fct_md = F->getMetadata(clspv::PushConstantsMetadataImageChannelName());
   if (fct_md != nullptr) {
     for (unsigned i = 0; i < fct_md->getNumOperands(); i++) {
