@@ -117,7 +117,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
           clspv::isValidExplicitLayout(M, struct_ty, spv::StorageClassUniform);
     }
   }
-  bool contains_image_channel_getter = FunctionContainsImageChannelGetter(&F);
+  const bool contains_image_channel_getter = FunctionContainsImageChannelGetter(&F);
 
   // Per-kernel push constant interface requires:
   // 1. Clustered pod args.
