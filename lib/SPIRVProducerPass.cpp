@@ -6680,7 +6680,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
       }
     }
 
-    // Generate the reflexion for the image channel getter function if it is
+    // Generate the reflection for the image channel getter function if it is
     // used in this kernel.
     auto *image_getter_md = F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
     if (image_getter_md) {
