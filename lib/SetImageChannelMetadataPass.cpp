@@ -73,7 +73,7 @@ void setMetadata(Module &M, ImageGetterMap &map, OffsetMap &off_map, int pc) {
         ConstantAsMetadata::get(ConstantInt::get(i32, pc))};
     concatWithFunctionMetadata(F, MDs);
     // Set metadata for the function to be able to generate the appropriate
-    // reflexion from it
+    // reflection from it
     F->setMetadata(clspv::PushConstantsMetadataImageChannelName(),
                    MDNode::get(M.getContext(), MDs));
 
