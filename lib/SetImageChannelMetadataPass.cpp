@@ -143,8 +143,8 @@ clspv::SetImageChannelMetadataPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
-  setMetadatas(M, MapOrder, off_map, (int)clspv::PushConstant::ChannelOrder);
-  setMetadatas(M, MapDataType, off_map,
+  setMetadata(M, MapOrder, off_map, (int)clspv::PushConstant::ChannelOrder);
+  setMetadata(M, MapDataType, off_map,
                (int)clspv::PushConstant::ChannelDataType);
 
   updatePushConstant(M, off_map);
