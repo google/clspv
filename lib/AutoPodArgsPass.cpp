@@ -70,7 +70,7 @@ bool FunctionContainsImageChannelGetter(Function *F) {
                 Name.contains("get_image_channel_data_type")) {
               return true;
             } else {
-              Function *f = M.getFunction(Name);
+              Function *f = call->getCalledFunction();
               if (visited_fct.count(f) == 0) {
                 next_fcts_to_visit.push_back(f);
               }
