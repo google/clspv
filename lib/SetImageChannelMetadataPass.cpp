@@ -57,7 +57,7 @@ void concatWithFunctionMetadatas(Function *F, MetadataVector &MDs) {
   }
 }
 
-void setMetadatas(Module &M, ImageGetterMap &map, OffsetMap &off_map, int pc) {
+void setMetadata(Module &M, ImageGetterMap &map, OffsetMap &off_map, int pc) {
   auto i32 = IntegerType::get(M.getContext(), 32);
 
   for (auto order : map) {
