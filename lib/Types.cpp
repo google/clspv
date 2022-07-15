@@ -50,6 +50,10 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   // Return the source data interpretation type.
   if (auto *gep = dyn_cast<GEPOperator>(v)) {
     return CacheType(gep->getResultElementType());
+  } else if (auto *alloca = dyn_cast<AllocaInst>(v)) {
+    return CacheType(alloca->getAllocatedType());
+  } else if (auto *gv = dyn_cast<GlobalVariable>(v)) {
+    return CacheType(gv->getValueType());
   }
 
   // Special resource-related functions. The last parameter of each function is

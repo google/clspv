@@ -15,6 +15,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -22,6 +23,7 @@
 
 #include "ReplacePointerBitcastPass.h"
 #include "BitcastUtils.h"
+#include "Types.h"
 
 using namespace llvm;
 using namespace BitcastUtils;
@@ -268,6 +270,7 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
   unsigned DstTyBitWidth = SizeInBits(Builder, DstTy);
   unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
 
+  Type *OrigSrcTy = SrcTy;
   SmallVector<Value *, 4> AddrIdxs;
   ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
              AddrIdxs, ToBeDeleted);
@@ -285,11 +288,9 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
       LastAddrIdx = Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
       AddrIdxs.push_back(LastAddrIdx);
     }
-    Value *SrcAddr = Builder.CreateGEP(
-        GetEleType(Src->getType())->getNonOpaquePointerElementType(), Src,
-        AddrIdxs);
+    auto *SrcAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
     LoadInst *SrcVal = Builder.CreateLoad(
-        SrcAddr->getType()->getNonOpaquePointerElementType(), SrcAddr);
+        cast<GEPOperator>(SrcAddr)->getResultElementType(), SrcAddr);
     LDValues.push_back(SrcVal);
   }
 
@@ -356,6 +357,7 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   unsigned DstTyBitWidth = SizeInBits(Builder, DstTy);
   unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
 
+  Type *OrigSrcTy = SrcTy;
   SmallVector<Value *, 4> AddrIdxs;
   ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
              AddrIdxs, ToBeDeleted);
@@ -430,9 +432,7 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
       AddrIdxs.push_back(LastAddrIdx);
     }
 
-    Value *DstAddr = Builder.CreateGEP(
-        GetEleType(Src->getType())->getNonOpaquePointerElementType(), Src,
-        AddrIdxs);
+    Value *DstAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
 
     Builder.CreateStore(STValues[i], DstAddr);
   }
@@ -444,11 +444,63 @@ PreservedAnalyses
 clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
-  const DataLayout &DL = M.getDataLayout();
-
   WeakInstructions ToBeDeleted;
   SmallVector<Instruction *, 16> WorkList;
   SmallVector<User *, 16> UserWorkList;
+  DenseMap<Value *, Type *> type_cache;
+  DenseSet<Value *> ImplicitCasts;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Value *dest = &I;
+        Type *dest_ty = nullptr;
+        // The following checks use InferType to distinguish when a pointer's
+        // interpretation changes between instructions. This requires the input
+        // to be an instruction whose result provides a clear type for a
+        // pointer (e.g. gep, alloca, or global variable).
+        if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+          source = gep->getPointerOperand();
+          source_ty = clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
+          dest_ty = gep->getSourceElementType();
+        } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
+          source = ld->getPointerOperand();
+          source_ty = clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
+          dest_ty = ld->getType();
+        } else if (auto *st = dyn_cast<StoreInst>(&I)) {
+          source = st->getPointerOperand();
+          source_ty = clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
+          dest_ty = st->getValueOperand()->getType();
+        }
+
+        if (source_ty && dest_ty && source_ty != dest_ty) {
+          bool ok = true;
+          UserWorkList.push_back(&I);
+          while (!UserWorkList.empty()) {
+            auto *user = UserWorkList.back();
+            UserWorkList.pop_back();
+
+            if (isa<GetElementPtrInst>(user)) {
+              for (auto *U : user->users())
+                UserWorkList.push_back(U);
+            } else if (!isa<StoreInst>(user) && !isa<LoadInst>(user)) {
+              ok = false;
+              break;
+            }
+          }
+          if (!ok)
+            continue;
+
+          ImplicitCasts.insert(source);
+          WorkList.push_back(&I);
+        }
+      }
+    }
+  }
+
+  const DataLayout &DL = M.getDataLayout();
+
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
@@ -500,11 +552,32 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
+
   for (Instruction *Inst : WorkList) {
     LLVM_DEBUG(dbgs() << "## Inst: "; Inst->dump());
-    Value *Src = Inst->getOperand(0);
-    Type *SrcTy = Src->getType()->getNonOpaquePointerElementType();
-    Type *DstTy = Inst->getType()->getNonOpaquePointerElementType();
+    Value *Src = nullptr;
+    Type *SrcTy = nullptr;
+    Type *DstTy = nullptr;
+    // TODO(#816): remove after final transition.
+    if (isa<BitCastInst>(Inst)) {
+      Src = Inst->getOperand(0);
+      SrcTy = Src->getType()->getNonOpaquePointerElementType();
+      DstTy = Inst->getType()->getNonOpaquePointerElementType();
+    } else {
+      if (auto *gep = dyn_cast<GetElementPtrInst>(Inst)) {
+        Src = gep->getPointerOperand();
+        DstTy = gep->getSourceElementType();
+      } else if (auto *ld = dyn_cast<LoadInst>(Inst)) {
+        Src = ld->getPointerOperand();
+        DstTy = ld->getType();
+      } else if (auto *st = dyn_cast<StoreInst>(Inst)) {
+        Src = st->getPointerOperand();
+        DstTy = st->getValueOperand()->getType();
+      } else {
+        llvm_unreachable("unsupported opaque pointer cast");
+      }
+      SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+    }
 
     SmallVector<size_t, 4> SrcTyBitWidths;
     Type *TmpTy = SrcTy;
@@ -522,8 +595,16 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     bool isPrivateMemory = isa<AllocaInst>(Src);
 
     // Investigate pointer bitcast's users.
-    for (User *BitCastUser : Inst->users()) {
-      LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
+    // TODO(#816): remove after final transition.
+    Value *start = isa<BitCastInst>(Inst) ? Inst : Src;
+    for (User *BitCastUser : start->users()) {
+      if (ImplicitCasts.count(BitCastUser)) {
+        // If this user was queued on the worklist as an implicit cast
+        // separately, don't handle it now.
+        continue;
+      }
+
+     LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
       SmallVector<Value *, 4> NewAddrIdxs;
 
       // It consist of User* and bool whether user is gep or not.
