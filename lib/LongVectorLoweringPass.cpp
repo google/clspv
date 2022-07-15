@@ -87,6 +87,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::ctlz:
   case Intrinsic::exp:
   case Intrinsic::fabs:
+  case Intrinsic::floor:
   case Intrinsic::fmuladd:
   case Intrinsic::fshl:
   case Intrinsic::log:
@@ -193,6 +194,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kAtanh:
   case clspv::Builtins::kCeil:
   case clspv::Builtins::kClamp:
+  case clspv::Builtins::kClspvFract:
   case clspv::Builtins::kCos:
   case clspv::Builtins::kCosh:
   case clspv::Builtins::kCospi:
