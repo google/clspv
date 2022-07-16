@@ -4341,6 +4341,15 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         Ops << OpTy << I.getOperand(0) << getSPIRVInt32Constant(255);
 
         RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+      } else if (Ty->isIntOrIntVectorTy(1) &&
+                 I.getOpcode() == Instruction::Trunc) {
+        // We usually map trunc to OpUConvert.
+        // But OpUConvert only takes integer types in input, not boolean type.
+        // Instead use OpINotEqual.
+        SPIRVOperandVec Ops;
+        Ops << Ty << I.getOperand(0)
+            << getSPIRVValue(ConstantInt::get(OpTy, 0));
+        RID = addSPIRVInst(spv::OpINotEqual, Ops);
       } else {
         // Ops[0] = Result Type ID
         // Ops[1] = Source Value ID
