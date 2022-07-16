@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-__kernel void foo( __global int* dst, __global int * src, const int n )
+__kernel void foo( __global char* dst, __global char * src, const int n )
 {
    size_t gid = get_global_id(0);
    int cond = 0;
@@ -22,3 +22,5 @@ __kernel void foo( __global int* dst, __global int * src, const int n )
 
 // CHECK-NOT: OpTypeInt 2 0
 // CHECK: OpTypeInt 8 0
+// CHECK-NOT: OpTypeInt 8 0
+// CHECK-NOT: OpTypeInt 2 0
