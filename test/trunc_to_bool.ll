@@ -16,5 +16,5 @@ entry:
 ; CHECK-DAG: [[v2uint:%[^ ]+]] = OpTypeVector [[uint]] 2
 ; CHECK-DAG: [[bool:%[^ ]+]] = OpTypeBool
 ; CHECK-DAG: [[v2bool:%[^ ]+]] = OpTypeVector [[bool]] 2
-; CHECK: [[null:%[^ ]+]] = OpConstantNull [[v2uint]]
+; CHECK-DAG: [[null:%[^ ]+]] = OpConstantNull [[v2uint]]
 ; CHECK: OpINotEqual [[v2bool]] [[null]] [[null]]
