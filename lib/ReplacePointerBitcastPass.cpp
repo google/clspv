@@ -454,7 +454,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       for (auto &I : BB) {
         Value *source = nullptr;
         Type *source_ty = nullptr;
-        Value *dest = &I;
         Type *dest_ty = nullptr;
         // The following checks use InferType to distinguish when a pointer's
         // interpretation changes between instructions. This requires the input
