@@ -1468,7 +1468,14 @@ SPIRVID SPIRVProducerPassImpl::addSPIRVGlobalVariable(const SPIRVID &TypeID,
 }
 
 Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
-  if (type->getNumContainedTypes() != 0) {
+  if (type->isIntegerTy()) {
+    auto bit_width = static_cast<uint32_t>(type->getPrimitiveSizeInBits());
+    if (bit_width > 1) {
+      // round up bit_width to a multiple of 8
+      bit_width = ((bit_width + 7) / 8) * 8;
+    }
+    return IntegerType::get(type->getContext(), bit_width);
+  } else if (type->getNumContainedTypes() != 0) {
     switch (type->getTypeID()) {
     case Type::PointerTyID: {
       // For the purposes of our Vulkan SPIR-V type system, constant and global
