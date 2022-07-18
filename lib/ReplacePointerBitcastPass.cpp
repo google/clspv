@@ -603,7 +603,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         continue;
       }
 
-     LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
+      LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
       SmallVector<Value *, 4> NewAddrIdxs;
 
       // It consist of User* and bool whether user is gep or not.

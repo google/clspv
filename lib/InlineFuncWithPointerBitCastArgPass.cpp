@@ -157,8 +157,8 @@ bool clspv::InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
               auto *next_gep = cast<GetElementPtrInst>(user);
               if (result_ele_ty &&
                   next_gep->getResultElementType() != result_ele_ty) {
-                // TODO: this is an over-approximation, but it's easier to not
-                // worry about phis.
+                // TODO: this is an over-approximation, but it is necessary
+                // unless we want to traverse phis multiple times.
                 add_all = true;
               }
               for (auto &use : user->uses()) {
