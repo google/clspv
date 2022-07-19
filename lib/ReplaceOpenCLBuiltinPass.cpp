@@ -2045,7 +2045,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
           PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
 
       // Cast the half* pointer to short*.
-      auto Cast = CastInst::CreatePointerCast(Arg1, ShortPointerTy, "", CI);
+      // TODO(#816): remove after final transition.
+      Value *Cast = Arg1;
+      if (Arg1->getType() != ShortPointerTy) {
+        Cast = CastInst::CreatePointerCast(Arg1, ShortPointerTy, "", CI);
+      }
 
       // Index into the correct address of the casted pointer.
       auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg0, "", CI);
@@ -2083,7 +2087,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
       // Cast the base pointer to int*.
       // In a valid call (according to assumptions), this should get
       // optimized away in the simplify GEP pass.
-      auto Cast = CastInst::CreatePointerCast(Arg1, IntPointerTy, "", CI);
+      // TODO(#816): remove after final transition.
+      Value *Cast = Arg1;
+      if (Arg1->getType() != IntPointerTy) {
+        Cast = CastInst::CreatePointerCast(Arg1, IntPointerTy, "", CI);
+      }
 
       auto One = ConstantInt::get(IntTy, 1);
       auto IndexIsOdd = BinaryOperator::CreateAnd(Arg0, One, "", CI);
@@ -2122,7 +2130,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Cast the half* pointer to int*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg0, "", CI);
@@ -2163,7 +2175,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
     auto Int2 = ConstantInt::get(IntTy, 2);
 
     // Cast the half* pointer to short*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Load the first element
     auto Index0 = BinaryOperator::Create(
@@ -2230,7 +2246,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Cast the half* pointer to int2*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
@@ -2282,7 +2302,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Cast the half* pointer to int2*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
@@ -2334,7 +2358,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Cast the half* pointer to int4*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg0, "", CI);
@@ -2402,7 +2430,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Cast the half* pointer to int4*.
-    auto Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg1;
+    if (Arg1->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0, ConstantInt::get(IntTy, 1), "", CI);
@@ -2645,7 +2677,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
 
       // Cast the half* pointer to short*.
-      auto Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
+      // TODO(#816): remove after final transition.
+      Value *Cast = Arg2;
+      if (Arg2->getType() != ShortPointerTy) {
+        Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
+      }
 
       // Index into the correct address of the casted pointer.
       auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
@@ -2683,8 +2719,12 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       // Compute index / 2
       auto IndexIntoI32 =
           BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
-      auto BaseI32Ptr =
+      // TODO(#816): remove after final transition.
+      Value *BaseI32Ptr = Arg2;
+      if (Arg2->getType() != IntPointerTy) {
+        BaseI32Ptr =
           CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
+      }
       auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32,
                                               "base_i32_ptr", CI);
       auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
@@ -2766,7 +2806,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
     auto X = CallInst::Create(NewF, Arg0, "", CI);
 
     // Cast the half* pointer to int*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg1, "", CI);
@@ -2828,7 +2872,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
                          ShortTy, "", CI);
 
     // Cast the half* pointer to short*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     auto Index0 = BinaryOperator::Create(
         Instruction::Add,
@@ -2901,7 +2949,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
                          ShortTy, "", CI);
 
     // Cast the half* pointer to short*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     auto Index0 = BinaryOperator::Create(Instruction::Shl, Arg1, Int2, "", CI);
     auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
@@ -2969,7 +3021,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
                                         "", CI);
 
     // Cast the half* pointer to int2*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg1, "", CI);
@@ -3039,7 +3095,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
                                         ConstantInt::get(IntTy, 3), "", CI);
 
     // Cast the half* pointer to int4*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg1, "", CI);
@@ -3134,7 +3194,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
                                          ConstantInt::get(IntTy, 3), "", CI);
 
     // Cast the half* pointer to int4*.
-    auto Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    // TODO(#816): remove after final transition.
+    Value *Cast = Arg2;
+    if (Arg2->getType() != NewPointerTy) {
+      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
+    }
 
     // Index into the correct address of the casted pointer.
     auto Arg1x2 = BinaryOperator::Create(Instruction::Shl, Arg1,
