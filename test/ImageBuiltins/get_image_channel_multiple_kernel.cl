@@ -53,7 +53,7 @@ void kernel fct2(global int *dst, image1d_t read_only image1, image1d_t read_onl
 // CHECK:  [[kernel1:%[^ ]+]] = OpExtInst %void {{.*}} Kernel [[fct1]] [[fct1_str]]
 // CHECK:  ImageArgumentInfoChannelDataTypePushConstant [[kernel1]] %uint_1 %uint_4 %uint_4
 // CHECK:  [[kernel2:%[^ ]+]] = OpExtInst %void {{.*}} Kernel [[fct2]] [[fct2_str]]
-// CHECK-DAG:  ImageArgumentInfoChannelOrderPushConstant [[kernel2]] {{.*}} %uint_4 %uint_4
-// CHECK-DAG:  ImageArgumentInfoChannelDataTypePushConstant [[kernel2]] {{.*}} %uint_8 %uint_4
-// CHECK-DAG:  ImageArgumentInfoChannelOrderPushConstant [[kernel2]] {{.*}} %uint_12 %uint_4
-// CHECK-DAG:  ImageArgumentInfoChannelDataTypePushConstant [[kernel2]] {{.*}} %uint_16 %uint_4
+// CHECK-DAG:  ImageArgumentInfoChannelOrderPushConstant [[kernel2]] %uint_1 %uint_4 %uint_4
+// CHECK-DAG:  ImageArgumentInfoChannelOrderPushConstant [[kernel2]] %uint_2 %uint_8 %uint_4
+// CHECK-DAG:  ImageArgumentInfoChannelDataTypePushConstant [[kernel2]] %uint_1 %uint_12 %uint_4
+// CHECK-DAG:  ImageArgumentInfoChannelDataTypePushConstant [[kernel2]] %uint_2 %uint_16 %uint_4

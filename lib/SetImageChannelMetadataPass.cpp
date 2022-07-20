@@ -29,7 +29,7 @@ using namespace llvm;
 namespace {
 
 using ImageGetterMap =
-    std::map<std::pair<Value *, unsigned>, SmallVector<CallInst *, 1>>;
+    std::map<std::pair<unsigned, unsigned>, SmallVector<CallInst *, 1>>;
 using MetadataVector = SmallVector<Metadata *, 3>;
 
 unsigned getImageOrdinal(Value *Image) {
@@ -56,11 +56,11 @@ unsigned setMetadata(Module &M, Function *F, ImageGetterMap &map) {
 
   unsigned int count = 0;
   for (auto elem : map) {
-    auto image = elem.first.first;
-    auto pc = elem.first.second;
+    auto pc = elem.first.first;
+    auto ordinal = elem.first.second;
+    auto calls = elem.second;
 
     unsigned offset = count++;
-    unsigned ordinal = getImageOrdinal(image);
 
     MetadataVector MDs = {
         ConstantAsMetadata::get(ConstantInt::get(i32, ordinal)),
@@ -75,7 +75,7 @@ unsigned setMetadata(Module &M, Function *F, ImageGetterMap &map) {
     auto call_md =
         MDNode::get(M.getContext(),
                     {ConstantAsMetadata::get(ConstantInt::get(i32, offset))});
-    for (auto call : elem.second) {
+    for (auto call : calls) {
       // Set metadata for the call to be able to generate the appropriate gep
       // with the correct offset from it
       call->setMetadata(clspv::ImageGetterPushConstantOffsetName(), call_md);
@@ -113,14 +113,14 @@ clspv::SetImageChannelMetadataPass::run(Module &M, ModuleAnalysisManager &) {
         if (auto call = dyn_cast<CallInst>(&I)) {
           auto Name = call->getCalledFunction()->getName();
           if (Name.contains("get_image_channel_order")) {
-            Value *Image = call->getArgOperand(0);
-            Map[std::make_pair(Image,
-                               (unsigned)clspv::ImageMetadata::ChannelOrder)]
+            unsigned ordinal = getImageOrdinal(call->getArgOperand(0));
+            Map[std::make_pair((unsigned)clspv::ImageMetadata::ChannelOrder,
+                               ordinal)]
                 .push_back(call);
           } else if (Name.contains("get_image_channel_data_type")) {
-            Value *Image = call->getArgOperand(0);
-            Map[std::make_pair(Image,
-                               (unsigned)clspv::ImageMetadata::ChannelDataType)]
+            unsigned ordinal = getImageOrdinal(call->getArgOperand(0));
+            Map[std::make_pair((unsigned)clspv::ImageMetadata::ChannelDataType,
+                               ordinal)]
                 .push_back(call);
           }
         }

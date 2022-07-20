@@ -92,4 +92,4 @@ declare { { i32 } } addrspace(9)* @_Z14clspv.resource.4(i32 %0, i32 %1, i32 %2, 
 ; CHECK-DAG: [[pc]] = !{i32 8}
 ; CHECK-DAG: [[fct0_kernel]] = !{i32 1, i32 0, i32 0}
 ; CHECK-DAG: [[fct1_kernel]] = !{i32 1, i32 0, i32 1}
-; CHECK-DAG: [[fct2_kernel]] = !{i32 {{.*}}, i32 3, i32 1, i32 {{.*}}, i32 2, i32 0, i32 {{.*}}, i32 1, i32 1, i32 {{.*}}, i32 0, i32 0
+; CHECK-DAG: [[fct2_kernel]] = !{i32 2, i32 3, i32 1, i32 1, i32 2, i32 1, i32 2, i32 1, i32 0, i32 1, i32 0, i32 0}
