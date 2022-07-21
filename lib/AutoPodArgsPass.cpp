@@ -52,6 +52,39 @@ PreservedAnalyses clspv::AutoPodArgsPass::run(Module &M,
   return PA;
 }
 
+namespace {
+bool FunctionContainsImageChannelGetter(Function *F) {
+  std::set<Function *> visited_fct;
+  SmallVector<Function *, 1> fcts_to_visit;
+  SmallVector<Function *, 1> next_fcts_to_visit;
+  fcts_to_visit.push_back(F);
+  while (!fcts_to_visit.empty()) {
+    for (auto *fct : fcts_to_visit) {
+      visited_fct.insert(fct);
+      for (auto &BB : *fct) {
+        for (auto &I : BB) {
+          if (auto call = dyn_cast<CallInst>(&I)) {
+            auto Name = call->getCalledFunction()->getName();
+            if (Name.contains("get_image_channel_order") ||
+                Name.contains("get_image_channel_data_type")) {
+              return true;
+            } else {
+              Function *f = call->getCalledFunction();
+              if (visited_fct.count(f) == 0) {
+                next_fcts_to_visit.push_back(f);
+              }
+            }
+          }
+        }
+      }
+    }
+    fcts_to_visit = std::move(next_fcts_to_visit);
+    next_fcts_to_visit.clear();
+  }
+  return false;
+}
+} // namespace
+
 void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   auto &M = *F.getParent();
   const auto &DL = M.getDataLayout();
@@ -83,6 +116,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
           clspv::isValidExplicitLayout(M, struct_ty, spv::StorageClassUniform);
     }
   }
+  const bool contains_image_channel_getter = FunctionContainsImageChannelGetter(&F);
 
   // Per-kernel push constant interface requires:
   // 1. Clustered pod args.
@@ -91,6 +125,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   // 4. No arrays.
   // 5. If 16-bit types are used, 16-bit push constants are supported.
   // 6. If 8-bit types are used, 8-bit push constants are supported.
+  // 7. Not to have a image channel getter function call.
   const auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
   const bool contains_array = ContainsArrayType(pod_struct_ty);
   const bool support_16bit_pc = !ContainsSizedType(pod_struct_ty, 16) ||
@@ -107,7 +142,8 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   const bool satisfies_push_constant =
       clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
       support_8bit_pc && fits_push_constant &&
-      !clspv::UsesGlobalPushConstants(M) && !contains_array;
+      !clspv::UsesGlobalPushConstants(M) && !contains_array &&
+      !contains_image_channel_getter;
 
   // Global type-mangled push constants require:
   // 1. Clustered pod args.

@@ -85,6 +85,18 @@ inline std::string PushConstantsVariableName() { return "__push_constants"; }
 // Name for module level metadata storing push constant indices.
 inline std::string PushConstantsMetadataName() { return "push_constants"; }
 
+// Name for the function level metadata storing association between argument
+// ordinal and push constant offset for image channel getter functions.
+inline std::string PushConstantsMetadataImageChannelName() {
+  return "push_constants_image_channel";
+}
+
+// Name for the call level metadata storing the offset in the push constants
+// variable.
+inline std::string ImageGetterPushConstantOffsetName() {
+  return "image_getter_push_constant_offset";
+}
+
 // Name for module level metadata storing next spec constant id.
 inline std::string NextSpecConstantMetadataName() {
   return "clspv.next_spec_constant_id";

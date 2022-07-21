@@ -350,6 +350,12 @@ Note: Vulkan implementations have limited push constant storage (default is 128B
 clspv provides the option `-max-pushconstant-size` to specify (in bytes) the
 implementation limit for push constants. This is validated at the start of the compile.
 
+Note: clspv also stores image metadata (to perform functions like `get_image_channel_order`)
+into `pod_pushconstant`. This is done late in the compilation flow, thus if those added
+bytes exceeds the limit for push constants, it will not be detected and will create an
+undefined behavior (most probably a crash in the runtime trying to push more than what is
+possible).
+
 Note: Module scope push constanst are currently incompatible with plain-old-data
 arguments sent as push constants.
 
@@ -790,8 +796,7 @@ The `printf()` built-in function **must not** be used.
 
 #### Image Read and Write Functions
 
-The `get_image_channel_data_type()` and `get_image_channel_order()`
-built-in functions **must not** be used.
+All supported.
 
 #### cl_khr_subgroups extension
 

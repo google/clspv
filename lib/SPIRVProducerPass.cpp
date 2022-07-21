@@ -3809,6 +3809,26 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     }
     break;
   }
+  case kGetImageChannelDataType:
+  case kGetImageChannelOrder: {
+    auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
+    auto offset = getSPIRVValue(mdconst::extract<ConstantInt>(
+        Call->getMetadata(clspv::ImageGetterPushConstantOffsetName())
+            ->getOperand(0)));
+    auto i32 = IntegerType::get(module->getContext(), 32);
+
+    SPIRVOperandVec Ops;
+    Ops << getSPIRVType(
+               PointerType::get(i32, GV->getType()->getPointerAddressSpace()))
+        << getSPIRVValue(GV)
+        << getSPIRVInt32Constant(GV->getValueType()->getStructNumElements() - 1)
+        << offset;
+    RID = addSPIRVInst(spv::OpAccessChain, Ops);
+
+    Ops.clear();
+    Ops << getSPIRVType(i32) << RID;
+    RID = addSPIRVInst(spv::OpLoad, Ops);
+  } break;
   default:
     llvm_unreachable("Unsupported Image builtin");
   }
@@ -6386,7 +6406,8 @@ void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
     for (unsigned i = 0; i < STy->getNumElements(); i++) {
       auto pc = static_cast<clspv::PushConstant>(
           mdconst::extract<ConstantInt>(MD->getOperand(i))->getZExtValue());
-      if (pc == PushConstant::KernelArgument)
+      if (pc == PushConstant::KernelArgument ||
+          pc == PushConstant::ImageMetadata)
         continue;
 
       auto memberType = STy->getElementType(i);
@@ -6671,6 +6692,54 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
                                 static_cast<uint32_t>(GetTypeAllocSize(
                                     local_arg_info.elem_type, DL)));
         }
+      }
+    }
+
+    // Generate the reflection for the image channel getter function if it is
+    // used in this kernel.
+    auto *image_getter_md = F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
+    if (image_getter_md) {
+      auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
+      auto STy = cast<StructType>(GV->getValueType());
+      auto num_operands = image_getter_md->getNumOperands();
+      assert(num_operands % 3 == 0);
+      for (unsigned i = 0; i < num_operands; i += 3) {
+        auto ordinal =
+            mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 0))
+                ->getZExtValue();
+        auto index =
+            mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 1))
+                ->getZExtValue();
+        auto pc = static_cast<clspv::ImageMetadata>(
+            mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 2))
+                ->getZExtValue());
+        auto offset = GetExplicitLayoutStructMemberOffset(
+                          STy, STy->getStructNumElements() - 1, DL) +
+                      GetExplicitLayoutStructMemberOffset(
+                          cast<StructType>(STy->getStructElementType(
+                              STy->getStructNumElements() - 1)),
+                          index, DL);
+
+        reflection::ExtInst pc_inst = reflection::ExtInstMax;
+        switch (pc) {
+        case ImageMetadata::ChannelOrder:
+          pc_inst =
+              reflection::ExtInstImageArgumentInfoChannelOrderPushConstant;
+          break;
+        case ImageMetadata::ChannelDataType:
+          pc_inst =
+              reflection::ExtInstImageArgumentInfoChannelDataTypePushConstant;
+          break;
+        default:
+          llvm_unreachable("Unhandled push constant");
+          break;
+        }
+        Ops.clear();
+        Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+            << pc_inst << kernel_decl << getSPIRVInt32Constant(ordinal)
+            << getSPIRVInt32Constant(offset)
+            << getSPIRVInt32Constant(sizeof(uint32_t));
+        addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
       }
     }
   }
