@@ -4461,7 +4461,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         Ops.clear();
         Ops << Ty << Cmp << Mod << Modm1;
         RID = addSPIRVInst(spv::OpSelect, Ops);
-      } else if (I.getOpcode() == Instruction::FDiv && !Option::UnsafeMath()) {
+      } else if (I.getOpcode() == Instruction::FDiv && !Option::UnsafeMath() &&
+                 I.getType()->getScalarType()->isFloatTy()) {
         // float div(float a, float b) {
         //   if (abs(b) > 0x1.0p+126f) {
         //     c = 0x1.0p-4f;
