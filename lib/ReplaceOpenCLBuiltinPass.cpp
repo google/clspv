@@ -276,7 +276,7 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceCopysign(F);
 
   case Builtins::kNativeRecip:
-    return replaceRecip(F);
+    return replaceNativeRecip(F);
 
   case Builtins::kDot:
     return replaceDot(F);
@@ -995,7 +995,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceRecip(Function &F) {
+bool ReplaceOpenCLBuiltinPass::replaceNativeRecip(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     // Recip has one arg.

@@ -4476,13 +4476,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         Type *FPTy = I.getType();
         auto a = getSPIRVValue(I.getOperand(0));
         auto b = getSPIRVValue(I.getOperand(1));
-        Type *boolTy = IntegerType::get(module->getContext(), 1);
-        if (FPTy->isVectorTy()) {
-          boolTy = VectorType::get(boolTy, dyn_cast<VectorType>(FPTy));
-        }
+        bool is_vector = FPTy->isVectorTy();
         SPIRVOperandVec Ops;
         SPIRVID Ty = getSPIRVType(FPTy);
-
 
         const float fmax_val = 0x1.0p+126f;
         const float fmin_val = 0x1.0p-126f;
@@ -4491,30 +4487,23 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         SPIRVID divisor, c;
 
         // Try to optimize it if b is constant.
-        if (auto b_cst = dyn_cast<ConstantFP>(I.getOperand(1))) {
-          SPIRVID c_max = getSPIRVConstant(ConstantFP::get(FPTy, c_max_val));
-          float b_val = b_cst->getValue().convertToFloat();
-          if (b_val > fmax_val) {
-            divisor =
-                getSPIRVConstant(ConstantFP::get(FPTy, b_val * c_max_val));
-            c = c_max;
-          } else if (b_val < fmin_val) {
-            SPIRVID c_min = getSPIRVConstant(ConstantFP::get(FPTy, c_min_val));
-            divisor =
-                getSPIRVConstant(ConstantFP::get(FPTy, b_val * c_min_val));
-            c = c_min;
+        if (auto b_cst = dyn_cast<Constant>(I.getOperand(1))) {
+          SmallVector<Constant *, 2> csts;
+          if (is_vector) {
+            for (unsigned i = 0;
+                 i < cast<FixedVectorType>(FPTy)->getNumElements(); i++) {
+              csts.push_back(b_cst->getAggregateElement(i));
+            }
           } else {
-            divisor = b;
+            csts.push_back(b_cst);
           }
-        } else if (auto b_cst_vec = dyn_cast<ConstantVector>(I.getOperand(1))) {
+
           SmallVector<Constant *, 2> divisor_vec;
           SmallVector<Constant *, 2> c_vec;
-          Type *ScalarTy = b_cst_vec->getType()->getElementType();
+          Type *ScalarTy = FPTy->getScalarType();
           bool c_vec_needed = false;
           bool vector_cst = true;
-          for (unsigned i = 0; i < b_cst_vec->getType()->getNumElements();
-               i++) {
-            auto b_elem = b_cst_vec->getOperand(i);
+          for (auto b_elem : csts) {
             float b_elem_val = 1.0f;
             if (auto b_elem_cst_fp = dyn_cast<ConstantFP>(b_elem)) {
               b_elem_val = b_elem_cst_fp->getValue().convertToFloat();
@@ -4538,43 +4527,23 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
             }
           }
           if (vector_cst && c_vec_needed) {
-            divisor = getSPIRVConstant(ConstantVector::get(divisor_vec));
-            c = getSPIRVConstant(ConstantVector::get(c_vec));
-          } else if (vector_cst) {
-            divisor = getSPIRVConstant(b_cst_vec);
-          }
-        } else if (auto b_cst_vec =
-                       dyn_cast<ConstantDataVector>(I.getOperand(1))) {
-          SmallVector<Constant *, 2> divisor_vec;
-          SmallVector<Constant *, 2> c_vec;
-          Type *ScalarTy = b_cst_vec->getElementType();
-          bool c_vec_needed = false;
-          for (unsigned i = 0; i < b_cst_vec->getNumElements(); i++) {
-            float b_elem_val = b_cst_vec->getElementAsFloat(i);
-            if (b_elem_val > fmax_val) {
-              divisor_vec.push_back(
-                  ConstantFP::get(ScalarTy, b_elem_val * c_max_val));
-              c_vec.push_back(ConstantFP::get(ScalarTy, c_max_val));
-              c_vec_needed = true;
-            } else if (b_elem_val < fmin_val) {
-              divisor_vec.push_back(
-                  ConstantFP::get(ScalarTy, b_elem_val * c_min_val));
-              c_vec.push_back(ConstantFP::get(ScalarTy, c_min_val));
-              c_vec_needed = true;
+            if (is_vector) {
+              divisor = getSPIRVConstant(ConstantVector::get(divisor_vec));
+              c = getSPIRVConstant(ConstantVector::get(c_vec));
             } else {
-              divisor_vec.push_back(ConstantFP::get(ScalarTy, b_elem_val));
-              c_vec.push_back(ConstantFP::get(ScalarTy, 1.0));
+              divisor = getSPIRVConstant(divisor_vec[0]);
+              c = getSPIRVConstant(c_vec[0]);
             }
-          }
-          if (c_vec_needed) {
-            divisor = getSPIRVConstant(ConstantVector::get(divisor_vec));
-            c = getSPIRVConstant(ConstantVector::get(c_vec));
-          } else {
-            divisor = getSPIRVConstant(b_cst_vec);
+          } else if (vector_cst) {
+            divisor = getSPIRVConstant(b_cst);
           }
         }
 
         if (!divisor.isValid()) {
+          Type *boolTy = IntegerType::get(module->getContext(), 1);
+          if (is_vector) {
+            boolTy = VectorType::get(boolTy, dyn_cast<VectorType>(FPTy));
+          }
           SPIRVID c_max = getSPIRVConstant(ConstantFP::get(FPTy, c_max_val));
           SPIRVID c_min = getSPIRVConstant(ConstantFP::get(FPTy, c_min_val));
           SPIRVID max = getSPIRVConstant(ConstantFP::get(FPTy, fmax_val));
