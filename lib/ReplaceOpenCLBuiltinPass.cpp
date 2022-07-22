@@ -275,13 +275,8 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kCopysign:
     return replaceCopysign(F);
 
-  case Builtins::kHalfRecip:
   case Builtins::kNativeRecip:
-    return replaceRecip(F);
-
-  case Builtins::kHalfDivide:
-  case Builtins::kNativeDivide:
-    return replaceDivide(F);
+    return replaceNativeRecip(F);
 
   case Builtins::kDot:
     return replaceDot(F);
@@ -1000,20 +995,22 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceRecip(Function &F) {
-  return replaceCallsWithValue(F, [](CallInst *CI) {
+bool ReplaceOpenCLBuiltinPass::replaceNativeRecip(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
     // Recip has one arg.
     auto Arg = CI->getOperand(0);
     auto Cst1 = ConstantFP::get(Arg->getType(), 1.0);
-    return BinaryOperator::Create(Instruction::FDiv, Cst1, Arg, "", CI);
-  });
-}
 
-bool ReplaceOpenCLBuiltinPass::replaceDivide(Function &F) {
-  return replaceCallsWithValue(F, [](CallInst *CI) {
-    auto Op0 = CI->getOperand(0);
-    auto Op1 = CI->getOperand(1);
-    return BinaryOperator::Create(Instruction::FDiv, Op0, Op1, "", CI);
+    Type *Ty = CI->getType();
+    SmallVector<Type *, 2> NativeDivideArgsTypes = {Ty, Ty};
+    const auto NativeDivideType =
+        FunctionType::get(Ty, NativeDivideArgsTypes, false);
+    auto NativeDivideName =
+        Builtins::GetMangledFunctionName("native_divide", NativeDivideType);
+    auto NativeDivide =
+        M.getOrInsertFunction(NativeDivideName, NativeDivideType);
+    return CallInst::Create(NativeDivide, {Cst1, Arg}, "", CI);
   });
 }
 

@@ -35,7 +35,7 @@ private:
   bool replaceAbs(llvm::Function &F);
   bool replaceAbsDiff(llvm::Function &F, bool is_signed);
   bool replaceCopysign(llvm::Function &F);
-  bool replaceRecip(llvm::Function &F);
+  bool replaceNativeRecip(llvm::Function &F);
   bool replaceDivide(llvm::Function &F);
   bool replaceDot(llvm::Function &F);
   bool replaceFmod(llvm::Function &F);
