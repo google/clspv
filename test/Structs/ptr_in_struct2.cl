@@ -13,5 +13,5 @@ struct T bar(global int* out) {
 
 kernel void foo(global int* out) {
   struct T t = bar(out);
-  t.ptr = 42;
+  *(t.ptr) = 42;
 }
