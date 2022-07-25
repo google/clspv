@@ -1872,7 +1872,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
         RID = addSPIRVInst<kTypes>(spv::OpTypeImage, Ops);
 
         // Only need a sampled version of the type if it is used with a sampler.
-        if (Sampled == 1) {
+        if (Sampled == 1 && ImageDimensionality(STy) != spv::DimBuffer) {
           Ops.clear();
           Ops << RID;
           getImageTypeMap()[Canonical] =
