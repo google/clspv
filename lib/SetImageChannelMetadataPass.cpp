@@ -55,7 +55,7 @@ unsigned setMetadata(Module &M, Function *F, ImageGetterMap &map) {
   auto i32 = IntegerType::get(M.getContext(), 32);
 
   unsigned int count = 0;
-  for (auto elem : map) {
+  for (const auto &elem : map) {
     auto pc = elem.first.first;
     auto ordinal = elem.first.second;
     auto calls = elem.second;
