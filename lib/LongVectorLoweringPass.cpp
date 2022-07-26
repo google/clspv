@@ -439,6 +439,49 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
   return ReturnValue;
 }
 
+/// Create module level metadata that maps a new remapped struct type to the
+/// layout information for the original struct type. Ensures UBO struct types
+/// with long vector members still match previously generated reflection
+/// metadata.
+void createStructLayoutRemapMetadata(StructType *OldStructTy,
+                                     StructType *NewStructTy, Module *Module) {
+  auto &DL = Module->getDataLayout();
+  auto &Ctx = Module->getContext();
+  const auto *Layout = Module->getDataLayout().getStructLayout(OldStructTy);
+  auto *Int32Ty = Type::getInt32Ty(Ctx);
+
+  // Record the correct offsets for use when generating the SPIR-V binary.
+  NamedMDNode *OffsetsMD =
+      Module->getOrInsertNamedMetadata(clspv::RemappedTypeOffsetMetadataName());
+  SmallVector<Metadata *, 8> OffsetValues;
+  for (unsigned i = 0; i < OldStructTy->getNumElements(); ++i) {
+    uint64_t Offset = Layout->getElementOffset(i);
+    OffsetValues.push_back(
+        ConstantAsMetadata::get(ConstantInt::get(Int32Ty, Offset)));
+  }
+  MDTuple *OffsetValuesMD = MDTuple::get(Ctx, OffsetValues);
+  MDTuple *OffsetEntry = MDTuple::get(
+      Ctx, {ConstantAsMetadata::get(Constant::getNullValue(NewStructTy)),
+            OffsetValuesMD});
+  OffsetsMD->addOperand(OffsetEntry);
+
+  // Record the correct sizes for use when generating the SPIR-V binary.
+  NamedMDNode *SizesMD =
+      Module->getOrInsertNamedMetadata(clspv::RemappedTypeSizesMetadataName());
+  Metadata *SizeValues[3];
+  SizeValues[0] = ConstantAsMetadata::get(
+      ConstantInt::get(Int32Ty, DL.getTypeSizeInBits(OldStructTy)));
+  SizeValues[1] = ConstantAsMetadata::get(
+      ConstantInt::get(Int32Ty, DL.getTypeStoreSize(OldStructTy)));
+  SizeValues[2] = ConstantAsMetadata::get(
+      ConstantInt::get(Int32Ty, DL.getTypeAllocSize(OldStructTy)));
+  MDTuple *SizeValuesMD = MDTuple::get(Ctx, SizeValues);
+  MDTuple *SizeEntry = MDTuple::get(
+      Ctx, {ConstantAsMetadata::get(Constant::getNullValue(NewStructTy)),
+            SizeValuesMD});
+  SizesMD->addOperand(SizeEntry);
+}
+
 /// Map the arguments of the wrapper function (which are either not long-vectors
 /// or aggregates of scalars) to the original arguments of the user-defined
 /// function (which can be long-vectors). Handle pointers as well.
@@ -446,16 +489,27 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
                                                      Function &Wrappee,
                                                      Function &Wrapper) {
   SmallVector<Value *, 16> Args;
+  auto *Module = Wrappee.getParent();
 
   std::size_t ArgumentCount = Wrapper.arg_size();
   Args.reserve(ArgumentCount);
 
   for (std::size_t i = 0; i < ArgumentCount; ++i) {
+    auto *Arg = Wrappee.getArg(i);
     auto *NewArg = Wrapper.getArg(i);
-    NewArg->takeName(Wrappee.getArg(i));
+    NewArg->takeName(Arg);
     auto *OldArgTy = Wrappee.getFunctionType()->getParamType(i);
     auto *EquivalentArg = convertEquivalentValue(B, NewArg, OldArgTy);
     Args.push_back(EquivalentArg);
+
+    // Converting struct members from vectors to arrays can result in changes to
+    // the struct layout. Record the correct layout information for use when
+    // generating the SPIR-V binary.
+    if (auto *StructTy = dyn_cast<StructType>(Arg->getType())) {
+      if (auto *NewStructTy = dyn_cast<StructType>(NewArg->getType())) {
+        createStructLayoutRemapMetadata(StructTy, NewStructTy, Module);
+      }
+    }
   }
 
   return Args;
