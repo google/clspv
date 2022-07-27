@@ -56,9 +56,9 @@ namespace {
 bool FunctionContainsImageChannelGetter(Function *F) {
   std::set<Function *> visited_fct;
   SmallVector<Function *, 1> fcts_to_visit;
-  SmallVector<Function *, 1> next_fcts_to_visit;
   fcts_to_visit.push_back(F);
   while (!fcts_to_visit.empty()) {
+    SmallVector<Function *, 1> next_fcts_to_visit;
     for (auto *fct : fcts_to_visit) {
       visited_fct.insert(fct);
       for (auto &BB : *fct) {
@@ -79,7 +79,6 @@ bool FunctionContainsImageChannelGetter(Function *F) {
       }
     }
     fcts_to_visit = std::move(next_fcts_to_visit);
-    next_fcts_to_visit.clear();
   }
   return false;
 }
