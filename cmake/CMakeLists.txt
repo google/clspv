@@ -13,6 +13,36 @@
 # limitations under the License.
 
 set(CLSPV_GENERATED_INCLUDES_DIR ${CLSPV_BINARY_DIR}/include/clspv)
+set(CLSPV_GENERATED_BC_DIR ${CLSPV_BINARY_DIR}/libclc-clspv)
+set(LIBCLC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/llvm/libclc)
+
+# TODO - There is a mistake in libclc's cmake where it calls
+# `llvm-config --system-libs` without any arguments, i.e. it resolves the system
+# links on *all* LLVM libs. This fails unless all these libraries are built.
+# Work around this for now by dragging in all these libraries as dependencies.
+llvm_map_components_to_libnames(workaround-llvm-libs all)
+
+include(ExternalProject)
+ExternalProject_Add(libclc-clspv
+  DEPENDS clang llvm-config llvm-as llvm-link opt
+    ${workaround-llvm-libs}
+  SOURCE_DIR ${LIBCLC_SOURCE_DIR}
+  CMAKE_ARGS -DLIBCLC_TARGETS_TO_BUILD=clspv--
+    -DLLVM_CONFIG=$<TARGET_FILE:llvm-config>
+  INSTALL_COMMAND ""
+  BINARY_DIR ${CLSPV_GENERATED_BC_DIR}
+  BUILD_BYPRODUCTS ${CLSPV_GENERATED_BC_DIR}/clspv--.bc
+  )
+
+# Pre-build step to force CMake to recognize the libclc sources are dependencies
+# of the build step. This way we can avoid using BUILD_ALWAYS above and only
+# rebuild libclc when the target sources actually change.
+file(GLOB_RECURSE LIBCLC_SOURCES "${LIBCLC_SOURCE_DIR}/*")
+ExternalProject_Add_Step(libclc-clspv prebuild
+  COMMAND ""
+  DEPENDEES configure
+  DEPENDERS build
+  DEPENDS ${LIBCLC_SOURCES})
 
 set(SPIRV_C_STRINGS_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/unified1/spirv.hpp)
 set(SPIRV_C_STRINGS_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/spirv_c_strings.hpp)
@@ -101,7 +131,7 @@ add_custom_command(
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   DEPENDS ${SPIRV_REFLECTION_INPUT_FILE} ${SSPIRV_REFLECTION_CMAKE_FILE})
 
-set(CLSPV_LIBRARY_INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/clspv--.bc)
+set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_GENERATED_BC_DIR}/clspv--.bc)
 set(CLSPV_LIBRARY_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/clspv_builtin_library.h)
 set(CLSPV_LIBRARY_DATA_VAR_NAME clspv_builtin_library_data)
 set(CLSPV_LIBRARY_SIZE_VAR_NAME clspv_builtin_library_size)
