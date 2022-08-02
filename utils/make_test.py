@@ -208,7 +208,7 @@ def generate_test_case(args):
     if inputext == '.cl':
         tc = generate_test_case_from_source(args)
     else:
-        tc = disassemble_and_post_process(args.spirv_module_or_cl_source)
+        tc = disassemble_and_post_process(args, args.spirv_module_or_cl_source)
 
     return tc
 
