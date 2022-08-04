@@ -534,6 +534,10 @@ Function *createFunctionWithMappedTypes(Function &F,
     llvm_unreachable("Unexpected failure when inlining function.");
   }
 
+  // Inlining a function can introduce constant expression that we could not
+  // handle afterwards.
+  BitcastUtils::RemovedCstExprFromFunction(Wrapper);
+
   return Wrapper;
 }
 
@@ -662,6 +666,7 @@ PreservedAnalyses clspv::LongVectorLoweringPass::run(Module &M,
   runOnGlobals(M);
 
   for (auto &F : M.functions()) {
+    BitcastUtils::RemovedCstExprFromFunction(&F);
     runOnFunction(F);
   }
 

@@ -18,6 +18,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "BitcastUtils.h"
 #include "SimplifyPointerBitcastPass.h"
 
 using namespace llvm;
@@ -28,13 +29,16 @@ PreservedAnalyses
 clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
+  // Start by removing all Constant Expressions. Do it only once as all the
+  // functions below will not generate new Constant Expression.
+  runOnInstFromCstExpr(M);
+
   // Loop through our individual simplification passes until they stop changing
   // things.
   bool changed = true;
   while (changed) {
     changed = false;
 
-    changed |= runOnGEPFromBitcastCstExpr(M);
     changed |= runOnTrivialBitcast(M);
     changed |= runOnBitcastFromGEP(M);
     changed |= runOnBitcastFromBitcast(M);
@@ -45,49 +49,10 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 }
 
 // TODO(#816): remove function after final transition.
-bool clspv::SimplifyPointerBitcastPass::runOnGEPFromBitcastCstExpr(
-    Module &M) const {
-  SmallVector<GetElementPtrInst *, 16> WorkList;
+void clspv::SimplifyPointerBitcastPass::runOnInstFromCstExpr(Module &M) const {
   for (Function &F : M) {
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        // If we have a GEP instruction...
-        if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) {
-          // ... whose source is a bitcast constant expression
-          if (const auto CE =
-                  dyn_cast<ConstantExpr>(GEP->getPointerOperand())) {
-            if (CE->getOpcode() == Instruction::BitCast) {
-              // ... whose source pointer element is not a struct:
-              //
-              // This case happen in some particular scenario, where it is not
-              // needed to simplify it. Mostly when using global array
-              // variables. In the end llvm managed to deal with it without us
-              // having to simplify it. Trying to simplify would make it very
-              // complicated for the ReplacePointerBitcast pass.
-              auto CETy = CE->getOperand(0)->getType();
-              if (!CETy->isOpaquePointerTy() &&
-                  !CETy->getNonOpaquePointerElementType()->isStructTy()) {
-                // ... record the GEP as something we need to process.
-                WorkList.push_back(GEP);
-              }
-            }
-          }
-        }
-      }
-    }
+    BitcastUtils::RemovedCstExprFromFunction(&F);
   }
-
-  for (GetElementPtrInst *GEP : WorkList) {
-    const auto CE = dyn_cast<ConstantExpr>(GEP->getPointerOperand());
-    auto Bitcast =
-        CastInst::CreatePointerCast(CE->getOperand(0), CE->getType(), "", GEP);
-    SmallVector<Value *, 4> Indices(GEP->indices());
-    auto NewGEP = GetElementPtrInst::Create(GEP->getSourceElementType(),
-                                            Bitcast, Indices, "", GEP);
-
-    GEP->replaceAllUsesWith(NewGEP);
-  }
-  return false;
 }
 
 bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {

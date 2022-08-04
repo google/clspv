@@ -36,6 +36,7 @@ void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
 void ConvertInto(Type *Ty, IRBuilder<> &Builder,
                  SmallVector<Value *, 8> &Values);
 
+bool RemovedCstExprFromFunction(Function *F);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H
