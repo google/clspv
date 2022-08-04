@@ -6731,6 +6731,11 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
     auto local_spec_id_md =
         module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
+
+    // Map new ordinals to old ordinals to be able to use old ordinals when
+    // generating reflection for image metadata.
+    std::unordered_map<uint32_t, uint32_t> ordinals_map;
+
     if (arg_map) {
       for (const auto &arg : arg_map->operands()) {
         const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
@@ -6748,6 +6753,8 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
             dyn_extract<ConstantInt>(arg_node->getOperand(4))->getZExtValue();
         const auto argKind = clspv::GetArgKindFromName(
             dyn_cast<MDString>(arg_node->getOperand(5))->getString().str());
+
+        ordinals_map[new_index] = old_index;
 
         // If this is a local memory argument, find the right spec id for this
         // argument.
@@ -6848,6 +6855,14 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         auto ordinal =
             mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 0))
                 ->getZExtValue();
+
+        // Ordinals could have changed because of pod arguments, remap it to the
+        // initial ordinal if needed.
+        auto find = ordinals_map.find(ordinal);
+        if (find != ordinals_map.end()) {
+          ordinal = find->second;
+        }
+
         auto index =
             mdconst::extract<ConstantInt>(image_getter_md->getOperand(i + 1))
                 ->getZExtValue();
