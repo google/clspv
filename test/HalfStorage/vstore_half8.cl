@@ -13,6 +13,7 @@ __kernel void test(__global half *a, float8 b, int c) {
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpTypeVector [[uint]] 2
+// CHECK-DAG: [[uint_28:%[^ ]+]] = OpConstant [[uint]] 28
 // CHECK-DAG: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
 // CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
 // CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2

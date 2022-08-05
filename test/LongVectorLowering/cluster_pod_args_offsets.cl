@@ -24,9 +24,10 @@ float8 f, __global float8 *result) {
 // CHECK: OpMemberDecorate [[struct]] 1 Offset 8
 // CHECK: OpMemberDecorate [[struct]] 2 Offset 16
 // CHECK: OpMemberDecorate [[struct]] 3 Offset 32
-// CHECK: OpMemberDecorate [[struct]] 4 Offset 64
-// CHECK: OpMemberDecorate [[struct]] 5 Offset 96
-// CHECK: OpMemberDecorate [[struct]] 6 Offset 128
+// CHECK: OpMemberDecorate [[struct]] 4 Offset 48
+// CHECK: OpMemberDecorate [[struct]] 5 Offset 64
+// CHECK: OpMemberDecorate [[struct]] 6 Offset 96
+// CHECK: OpMemberDecorate [[struct]] 7 Offset 128
 
 // MAP: kernel,test,arg,c,argOrdinal,0,descriptorSet,0,binding,1,offset,0,argKind,pod_ubo,argSize,8
 // MAP: kernel,test,arg,uc,argOrdinal,1,descriptorSet,0,binding,1,offset,8,argKind,pod_ubo,argSize,8

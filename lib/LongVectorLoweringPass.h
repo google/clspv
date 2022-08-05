@@ -100,6 +100,12 @@ private:
     return EquivalentTy ? EquivalentTy : Ty;
   }
 
+  /// Rework Indices for GEP
+  void reworkIndices(llvm::SmallVector<llvm::Value *, 4> &Indices,
+                     llvm::Type *Ty);
+  /// Rework Indices for extractvalue and insertvalue
+  void reworkIndices(llvm::SmallVector<unsigned, 4> &Indices, llvm::Type *Ty);
+
 private:
   // Hight-level implementation details of runOnModule.
 
@@ -180,6 +186,8 @@ private:
   /// all functions have been visited.
   llvm::DenseMap<llvm::GlobalVariable *, llvm::GlobalVariable *>
       GlobalVariableMap;
+
+  const llvm::DataLayout *DL;
 };
 } // namespace clspv
 

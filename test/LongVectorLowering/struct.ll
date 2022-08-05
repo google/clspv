@@ -8,4 +8,4 @@ target triple = "spir-unknown-unknown"
 
 @test.s = internal addrspace(3) global [64 x %struct.S] undef, align 1
 
-; CHECK: @test.s = internal addrspace(3) global [64 x { [8 x i32], i32 }] undef, align 1
+; CHECK: @test.s = internal addrspace(3) global [64 x <{ [8 x i32], i32 }>] undef, align 1

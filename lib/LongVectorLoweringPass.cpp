@@ -313,7 +313,8 @@ Function *getBIFScalarVersion(Function &Builtin) {
 /// @return an equivalent pointer when both @p V and @p newType are pointers.
 /// @return an equivalent vector when @p V is an aggregate.
 /// @return an equivalent aggregate when @p V is a vector.
-Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
+Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy,
+                              const DataLayout *DL) {
   if (V->getType() == EquivalentTy) {
     return V;
   }
@@ -330,14 +331,32 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
 
   if (EquivalentTy->isStructTy()) {
     StructType *StructTy = dyn_cast<StructType>(EquivalentTy);
+    StructType *VStructTy = dyn_cast<StructType>(V->getType());
     unsigned Arity = StructTy->getStructNumElements();
+    // We use convertEquivalentValue to convert in both ways (vector to array
+    // and array to vector). Thus, the structure with added padding elements
+    // might not be the one we expect.
+    bool inverse = false;
+    if (Arity > VStructTy->getStructNumElements()) {
+      inverse = true;
+      Arity = VStructTy->getStructNumElements();
+    }
     if (Arity == 0)
       return nullptr;
     for (unsigned i = 0; i < Arity; ++i) {
-      Type *ElementType = StructTy->getContainedType(i);
-      Value *Element = B.CreateExtractValue(V, {i});
-      Value *NewElement = convertEquivalentValue(B, Element, ElementType);
-      NewValue = B.CreateInsertValue(NewValue, NewElement, {i});
+      unsigned idx_struct = i;
+      unsigned idx_V =
+          DL->getStructLayout(VStructTy)->getElementContainingOffset(
+              DL->getStructLayout(StructTy)->getElementOffset(i));
+      if (inverse) {
+        idx_struct = DL->getStructLayout(StructTy)->getElementContainingOffset(
+            DL->getStructLayout(VStructTy)->getElementOffset(i));
+        idx_V = i;
+      }
+      Type *ElementType = StructTy->getContainedType(idx_struct);
+      Value *Element = B.CreateExtractValue(V, {idx_V});
+      Value *NewElement = convertEquivalentValue(B, Element, ElementType, DL);
+      NewValue = B.CreateInsertValue(NewValue, NewElement, {idx_struct});
     }
   } else if (EquivalentTy->isVectorTy()) {
     assert(V->getType()->isArrayTy());
@@ -439,57 +458,14 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
   return ReturnValue;
 }
 
-/// Create module level metadata that maps a new remapped struct type to the
-/// layout information for the original struct type. Ensures UBO struct types
-/// with long vector members still match previously generated reflection
-/// metadata.
-void createStructLayoutRemapMetadata(StructType *OldStructTy,
-                                     StructType *NewStructTy, Module *Module) {
-  auto &DL = Module->getDataLayout();
-  auto &Ctx = Module->getContext();
-  const auto *Layout = Module->getDataLayout().getStructLayout(OldStructTy);
-  auto *Int32Ty = Type::getInt32Ty(Ctx);
-
-  // Record the correct offsets for use when generating the SPIR-V binary.
-  NamedMDNode *OffsetsMD =
-      Module->getOrInsertNamedMetadata(clspv::RemappedTypeOffsetMetadataName());
-  SmallVector<Metadata *, 8> OffsetValues;
-  for (unsigned i = 0; i < OldStructTy->getNumElements(); ++i) {
-    uint64_t Offset = Layout->getElementOffset(i);
-    OffsetValues.push_back(
-        ConstantAsMetadata::get(ConstantInt::get(Int32Ty, Offset)));
-  }
-  MDTuple *OffsetValuesMD = MDTuple::get(Ctx, OffsetValues);
-  MDTuple *OffsetEntry = MDTuple::get(
-      Ctx, {ConstantAsMetadata::get(Constant::getNullValue(NewStructTy)),
-            OffsetValuesMD});
-  OffsetsMD->addOperand(OffsetEntry);
-
-  // Record the correct sizes for use when generating the SPIR-V binary.
-  NamedMDNode *SizesMD =
-      Module->getOrInsertNamedMetadata(clspv::RemappedTypeSizesMetadataName());
-  Metadata *SizeValues[3];
-  SizeValues[0] = ConstantAsMetadata::get(
-      ConstantInt::get(Int32Ty, DL.getTypeSizeInBits(OldStructTy)));
-  SizeValues[1] = ConstantAsMetadata::get(
-      ConstantInt::get(Int32Ty, DL.getTypeStoreSize(OldStructTy)));
-  SizeValues[2] = ConstantAsMetadata::get(
-      ConstantInt::get(Int32Ty, DL.getTypeAllocSize(OldStructTy)));
-  MDTuple *SizeValuesMD = MDTuple::get(Ctx, SizeValues);
-  MDTuple *SizeEntry = MDTuple::get(
-      Ctx, {ConstantAsMetadata::get(Constant::getNullValue(NewStructTy)),
-            SizeValuesMD});
-  SizesMD->addOperand(SizeEntry);
-}
-
 /// Map the arguments of the wrapper function (which are either not long-vectors
 /// or aggregates of scalars) to the original arguments of the user-defined
 /// function (which can be long-vectors). Handle pointers as well.
 SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
                                                      Function &Wrappee,
-                                                     Function &Wrapper) {
+                                                     Function &Wrapper,
+                                                     const DataLayout *DL) {
   SmallVector<Value *, 16> Args;
-  auto *Module = Wrappee.getParent();
 
   std::size_t ArgumentCount = Wrapper.arg_size();
   Args.reserve(ArgumentCount);
@@ -499,17 +475,8 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
     auto *NewArg = Wrapper.getArg(i);
     NewArg->takeName(Arg);
     auto *OldArgTy = Wrappee.getFunctionType()->getParamType(i);
-    auto *EquivalentArg = convertEquivalentValue(B, NewArg, OldArgTy);
+    auto *EquivalentArg = convertEquivalentValue(B, NewArg, OldArgTy, DL);
     Args.push_back(EquivalentArg);
-
-    // Converting struct members from vectors to arrays can result in changes to
-    // the struct layout. Record the correct layout information for use when
-    // generating the SPIR-V binary.
-    if (auto *StructTy = dyn_cast<StructType>(Arg->getType())) {
-      if (auto *NewStructTy = dyn_cast<StructType>(NewArg->getType())) {
-        createStructLayoutRemapMetadata(StructTy, NewStructTy, Module);
-      }
-    }
   }
 
   return Args;
@@ -521,7 +488,8 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
 /// the given function (the "wrappee"). Only the parameters and return types are
 /// mapped. The function body still needs to be lowered.
 Function *createFunctionWithMappedTypes(Function &F,
-                                        FunctionType *EquivalentFunctionTy) {
+                                        FunctionType *EquivalentFunctionTy,
+                                        const DataLayout *DL) {
   assert(!F.isVarArg() && "varargs not supported");
 
   auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
@@ -534,13 +502,13 @@ Function *createFunctionWithMappedTypes(Function &F,
   IRBuilder<> B(&Wrapper->getEntryBlock());
 
   // Fill in the body of the wrapper function.
-  auto WrappeeArgs = mapWrapperArgsToWrappeeArgs(B, F, *Wrapper);
+  auto WrappeeArgs = mapWrapperArgsToWrappeeArgs(B, F, *Wrapper, DL);
   CallInst *Call = B.CreateCall(&F, WrappeeArgs);
   if (Call->getType()->isVoidTy()) {
     B.CreateRetVoid();
   } else {
     auto *EquivalentReturnTy = EquivalentFunctionTy->getReturnType();
-    Value *ReturnValue = convertEquivalentValue(B, Call, EquivalentReturnTy);
+    Value *ReturnValue = convertEquivalentValue(B, Call, EquivalentReturnTy, DL);
     B.CreateRet(ReturnValue);
   }
 
@@ -680,6 +648,7 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
 PreservedAnalyses clspv::LongVectorLoweringPass::run(Module &M,
                                                      ModuleAnalysisManager &) {
   PreservedAnalyses PA;
+  DL = &M.getDataLayout();
   runOnGlobals(M);
 
   for (auto &F : M.functions()) {
@@ -996,18 +965,83 @@ clspv::LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   return V;
 }
 
+void clspv::LongVectorLoweringPass::reworkIndices(
+    SmallVector<unsigned, 4> &Indices, Type *Ty) {
+  auto EqTy = getEquivalentType(Ty);
+  if (!EqTy)
+    return;
+  SmallVector<unsigned, 4> Idxs(Indices);
+  SmallVector<uint64_t, 4> Indices_64b;
+  Indices.clear();
+  for (auto Idx : Idxs) {
+    Indices.push_back(Idx);
+    Indices_64b.push_back((uint64_t)Idx);
+    auto IndexedTy = GetElementPtrInst::getIndexedType(Ty, Indices_64b);
+    if (getEquivalentType(IndexedTy)) {
+      auto id = Indices.pop_back_val();
+      Indices_64b.pop_back();
+      if (auto STy = dyn_cast<StructType>(
+              GetElementPtrInst::getIndexedType(Ty, Indices_64b))) {
+        auto off = DL->getStructLayout(STy)->getElementOffset(id);
+        auto newId =
+            DL->getStructLayout(dyn_cast<StructType>(getEquivalentType(STy)))
+                ->getElementContainingOffset(off);
+        Indices.push_back(newId);
+        Indices_64b.push_back((uint64_t)newId);
+      } else {
+        Indices.push_back(id);
+        Indices_64b.push_back((uint64_t)id);
+      }
+    }
+  }
+}
+
 Value *
 clspv::LongVectorLoweringPass::visitExtractValueInst(ExtractValueInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   if (!EquivalentValue)
     return nullptr;
 
-  auto Indices = I.getIndices();
+  SmallVector<unsigned, 4> Indices(I.indices());
+  reworkIndices(Indices, I.getOperand(0)->getType());
 
   IRBuilder<> B(&I);
   Value *V = B.CreateExtractValue(EquivalentValue, Indices);
   registerReplacement(I, *V);
   return V;
+}
+
+void clspv::LongVectorLoweringPass::reworkIndices(
+    SmallVector<Value *, 4> &Indices, Type *Ty) {
+  auto EqTy = getEquivalentType(Ty);
+  if (!EqTy)
+    return;
+  assert(Indices.size() > 0);
+  SmallVector<Value *, 4> Idxs(Indices);
+  Indices.clear();
+  Indices.push_back(Idxs[0]);
+  for (unsigned i = 1; i < Idxs.size(); i++) {
+    Indices.push_back(Idxs[i]);
+    auto IndexedTy = GetElementPtrInst::getIndexedType(Ty, Indices);
+    if (getEquivalentType(IndexedTy)) {
+      auto Idx = Indices.pop_back_val();
+      if (auto STy = dyn_cast<StructType>(
+              GetElementPtrInst::getIndexedType(Ty, Indices))) {
+        auto Cst = dyn_cast<ConstantInt>(Idx);
+        if (!Cst) {
+          llvm_unreachable("unexpected index for gep on struct type");
+        }
+        auto id = Cst->getZExtValue();
+        auto off = DL->getStructLayout(STy)->getElementOffset(id);
+        auto newId =
+            DL->getStructLayout(dyn_cast<StructType>(getEquivalentType(STy)))
+                ->getElementContainingOffset(off);
+        Indices.push_back(ConstantInt::get(Idx->getType(), newId));
+      } else {
+        Indices.push_back(Idx);
+      }
+    }
+  }
 }
 
 Value *
@@ -1029,6 +1063,8 @@ clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   IRBuilder<> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
+  reworkIndices(Indices, I.getSourceElementType());
+
   Value *V;
   if (I.isInBounds()) {
     V = B.CreateInBoundsGEP(Type, EquivalentPointer, Indices);
@@ -1067,7 +1103,8 @@ Value *clspv::LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
       EquivalentInsertValue == I.getOperand(1)) // Nothing lowered
     return nullptr;
 
-  auto Idxs = I.getIndices();
+  SmallVector<unsigned, 4> Idxs(I.indices());
+  reworkIndices(Idxs, I.getOperand(0)->getType());
 
   IRBuilder<> B(&I);
   Value *V =
@@ -1382,19 +1419,36 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
     LLVMContext &Ctx = StructTy->getContainedType(0)->getContext();
     SmallVector<Type *, 16> Types;
     bool RequiredLowering = false;
+    bool Packed = StructTy->isPacked();
     for (unsigned i = 0; i < Arity; ++i) {
       Type *CTy = StructTy->getContainedType(i);
       auto *EquivalentTy = getEquivalentType(CTy);
       if (EquivalentTy != nullptr) {
         Types.push_back(EquivalentTy);
         RequiredLowering = true;
+
+        auto InitialOff = DL->getStructLayout(StructTy)->getElementOffset(i);
+        auto NewOff = DL->getStructLayout(StructType::get(Ctx, Types, Packed))
+                          ->getElementOffset(Types.size() - 1);
+        if (InitialOff != NewOff) {
+          Types.pop_back();
+          Types.push_back(
+              ArrayType::get(Ty->getInt8Ty(Ctx), InitialOff - NewOff));
+          Types.push_back(EquivalentTy);
+        }
       } else {
         Types.push_back(CTy);
       }
     }
 
     if (RequiredLowering) {
-      return StructType::get(Ctx, Types, false);
+      auto InitialSize = DL->getTypeAllocSize(StructTy);
+      auto NewSize = DL->getTypeAllocSize(StructType::get(Ctx, Types, Packed));
+      if (InitialSize != NewSize) {
+        Types.push_back(
+            ArrayType::get(Ty->getInt8Ty(Ctx), InitialSize - NewSize));
+      }
+      return StructType::get(Ctx, Types, Packed);
     } else {
       return nullptr;
     }
@@ -1724,7 +1778,7 @@ clspv::LongVectorLoweringPass::convertUserDefinedFunction(Function &F) {
   }
 
   Function *EquivalentFunction =
-      createFunctionWithMappedTypes(F, EquivalentFunctionTy);
+      createFunctionWithMappedTypes(F, EquivalentFunctionTy, DL);
 
   LLVM_DEBUG(dbgs() << "Wrapper function:\n" << *EquivalentFunction << "\n");
 
