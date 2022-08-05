@@ -37,15 +37,14 @@ PreservedAnalyses
 clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
-  // Remove lifetime annotations first.  They could be using memset
-  // and memcpy calls.
-  removeLifetimeDeclarations(M);
-  replaceMemset(M);
-  replaceMemcpy(M);
-
   for (auto &F : M) {
     runOnFunction(F);
   }
+
+  // Remove lifetime annotations first.  They could be using memset
+  // and memcpy calls.
+  replaceMemset(M);
+  replaceMemcpy(M);
 
   for (auto F : DeadFunctions) {
     F->eraseFromParent();
@@ -72,7 +71,14 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
     return replaceAddSubSat(F, true, false);
   case Intrinsic::sadd_sat:
     return replaceAddSubSat(F, true, true);
-
+  // SPIR-V OpAssumeTrueKHR requires ExpectAssumeKHR capability in SPV_KHR_expect_assume extension.
+  // Vulkan doesn't support that, so remove assume declaration.
+  case Intrinsic::assume:
+  // SPIR-V OpLifetimeStart and OpLifetimeEnd require Kernel capability.
+  // Vulkan doesn't support that, so remove all lifteime bounds declarations.
+  case Intrinsic::lifetime_start:
+  case Intrinsic::lifetime_end:
+    return removeIntrinsicDeclaration(F);
   default:
     break;
   }
@@ -448,32 +454,16 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   return Changed;
 }
 
-bool clspv::ReplaceLLVMIntrinsicsPass::removeLifetimeDeclarations(Module &M) {
-  // SPIR-V OpLifetimeStart and OpLifetimeEnd require Kernel capability.
-  // Vulkan doesn't support that, so remove all lifteime bounds declarations.
-
-  bool Changed = false;
-
-  SmallVector<Function *, 2> WorkList;
-  for (auto &F : M) {
-    if (F.getName().startswith("llvm.lifetime.")) {
-      WorkList.push_back(&F);
+bool clspv::ReplaceLLVMIntrinsicsPass::removeIntrinsicDeclaration(Function &F) {
+  // Copy users to avoid modifying the list in place.
+  SmallVector<User *, 8> users(F.users());
+  for (auto U : users) {
+    if (auto *CI = dyn_cast<CallInst>(U)) {
+      CI->eraseFromParent();
     }
   }
-
-  for (auto *F : WorkList) {
-    Changed = true;
-    // Copy users to avoid modifying the list in place.
-    SmallVector<User *, 8> users(F->users());
-    for (auto U : users) {
-      if (auto *CI = dyn_cast<CallInst>(U)) {
-        CI->eraseFromParent();
-      }
-    }
-    F->eraseFromParent();
-  }
-
-  return Changed;
+  DeadFunctions.push_back(&F);
+  return true;
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F,

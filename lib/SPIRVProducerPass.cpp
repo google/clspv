@@ -2282,6 +2282,13 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
   } else if (Cst->isNullValue()) {
     Opcode = spv::OpConstantNull;
+  } else if(const Function *Fn = dyn_cast<Function>(Cst)) {
+    if (Fn->isIntrinsic()) {
+      Fn->print(errs());
+      llvm_unreachable("Unsupported llvm intrinsic");
+    }
+    Fn->print(errs());
+    llvm_unreachable("Unhandled function declaration/definition");
   } else {
     Cst->print(errs());
     llvm_unreachable("Unsupported Constant???");
@@ -6914,6 +6921,11 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   Ops << void_id << import_id << reflection::ExtInstArgumentInfo << arg_name;
 
   if (clspv::Option::KernelArgInfo()) {
+    assert(kernelFn.getMetadata("kernel_arg_type") &&
+            kernelFn.getMetadata("kernel_arg_addr_space") &&
+            kernelFn.getMetadata("kernel_arg_access_qual") &&
+            kernelFn.getMetadata("kernel_arg_type_qual")
+          );
     auto const &type_op =
         kernelFn.getMetadata("kernel_arg_type")->getOperand(ordinal);
     auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
@@ -6971,6 +6983,7 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     }
     auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
     Ops << type_qual_enum;
+  
   }
 
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
