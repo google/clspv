@@ -44,6 +44,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   return PA;
 }
 
+// TODO(#816): remove function after final transition.
 bool clspv::SimplifyPointerBitcastPass::runOnGEPFromBitcastCstExpr(
     Module &M) const {
   SmallVector<GetElementPtrInst *, 16> WorkList;
@@ -63,10 +64,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromBitcastCstExpr(
               // variables. In the end llvm managed to deal with it without us
               // having to simplify it. Trying to simplify would make it very
               // complicated for the ReplacePointerBitcast pass.
-              if (!CE->getOperand(0)
-                       ->getType()
-                       ->getNonOpaquePointerElementType()
-                       ->isStructTy()) {
+              auto CETy = CE->getOperand(0)->getType();
+              if (!CETy->isOpaquePointerTy() &&
+                  !CETy->getNonOpaquePointerElementType()->isStructTy()) {
                 // ... record the GEP as something we need to process.
                 WorkList.push_back(GEP);
               }
@@ -132,6 +132,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
   return Changed;
 }
 
+// TODO(#816): remove function after final transition.
 bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
   SmallVector<BitCastInst *, 16> WorkList;
   for (Function &F : M) {
@@ -142,12 +143,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
           // ... whose source is a GEP instruction...
           if (auto GEP = dyn_cast<GetElementPtrInst>(Bitcast->getOperand(0))) {
             // ... where the GEP is retrieving an element of the same type...
-            if (GEP->getSourceElementType() == GEP->getResultElementType()) {
+            auto BitcastTy = Bitcast->getType();
+            if (!BitcastTy->isOpaquePointerTy() &&
+                GEP->getSourceElementType() == GEP->getResultElementType()) {
               auto GEPTy = GEP->getResultElementType();
-              auto BitcastTy = Bitcast->getType()->getPointerElementType();
+              auto BitcastElementTy =
+                  BitcastTy->getNonOpaquePointerElementType();
               // ... and the types have a known compile time size...
               if ((0 != GEPTy->getPrimitiveSizeInBits()) &&
-                  (0 != BitcastTy->getPrimitiveSizeInBits())) {
+                  (0 != BitcastElementTy->getPrimitiveSizeInBits())) {
                 // ... record the bitcast as something we need to process.
                 WorkList.push_back(Bitcast);
               }
@@ -162,7 +166,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
 
   for (auto Bitcast : WorkList) {
     auto BitcastTy = Bitcast->getType();
-    auto BitcastElementTy = BitcastTy->getPointerElementType();
+    auto BitcastElementTy = BitcastTy->getNonOpaquePointerElementType();
 
     auto GEP = cast<GetElementPtrInst>(Bitcast->getOperand(0));
 
@@ -284,8 +288,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
         if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) {
           // ... whose operand is also a GEP instruction...
           if (isa<GetElementPtrInst>(GEP->getPointerOperand())) {
-            // ... record the GEP as something we need to process.
-            WorkList.push_back(GEP);
+            // ... with no implicit cast between them...
+            auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
+            if (OtherGEP->getResultElementType() == GEP->getSourceElementType()) {
+              // ... record the GEP as something we need to process.
+              WorkList.push_back(GEP);
+            }
           }
         }
       }
