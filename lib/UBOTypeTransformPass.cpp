@@ -13,10 +13,12 @@
 // limitations under the License.
 
 // This pass performs type mutation to create types that satisfy the standard
-// Uniform buffer layout rules of Vulkan section 14.5.4.
+// Uniform buffer layout rules of Vulkan section 14.5.4 (Offset and Stride
+// Assignment).
 //
 // Assumes the following passes have run:
 // UndoGetElementPtrConstantExprPass
+// AllocateDescriptorsPass
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -32,6 +34,7 @@
 #include "clspv/Option.h"
 
 #include "ArgKind.h"
+#include "Builtins.h"
 #include "Constants.h"
 #include "UBOTypeTransformPass.h"
 
@@ -45,19 +48,30 @@ PreservedAnalyses clspv::UBOTypeTransformPass::run(Module &M,
                         clspv::Option::Std430UniformBufferLayout();
 
   for (auto &F : M) {
-    if (F.isDeclaration() || F.getCallingConv() != CallingConv::SPIR_KERNEL)
-      continue;
-
-    auto pod_arg_impl = clspv::GetPodArgsImpl(F);
-    for (auto &Arg : F.args()) {
-      if ((clspv::Option::ConstantArgsInUniformBuffer() &&
-           clspv::GetArgKind(Arg) == clspv::ArgKind::BufferUBO) ||
-          (!Arg.getType()->isPointerTy() &&
-           pod_arg_impl == clspv::PodArgImpl::kUBO)) {
-        // Pre-populate the type mapping for types that must change. This
-        // necessary to prevent caching what would appear to be a no-op too
-        // early.
-        MapType(Arg.getType(), M, /* rewrite = */ true);
+    if (!F.isDeclaration() && F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+      auto pod_arg_impl = clspv::GetPodArgsImpl(F);
+      for (auto &Arg : F.args()) {
+        if (!Arg.getType()->isPointerTy() &&
+            pod_arg_impl == clspv::PodArgImpl::kUBO) {
+          // Pre-populate the type mapping for types that must change. This
+          // necessary to prevent caching what would appear to be a no-op too
+          // early.
+          MapType(Arg.getType(), M, /* rewrite = */ true);
+        }
+      }
+    } else if (F.isDeclaration() && clspv::Builtins::Lookup(&F).getType() ==
+                                        clspv::Builtins::kClspvResource) {
+      // In AllocateDescriptorsPass, access to arguments is replaced with
+      // builtin clspv::ResourceAccessorFunction functions, and the type is
+      // specified in the function signature. This also works for non opaque
+      // pointers, so the same solution is used.
+      const auto *return_ty = F.getReturnType();
+      assert(return_ty->isPointerTy());
+      if (clspv::Option::ConstantArgsInUniformBuffer() &&
+          return_ty->getPointerAddressSpace() ==
+              clspv::AddressSpace::Constant) {
+        MapType(F.getArg(clspv::ClspvOperand::kResourceDataType)->getType(), M,
+                /* rewrite = */ true);
       }
     }
   }
@@ -87,9 +101,12 @@ Type *clspv::UBOTypeTransformPass::MapType(Type *type, Module &M,
   switch (type->getTypeID()) {
   case Type::PointerTyID: {
     PointerType *pointer = cast<PointerType>(type);
-    Type *pointee =
-        MapType(pointer->getNonOpaquePointerElementType(), M, rewrite);
-    remapped = PointerType::get(pointee, pointer->getAddressSpace());
+    // TODO: #816 remove after final switch.
+    if (!pointer->isOpaquePointerTy()) {
+      Type *pointee =
+          MapType(pointer->getNonOpaquePointerElementType(), M, rewrite);
+      remapped = PointerType::get(pointee, pointer->getAddressSpace());
+    }
     break;
   }
   case Type::StructTyID:
@@ -151,19 +168,17 @@ StructType *clspv::UBOTypeTransformPass::MapStructType(StructType *struct_ty,
 
   bool changed = false;
   SmallVector<Type *, 8> elements;
-  SmallVector<uint64_t, 8> offsets;
   const auto *layout = M.getDataLayout().getStructLayout(struct_ty);
   for (unsigned i = 0; i != struct_ty->getNumElements(); ++i) {
     Type *element = struct_ty->getElementType(i);
-    uint64_t offset = layout->getElementOffset(i);
     const auto *array = dyn_cast<ArrayType>(element);
     // Do not modify the element unless |rewrite| is true.
     if (rewrite && array && array->getElementType()->isIntegerTy(8) &&
         !support_int8_array_) {
-      // Unless char arrays in UBOs are supported, replace all instances with an
-      // i32.
-      // This is a padding element. If chars are supported, replace the array
-      // with a single char, otherwise use an int replacement.
+      // Unless char arrays in UBOs are supported, replace all instances
+      // with an i32. This is a padding element. If chars are supported,
+      // replace the array with a single char, otherwise use an int
+      // replacement.
       if (clspv::Option::Int8Support()) {
         elements.push_back(Type::getInt8Ty(M.getContext()));
       } else {
@@ -174,7 +189,6 @@ StructType *clspv::UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     } else {
       elements.push_back(MapType(element, M, rewrite));
     }
-    offsets.push_back(offset);
     changed |= (element != elements.back());
   }
 
@@ -186,6 +200,7 @@ StructType *clspv::UBOTypeTransformPass::MapStructType(StructType *struct_ty,
     NamedMDNode *offsets_md =
         M.getOrInsertNamedMetadata(clspv::RemappedTypeOffsetMetadataName());
     SmallVector<Metadata *, 8> offset_values;
+    const auto offsets = layout->getMemberOffsets();
     for (auto offset : offsets) {
       offset_values.push_back(ConstantAsMetadata::get(
           ConstantInt::get(Type::getInt32Ty(M.getContext()), offset)));
@@ -252,8 +267,9 @@ bool clspv::UBOTypeTransformPass::RemapFunctions(
     SmallVectorImpl<Function *> *functions_to_modify, Module &M) {
   bool changed = false;
   for (auto &F : M) {
-    auto *remapped = RebuildType(F.getFunctionType(), M);
-    if (F.getType() != remapped) {
+    auto *original_type = F.getFunctionType();
+    auto *remapped = RebuildType(original_type, M);
+    if (remapped != original_type) {
       changed = true;
       functions_to_modify->push_back(&F);
     }
@@ -274,6 +290,7 @@ bool clspv::UBOTypeTransformPass::RemapFunctions(
     function_replacements_[func] = replacement;
     replacement->setCallingConv(func->getCallingConv());
     replacement->copyMetadata(func, 0);
+    replacement->copyAttributesFrom(func);
 
     // Move the basic blocks into the replacement function.
     if (!func->isDeclaration()) {
@@ -295,8 +312,9 @@ bool clspv::UBOTypeTransformPass::RemapGlobalVariables(
     SmallVectorImpl<GlobalVariable *> *variables_to_modify, Module &M) {
   bool changed = false;
   for (auto &GV : M.globals()) {
-    auto *remapped = RebuildType(GV.getValueType(), M);
-    if (remapped != GV.getValueType()) {
+    auto *original_type = GV.getValueType();
+    auto *remapped = RebuildType(original_type, M);
+    if (remapped != original_type) {
       changed = true;
       variables_to_modify->push_back(&GV);
     }
@@ -316,6 +334,7 @@ bool clspv::UBOTypeTransformPass::RemapGlobalVariables(
         GV->getType()->getPointerAddressSpace());
     remapped_globals_[GV] = replacement;
     replacement->copyMetadata(GV, 0);
+    replacement->copyAttributesFrom(GV);
   }
 
   return changed;
@@ -352,14 +371,21 @@ bool clspv::UBOTypeTransformPass::RemapUser(User *user, Module &M) {
 }
 
 bool clspv::UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
-  Type *remapped = RebuildType(value->getType(), M);
-  if (remapped == value->getType())
+  auto *original_type = value->getType();
+  Type *remapped = RebuildType(original_type, M);
+  if (remapped == original_type)
     return false;
 
   if (auto *gep = dyn_cast<GetElementPtrInst>(value)) {
-    auto *remapped_ele_ty = RebuildType(gep->getResultElementType(), M);
-    if (remapped_ele_ty != gep->getResultElementType()) {
-      gep->setResultElementType(remapped->getNonOpaquePointerElementType());
+    // if we're using opaque pointers then the result of a gep is always an
+    // opaque pointer
+    // TODO: #816 remove after final switch.
+    auto result_ty = gep->getResultElementType();
+    if (!result_ty->isOpaquePointerTy()) {
+      auto *remapped_ele_ty = RebuildType(result_ty, M);
+      if (remapped_ele_ty != result_ty) {
+        gep->setResultElementType(remapped->getNonOpaquePointerElementType());
+      }
     }
   }
 
