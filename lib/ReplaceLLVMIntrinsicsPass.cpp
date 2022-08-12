@@ -35,6 +35,12 @@ using namespace llvm;
 #define DEBUG_TYPE "ReplaceLLVMIntrinsics"
 
 namespace {
+uint32_t NewAlignment(uint32_t Alignment, uint32_t ElemSize) {
+  if (Alignment == 0) {
+    return 0;
+  }
+  return ((Alignment + ElemSize - 1) % Alignment) + 1;
+}
 Type *UpdateTy(LLVMContext &Ctx, uint64_t Size) {
   if (Size % (4 * sizeof(uint32_t)) == 0) {
     return FixedVectorType::get(Type::getInt32Ty(Ctx), 4);
@@ -454,15 +460,13 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
               DstElemPtr->getType(), SrcElemPtr->getType(), I32Ty, I32Ty};
           SmallVector<Value *, 5> param_values = {
               DstElemPtr, SrcElemPtr,
-              ConstantInt::get(
-                  I32Ty,
-                  ((DstAlignment + i * DstElemSize - 1) % DstAlignment) + 1)};
+              ConstantInt::get(I32Ty,
+                               NewAlignment(DstAlignment, i * DstElemSize))};
           if (clspv::Option::SpvVersion() >=
               clspv::Option::SPIRVVersion::SPIRV_1_4) {
             param_tys.push_back(I32Ty);
             param_values.push_back(ConstantInt::get(
-                I32Ty,
-                ((SrcAlignment + i * SrcElemSize - 1) % SrcElemSize) + 1));
+                I32Ty, NewAlignment(SrcAlignment, i * SrcElemSize)));
           }
           param_values.push_back(Volatile);
           NewFType = NewFType != nullptr ? NewFType
