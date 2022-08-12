@@ -28,15 +28,18 @@ kernel void foo(global S* data) { }
 // CHECK: OpDecorate [[rta:%[a-zA-Z0-9_]+]] ArrayStride 32
 // CHECK: OpDecorate [[var:%[a-zA-Z0-9_]+]] DescriptorSet
 // CHECK: OpDecorate [[array:%[a-zA-Z0-9_]+]] ArrayStride 1
+// CHECK: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
 // CHECK: [[char2:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 2
 // CHECK: [[char3:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 3
 // CHECK: [[char4:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 4
-// CHECK: [[four:%[a-zA-Z0-9_]+]] = OpConstant {{.*}} 4
-// CHECK: [[array:%[a-zA-Z0-9_]+]] = OpTypeArray [[char]] [[four]]
+// CHECK: [[one:%[a-zA-Z0-9_]+]] = OpConstant {{.*}} 1
+// CHECK: [[padding:%[a-zA-Z0-9_]+]] = OpTypeArray [[uint]] [[one]]
 // CHECK: [[eight:%[a-zA-Z0-9_]+]] = OpConstant {{.*}} 8
 // CHECK: [[char8:%[a-zA-Z0-9_]+]] = OpTypeArray [[char]] [[eight]]
-// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]] [[char]] [[char2]] [[char3]] [[char4]] [[array]] [[char8]] [[array]] [[array]]
+// CHECK: [[four:%[a-zA-Z0-9_]+]] = OpConstant {{.*}} 4
+// CHECK: [[array:%[a-zA-Z0-9_]+]] = OpTypeArray [[char]] [[four]]
+// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]] [[char]] [[char2]] [[char3]] [[char4]] [[padding]] [[char8]] [[array]] [[padding]]
 // CHECK: [[rta:%[a-zA-Z0-9_]+]] = OpTypeRuntimeArray [[struct]]
 // CHECK: [[block:%[a-zA-Z0-9_]+]] = OpTypeStruct [[rta]]
 // CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[block]]

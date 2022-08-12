@@ -47,6 +47,16 @@ namespace {
 
 using PartitionCallback = std::function<void(Instruction *)>;
 
+Type *getPaddingArray(LLVMContext &Ctx, uint64_t Size) {
+  if (Size % sizeof(uint64_t)) {
+    return ArrayType::get(Type::getInt32Ty(Ctx), Size / sizeof(uint32_t));
+  } else if (Size % sizeof(uint16_t)) {
+    return ArrayType::get(Type::getInt16Ty(Ctx), Size / sizeof(uint16_t));
+  } else {
+    return ArrayType::get(Type::getInt8Ty(Ctx), Size / sizeof(uint8_t));
+  }
+}
+
 /// Partition the @p Instructions based on their liveness.
 void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
                            PartitionCallback OnDead,
@@ -1432,8 +1442,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
                           ->getElementOffset(Types.size() - 1);
         if (InitialOff != NewOff) {
           Types.pop_back();
-          Types.push_back(
-              ArrayType::get(Ty->getInt8Ty(Ctx), InitialOff - NewOff));
+          Types.push_back(getPaddingArray(Ctx, InitialOff - NewOff));
           Types.push_back(EquivalentTy);
         }
       } else {
@@ -1445,8 +1454,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
       auto InitialSize = DL->getTypeAllocSize(StructTy);
       auto NewSize = DL->getTypeAllocSize(StructType::get(Ctx, Types, Packed));
       if (InitialSize != NewSize) {
-        Types.push_back(
-            ArrayType::get(Ty->getInt8Ty(Ctx), InitialSize - NewSize));
+        Types.push_back(getPaddingArray(Ctx, InitialSize - NewSize));
       }
       return StructType::get(Ctx, Types, Packed);
     } else {

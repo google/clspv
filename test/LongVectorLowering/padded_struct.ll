@@ -25,16 +25,16 @@ entry:
 }
 
 ; CHECK-LABEL: @test3(
-; CHECK:  extractvalue { i8, [28 x i8], [8 x i32] } %s, 0
-; CHECK:  insertvalue { i8, [28 x i8], [8 x i32] } undef, i8 {{.*}}, 0
-; CHECK:  extractvalue { i8, [28 x i8], [8 x i32] } %s, 2
-; CHECK:  insertvalue { i8, [28 x i8], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
-; CHECK:  insertvalue { i8, [28 x i8], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
+; CHECK:  extractvalue { i8, [7 x i32], [8 x i32] } %s, 0
+; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } undef, i8 {{.*}}, 0
+; CHECK:  extractvalue { i8, [7 x i32], [8 x i32] } %s, 2
+; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
+; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
 
 ; CHECK-LABEL: @test2(
-; CHECK: extractvalue { i8, [28 x i8], [8 x i32] } %s, 0
-; CHECK: insertvalue { i8, [28 x i8], [8 x i32] } undef, i8 {{.*}}, 0
-; CHECK: extractvalue { i8, [28 x i8], [8 x i32] } %s, 2
+; CHECK: extractvalue { i8, [7 x i32], [8 x i32] } %s, 0
+; CHECK: insertvalue { i8, [7 x i32], [8 x i32] } undef, i8 {{.*}}, 0
+; CHECK: extractvalue { i8, [7 x i32], [8 x i32] } %s, 2
 
 ; CHECK-LABEL: @test1(
-; CHECK: getelementptr { i8, [28 x i8], [8 x i32] }, { i8, [28 x i8], [8 x i32] } addrspace(1)* %ptr, i32 0, i32 2
+; CHECK: getelementptr { i8, [7 x i32], [8 x i32] }, { i8, [7 x i32], [8 x i32] } addrspace(1)* %ptr, i32 0, i32 2
