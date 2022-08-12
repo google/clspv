@@ -336,8 +336,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
             auto Size =
                 dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
 
-            auto DstElemTy = DstTy->getPointerElementType();
-            auto SrcElemTy = SrcTy->getPointerElementType();
+            auto DstElemTy = DstTy->getNonOpaquePointerElementType();
+            auto SrcElemTy = SrcTy->getNonOpaquePointerElementType();
             unsigned NumDstUnpackings = 0;
             unsigned NumSrcUnpackings = 0;
             match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
