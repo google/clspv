@@ -48,9 +48,9 @@ namespace {
 using PartitionCallback = std::function<void(Instruction *)>;
 
 Type *getPaddingArray(LLVMContext &Ctx, uint64_t Size) {
-  if (Size % sizeof(uint64_t)) {
+  if (Size % sizeof(uint32_t) == 0) {
     return ArrayType::get(Type::getInt32Ty(Ctx), Size / sizeof(uint32_t));
-  } else if (Size % sizeof(uint16_t)) {
+  } else if (Size % sizeof(uint16_t) == 0) {
     return ArrayType::get(Type::getInt16Ty(Ctx), Size / sizeof(uint16_t));
   } else {
     return ArrayType::get(Type::getInt8Ty(Ctx), Size / sizeof(uint8_t));
