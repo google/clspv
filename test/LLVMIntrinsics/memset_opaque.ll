@@ -9,13 +9,13 @@ target triple = "spir-unknown-unknown"
 
 define dso_local spir_kernel void @fct1(ptr addrspace(1) %dst) {
 entry:
-  tail call void @llvm.memset.p1.i32(ptr addrspace(1) %dst, i8 0, i32 128, i1 false)
+  tail call void @llvm.memset.p1.i32(ptr addrspace(1) %dst, i8 0, i32 64, i1 false)
   ret void
 }
 
 define dso_local spir_kernel void @fct2(ptr addrspace(1) %dst) {
 entry:
-  tail call void @llvm.memset.p1.i32(ptr addrspace(1) %dst, i8 0, i32 16, i1 false)
+  tail call void @llvm.memset.p1.i32(ptr addrspace(1) %dst, i8 0, i32 8, i1 false)
   ret void
 }
 
@@ -41,20 +41,20 @@ entry:
 declare void @llvm.memset.p1.i32(ptr addrspace(1), i8, i32, i1)
 
 ; CHECK-LABEL: @fct1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) %dst, i32 0
-; CHECK:  [[gep0:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) [[gep]], i32 0
-; CHECK:  store <4 x i64> zeroinitializer, ptr addrspace(1) [[gep0]]
-; CHECK:  [[gep1:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) [[gep]], i32 1
-; CHECK:  store <4 x i64> zeroinitializer, ptr addrspace(1) [[gep1]]
-; CHECK:  [[gep2:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) [[gep]], i32 2
-; CHECK:  store <4 x i64> zeroinitializer, ptr addrspace(1) [[gep2]]
-; CHECK:  [[gep3:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) [[gep]], i32 3
-; CHECK:  store <4 x i64> zeroinitializer, ptr addrspace(1) [[gep3]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %dst, i32 0
+; CHECK:  [[gep0:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) [[gep]], i32 0
+; CHECK:  store <4 x i32> zeroinitializer, ptr addrspace(1) [[gep0]]
+; CHECK:  [[gep1:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) [[gep]], i32 1
+; CHECK:  store <4 x i32> zeroinitializer, ptr addrspace(1) [[gep1]]
+; CHECK:  [[gep2:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) [[gep]], i32 2
+; CHECK:  store <4 x i32> zeroinitializer, ptr addrspace(1) [[gep2]]
+; CHECK:  [[gep3:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) [[gep]], i32 3
+; CHECK:  store <4 x i32> zeroinitializer, ptr addrspace(1) [[gep3]]
 
 ; CHECK-LABEL: @fct2
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i64>, ptr addrspace(1) %dst, i32 0
-; CHECK:  [[gep0:%[^ ]+]] = getelementptr <2 x i64>, ptr addrspace(1) [[gep]], i32 0
-; CHECK:  store <2 x i64> zeroinitializer, ptr addrspace(1) [[gep0]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i32>, ptr addrspace(1) %dst, i32 0
+; CHECK:  [[gep0:%[^ ]+]] = getelementptr <2 x i32>, ptr addrspace(1) [[gep]], i32 0
+; CHECK:  store <2 x i32> zeroinitializer, ptr addrspace(1) [[gep0]]
 
 ; CHECK-LABEL: @fct3
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %dst, i32 0

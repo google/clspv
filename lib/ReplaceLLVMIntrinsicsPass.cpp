@@ -36,13 +36,16 @@ using namespace llvm;
 
 namespace {
 Type *UpdateTy(LLVMContext &Ctx, uint64_t Size) {
-  if (__builtin_popcount(Size) != 1) {
-    return Type::getInt8Ty(Ctx);
-  } else if (Size > sizeof(uint64_t)) {
-    return FixedVectorType::get(Type::getInt64Ty(Ctx),
-                                std::min(Size / sizeof(uint64_t), 4UL));
+  if (Size % (4 * sizeof(uint32_t)) == 0) {
+    return FixedVectorType::get(Type::getInt32Ty(Ctx), 4);
+  } else if (Size % (2 * sizeof(uint32_t)) == 0) {
+    return FixedVectorType::get(Type::getInt32Ty(Ctx), 2);
+  } else if (Size % sizeof(uint32_t) == 0) {
+    return Type::getInt32Ty(Ctx);
+  } else if (Size % sizeof(uint16_t) == 0) {
+    return Type::getInt16Ty(Ctx);
   } else {
-    return Type::getIntNTy(Ctx, Size * CHAR_BIT);
+    return Type::getInt8Ty(Ctx);
   }
 }
 Type *descend_type(Type *InType) {
@@ -318,6 +321,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           auto SrcBc =
               dyn_cast<BitCastOperator>(CI->getArgOperand(1));
 
+          // TODO(#816): remove after final transition.
           if (SrcBc && DstBc) {
             auto Dst = DstBc->getOperand(0);
             auto Src = SrcBc->getOperand(0);
@@ -392,10 +396,15 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         Type *SrcElemTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
         IRBuilder<> Builder(CI);
-        if (DstElemTy == nullptr || SrcElemTy == nullptr) {
-          assert(DstElemTy == SrcElemTy);
+        if (DstElemTy == nullptr && SrcElemTy == nullptr) {
           DstElemTy = SrcElemTy = UpdateTy(M.getContext(), Size);
           Dst = Builder.CreateGEP(DstElemTy, Dst, {ConstantInt::get(I32Ty, 0)});
+          Src = Builder.CreateGEP(SrcElemTy, Src, {ConstantInt::get(I32Ty, 0)});
+        } else if (DstElemTy == nullptr) {
+          DstElemTy = SrcElemTy;
+          Dst = Builder.CreateGEP(DstElemTy, Dst, {ConstantInt::get(I32Ty, 0)});
+        } else if (SrcElemTy == nullptr) {
+          SrcElemTy = DstElemTy;
           Src = Builder.CreateGEP(SrcElemTy, Src, {ConstantInt::get(I32Ty, 0)});
         }
 
