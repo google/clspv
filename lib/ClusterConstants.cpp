@@ -97,10 +97,19 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
         auto padding = align != 0 ? (align - (offset % align)) % align : 0;
         if (padding) {
           types.pop_back();
-          ArrayType *pad_ty = ArrayType::get(ty->getInt8Ty(Context), padding);
+          Type *pad_elem_ty;
+          if (padding % sizeof(uint32_t) == 0) {
+            pad_elem_ty = ty->getInt32Ty(Context);
+          } else if (padding % sizeof(uint16_t) == 0) {
+            pad_elem_ty = ty->getInt16Ty(Context);
+          } else {
+            pad_elem_ty = ty->getInt8Ty(Context);
+          }
+          padding /= (pad_elem_ty->getScalarSizeInBits() / 8);
+          ArrayType *pad_ty = ArrayType::get(pad_elem_ty, padding);
           SmallVector<Constant *, 4> data;
           for (unsigned i = 0; i < padding; i++) {
-            data.push_back(ConstantInt::get(ty->getInt8Ty(Context), 0));
+            data.push_back(ConstantInt::get(pad_elem_ty, 0));
           }
           types.push_back(pad_ty);
           types.push_back(ty);
