@@ -15,12 +15,49 @@
 // This translation unit defines all Clspv command line option variables.
 
 #include "llvm/PassRegistry.h"
-#include "llvm/Support/CommandLine.h"
 
+#include "Builtins.h"
+#include "BuiltinsEnum.h"
 #include "Passes.h"
 #include "clspv/Option.h"
 
+#include <sstream>
+
 namespace {
+
+// Custom parser for parsing a comma separated list of builtin functions into a
+// std::set containing the equivalent list of BuiltinType enums. We use a
+// custom parser with a regular cl::opt instead of a cl::list because cl::list
+// requires you to list all possible choices (in this case all builtin
+// functions) and then includes all those choices in the helptext for the flag.
+struct BuiltinListParser
+    : public llvm::cl::parser<std::set<clspv::Builtins::BuiltinType>> {
+  BuiltinListParser(llvm::cl::Option &opt)
+      : llvm::cl::parser<std::set<clspv::Builtins::BuiltinType>>(opt){};
+  bool parse(llvm::cl::Option &opt, llvm::StringRef,
+             const llvm::StringRef &ArgValue,
+             std::set<clspv::Builtins::BuiltinType> &Val) {
+    std::stringstream argValStream(ArgValue.str());
+    while (argValStream.good()) {
+      std::string substr;
+      std::getline(argValStream, substr, ',');
+      // A trailing comma will result in our last string being empty
+      if (substr.empty()) {
+        break;
+      }
+      auto builtinType = clspv::Builtins::LookupBuiltinType(substr);
+      if (builtinType == clspv::Builtins::kBuiltinNone) {
+        // We got a function name that we don't recognize as a builtin.
+        return opt.error("'" + substr +
+                         "' wasn't recognized as a builtin function!");
+      }
+      Val.insert(builtinType);
+    }
+
+    // Implementations of parse() are expected to return false on success.
+    return false;
+  }
+};
 
 llvm::cl::opt<bool>
     inline_entry_points("inline-entry-points", llvm::cl::init(false),
@@ -249,6 +286,15 @@ static llvm::cl::list<clspv::Option::StorageClass> no_8bit_storage(
         clEnumValN(clspv::Option::StorageClass::kPushConstant, "pushconstant",
                    "Disallow 8-bit types in push constant interfaces")));
 
+static llvm::cl::opt<std::set<clspv::Builtins::BuiltinType>, false,
+                     BuiltinListParser>
+    use_native_builtins(
+        "use-native-builtins",
+        llvm::cl::desc(
+            "Comma separated list of builtin functions that should use "
+            "the native implementation instead of the one provided by "
+            "the builtin library."));
+
 static llvm::cl::opt<bool> cl_unsafe_math_optimizations(
     "cl-unsafe-math-optimizations", llvm::cl::init(false),
     llvm::cl::desc("Allow optimizations for floating-point arithmetic that (a) "
@@ -304,7 +350,6 @@ static llvm::cl::opt<bool>
 
 namespace clspv {
 namespace Option {
-
 bool InlineEntryPoints() { return inline_entry_points; }
 bool InlineSingleCallSite() { return !no_inline_single_call_site; }
 bool DirectResourceAccess() {
@@ -379,6 +424,10 @@ bool FiniteMath() {
 }
 bool FastRelaxedMath() { return cl_fast_relaxed_math || NativeMath(); }
 bool NativeMath() { return cl_native_math; }
+
+std::set<clspv::Builtins::BuiltinType> UseNativeBuiltins() {
+  return use_native_builtins;
+}
 
 bool FP16() { return fp16; }
 bool FP64() { return fp64; }

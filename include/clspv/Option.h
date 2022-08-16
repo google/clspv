@@ -16,8 +16,14 @@
 #define CLSPV_INCLUDE_CLSPV_OPTION_H_
 
 #include <cstdint>
+#include <set>
 
 namespace clspv {
+
+namespace Builtins {
+enum BuiltinType : unsigned int;
+}
+
 namespace Option {
 
 // Returns true if each kernel must use its own descriptor set for all
@@ -133,6 +139,11 @@ bool LongVectorSupport();
 
 // Returns true when images are supported.
 bool ImageSupport();
+
+// Returns a list of builtin functions (represented by their BuiltinType) that
+// we should generate natively (with an equivalent GLSL extended or core SPIR-V
+// instruction) rather than using the builtin library implementation.
+std::set<clspv::Builtins::BuiltinType> UseNativeBuiltins();
 
 // Returns the source language.
 enum class SourceLanguage {

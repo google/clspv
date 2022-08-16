@@ -101,7 +101,6 @@ const bool Hack_generate_runtime_array_stride_early = true;
 // The value of 1/pi.  This value is from MSDN
 // https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
 const double kOneOverPi = 0.318309886183790671538;
-const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
 
 // SPIRV Module Sections (per 2.4 of the SPIR-V spec)
 // These are used to collect SPIRVInstructions by type on-the-fly.
@@ -457,18 +456,6 @@ struct SPIRVProducerPassImpl {
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
-  // Returns the GLSL extended instruction enum that the given function
-  // call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
-  glsl::ExtInst getExtInstEnum(const Builtins::FunctionInfo &func_info);
-  // Returns the GLSL extended instruction enum indirectly used by the given
-  // function.  That is, to implement the given function, we use an extended
-  // instruction plus one more instruction. If none, then returns the 0 value,
-  // i.e. GLSLstd4580Bad.
-  glsl::ExtInst getIndirectExtInstEnum(const Builtins::FunctionInfo &func_info);
-  // Returns the single GLSL extended instruction used directly or
-  // indirectly by the given function call.
-  glsl::ExtInst
-  getDirectOrIndirectExtInstEnum(const Builtins::FunctionInfo &func_info);
   void WriteOneWord(uint32_t Word);
   void WriteResultID(const SPIRVInstruction &Inst);
   void WriteWordCountAndOpcode(const SPIRVInstruction &Inst);
@@ -4239,7 +4226,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     break;
   }
   default: {
-    glsl::ExtInst EInst = getDirectOrIndirectExtInstEnum(func_info);
+    glsl::ExtInst EInst = Builtins::getDirectOrIndirectExtInstEnum(func_info);
 
     // Do not replace functions with implementations.
     if (EInst && Call->getCalledFunction()->isDeclaration()) {
@@ -4272,7 +4259,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
 
       RID = addSPIRVInst(spv::OpExtInst, Ops);
 
-      const auto IndirectExtInst = getIndirectExtInstEnum(func_info);
+      const auto IndirectExtInst = Builtins::getIndirectExtInstEnum(func_info);
       if (IndirectExtInst != kGlslExtInstBad) {
         // Generate one more instruction that uses the result of the extended
         // instruction.  Its result id is one more than the id of the
@@ -5636,242 +5623,6 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
-}
-
-glsl::ExtInst
-SPIRVProducerPassImpl::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
-  switch (func_info.getType()) {
-  case Builtins::kClamp: {
-    auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
-      return glsl::ExtInst::ExtInstNClamp;
-    }
-    return param_type.is_signed ? glsl::ExtInst::ExtInstSClamp
-                                : glsl::ExtInst::ExtInstUClamp;
-  }
-  case Builtins::kMax: {
-    auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
-      return glsl::ExtInst::ExtInstFMax;
-    }
-    return param_type.is_signed ? glsl::ExtInst::ExtInstSMax
-                                : glsl::ExtInst::ExtInstUMax;
-  }
-  case Builtins::kMin: {
-    auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
-      return glsl::ExtInst::ExtInstFMin;
-    }
-    return param_type.is_signed ? glsl::ExtInst::ExtInstSMin
-                                : glsl::ExtInst::ExtInstUMin;
-  }
-  case Builtins::kAbs:
-    return glsl::ExtInst::ExtInstSAbs;
-  case Builtins::kFmax:
-    return glsl::ExtInst::ExtInstNMax;
-  case Builtins::kFmin:
-    return glsl::ExtInst::ExtInstNMin;
-  case Builtins::kDegrees:
-    return glsl::ExtInst::ExtInstDegrees;
-  case Builtins::kRadians:
-    return glsl::ExtInst::ExtInstRadians;
-  case Builtins::kMix:
-    return glsl::ExtInst::ExtInstFMix;
-  case Builtins::kAcos:
-  case Builtins::kAcospi:
-    return glsl::ExtInst::ExtInstAcos;
-  case Builtins::kAcosh:
-    return glsl::ExtInst::ExtInstAcosh;
-  case Builtins::kAsin:
-  case Builtins::kAsinpi:
-    return glsl::ExtInst::ExtInstAsin;
-  case Builtins::kAsinh:
-    return glsl::ExtInst::ExtInstAsinh;
-  case Builtins::kAtan:
-  case Builtins::kAtanpi:
-    return glsl::ExtInst::ExtInstAtan;
-  case Builtins::kAtanh:
-    return glsl::ExtInst::ExtInstAtanh;
-  case Builtins::kAtan2:
-  case Builtins::kAtan2pi:
-    return glsl::ExtInst::ExtInstAtan2;
-  case Builtins::kCeil:
-    return glsl::ExtInst::ExtInstCeil;
-  case Builtins::kSin:
-  case Builtins::kHalfSin:
-  case Builtins::kNativeSin:
-    return glsl::ExtInst::ExtInstSin;
-  case Builtins::kSinh:
-    return glsl::ExtInst::ExtInstSinh;
-  case Builtins::kCos:
-  case Builtins::kHalfCos:
-  case Builtins::kNativeCos:
-    return glsl::ExtInst::ExtInstCos;
-  case Builtins::kCosh:
-    return glsl::ExtInst::ExtInstCosh;
-  case Builtins::kTan:
-  case Builtins::kHalfTan:
-  case Builtins::kNativeTan:
-    return glsl::ExtInst::ExtInstTan;
-  case Builtins::kTanh:
-    return glsl::ExtInst::ExtInstTanh;
-  case Builtins::kExp:
-  case Builtins::kHalfExp:
-  case Builtins::kNativeExp:
-    return glsl::ExtInst::ExtInstExp;
-  case Builtins::kExp2:
-  case Builtins::kHalfExp2:
-  case Builtins::kNativeExp2:
-    return glsl::ExtInst::ExtInstExp2;
-  case Builtins::kLog:
-  case Builtins::kHalfLog:
-  case Builtins::kNativeLog:
-    return glsl::ExtInst::ExtInstLog;
-  case Builtins::kLog2:
-  case Builtins::kHalfLog2:
-  case Builtins::kNativeLog2:
-    return glsl::ExtInst::ExtInstLog2;
-  case Builtins::kFabs:
-    return glsl::ExtInst::ExtInstFAbs;
-  case Builtins::kFma:
-    return glsl::ExtInst::ExtInstFma;
-  case Builtins::kFloor:
-    return glsl::ExtInst::ExtInstFloor;
-  case Builtins::kLdexp:
-    return glsl::ExtInst::ExtInstLdexp;
-  case Builtins::kPow:
-  case Builtins::kPowr:
-  case Builtins::kHalfPowr:
-  case Builtins::kNativePowr:
-    return glsl::ExtInst::ExtInstPow;
-  case Builtins::kRint:
-    return glsl::ExtInst::ExtInstRoundEven;
-  case Builtins::kRound:
-    return glsl::ExtInst::ExtInstRound;
-  case Builtins::kSqrt:
-  case Builtins::kHalfSqrt:
-  case Builtins::kNativeSqrt:
-    return glsl::ExtInst::ExtInstSqrt;
-  case Builtins::kRsqrt:
-  case Builtins::kHalfRsqrt:
-  case Builtins::kNativeRsqrt:
-    return glsl::ExtInst::ExtInstInverseSqrt;
-  case Builtins::kTrunc:
-    return glsl::ExtInst::ExtInstTrunc;
-  case Builtins::kFrexp:
-    return glsl::ExtInst::ExtInstFrexp;
-  case Builtins::kClspvFract:
-  case Builtins::kFract:
-    return glsl::ExtInst::ExtInstFract;
-  case Builtins::kSign:
-    return glsl::ExtInst::ExtInstFSign;
-  case Builtins::kLength:
-  case Builtins::kFastLength:
-    return glsl::ExtInst::ExtInstLength;
-  case Builtins::kDistance:
-  case Builtins::kFastDistance:
-    return glsl::ExtInst::ExtInstDistance;
-  case Builtins::kStep:
-    return glsl::ExtInst::ExtInstStep;
-  case Builtins::kSmoothstep:
-    return glsl::ExtInst::ExtInstSmoothStep;
-  case Builtins::kCross:
-    return glsl::ExtInst::ExtInstCross;
-  case Builtins::kNormalize:
-  case Builtins::kFastNormalize:
-    return glsl::ExtInst::ExtInstNormalize;
-  case Builtins::kSpirvPack:
-    return glsl::ExtInst::ExtInstPackHalf2x16;
-  case Builtins::kSpirvUnpack:
-    return glsl::ExtInst::ExtInstUnpackHalf2x16;
-  default:
-    break;
-  }
-
-  // TODO: improve this by checking the intrinsic id.
-  if (func_info.getName().find("llvm.fmuladd.") == 0) {
-    return glsl::ExtInst::ExtInstFma;
-  }
-  if (func_info.getName().find("llvm.sqrt.") == 0) {
-    return glsl::ExtInst::ExtInstSqrt;
-  }
-  if (func_info.getName().find("llvm.trunc.") == 0) {
-    return glsl::ExtInst::ExtInstTrunc;
-  }
-  if (func_info.getName().find("llvm.ctlz.") == 0) {
-    return glsl::ExtInst::ExtInstFindUMsb;
-  }
-  if (func_info.getName().find("llvm.cttz.") == 0) {
-    return glsl::ExtInst::ExtInstFindILsb;
-  }
-  if (func_info.getName().find("llvm.ceil.") == 0) {
-    return glsl::ExtInst::ExtInstCeil;
-  }
-  if (func_info.getName().find("llvm.rint.") == 0) {
-    return glsl::ExtInst::ExtInstRoundEven;
-  }
-  if (func_info.getName().find("llvm.fabs.") == 0) {
-    return glsl::ExtInst::ExtInstFAbs;
-  }
-  if (func_info.getName().find("llvm.abs.") == 0) {
-    return glsl::ExtInst::ExtInstSAbs;
-  }
-  if (func_info.getName().find("llvm.floor.") == 0) {
-    return glsl::ExtInst::ExtInstFloor;
-  }
-  if (func_info.getName().find("llvm.sin.") == 0) {
-    return glsl::ExtInst::ExtInstSin;
-  }
-  if (func_info.getName().find("llvm.cos.") == 0) {
-    return glsl::ExtInst::ExtInstCos;
-  }
-  if (func_info.getName().find("llvm.exp.") == 0) {
-    return glsl::ExtInst::ExtInstExp;
-  }
-  if (func_info.getName().find("llvm.log.") == 0) {
-    return glsl::ExtInst::ExtInstLog;
-  }
-  if (func_info.getName().find("llvm.pow.") == 0) {
-    return glsl::ExtInst::ExtInstPow;
-  }
-  if (func_info.getName().find("llvm.smax.") == 0) {
-    return glsl::ExtInst::ExtInstSMax;
-  }
-  if (func_info.getName().find("llvm.smin.") == 0) {
-    return glsl::ExtInst::ExtInstSMin;
-  }
-  if (func_info.getName().find("llvm.umax.") == 0) {
-    return glsl::ExtInst::ExtInstUMax;
-  }
-  if (func_info.getName().find("llvm.umin.") == 0) {
-    return glsl::ExtInst::ExtInstUMin;
-  }
-  return kGlslExtInstBad;
-}
-
-glsl::ExtInst SPIRVProducerPassImpl::getIndirectExtInstEnum(
-    const Builtins::FunctionInfo &func_info) {
-  switch (func_info.getType()) {
-  case Builtins::kAcospi:
-    return glsl::ExtInst::ExtInstAcos;
-  case Builtins::kAsinpi:
-    return glsl::ExtInst::ExtInstAsin;
-  case Builtins::kAtanpi:
-    return glsl::ExtInst::ExtInstAtan;
-  case Builtins::kAtan2pi:
-    return glsl::ExtInst::ExtInstAtan2;
-  default:
-    break;
-  }
-  return kGlslExtInstBad;
-}
-
-glsl::ExtInst SPIRVProducerPassImpl::getDirectOrIndirectExtInstEnum(
-    const Builtins::FunctionInfo &func_info) {
-  auto direct = getExtInstEnum(func_info);
-  if (direct != kGlslExtInstBad)
-    return direct;
-  return getIndirectExtInstEnum(func_info);
 }
 
 void SPIRVProducerPassImpl::WriteOneWord(uint32_t Word) {

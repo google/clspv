@@ -18,7 +18,7 @@ import re
 import json
 
 def write_enum(grammar, output):
-    output.write("enum ExtInst {\n")
+    output.write("enum ExtInst : unsigned int {\n")
     insts = grammar['instructions']
     for inst in insts:
         output.write("  ExtInst%s = %d,\n" % (inst['opname'], inst['opcode']))
@@ -26,7 +26,7 @@ def write_enum(grammar, output):
     output.write("}; // enum ExtInst\n\n")
 
 def write_name_func(grammar, output):
-    output.write("const char* getExtInstName(const ExtInst thing) {\n")
+    output.write("inline const char* getExtInstName(const ExtInst thing) {\n")
     output.write("  switch(thing) {\n")
     insts = grammar['instructions']
     for inst in insts:

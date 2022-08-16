@@ -22,6 +22,8 @@
 
 #include "Builtins.h"
 
+#include <set>
+
 #ifndef _CLSPV_LIB_REPLACE_OPENCL_BUILTIN_PASS_H
 #define _CLSPV_LIB_REPLACE_OPENCL_BUILTIN_PASS_H
 
@@ -130,7 +132,12 @@ private:
   llvm::DenseMap<llvm::Type *, llvm::Type *> PairStructMap;
 
   llvm::DenseMap<llvm::Value *, llvm::Type *> InferredTypeCache;
+
+public:
+  // Set containing every builtin this pass is capable of replacing.
+  static std::set<Builtins::BuiltinType> ReplaceableBuiltins;
 };
+
 } // namespace clspv
 
 #endif // _CLSPV_LIB_REPLACE_OPENCL_BUILTIN_PASS_H

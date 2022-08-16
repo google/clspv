@@ -18,7 +18,7 @@
 namespace clspv {
 namespace Builtins {
 
-enum BuiltinType {
+enum BuiltinType : unsigned int {
   kBuiltinNone = 0,
 
   kType_Clspv_Start,
