@@ -103,6 +103,38 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
   return Val;
 }
 
+// Check whether a pointer to the type `ContainingTy` is also usable as a
+// pointer to the type `TargetTy` due to the layout of the vector or aggregrate
+// type. Descends through the first element of the `ContainingTy` until it is
+// found or it cannot descend any further. Writes out levels of indirection to
+// `Steps`.
+bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps) {
+  int StepCount = 0;
+
+  do {
+    if (ContainingTy == TargetTy) {
+      Steps = StepCount;
+      return true;
+    }
+    StepCount++;
+
+    if (auto *VectorTy = dyn_cast<VectorType>(ContainingTy)) {
+      ContainingTy = VectorTy->getElementType();
+    } else if (auto *ArrayTy = dyn_cast<ArrayType>(ContainingTy)) {
+      ContainingTy = ArrayTy->getArrayElementType();
+    } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
+      if (StructTy->isOpaque())
+        break;
+      ContainingTy = StructTy->getStructElementType(0);
+    } else {
+      break;
+    }
+  } while (ContainingTy->isAggregateType() || ContainingTy->isVectorTy() ||
+           ContainingTy == TargetTy);
+
+  return false;
+}
+
 // 'Values' is expected to contain either vectors or scalars.
 // At the end of the function, 'Idx' has been updated with the potential
 // remainder of the index to get to the expected element.
@@ -449,6 +481,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   SmallVector<User *, 16> UserWorkList;
   DenseMap<Value *, Type *> type_cache;
   DenseSet<Value *> ImplicitCasts;
+  DenseMap<Instruction *, int> ImplicitGEPs;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -474,6 +507,15 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         }
 
         if (source_ty && dest_ty && source_ty != dest_ty) {
+          int Steps = 0;
+          if (!isa<GetElementPtrInst>(I) &&
+              FindAliasingContainedType(source_ty, dest_ty, Steps)) {
+            if (Steps > 0) {
+              ImplicitGEPs.insert({&I, Steps});
+              continue;
+            }
+          }
+
           bool ok = true;
           UserWorkList.push_back(&I);
           while (!UserWorkList.empty()) {
@@ -496,6 +538,32 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         }
       }
     }
+  }
+
+  // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
+  // handled by explcitly inserting the GEP.
+  for (auto GEPInfo : ImplicitGEPs) {
+    auto *I = GEPInfo.first;
+    auto Steps = GEPInfo.second;
+    IRBuilder<> Builder{I};
+    SmallVector<Value *, 8> GEPIndices{};
+    unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+
+    if (!isa<LoadInst>(I) && !isa<StoreInst>(I) && !isa<GetElementPtrInst>(I)) {
+      continue;
+    }
+
+    for (int i = 0; i < Steps + 1; i++) {
+      GEPIndices.push_back(Builder.getInt32(0));
+    }
+
+    Value *PointerOp = I->getOperand(PointerOperandNum);
+    auto *PointerOpType =
+        clspv::InferType(PointerOp, M.getContext(), &type_cache);
+    auto *NewGEP =
+        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices);
+    Builder.Insert(NewGEP);
+    I->setOperand(PointerOperandNum, NewGEP);
   }
 
   const DataLayout &DL = M.getDataLayout();
