@@ -14,10 +14,11 @@ entry:
 declare void @llvm.memset.p1i8.i32(i8 addrspace(1)*, i8, i32, i1)
 
 ; CHECK-NOT: bitcast
-; CHECK: store float 0.000000e+00, float addrspace(1)* %data
-; CHECK: [[gep0:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* %data, i32 1
+; CHECK: [[gep0:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* %data, i32 0
 ; CHECK: store float 0.000000e+00, float addrspace(1)* [[gep0]]
-; CHECK: [[gep1:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* [[gep0]], i32 1
+; CHECK: [[gep1:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* %data, i32 1
 ; CHECK: store float 0.000000e+00, float addrspace(1)* [[gep1]]
-; CHECK: [[gep2:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* [[gep1]], i32 1
+; CHECK: [[gep2:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* %data, i32 2
 ; CHECK: store float 0.000000e+00, float addrspace(1)* [[gep2]]
+; CHECK: [[gep3:%[0-9a-zA-Z_.]+]] = getelementptr float, float addrspace(1)* %data, i32 3
+; CHECK: store float 0.000000e+00, float addrspace(1)* [[gep3]]
