@@ -31,6 +31,7 @@
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 
+#include "BitcastUtils.h"
 #include "Builtins.h"
 #include "ThreeElementVectorLoweringPass.h"
 
@@ -196,6 +197,10 @@ Function *createFunctionWithMappedTypes(Function &F,
     llvm_unreachable("Unexpected failure when inlining function.");
   }
 
+  // Inlining a function can introduce constant expression that we could not
+  // handle afterwards.
+  BitcastUtils::RemovedCstExprFromFunction(Wrapper);
+
   return Wrapper;
 }
 
@@ -299,6 +304,7 @@ clspv::ThreeElementVectorLoweringPass::run(Module &M, ModuleAnalysisManager &) {
 
   runOnGlobals(M);
   for (auto &F : M.functions()) {
+    BitcastUtils::RemovedCstExprFromFunction(&F);
     runOnFunction(F);
   }
 
