@@ -300,6 +300,11 @@ static llvm::cl::opt<bool>
     force_no_vec3_to_vec4("no-vec3-to-vec4", llvm::cl::init(false),
                           llvm::cl::desc("Force NOT lowering vec3 to vec4"));
 
+static llvm::cl::opt<bool>
+    opaque_pointers("enable-opaque-pointers",
+                    llvm::cl::desc("Use opaque pointers"),
+                    llvm::cl::init(false));
+
 } // namespace
 
 namespace clspv {
@@ -399,6 +404,8 @@ Vec3ToVec4SupportClass Vec3ToVec4() {
     return Vec3ToVec4SupportClass::vec3ToVec4SupportDefault;
   }
 }
+
+bool OpaquePointers() { return opaque_pointers; }
 
 } // namespace Option
 } // namespace clspv

@@ -153,10 +153,6 @@ static llvm::cl::opt<std::string> IROutputFile(
         "Emit LLVM IR to the given file after parsing and stop compilation."),
     llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<bool> OpaquePointers("enable-opaque-pointers",
-                                          llvm::cl::desc("Use opaque pointers"),
-                                          llvm::cl::init(false));
-
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
   OpenCLBuiltinMemoryBuffer(const void *data, uint64_t data_length) {
@@ -276,7 +272,7 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
-  instance.getCodeGenOpts().OpaquePointers = OpaquePointers;
+  instance.getCodeGenOpts().OpaquePointers = clspv::Option::OpaquePointers();
   instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
 
   instance.getLangOpts().SinglePrecisionConstants =
