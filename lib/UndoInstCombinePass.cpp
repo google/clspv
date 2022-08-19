@@ -72,7 +72,8 @@ bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
     return false;
 
   auto vec_ty = extract->getVectorOperandType();
-  if (vec_ty->getElementCount().getKnownMinValue() <= 4)
+  auto vec_size = vec_ty->getElementCount().getKnownMinValue();
+  if (vec_size <= 4)
     return false;
 
   // Instcombine only transforms TruncInst (which operates on integers).
@@ -84,56 +85,93 @@ bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
     return false;
 
   auto load = dyn_cast<LoadInst>(extract->getVectorOperand());
-  auto cast = dyn_cast<BitCastOperator>(extract->getVectorOperand());
-  if (load) {
-    // If this is a laod, check for a cast on the pointer operand
-    cast = dyn_cast<BitCastOperator>(load->getPointerOperand());
-  }
+  if (load && load->getPointerOperand()->getType()->isOpaquePointerTy()) {
+    // calculate the smallest vector we can create and still access the target
+    // bytes
+    uint64_t idx = const_idx->getZExtValue();
+    uint64_t new_size = 4;
+    while (vec_size % new_size) { // will always break at new_size == 1
+      new_size -= 1;
+    }
+    uint64_t divisor = vec_size / new_size;
 
-  if (!cast)
-    return false;
+    uint64_t new_idx = idx / divisor;
+    IRBuilder<> builder(inst);
+    const auto old_type = llvm::cast<VectorType>(load->getType());
 
-  auto src = cast->getOperand(0);
-  VectorType *src_vec_ty = nullptr;
-  if (isa<PointerType>(src->getType()))
-    // In the load cast, go through the pointer first.
-    src_vec_ty = dyn_cast<VectorType>(src->getType()->getPointerElementType());
-  else
-    src_vec_ty = dyn_cast<VectorType>(src->getType());
+    auto new_bit_width =
+        cast<IntegerType>(old_type->getElementType())->getBitWidth() * divisor;
 
-  if (!src_vec_ty)
-    return false;
+    Value *new_load = builder.CreateLoad(
+        VectorType::get(IntegerType::get(old_type->getContext(), new_bit_width),
+                        new_size, old_type->getElementCount().isScalable()),
+        load->getPointerOperand());
 
-  uint64_t src_elements = src_vec_ty->getElementCount().getKnownMinValue();
-  uint64_t dst_elements = vec_ty->getElementCount().getKnownMinValue();
+    Value *new_src =
+        builder.CreateExtractElement(new_load, builder.getInt32(new_idx));
+    auto trunc = builder.CreateTrunc(new_src, extract->getType());
 
-  if (dst_elements < src_elements)
-    return false;
+    extract->replaceAllUsesWith(trunc);
+    dead_.push_back(extract);
 
-  uint64_t idx = const_idx->getZExtValue();
-  uint64_t ratio = dst_elements / src_elements;
-  uint64_t new_idx = idx / ratio;
-
-  // Instcombine should never have generated an odd index, so don't handle
-  // right now.
-  if (idx & 0x1)
-    return false;
-
-  // Create a truncate of an extract element.
-  IRBuilder<> builder(inst);
-  Value *new_src = nullptr;
-  if (load) {
     potentially_dead_.insert(load);
-    new_src = builder.CreateLoad(src_vec_ty, src);
-    src = new_src;
-  }
-  new_src = builder.CreateExtractElement(src, builder.getInt32(new_idx));
-  auto trunc = builder.CreateTrunc(new_src, extract->getType());
-  extract->replaceAllUsesWith(trunc);
-  dead_.push_back(extract);
-  potentially_dead_.insert(cast);
+    return true;
+  } else {
 
-  return true;
+    auto cast = load ? dyn_cast<BitCastOperator>(load->getPointerOperand())
+                     : dyn_cast<BitCastOperator>(extract->getVectorOperand());
+
+    if (!cast)
+      return false;
+
+    auto src = cast->getOperand(0);
+    auto src_ty = src->getType();
+    VectorType *src_vec_ty = nullptr;
+    // TODO: #816 remove after final switch. would not do a bitcast on a pointer
+    if (isa<PointerType>(src_ty)) {
+      // In the load cast, go through the pointer first.
+      src_vec_ty =
+          dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
+    } else {
+      src_vec_ty = dyn_cast<VectorType>(src_ty);
+    }
+
+    if (!src_vec_ty)
+      return false;
+
+    uint64_t src_elements = src_vec_ty->getElementCount().getKnownMinValue();
+    uint64_t dst_elements = vec_ty->getElementCount().getKnownMinValue();
+
+    if (dst_elements < src_elements)
+      return false;
+
+    uint64_t idx = const_idx->getZExtValue();
+    uint64_t ratio = dst_elements / src_elements;
+    uint64_t new_idx = idx / ratio;
+
+    // Instcombine should never have generated an odd index, so don't handle
+    // right now.
+    if (idx & 0x1)
+      return false;
+
+    // Create a truncate of an extract element.
+    IRBuilder<> builder(inst);
+    Value *new_src = nullptr;
+    // TODO: #816 remove after final switch. (load handled by opaque pointer
+    // case)
+    if (load) {
+      potentially_dead_.insert(load);
+      new_src = builder.CreateLoad(src_vec_ty, src);
+      src = new_src;
+    }
+    new_src = builder.CreateExtractElement(src, builder.getInt32(new_idx));
+    auto trunc = builder.CreateTrunc(new_src, extract->getType());
+    extract->replaceAllUsesWith(trunc);
+    dead_.push_back(extract);
+    potentially_dead_.insert(cast);
+
+    return true;
+  }
 }
 
 bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
@@ -154,7 +192,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   auto in1_load = dyn_cast<LoadInst>(in1);
   auto in1_cast = dyn_cast<BitCastOperator>(in1);
   if (in1_load) {
-    // If this is a laod, check for a cast on the pointer operand
+    // If this is a load, check for a cast on the pointer operand
     in1_cast = dyn_cast<BitCastOperator>(in1_load->getPointerOperand());
   }
 
@@ -167,12 +205,17 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
     return false;
 
   auto src = in1_cast->getOperand(0);
+  auto src_ty = src->getType();
   VectorType *src_vec_ty = nullptr;
-  if (isa<PointerType>(src->getType()))
+  // TODO: #816 remove after final switch.
+  if (isa<PointerType>(src_ty)) {
     // In the load cast, go through the pointer first.
-    src_vec_ty = dyn_cast<VectorType>(src->getType()->getPointerElementType());
-  else
-    src_vec_ty = dyn_cast<VectorType>(src->getType());
+    if (src_ty->isOpaquePointerTy())
+      return false;
+    src_vec_ty = dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
+  } else {
+    src_vec_ty = dyn_cast<VectorType>(src_ty);
+  }
 
   if (!src_vec_ty)
     return false;
