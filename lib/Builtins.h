@@ -28,6 +28,10 @@
 
 namespace clspv {
 
+namespace glsl {
+enum ExtInst : unsigned int;
+}
+
 namespace Builtins {
 
 struct ParamTypeInfo {
@@ -90,6 +94,20 @@ std::string GetMangledFunctionName(const FunctionInfo &Info);
 
 std::string GetMangledTypeName(llvm::Type *T);
 
+BuiltinType LookupBuiltinType(const std::string &name);
+
+const glsl::ExtInst kGlslExtInstBad = static_cast<glsl::ExtInst>(0);
+// Returns the GLSL extended instruction enum that the given function
+// call maps to.  If none, then returns the 0 value, i.e. GLSLstd4580Bad.
+glsl::ExtInst getExtInstEnum(const FunctionInfo &func_info);
+// Returns the GLSL extended instruction enum indirectly used by the given
+// function.  That is, to implement the given function, we use an extended
+// instruction plus one more instruction. If none, then returns the 0 value,
+// i.e. GLSLstd4580Bad.
+glsl::ExtInst getIndirectExtInstEnum(const FunctionInfo &func_info);
+// Returns the single GLSL extended instruction used directly or
+// indirectly by the given function call.
+glsl::ExtInst getDirectOrIndirectExtInstEnum(const FunctionInfo &func_info);
 } // namespace Builtins
 
 } // namespace clspv
