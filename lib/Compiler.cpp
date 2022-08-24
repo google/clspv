@@ -477,6 +477,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
     pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
+    pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
     // Lower longer vectors when requested. Note that this pass depends on
