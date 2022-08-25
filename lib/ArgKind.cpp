@@ -86,6 +86,7 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
 namespace clspv {
 
 PodArgImpl GetPodArgsImpl(Function &F) {
+  assert(F.hasMetadata(PodArgsImplMetadataName()));
   auto md = F.getMetadata(PodArgsImplMetadataName());
   auto impl = static_cast<PodArgImpl>(
       cast<ConstantInt>(
