@@ -185,7 +185,8 @@ private:
     // First check if we have a pointer type.
     if (Ty->isPointerType()) {
       const Type *pointeeTy = Ty->getPointeeType().getTypePtr();
-      if (pointeeTy && pointeeTy->isVoidType()) {
+      if (pointeeTy && pointeeTy->isVoidType() &&
+          !(clspv::Option::OpaquePointers() && clspv::Option::Int8Support())) {
         // We don't support void pointers.
         Instance.getDiagnostics().Report(
             SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer]);
@@ -525,7 +526,8 @@ public:
             DiagnosticsEngine::Error,
             "vectors with more than 4 elements are not supported");
     CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer] = DE.getCustomDiagID(
-        DiagnosticsEngine::Error, "pointer-to-void is not supported");
+        DiagnosticsEngine::Error, "pointer-to-void is only supported with int8 "
+                                  "support and opaque pointers");
     CustomDiagnosticsIDMap[CustomDiagnosticUnalignedScalar] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "scalar elements must be aligned to their size");
