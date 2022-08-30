@@ -79,7 +79,8 @@ if (NOT DEFINED SPIRV_TOOLS_SOURCE_DIR)
   use_component(${SPIRV_TOOLS_SOURCE_DIR})
 endif()
 
-if (NOT TARGET spirv-dis)
+option(CLSPV_BUILD_SPIRV_DIS "Enable build of spirv-dis if the target does not exist" ON)
+if (NOT TARGET spirv-dis AND CLSPV_BUILD_SPIRV_DIS)
   # First tell SPIR-V Tools where to find SPIR-V Headers
   set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
 
