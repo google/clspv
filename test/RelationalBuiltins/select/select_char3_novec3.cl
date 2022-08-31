@@ -3,6 +3,11 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv %s -o %t.spv -vec3-to-vec4 --enable-opaque-pointers
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
 kernel void foo(global char3* a, global char3* b, global uchar3* c) {
   *a = select(*a, *b, *c);
 }
