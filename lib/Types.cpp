@@ -88,7 +88,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     User *user = worklist.back().first;
     unsigned operand = worklist.back().second;
     worklist.pop_back();
-
+    bool isPointerTy = false;
     if (!seen.insert(user).second) {
       continue;
     }
@@ -96,9 +96,15 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     if (auto *GEP = dyn_cast<GEPOperator>(user)) {
       return CacheType(GEP->getSourceElementType());
     } else if (auto *load = dyn_cast<LoadInst>(user)) {
-      return CacheType(load->getType());
+      if (!load->getType()->isPointerTy()) {
+        return CacheType(load->getType());
+      }
+      isPointerTy = true;
     } else if (auto *store = dyn_cast<StoreInst>(user)) {
-      return CacheType(store->getValueOperand()->getType());
+      if (!store->getValueOperand()->getType()->isPointerTy()) {
+        return CacheType(store->getValueOperand()->getType());
+      }
+      isPointerTy = true;
     } else if (auto *call = dyn_cast<CallInst>(user)) {
       auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
       // TODO: remaining builtins
@@ -186,7 +192,12 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     }
 
     // If the result is also a pointer, try to infer from further uses.
-    if (user->getType()->isPointerTy()) {
+    if (user->getType()->isPointerTy() || isPointerTy) {
+      // Handle stores with only pointer operands.
+      auto *store = dyn_cast<StoreInst>(user);
+      if (store &&  store->getPointerOperand() != v) {
+        user = dyn_cast<User>(store->getPointerOperand());
+      }
       for (auto &use : user->uses())
         worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
     }

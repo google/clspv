@@ -104,18 +104,35 @@ private:
 private:
   // High-level implementation details of runOnModule.
 
+  /// Look for bitcast of vec3 inside the function
+  bool vec3BitcastInFunction(llvm::Function &F);
+
+  /// Returns whether the vec3 should be transform into vec4
+  bool vec3ShouldBeLowered(llvm::Module &M);
+
   /// Lower all global variables in the module.
   bool runOnGlobals(llvm::Module &M);
 
   /// Lower the given function.
   bool runOnFunction(llvm::Function &F);
 
+  /// In order not to overflow, we need to copy elements one by one when
+  /// CopyMemory arguments are transformed from vec3 to vec4.
+  llvm::Value *
+  convertOpCopyMemoryOperation(llvm::CallInst &VectorCall,
+                               llvm::ArrayRef<llvm::Value *> EquivalentArgs);
+
   /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
   /// the same calls but reworking the args and the return value.
   llvm::Value *convertBuiltinCall(llvm::CallInst &CI,
                                   llvm::Type *EquivalentReturnTy,
                                   llvm::ArrayRef<llvm::Value *> EquivalentArgs);
-
+  /// Replace all instructions that have vector of size 3 to vector of size 4.
+  /// This will run at the end of the pass and before cleaning dead
+  /// instructions. It was needed as opaque pointers will depend on inferring
+  /// the types from other instructions so we should keep instructions change to
+  /// the end of the pass pipeline.
+  void replaceAllVec3Instances();
   /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
   /// a calls with vec4 without reworking the args and the return value.
   llvm::Value *
@@ -151,6 +168,9 @@ private:
 private:
   /// A map between 3 elements vector types and their equivalent representation.
   llvm::DenseMap<llvm::Type *, llvm::Type *> TypeMap;
+
+  /// Opaque pointer type cache.
+  llvm::DenseMap<llvm::Value *, llvm::Type *> type_cache_;
 
   /// A map between original values and their replacement.
   ///
