@@ -31,7 +31,6 @@ kernel void foo(global half *out, half s, half2 v2, half3 v3, half4 v4) {
 // CHECK-DAG: [[int_2:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 2
 // CHECK-DAG: [[int_5:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 5
 // CHECK-DAG: [[half:%[a-zA-Z0-9_]+]] = OpTypeFloat 16
-// cHECK-DAG: [[half2:%[a-zA-Z0-9_]+]] = OpTypeVector [[half]] 2
 // CHECK-DAG: [[inner]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]] [[int]] [[int]]
 // CHECK-DAG: [[outer:%[a-zA-Z0-9_]+]] = OpTypeStruct [[inner]]
 // CHECK-DAG: [[outer_ptr:%[a-zA-Z0-9_]+]] = OpTypePointer PushConstant [[outer]]
