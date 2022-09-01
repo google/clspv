@@ -195,7 +195,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     if (user->getType()->isPointerTy() || isPointerTy) {
       // Handle stores with only pointer operands.
       auto *store = dyn_cast<StoreInst>(user);
-      if (store &&  store->getPointerOperand() != v) {
+      if (store && store->getPointerOperand() != v) {
         user = dyn_cast<User>(store->getPointerOperand());
       }
       for (auto &use : user->uses())

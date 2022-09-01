@@ -249,15 +249,14 @@ clspv::ThreeElementVectorLoweringPass::run(Module &M, ModuleAnalysisManager &) {
   replaceAllVec3Instances();
 
   cleanDeadInstructions();
-
+  cleanDeadFunctions();
+  cleanDeadGlobals();
+#ifdef DEBUG
   for (auto &F : M.functions()) {
     LLVM_DEBUG(dbgs() << "Final version for " << F.getName() << '\n');
     LLVM_DEBUG(dbgs() << F << '\n');
   }
-
-  cleanDeadFunctions();
-  cleanDeadGlobals();
-
+#endif
   return PA;
 }
 
@@ -304,8 +303,6 @@ bool clspv::ThreeElementVectorLoweringPass::vec3BitcastInFunction(Function &F) {
 
       // ... and its main type is a vec3 type...
       if (type_name_str.endswith("3*")) {
-        auto arg_base_type = type_name_str.drop_back(2);
-
         // ... and its inferred type is of scalar type...
         if (!ArgInferredType->isVectorTy()) {
           return true;
@@ -629,19 +626,14 @@ Value *clspv::ThreeElementVectorLoweringPass::visitGetElementPtrInst(
   if (isSpirvGlobalVariable(I.getPointerOperand()->getName())) {
     return &I;
   }
-
-  Type *EquivalentType = nullptr;
   Value *EquivalentPointer = visitOrSelf(I.getPointerOperand());
 
   bool isOpaque = I.getPointerOperand()->getType()->isOpaquePointerTy();
 
-  if (isOpaque) {
-    EquivalentType = getEquivalentType(I.getSourceElementType());
-  } else {
-    EquivalentType = EquivalentPointer->getType()
-                         ->getScalarType()
-                         ->getNonOpaquePointerElementType();
-  }
+  Type *EquivalentType = isOpaque ? getEquivalentType(I.getSourceElementType())
+                                  : EquivalentPointer->getType()
+                                        ->getScalarType()
+                                        ->getNonOpaquePointerElementType();
 
   if (EquivalentType == nullptr ||
       (!isOpaque && EquivalentPointer == I.getPointerOperand()))
@@ -700,19 +692,14 @@ Value *clspv::ThreeElementVectorLoweringPass::visitLoadInst(LoadInst &I) {
   if (isSpirvGlobalVariable(I.getPointerOperand()->getName())) {
     return &I;
   }
-
-  Type *EquivalentType = nullptr;
   Value *EquivalentPointer = visitOrSelf(I.getPointerOperand());
 
   bool isOpaque = I.getPointerOperand()->getType()->isOpaquePointerTy();
 
-  if (isOpaque) {
-    EquivalentType = getEquivalentType(I.getType());
-  } else {
-    EquivalentType = EquivalentPointer->getType()
-                         ->getScalarType()
-                         ->getNonOpaquePointerElementType();
-  }
+  Type *EquivalentType = isOpaque ? getEquivalentType(I.getType())
+                                  : EquivalentPointer->getType()
+                                        ->getScalarType()
+                                        ->getNonOpaquePointerElementType();
 
   if (EquivalentType == nullptr ||
       (!isOpaque && EquivalentPointer == I.getPointerOperand()))
@@ -1101,12 +1088,12 @@ Value *clspv::ThreeElementVectorLoweringPass::convertOpCopyMemoryOperation(
     auto ptrTy =
         clspv::InferType(DstOperand, VectorCall.getContext(), &type_cache_);
     assert(ptrTy->isVectorTy());
-    auto *VectorType = dyn_cast<FixedVectorType>(ptrTy);
+    auto *VectorType = cast<FixedVectorType>(ptrTy);
     assert(VectorType->getElementCount().getKnownMinValue() == 4);
   } else {
     assert(
         DstOperand->getType()->getNonOpaquePointerElementType()->isVectorTy());
-    assert(dyn_cast<VectorType>(
+    assert(cast<VectorType>(
                DstOperand->getType()->getNonOpaquePointerElementType())
                ->getElementCount()
                .getKnownMinValue() == 4);
