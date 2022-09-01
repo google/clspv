@@ -203,7 +203,8 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, int32_t num) {
   return list;
 }
 
-SPIRVOperandVec &operator<<(SPIRVOperandVec &list, ArrayRef<uint32_t> num_vec) {
+SPIRVOperandVec &operator<<(SPIRVOperandVec &list,
+                            const std::vector<uint32_t> &num_vec) {
   list.emplace_back(num_vec);
   return list;
 }
