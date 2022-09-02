@@ -309,10 +309,10 @@ int SetCompilerInstanceOptions(
   // chance to view the unoptimal code first
   instance.getCodeGenOpts().OptimizationLevel = 0;
 
-// Debug information is disabled temporarily to call instruction.
-#if 0
-  instance.getCodeGenOpts().setDebugInfo(clang::codegenoptions::FullDebugInfo);
-#endif
+  if (clspv::Option::DebugInfo()) {
+    instance.getCodeGenOpts().setDebugInfo(
+        clang::codegenoptions::FullDebugInfo);
+  }
 
   // We use the 32-bit pointer-width SPIR triple
   llvm::Triple triple("spir-unknown-unknown");

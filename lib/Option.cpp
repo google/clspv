@@ -351,6 +351,10 @@ static llvm::cl::opt<bool>
                     llvm::cl::desc("Use opaque pointers"),
                     llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+    debug_info("g", llvm::cl::init(false),
+               llvm::cl::desc("Produce debug information."));
+
 } // namespace
 
 namespace clspv {
@@ -455,6 +459,8 @@ Vec3ToVec4SupportClass Vec3ToVec4() {
 }
 
 bool OpaquePointers() { return opaque_pointers; }
+
+bool DebugInfo() { return debug_info; }
 
 } // namespace Option
 } // namespace clspv

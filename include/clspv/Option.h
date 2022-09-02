@@ -253,6 +253,9 @@ Vec3ToVec4SupportClass Vec3ToVec4();
 // Returns true if opaque pointers are enabled
 bool OpaquePointers();
 
+// Returns true if the debug information should be generated
+bool DebugInfo();
+
 } // namespace Option
 } // namespace clspv
 
