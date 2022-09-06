@@ -40,6 +40,7 @@
 #include "NativeMathPass.h"
 #include "OpenCLInlinerPass.h"
 #include "PhysicalPointerArgsPass.h"
+#include "PrintfPass.h"
 #include "RemoveUnusedArguments.h"
 #include "ReorderBasicBlocksPass.h"
 #include "ReplaceLLVMIntrinsicsPass.h"

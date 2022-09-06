@@ -591,6 +591,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID getReflectionImport();
   void GenerateReflection();
   void GenerateKernelReflection();
+  void GeneratePrintfReflection();
   void GeneratePushConstantReflection();
   void GenerateSpecConstantReflection();
   void AddArgumentReflection(const Function &F, SPIRVID kernel_decl,
@@ -1264,6 +1265,10 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     if (GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
       auto Ty = GV.getValueType();
       assert(Ty->isStructTy() && "Push constants have to be structures.");
+      auto STy = cast<StructType>(Ty);
+      StructTypesNeedingBlock.insert(STy);
+    } else if (GV.getName() == clspv::PrintfBufferVariableName()) {
+      auto Ty = GV.getValueType();
       auto STy = cast<StructType>(Ty);
       StructTypesNeedingBlock.insert(STy);
     }
@@ -2288,7 +2293,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
     Fn->print(errs());
     llvm_unreachable("Unhandled function declaration/definition");
- } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
+  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
     // If there is exactly one use we know where to insert the instruction
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
@@ -2783,6 +2788,8 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       (AS == AddressSpace::Constant) && GV.hasInitializer() &&
       clspv::Option::ModuleConstantsInStorageBuffer();
 
+  const bool is_printf_buffer = GV.getName() == PrintfBufferVariableName();
+
   if (GV.hasInitializer()) {
     auto GVInit = GV.getInitializer();
     if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init) {
@@ -2797,10 +2804,10 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
        AS == AddressSpace::Local);
   auto ptr_id = getSPIRVPointerType(Ty, GV.getValueType());
 
+  SPIRVID var_id;
   if (!(module_scope_constant_external_init &&
         clspv::Option::PhysicalStorageBuffers())) {
-    SPIRVID var_id =
-        addSPIRVGlobalVariable(ptr_id, spvSC, InitializerID, interface);
+    var_id = addSPIRVGlobalVariable(ptr_id, spvSC, InitializerID, interface);
     VMap[&GV] = var_id;
   }
 
@@ -2897,6 +2904,22 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       Ops << VMap[&GV] << spv::DecorationBinding << 0;
       addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
     }
+  } else if (is_printf_buffer) {
+    const uint32_t descriptor_set = TakeDescriptorIndex(module);
+    SPIRVOperandVec Ops;
+    Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+
+    Ops.clear();
+    Ops << var_id << spv::DecorationBinding << 0;
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+
+    Ops.clear();
+    Ops << getSPIRVType(Type::getVoidTy(module->getContext()))
+        << getReflectionImport() << reflection::ExtInstPrintfBufferStorageBuffer
+        << getSPIRVInt32Constant(descriptor_set) << getSPIRVInt32Constant(0)
+        << getSPIRVInt32Constant(clspv::Option::PrintfBufferSize());
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
   }
 }
 
@@ -3136,6 +3159,11 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
         if (V) {
           Ops << getValueMap()[V];
         }
+      }
+
+      if (auto *V = module->getGlobalVariable(clspv::PrintfBufferVariableName(),
+                                              true)) {
+        Ops << getValueMap()[V];
       }
 
       auto local_spec_id_md =
@@ -6540,6 +6568,7 @@ SPIRVID SPIRVProducerPassImpl::getReflectionImport() {
 
 void SPIRVProducerPassImpl::GenerateReflection() {
   GenerateKernelReflection();
+  GeneratePrintfReflection();
   GeneratePushConstantReflection();
   GenerateSpecConstantReflection();
 }
@@ -7080,4 +7109,38 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   }
   Ops << arg_info;
   addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+}
+
+void SPIRVProducerPassImpl::GeneratePrintfReflection() {
+  auto import_id = getReflectionImport();
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+
+  auto *PrintfMD = module->getNamedMetadata(PrintfMetadataName());
+  if (!PrintfMD) {
+    return;
+  }
+
+  SPIRVOperandVec Ops;
+
+  for (auto *PrintMD : PrintfMD->operands()) {
+    Ops << void_id << import_id << reflection::ExtInstPrintfInfo;
+
+    assert(PrintMD->getNumOperands() == 3);
+    auto *PrintfID = dyn_cast<ConstantAsMetadata>(PrintMD->getOperand(0).get());
+    auto *PrintfString = dyn_cast<MDString>(PrintMD->getOperand(1).get());
+    auto *PrintfArgs = dyn_cast<MDTuple>(PrintMD->getOperand(2).get());
+    auto PrintfStringConstant = addSPIRVInst<kDebug>(
+        spv::OpString, PrintfString->getString().str().c_str());
+
+    Ops << getSPIRVInt32Constant(static_cast<int32_t>(
+        mdconst::extract<ConstantInt>(PrintfID)->getZExtValue()));
+    Ops << PrintfStringConstant;
+    for (auto &ArgSizeOperand : PrintfArgs->operands()) {
+      auto *ArgSizeConst = dyn_cast<ConstantAsMetadata>(ArgSizeOperand.get());
+      int32_t ArgSizeVal = static_cast<int32_t>(
+          mdconst::extract<ConstantInt>(ArgSizeConst)->getZExtValue());
+      Ops << getSPIRVInt32Constant(ArgSizeVal);
+    }
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
 }
