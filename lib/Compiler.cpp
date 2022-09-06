@@ -518,6 +518,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::RewritePackedStructs());
     }
 
+    if (clspv::Option::PrintfSupport()) {
+      pm.addPass(clspv::PrintfPass());
+    }
+
     if (level.getSpeedupLevel() > 0) {
       pm.addPass(clspv::OpenCLInlinerPass());
     }

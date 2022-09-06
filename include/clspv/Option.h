@@ -277,6 +277,12 @@ bool DecorateNonUniform();
 // buffers
 bool PhysicalStorageBuffers();
 
+// Returns true if printf support is enabled
+bool PrintfSupport();
+
+// Returns the size of the printf buffer in bytes. The default value is 1MB.
+uint32_t PrintfBufferSize();
+
 } // namespace Option
 } // namespace clspv
 

@@ -140,6 +140,14 @@ inline std::string PointerPodArgMetadataName() {
   return "clspv.pointer_from_pod";
 }
 
+inline std::string PrintfMetadataName() {
+  return "clspv.printf_metadata";
+}
+
+inline std::string PrintfBufferVariableName() {
+  return "__clspv_printf_buffer";
+}
+
 } // namespace clspv
 
 #endif

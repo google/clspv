@@ -646,6 +646,29 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
+  // Handle atomic instructions in a very limited form
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (auto *atomic = dyn_cast<AtomicRMWInst>(&I)) {
+          auto *source_ty = clspv::InferType(atomic->getPointerOperand(),
+                                             M.getContext(), &type_cache);
+          auto *dest_ty = atomic->getType();
+          if (source_ty && dest_ty && source_ty != dest_ty) {
+            int Steps = 0;
+            bool PerfectMatch;
+            if (FindAliasingContainedType(source_ty, dest_ty, Steps,
+                                          PerfectMatch, DL)) {
+              if (Steps > 0) {
+                ImplicitGEPs.insert({&I, std::make_pair(Steps, PerfectMatch)});
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
   // handled by explcitly inserting the GEP.
   WeakInstructions ToBeDeleted;
@@ -657,8 +680,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     SmallVector<Value *, 8> GEPIndices{};
     unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
 
-    if ((!isa<LoadInst>(I) && !isa<StoreInst>(I) &&
-         !isa<GetElementPtrInst>(I))) {
+    if (!isa<LoadInst>(I) && !isa<StoreInst>(I) && !isa<GetElementPtrInst>(I) &&
+        !isa<AtomicRMWInst>(I)) {
       continue;
     }
 
