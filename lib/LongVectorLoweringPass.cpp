@@ -968,16 +968,33 @@ Value *
 clspv::LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
   Value *EquivalentValue = visit(I.getOperand(0));
   assert(EquivalentValue && "value not lowered");
-
   ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(1));
-  // Non-constant indices could be done with a gep + load pair.
-  assert(CI && "Dynamic indices not supported yet");
-  unsigned Index = CI->getZExtValue();
-
   IRBuilder<> B(&I);
-  auto *V = B.CreateExtractValue(EquivalentValue, Index);
-  registerReplacement(I, *V);
-  return V;
+  if (CI) {
+    unsigned Index = CI->getZExtValue();
+
+    auto *V = B.CreateExtractValue(EquivalentValue, Index);
+    registerReplacement(I, *V);
+    return V;
+  }
+
+  // Extract array pointer
+  Value *PtrOperand = nullptr;
+  if (auto *Load = dyn_cast<LoadInst>(EquivalentValue)) {
+    PtrOperand = Load->getPointerOperand();
+  } else {
+    IRBuilder<> BFront(&I.getFunction()->front().front());
+
+    PtrOperand = BFront.CreateAlloca(EquivalentValue->getType());
+    B.CreateStore(EquivalentValue, PtrOperand);
+  }
+
+  auto *GEP = B.CreateInBoundsGEP(EquivalentValue->getType(), PtrOperand,
+                                  {B.getInt32(0), I.getOperand(1)});
+  auto *Load =
+      B.CreateLoad(EquivalentValue->getType()->getArrayElementType(), GEP);
+  registerReplacement(I, *Load);
+  return Load;
 }
 
 void clspv::LongVectorLoweringPass::reworkIndices(
@@ -1100,14 +1117,32 @@ clspv::LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
          ScalarElement->getType()->isFloatingPointTy());
 
   ConstantInt *CI = dyn_cast<ConstantInt>(I.getOperand(2));
-  // We'd have to lower this to a store-store-load sequence.
-  assert(CI && "Dynamic indices not supported yet");
-  unsigned Index = CI->getZExtValue();
 
   IRBuilder<> B(&I);
-  auto *V = B.CreateInsertValue(EquivalentValue, ScalarElement, {Index});
-  registerReplacement(I, *V);
-  return V;
+  if (CI) {
+    unsigned Index = CI->getZExtValue();
+
+    auto *V = B.CreateInsertValue(EquivalentValue, ScalarElement, {Index});
+    registerReplacement(I, *V);
+    return V;
+  }
+
+  // Extract array pointer
+  Value *PtrOperand = nullptr;
+  if (auto *Load = dyn_cast<LoadInst>(EquivalentValue)) {
+    PtrOperand = Load->getPointerOperand();
+  } else {
+    IRBuilder<> BFront(&I.getFunction()->front().front());
+
+    PtrOperand = BFront.CreateAlloca(EquivalentValue->getType());
+    B.CreateStore(EquivalentValue, PtrOperand);
+  }
+
+  auto *GEP = B.CreateInBoundsGEP(EquivalentValue->getType(), PtrOperand,
+                                  {B.getInt32(0), I.getOperand(2)});
+  B.CreateStore(ScalarElement, GEP);
+  registerReplacement(I, *EquivalentValue);
+  return EquivalentValue;
 }
 
 Value *clspv::LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
