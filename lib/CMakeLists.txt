@@ -40,6 +40,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FixupBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FixupStructuredCFGPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/HideConstantLoadsPass.cpp

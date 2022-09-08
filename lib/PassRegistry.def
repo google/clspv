@@ -25,6 +25,7 @@ MODULE_PASS("cluster-pod-kernel-args-pass", clspv::ClusterPodKernelArgumentsPass
 MODULE_PASS("declare-push-constants", clspv::DeclarePushConstantsPass)
 MODULE_PASS("define-opencl-workitem-builtins", clspv::DefineOpenCLWorkItemBuiltinsPass)
 MODULE_PASS("direct-resource-access", clspv::DirectResourceAccessPass)
+MODULE_PASS("fixup-builtins", clspv::FixupBuiltinsPass)
 MODULE_PASS("function-internalizer", clspv::FunctionInternalizerPass)
 MODULE_PASS("hide-constant-loads", clspv::HideConstantLoadsPass)
 MODULE_PASS("inline-entry-points-pass", clspv::InlineEntryPointsPass)

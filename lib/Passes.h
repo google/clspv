@@ -23,6 +23,7 @@
 #include "DeclarePushConstantsPass.h"
 #include "DefineOpenCLWorkItemBuiltinsPass.h"
 #include "DirectResourceAccessPass.h"
+#include "FixupBuiltinsPass.h"
 #include "FixupStructuredCFGPass.h"
 #include "FunctionInternalizerPass.h"
 #include "HideConstantLoadsPass.h"
