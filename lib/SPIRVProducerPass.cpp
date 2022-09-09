@@ -297,6 +297,8 @@ struct SPIRVProducerPassImpl {
   typedef UniqueVector<Type *> TypeList;
   typedef UniqueVector<StrideType> StrideTypeList;
   typedef DenseMap<Value *, SPIRVID> ValueMapType;
+  typedef DenseMap<DIFile *, SPIRVID> DIFileMap;
+  typedef DenseMap<BasicBlock *, std::pair<uint32_t, uint32_t>> BBDILocMap;
   typedef std::list<SPIRVID> SPIRVIDListType;
   typedef std::vector<std::pair<Value *, SPIRVID>> EntryPointVecType;
   typedef std::set<uint32_t> CapabilitySetType;
@@ -346,6 +348,8 @@ struct SPIRVProducerPassImpl {
   CapabilitySetType &getCapabilitySet() { return CapabilitySet; }
   TypeMapType &getImageTypeMap() { return ImageTypeMap; }
   ValueMapType &getValueMap() { return ValueMap; }
+  DIFileMap &getDebugDIFileMap() { return DebugDIFileMap; }
+  BBDILocMap &getBBDILocMap() { return DebugBBDILocMap; }
   SPIRVInstructionList &getSPIRVInstList(SPIRVSection Section) {
     return SPIRVSections[Section];
   };
@@ -631,6 +635,8 @@ private:
   TypeList Types;
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   ValueMapType ValueMap;
+  DIFileMap DebugDIFileMap;
+  BBDILocMap DebugBBDILocMap;
   SPIRVInstructionList SPIRVSections[kSectionCount];
 
   EntryPointVecType EntryPointVec;
@@ -4098,6 +4104,13 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   SPIRVID RID;
 
   switch (Call->getCalledFunction()->getIntrinsicID()) {
+  case Intrinsic::dbg_addr:
+  case Intrinsic::dbg_label:
+  case Intrinsic::dbg_value:
+  case Intrinsic::dbg_declare: {
+    // TODO: Generate 'OpExtInst %void %<> Debug*'
+    return RID;
+  }
   case Intrinsic::ctlz: {
     // Implement as 31 - FindUMsb. Ignore the second operand of llvm.ctlz.
     SPIRVOperandVec Ops;
@@ -4324,9 +4337,34 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
 
 void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
   ValueMapType &VMap = getValueMap();
+  DIFileMap &DbgDIFileMap = getDebugDIFileMap();
+  BBDILocMap &LastDILocInBB = getBBDILocMap();
   LLVMContext &Context = module->getContext();
 
   SPIRVID RID;
+
+  auto md = I.getMetadata("dbg");
+  if (md && isa<llvm::DILocation>(md)) {
+    auto loc = dyn_cast<llvm::DILocation>(md);
+    auto line = loc->getLine();
+    auto column = loc->getColumn();
+    auto file = loc->getFile();
+    if (DbgDIFileMap.find(file) == DbgDIFileMap.end()) {
+      DbgDIFileMap[file] = addSPIRVInst<kDebug>(
+          spv::OpString, file->getFilename().str().c_str());
+    }
+    auto find = LastDILocInBB.find(I.getParent());
+    if (!(find != LastDILocInBB.end() && find->second.first == line &&
+          find->second.second == column)) {
+      SPIRVOperandVec Ops;
+      Ops << DbgDIFileMap[file] << line << column;
+      addSPIRVInst(spv::OpLine, Ops);
+      LastDILocInBB[I.getParent()] = std::make_pair(line, column);
+    }
+  } else if (clspv::Option::DebugInfo()) {
+    LastDILocInBB.erase(I.getParent());
+    addSPIRVInst(spv::OpNoLine);
+  }
 
   switch (I.getOpcode()) {
   default: {
@@ -5708,6 +5746,8 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
       llvm_unreachable("Unsupported SPIRV instruction");
       break;
     }
+    case spv::OpLine:
+    case spv::OpNoLine:
     case spv::OpUnreachable:
     case spv::OpCapability:
     case spv::OpExtension:
