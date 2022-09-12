@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <vector>
 
 #include "llvm/ADT/UniqueVector.h"
@@ -73,10 +74,18 @@ VectorType *InferTypeForOpaqueLoad(LoadInst *load, uint64_t vec_size) {
   // Calculate the largest vector that the target can be split into.
   // If the indexes don't work at the resulting size then they won't work for a
   // smaller size.
-  uint64_t new_size = clspv::SPIRVMaxVectorSize();
-  while (vec_size % new_size) { // will always break at new_size == 1
-    new_size -= 1;
-  }
+  std::array<uint64_t, 6> possible_sizes{16, 8, 4, 3, 2};
+  uint64_t max_size = clspv::SPIRVMaxVectorSize();
+
+  assert(max_size == 16 || max_size == 4);
+  auto begin_itr =
+      max_size == 4 ? possible_sizes.begin() + 2 : possible_sizes.begin();
+  auto new_size_itr =
+      std::find_if(begin_itr, possible_sizes.end(),
+                   [vec_size](auto x) { return vec_size % x == 0; });
+  assert(new_size_itr != possible_sizes.end());
+
+  const auto new_size = *new_size_itr;
   uint64_t divisor = vec_size / new_size;
 
   const auto old_type = llvm::cast<VectorType>(load->getType());
@@ -209,12 +218,11 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
     return false;
 
   uint64_t src_elements = src_vec_ty->getElementCount().getKnownMinValue();
-  uint64_t dst_elements = in1_vec_size;
 
-  if (dst_elements <= src_elements)
+  if (in1_vec_size <= src_elements)
     return false;
 
-  uint64_t ratio = dst_elements / src_elements;
+  uint64_t ratio = in1_vec_size / src_elements;
   auto dst_scalar_type = vec_ty->getElementType();
 
   SmallVector<int, 16> mask;
