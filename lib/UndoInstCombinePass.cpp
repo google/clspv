@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
 #include <vector>
 
 #include "llvm/ADT/UniqueVector.h"
@@ -23,12 +22,14 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 
-#include "Constants.h"
 #include "UndoInstCombinePass.h"
 
 #define DEBUG_TYPE "undoinstcombine"
 
 using namespace llvm;
+
+// This pass is run afer LongVectorLowering so the maximum vector size is 4
+constexpr unsigned int max_vector_size = 4;
 
 PreservedAnalyses clspv::UndoInstCombinePass::run(Module &M,
                                                   ModuleAnalysisManager &) {
@@ -71,21 +72,15 @@ bool clspv::UndoInstCombinePass::runOnFunction(Function &F) {
 VectorType *InferTypeForOpaqueLoad(LoadInst *load, uint64_t vec_size) {
   assert(load);
   assert(load->getPointerOperandTy()->isOpaquePointerTy());
+
   // Calculate the largest vector that the target can be split into.
   // If the indexes don't work at the resulting size then they won't work for a
   // smaller size.
-  std::array<uint64_t, 6> possible_sizes{16, 8, 4, 3, 2};
-  uint64_t max_size = clspv::SPIRVMaxVectorSize();
+  uint64_t new_size = 4;
+  while (vec_size % new_size) {
+    --new_size;
+  }
 
-  assert(max_size == 16 || max_size == 4);
-  auto begin_itr =
-      max_size == 4 ? possible_sizes.begin() + 2 : possible_sizes.begin();
-  auto new_size_itr =
-      std::find_if(begin_itr, possible_sizes.end(),
-                   [vec_size](auto x) { return vec_size % x == 0; });
-  assert(new_size_itr != possible_sizes.end());
-
-  const auto new_size = *new_size_itr;
   uint64_t divisor = vec_size / new_size;
 
   const auto old_type = llvm::cast<VectorType>(load->getType());
@@ -104,7 +99,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
 
   auto vec_ty = extract->getVectorOperandType();
   auto vec_size = vec_ty->getElementCount().getKnownMinValue();
-  if (vec_size <= clspv::SPIRVMaxVectorSize())
+  if (vec_size <= max_vector_size)
     return false;
 
   // Instcombine only transforms TruncInst (which operates on integers).
@@ -189,7 +184,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   auto in1 = shuffle->getOperand(0);
   auto in1_vec_ty = cast<VectorType>(in1->getType());
   auto in1_vec_size = in1_vec_ty->getElementCount().getKnownMinValue();
-  if (in1_vec_size <= clspv::SPIRVMaxVectorSize())
+  if (in1_vec_size <= max_vector_size)
     return false;
 
   auto in1_load = dyn_cast<LoadInst>(in1);
