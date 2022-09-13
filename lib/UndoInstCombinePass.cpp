@@ -76,7 +76,7 @@ VectorType *InferTypeForOpaqueLoad(LoadInst *load, uint64_t vec_size) {
   // Calculate the largest vector that the target can be split into.
   // If the indexes don't work at the resulting size then they won't work for a
   // smaller size.
-  uint64_t new_size = 4;
+  uint64_t new_size = max_vector_size;
   while (vec_size % new_size) {
     --new_size;
   }
