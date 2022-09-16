@@ -268,6 +268,10 @@ int SetCompilerInstanceOptions(
   instance.getLangOpts().ModulesSearchAll = false;
   instance.getLangOpts().SinglePrecisionConstants = true;
   instance.getLangOpts().DeclareOpenCLBuiltins = true;
+  if (clspv::Option::FP16()) {
+    instance.getLangOpts().NativeHalfType = true;
+    instance.getLangOpts().NativeHalfArgsAndReturns = true;
+  }
   instance.getCodeGenOpts().StackRealignment = true;
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
