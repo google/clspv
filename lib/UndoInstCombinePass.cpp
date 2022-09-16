@@ -252,7 +252,6 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   }
   shuffle->replaceAllUsesWith(insert);
   dead_.push_back(shuffle);
-  // TODO: #816 remove after final switch.
   if (in1_cast)
     potentially_dead_.insert(in1_cast);
 
