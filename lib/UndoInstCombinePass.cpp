@@ -69,23 +69,20 @@ bool clspv::UndoInstCombinePass::runOnFunction(Function &F) {
   return changed;
 }
 
-VectorType *InferTypeForOpaqueLoad(LoadInst *load, uint64_t vec_size) {
-  assert(load);
-  assert(load->getPointerOperandTy()->isOpaquePointerTy());
+VectorType *InferTypeForOpaqueLoad(VectorType *old_type) {
+  auto vec_size = old_type->getElementCount().getKnownMinValue();
+  auto bit_width = cast<IntegerType>(old_type->getElementType())->getBitWidth();
 
-  // Calculate the largest vector that the target can be split into.
-  // If the indexes don't work at the resulting size then they won't work for a
-  // smaller size.
-  uint64_t new_size = max_vector_size;
-  while (vec_size % new_size) {
-    --new_size;
-  }
+  // All the integers in OpenCL C have a power of two bit width
+  auto is_pow_of_two = [](auto x) { return (x & (x - 1)) == 0; };
 
+  // If vec size 4 or 3 doesn't fit the index then smaller sizes won't allow
+  // greater granularity
+  uint64_t new_size =
+      vec_size % 4 == 0 && is_pow_of_two((vec_size / 4) * bit_width) ? 4 : 3;
   uint64_t divisor = vec_size / new_size;
 
-  const auto old_type = llvm::cast<VectorType>(load->getType());
-  auto new_bit_width =
-      cast<IntegerType>(old_type->getElementType())->getBitWidth() * divisor;
+  auto new_bit_width = bit_width * divisor;
 
   return VectorType::get(
       IntegerType::get(old_type->getContext(), new_bit_width), new_size,
@@ -122,9 +119,9 @@ bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
     return false;
 
   auto src_ty = src->getType();
-  VectorType *src_vec_ty = [src_ty, load, vec_size] {
+  VectorType *src_vec_ty = [src_ty, vec_ty] {
     if (src_ty->isOpaquePointerTy()) {
-      return InferTypeForOpaqueLoad(load, vec_size);
+      return InferTypeForOpaqueLoad(vec_ty);
       // TODO: #816 remove after final switch.
     } else if (src_ty->isPointerTy()) {
       return dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
@@ -198,9 +195,9 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
     return false;
 
   auto src_ty = src->getType();
-  VectorType *src_vec_ty = [src_ty, in1_load, in1_vec_size] {
+  VectorType *src_vec_ty = [src_ty, in1_vec_ty] {
     if (src_ty->isOpaquePointerTy()) {
-      return InferTypeForOpaqueLoad(in1_load, in1_vec_size);
+      return InferTypeForOpaqueLoad(in1_vec_ty);
       // TODO: #816 remove after final switch.
     } else if (src_ty->isPointerTy()) {
       return dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
@@ -255,6 +252,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   }
   shuffle->replaceAllUsesWith(insert);
   dead_.push_back(shuffle);
+  // TODO: #816 remove after final switch.
   if (in1_cast)
     potentially_dead_.insert(in1_cast);
 

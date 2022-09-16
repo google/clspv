@@ -16,8 +16,7 @@ target triple = "spir-unknown-unknown"
 define spir_kernel void @test(ptr addrspace(1) %out) {
 entry:
   %alloca = alloca <3 x i32>
-  %cast = bitcast ptr %alloca to ptr
-  %load = load <6 x i16>, ptr %cast, align 16
+  %load = load <6 x i16>, ptr %alloca, align 16
   %conv = shufflevector <6 x i16> %load, <6 x i16> undef, <2 x i32> <i32 2, i32 4>
   store <2 x i16> %conv, ptr addrspace(1) %out, align 1
   ret void
