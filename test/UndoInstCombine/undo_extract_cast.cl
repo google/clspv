@@ -3,6 +3,11 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv %s -o %t.spv --enable-opaque-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
 // CHECK-NOT: OpTypeVector {{.*}} 16
 
 __kernel void test_r_uint8(read_only image2d_t srcimg, __global unsigned char *dst, sampler_t sampler)
