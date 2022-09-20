@@ -107,8 +107,12 @@ private:
   /// Look for bitcast of vec3 inside the function
   bool vec3BitcastInFunction(llvm::Function &F);
 
-  /// Returns whether the vec3 should be transform into vec4
+  /// Returns whether the vec3 should be transformed into vec4
   bool vec3ShouldBeLowered(llvm::Module &M);
+
+  /// Returns whether a value have an implicit cast or not, works only with
+  /// opaque pointers
+  bool haveImplicitCast(llvm::Value *Value);
 
   /// Lower all global variables in the module.
   bool runOnGlobals(llvm::Module &M);

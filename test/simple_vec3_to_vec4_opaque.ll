@@ -1,4 +1,4 @@
-; RUN: clspv-opt --vec3-to-vec4 --passes=three-element-vector-lowering --opaque-pointers=true %s -o %t.ll
+; RUN: clspv-opt --vec3-to-vec4 --passes=three-element-vector-lowering --opaque-pointers %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 declare void @_Z8spirv.op.63.PU3AS3Dv3_hPU3AS1Dv3_h(i32, ptr, ptr)

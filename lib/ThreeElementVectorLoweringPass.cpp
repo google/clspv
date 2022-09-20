@@ -276,6 +276,8 @@ bool clspv::ThreeElementVectorLoweringPass::vec3ShouldBeLowered(Module &M) {
 }
 
 bool clspv::ThreeElementVectorLoweringPass::vec3BitcastInFunction(Function &F) {
+  // TODO(#816): remove this loop after final transition.
+  // Explicit casts with non opaque pointers.
   for (Instruction &I : instructions(F)) {
     if (auto *Inst = dyn_cast<CastInst>(&I)) {
       auto *Type = Inst->getSrcTy();
@@ -289,35 +291,40 @@ bool clspv::ThreeElementVectorLoweringPass::vec3BitcastInFunction(Function &F) {
     }
   }
 
-  int ArgIndex = 0;
-  for (auto &Arg : F.args()) {
-    // If the argument is of opaque pointer type...
-    if (Arg.getType()->isOpaquePointerTy() &&
-        F.getMetadata("kernel_arg_type")) {
-      auto const &type_op =
-          F.getMetadata("kernel_arg_type")->getOperand(ArgIndex);
-      auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
+  // Implicit casts with opaque pointers.
+  for (auto &arg : F.args()) {
+    if (arg.getType()->isOpaquePointerTy()) {
+      if (haveImplicitCast(&arg)) {
+        return true;
+      }
+    }
+  }
 
-      auto ArgInferredType =
-          clspv::InferType(&Arg, F.getContext(), &type_cache_);
+  for (Instruction &I : instructions(F)) {
+    if (I.getType()->isOpaquePointerTy()) {
+      if (haveImplicitCast(&I)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
-      // ... and its main type is a vec3 type...
-      if (type_name_str.endswith("3*")) {
-        // ... and its inferred type is of scalar type...
-        if (!ArgInferredType->isVectorTy()) {
-          return true;
-        }
-
-        // .. or have a mismatched vector size...
-        auto *VectorType = dyn_cast<FixedVectorType>(ArgInferredType);
-        if (VectorType->getElementCount().getKnownMinValue() != 3) {
+bool clspv::ThreeElementVectorLoweringPass::haveImplicitCast(Value *Value) {
+  auto InferredType =
+      clspv::InferType(Value, Value->getContext(), &type_cache_);
+  if (InferredType && InferredType->isVectorTy()) {
+    auto *VectorType = dyn_cast<FixedVectorType>(InferredType);
+    if (VectorType && VectorType->getElementCount().getKnownMinValue() == 3) {
+      for (auto user : Value->users()) {
+        auto userInferredType =
+            clspv::InferType(user, Value->getContext(), &type_cache_);
+        if (userInferredType && userInferredType != InferredType) {
           return true;
         }
       }
     }
-    ArgIndex++;
   }
-
   return false;
 }
 
@@ -837,8 +844,8 @@ clspv::ThreeElementVectorLoweringPass::visitUnaryOperator(UnaryOperator &I) {
 }
 
 bool clspv::ThreeElementVectorLoweringPass::handlingRequired(User &U) {
-  if (getEquivalentType(clspv::InferType(&U, U.getContext(), &type_cache_)) !=
-      nullptr) {
+  auto UserTy = clspv::InferType(&U, U.getContext(), &type_cache_);
+  if (UserTy && getEquivalentType(UserTy) != nullptr) {
     return true;
   }
 
@@ -847,7 +854,7 @@ bool clspv::ThreeElementVectorLoweringPass::handlingRequired(User &U) {
     if (OperandTy->isOpaquePointerTy()) {
       OperandTy = clspv::InferType(Operand, U.getContext(), &type_cache_);
     }
-    if (OperandTy != nullptr && getEquivalentType(OperandTy) != nullptr) {
+    if (OperandTy && getEquivalentType(OperandTy) != nullptr) {
       return true;
     }
   }
@@ -1084,6 +1091,7 @@ Value *clspv::ThreeElementVectorLoweringPass::convertOpCopyMemoryOperation(
   auto *DstOperand = EquivalentArgs[1];
   auto *SrcOperand = EquivalentArgs[2];
 
+#ifdef DEBUG
   if (DstOperand->getType()->isOpaquePointerTy()) {
     auto ptrTy =
         clspv::InferType(DstOperand, VectorCall.getContext(), &type_cache_);
@@ -1098,7 +1106,7 @@ Value *clspv::ThreeElementVectorLoweringPass::convertOpCopyMemoryOperation(
                ->getElementCount()
                .getKnownMinValue() == 4);
   }
-
+#endif
   IRBuilder<> B(&VectorCall);
   Value *ReturnValue = nullptr;
 
