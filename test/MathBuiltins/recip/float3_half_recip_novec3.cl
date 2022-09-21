@@ -3,6 +3,11 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv %s -o %t.spv -vec3-to-vec4 --enable-opaque-pointers
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT_UNDEF:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_TYPE_ID]]
 // CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4

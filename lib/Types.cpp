@@ -37,6 +37,11 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   if (!v->getType()->isOpaquePointerTy())
     return v->getType()->getNonOpaquePointerElementType();
 
+  // Null ptr constants cannot be inferred from other uses.
+  if (isa<ConstantPointerNull>(*v)) {
+    return nullptr;
+  }
+
   auto iter = cache->find(v);
   if (iter != cache->end()) {
     return iter->second;
@@ -51,7 +56,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   if (auto *gep = dyn_cast<GEPOperator>(v)) {
     return CacheType(gep->getResultElementType());
   } else if (auto *alloca = dyn_cast<AllocaInst>(v)) {
-    return CacheType(alloca->getAllocatedType());
+    if (!alloca->getAllocatedType()->isPointerTy()) {
+      return CacheType(alloca->getAllocatedType());
+    }
   } else if (auto *gv = dyn_cast<GlobalVariable>(v)) {
     return CacheType(gv->getValueType());
   }
@@ -88,7 +95,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     User *user = worklist.back().first;
     unsigned operand = worklist.back().second;
     worklist.pop_back();
-
+    bool isPointerTy = false;
     if (!seen.insert(user).second) {
       continue;
     }
@@ -96,9 +103,16 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     if (auto *GEP = dyn_cast<GEPOperator>(user)) {
       return CacheType(GEP->getSourceElementType());
     } else if (auto *load = dyn_cast<LoadInst>(user)) {
-      return CacheType(load->getType());
+      if (!load->getType()->isPointerTy()) {
+        return CacheType(load->getType());
+      }
+      isPointerTy = true;
     } else if (auto *store = dyn_cast<StoreInst>(user)) {
-      return CacheType(store->getValueOperand()->getType());
+      if (!store->getValueOperand()->getType()->isPointerTy()) {
+        return CacheType(store->getValueOperand()->getType());
+      } else if (!isa<ConstantPointerNull>(store->getValueOperand())) {
+        isPointerTy = true;
+      }
     } else if (auto *call = dyn_cast<CallInst>(user)) {
       auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
       // TODO: remaining builtins
@@ -186,12 +200,20 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     }
 
     // If the result is also a pointer, try to infer from further uses.
-    if (user->getType()->isPointerTy()) {
-      for (auto &use : user->uses())
+    if (user->getType()->isPointerTy() || isPointerTy) {
+      // Handle stores with only pointer operands.
+      if (auto *store = dyn_cast<StoreInst>(user)) {
+        if (store->getPointerOperand() != v) {
+          user = dyn_cast<User>(store->getPointerOperand());
+        } else if (auto *value = dyn_cast<User>(store->getValueOperand())) {
+          user = value;
+        }
+      }
+      for (auto &use : user->uses()) {
         worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
+      }
     }
   }
-
   return nullptr;
 }
 

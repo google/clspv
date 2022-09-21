@@ -3,6 +3,11 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv %s -o %t.spv -vec3-to-vec4 --enable-opaque-pointers
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
 kernel void foo(global ushort3* a, global ushort3* b) {
   *a = popcount(*b);
 }
