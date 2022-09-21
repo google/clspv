@@ -87,7 +87,7 @@ bool clspv::InlineFuncWithImageMetadataGetterPass::InlineFunctions(Module &M) {
 
   for (CallInst *Call : WorkList) {
     InlineFunctionInfo IFI;
-    Changed |= InlineFunction(*Call, IFI, nullptr, false).isSuccess();
+    Changed |= InlineFunction(*Call, IFI, false, nullptr, false).isSuccess();
   }
 
   return Changed;

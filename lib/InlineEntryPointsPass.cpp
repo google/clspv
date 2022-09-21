@@ -53,7 +53,7 @@ bool clspv::InlineEntryPointsPass::InlineFunctions(Module &M) {
   for (auto call : to_inline) {
     InlineFunctionInfo IFI;
     // Disable generation of lifetime intrinsic.
-    Changed |= InlineFunction(*call, IFI, nullptr, false).isSuccess();
+    Changed |= InlineFunction(*call, IFI, false, nullptr, false).isSuccess();
   }
 
   return Changed;

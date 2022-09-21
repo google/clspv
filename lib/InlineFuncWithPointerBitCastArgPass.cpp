@@ -180,7 +180,7 @@ bool clspv::InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
   for (CallInst *Call : WorkList) {
     InlineFunctionInfo IFI;
     // Disable generation of lifetime intrinsic.
-    Changed |= InlineFunction(*Call, IFI, nullptr, false).isSuccess();
+    Changed |= InlineFunction(*Call, IFI, false, nullptr, false).isSuccess();
   }
 
   return Changed;

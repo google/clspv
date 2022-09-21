@@ -126,7 +126,7 @@ bool clspv::MultiVersionUBOFunctionsPass::AnalyzeCall(
 
 void clspv::MultiVersionUBOFunctionsPass::InlineCallSite(CallInst *call) {
   InlineFunctionInfo IFI;
-  InlineFunction(*call, IFI, nullptr, false);
+  InlineFunction(*call, IFI, false, nullptr, false);
 }
 
 void clspv::MultiVersionUBOFunctionsPass::SpecializeCall(
