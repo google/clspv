@@ -58,6 +58,15 @@ Show help:
 
     clspv -help
 
+## Compiler-explorer
+> Compiler Explorer is an interactive compiler exploration website. Edit code in C, C++, C#, F#, Rust, Go, D, Haskell, Swift, Pascal, ispc, Python, Java or in any of the other 30+ supported languages, and see how that code looks after being compiled in real time. Multiple compilers are supported for each language, many different tools and visualisations are available, and the UI layout is configurable (thanks to GoldenLayout).
+>
+> -- https://github.com/compiler-explorer/compiler-explorer#readme
+
+clspv is available in [compiler-explorer](https://godbolt.org/) among the `OpenCL C` compilers.
+
+It is built daily by the compiler-explorer infrastructure.
+
 ## Build
 
 ### Tools
