@@ -31,13 +31,16 @@ struct DefineOpenCLWorkItemBuiltinsPass
 
   bool defineMappedBuiltin(llvm::Module &M, llvm::StringRef FuncName,
                            llvm::StringRef GlobalVarName, unsigned DefaultValue,
-                           AddressSpace::Type AddrSpace);
+                           AddressSpace::Type AddrSpace,
+                           llvm::ArrayRef<llvm::StringRef> dependents);
 
   bool defineGlobalIDBuiltin(llvm::Module &M);
   bool defineNumGroupsBuiltin(llvm::Module &M);
   bool defineGroupIDBuiltin(llvm::Module &M);
   bool defineGlobalSizeBuiltin(llvm::Module &M);
   bool defineGlobalOffsetBuiltin(llvm::Module &M);
+  bool defineGlobalLinearIDBuiltin(llvm::Module &M);
+  bool defineLocalLinearIDBuiltin(llvm::Module &M);
   bool defineWorkDimBuiltin(llvm::Module &M);
   bool defineEnqueuedLocalSizeBuiltin(llvm::Module &M);
   bool defineMaxSubGroupSizeBuiltin(llvm::Module &M);

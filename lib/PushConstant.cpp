@@ -134,7 +134,8 @@ bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
                     clspv::Option::NonUniformNDRangeSupported()) ||
                    clspv::Option::GlobalOffsetPushConstant();
   bool isUsed = (M.getFunction("_Z17get_global_offsetj") != nullptr) ||
-                (M.getFunction("_Z13get_global_idj") != nullptr);
+                (M.getFunction("_Z13get_global_idj") != nullptr) ||
+                (M.getFunction("_Z20get_global_linear_idv") != nullptr);
   return isEnabled && isUsed;
 }
 
@@ -147,13 +148,15 @@ bool ShouldDeclareEnqueuedLocalSizePushConstant(Module &M) {
 
 bool ShouldDeclareGlobalSizePushConstant(Module &M) {
   bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z15get_global_sizej") != nullptr;
+  bool isUsed = M.getFunction("_Z15get_global_sizej") != nullptr ||
+                M.getFunction("_Z20get_global_linear_idv") != nullptr;
   return isEnabled && isUsed;
 }
 
 bool ShouldDeclareRegionOffsetPushConstant(Module &M) {
   bool isEnabled = clspv::Option::NonUniformNDRangeSupported();
-  bool isUsed = M.getFunction("_Z13get_global_idj") != nullptr;
+  bool isUsed = M.getFunction("_Z13get_global_idj") != nullptr ||
+                M.getFunction("_Z20get_global_linear_idv") != nullptr;
   return isEnabled && isUsed;
 }
 
@@ -305,9 +308,9 @@ Value *ConvertToType(Module &M, StructType *pod_struct, unsigned index,
                            int_elements);
 }
 
-Value *BuildFromElements(
-    Module &M, IRBuilder<> &builder, Type *dst_type, uint64_t base_offset,
-    uint64_t base_index, const std::vector<Value *> &elements) {
+Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
+                         uint64_t base_offset, uint64_t base_index,
+                         const std::vector<Value *> &elements) {
   auto int32_ty = IntegerType::get(M.getContext(), 32);
   const auto &DL = M.getDataLayout();
   const auto dst_size = DL.getTypeStoreSize(dst_type).getKnownMinSize();
@@ -430,6 +433,5 @@ Value *BuildFromElements(
 
   return dst;
 }
-
 
 } // namespace clspv

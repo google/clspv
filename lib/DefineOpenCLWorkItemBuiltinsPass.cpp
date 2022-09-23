@@ -28,44 +28,23 @@
 using namespace llvm;
 using namespace clspv;
 
-PreservedAnalyses
-DefineOpenCLWorkItemBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
-  PreservedAnalyses PA;
-
-  defineGlobalOffsetBuiltin(M);
-  defineGlobalIDBuiltin(M);
-
-  defineMappedBuiltin(M, "_Z14get_local_sizej",
-                      clspv::WorkgroupSizeVariableName(), 1,
-                      clspv::WorkgroupSizeAddressSpace());
-  defineMappedBuiltin(M, "_Z12get_local_idj",
-                      clspv::LocalInvocationIdVariableName(), 0,
-                      clspv::LocalInvocationIdAddressSpace());
-  defineNumGroupsBuiltin(M);
-  defineGroupIDBuiltin(M);
-  defineGlobalSizeBuiltin(M);
-  defineWorkDimBuiltin(M);
-  defineEnqueuedLocalSizeBuiltin(M);
-  defineMaxSubGroupSizeBuiltin(M);
-  defineEnqueuedNumSubGroupsBuiltin(M);
-  addWorkgroupSizeIfRequired(M);
-
-  return PA;
-}
-
-GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(
-    Module &M, StringRef GlobalVarName, Type *Ty,
-    AddressSpace::Type AddrSpace) {
-  auto GV = new GlobalVariable(
-      M, Ty, false, GlobalValue::ExternalLinkage, nullptr, GlobalVarName,
-      nullptr, GlobalValue::ThreadLocalMode::NotThreadLocal, AddrSpace);
-
-  GV->setInitializer(Constant::getNullValue(Ty));
-
-  return GV;
-}
-
 namespace {
+constexpr auto enqueued_local_size_mangled_name =
+    "_Z23get_enqueued_local_sizej";
+constexpr auto enqueued_num_sub_groups_mangled_name =
+    "_Z27get_enqueued_num_sub_groupsv";
+constexpr auto global_id_mangled_name = "_Z13get_global_idj";
+constexpr auto global_linear_id_mangled_name = "_Z20get_global_linear_idv";
+constexpr auto global_offset_mangled_name = "_Z17get_global_offsetj";
+constexpr auto global_size_mangled_name = "_Z15get_global_sizej";
+constexpr auto group_id_mangled_name = "_Z12get_group_idj";
+constexpr auto local_id_mangled_name = "_Z12get_local_idj";
+constexpr auto local_linear_id_mangled_name = "_Z19get_local_linear_idv";
+constexpr auto local_size_mangled_name = "_Z14get_local_sizej";
+constexpr auto max_sub_group_size_mangled_name = "_Z22get_max_sub_group_sizev";
+constexpr auto num_groups_mangled_name = "_Z14get_num_groupsj";
+constexpr auto work_dim_mangled_name = "_Z12get_work_dimv";
+
 Value *inBoundsDimensionCondition(IRBuilder<> &Builder, Value *Dim) {
   // Vulkan has 3 dimensions for work-items, but the OpenCL API is written
   // such that it could have more. We have to check whether the value provided
@@ -85,19 +64,82 @@ Value *inBoundsDimensionOrDefaultValue(IRBuilder<> &Builder, Value *Dim,
   auto Cond = inBoundsDimensionCondition(Builder, Dim);
   return Builder.CreateSelect(Cond, Val, Builder.getInt32(DefaultValue));
 }
+
+// Retrieve the function if it's needed directly or by a dependent
+Function *getFunctionIfNeeded(Module &M, StringRef Name,
+                              ArrayRef<StringRef> Dependents,
+                              FunctionType *FType) {
+  Function *F = M.getFunction(Name);
+  if (F)
+    return F; // function is used directly
+
+  for (auto &Dependent : Dependents) {
+    auto D = M.getFunction(Dependent);
+    if (D) {
+      // function must be inserted for use by dependent
+      F = cast<Function>(M.getOrInsertFunction(Name, FType).getCallee());
+      F->setCallingConv(CallingConv::SPIR_FUNC);
+      return F;
+    }
+  }
+  return nullptr;
+}
 } // namespace
+
+PreservedAnalyses
+DefineOpenCLWorkItemBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+
+  defineGlobalOffsetBuiltin(M);
+  defineGlobalIDBuiltin(M);
+
+  defineMappedBuiltin(
+      M, local_size_mangled_name, clspv::WorkgroupSizeVariableName(), 1,
+      clspv::WorkgroupSizeAddressSpace(), {local_linear_id_mangled_name});
+  defineMappedBuiltin(
+      M, local_id_mangled_name, clspv::LocalInvocationIdVariableName(), 0,
+      clspv::LocalInvocationIdAddressSpace(), {local_linear_id_mangled_name});
+  defineNumGroupsBuiltin(M);
+  defineGroupIDBuiltin(M);
+  defineGlobalSizeBuiltin(M);
+  defineWorkDimBuiltin(M);
+  defineEnqueuedLocalSizeBuiltin(M);
+  defineMaxSubGroupSizeBuiltin(M);
+  defineEnqueuedNumSubGroupsBuiltin(M);
+  addWorkgroupSizeIfRequired(M);
+
+  defineGlobalLinearIDBuiltin(M);
+  defineLocalLinearIDBuiltin(M);
+
+  return PA;
+}
+
+GlobalVariable *DefineOpenCLWorkItemBuiltinsPass::createGlobalVariable(
+    Module &M, StringRef GlobalVarName, Type *Ty,
+    AddressSpace::Type AddrSpace) {
+  auto GV = new GlobalVariable(
+      M, Ty, false, GlobalValue::ExternalLinkage, nullptr, GlobalVarName,
+      nullptr, GlobalValue::ThreadLocalMode::NotThreadLocal, AddrSpace);
+
+  GV->setInitializer(Constant::getNullValue(Ty));
+
+  return GV;
+}
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     Module &M, StringRef FuncName, StringRef GlobalVarName,
-    unsigned DefaultValue, AddressSpace::Type AddrSpace) {
-  Function *F = M.getFunction(FuncName);
+    unsigned DefaultValue, AddressSpace::Type AddrSpace,
+    ArrayRef<StringRef> dependents) {
+
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(IT, IT, false);
+  Function *F = getFunctionIfNeeded(M, FuncName, dependents, FType);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
     return false;
   }
 
-  IntegerType *IT = IntegerType::get(M.getContext(), 32);
   VectorType *VT = FixedVectorType::get(IT, 3);
 
   GlobalVariable *GV = createGlobalVariable(M, GlobalVarName, VT, AddrSpace);
@@ -128,8 +170,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
 }
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(IT, IT, false);
 
-  Function *F = M.getFunction("_Z13get_global_idj");
+  Function *F = getFunctionIfNeeded(M, global_id_mangled_name,
+                                    {global_linear_id_mangled_name}, FType);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -139,7 +184,6 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  IntegerType *IT = IntegerType::get(M.getContext(), 32);
   VectorType *VT = FixedVectorType::get(IT, 3);
 
   GlobalVariable *GV = createGlobalVariable(M, "__spirv_GlobalInvocationId", VT,
@@ -167,7 +211,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
     if (clspv::Option::GlobalOffset() ||
         clspv::Option::GlobalOffsetPushConstant()) {
       auto Goff =
-          Builder.CreateCall(M.getFunction("_Z17get_global_offsetj"), Dim);
+          Builder.CreateCall(M.getFunction(global_offset_mangled_name), Dim);
       Goff->setCallingConv(CallingConv::SPIR_FUNC);
       Ret = Builder.CreateAdd(Ret, Goff);
     }
@@ -179,7 +223,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 }
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
-  Function *F = M.getFunction("_Z15get_global_sizej");
+  IntegerType *IT = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(IT, IT, false);
+  Function *F = getFunctionIfNeeded(M, global_size_mangled_name,
+                                    {global_linear_id_mangled_name}, FType);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -244,7 +291,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
 
-  Function *F = M.getFunction("_Z14get_num_groupsj");
+  Function *F = M.getFunction(num_groups_mangled_name);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -279,7 +326,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
 
-  Function *F = M.getFunction("_Z12get_group_idj");
+  Function *F = M.getFunction(group_id_mangled_name);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -321,29 +368,20 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
 }
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
-  Function *F = M.getFunction("_Z17get_global_offsetj");
-  bool isSupportEnabled = clspv::Option::GlobalOffset() ||
-                          clspv::Option::GlobalOffsetPushConstant();
-  bool isUsedDirectly = F != nullptr;
-  bool isUsedIndirectly =
-      isSupportEnabled && M.getFunction("_Z13get_global_idj") != nullptr;
-  bool isUsed = isUsedDirectly || isUsedIndirectly;
+  auto Int32Ty = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+  Function *F = getFunctionIfNeeded(
+      M, global_offset_mangled_name,
+      {global_id_mangled_name, global_linear_id_mangled_name}, FType);
 
   // Only define get_global_offset when it is used or the option is enabled
   // and get_global_id is used (since it is used in global ID calculations).
-  if (!isUsed) {
+  if (F == nullptr) {
     return false;
   }
 
-  // If get_global_offset isn't used but get_global_id is then we need to
-  // declare it ourselves.
-  auto &C = M.getContext();
-  auto Int32Ty = IntegerType::get(C, 32);
-  if (isUsedIndirectly && !isUsedDirectly) {
-    auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
-    F = cast<Function>(
-        M.getOrInsertFunction("_Z17get_global_offsetj", FType).getCallee());
-  }
+  bool isSupportEnabled = clspv::Option::GlobalOffset() ||
+                          clspv::Option::GlobalOffsetPushConstant();
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
@@ -377,8 +415,114 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   return true;
 }
 
+bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalLinearIDBuiltin(Module &M) {
+  Function *F = M.getFunction(global_linear_id_mangled_name);
+
+  // Only define get_global_linear_id when it is used.
+  if (F == nullptr) {
+    return false;
+  }
+
+  bool useGlobalOffset = clspv::Option::GlobalOffset() ||
+                         clspv::Option::GlobalOffsetPushConstant();
+  auto GlobalOffsetFunc =
+      useGlobalOffset ? M.getFunction(global_offset_mangled_name) : nullptr;
+  assert(useGlobalOffset == (GlobalOffsetFunc != nullptr) &&
+         "if useGlobalOffset is enabled it should have been created by now "
+         "(since global_linear_id is a dependent of get_global_offset).");
+
+  auto GlobalIdFunc = M.getFunction(global_id_mangled_name);
+  auto GlobalSizeFunc = M.getFunction(global_size_mangled_name);
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  llvm::ConstantInt *Zero = Builder.getInt32(0);
+  llvm::ConstantInt *One = Builder.getInt32(1);
+  llvm::ConstantInt *Two = Builder.getInt32(2);
+
+  auto addCallingConv = [](llvm::CallInst *call) {
+    call->setCallingConv(CallingConv::SPIR_FUNC);
+  };
+
+  auto getDimSize = [&](llvm::ConstantInt *Dim) -> llvm::Value * {
+    auto GID = Builder.CreateCall(GlobalIdFunc, Dim);
+    addCallingConv(GID);
+    if (useGlobalOffset) {
+      auto Offset = Builder.CreateCall(GlobalOffsetFunc, Dim);
+      addCallingConv(Offset);
+      return Builder.CreateSub(GID, Offset);
+    }
+    return GID;
+  };
+
+  auto Dim0 = getDimSize(Zero);
+  auto Dim1 = getDimSize(One);
+  auto Dim2 = getDimSize(Two);
+
+  auto GSize0 = Builder.CreateCall(GlobalSizeFunc, Zero);
+  addCallingConv(GSize0);
+  auto GSize1 = Builder.CreateCall(GlobalSizeFunc, One);
+  addCallingConv(GSize1);
+
+  // both get_global_id and get_global_offset default to 0 when the dimension is
+  // >= get_work_dim(), so there is no need for branching here
+  auto SecondDim = Builder.CreateMul(Dim1, GSize0);
+  auto ThirdDim = Builder.CreateMul(Dim2, Builder.CreateMul(GSize0, GSize1));
+  auto Sum = Builder.CreateAdd(ThirdDim, Builder.CreateAdd(SecondDim, Dim0));
+
+  Builder.CreateRet(Sum);
+
+  return true;
+}
+
+bool DefineOpenCLWorkItemBuiltinsPass::defineLocalLinearIDBuiltin(Module &M) {
+  Function *F = M.getFunction(local_linear_id_mangled_name);
+
+  // Only define get_local_linear_id when it is used.
+  if (F == nullptr) {
+    return false;
+  }
+
+  auto LocalIdFunc = M.getFunction(local_id_mangled_name);
+  auto LocalSizeFunc = M.getFunction(local_size_mangled_name);
+
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
+  IRBuilder<> Builder(BB);
+
+  llvm::ConstantInt *Zero = Builder.getInt32(0);
+  llvm::ConstantInt *One = Builder.getInt32(1);
+  llvm::ConstantInt *Two = Builder.getInt32(2);
+
+  auto addCallingConv = [](llvm::CallInst *call) {
+    call->setCallingConv(CallingConv::SPIR_FUNC);
+  };
+
+  auto LID0 = Builder.CreateCall(LocalIdFunc, Zero);
+  addCallingConv(LID0);
+  auto LID1 = Builder.CreateCall(LocalIdFunc, One);
+  addCallingConv(LID1);
+  auto LID2 = Builder.CreateCall(LocalIdFunc, Two);
+  addCallingConv(LID2);
+
+  auto LSize0 = Builder.CreateCall(LocalSizeFunc, Zero);
+  addCallingConv(LSize0);
+  auto LSize1 = Builder.CreateCall(LocalSizeFunc, One);
+  addCallingConv(LSize1);
+
+  // get_local_id defaults to 0 when the dimension is >= get_work_dim(), so
+  // there is no need for branching here
+  auto SecondDim = Builder.CreateMul(LID1, LSize0);
+  auto ThirdDim = Builder.CreateMul(LID2, Builder.CreateMul(LSize0, LSize1));
+  auto Sum = Builder.CreateAdd(ThirdDim, Builder.CreateAdd(SecondDim, LID0));
+
+  Builder.CreateRet(Sum);
+
+  return true;
+}
+
 bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
-  Function *F = M.getFunction("_Z12get_work_dimv");
+  Function *F = M.getFunction(work_dim_mangled_name);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -406,28 +550,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineWorkDimBuiltin(Module &M) {
 bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
     Module &M) {
 
-  Function *F = M.getFunction("_Z23get_enqueued_local_sizej");
-  bool isUsedDirectly = F != nullptr;
-  bool isUsedIndirectly =
-      M.getFunction("_Z27get_enqueued_num_sub_groupsv") != nullptr;
-  bool isUsed = isUsedDirectly || isUsedIndirectly;
+  auto Int32Ty = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+  Function *F =
+      getFunctionIfNeeded(M, enqueued_local_size_mangled_name,
+                          {enqueued_num_sub_groups_mangled_name}, FType);
 
-  // If the builtin was not used in the module, don't create it!
-  if (!isUsed) {
+  if (nullptr == F)
     return false;
-  }
-
-  // If get_enqueued_local_size is used indirectly then we need to declare it
-  // ourselves.
-  auto &C = M.getContext();
-  auto Int32Ty = IntegerType::get(C, 32);
-  if (isUsedIndirectly && !isUsedDirectly) {
-    auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
-    F = cast<Function>(
-        M.getOrInsertFunction("_Z23get_enqueued_local_sizej", FType)
-            .getCallee());
-    F->setCallingConv(CallingConv::SPIR_FUNC);
-  }
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
@@ -447,28 +577,14 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineMaxSubGroupSizeBuiltin(Module &M) {
 
-  Function *F = M.getFunction("_Z22get_max_sub_group_sizev");
-  bool isUsedDirectly = F != nullptr;
-  bool isUsedIndirectly =
-      M.getFunction("_Z27get_enqueued_num_sub_groupsv") != nullptr;
-  bool isUsed = isUsedDirectly || isUsedIndirectly;
+  auto Int32Ty = IntegerType::get(M.getContext(), 32);
+  auto FType = FunctionType::get(Int32Ty, false);
+  Function *F =
+      getFunctionIfNeeded(M, max_sub_group_size_mangled_name,
+                          {enqueued_num_sub_groups_mangled_name}, FType);
 
-  // If the builtin was not used in the module, don't create it!
-  if (!isUsed) {
+  if (nullptr == F)
     return false;
-  }
-
-  // If get_max_sub_group_size is used indirectly then we need to declare it
-  // ourselves.
-  auto &C = M.getContext();
-  auto Int32Ty = IntegerType::get(C, 32);
-  if (isUsedIndirectly && !isUsedDirectly) {
-    auto FType = FunctionType::get(Int32Ty, false);
-    F = cast<Function>(
-        M.getOrInsertFunction("_Z22get_max_sub_group_sizev", FType)
-            .getCallee());
-    F->setCallingConv(CallingConv::SPIR_FUNC);
-  }
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
@@ -486,7 +602,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMaxSubGroupSizeBuiltin(Module &M) {
 bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedNumSubGroupsBuiltin(
     Module &M) {
 
-  Function *F = M.getFunction("_Z27get_enqueued_num_sub_groupsv");
+  Function *F = M.getFunction(enqueued_num_sub_groups_mangled_name);
 
   // If the builtin was not used in the module, don't create it!
   if (nullptr == F) {
@@ -496,7 +612,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedNumSubGroupsBuiltin(
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
-  auto FELS = M.getFunction("_Z23get_enqueued_local_sizej");
+  auto FELS = M.getFunction(enqueued_local_size_mangled_name);
 
   auto ELS0 = Builder.CreateCall(FELS, Builder.getInt32(0));
   ELS0->setCallingConv(CallingConv::SPIR_FUNC);
@@ -508,7 +624,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedNumSubGroupsBuiltin(
   ELS = Builder.CreateMul(ELS, ELS2);
 
   auto MaxSubgroupSize =
-      Builder.CreateCall(M.getFunction("_Z22get_max_sub_group_sizev"));
+      Builder.CreateCall(M.getFunction(max_sub_group_size_mangled_name));
   MaxSubgroupSize->setCallingConv(CallingConv::SPIR_FUNC);
 
   auto ELSRoundedUp = Builder.CreateAdd(ELS, MaxSubgroupSize);
