@@ -95,6 +95,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::copysign:
   case Intrinsic::cos:
   case Intrinsic::ctlz:
+  case Intrinsic::cttz:
   case Intrinsic::exp:
   case Intrinsic::fabs:
   case Intrinsic::floor:
