@@ -251,6 +251,10 @@ private:
       return true;
     }
 
+    if (QT->isEnumeralType()) {
+        return true;
+    }
+
     if (QT->isBuiltinType()) {
       return true;
     }
