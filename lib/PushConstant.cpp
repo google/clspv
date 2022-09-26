@@ -342,22 +342,62 @@ Value *BuildFromElements(
       // We need at most two integers to handle any case here.
       auto ele_ty = dst_vec_ty->getElementType();
       uint32_t num_elements = dst_vec_ty->getElementCount().getKnownMinValue();
-      assert(num_elements <= 4 && "Unhandled large vectors");
       uint32_t ratio = (int32_ty->getPrimitiveSizeInBits() /
                         ele_ty->getPrimitiveSizeInBits());
       auto scaled_vec_ty = FixedVectorType::get(ele_ty, ratio);
-      Value *casts[2] = {UndefValue::get(scaled_vec_ty),
-                         UndefValue::get(scaled_vec_ty)};
-      uint32_t num_ints = (num_elements + ratio - 1) / ratio; // round up
+      SmallVector<Value *, 4> casts;
+      uint32_t num_ints = (num_elements + ratio - 1) / ratio;  // round up
       num_ints = std::max(num_ints, 1u);
       for (uint32_t i = 0; i < num_ints; ++i) {
-        casts[i] =
-            builder.CreateBitCast(elements[base_index + i], scaled_vec_ty);
+        casts.push_back(
+            builder.CreateBitCast(elements[base_index + i], scaled_vec_ty));
       }
       SmallVector<int, 4> indices(num_elements);
       uint32_t i = 0;
       std::generate_n(indices.data(), num_elements, [&i]() { return i++; });
-      dst = builder.CreateShuffleVector(casts[0], casts[1], indices);
+      switch (casts.size()) {
+        case 1:
+          // The only types that results in 1 cast are char2 and char3.
+          dst = builder.CreateShuffleVector(casts[0], indices);
+          break;
+        case 2:
+          dst = builder.CreateShuffleVector(casts[0], casts[1], indices);
+          break;
+        case 4: {
+          SmallVector<int, 4> inter_indices({0, 1, 2, 3});
+          // Four casts could be 8 wide, 16-bit ele type or 16 wide 8-bit ele
+          // type. We can determine this by looking at the known min width of
+          // our cast vectors and setting up shuffle indices according.
+          auto vec_size = cast<VectorType>(casts[0]->getType())
+                              ->getElementCount()
+                              .getKnownMinValue();
+          if (vec_size == 4) {
+            inter_indices.append({4, 5, 6, 7});
+          } else if(vec_size != 2) {
+            llvm_unreachable("Impossible cast vector size encountered.");
+          }
+          auto lo =
+              builder.CreateShuffleVector(casts[0], casts[1], inter_indices);
+          auto hi =
+              builder.CreateShuffleVector(casts[2], casts[3], inter_indices);
+          dst = builder.CreateShuffleVector(lo, hi, indices);
+          break;
+        }
+        case 8: {
+          // The only case with 8 casts is a vector of 16 width, 16-bit element
+          // type. We can reconstruct this by first shuffling them into 2 vec8s
+          // and then into the final vec16.
+          SmallVector<int, 8> inter_indices = {0, 1, 2, 3};
+          auto lo = builder.CreateShuffleVector(casts[0], casts[1], inter_indices);
+          auto hi = builder.CreateShuffleVector(casts[2], casts[3], inter_indices);
+          auto lo2 = builder.CreateShuffleVector(casts[4], casts[5], inter_indices);
+          auto hi2 = builder.CreateShuffleVector(casts[6], casts[7], inter_indices);
+          inter_indices.append({4, 5, 6, 7});
+          auto lo3 = builder.CreateShuffleVector(lo, hi, inter_indices);
+          auto hi3 = builder.CreateShuffleVector(lo2, hi2, inter_indices);
+          dst = builder.CreateShuffleVector(lo3, hi3, indices);
+        }
+      }
     } else {
       // General case, break into elements and construct the composite type.
       auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
@@ -412,8 +452,7 @@ Value *BuildFromElements(
       assert(base_offset == 0 && "Unexpected packed data format");
       // Create a bit cast if necessary.
       dst = elements[base_index];
-      if (dst_type != int32_ty)
-        dst = builder.CreateBitCast(dst, dst_type);
+      if (dst_type != int32_ty) dst = builder.CreateBitCast(dst, dst_type);
     } else {
       assert(base_offset == 0 && "Unexpected packed data format");
       assert(dst_size == kIntBytes * 2 && "Expected 64-bit scalar");
