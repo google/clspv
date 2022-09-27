@@ -1,6 +1,6 @@
 // We have -O0 here because the compiler will optimize away the unused
 // local uint b[5] otherwise.
-// RUN: clspv -O0 %s -o %t.spv
+// RUN: clspv %target -O0 %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

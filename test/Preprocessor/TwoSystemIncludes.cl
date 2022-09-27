@@ -1,4 +1,4 @@
-// RUN: clspv -I %S/SomeIncludeDirectory -I %S/AnotherIncludeDirectory %s -o %t.spv
+// RUN: clspv %target -I %S/SomeIncludeDirectory -I %S/AnotherIncludeDirectory %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

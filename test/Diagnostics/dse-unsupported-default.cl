@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s
+// RUN: clspv %target -verify %s
 
 kernel void dse(queue_t queue) { //expected-error{{unknown type name 'queue_t'}}
     ndrange_t ndrange = ndrange_1D(1); //expected-error{{use of undeclared identifier 'ndrange_t'}}

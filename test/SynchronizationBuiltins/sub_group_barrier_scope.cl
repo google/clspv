@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv --cl-std=CL2.0 -inline-entry-points --spv-version=1.3
+// RUN: clspv %target %s -o %t.spv --cl-std=CL2.0 -inline-entry-points --spv-version=1.3
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.1 %t.spv

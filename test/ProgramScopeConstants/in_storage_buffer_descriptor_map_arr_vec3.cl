@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -module-constants-in-storage-buffer
+// RUN: clspv %target %s -o %t.spv -module-constants-in-storage-buffer
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

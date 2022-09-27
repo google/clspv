@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL2.0 -inline-entry-points -verify %s
+// RUN: clspv %target -cl-std=CL2.0 -inline-entry-points -verify %s
 
 kernel void dse(queue_t queue) { //expected-error{{unknown type name 'queue_t'}}
     ndrange_t ndrange = ndrange_1D(1);

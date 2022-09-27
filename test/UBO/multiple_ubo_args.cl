@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -constant-args-ubo
+// RUN: clspv %target %s -o %t.spv -constant-args-ubo
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val %t.spv --target-env vulkan1.0

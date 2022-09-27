@@ -1,4 +1,4 @@
-// RUN: clspv %s --long-vector -verify
+// RUN: clspv %target %s --long-vector -verify
 //
 // Test that long-vector types are supported as parameters of non-kernel functions.
 //

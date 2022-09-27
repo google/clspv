@@ -1,12 +1,21 @@
-// RUN: clspv -cl-std=CL2.0 -inline-entry-points %s -o %t.spv
+// RUN: clspv %target -cl-std=CL2.0 -inline-entry-points %s -o %t.spv -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %target -cl-std=CL2.0 -inline-entry-points %s -o %t.spv -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-64-DAG: %[[ulong:[0-9a-zA-Z_]+]] = OpTypeInt 64 0
 // CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
 // CHECK-DAG: %[[uint_1:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 1
 // CHECK-DAG: %[[uint_2:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 2
+// CHECK-64-DAG: %[[ulong_0:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 0
+// CHECK-64-DAG: %[[ulong_1:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 1
+// CHECK-64-DAG: %[[ulong_2:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 2
 // CHECK-DAG: %[[v3uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 3
 
 // CHECK-DAG: %[[ptr_input_v3uint:[0-9a-zA-Z_]+]] = OpTypePointer Input %[[v3uint]]
@@ -16,9 +25,12 @@
 
 // CHECK: OpFunction
 
-// CHECK-DAG: %[[lid0_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_0]]
-// CHECK-DAG: %[[lid1_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_1]]
-// CHECK-DAG: %[[lid2_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_2]]
+// CHECK-32-DAG: %[[lid0_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_0]]
+// CHECK-32-DAG: %[[lid1_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_1]]
+// CHECK-32-DAG: %[[lid2_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[uint_2]]
+// CHECK-64-DAG: %[[lid0_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[ulong_0]]
+// CHECK-64-DAG: %[[lid1_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[ulong_1]]
+// CHECK-64-DAG: %[[lid2_ptr:[0-9]+]] = OpAccessChain {{.*}} %[[gl_LocalInvocationID]] %[[ulong_2]]
 // CHECK-DAG: %[[lid0:[0-9]+]] = OpLoad %[[uint]] %[[lid0_ptr]]
 // CHECK-DAG: %[[lid1:[0-9]+]] = OpLoad %[[uint]] %[[lid1_ptr]]
 // CHECK-DAG: %[[lid2:[0-9]+]] = OpLoad %[[uint]] %[[lid2_ptr]]

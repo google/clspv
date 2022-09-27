@@ -2,7 +2,7 @@
 // It's a workaround for https://github.com/google/clspv/issues/95
 // This test no longer is powerful due to zero-initizalization of allocas.
 
-// RUN: clspv %s -o %t.spv -hack-undef
+// RUN: clspv %target %s -o %t.spv -hack-undef
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

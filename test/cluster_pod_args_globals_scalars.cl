@@ -1,9 +1,9 @@
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -arch=spir
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -arch=spir64
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir64
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

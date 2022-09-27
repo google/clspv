@@ -1,4 +1,4 @@
-// RUN: clspv --cl-std=CL3.0 %s -o %t.spv
+// RUN: clspv %target --cl-std=CL3.0 %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 //

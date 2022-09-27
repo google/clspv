@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -pod-pushconstant -cluster-pod-kernel-args
+// RUN: clspv %target %s -o %t.spv -pod-pushconstant -cluster-pod-kernel-args
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map

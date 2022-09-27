@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL3.0 -verify %s
+// RUN: clspv %target -cl-std=CL3.0 -verify %s
 
 kernel void pipes(read_only pipe int in, write_only pipe int out) {
     //expected-error@3{{OpenCL C version 3.0 does not support the 'pipe' type qualifier}}

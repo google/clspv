@@ -1,5 +1,5 @@
 // We use -O0 here to ensure we thoroughly test that our CFG is structured.
-// RUN: clspv -O0 %s -o %t.spv
+// RUN: clspv %target -O0 %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

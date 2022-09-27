@@ -2,7 +2,7 @@
 // Check that we can remove partial chains of insertvalue
 // to avoid OpCompositeInsert entirely.
 
-// RUN: clspv %s -o %t.spv -hack-inserts -no-inline-single
+// RUN: clspv %target %s -o %t.spv -hack-inserts -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

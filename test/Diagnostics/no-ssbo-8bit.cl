@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s -no-8bit-storage=ssbo -w
+// RUN: clspv %target -verify %s -no-8bit-storage=ssbo -w
 
 kernel void foo(global char* a) { } //expected-error{{8-bit storage is not supported for SSBOs}}
 

@@ -1,4 +1,4 @@
-// RUN: clspv -w -pod-ubo -verify %s
+// RUN: clspv %target -w -pod-ubo -verify %s
 
 typedef struct {
   struct { int x[4]; int y; } x[2]; //expected-note{{here}}

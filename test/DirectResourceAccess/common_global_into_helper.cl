@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -keep-unused-arguments
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-dis -o %t2.spvasm %t.spv

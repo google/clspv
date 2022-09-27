@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // CHECK: OpExtInst %{{.*}} %{{.*}} Fma

@@ -1,5 +1,5 @@
-// RUN: clspv %s --long-vector -verify
-// RUN: clspv %s --long-vector -o %t.spv
+// RUN: clspv %target %s --long-vector -verify
+// RUN: clspv %target %s --long-vector -o %t.spv
 // RUN: spirv-dis %t.spv -o - | FileCheck %s
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

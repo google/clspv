@@ -2,7 +2,7 @@
 // Fixes https://github.com/google/clspv/issues/142
 
 
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

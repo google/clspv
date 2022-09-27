@@ -1,4 +1,4 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -cluster-pod-kernel-args=0 -pod-ubo
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -cluster-pod-kernel-args=0 -pod-ubo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t2.map

@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -int8 -vec3-to-vec4
+// RUN: clspv %target %s -o %t.spv -int8 -vec3-to-vec4
 // RUN: spirv-dis -o %t.spvasm %t.spv
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

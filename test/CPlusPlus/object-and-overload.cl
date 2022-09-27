@@ -1,11 +1,11 @@
-// RUN: clspv -cl-std=CLC++ -inline-entry-points %s -o %t.spv
+// RUN: clspv %target -cl-std=CLC++ -inline-entry-points %s -o %t.spv -arch=spir
 // RUN: clspv-reflection %t.spv -o %t.dmap
 // RUN: FileCheck %s < %t.dmap -check-prefix=MAP
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv -cl-std=CLC++ -inline-entry-points %s -o %t.spv -arch=spir64
+// RUN: clspv %target -cl-std=CLC++ -inline-entry-points %s -o %t.spv -arch=spir64
 // RUN: clspv-reflection %t.spv -o %t.dmap
 // RUN: FileCheck %s < %t.dmap -check-prefix=MAP
 // RUN: spirv-dis -o %t2.spvasm %t.spv

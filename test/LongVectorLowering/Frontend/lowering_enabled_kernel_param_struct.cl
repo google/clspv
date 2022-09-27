@@ -1,4 +1,4 @@
-// RUN: clspv %s --long-vector -verify
+// RUN: clspv %target %s --long-vector -verify
 //
 // expected-no-diagnostics
 

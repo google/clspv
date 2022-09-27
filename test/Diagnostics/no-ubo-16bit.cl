@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s -no-16bit-storage=ubo -w -pod-ubo -constant-args-ubo -std430-ubo-layout
+// RUN: clspv %target -verify %s -no-16bit-storage=ubo -w -pod-ubo -constant-args-ubo -std430-ubo-layout
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 

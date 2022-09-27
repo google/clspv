@@ -2,7 +2,7 @@
 // We must keep the undef image value.
 // See https://github.com/google/clspv/issues/95
 
-// RUN: clspv %s -o %t.spv -hack-undef -no-inline-single -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -hack-undef -no-inline-single -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

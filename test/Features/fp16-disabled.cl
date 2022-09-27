@@ -1,4 +1,4 @@
-// RUN: clspv -fp16=0 %s -verify
+// RUN: clspv %target -fp16=0 %s -verify
 
 #ifdef cl_khr_fp16
 #error FAIL

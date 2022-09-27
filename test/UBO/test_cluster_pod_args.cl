@@ -1,4 +1,4 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points -cluster-pod-kernel-args %s -o %t.spv -pod-ubo
+// RUN: clspv %target -constant-args-ubo -inline-entry-points -cluster-pod-kernel-args %s -o %t.spv -pod-ubo
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

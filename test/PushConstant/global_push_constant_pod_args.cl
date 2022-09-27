@@ -1,11 +1,11 @@
-// RUN: clspv %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points -arch=spir
+// RUN: clspv %target %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points -arch=spir
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck --check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points -arch=spir64
+// RUN: clspv %target %s -o %t.spv -cl-std=CL2.0 -global-offset -inline-entry-points -arch=spir64
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t.map

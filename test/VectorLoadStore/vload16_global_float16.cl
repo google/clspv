@@ -1,9 +1,9 @@
-// RUN: clspv --long-vector %s -o %t.spv -arch=spir
+// RUN: clspv %target --long-vector %s -o %t.spv -arch=spir
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv --long-vector %s -o %t.spv -arch=spir64
+// RUN: clspv %target --long-vector %s -o %t.spv -arch=spir64
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

@@ -1,4 +1,4 @@
-// RUN: clspv %s --output-format=ll -o %t.ll
+// RUN: clspv %target %s --output-format=ll -o %t.ll
 // RUN: FileCheck %s < %t.ll
 
 // RUN: clspv %s --output-format=bc -o %t.bc

@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -module-constants-in-storage-buffer -no-inline-single -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -module-constants-in-storage-buffer -no-inline-single -keep-unused-arguments
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map

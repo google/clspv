@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL2.0 -global-offset %s -o %t.spv -inline-entry-points -arch=spir
+// RUN: clspv %target -cl-std=CL2.0 -global-offset %s -o %t.spv -inline-entry-points -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.dmap

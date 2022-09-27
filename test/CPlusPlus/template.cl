@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CLC++ -inline-entry-points %s -o %t.spv
+// RUN: clspv %target -cl-std=CLC++ -inline-entry-points %s -o %t.spv
 // RUN: clspv-reflection %t.spv -o %t.dmap
 // RUN: FileCheck %s < %t.dmap -check-prefix=MAP
 // RUN: spirv-dis -o %t2.spvasm %t.spv

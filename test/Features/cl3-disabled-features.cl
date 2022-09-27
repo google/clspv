@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL3.0 %s -verify
+// RUN: clspv %target -cl-std=CL3.0 %s -verify
 
 #ifdef __opencl_c_pipes
 #error FAIL

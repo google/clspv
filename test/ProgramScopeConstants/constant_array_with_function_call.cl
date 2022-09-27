@@ -1,8 +1,8 @@
-// RUN: clspv %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir
+// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 
-// RUN: clspv %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir64
+// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir64
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 
