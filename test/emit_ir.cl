@@ -10,7 +10,7 @@ void kernel foo(global double *out, int in)
   *out = in / 2.304;
 }
 
-// CHECK: target triple = "spir-unknown-unknown"
+// CHECK: target triple = "spir{{[64]*}}-unknown-unknown"
 // CHECK: define
 // CHECK-SAME: spir_kernel
 // CHECK-SAME: void @foo

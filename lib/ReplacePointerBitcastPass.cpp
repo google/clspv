@@ -25,6 +25,8 @@
 #include "BitcastUtils.h"
 #include "Types.h"
 
+#include "clspv/Option.h"
+
 #include <cmath>
 
 using namespace llvm;
@@ -38,14 +40,30 @@ namespace {
 
 bool IsPowerOfTwo(unsigned x) { return (x & (x - 1)) == 0; }
 
+Type *GetIndexTy(IRBuilder<> &Builder) {
+  auto* M = Builder.GetInsertBlock()->getParent()->getParent();
+  return clspv::PointersAre64Bit(*M) ? Builder.getInt64Ty()
+                                     : Builder.getInt32Ty();
+}
+
+ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C) {
+    auto* M = Builder.GetInsertBlock()->getParent()->getParent();
+    return clspv::PointersAre64Bit(*M) ? Builder.getInt64(C)
+                                       : Builder.getInt32(C);
+}
+
 Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val) {
   if (div == 1) {
     return Val;
   }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
+  }
   if (IsPowerOfTwo(div)) {
-    return Builder.CreateLShr(Val, Builder.getInt32(std::log2(div)));
+    return Builder.CreateLShr(Val, GetIndexTyConst(Builder, std::log2(div)));
   } else {
-    return Builder.CreateUDiv(Val, Builder.getInt32(div));
+    return Builder.CreateUDiv(Val, GetIndexTyConst(Builder, div));
   }
 }
 
@@ -53,21 +71,29 @@ Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val) {
   if (mul == 1) {
     return Val;
   }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
+  }
   if (IsPowerOfTwo(mul)) {
-    return Builder.CreateShl(Val, Builder.getInt32(std::log2(mul)));
+    return Builder.CreateShl(Val, GetIndexTyConst(Builder, std::log2(mul)));
   } else {
-    return Builder.CreateMul(Val, Builder.getInt32(mul));
+    return Builder.CreateMul(Val, GetIndexTyConst(Builder, mul));
   }
 }
 
 Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
   if (rem == 1) {
-    return Builder.getInt32(0);
+    return GetIndexTyConst(Builder, 0);
+  }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
   }
   if (IsPowerOfTwo(rem)) {
-    return Builder.CreateAnd(Val, Builder.getInt32(rem - 1));
+    return Builder.CreateAnd(Val, GetIndexTyConst(Builder, rem - 1));
   } else {
-    return Builder.CreateURem(Val, Builder.getInt32(rem));
+    return Builder.CreateURem(Val, GetIndexTyConst(Builder, rem));
   }
 }
 
@@ -319,7 +345,7 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
        i++) {
     if (i > 0) {
       Value *LastAddrIdx = AddrIdxs.pop_back_val();
-      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, GetIndexTyConst(Builder, 1));
       AddrIdxs.push_back(LastAddrIdx);
     }
     auto *SrcAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
@@ -462,7 +488,7 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
     if (i > 0) {
       // Calculate next store address
       Value *LastAddrIdx = AddrIdxs.pop_back_val();
-      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, Builder.getInt32(1));
+      LastAddrIdx = Builder.CreateAdd(LastAddrIdx, GetIndexTyConst(Builder, 1));
       AddrIdxs.push_back(LastAddrIdx);
     }
 

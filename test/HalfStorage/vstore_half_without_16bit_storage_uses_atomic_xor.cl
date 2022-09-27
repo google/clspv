@@ -1,13 +1,19 @@
-// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo
+// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %s -o %t.spv -no-16bit-storage=ssbo -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
+// CHECK-64-DAG: %[[ULONG_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 64 0
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT2_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 2
 // CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
-// CHECK: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT2_TYPE_ID]]
+// CHECK-DAG: %[[UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT2_TYPE_ID]]
 // CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 // CHECK-DAG: %[[CONSTANT_4_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 4
 // CHECK-DAG: %[[CONSTANT_16_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 16
@@ -18,7 +24,9 @@
 // CHECK: %[[INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[FLOAT2_TYPE_ID]] %[[B]] %[[UNDEF_ID]] 0
 // CHECK: %[[PACKED_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] {{.*}} PackHalf2x16 %[[INSERT_ID]]
 // CHECK: %[[INDEX_INTO_UINT:[a-zA-Z0-9_]*]] = OpShiftRightLogical %[[UINT_TYPE_ID]] %[[N]] %[[CONSTANT_1_ID]]
-// CHECK: %[[OUT_PTR:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[ARG0_ID:[a-zA-Z0-9_]+]] %[[CONSTANT_0_ID]] %[[INDEX_INTO_UINT]]
+// CHECK-64: %[[INDEX_INTO_UINT_AS_ULONG:[a-zA-Z0-9_]*]] = OpUConvert %[[ULONG_TYPE_ID]] %[[INDEX_INTO_UINT]]
+// CHECK-64: %[[OUT_PTR:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[ARG0_ID:[a-zA-Z0-9_]+]] %[[CONSTANT_0_ID]] %[[INDEX_INTO_UINT_AS_ULONG]]
+// CHECK-32: %[[OUT_PTR:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[ARG0_ID:[a-zA-Z0-9_]+]] %[[CONSTANT_0_ID]] %[[INDEX_INTO_UINT]]
 // CHECK: %[[PREV_VALUE:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[OUT_PTR]]
 // CHECK: %[[SHIFT_RAW:[a-zA-Z0-9_]*]] = OpShiftLeftLogical %[[UINT_TYPE_ID]] %[[N]] %[[CONSTANT_4_ID]]
 // CHECK: %[[SHIFT:[a-zA-Z0-9_]*]] = OpBitwiseAnd %[[UINT_TYPE_ID]] %[[SHIFT_RAW]] %[[CONSTANT_16_ID]]

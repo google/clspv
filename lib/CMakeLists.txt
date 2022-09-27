@@ -134,7 +134,7 @@ add_dependencies(clspv_passes clspv_c_strings clspv_glsl clspv_reflection)
 target_link_libraries(clspv_passes PRIVATE ${CLSPV_LLVM_COMPONENTS})
 
 # clspv_baked_opencl_header and clspv_builtin_library are used by Compiler.cpp.
-add_dependencies(clspv_core clspv_baked_opencl_header clspv_builtin_library)
+add_dependencies(clspv_core clspv_baked_opencl_header clspv_builtin_library clspv64_builtin_library)
 target_link_libraries(clspv_core PUBLIC clspv_passes)
 target_link_libraries(clspv_core PRIVATE
   LLVMIRReader

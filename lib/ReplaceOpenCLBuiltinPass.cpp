@@ -968,6 +968,8 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto Cst2 = Builder.getInt32(2);
 
   auto *IT = IntegerType::get(M.getContext(), 32);
+  auto *IndexT =
+      IntegerType::get(M.getContext(), clspv::PointersAre64Bit(M) ? 64 : 32);
   auto *VT = FixedVectorType::get(IT, 3);
 
   // get_local_id({0, 1, 2});
@@ -989,6 +991,15 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto LocalSize0 = Builder.CreateExtractElement(LocalSize, Cst0);
   auto LocalSize1 = Builder.CreateExtractElement(LocalSize, Cst1);
   auto LocalSize2 = Builder.CreateExtractElement(LocalSize, Cst2);
+
+  if (clspv::PointersAre64Bit(M)) {
+    LocalId0 = Builder.CreateZExt(LocalId0, Builder.getInt64Ty());
+    LocalId1 = Builder.CreateZExt(LocalId1, Builder.getInt64Ty());
+    LocalId2 = Builder.CreateZExt(LocalId2, Builder.getInt64Ty());
+    LocalSize0 = Builder.CreateZExt(LocalSize0, Builder.getInt64Ty());
+    LocalSize1 = Builder.CreateZExt(LocalSize1, Builder.getInt64Ty());
+    LocalSize2 = Builder.CreateZExt(LocalSize2, Builder.getInt64Ty());
+  }
 
   // size_t start_id = ((get_local_id(2) * get_local_size(1))
   //                   + get_local_id(1)) * get_local_size(0)
@@ -1014,7 +1025,7 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
 
   // CmpBB
   Builder.SetInsertPoint(CmpBB);
-  auto PHIIterator = Builder.CreatePHI(Builder.getInt32Ty(), 2);
+  auto PHIIterator = Builder.CreatePHI(IndexT, 2);
   auto Cmp = Builder.CreateCmp(CmpInst::ICMP_ULT, PHIIterator, NumGentypes);
   Builder.CreateCondBr(Cmp, LoopBB, ExitBB);
 
@@ -2028,6 +2039,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     // Avoid pointer casts. Instead generate the correct number of stores
     // and rely on drivers to coalesce appropriately.
     IRBuilder<> builder(CI);
+    if (clspv::PointersAre64Bit(*F.getParent())) {
+      auto M = F.getParent();
+      offset = builder.CreateTrunc(offset, IntegerType::get(M->getContext(), 32));
+    }
     auto elems_const = builder.getInt32(elems);
     auto adjust = builder.CreateMul(offset, elems_const);
     for (size_t i = 0; i < elems; ++i) {
@@ -2060,6 +2075,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     // Avoid pointer casts. Instead generate the correct number of loads
     // and rely on drivers to coalesce appropriately.
     IRBuilder<> builder(CI);
+    if (clspv::PointersAre64Bit(*F.getParent())) {
+      auto M = F.getParent();
+      offset = builder.CreateTrunc(offset, IntegerType::get(M->getContext(), 32));
+    }
     auto elems_const = builder.getInt32(elems);
     V = UndefValue::get(ret_type);
     auto adjust = builder.CreateMul(offset, elems_const);
@@ -2276,6 +2295,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto IndexTy = clspv::PointersAre64Bit(M)
+                       ? Type::getInt64Ty(M.getContext())
+                       : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -2284,9 +2306,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
         PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    auto Int0 = ConstantInt::get(IntTy, 0);
-    auto Int1 = ConstantInt::get(IntTy, 1);
-    auto Int2 = ConstantInt::get(IntTy, 2);
+    auto Int0 = ConstantInt::get(IndexTy, 0);
+    auto Int1 = ConstantInt::get(IndexTy, 1);
+    auto Int2 = ConstantInt::get(IndexTy, 2);
 
     // Cast the half* pointer to short*.
     // TODO(#816): remove after final transition.
@@ -2537,6 +2559,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto IndexTy = clspv::PointersAre64Bit(M)
+                       ? Type::getInt64Ty(M.getContext())
+                       : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
@@ -2551,9 +2576,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     }
 
     // Index into the correct address of the casted pointer.
-    auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0, ConstantInt::get(IntTy, 1), "", CI);
+    auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0, ConstantInt::get(IndexTy, 1), "", CI);
     auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2, "", CI);
-    auto Arg0x2p1 = BinaryOperator::Create(Instruction::Add, Arg0x2, ConstantInt::get(IntTy, 1), "", CI);
+    auto Arg0x2p1 = BinaryOperator::Create(Instruction::Add, Arg0x2, ConstantInt::get(IndexTy, 1), "", CI);
     auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2p1, "", CI);
 
     // Load from the int4* we casted to.
@@ -2747,7 +2772,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
-    auto One = ConstantInt::get(IntTy, 1);
 
     // Our intrinsic to pack a float2 to an int.
     auto SPIRVIntrinsic = clspv::PackFunction();
@@ -2825,8 +2849,14 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       auto IntPointerTy =
           PointerType::get(IntTy, Arg2->getType()->getPointerAddressSpace());
 
+      auto One = ConstantInt::get(IntTy, 1);
       auto Four = ConstantInt::get(IntTy, 4);
       auto FFFF = ConstantInt::get(IntTy, 0xffff);
+
+      if (clspv::PointersAre64Bit(M)) {
+        Arg1 = CastInst::Create(Instruction::CastOps::Trunc, Arg1, IntTy,
+                                "offset_i32", CI);
+      }
 
       auto IndexIsOdd =
           BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
@@ -2947,6 +2977,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto IndexTy = clspv::PointersAre64Bit(M)
+                       ? Type::getInt64Ty(M.getContext())
+                       : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -2954,9 +2987,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
         PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
-    auto Int0 = ConstantInt::get(IntTy, 0);
-    auto Int1 = ConstantInt::get(IntTy, 1);
-    auto Int2 = ConstantInt::get(IntTy, 2);
+    auto Int0 = ConstantInt::get(IndexTy, 0);
+    auto Int1 = ConstantInt::get(IndexTy, 1);
+    auto Int2 = ConstantInt::get(IndexTy, 2);
 
     auto X0 = InsertElementInst::Create(
         UndefValue::get(Float2Ty),
@@ -3024,6 +3057,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto IndexTy = clspv::PointersAre64Bit(M)
+                       ? Type::getInt64Ty(M.getContext())
+                       : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -3031,9 +3067,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
         PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
-    auto Int0 = ConstantInt::get(IntTy, 0);
-    auto Int1 = ConstantInt::get(IntTy, 1);
-    auto Int2 = ConstantInt::get(IntTy, 2);
+    auto Int0 = ConstantInt::get(IndexTy, 0);
+    auto Int1 = ConstantInt::get(IndexTy, 1);
+    auto Int2 = ConstantInt::get(IndexTy, 2);
 
     auto X0 = InsertElementInst::Create(
         UndefValue::get(Float2Ty),
@@ -3236,6 +3272,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto IndexTy = clspv::PointersAre64Bit(M)
+                       ? Type::getInt64Ty(M.getContext())
+                       : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
@@ -3316,7 +3355,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
 
     // Index into the correct address of the casted pointer.
     auto Arg1x2 = BinaryOperator::Create(Instruction::Shl, Arg1,
-                                         ConstantInt::get(IntTy, 1), "", CI);
+                                         ConstantInt::get(IndexTy, 1), "", CI);
     auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1x2, "", CI);
 
     // Store to the int4* we casted to.
@@ -3324,7 +3363,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
 
     // Index into the correct address of the casted pointer.
     auto Arg1Plus1 = BinaryOperator::Create(Instruction::Add, Arg1x2,
-                                            ConstantInt::get(IntTy, 1), "", CI);
+                                            ConstantInt::get(IndexTy, 1), "", CI);
     auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1Plus1, "", CI);
 
     // Store to the int4* we casted to.

@@ -106,8 +106,16 @@ set(CLSPV_LIBRARY_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/clspv_builtin_libr
 set(CLSPV_LIBRARY_DATA_VAR_NAME clspv_builtin_library_data)
 set(CLSPV_LIBRARY_SIZE_VAR_NAME clspv_builtin_library_size)
 
+set(CLSPV64_LIBRARY_INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/clspv64--.bc)
+set(CLSPV64_LIBRARY_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/clspv64_builtin_library.h)
+set(CLSPV64_LIBRARY_DATA_VAR_NAME clspv64_builtin_library_data)
+set(CLSPV64_LIBRARY_SIZE_VAR_NAME clspv64_builtin_library_size)
+
 add_custom_target(clspv_builtin_library
   DEPENDS ${CLSPV_LIBRARY_OUTPUT_FILE})
+
+add_custom_target(clspv64_builtin_library
+  DEPENDS ${CLSPV64_LIBRARY_OUTPUT_FILE})
 
 add_custom_command(
   OUTPUT ${CLSPV_LIBRARY_OUTPUT_FILE}
@@ -118,4 +126,15 @@ add_custom_command(
     --header-size=${CLSPV_LIBRARY_SIZE_VAR_NAME}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV_LIBRARY_INPUT_FILE}
+)
+
+add_custom_command(
+  OUTPUT ${CLSPV64_LIBRARY_OUTPUT_FILE}
+  COMMAND ${PYTHON_EXECUTABLE} ${BAKE_FILE_PYTHON_FILE}
+    --input-header-file=${CLSPV64_LIBRARY_INPUT_FILE}
+    --output-file=${CLSPV64_LIBRARY_OUTPUT_FILE}
+    --header-var=${CLSPV64_LIBRARY_DATA_VAR_NAME}
+    --header-size=${CLSPV64_LIBRARY_SIZE_VAR_NAME}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV64_LIBRARY_INPUT_FILE}
 )

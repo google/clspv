@@ -1,6 +1,13 @@
 // RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -pod-ubo
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: FileCheck %s < %t2.map -check-prefix=MAP
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args -pod-ubo -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck %s < %t2.map -check-prefix=MAP
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -42,15 +49,18 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK-DAG:  [[__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypeArray [[__struct_24]] [[_7]]
 // CHECK-DAG:  [[__ptr_Workgroup__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr__struct_24_7]]
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK:      [[_37]] = OpVariable [[__ptr_Uniform__struct_16]] Uniform
-// CHECK:      [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
-// CHECK:      [[_6:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr__struct_24_7]] Workgroup
+// CHECK-DAG:  [[_37]] = OpVariable [[__ptr_Uniform__struct_16]] Uniform
+// CHECK-DAG:  [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
+// CHECK-DAG:  [[_6:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr__struct_24_7]] Workgroup
+// CHECK-64-DAG: [[_ulong:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
+// CHECK-64-DAG: [[_ulong_0:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 0
 // CHECK:      [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_uint_0]]
 // CHECK:      [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Uniform__struct_15]] [[_37]] [[_uint_0]]
 // CHECK:      [[_43:%[0-9a-zA-Z_]+]] = OpLoad [[__struct_15]] [[_42]]
 // CHECK:      [[_44:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 0
 // CHECK:      [[_45:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 1
 // CHECK:      [[_46:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_5]]
-// CHECK:      [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_uint_0]] [[_uint_0]]
+// CHECK-64:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_ulong_0]] [[_uint_0]]
+// CHECK-32:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_uint_0]] [[_uint_0]]
 // CHECK:      [[_52:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_51]]
 // CHECK:      [[_53:%[0-9a-zA-Z_]+]] = OpConvertSToF [[_float]] [[_52]]

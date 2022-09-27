@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %s -o %t.spv -arch=spir
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

@@ -68,6 +68,9 @@ bool IsIntImageType(llvm::StructType *type);
 // Can only return true after image specialization.
 bool IsUintImageType(llvm::StructType *type);
 
+// Returns true if pointers in the module are 64-bit.
+bool PointersAre64Bit(llvm::Module &m);
+
 } // namespace clspv
 
 #endif

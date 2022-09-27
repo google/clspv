@@ -422,6 +422,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID getSPIRVType(Type *Ty);
   SPIRVID getSPIRVConstant(Constant *Cst);
   SPIRVID getSPIRVInt32Constant(uint32_t CstVal);
+  SPIRVID getSPIRVInt64Constant(uint64_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V);
 
@@ -2283,6 +2284,17 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
     Fn->print(errs());
     llvm_unreachable("Unhandled function declaration/definition");
+ } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
+    // If there is exactly one use we know where to insert the instruction
+    if (ConstExpr->getNumUses() == 1) {
+      auto *User = *ConstExpr->user_begin();
+      auto *EquivInstr =
+          ConstExpr->getAsInstruction(dyn_cast<Instruction>(User));
+      GenerateInstruction(*EquivInstr);
+      RID = VMap[EquivInstr];
+    } else {
+      llvm_unreachable("Unhandled ConstantExpr");
+    }
   } else {
     Cst->print(errs());
     llvm_unreachable("Unsupported Constant???");
@@ -3815,7 +3827,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       // Implement:
       //     %result = OpCompositeExtract %uint %sizes <component number>
       Ops.clear();
-      Ops << Call->getType() << RID;
+      Ops << Type::getInt32Ty(Context) << RID;
 
       uint32_t component = 0;
       if (FuncInfo.getType() == Builtins::kGetImageHeight)
@@ -3828,6 +3840,15 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       Ops << component;
 
       RID = addSPIRVInst(spv::OpCompositeExtract, Ops);
+
+      // get_image_array_size returns a size_t so we need to extend it to an
+      // i64 if size_t is 64-bit
+      if (FuncInfo.getType() == Builtins::kGetImageArraySize &&
+          clspv::PointersAre64Bit(*module)) {
+        Ops.clear();
+        Ops << Type::getInt64Ty(Context) << RID;
+        RID = addSPIRVInst(spv::OpUConvert, Ops);
+      }
     }
     break;
   }

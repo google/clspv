@@ -3,6 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO variant with 64-bit addresses?
 typedef struct { int arr[2]; } S1;
 typedef struct { S1 s1; int a; S1 s2; } S2;
 

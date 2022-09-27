@@ -20,6 +20,9 @@
 
 #include "BitcastUtils.h"
 #include "SimplifyPointerBitcastPass.h"
+#include "Types.h"
+
+#include "clspv/Option.h"
 
 using namespace llvm;
 
@@ -255,7 +258,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
           if (isa<GetElementPtrInst>(GEP->getPointerOperand())) {
             // ... with no implicit cast between them...
             auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
-            if (OtherGEP->getResultElementType() == GEP->getSourceElementType()) {
+            if (OtherGEP->getResultElementType() ==
+                GEP->getSourceElementType()) {
               // ... record the GEP as something we need to process.
               WorkList.push_back(GEP);
             }
@@ -275,8 +279,19 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     SmallVector<Value *, 8> Idxs;
 
     Value *SrcLastIdxOp = OtherGEP->getOperand(OtherGEP->getNumOperands() - 1);
-
     Value *GEPIdxOp = GEP->getOperand(1);
+
+    if (clspv::PointersAre64Bit(M) && OtherGEP->getType()->isStructTy()) {
+      if (GEPIdxOp->getType()->isIntegerTy(64)) {
+        GEPIdxOp =
+            Builder.CreateTrunc(GEPIdxOp, IntegerType::get(M.getContext(), 32));
+      }
+      if (SrcLastIdxOp->getType()->isIntegerTy(64)) {
+        SrcLastIdxOp = Builder.CreateTrunc(
+            SrcLastIdxOp, IntegerType::get(M.getContext(), 32));
+      }
+    }
+
     Value *MergedIdx = GEPIdxOp;
 
     // Add the indices together, if the last one from before is not zero.
@@ -285,12 +300,44 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       last_idx_is_zero = constant->isZero();
     }
     if (!last_idx_is_zero) {
+      if (clspv::PointersAre64Bit(M) && !OtherGEP->getType()->isStructTy()) {
+        if (GEPIdxOp->getType()->isIntegerTy(32)) {
+          GEPIdxOp = Builder.CreateZExt(GEPIdxOp,
+                                        IntegerType::get(M.getContext(), 64));
+        }
+        if (SrcLastIdxOp->getType()->isIntegerTy(32)) {
+          SrcLastIdxOp = Builder.CreateZExt(
+              SrcLastIdxOp, IntegerType::get(M.getContext(), 64));
+        }
+      }
       MergedIdx = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
     }
 
     Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
     Idxs.push_back(MergedIdx);
     Idxs.append(GEP->op_begin() + 2, GEP->op_end());
+
+    // Struct types require i32 indexes, so fix up any constant i64s
+    // that are safe to change
+    if (clspv::PointersAre64Bit(M) &&
+        OtherGEP->getSourceElementType()->isStructTy()) {
+      SmallVector<Value *, 8> NewIdxs;
+      for (auto *Idx : Idxs) {
+        if (auto ConstIdx = dyn_cast<ConstantInt>(Idx)) {
+          uint64_t C = ConstIdx->getZExtValue();
+          if (C < std::numeric_limits<uint32_t>::max()) {
+            NewIdxs.push_back(
+                ConstantInt::get(IntegerType::get(M.getContext(), 32), C));
+          } else {
+            NewIdxs.push_back(Idx);
+          }
+        } else {
+          NewIdxs.push_back(Idx);
+        }
+      }
+
+      Idxs = NewIdxs;
+    }
 
     Value *NewGEP = nullptr;
     // Create the new GEP.  If we used the Builder it will do some folding

@@ -1,5 +1,11 @@
-// RUN: clspv --long-vector %s -o %t.spv
-// RUN: spirv-dis %t.spv -o - | FileCheck %s
+// RUN: clspv --long-vector %s -o %t.spv -arch=spir
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv --long-vector %s -o %t.spv -arch=spir64
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // Check that vstore for float16 is supported.
@@ -8,6 +14,8 @@
 // CHECK-DAG: [[RUNTIME_UINT:%[^ ]+]] = OpTypeRuntimeArray [[UINT]]
 // CHECK-DAG: [[STRUCT_RUNTIME_UINT:%[^ ]+]] = OpTypeStruct [[RUNTIME_UINT]]
 // CHECK-DAG: [[PTR_UINT:%[^ ]+]] = OpTypePointer StorageBuffer [[STRUCT_RUNTIME_UINT]]
+//
+// CHECK-64-DAG: [[ULONG:%[^ ]+]] = OpTypeInt 64 0
 //
 // CHECK-DAG: [[FLOAT:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[RUNTIME_FLOAT:%[^ ]+]] = OpTypeRuntimeArray [[FLOAT]]
@@ -80,68 +88,100 @@
 // CHECK-DAG: [[P:%[^ ]+]] = OpCompositeExtract [[FLOAT]] [[VAL_4]] 3
 //
 // CHECK-DAG: [[BASE_OFFSET:%[^ ]+]] = OpShiftLeftLogical [[UINT]] [[VAL_0]] [[CST_4]]
+// CHECK-64-DAG: [[BASE_OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[BASE_OFFSET]]
 //
-// CHECK-DAG: [[PTR_A:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[BASE_OFFSET]]
+// CHECK-64-DAG: [[PTR_A:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[BASE_OFFSET_LONG]]
+// CHECK-32-DAG: [[PTR_A:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[BASE_OFFSET]]
 // CHECK-DAG: OpStore [[PTR_A]] [[A]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_1]]
-// CHECK-DAG: [[PTR_B:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_B:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_B:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG: OpStore [[PTR_B]] [[B]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_2]]
-// CHECK-DAG: [[PTR_C:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_C:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_C:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_C]] [[C]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_3]]
-// CHECK-DAG: [[PTR_D:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_D:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_D:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:   OpStore [[PTR_D]] [[D]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_4]]
-// CHECK-DAG: [[PTR_E:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_E:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_E:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_E]] [[E]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]]  [[CST_5]]
-// CHECK-DAG: [[PTR_F:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_F:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_F:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_F]] [[F]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]]  [[BASE_OFFSET]]  [[CST_6]]
-// CHECK-DAG: [[PTR_G:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_G:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_G:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_G]] [[G]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]]  [[BASE_OFFSET]]  [[CST_7]]
-// CHECK-DAG: [[PTR_H:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_H:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_H:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_H]] [[H]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_8]]
-// CHECK-DAG: [[PTR_I:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_I:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_I:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_I]] [[I]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_9]]
-// CHECK-DAG: [[PTR_J:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_J:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_J:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:   OpStore [[PTR_J]] [[J]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_10]]
-// CHECK-DAG: [[PTR_K:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_K:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_K:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_K]] [[K]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]]  [[CST_11]]
-// CHECK-DAG: [[PTR_L:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_L:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_L:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_L]] [[L]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]]  [[BASE_OFFSET]]  [[CST_12]]
-// CHECK-DAG: [[PTR_M:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_M:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_M:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_M]] [[M]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]]  [[BASE_OFFSET]]  [[CST_13]]
-// CHECK-DAG: [[PTR_N:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_N:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_N:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_N]] [[N]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_14]]
-// CHECK-DAG: [[PTR_O:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_O:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_O:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:  OpStore [[PTR_O]] [[O]]
 //
 // CHECK-DAG: [[SHIFT:%[^ ]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_15]]
-// CHECK-DAG: [[PTR_P:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
+// CHECK-64-DAG: [[SHIFT_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[SHIFT]]
+// CHECK-64-DAG: [[PTR_P:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT_LONG]]
+// CHECK-32-DAG: [[PTR_P:%[^ ]+]] = OpAccessChain [[BUFFER_FLOAT_PTR]] [[DST]] [[CST_0]] [[SHIFT]]
 // CHECK-DAG:   OpStore [[PTR_P]] [[P]]
 
 kernel void test(global uint *offset, global float *dst,

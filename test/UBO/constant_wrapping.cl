@@ -1,6 +1,13 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: FileCheck -check-prefix=MAP %s < %t2.map
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -31,7 +38,7 @@ __kernel void foo(__global inner* data, __constant outer* c) {
 // CHECK-DAG: OpDecorate [[data]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[c:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[c]] DescriptorSet 0
-// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK: [[inner]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]]
 // CHECK: [[inner_runtime]] = OpTypeRuntimeArray [[inner]]
 // CHECK: [[data_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner_runtime]]

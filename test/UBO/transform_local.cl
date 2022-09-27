@@ -1,6 +1,13 @@
 // RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: FileCheck -check-prefix=MAP %s < %t2.map
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -46,12 +53,15 @@ __kernel void foo(__global data_type* data, __constant data_type* c_arg, __local
 // CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
 // CHECK-DAG: [[l_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[int]]
 // CHECK-DAG: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
+// CHECK-64-DAG: [[long:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
+// CHECK-64-DAG: [[long_zero:%[0-9a-zA-Z_]+]] = OpConstant [[long]] 0
 // CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 // CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
 // CHECK: [[l_arg:%[0-9a-zA-Z_]+]] = OpVariable [[l_arg_ptr]] Workgroup
 // CHECK: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[zero]] [[zero]]
 // CHECK: [[c_load:%[0-9a-zA-Z_]+]] = OpLoad [[int]] [[c_arg_gep]]
-// CHECK: [[l_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[l_arg_ele_ptr]] [[l_arg]] [[zero]] [[zero]]
+// CHECK-64: [[l_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[l_arg_ele_ptr]] [[l_arg]] [[long_zero]] [[zero]]
+// CHECK-32: [[l_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[l_arg_ele_ptr]] [[l_arg]] [[zero]] [[zero]]
 // CHECK: [[l_load:%[0-9a-zA-Z_]+]] = OpLoad [[int]] [[l_arg_gep]]
 // CHECK: [[add:%[0-9a-zA-Z_]+]] = OpIAdd [[int]] [[l_load]] [[c_load]]
 // CHECK: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[zero]] [[zero]]

@@ -1,4 +1,4 @@
-; RUN: clspv -cl-std=CL2.0 -inline-entry-points -x=ir %s -o %t.spv
+; RUN: clspv -cl-std=CL2.0 -inline-entry-points -x=ir %s -o %t.spv -arch=spir
 ; RUN: spirv-dis -o %t.spvasm %t.spv
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.0 %t.spv

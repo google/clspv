@@ -1,10 +1,17 @@
-// RUN: clspv --long-vector %s -o %t.spv
-// RUN: spirv-dis %t.spv -o - | FileCheck %s
+// RUN: clspv --long-vector %s -o %t.spv -arch=spir
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv --long-vector %s -o %t.spv -arch=spir64
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // Check that vload for float16 is supported.
 
 // CHECK-DAG: [[UINT:%[0-9a-zA-Z_]+]]   = OpTypeInt 32 0
+// CHECK-64-DAG: [[ULONG:%[0-9a-zA-Z_]+]]   = OpTypeInt 64 0
 // CHECK-DAG: [[FLOAT:%[0-9a-zA-Z_]+]]  = OpTypeFloat 32
 // CHECK-DAG: [[FLOAT_PTR:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[FLOAT]]
 //
@@ -31,70 +38,102 @@
 // We expect 16 loads from the StorageBuffer for "src".
 //
 // CHECK: [[BASE_OFFSET:%[0-9]+]] = OpShiftLeftLogical [[UINT]] {{%[0-9]+}} [[CST_4]]
+// CHECK-64-DAG: [[BASE_OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[BASE_OFFSET]]
 //
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC:%[0-9a-zA-Z_]+]]
-// CHECK-SAME: [[CST_0]] [[BASE_OFFSET]]
-
+// CHECK-64-SAME: [[CST_0]] [[BASE_OFFSET_LONG]]
+// CHECK-32-SAME: [[CST_0]] [[BASE_OFFSET]]
+//
 // CHECK: [[LOAD_0:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_1]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_1:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_2]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_2:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_3]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_3:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_4]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_4:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_5]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_5:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_6]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_6:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_7]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_7:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_8]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_8:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_9]]
-// CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_9:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_10]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_10:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_11]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_11:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_12]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_12:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_13]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_13:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_14]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_14:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
 // CHECK: [[OFFSET:%[0-9]+]]  = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_15]]
-// CHECK: [[PTR:%[0-9]+]]     = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
+// CHECK-64-DAG: [[OFFSET_LONG:%[^ ]+]] = OpSConvert [[ULONG]] [[OFFSET]]
+// CHECK-64: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET_LONG]]
+// CHECK-32: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_15:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 
 kernel void test(uint offset, global float *src, global float *dst) {

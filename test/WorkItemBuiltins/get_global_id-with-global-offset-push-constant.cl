@@ -1,4 +1,4 @@
-// RUN: clspv -global-offset-push-constant %s -o %t.spv
+// RUN: clspv -global-offset-push-constant %s -o %t.spv -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
