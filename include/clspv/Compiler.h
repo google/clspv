@@ -32,6 +32,15 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::string *output_log = nullptr);
+
+// Compile from multiple source strings.
+//
+// For use in clLinkProgram.
+// Command line options to clspv are passed as |options|.
+int CompileFromSourcesString(const std::vector<std::string> &programs,
+                             const std::string &options,
+                             std::vector<uint32_t> *output_buffer,
+                             std::string *output_log);
 } // namespace clspv
 
 #endif // CLSPV_INCLUDE_CLSPV_COMPILER_H_

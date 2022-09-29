@@ -19,6 +19,7 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/PassManager.h"
@@ -58,6 +59,8 @@
 #include "Passes.h"
 
 #include <cassert>
+#include <fstream>
+#include <iostream>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -112,9 +115,9 @@ static llvm::cl::list<std::string>
             llvm::cl::desc("Define a #define directive."), llvm::cl::ZeroOrMore,
             llvm::cl::value_desc("define"));
 
-static llvm::cl::opt<std::string>
-    InputFilename(llvm::cl::Positional, llvm::cl::desc("<input .cl file>"),
-                  llvm::cl::init("-"));
+static llvm::cl::list<std::string>
+    InputsFilename(llvm::cl::Positional, llvm::cl::desc("<input files>"),
+                   llvm::cl::ZeroOrMore);
 
 static llvm::cl::opt<clang::Language> InputLanguage(
     "x", llvm::cl::desc("Select input type"),
@@ -153,6 +156,10 @@ static llvm::cl::opt<std::string> IROutputFile(
     llvm::cl::desc(
         "Emit LLVM IR to the given file after parsing and stop compilation."),
     llvm::cl::value_desc("filename"));
+
+static llvm::cl::opt<bool>
+    IRBinaryOutput("emit-binary-ir", llvm::cl::init(false),
+                   llvm::cl::desc("Emit binary LLVM IR to the output file."));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
@@ -209,27 +216,16 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
 }
 
 // Sets |instance|'s options for compiling. Returns 0 if successful.
-int SetCompilerInstanceOptions(
-    CompilerInstance &instance, const llvm::StringRef &overiddenInputFilename,
-    clang::FrontendInputFile &kernelFile, const std::string &program,
-    std::unique_ptr<llvm::MemoryBuffer> &file_memory_buffer,
-    llvm::raw_string_ostream *diagnosticsStream) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> errorOrInputFile(nullptr);
+int SetCompilerInstanceOptions(CompilerInstance &instance,
+                               const llvm::StringRef &overiddenInputFilename,
+                               clang::FrontendInputFile &kernelFile,
+                               const std::string &program,
+                               llvm::raw_string_ostream *diagnosticsStream) {
   if (program.empty()) {
-    auto errorOrInputFile =
-        llvm::MemoryBuffer::getFileOrSTDIN(InputFilename.getValue());
-
-    // If there was an error in getting the input file.
-    if (!errorOrInputFile) {
-      llvm::errs() << "Error: " << errorOrInputFile.getError().message() << " '"
-                   << InputFilename.getValue() << "'\n";
-      return -1;
-    }
-    file_memory_buffer = std::move(errorOrInputFile.get());
-  } else {
-    file_memory_buffer =
-        llvm::MemoryBuffer::getMemBuffer(program, overiddenInputFilename);
+    return -1;
   }
+  std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer =
+      llvm::MemoryBuffer::getMemBuffer(program, overiddenInputFilename);
 
   if (verify) {
     instance.getDiagnosticOpts().VerifyDiagnostics = true;
@@ -741,23 +737,41 @@ int ParseOptions(const int argc, const char *const argv[]) {
   return 0;
 }
 
-int GenerateIRFile(llvm::Module &module, std::string output) {
-  std::error_code ec;
-  std::unique_ptr<llvm::ToolOutputFile> out(
-      new llvm::ToolOutputFile(output, ec, llvm::sys::fs::OF_None));
-  if (ec) {
-    llvm::errs() << output << ": " << ec.message() << '\n';
-    return -1;
+int WriteOutput(const std::string &output_filename, const std::string &output,
+                std::vector<uint32_t> *output_buffer) {
+  if (!output_filename.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream outStream(output_filename, error,
+                                   llvm::sys::fs::FA_Write);
+
+    if (error) {
+      llvm::errs() << "Unable to open output file '" << output_filename
+                   << "': " << error.message() << '\n';
+      return -1;
+    }
+    outStream << output;
+  }
+  if (output_buffer) {
+    output_buffer->resize((output.size() + sizeof(uint32_t) - 1) /
+                          sizeof(uint32_t));
+    memcpy(output_buffer->data(), output.data(), output.size());
+  }
+  return 0;
+}
+
+int GenerateIRFile(const std::string &output_filename,
+                   std::unique_ptr<llvm::Module> &module,
+                   std::vector<uint32_t> *output_binary) {
+  std::string module_string;
+  llvm::raw_string_ostream stream(module_string);
+  if (IRBinaryOutput) {
+    llvm::WriteBitcodeToFile(*module, stream);
+  } else {
+    stream << *module;
+    stream.flush();
   }
 
-  llvm::ModuleAnalysisManager mam;
-  llvm::ModulePassManager pm;
-  llvm::PassBuilder pb;
-  pb.registerModuleAnalyses(mam);
-  pm.addPass(llvm::PrintModulePass(out->os(), "", false));
-  pm.run(module, mam);
-  out->keep();
-  return 0;
+  return WriteOutput(output_filename, module_string, output_binary);
 }
 
 bool LinkBuiltinLibrary(llvm::Module *module) {
@@ -782,32 +796,30 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
   return true;
 }
 
-} // namespace
-
-namespace clspv {
-int Compile(const llvm::StringRef &input_filename, const std::string &program,
-            std::vector<uint32_t> *output_binary, std::string *output_log) {
-  llvm::StringRef overiddenInputFilename = input_filename;
+std::unique_ptr<llvm::Module>
+ProgramToModule(llvm::LLVMContext &context,
+                const llvm::StringRef &inputFilename,
+                const std::string &program, std::string *output_log, int *err) {
 
   clang::CompilerInstance instance;
-  clang::FrontendInputFile kernelFile(overiddenInputFilename,
+  clang::FrontendInputFile kernelFile(inputFilename,
                                       clang::InputKind(InputLanguage));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
-  std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer;
   if (auto error = SetCompilerInstanceOptions(
-          instance, overiddenInputFilename, kernelFile, program,
-          file_memory_buffer, &diagnosticsStream))
-    return error;
+          instance, inputFilename, kernelFile, program, &diagnosticsStream)) {
+    *err = error;
+    return nullptr;
+  }
 
   // Parse.
-  llvm::LLVMContext context;
   clang::EmitLLVMOnlyAction action(&context);
 
   // Prepare the action for processing kernelFile
   const bool success = action.BeginSourceFile(instance, kernelFile);
   if (!success) {
-    return -1;
+    *err = -1;
+    return nullptr;
   }
 
   auto result = action.Execute();
@@ -820,30 +832,41 @@ int Compile(const llvm::StringRef &input_filename, const std::string &program,
   auto num_warnings = consumer->getNumWarnings();
   auto num_errors = consumer->getNumErrors();
   if (output_log != nullptr) {
-    *output_log = log;
+    output_log->append(log);
   } else if ((num_errors > 0) || (num_warnings > 0)) {
     llvm::errs() << log;
   }
   if (result || num_errors > 0) {
-    return -1;
+    *err = -1;
+    return nullptr;
   }
+
+  *err = 0;
 
   // Don't run the passes or produce any output in verify mode.
   // Clang doesn't always produce a valid module.
   if (verify) {
-    return 0;
+    return nullptr;
   }
 
-  std::unique_ptr<llvm::Module> module(action.takeModule());
+  return action.takeModule();
+}
 
+int CompileModule(const llvm::StringRef &input_filename,
+                  std::unique_ptr<llvm::Module> &module,
+                  std::vector<uint32_t> *output_buffer,
+                  std::string *output_log) {
   // Optimize.
   // Create a memory buffer for temporarily writing the result.
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
 
-  // If --emit-ir was requested, emit the initial LLVM IR and stop compilation.
+  // If --emit-ir or --emit-binary-ir was requested, emit the initial LLVM IR
+  // and stop compilation.
   if (!IROutputFile.empty()) {
-    return GenerateIRFile(*module, IROutputFile);
+    return GenerateIRFile(IROutputFile, module, output_buffer);
+  } else if (IRBinaryOutput) {
+    return GenerateIRFile(OutputFilename, module, output_buffer);
   }
 
   if (!LinkBuiltinLibrary(module.get())) {
@@ -855,63 +878,122 @@ int Compile(const llvm::StringRef &input_filename, const std::string &program,
     return -1;
   }
 
-  // Write the resulting binary.
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
-  if (output_binary) {
-    output_binary->resize(binary.size() / 4);
-    memcpy(output_binary->data(), binary.data(), binary.size());
-  }
-
-  if (!OutputFilename.empty()) {
-    std::error_code error;
-    llvm::raw_fd_ostream outStream(OutputFilename, error,
-                                   llvm::sys::fs::FA_Write);
-
-    if (error) {
-      llvm::errs() << "Unable to open output file '" << OutputFilename
-                   << "': " << error.message() << '\n';
-      return -1;
-    }
-    outStream << binaryStream.str();
-  }
-
-  return 0;
+  return WriteOutput(OutputFilename, binaryStream.str().str(), output_buffer);
 }
+
+int CompilePrograms(const std::vector<std::string> &programs,
+                    std::vector<uint32_t> *output_buffer,
+                    std::string *output_log) {
+  std::vector<std::unique_ptr<llvm::Module>> modules;
+
+  llvm::LLVMContext context;
+  for (auto program : programs) {
+    int error;
+    modules.push_back(
+        ProgramToModule(context, "source", program, output_log, &error));
+    if (error != 0)
+      return error;
+  }
+  if (modules.size() == 0 || modules.back() == nullptr)
+    return -1;
+
+  std::unique_ptr<llvm::Module> module(modules.back().release());
+  modules.pop_back();
+  llvm::Linker L(*module);
+  for (auto &mod : modules) {
+    L.linkInModule(std::move(mod), 0);
+  }
+
+  return CompileModule("source", module, output_buffer, output_log);
+}
+
+int CompileProgram(const llvm::StringRef &input_filename,
+                   const std::string &program,
+                   std::vector<uint32_t> *output_buffer,
+                   std::string *output_log) {
+  int error;
+  llvm::LLVMContext context;
+  std::unique_ptr<llvm::Module> module =
+      ProgramToModule(context, input_filename, program, output_log, &error);
+  if (module == nullptr) {
+    return error;
+  }
+
+  return CompileModule(input_filename, module, output_buffer, output_log);
+}
+
+} // namespace
+
+namespace clspv {
 
 int Compile(const int argc, const char *const argv[]) {
   if (auto error = ParseOptions(argc, argv))
     return error;
 
-  // if no input file was provided, use a default
-  llvm::StringRef overiddenInputFilename = InputFilename.getValue();
-
-  // If we are reading our input file from stdin.
-  if ("-" == InputFilename) {
-    // We need to overwrite the file name we use.
-    switch (InputLanguage) {
-    case clang::Language::OpenCL:
-      overiddenInputFilename = "stdin.cl";
-      break;
-    case clang::Language::LLVM_IR:
-      overiddenInputFilename = "stdin.ll";
-      break;
-    default:
-      // Default to fix compiler warnings/errors. Option parsing will reject a
-      // bad enum value for the option so there is no need for a message.
-      return -1;
-    }
-  }
-
   if (OutputFilename.empty()) {
-    if (OutputFormat == "c") {
+    if (IROutputFile.empty() && IRBinaryOutput) {
+      OutputFilename = "a.bc";
+    } else if (OutputFormat == "c") {
       OutputFilename = "a.spvinc";
     } else {
       OutputFilename = "a.spv";
     }
   }
 
-  return Compile(overiddenInputFilename, "", nullptr, nullptr);
+  if (InputsFilename.size() == 0 ||
+      (InputsFilename.size() == 1 && InputsFilename[0] == "-")) {
+    llvm::StringRef inputFilename;
+    switch (InputLanguage) {
+    case clang::Language::OpenCL:
+      inputFilename = "stdin.cl";
+      break;
+    case clang::Language::LLVM_IR:
+      inputFilename = "stdin.ll";
+      break;
+    default:
+      // Default to fix compiler warnings/errors. Option parsing will reject a
+      // bad enum value for the option so there is no need for a message.
+      return -1;
+    }
+    std::string program((std::istreambuf_iterator<char>(std::cin)),
+                        std::istreambuf_iterator<char>());
+    return CompileProgram(inputFilename, program, nullptr, nullptr);
+  } else if (InputsFilename.size() == 1) {
+    llvm::StringRef inputFilename = InputsFilename[0];
+    std::ifstream stream(inputFilename.str());
+    std::string program((std::istreambuf_iterator<char>(stream)),
+                        std::istreambuf_iterator<char>());
+    return CompileProgram(inputFilename, program, nullptr, nullptr);
+  } else {
+    std::vector<std::string> programs;
+    for (auto InputFilename : InputsFilename) {
+      std::ifstream stream(InputFilename);
+      std::string program((std::istreambuf_iterator<char>(stream)),
+                          std::istreambuf_iterator<char>());
+      programs.push_back(std::move(program));
+    }
+
+    return CompilePrograms(programs, nullptr, nullptr);
+  }
+}
+
+int CompileFromSourcesString(const std::vector<std::string> &programs,
+                             const std::string &options,
+                             std::vector<uint32_t> *output_buffer,
+                             std::string *output_log) {
+  llvm::SmallVector<const char *, 20> argv;
+  llvm::BumpPtrAllocator A;
+  llvm::StringSaver Saver(A);
+  argv.push_back(Saver.save("clspv").data());
+  llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
+  int argc = static_cast<int>(argv.size());
+
+  if (auto error = ParseOptions(argc, &argv[0]))
+    return error;
+
+  return CompilePrograms(programs, output_buffer, output_log);
 }
 
 int CompileFromSourceString(const std::string &program,
@@ -930,6 +1012,6 @@ int CompileFromSourceString(const std::string &program,
   if (auto error = ParseOptions(argc, &argv[0]))
     return error;
 
-  return Compile("source", program, output_binary, output_log);
+  return CompileProgram("source", program, output_binary, output_log);
 }
 } // namespace clspv

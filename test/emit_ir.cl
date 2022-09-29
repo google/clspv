@@ -1,6 +1,14 @@
 // RUN: clspv %s --emit-ir=%t.ll
 // RUN: FileCheck %s < %t.ll
 
+// RUN: clspv %s --emit-ir=%t.bc --emit-binary-ir
+// RUN: llvm-dis %t.bc -o %t.bc.ll
+// RUN: FileCheck %s < %t.bc.ll
+
+// RUN: clspv %s --emit-binary-ir -o %t.2.bc
+// RUN: llvm-dis %t.2.bc -o %t.2.bc.ll
+// RUN: FileCheck %s < %t.2.bc.ll
+
 void kernel foo(global double *out, int in)
 {
   *out = in / 2.304;
