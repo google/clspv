@@ -969,6 +969,7 @@ int Compile(const int argc, const char *const argv[]) {
     return CompileProgram(inputFilename, program, nullptr, nullptr);
   } else {
     std::vector<std::string> programs;
+    programs.reserve(InputsFilename.size());
     for (auto InputFilename : InputsFilename) {
       std::ifstream stream(InputFilename);
       std::string program((std::istreambuf_iterator<char>(stream)),
