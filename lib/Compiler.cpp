@@ -897,8 +897,7 @@ int CompilePrograms(const std::vector<std::string> &programs,
     if (error != 0)
       return error;
   }
-  if (modules.size() == 0 || modules.back() == nullptr)
-    return -1;
+  assert(modules.size() > 0 && modules.back() != nullptr);
 
   std::unique_ptr<llvm::Module> module(modules.back().release());
   modules.pop_back();
