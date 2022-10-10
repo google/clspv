@@ -887,6 +887,7 @@ int CompilePrograms(const std::vector<std::string> &programs,
                     std::vector<uint32_t> *output_buffer,
                     std::string *output_log) {
   std::vector<std::unique_ptr<llvm::Module>> modules;
+  modules.reserve(programs.size());
 
   llvm::LLVMContext context;
   for (auto program : programs) {
