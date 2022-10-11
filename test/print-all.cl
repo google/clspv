@@ -1,5 +1,3 @@
-// TODO: figure out how to setup the pass printing properly again
-// XFAIL: *
 // RUN: clspv %s -cluster-pod-kernel-args -o %t-before.spv -print-before-all 2> %t-before.txt
 // RUN: FileCheck -check-prefix=BEFORE %s < %t-before.txt
 // RUN: clspv %s -cluster-pod-kernel-args -o %t-after.spv -print-after-all 2> %t-after.txt
@@ -13,6 +11,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a, u
   }
 }
 
-// BEFORE: *** IR Dump Before Cluster POD Kernel Arguments Pass
+// Ideally the pass name would be the registered 'cluster-pod-kernel-args-pass'
+// name rather than the class name, but it's informative enough
 
-// AFTER: *** IR Dump After Cluster POD Kernel Arguments Pass
+// BEFORE: *** IR Dump Before clspv::ClusterPodKernelArgumentsPass
+
+// AFTER: *** IR Dump After clspv::ClusterPodKernelArgumentsPass

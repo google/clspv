@@ -26,6 +26,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Linker/Linker.h"
@@ -407,7 +408,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   llvm::CGSCCAnalysisManager cgam;
   llvm::ModuleAnalysisManager mam;
   llvm::PassInstrumentationCallbacks PIC;
+  llvm::StandardInstrumentations si(false /*DebugLogging*/);
   clspv::RegisterClspvPasses(&PIC);
+  si.registerCallbacks(PIC, &fam);
   llvm::PassBuilder pb(nullptr, llvm::PipelineTuningOptions(), llvm::None,
                        &PIC);
   pb.registerModuleAnalyses(mam);
