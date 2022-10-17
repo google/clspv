@@ -94,10 +94,6 @@ SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
 Function *createFunctionWithMappedTypes(Function &F,
                                         FunctionType *EquivalentFunctionTy,
                                         const DataLayout *DL) {
-  if (F.isVarArg()) {
-    llvm_unreachable("varargs not supported");
-  }
-
   auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
   Wrapper->takeName(&F);
   Wrapper->setCallingConv(F.getCallingConv());
@@ -139,7 +135,7 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
   PreservedAnalyses PA;
   DL = &M.getDataLayout();
 
-  Function *OldKernelFn = nullptr;
+  SmallVector<Function *, 16> OldKernels;
   for (auto &F : M.functions()) {
     bool needRewriting = false;
     bool isOpaqueFn = false;
@@ -169,15 +165,15 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
         runOnOpaqueFunction(F);
       } else {
         if (runOnFunction(F)) {
-          OldKernelFn = &F;
+          OldKernels.push_back(&F);
         }
       }
     }
   }
 
-  // Delete the old kernel if we have rewritten it.
-  if (OldKernelFn) {
-    OldKernelFn->eraseFromParent();
+  // Delete the old kernels if we have rewritten them.
+  for (auto OldKernel : OldKernels) {
+    OldKernel->eraseFromParent();
   }
 
   return PA;
@@ -235,7 +231,7 @@ Type *clspv::RewritePackedStructs::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *FunctionTy = dyn_cast<FunctionType>(Ty)) {
-    if (FunctionTy.isVarArg()) {
+    if (FunctionTy->isVarArg()) {
       llvm_unreachable("varargs not supported");
     }
 
@@ -328,9 +324,9 @@ bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
         // Extract the processed value from allocated local pointer, map them to
         // i8 type vector and add these values to the input buffer.
         auto EndInsertionPt = &*F.getEntryBlock().getTerminator();
-        IRBuilder<> B2(EndInsertionPt);
+        B.SetInsertPoint(EndInsertionPt);
 
-        auto LocalStruct = B2.CreateLoad(StructTy, LocalStructPtr);
+        auto LocalStruct = B.CreateLoad(StructTy, LocalStructPtr);
 
         unsigned StructArrayIdx = 0;
         for (unsigned LocalStructIdx = 0;
@@ -338,12 +334,12 @@ bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
              LocalStructIdx++) {
           // Extract the processed value from allocated local pointer.
           auto LocalStructValue =
-              B2.CreateExtractValue(LocalStruct, {LocalStructIdx});
+              B.CreateExtractValue(LocalStruct, {LocalStructIdx});
           unsigned LocalStructTypeSize =
               DL->getTypeAllocSize(StructTy->getContainedType(LocalStructIdx));
 
           // Map values to i8 type vector.
-          auto bitcastedValue = B2.CreateBitCast(
+          auto bitcastedValue = B.CreateBitCast(
               LocalStructValue,
               FixedVectorType::get(
                   Type::getInt8Ty(EquivalentStructTy->getContext()),
@@ -351,11 +347,11 @@ bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
 
           // Add these values to the input buffer.
           for (unsigned VecIdx = 0; VecIdx < LocalStructTypeSize; VecIdx++) {
-            auto VecValue = B2.CreateExtractElement(bitcastedValue, VecIdx);
-            auto InputBufferPtr = B2.CreateGEP(
+            auto VecValue = B.CreateExtractElement(bitcastedValue, VecIdx);
+            auto InputBufferPtr = B.CreateGEP(
                 EquivalentStructTy, &Arg,
                 {B.getInt32(0), B.getInt32(0), B.getInt32(StructArrayIdx)});
-            B2.CreateStore(VecValue, InputBufferPtr);
+            B.CreateStore(VecValue, InputBufferPtr);
             StructArrayIdx++;
           }
         }
