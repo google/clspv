@@ -323,6 +323,8 @@ struct SPIRVProducerPassImpl {
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
         TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
+    if (clspv::Option::PhysicalStorageBuffers())
+      addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
     Ptr = this;
   }
 
@@ -334,6 +336,8 @@ struct SPIRVProducerPassImpl {
         HasVariablePointers(false), HasNonUniformPointers(false),
         SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0), TestOutput(true) {
+    if (clspv::Option::PhysicalStorageBuffers())
+      addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -467,6 +471,7 @@ struct SPIRVProducerPassImpl {
   void HandleDeferredInstruction();
   void HandleDeferredDecorations();
   bool is4xi8vec(Type *Ty) const;
+  spv::StorageClass GetStorageBufferClass() const;
   spv::StorageClass GetStorageClass(unsigned AddrSpace) const;
   spv::StorageClass GetStorageClassForArgKind(clspv::ArgKind arg_kind) const;
   spv::BuiltIn GetBuiltin(StringRef globalVarName) const;
@@ -1393,6 +1398,12 @@ void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
   }
 }
 
+spv::StorageClass SPIRVProducerPassImpl::GetStorageBufferClass() const {
+  return clspv::Option::PhysicalStorageBuffers()
+             ? spv::StorageClassPhysicalStorageBuffer
+             : spv::StorageClassStorageBuffer;
+}
+
 spv::StorageClass
 SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
   switch (AddrSpace) {
@@ -1401,7 +1412,7 @@ SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
   case AddressSpace::Private:
     return spv::StorageClassFunction;
   case AddressSpace::Global:
-    return spv::StorageClassStorageBuffer;
+    return GetStorageBufferClass();
   case AddressSpace::Constant:
     return clspv::Option::ConstantArgsInUniformBuffer()
                ? spv::StorageClassUniform
@@ -1513,7 +1524,7 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
       auto *ptr_ty = cast<PointerType>(type);
       unsigned AddrSpace = ptr_ty->getAddressSpace();
       if (AddressSpace::Constant == AddrSpace) {
-        if (!clspv::Option::ConstantArgsInUniformBuffer()) {
+        if (!clspv::Option::ConstantArgsInUniformBuffer() && !clspv::Option::PhysicalStorageBuffers()) {
           AddrSpace = AddressSpace::Global;
           // The canonical type of __constant is __global unless constants are
           // passed in uniform buffers.
@@ -2992,6 +3003,18 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
       }
 
+      // PhysicalStorageBuffer args require a Restrict or Aliased decoration
+      if (auto *PtrTy = dyn_cast<PointerType>(Arg.getType())) {
+        if (clspv::Option::PhysicalStorageBuffers() &&
+            PtrTy->getAddressSpace() == clspv::AddressSpace::Global) {
+          Ops.clear();
+          Ops << param_id
+              << (Arg.hasNoAliasAttr() ? spv::DecorationRestrict
+                                       : spv::DecorationAliased);
+          addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+        }
+      }
+
       ArgIdx++;
     }
   }
@@ -3032,6 +3055,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
       addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_variable_pointers");
     }
   }
+  if (clspv::Option::PhysicalStorageBuffers()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension,
+                              "SPV_KHR_physical_storage_buffer");
+  }
 
   // Descriptor indexing extension was made core in SPIR-V 1.5.
   if (hasNonUniformPointers() &&
@@ -3047,7 +3074,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
   // Ops[0] = Addressing Model
   // Ops[1] = Memory Model
   Ops.clear();
-  Ops << spv::AddressingModelLogical << spv::MemoryModelGLSL450;
+  Ops << (clspv::Option::PhysicalStorageBuffers()
+              ? spv::AddressingModelPhysicalStorageBuffer64
+              : spv::AddressingModelLogical)
+      << spv::MemoryModelGLSL450;
 
   addSPIRVInst<kMemoryModel>(spv::OpMemoryModel, Ops);
 
@@ -3328,7 +3358,10 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVCastOpcode(Instruction &I) {
       {Instruction::SIToFP, spv::OpConvertSToF},
       {Instruction::FPTrunc, spv::OpFConvert},
       {Instruction::FPExt, spv::OpFConvert},
-      {Instruction::BitCast, spv::OpBitcast}};
+      {Instruction::BitCast, spv::OpBitcast},
+      {Instruction::PtrToInt, spv::OpConvertPtrToU},
+      {Instruction::IntToPtr, spv::OpConvertUToPtr},
+      };
 
   assert(0 != Map.count(I.getOpcode()));
 
@@ -4796,6 +4829,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       setVariablePointersCapabilities(address_space);
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
+      case spv::StorageClassPhysicalStorageBuffer:
         // Save the type to generate an ArrayStride decoration later, but
         // assume opaque pointers may be present so also cache the SPIRVID for
         // the type and the stride value.
@@ -5272,6 +5306,12 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     SPIRVOperandVec Ops;
     Ops << result_type_id << ptr;
 
+    // Align MemoryOperand is required for PhysicalStorageBuffer
+    if (clspv::Option::PhysicalStorageBuffers()) {
+      Ops << spv::MemoryAccessAlignedMask;
+      Ops << static_cast<uint32_t>(LD->getAlign().value());
+    }
+
     RID = addSPIRVInst(spv::OpLoad, Ops);
 
     auto no_layout_id = getSPIRVType(LD->getType());
@@ -5323,6 +5363,13 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     } else {
       Ops << ST->getValueOperand();
     }
+
+    // Align MemoryOperand is required for PhysicalStorageBuffer
+    if (clspv::Option::PhysicalStorageBuffers()) {
+      Ops << spv::MemoryAccessAlignedMask;
+      Ops << static_cast<uint32_t>(ST->getAlign().value());
+    }
+
     RID = addSPIRVInst(spv::OpStore, Ops);
     break;
   }
@@ -6884,6 +6931,12 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   case clspv::ArgKind::PodPushConstant:
     ext_inst = reflection::ExtInstArgumentPodPushConstant;
     break;
+  case clspv::ArgKind::PointerPushConstant:
+    ext_inst = reflection::ExtInstArgumentPointerPushConstant;
+    break;
+  case clspv::ArgKind::PointerUBO:
+    ext_inst = reflection::ExtInstArgumentPointerUniform;
+    break;
   case clspv::ArgKind::SampledImage:
     ext_inst = reflection::ExtInstArgumentSampledImage;
     break;
@@ -6905,6 +6958,7 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   case clspv::ArgKind::BufferUBO:
   case clspv::ArgKind::Pod:
   case clspv::ArgKind::PodUBO:
+  case clspv::ArgKind::PointerUBO:
   case clspv::ArgKind::SampledImage:
   case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
@@ -6923,6 +6977,8 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   case clspv::ArgKind::Pod:
   case clspv::ArgKind::PodUBO:
   case clspv::ArgKind::PodPushConstant:
+  case clspv::ArgKind::PointerPushConstant:
+  case clspv::ArgKind::PointerUBO:
     Ops << getSPIRVInt32Constant(offset) << getSPIRVInt32Constant(size);
     break;
   default:

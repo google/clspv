@@ -25,6 +25,7 @@
 #include "BitcastUtils.h"
 #include "Types.h"
 
+#include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 #include <cmath>
@@ -33,6 +34,16 @@ using namespace llvm;
 using namespace BitcastUtils;
 
 #define DEBUG_TYPE "replacepointerbitcast"
+
+namespace {
+
+// TODO: It should be safe to leave these bitcasts as-is, but replacing them
+// anyway helps work around Vulkan driver bugs
+cl::opt<bool> ReplacePhysicalPointerBitcasts(
+    "replace-physical-pointer-bitcasts", cl::init(true), cl::Hidden,
+    cl::desc("Try to remove pointer bitcasts in physical address spaces"));
+
+} // namespace
 
 using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
 
@@ -125,7 +136,7 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
     // Select the appropriate subvector
     Value *Val0 = Builder.CreateShuffleVector(Val, {0, 1});
     Value *Val1 = Builder.CreateShuffleVector(Val, {2, 3});
-    Value *Cmp = Builder.CreateICmpEQ(ValIdx, Builder.getInt32(0));
+    Value *Cmp = Builder.CreateICmpEQ(ValIdx, GetIndexTyConst(Builder, 0));
     Val = Builder.CreateSelect(Cmp, Val0, Val1);
   }
   return Val;
@@ -540,6 +551,17 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
           dest_ty = st->getValueOperand()->getType();
         }
 
+        // Skip pointer transforms when physical addressing will be used
+        if (source && !ReplacePhysicalPointerBitcasts &&
+            clspv::Option::PhysicalStorageBuffers()) {
+          if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
+            if (source_ptr_ty->getAddressSpace() ==
+                clspv::AddressSpace::Global) {
+              continue;
+            }
+          }
+        }
+
         if (source_ty && dest_ty && source_ty != dest_ty) {
           int Steps = 0;
           if (!isa<GetElementPtrInst>(I) &&
@@ -608,12 +630,17 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         // Find pointer bitcast instruction.
         if (isa<BitCastInst>(&I) && isa<PointerType>(I.getType())) {
           Value *Src = I.getOperand(0);
-          if (isa<PointerType>(Src->getType())) {
+          if (auto* SrcPtrTy = dyn_cast<PointerType>(Src->getType())) {
             // Check if this bitcast is one that can be handled during this run
             // of the pass. If not, just skip it and don't make changes to the
             // module. These checks are coarse level checks that only the right
             // instructions appear. Rejected bitcasts might be able to be
             // handled later in the flow after further optimization.
+            if (!ReplacePhysicalPointerBitcasts &&
+                clspv::Option::PhysicalStorageBuffers() &&
+                SrcPtrTy->getAddressSpace() == clspv::AddressSpace::Global) {
+              continue;
+            }
             UserWorkList.clear();
             for (auto User : I.users()) {
               UserWorkList.push_back(User);

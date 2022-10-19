@@ -96,8 +96,11 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
       arg_type = Arg.getParamByValType();
     }
 
-    if (isa<PointerType>(arg_type))
-      continue;
+    if (auto *ptr_ty = dyn_cast<PointerType>(arg_type)) {
+      if (!(clspv::Option::PhysicalStorageBuffers() &&
+            ptr_ty->getAddressSpace() == clspv::AddressSpace::Global))
+        continue;
+    }
 
     pod_types.push_back(arg_type);
 

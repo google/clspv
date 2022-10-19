@@ -495,6 +495,14 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
     pm.addPass(clspv::UndoByvalPass());
     pm.addPass(clspv::UndoSRetPass());
+
+    // Handle physical pointer arguments by converting them to POD integers,
+    // and update all uses to bitcast them to a pointer first. This allows these
+    // arguments to be handled in later passes as if they were regular PODs.
+    if (clspv::Option::PhysicalStorageBuffers()) {
+      pm.addPass(clspv::PhysicalPointerArgsPass());
+    }
+
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
@@ -770,6 +778,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
       enabled_feature_macros.count(clspv::FeatureMacro::__opencl_c_fp64)) {
     llvm::errs() << "error: Cannot enabled feature macro __opencl_c_fp64 while "
                     "-fp64 is disabled!\n";
+    return -1;
+  }
+
+  if (clspv::Option::PhysicalStorageBuffers() &&
+      target_arch != SPIRArch::SPIR64) {
+    llvm::errs() << "error: -physical-storage-buffers can only be used with "
+                    "the spir64 target\n";
     return -1;
   }
 

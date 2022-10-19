@@ -95,7 +95,6 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
   DenseMap<Value *, Type *> type_cache;
   for (Function *F : WorkList) {
     auto pod_arg_impl = clspv::GetPodArgsImpl(*F);
-    auto pod_arg_kind = clspv::GetArgKindForPodArgs(*F);
     // An ArgMapping describes how a kernel argument is remapped.
     struct ArgMapping {
       std::string name;
@@ -198,6 +197,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
         if (!isa<PointerType>(ArgTy)) {
+          auto pod_arg_kind = clspv::GetArgKind(Arg, ArgTy);
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           unsigned offset = StructLayout->getElementOffset(PodIndexMap[&Arg]);
           int remapped_index = new_index;
@@ -241,7 +241,9 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     for (auto &rinfo : RemapInfo) {
       bool argIsPod = rinfo.arg_kind == clspv::ArgKind::Pod ||
                       rinfo.arg_kind == clspv::ArgKind::PodUBO ||
-                      rinfo.arg_kind == clspv::ArgKind::PodPushConstant;
+                      rinfo.arg_kind == clspv::ArgKind::PodPushConstant ||
+                      rinfo.arg_kind == clspv::ArgKind::PointerUBO ||
+                      rinfo.arg_kind == clspv::ArgKind::PointerPushConstant;
       if (!argIsPod && Attributes.hasParamAttrs(rinfo.old_index)) {
         auto idx = rinfo.new_index + AttributeList::FirstArgIndex;
         auto attrs = Attributes.getParamAttrs(rinfo.old_index);

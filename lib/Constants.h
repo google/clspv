@@ -136,6 +136,10 @@ inline AddressSpace::Type WorkgroupSizeAddressSpace() {
 
 inline unsigned int SPIRVMaxVectorSize() { return 4; }
 
+inline std::string PointerPodArgMetadataName() {
+  return "clspv.pointer_from_pod";
+}
+
 } // namespace clspv
 
 #endif

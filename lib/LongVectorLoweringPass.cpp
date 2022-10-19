@@ -929,6 +929,17 @@ Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
                                ScalarFactory);
     break;
   }
+  case Instruction::PtrToInt: {
+    IRBuilder<> B(&I);
+    V = B.CreatePtrToInt(EquivalentValue, EquivalentDestTy, I.getName());
+    break;
+  }
+  case Instruction::IntToPtr:
+  {
+    IRBuilder<> B(&I);
+    V = B.CreateIntToPtr(EquivalentValue, EquivalentDestTy, I.getName());
+    break;
+  }
 
   default:
     llvm_unreachable("Cast unsupported.");

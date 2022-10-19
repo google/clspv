@@ -390,6 +390,10 @@ static llvm::cl::opt<bool> decorate_non_uniform(
     llvm::cl::desc(
         "Decorate NonUniform Pointers with the NonUniform decoration."));
 
+static llvm::cl::opt<bool> physical_storage_buffers(
+    "physical-storage-buffers", llvm::cl::init(false),
+    llvm::cl::desc("Use physical storage buffers instead of storage buffers"));
+
 } // namespace
 
 namespace clspv {
@@ -501,6 +505,8 @@ bool DebugInfo() { return debug_info; }
 std::set<FeatureMacro> EnabledFeatureMacros() { return enabled_feature_macros; }
 
 bool DecorateNonUniform() { return decorate_non_uniform; }
+
+bool PhysicalStorageBuffers() { return physical_storage_buffers; }
 
 } // namespace Option
 } // namespace clspv
