@@ -1426,8 +1426,10 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   }
 
   if (auto *VectorTy = dyn_cast<VectorType>(Ty)) {
-    unsigned Arity = VectorTy->getElementCount().getKnownMinValue();
-    bool RequireLowering = (Arity >= 8);
+    unsigned VecWidth = VectorTy->getElementCount().getKnownMinValue();
+    // Larger vector types can be produced by optimizations like InstCombine,
+    // these will be handled in our UndoInstCombine pass.
+    bool RequireLowering = (VecWidth >= 8 && VecWidth <= 16);
 
     if (RequireLowering) {
       assert(!VectorTy->getElementCount().isScalable() &&
@@ -1439,7 +1441,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
       assert((ScalarTy->isFloatingPointTy() || ScalarTy->isIntegerTy()) &&
              "Unsupported scalar type");
 
-      return ArrayType::get(ScalarTy, Arity);
+      return ArrayType::get(ScalarTy, VecWidth);
     }
 
     return nullptr;
