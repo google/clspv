@@ -116,6 +116,10 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kAtomicFetchMinExplicit,
      Builtins::kAtomicFetchMax,
      Builtins::kAtomicFetchMaxExplicit,
+     Builtins::kAtomicFlagTestAndSet,
+     Builtins::kAtomicFlagTestAndSetExplicit,
+     Builtins::kAtomicFlagClear,
+     Builtins::kAtomicFlagClearExplicit,
      Builtins::kAtomicCompareExchangeWeak,
      Builtins::kAtomicCompareExchangeWeakExplicit,
      Builtins::kAtomicCompareExchangeStrong,
@@ -163,6 +167,26 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
 
 namespace {
 
+enum class AtomicMemoryOrder : uint32_t {
+  kMemoryOrderRelaxed = 0,
+  kMemoryOrderConsume = 1, // not supported
+  kMemoryOrderAcquire = 2,
+  kMemoryOrderRelease = 3,
+  kMemoryOrderAcqRel = 4,
+  kMemoryOrderSeqCst = 5
+};
+
+// https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/vkspec.html#shaders-execution-memory-ordering
+// The SPIR-V SubgroupMemory, CrossWorkgroupMemory, and AtomicCounterMemory
+// memory semantics are ignored.
+enum class AtomicMemoryScope : uint32_t {
+  kMemoryScopeWorkItem = 0,
+  kMemoryScopeWorkGroup = 1,
+  kMemoryScopeDevice = 2,
+  kMemoryScopeAllSVMDevices = 3, // not supported
+  kMemoryScopeSubGroup = 4       // not supported
+};
+
 uint32_t clz(uint32_t v) {
   uint32_t r;
   uint32_t shift;
@@ -196,21 +220,18 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
                             Instruction *InsertBefore,
                             spv::MemorySemanticsMask base_semantics,
                             bool include_storage = true) {
-  enum AtomicMemoryOrder : uint32_t {
-    kMemoryOrderRelaxed = 0,
-    kMemoryOrderAcquire = 2,
-    kMemoryOrderRelease = 3,
-    kMemoryOrderAcqRel = 4,
-    kMemoryOrderSeqCst = 5
-  };
 
   IRBuilder<> builder(InsertBefore);
 
   // Constants for OpenCL C 2.0 memory_order.
-  const auto relaxed = builder.getInt32(AtomicMemoryOrder::kMemoryOrderRelaxed);
-  const auto acquire = builder.getInt32(AtomicMemoryOrder::kMemoryOrderAcquire);
-  const auto release = builder.getInt32(AtomicMemoryOrder::kMemoryOrderRelease);
-  const auto acq_rel = builder.getInt32(AtomicMemoryOrder::kMemoryOrderAcqRel);
+  const auto relaxed = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryOrder::kMemoryOrderRelaxed));
+  const auto acquire = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryOrder::kMemoryOrderAcquire));
+  const auto release = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryOrder::kMemoryOrderRelease));
+  const auto acq_rel = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryOrder::kMemoryOrderAcqRel));
 
   // Constants for SPIR-V ordering memory semantics.
   const auto RelaxedSemantics = builder.getInt32(spv::MemorySemanticsMaskNone);
@@ -266,30 +287,23 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
 }
 
 Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
-  enum AtomicMemoryScope : uint32_t {
-    kMemoryScopeWorkItem = 0,
-    kMemoryScopeWorkGroup = 1,
-    kMemoryScopeDevice = 2,
-    kMemoryScopeAllSVMDevices = 3, // not supported
-    kMemoryScopeSubGroup = 4
-  };
 
   IRBuilder<> builder(InsertBefore);
 
   // Constants for OpenCL C 2.0 memory_scope.
-  const auto work_item =
-      builder.getInt32(AtomicMemoryScope::kMemoryScopeWorkItem);
-  const auto work_group =
-      builder.getInt32(AtomicMemoryScope::kMemoryScopeWorkGroup);
-  const auto sub_group =
-      builder.getInt32(AtomicMemoryScope::kMemoryScopeSubGroup);
-  const auto device = builder.getInt32(AtomicMemoryScope::kMemoryScopeDevice);
+  const auto work_item = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryScope::kMemoryScopeWorkItem));
+  const auto work_group = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryScope::kMemoryScopeWorkGroup));
+  const auto sub_group = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryScope::kMemoryScopeSubGroup));
+  const auto device = builder.getInt32(
+      static_cast<uint32_t>(AtomicMemoryScope::kMemoryScopeDevice));
 
   // Constants for SPIR-V memory scopes.
   const auto InvocationScope = builder.getInt32(spv::ScopeInvocation);
   const auto WorkgroupScope = builder.getInt32(spv::ScopeWorkgroup);
   const auto DeviceScope = builder.getInt32(spv::ScopeDevice);
-  const auto SubgroupScope = builder.getInt32(spv::ScopeSubgroup);
 
   auto base_scope = is_global ? DeviceScope : WorkgroupScope;
   if (scope == nullptr)
@@ -302,7 +316,7 @@ Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
 
   scope = builder.CreateSelect(is_work_item, InvocationScope, base_scope);
   scope = builder.CreateSelect(is_work_group, WorkgroupScope, scope);
-  scope = builder.CreateSelect(is_sub_group, SubgroupScope, scope);
+  scope = builder.CreateSelect(is_sub_group, WorkgroupScope, scope);
   scope = builder.CreateSelect(is_device, DeviceScope, scope);
 
   return scope;
@@ -551,6 +565,14 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kAtomicCompareExchangeStrong:
   case Builtins::kAtomicCompareExchangeStrongExplicit:
     return replaceAtomicCompareExchange(F);
+
+  case Builtins::kAtomicFlagTestAndSet:
+  case Builtins::kAtomicFlagTestAndSetExplicit:
+    return replaceAtomicFlagTestAndSet(F);
+
+  case Builtins::kAtomicFlagClear:
+  case Builtins::kAtomicFlagClearExplicit:
+    return replaceAtomicFlagClear(F);
 
   // Legacy atomic functions.
   case Builtins::kAtomicInc:
@@ -1060,7 +1082,8 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   return Event;
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F, Type *ty) {
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F,
+                                                         Type *ty) {
   return replaceCallsWithValue(F, [&F, ty, this](CallInst *CI) {
     Module &M = *F.getParent();
 
@@ -1074,7 +1097,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopy(Function &F, Type *ty) 
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F, Type *ty) {
+bool ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupStridedCopy(Function &F,
+                                                                Type *ty) {
   return replaceCallsWithValue(F, [&F, ty, this](CallInst *CI) {
     Module &M = *F.getParent();
 
@@ -2296,9 +2320,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto IndexTy = clspv::PointersAre64Bit(M)
-                       ? Type::getInt64Ty(M.getContext())
-                       : IntTy;
+    auto IndexTy =
+        clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -2560,9 +2583,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     auto Arg1 = CI->getOperand(1);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto IndexTy = clspv::PointersAre64Bit(M)
-                       ? Type::getInt64Ty(M.getContext())
-                       : IntTy;
+    auto IndexTy =
+        clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
@@ -2577,9 +2599,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     }
 
     // Index into the correct address of the casted pointer.
-    auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0, ConstantInt::get(IndexTy, 1), "", CI);
+    auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0,
+                                         ConstantInt::get(IndexTy, 1), "", CI);
     auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2, "", CI);
-    auto Arg0x2p1 = BinaryOperator::Create(Instruction::Add, Arg0x2, ConstantInt::get(IndexTy, 1), "", CI);
+    auto Arg0x2p1 = BinaryOperator::Create(
+        Instruction::Add, Arg0x2, ConstantInt::get(IndexTy, 1), "", CI);
     auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2p1, "", CI);
 
     // Load from the int4* we casted to.
@@ -2737,7 +2761,8 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F, int vec_size, bool aligned) {
+bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F, int vec_size,
+                                                 bool aligned) {
   switch (vec_size) {
   case 0:
     return replaceVstoreHalf(F);
@@ -2865,7 +2890,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       Value *BaseI32Ptr = Arg2;
       if (Arg2->getType() != IntPointerTy) {
         BaseI32Ptr =
-          CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
+            CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
       }
       auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32,
                                               "base_i32_ptr", CI);
@@ -2980,9 +3005,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto IndexTy = clspv::PointersAre64Bit(M)
-                       ? Type::getInt64Ty(M.getContext())
-                       : IntTy;
+    auto IndexTy =
+        clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -3060,9 +3084,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto IndexTy = clspv::PointersAre64Bit(M)
-                       ? Type::getInt64Ty(M.getContext())
-                       : IntTy;
+    auto IndexTy =
+        clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
     auto Float2Ty = FixedVectorType::get(FloatTy, 2);
@@ -3275,9 +3298,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto IndexTy = clspv::PointersAre64Bit(M)
-                       ? Type::getInt64Ty(M.getContext())
-                       : IntTy;
+    auto IndexTy =
+        clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewPointerTy =
@@ -3365,8 +3387,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     new StoreInst(Combine1, Index1, CI);
 
     // Index into the correct address of the casted pointer.
-    auto Arg1Plus1 = BinaryOperator::Create(Instruction::Add, Arg1x2,
-                                            ConstantInt::get(IndexTy, 1), "", CI);
+    auto Arg1Plus1 = BinaryOperator::Create(
+        Instruction::Add, Arg1x2, ConstantInt::get(IndexTy, 1), "", CI);
     auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1Plus1, "", CI);
 
     // Store to the int4* we casted to.
@@ -3817,6 +3839,122 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     builder.SetInsertPoint(then_branch);
     builder.CreateStore(cmp_xchg, expected);
     return cmp;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
+  // convert
+  // %was_set        = OpAtomicFlagTestAndSet %bool %flag %scope %semantics
+  // to
+  // %previous_value = OpAtomicExchange       %r_ty %flag %scope %semantics 1
+  // %was_set        = OpIEqual %previous_value 1
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    auto flag_pointer = Call->getArgOperand(0);
+    const auto num_args = Call->arg_size();
+    auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
+    auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
+    if (scope_arg) {
+      // order_arg and scope_arg are always OpConstants
+      // see "Validation Rules for Shader Capabilities" in SPIR-V spec
+      auto scope_const = llvm::cast<ConstantInt>(scope_arg);
+
+      if (scope_const->equalsInt(static_cast<uint64_t>(
+              AtomicMemoryScope::kMemoryScopeAllSVMDevices))) {
+        llvm::errs() << "Error when replacing call to function: ";
+        Call->print(llvm::errs());
+        llvm::errs() << '\n';
+        llvm::report_fatal_error("memory_scope_all_devices/"
+                                 "memory_scope_all_svm_devices not supported!",
+                                 false);
+      }
+
+      if (scope_const->equalsInt(
+              static_cast<uint64_t>(AtomicMemoryScope::kMemoryScopeWorkItem))) {
+        llvm::errs() << "Error when replacing call to function: ";
+        Call->print(llvm::errs());
+        llvm::errs() << '\n';
+        llvm::report_fatal_error("memory_scope_work_item can only be used with "
+                                 "atomic_work_item_fence.",
+                                 false);
+      }
+    }
+
+    bool is_global = flag_pointer->getType()->getPointerAddressSpace() ==
+                     clspv::AddressSpace::Global;
+    auto semantics = MemoryOrderSemantics(
+        order_arg, is_global, Call, spv::MemorySemanticsAcquireReleaseMask);
+
+    auto scope = MemoryScope(scope_arg, is_global, Call);
+    IRBuilder<> builder(Call);
+    auto set_value = builder.getInt32(1);
+    auto previous_value = InsertSPIRVOp(
+        Call, spv::OpAtomicExchange, {Attribute::Convergent},
+        set_value->getType(), {flag_pointer, scope, semantics, set_value});
+    return builder.CreateICmpEQ(previous_value, set_value);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
+  // convert
+  //   OpAtomicFlagClear %flag %scope %semantics
+  // to
+  //   OpAtomicStore %flag %scope %semantics 0
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    auto flag_pointer = Call->getArgOperand(0);
+    const auto num_args = Call->arg_size();
+    auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
+    auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
+
+    if (scope_arg) {
+      // order_arg and scope_arg are always OpConstants
+      // see "Validation Rules for Shader Capabilities" in SPIR-V spec
+      auto scope_const = llvm::cast<ConstantInt>(scope_arg);
+      auto order_const = llvm::cast<ConstantInt>(order_arg);
+      if (scope_const->equalsInt(static_cast<uint64_t>(
+              AtomicMemoryScope::kMemoryScopeAllSVMDevices))) {
+        llvm::errs() << "Error when replacing call to function: ";
+        Call->print(llvm::errs());
+        llvm::errs() << '\n';
+        llvm::report_fatal_error("memory_scope_all_devices/"
+                                 "memory_scope_all_svm_devices not supported!",
+                                 false);
+      }
+      if (scope_const->equalsInt(
+              static_cast<uint64_t>(AtomicMemoryScope::kMemoryScopeWorkItem))) {
+        llvm::errs() << "Error when replacing call to function: ";
+        Call->print(llvm::errs());
+        llvm::errs() << '\n';
+        llvm::report_fatal_error("memory_scope_work_item can only be used with "
+                                 "atomic_work_item_fence.",
+                                 false);
+      }
+      if (order_const->equalsInt(
+              static_cast<uint64_t>(AtomicMemoryOrder::kMemoryOrderAcqRel)) ||
+          order_const->equalsInt(
+              static_cast<uint64_t>(AtomicMemoryOrder::kMemoryOrderAcquire))) {
+        llvm::errs() << "Error when replacing call to function: ";
+        Call->print(llvm::errs());
+        llvm::errs() << '\n';
+        llvm::report_fatal_error(
+            "The order argument shall not be memory_order_acquire nor "
+            "memory_order_acq_rel for atomic_flag_clear.",
+            false);
+      }
+    }
+
+    bool is_global = flag_pointer->getType()->getPointerAddressSpace() ==
+                     clspv::AddressSpace::Global;
+    auto semantics = MemoryOrderSemantics(
+        order_arg, is_global, Call,
+        spv::MemorySemanticsReleaseMask); // Must not be Acquire or
+                                          // AcquireRelease per spec
+    auto scope = MemoryScope(scope_arg, is_global, Call);
+
+    IRBuilder<> builder(Call);
+    auto clear_value = builder.getInt32(0);
+    return InsertSPIRVOp(Call, spv::OpAtomicStore, {Attribute::Convergent},
+                         builder.getVoidTy(),
+                         {flag_pointer, scope, semantics, clear_value});
   });
 }
 

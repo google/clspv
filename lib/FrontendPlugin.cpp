@@ -27,6 +27,7 @@
 #include "Constants.h"
 #include "FrontendPlugin.h"
 
+#include <algorithm>
 #include <unordered_set>
 
 using namespace clang;
@@ -67,6 +68,8 @@ private:
     CustomDiagnosticUnsupported16BitStorage,
     CustomDiagnosticUnsupported8BitStorage,
     CustomDiagnosticUnsupportedPipes,
+    CustomDiagnosticMemoryOrderSeqCst,
+    CustomDiagnosticMemoryScopeSubGroup,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -177,9 +180,10 @@ private:
 
     // Reject Pipe types with an error
     if (Ty->getTypeClass() == Type::Pipe) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes]);
-        return false;
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes]);
+      return false;
     }
 
     // First check if we have a pointer type.
@@ -252,7 +256,7 @@ private:
     }
 
     if (QT->isEnumeralType()) {
-        return true;
+      return true;
     }
 
     if (QT->isBuiltinType()) {
@@ -491,6 +495,37 @@ private:
     return true;
   }
 
+  bool isSupportedFunctionCall(CallExpr *C) {
+    constexpr std::array<StringRef, 2> atomic_funcs{
+        "atomic_flag_test_and_set",
+        "atomic_flag_clear",
+    };
+    const auto declName =
+        cast<FunctionDecl>(C->getCalleeDecl())->getDeclName().getAsString();
+    if (std::count(atomic_funcs.begin(), atomic_funcs.end(), declName)) {
+      Instance.getDiagnostics().Report(
+          C->getSourceRange().getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+    }
+    return true;
+  }
+
+  bool isSupportedDeclRef(DeclRefExpr *D) {
+    if (auto enumConstant = dyn_cast<EnumConstantDecl>(D->getDecl())) {
+      if (enumConstant->getName() == "memory_order_seq_cst") {
+        Instance.getDiagnostics().Report(
+            D->getSourceRange().getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+      }
+      if (enumConstant->getName() == "memory_scope_sub_group") {
+        Instance.getDiagnostics().Report(
+            D->getSourceRange().getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeSubGroup]);
+      }
+    }
+    return true;
+  }
+
   // This will be used to check the inside of function bodies.
   class DeclVisitor : public RecursiveASTVisitor<DeclVisitor> {
   private:
@@ -512,6 +547,13 @@ private:
     bool VisitValueDecl(TypeDecl *TD) {
       QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
       return consumer.IsSupportedType(DefinedType, TD->getSourceRange(), false);
+    }
+
+    bool VisitCallExpr(CallExpr *C) {
+      return consumer.isSupportedFunctionCall(C);
+    }
+    bool VisitDeclRefExpr(DeclRefExpr *D) {
+      return consumer.isSupportedDeclRef(D);
     }
   };
 
@@ -613,8 +655,15 @@ public:
                            "8-bit storage is not supported for "
                            "%select{SSBOs|UBOs|push constants}0");
     CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes] =
-        DE.getCustomDiagID(DiagnosticsEngine::Error,
-                           "pipes are not supported");
+        DE.getCustomDiagID(DiagnosticsEngine::Error, "pipes are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Warning,
+            "memory_order_seq_cst is treated as memory_order_acq_rel");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeSubGroup] =
+        DE.getCustomDiagID(DiagnosticsEngine::Warning,
+                           "memory_scope_sub_group is strengthened to "
+                           "memory_order_work_group");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {

@@ -89,6 +89,8 @@ private:
                               spv::MemorySemanticsMask semantics =
                                   spv::MemorySemanticsAcquireReleaseMask);
   bool replaceAtomicCompareExchange(llvm::Function &);
+  bool replaceAtomicFlagTestAndSet(llvm::Function &F);
+  bool replaceAtomicFlagClear(llvm::Function &F);
   bool replaceCross(llvm::Function &F);
   bool replaceFract(llvm::Function &F, int vec_size);
   bool replaceVload(llvm::Function &F);
@@ -121,8 +123,8 @@ private:
   bool replaceAsyncWorkGroupStridedCopy(llvm::Function &F, llvm::Type *ty);
 
   // Caches struct types for { |type|, |type| }. This prevents
-  // getOrInsertllvm::Function from introducing a bitcasts between structs with
-  // identical contents.
+  // getOrInsertllvm::Function from introducing a bitcasts between structs
+  // with identical contents.
   llvm::Type *GetPairStruct(llvm::Type *type);
 
   llvm::Value *InsertOpMulExtended(llvm::Instruction *InsertPoint,

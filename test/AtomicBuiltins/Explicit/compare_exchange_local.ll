@@ -64,7 +64,7 @@ declare spir_func zeroext i1 @_Z37atomic_compare_exchange_weak_explicitPU3AS4VU7
 ; CHECK: br label %[[fi]]
 ; CHECK: [[fi]]:
 ; CHECK: [[load_expected:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* %expected
-; CHECK: [[cmp_xchg:%[a-zA-Z0-9_.]+]] = call i32 @_Z8spirv.op.230.{{.*}}(i32 230, i32 addrspace(3)* %atomic, i32 3, i32 258, i32 256, i32 997, i32 [[load_expected]])
+; CHECK: [[cmp_xchg:%[a-zA-Z0-9_.]+]] = call i32 @_Z8spirv.op.230.{{.*}}(i32 230, i32 addrspace(3)* %atomic, i32 2, i32 258, i32 256, i32 997, i32 [[load_expected]])
 ; CHECK: [[cmp2:%[a-zA-Z0-9_.]+]] = icmp eq i32 [[cmp_xchg]], [[load_expected]]
 ; CHECK: [[not:%[a-zA-Z0-9_.]+]] = xor i1 [[cmp2]], true
 ; CHECK: br i1 [[not]], label %[[then:[a-zA-Z0-9_.]+]], label %[[fi:[a-zA-Z0-9_.]+]]
@@ -105,7 +105,7 @@ declare spir_func zeroext i1 @_Z37atomic_compare_exchange_weak_explicitPU3AS4VU7
 ; CHECK: br label %[[fi]]
 ; CHECK: [[fi]]:
 ; CHECK: [[load_expected:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(3)* %expected
-; CHECK: [[cmp_xchg:%[a-zA-Z0-9_.]+]] = call i32 @_Z8spirv.op.230.{{.*}}(i32 230, i32 addrspace(3)* %atomic, i32 3, i32 258, i32 256, i32 997, i32 [[load_expected]])
+; CHECK: [[cmp_xchg:%[a-zA-Z0-9_.]+]] = call i32 @_Z8spirv.op.230.{{.*}}(i32 230, i32 addrspace(3)* %atomic, i32 2, i32 258, i32 256, i32 997, i32 [[load_expected]])
 ; CHECK: [[cmp2:%[a-zA-Z0-9_.]+]] = icmp eq i32 [[cmp_xchg]], [[load_expected]]
 ; CHECK: [[not:%[a-zA-Z0-9_.]+]] = xor i1 [[cmp2]], true
 ; CHECK: br i1 [[not]], label %[[then:[a-zA-Z0-9_.]+]], label %[[fi:[a-zA-Z0-9_.]+]]
