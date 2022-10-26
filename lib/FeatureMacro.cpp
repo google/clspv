@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Support/raw_ostream.h"
+
 #include "clspv/FeatureMacro.h"
 #include <algorithm>
 
@@ -28,12 +30,18 @@ FeatureMacro FeatureMacroLookup(const std::string &name) {
       FeatureMacroList.begin(), FeatureMacroList.end(),
       [name](const auto &macro) { return std::get<1>(macro) == name; });
 
-  if (macro_ptr == FeatureMacroList.end() ||
-      std::find(NotSuppported.begin(), NotSuppported.end(),
-                std::get<0>(*macro_ptr)) != NotSuppported.end()) {
-    return FeatureMacro::error;
-  } else {
-    return std::get<0>(*macro_ptr);
+  if (macro_ptr != FeatureMacroList.end()) {
+    const auto feature = std::get<0>(*macro_ptr);
+    const auto supported = std::find(NotSuppported.begin(), NotSuppported.end(),
+                                     feature) == NotSuppported.end();
+
+    if (supported)
+      return feature;
+
+    llvm::errs() << name << " is not a supported feature macro.\n";
   }
+
+  return FeatureMacro::error;
 }
+
 } // namespace clspv

@@ -1,4 +1,4 @@
-// RUN: clspv  -fp64=0 -images=0 -cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_order_acq_rel,__opencl_c_images %s -verify
+// RUN: clspv -cl-std=CL3.0 -fp64=0 --enable-feature-macros=__opencl_c_atomic_order_acq_rel,__opencl_c_images %s -verify
 
 #ifdef __opencl_c_3d_image_writes
 #error __opencl_c_3d_image_writes should not be defined
