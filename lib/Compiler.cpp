@@ -134,12 +134,6 @@ static llvm::cl::opt<char>
                       llvm::cl::desc("Optimization level to use"),
                       llvm::cl::value_desc("level"));
 
-static llvm::cl::opt<std::string> OutputFormat(
-    "mfmt", llvm::cl::init(""),
-    llvm::cl::desc(
-        "Specify special output format. 'c' is as a C initializer list"),
-    llvm::cl::value_desc("format"));
-
 static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
                                   llvm::cl::desc("Verify diagnostic outputs"));
 
@@ -151,15 +145,21 @@ static llvm::cl::opt<bool>
     WarningsAsErrors("Werror", llvm::cl::init(false),
                      llvm::cl::desc("Turn warnings into errors"));
 
-static llvm::cl::opt<std::string> IROutputFile(
-    "emit-ir",
-    llvm::cl::desc(
-        "Emit LLVM IR to the given file after parsing and stop compilation."),
-    llvm::cl::value_desc("filename"));
+enum OutputFormat {
+  OutputFormatLLVMIR,
+  OutputFormatLLVMIRBinary,
+  OutputFormatSPIRV,
+  OutputFormatC,
+};
 
-static llvm::cl::opt<bool>
-    IRBinaryOutput("emit-binary-ir", llvm::cl::init(false),
-                   llvm::cl::desc("Emit binary LLVM IR to the output file."));
+static llvm::cl::opt<enum OutputFormat> OutputFormat(
+    "output-format", llvm::cl::desc("Select output format (ll|bc|spv|c)"),
+    llvm::cl::init(OutputFormatSPIRV),
+    llvm::cl::values(clEnumValN(OutputFormatSPIRV, "spv", "SPIRV"),
+                     clEnumValN(OutputFormatLLVMIR, "ll", "Readable LLVM IR"),
+                     clEnumValN(OutputFormatLLVMIRBinary, "bc",
+                                "Binary LLVM IR"),
+                     clEnumValN(OutputFormatC, "c", "C initializer list")));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
@@ -632,7 +632,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
 
-    pm.addPass(clspv::SPIRVProducerPass(binaryStream, OutputFormat == "c"));
+    pm.addPass(
+        clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
   });
 
   // Add the default optimizations for the requested optimization level.
@@ -737,15 +738,15 @@ int ParseOptions(const int argc, const char *const argv[]) {
   return 0;
 }
 
-int WriteOutput(const std::string &output_filename, const std::string &output,
+int WriteOutput(const std::string &output,
                 std::vector<uint32_t> *output_buffer) {
-  if (!output_filename.empty()) {
+  if (!OutputFilename.empty()) {
     std::error_code error;
-    llvm::raw_fd_ostream outStream(output_filename, error,
+    llvm::raw_fd_ostream outStream(OutputFilename, error,
                                    llvm::sys::fs::FA_Write);
 
     if (error) {
-      llvm::errs() << "Unable to open output file '" << output_filename
+      llvm::errs() << "Unable to open output file '" << OutputFilename
                    << "': " << error.message() << '\n';
       return -1;
     }
@@ -759,19 +760,23 @@ int WriteOutput(const std::string &output_filename, const std::string &output,
   return 0;
 }
 
-int GenerateIRFile(const std::string &output_filename,
-                   std::unique_ptr<llvm::Module> &module,
+int GenerateIRFile(std::unique_ptr<llvm::Module> &module,
                    std::vector<uint32_t> *output_binary) {
   std::string module_string;
   llvm::raw_string_ostream stream(module_string);
-  if (IRBinaryOutput) {
+  switch (OutputFormat) {
+  case OutputFormatLLVMIRBinary:
     llvm::WriteBitcodeToFile(*module, stream);
-  } else {
+    break;
+  case OutputFormatLLVMIR:
     stream << *module;
     stream.flush();
+    break;
+  default:
+    llvm_unreachable("unknown LLVM IR Format");
   }
 
-  return WriteOutput(output_filename, module_string, output_binary);
+  return WriteOutput(module_string, output_binary);
 }
 
 bool LinkBuiltinLibrary(llvm::Module *module) {
@@ -863,10 +868,9 @@ int CompileModule(const llvm::StringRef &input_filename,
 
   // If --emit-ir or --emit-binary-ir was requested, emit the initial LLVM IR
   // and stop compilation.
-  if (!IROutputFile.empty()) {
-    return GenerateIRFile(IROutputFile, module, output_buffer);
-  } else if (IRBinaryOutput) {
-    return GenerateIRFile(OutputFilename, module, output_buffer);
+  if (OutputFormat == OutputFormatLLVMIR ||
+      OutputFormat == OutputFormatLLVMIRBinary) {
+    return GenerateIRFile(module, output_buffer);
   }
 
   if (!LinkBuiltinLibrary(module.get())) {
@@ -880,7 +884,7 @@ int CompileModule(const llvm::StringRef &input_filename,
 
   // Wait until now to try writing the file so that we only write it on
   // successful compilation.
-  return WriteOutput(OutputFilename, binaryStream.str().str(), output_buffer);
+  return WriteOutput(binaryStream.str().str(), output_buffer);
 }
 
 int CompilePrograms(const std::vector<std::string> &programs,
@@ -933,12 +937,21 @@ int Compile(const int argc, const char *const argv[]) {
     return error;
 
   if (OutputFilename.empty()) {
-    if (IROutputFile.empty() && IRBinaryOutput) {
+    switch (OutputFormat) {
+    case OutputFormatLLVMIR:
+      OutputFilename = "a.ll";
+      break;
+    case OutputFormatLLVMIRBinary:
       OutputFilename = "a.bc";
-    } else if (OutputFormat == "c") {
+      break;
+    case OutputFormatC:
       OutputFilename = "a.spvinc";
-    } else {
+      break;
+    case OutputFormatSPIRV:
       OutputFilename = "a.spv";
+      break;
+    default:
+      llvm_unreachable("unknown output format");
     }
   }
 
@@ -971,9 +984,8 @@ int Compile(const int argc, const char *const argv[]) {
     programs.reserve(InputsFilename.size());
     for (auto InputFilename : InputsFilename) {
       std::ifstream stream(InputFilename);
-       programs.emplace_back(std::istreambuf_iterator<char>(stream),
-                             std::istreambuf_iterator<char>());
-
+      programs.emplace_back(std::istreambuf_iterator<char>(stream),
+                            std::istreambuf_iterator<char>());
     }
 
     return CompilePrograms(programs, nullptr, nullptr);
