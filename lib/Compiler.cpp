@@ -866,8 +866,7 @@ int CompileModule(const llvm::StringRef &input_filename,
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
 
-  // If --emit-ir or --emit-binary-ir was requested, emit the initial LLVM IR
-  // and stop compilation.
+  // If LLVM IR output format was requested, emit the file and stop compilation.
   if (OutputFormat == OutputFormatLLVMIR ||
       OutputFormat == OutputFormatLLVMIRBinary) {
     return GenerateIRFile(module, output_buffer);
