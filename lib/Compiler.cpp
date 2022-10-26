@@ -155,11 +155,16 @@ enum OutputFormat {
 static llvm::cl::opt<enum OutputFormat> OutputFormat(
     "output-format", llvm::cl::desc("Select output format (ll|bc|spv|c)"),
     llvm::cl::init(OutputFormatSPIRV),
-    llvm::cl::values(clEnumValN(OutputFormatSPIRV, "spv", "SPIRV"),
-                     clEnumValN(OutputFormatLLVMIR, "ll", "Readable LLVM IR"),
-                     clEnumValN(OutputFormatLLVMIRBinary, "bc",
-                                "Binary LLVM IR"),
-                     clEnumValN(OutputFormatC, "c", "C initializer list")));
+    llvm::cl::values(
+        clEnumValN(OutputFormatSPIRV, "spv", "Vulkan SPIR-V"),
+        clEnumValN(
+            OutputFormatLLVMIR, "ll",
+            "Readable LLVM IR (Stop compilation before clspv specific passes)"),
+        clEnumValN(
+            OutputFormatLLVMIRBinary, "bc",
+            "Binary LLVM IR (Stop compilation before clspv specific passes)"),
+        clEnumValN(OutputFormatC, "c",
+                   "C initializer list (of Vulkan SPIR-V)")));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
