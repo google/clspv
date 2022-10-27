@@ -15,6 +15,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/FeatureMacro.h"
+
 #include <algorithm>
 
 namespace clspv {

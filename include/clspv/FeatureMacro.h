@@ -17,6 +17,7 @@
 
 #include <array>
 #include <utility>
+#include <string>
 
 namespace clspv {
 
