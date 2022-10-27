@@ -26,12 +26,12 @@ FeatureMacro FeatureMacroLookup(const std::string &name) {
       FeatureMacro::__opencl_c_device_enqueue,
       FeatureMacro::__opencl_c_program_scope_global_variables};
 
-  const auto *macro_ptr = std::find_if(
+  const auto macro_itr = std::find_if(
       FeatureMacroList.begin(), FeatureMacroList.end(),
       [name](const auto &macro) { return std::get<1>(macro) == name; });
 
-  if (macro_ptr != FeatureMacroList.end()) {
-    const auto feature = std::get<0>(*macro_ptr);
+  if (macro_itr != FeatureMacroList.end()) {
+    const auto feature = std::get<0>(*macro_itr);
     const auto supported = std::find(NotSuppported.begin(), NotSuppported.end(),
                                      feature) == NotSuppported.end();
 
