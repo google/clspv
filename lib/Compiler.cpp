@@ -740,7 +740,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
 
   const auto enabled_feature_macros = clspv::Option::EnabledFeatureMacros();
-  if (not clspv::Option::FP64() &&
+  if (!clspv::Option::FP64() &&
       enabled_feature_macros.find(clspv::FeatureMacro::__opencl_c_fp64) !=
           enabled_feature_macros.end()) {
     llvm::errs() << "error: Cannot enabled feature macro __opencl_c_fp64 while "
@@ -748,7 +748,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
-  if (not clspv::Option::ImageSupport() &&
+  if (!clspv::Option::ImageSupport() &&
       enabled_feature_macros.find(clspv::FeatureMacro::__opencl_c_images) !=
           enabled_feature_macros.end()) {
     llvm::errs()
