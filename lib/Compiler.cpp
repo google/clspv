@@ -22,15 +22,15 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
@@ -38,8 +38,8 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/DCE.h"
 #include "llvm/Transforms/Scalar/InferAddressSpaces.h"
 #include "llvm/Transforms/Scalar/SROA.h"
@@ -199,21 +199,22 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
     Opts["cl_khr_fp64"] = false;
   }
 
-  // Disable CL3.0 feature macros for unsupported features
+  // Enable/Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
 
-    // The following features are never supported
-    Opts["__opencl_c_pipes"] = false;
-    Opts["__opencl_c_generic_address_space"] = false;
-    Opts["__opencl_c_device_enqueue"] = false;
-    Opts["__opencl_c_program_scope_global_variables"] = false;
+    const auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
 
-    if (!clspv::Option::ImageSupport()) {
-      Opts["__opencl_c_images"] = false;
+    for (auto [feature, str] : clspv::FeatureMacroList) {
+      Opts[str] =
+          std::find(EnabledFeatureMacros.cbegin(), EnabledFeatureMacros.cend(),
+                    feature) != EnabledFeatureMacros.cend();
     }
-
-    if (!clspv::Option::FP64()) {
-      Opts["__opencl_c_fp64"] = false;
+    // overwrite feature macro list for certain options
+    if (clspv::Option::FP64()) {
+      Opts["__opencl_c_fp64"] = true;
+    }
+    if (clspv::Option::ImageSupport()) {
+      Opts["__opencl_c_images"] = true;
     }
   }
 
@@ -737,6 +738,22 @@ int ParseOptions(const int argc, const char *const argv[]) {
       clspv::Option::Vec3ToVec4SupportClass::vec3ToVec4SupportError) {
     llvm::errs() << "error: -vec3-to-vec4 and -no-vec3-to-vec4 are exclusive "
                     "so they cannot be used together!\n";
+    return -1;
+  }
+
+  const auto enabled_feature_macros = clspv::Option::EnabledFeatureMacros();
+  if (!clspv::Option::FP64() &&
+      enabled_feature_macros.count(clspv::FeatureMacro::__opencl_c_fp64)) {
+    llvm::errs() << "error: Cannot enabled feature macro __opencl_c_fp64 while "
+                    "-fp64 is disabled!\n";
+    return -1;
+  }
+
+  if (!clspv::Option::ImageSupport() &&
+      enabled_feature_macros.count(clspv::FeatureMacro::__opencl_c_images)) {
+    llvm::errs()
+        << "error: Cannot enabled feature macro __opencl_c_images while "
+           "-images is disabled!\n";
     return -1;
   }
 

@@ -40,6 +40,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/FeatureMacro.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FixupBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FixupStructuredCFGPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FunctionInternalizerPass.cpp
@@ -162,6 +163,7 @@ if (ENABLE_CLSPV_INSTALL)
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/AddressSpace.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/ArgKind.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Compiler.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/FeatureMacro.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Option.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/Passes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/../include/clspv/PushConstant.h

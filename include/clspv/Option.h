@@ -15,6 +15,8 @@
 #ifndef CLSPV_INCLUDE_CLSPV_OPTION_H_
 #define CLSPV_INCLUDE_CLSPV_OPTION_H_
 
+#include "FeatureMacro.h"
+
 #include <cstdint>
 #include <set>
 
@@ -255,6 +257,8 @@ bool OpaquePointers();
 
 // Returns true if the debug information should be generated
 bool DebugInfo();
+
+std::set<FeatureMacro> EnabledFeatureMacros();
 
 } // namespace Option
 } // namespace clspv

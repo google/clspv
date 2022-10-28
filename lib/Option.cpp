@@ -25,18 +25,34 @@
 
 namespace {
 
+struct BuiltinOptionParserInfo {
+  using OptionEnum = clspv::Builtins::BuiltinType;
+  constexpr static OptionEnum ErrorValue = OptionEnum::kBuiltinNone;
+  constexpr static OptionEnum (*Lookup)(const std::string &) =
+      clspv::Builtins::LookupBuiltinType;
+};
+
+struct FeatureMacroOptionParserInfo {
+  using OptionEnum = clspv::FeatureMacro;
+  constexpr static OptionEnum ErrorValue = clspv::FeatureMacro::error;
+  constexpr static OptionEnum (*Lookup)(const std::string &) =
+      clspv::FeatureMacroLookup;
+};
+
 // Custom parser for parsing a comma separated list of builtin functions into a
 // std::set containing the equivalent list of BuiltinType enums. We use a
 // custom parser with a regular cl::opt instead of a cl::list because cl::list
 // requires you to list all possible choices (in this case all builtin
 // functions) and then includes all those choices in the helptext for the flag.
-struct BuiltinListParser
-    : public llvm::cl::parser<std::set<clspv::Builtins::BuiltinType>> {
-  BuiltinListParser(llvm::cl::Option &opt)
-      : llvm::cl::parser<std::set<clspv::Builtins::BuiltinType>>(opt){};
+template <typename OptionParserInfo>
+struct HiddenOptionListParser
+    : public llvm::cl::parser<std::set<typename OptionParserInfo::OptionEnum>> {
+  HiddenOptionListParser(llvm::cl::Option &opt)
+      : llvm::cl::parser<std::set<typename OptionParserInfo::OptionEnum>>(
+            opt){};
   bool parse(llvm::cl::Option &opt, llvm::StringRef,
              const llvm::StringRef &ArgValue,
-             std::set<clspv::Builtins::BuiltinType> &Val) {
+             std::set<typename OptionParserInfo::OptionEnum> &Val) {
     std::stringstream argValStream(ArgValue.str());
     while (argValStream.good()) {
       std::string substr;
@@ -45,13 +61,12 @@ struct BuiltinListParser
       if (substr.empty()) {
         break;
       }
-      auto builtinType = clspv::Builtins::LookupBuiltinType(substr);
-      if (builtinType == clspv::Builtins::kBuiltinNone) {
+      auto typeEnum = OptionParserInfo::Lookup(substr);
+      if (typeEnum == OptionParserInfo::ErrorValue) {
         // We got a function name that we don't recognize as a builtin.
-        return opt.error("'" + substr +
-                         "' wasn't recognized as a builtin function!");
+        return opt.error("'" + substr + "' wasn't recognized as an option!");
       }
-      Val.insert(builtinType);
+      Val.insert(typeEnum);
     }
 
     // Implementations of parse() are expected to return false on success.
@@ -236,6 +251,15 @@ llvm::cl::opt<clspv::Option::SPIRVVersion> spv_version(
         clEnumValN(clspv::Option::SPIRVVersion::SPIRV_1_6, "1.6",
                    "SPIR-V version 1.6 (Vulkan 1.3). Experimental")));
 
+static llvm::cl::opt<std::set<clspv::FeatureMacro>, false,
+                     HiddenOptionListParser<FeatureMacroOptionParserInfo>>
+    enabled_feature_macros(
+        "enable-feature-macros",
+        llvm::cl::desc(
+            "Comma separated list of feature macros to enable. Feature "
+            "macros not enabled are implicitly disabled. Only "
+            "available with CL3.0."));
+
 static llvm::cl::opt<bool> images("images", llvm::cl::init(true),
                                   llvm::cl::desc("Enable support for images"));
 
@@ -287,7 +311,7 @@ static llvm::cl::list<clspv::Option::StorageClass> no_8bit_storage(
                    "Disallow 8-bit types in push constant interfaces")));
 
 static llvm::cl::opt<std::set<clspv::Builtins::BuiltinType>, false,
-                     BuiltinListParser>
+                     HiddenOptionListParser<BuiltinOptionParserInfo>>
     use_native_builtins(
         "use-native-builtins",
         llvm::cl::desc(
@@ -461,6 +485,8 @@ Vec3ToVec4SupportClass Vec3ToVec4() {
 bool OpaquePointers() { return opaque_pointers; }
 
 bool DebugInfo() { return debug_info; }
+
+std::set<FeatureMacro> EnabledFeatureMacros() { return enabled_feature_macros; }
 
 } // namespace Option
 } // namespace clspv
