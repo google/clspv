@@ -31,6 +31,8 @@ enum class ArgKind : int {
   Sampler,
   PointerUBO,
   PointerPushConstant,
+  StorageTexelBuffer,
+  UniformTexelBuffer,
 };
 
 // Converts an ArgKind to its string name.

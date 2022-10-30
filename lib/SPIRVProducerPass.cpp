@@ -1266,6 +1266,8 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     case clspv::ArgKind::SampledImage:
     case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::Sampler:
+    case clspv::ArgKind::StorageTexelBuffer:
+    case clspv::ArgKind::UniformTexelBuffer:
       break;
     default:
       break;
@@ -1498,6 +1500,8 @@ spv::StorageClass SPIRVProducerPassImpl::GetStorageClassForArgKind(
   case clspv::ArgKind::SampledImage:
   case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
+  case clspv::ArgKind::StorageTexelBuffer:
+  case clspv::ArgKind::UniformTexelBuffer:
     return spv::StorageClassUniformConstant;
   default:
     llvm_unreachable("Unsupported storage class for argument kind");
@@ -1930,7 +1934,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       RID = addSPIRVInst<kTypes>(spv::OpTypeImage, Ops);
 
       // Only need a sampled version of the type if it is used with a sampler.
-      if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) {
+      if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) { // TODO why is DimBuffer excluded?
           Ops.clear();
           Ops << RID;
           getImageTypeMap()[Canonical] =
@@ -2516,6 +2520,8 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     case clspv::ArgKind::Sampler:
     case clspv::ArgKind::SampledImage:
     case clspv::ArgKind::StorageImage:
+    case clspv::ArgKind::StorageTexelBuffer:
+    case clspv::ArgKind::UniformTexelBuffer:
       type = info->data_type->getPointerTo(AddressSpace::UniformConstant);
       break;
     default:
@@ -2547,6 +2553,8 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
           case clspv::ArgKind::Sampler:
           case clspv::ArgKind::SampledImage:
           case clspv::ArgKind::StorageImage:
+          case clspv::ArgKind::StorageTexelBuffer:
+          case clspv::ArgKind::UniformTexelBuffer:
             // The call maps to a load we generate later.
             ResourceVarDeferredLoadCalls[call] = info->var_id;
             break;
@@ -3745,7 +3753,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
         Ops << Call->getType() << RID;
         RID = addSPIRVInst(spv::OpBitcast, Ops);
       }
-    } else if (IsStorageImageType(image_ty)) {
+    } else if (IsStorageImageType(image_ty) || IsStorageTexelBufferImageType(image_ty)) {
       // read_image on a storage image is mapped to OpImageRead.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
@@ -7164,6 +7172,12 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   case clspv::ArgKind::Sampler:
     ext_inst = reflection::ExtInstArgumentSampler;
     break;
+  case clspv::ArgKind::StorageTexelBuffer:
+    ext_inst = reflection::ExtInstArgumentStorageTexelBuffer;
+    break;
+  case clspv::ArgKind::UniformTexelBuffer:
+    ext_inst = reflection::ExtInstArgumentUniformTexelBuffer;
+    break;
   default:
     llvm_unreachable("Unhandled argument reflection");
     break;
@@ -7180,6 +7194,8 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
   case clspv::ArgKind::SampledImage:
   case clspv::ArgKind::StorageImage:
   case clspv::ArgKind::Sampler:
+  case clspv::ArgKind::StorageTexelBuffer:
+  case clspv::ArgKind::UniformTexelBuffer:
     Ops << getSPIRVInt32Constant(descriptor_set)
         << getSPIRVInt32Constant(binding);
     break;

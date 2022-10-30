@@ -64,6 +64,8 @@ bool IsSampledImageType(llvm::Type *type);
 // for read_write and write_only images.
 bool IsStorageImageType(llvm::Type *type);
 
+bool IsStorageTexelBufferImageType(llvm::StructType *type);
+
 // Returns true if the given type is a float image type.
 // Before image specialization, all images are considered float images.
 bool IsFloatImageType(llvm::Type *type);
