@@ -976,6 +976,11 @@ int Compile(const int argc, const char *const argv[]) {
     }
   }
 
+  std::ios_base::openmode openMode = std::ios::in;
+  if (InputLanguage == clang::Language::LLVM_IR) {
+    openMode |= std::ios::binary;
+  }
+
   if (InputsFilename.size() == 0 ||
       (InputsFilename.size() == 1 && InputsFilename[0] == "-")) {
     llvm::StringRef inputFilename;
@@ -996,7 +1001,7 @@ int Compile(const int argc, const char *const argv[]) {
     return CompileProgram(inputFilename, program, nullptr, nullptr);
   } else if (InputsFilename.size() == 1) {
     llvm::StringRef inputFilename = InputsFilename[0];
-    std::ifstream stream(inputFilename.str());
+    std::ifstream stream(inputFilename.str(), openMode);
     std::string program((std::istreambuf_iterator<char>(stream)),
                         std::istreambuf_iterator<char>());
     return CompileProgram(inputFilename, program, nullptr, nullptr);
@@ -1004,7 +1009,7 @@ int Compile(const int argc, const char *const argv[]) {
     std::vector<std::string> programs;
     programs.reserve(InputsFilename.size());
     for (auto InputFilename : InputsFilename) {
-      std::ifstream stream(InputFilename);
+      std::ifstream stream(InputFilename, openMode);
       programs.emplace_back(std::istreambuf_iterator<char>(stream),
                             std::istreambuf_iterator<char>());
     }
