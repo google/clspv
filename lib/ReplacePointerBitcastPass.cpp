@@ -25,6 +25,8 @@
 #include "BitcastUtils.h"
 #include "Types.h"
 
+#include <cmath>
+
 using namespace llvm;
 using namespace BitcastUtils;
 
