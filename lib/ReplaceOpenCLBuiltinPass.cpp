@@ -2039,14 +2039,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
     // Avoid pointer casts. Instead generate the correct number of stores
     // and rely on drivers to coalesce appropriately.
     IRBuilder<> builder(CI);
-    if (clspv::PointersAre64Bit(*F.getParent())) {
-      auto M = F.getParent();
-      offset = builder.CreateTrunc(offset, IntegerType::get(M->getContext(), 32));
-    }
-    auto elems_const = builder.getInt32(elems);
+    auto elems_const = clspv::PointersAre64Bit(*F.getParent())
+                           ? builder.getInt64(elems)
+                           : builder.getInt32(elems);
     auto adjust = builder.CreateMul(offset, elems_const);
     for (size_t i = 0; i < elems; ++i) {
-      auto idx = builder.getInt32(i);
+      auto idx = clspv::PointersAre64Bit(*F.getParent()) ? builder.getInt64(i)
+                                                         : builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
       auto gep = builder.CreateGEP(vec_data_type->getScalarType(), ptr, add);
       auto extract = builder.CreateExtractElement(data, i);
@@ -2075,15 +2074,14 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     // Avoid pointer casts. Instead generate the correct number of loads
     // and rely on drivers to coalesce appropriately.
     IRBuilder<> builder(CI);
-    if (clspv::PointersAre64Bit(*F.getParent())) {
-      auto M = F.getParent();
-      offset = builder.CreateTrunc(offset, IntegerType::get(M->getContext(), 32));
-    }
-    auto elems_const = builder.getInt32(elems);
+    auto elems_const = clspv::PointersAre64Bit(*F.getParent())
+                           ? builder.getInt64(elems)
+                           : builder.getInt32(elems);
     V = UndefValue::get(ret_type);
     auto adjust = builder.CreateMul(offset, elems_const);
     for (unsigned i = 0; i < elems; ++i) {
-      auto idx = builder.getInt32(i);
+      auto idx = clspv::PointersAre64Bit(*F.getParent()) ? builder.getInt64(i)
+                                                         : builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
       auto gep = builder.CreateGEP(vec_ret_type->getScalarType(), ptr, add);
       auto load = builder.CreateLoad(vec_ret_type->getScalarType(), gep);
@@ -2770,6 +2768,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     auto Arg2 = CI->getOperand(2);
 
     auto IntTy = Type::getInt32Ty(M.getContext());
+    auto Int64Ty = Type::getInt64Ty(M.getContext());
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
@@ -2849,15 +2848,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       auto IntPointerTy =
           PointerType::get(IntTy, Arg2->getType()->getPointerAddressSpace());
 
-      auto One = ConstantInt::get(IntTy, 1);
-      auto Four = ConstantInt::get(IntTy, 4);
+      auto One =
+          ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 1);
+      auto Four =
+          ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 4);
       auto FFFF = ConstantInt::get(IntTy, 0xffff);
-
-      if (clspv::PointersAre64Bit(M)) {
-        Arg1 = CastInst::Create(Instruction::CastOps::Trunc, Arg1, IntTy,
-                                "offset_i32", CI);
-      }
-
       auto IndexIsOdd =
           BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
       // Compute index / 2
@@ -2872,7 +2867,12 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
       auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32,
                                               "base_i32_ptr", CI);
       auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
-      auto Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+      Value *Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+      // The shift is safe to truncate as it will definitely fit in a 32-bit int
+      if (Shift->getType() != IntTy) {
+        Shift = CastInst::Create(Instruction::CastOps::Trunc, Shift, IntTy,
+                                 "shift_trunc", CI);
+      }
       auto MaskBitsToWrite =
           BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
       auto MaskedCurrent = BinaryOperator::CreateAnd(

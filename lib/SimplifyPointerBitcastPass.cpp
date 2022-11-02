@@ -280,18 +280,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
 
     Value *SrcLastIdxOp = OtherGEP->getOperand(OtherGEP->getNumOperands() - 1);
     Value *GEPIdxOp = GEP->getOperand(1);
-
-    if (clspv::PointersAre64Bit(M) && OtherGEP->getType()->isStructTy()) {
-      if (GEPIdxOp->getType()->isIntegerTy(64)) {
-        GEPIdxOp =
-            Builder.CreateTrunc(GEPIdxOp, IntegerType::get(M.getContext(), 32));
-      }
-      if (SrcLastIdxOp->getType()->isIntegerTy(64)) {
-        SrcLastIdxOp = Builder.CreateTrunc(
-            SrcLastIdxOp, IntegerType::get(M.getContext(), 32));
-      }
-    }
-
     Value *MergedIdx = GEPIdxOp;
 
     // Add the indices together, if the last one from before is not zero.

@@ -133,7 +133,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     ArrayRef<StringRef> dependents) {
 
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(IT, IT, false);
+  IntegerType *SizeT =
+      clspv::PointersAre64Bit(M) ? IntegerType::get(M.getContext(), 64) : IT;
+  auto FType = FunctionType::get(SizeT, IT, false);
   Function *F = getFunctionIfNeeded(M, FuncName, dependents, FType);
 
   // If the builtin was not used in the module, don't create it!
@@ -166,10 +168,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
   Value *Select2 =
       inBoundsDimensionOrDefaultValue(Builder, Dim, Result, DefaultValue);
 
-  if (clspv::PointersAre64Bit(M)) {
-    Select2 = Builder.CreateZExt(Select2, IntegerType::get(M.getContext(), 64));
-  }
-
+  Select2 = Builder.CreateZExt(Select2, SizeT);
   Builder.CreateRet(Select2);
 
   return true;
@@ -241,7 +240,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(IT, IT, false);
+  IntegerType *SizeT =
+      clspv::PointersAre64Bit(M) ? IntegerType::get(M.getContext(), 64) : IT;
+  auto FType = FunctionType::get(SizeT, IT, false);
   Function *F = getFunctionIfNeeded(M, global_size_mangled_name,
                                     {global_linear_id_mangled_name}, FType);
 
