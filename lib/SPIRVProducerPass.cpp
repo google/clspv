@@ -318,8 +318,9 @@ struct SPIRVProducerPassImpl {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(false), SamplerPointerTy(nullptr),
-        SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
+        HasVariablePointers(false), HasNonUniformPointers(false),
+        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
         TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
@@ -330,9 +331,9 @@ struct SPIRVProducerPassImpl {
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(false), SamplerPointerTy(nullptr),
-        SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        TestOutput(true) {
+        HasVariablePointers(false), HasNonUniformPointers(false),
+        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        WorkgroupSizeValueID(0), WorkgroupSizeVarID(0), TestOutput(true) {
     addCapability(spv::CapabilityShader);
     Ptr = this;
   }
@@ -375,6 +376,13 @@ struct SPIRVProducerPassImpl {
     if (!HasVariablePointers) {
       addCapability(spv::CapabilityVariablePointers);
       HasVariablePointers = true;
+    }
+  }
+  bool hasNonUniformPointers() { return HasNonUniformPointers; }
+  void setNonUniformPointers() {
+    if (!HasNonUniformPointers) {
+      addCapability(spv::CapabilityShaderNonUniform);
+      HasNonUniformPointers = true;
     }
   }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
@@ -427,6 +435,8 @@ struct SPIRVProducerPassImpl {
   SPIRVID getSPIRVValue(Value *V);
 
   bool PointerRequiresLayout(unsigned aspace);
+
+  void DecoratePtrIfNonUniform(Value *ptr);
 
   SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
 
@@ -503,6 +513,8 @@ struct SPIRVProducerPassImpl {
   // Returns true if |inst| is phi or select that selects from the same
   // structure (or null).
   bool selectFromSameObject(Instruction *inst);
+
+  bool isPointerUniform(Value *ptr);
 
   // Returns true if |Arg| is called with a coherent resource.
   bool CalledWithCoherentResource(Argument &Arg);
@@ -647,6 +659,7 @@ private:
   std::vector<SPIRVID> BuiltinDimensionVec;
   bool HasVariablePointersStorageBuffer;
   bool HasVariablePointers;
+  bool HasNonUniformPointers;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
@@ -3019,6 +3032,12 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     }
   }
 
+  // Descriptor indexing extension was made core in SPIR-V 1.5.
+  if (hasNonUniformPointers() &&
+      clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_5) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_EXT_descriptor_indexing");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -3384,6 +3403,16 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
   }
 
   return RID;
+}
+
+void SPIRVProducerPassImpl::DecoratePtrIfNonUniform(Value *ptr) {
+  if (clspv::Option::DecorateNonUniform() && !isPointerUniform(ptr)) {
+    setNonUniformPointers();
+
+    SPIRVOperandVec Ops;
+    Ops << getSPIRVValue(ptr) << spv::DecorationNonUniform;
+    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+  }
 }
 
 SPIRVID
@@ -4384,6 +4413,10 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
   } else if (clspv::Option::DebugInfo()) {
     LastDILocInBB.erase(I.getParent());
     addSPIRVInst(spv::OpNoLine);
+  }
+
+  for (auto &op : I.operands()) {
+    DecoratePtrIfNonUniform(op);
   }
 
   switch (I.getOpcode()) {
@@ -6190,6 +6223,35 @@ bool SPIRVProducerPassImpl::selectFromSameObject(Instruction *inst) {
 
   // Conservatively return false.
   return false;
+}
+
+bool SPIRVProducerPassImpl::isPointerUniform(Value *ptr) {
+  if (!ptr->getType()->isPointerTy()) {
+    return true;
+  }
+  if (GetStorageClass(ptr->getType()->getPointerAddressSpace()) !=
+      spv::StorageClassStorageBuffer) {
+    return true;
+  }
+
+  static std::set<Value *> nonUniformPointer;
+  if (nonUniformPointer.count(ptr) > 0)
+    return false;
+
+  while (auto gep = dyn_cast<GetElementPtrInst>(ptr)) {
+    ptr = gep->getPointerOperand();
+  }
+
+  bool uniformPointer = true;
+  if (auto inst = dyn_cast<PHINode>(ptr)) {
+    uniformPointer = selectFromSameObject(inst);
+  } else if (auto inst = dyn_cast<SelectInst>(ptr)) {
+    uniformPointer = selectFromSameObject(inst);
+  }
+  if (!uniformPointer) {
+    nonUniformPointer.insert(ptr);
+  }
+  return uniformPointer;
 }
 
 bool SPIRVProducerPassImpl::CalledWithCoherentResource(Argument &Arg) {

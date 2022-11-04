@@ -265,6 +265,10 @@ bool DebugInfo();
 
 std::set<FeatureMacro> EnabledFeatureMacros();
 
+// Returns true if the NonUniform pointers need to be decorated with the
+// NonUniform decoration.
+bool DecorateNonUniform();
+
 } // namespace Option
 } // namespace clspv
 

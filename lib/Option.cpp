@@ -385,6 +385,11 @@ static llvm::cl::opt<bool>
     debug_info("g", llvm::cl::init(false),
                llvm::cl::desc("Produce debug information."));
 
+static llvm::cl::opt<bool> decorate_non_uniform(
+    "decorate-nonuniform", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Decorate NonUniform Pointers with the NonUniform decoration."));
+
 } // namespace
 
 namespace clspv {
@@ -494,6 +499,8 @@ bool OpaquePointers() { return opaque_pointers; }
 bool DebugInfo() { return debug_info; }
 
 std::set<FeatureMacro> EnabledFeatureMacros() { return enabled_feature_macros; }
+
+bool DecorateNonUniform() { return decorate_non_uniform; }
 
 } // namespace Option
 } // namespace clspv
