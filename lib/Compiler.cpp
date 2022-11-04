@@ -51,8 +51,8 @@
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 #include "clspv/Sampler.h"
-#include "clspv/clspv_builtin_library.h"
 #include "clspv/clspv64_builtin_library.h"
+#include "clspv/clspv_builtin_library.h"
 #include "clspv/opencl_builtins_header.h"
 
 #include "Builtins.h"
@@ -214,26 +214,41 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   if (!clspv::Option::FP64()) {
     Opts["cl_khr_fp64"] = false;
   }
-
   // Enable/Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
 
-    const auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
-
-    for (auto [feature, str] : clspv::FeatureMacroList) {
-      Opts[str] =
-          std::find(EnabledFeatureMacros.cbegin(), EnabledFeatureMacros.cend(),
-                    feature) != EnabledFeatureMacros.cend();
-    }
+    auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
     // overwrite feature macro list for certain options
     if (clspv::Option::FP64()) {
-      Opts["__opencl_c_fp64"] = true;
+      EnabledFeatureMacros.insert(clspv::FeatureMacro::__opencl_c_fp64);
     }
     if (clspv::Option::ImageSupport()) {
-      Opts["__opencl_c_images"] = true;
+      EnabledFeatureMacros.insert(clspv::FeatureMacro::__opencl_c_images);
+    }
+
+    // TODO remove when feature macros are added to OpenCLExtensions.def
+    // https://github.com/llvm/llvm-project/blob/main/clang/include/clang/Basic/OpenCLExtensions.def#L119
+    constexpr std::array<clspv::FeatureMacro, 3> specialDefines{
+        clspv::FeatureMacro::__opencl_c_atomic_scope_device,
+        clspv::FeatureMacro::__opencl_c_atomic_scope_all_devices,
+        clspv::FeatureMacro::__opencl_c_work_group_collective_functions};
+
+    const auto featureList = clspv::FeatureMacroList;
+    for (auto [feat, str] : featureList) {
+      const bool enabled =
+          std::find(EnabledFeatureMacros.cbegin(), EnabledFeatureMacros.cend(),
+                    feat) != EnabledFeatureMacros.cend();
+      Opts[str] = enabled;
+
+      if (std::count(specialDefines.cbegin(), specialDefines.cend(), feat) &&
+          enabled) {
+        instance.getPreprocessorOpts().addMacroDef(str);
+      }
+      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled){
+        instance.getPreprocessorOpts().addMacroUndef(str);
+      }
     }
   }
-
   return TargetInfo;
 }
 
@@ -379,6 +394,11 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
       new OpenCLBuiltinMemoryBuffer(opencl_base_builtins_header_data,
                                     opencl_base_builtins_header_size - 1));
 
+  // TODO this is a hack to get around optional feature macros always being
+  // defined in opencl-c-base.h
+  instance.getPreprocessorOpts().addMacroUndef("__SPIR__");
+  instance.getPreprocessorOpts().addMacroUndef("__SPIRV__");
+
   instance.getPreprocessorOpts().Includes.push_back("opencl-c-base.h");
 
   std::unique_ptr<llvm::MemoryBuffer> clspvBuiltinMemoryBuffer(
@@ -510,7 +530,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     }
 
     // We need to run mem2reg and inst combine early because our
-    // createInlineFuncWithPointerBitCastArgPass pass cannot handle the pattern
+    // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
+    // pattern
     //   %1 = alloca i32 1
     //        store <something> %1
     //   %2 = bitcast float* %1
@@ -549,8 +570,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // clspv needs to remove them ahead of transformation.
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
 
-    // SROA pass is run because it will fold structs/unions that are problematic
-    // on Vulkan SPIR-V away.
+    // SROA pass is run because it will fold structs/unions that are
+    // problematic on Vulkan SPIR-V away.
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::SROAPass()));
 
     // InstructionCombining pass folds bitcast and gep instructions which are
@@ -567,7 +588,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   // Run the following passes after the default LLVM pass pipeline.
   pb.registerOptimizerLastEPCallback([binaryStream](llvm::ModulePassManager &pm,
                                                     llvm::OptimizationLevel) {
-    // No point attempting to handle freeze currently so strip them from the IR.
+    // No point attempting to handle freeze currently so strip them from the
+    // IR.
     pm.addPass(clspv::StripFreezePass());
 
     // Unhide loads from __constant address space.  Undoes the action of
@@ -600,7 +622,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
     if (clspv::Option::RewritePackedStructs()) {
       if (!clspv::Option::Int8Support()) {
-        llvm_unreachable("Int8 has to be supported with rewrite-packed-structs option");
+        llvm_unreachable(
+            "Int8 has to be supported with rewrite-packed-structs option");
       }
       pm.addPass(clspv::RewritePackedStructs());
     }
@@ -640,13 +663,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // UBO Transformations
     if (clspv::Option::ConstantArgsInUniformBuffer() &&
         !clspv::Option::InlineEntryPoints()) {
-      // MultiVersionUBOFunctionsPass will examine non-kernel functions with UBO
-      // arguments and either multi-version them as necessary or inline them if
-      // multi-versioning cannot be accomplished.
+      // MultiVersionUBOFunctionsPass will examine non-kernel functions with
+      // UBO arguments and either multi-version them as necessary or inline
+      // them if multi-versioning cannot be accomplished.
       pm.addPass(clspv::MultiVersionUBOFunctionsPass());
       // Cleanup passes.
-      // Specialization can blindly generate GEP chains that are easily cleaned
-      // up by SimplifyPointerBitcastPass.
+      // Specialization can blindly generate GEP chains that are easily
+      // cleaned up by SimplifyPointerBitcastPass.
       pm.addPass(clspv::SimplifyPointerBitcastPass());
       // RemoveUnusedArgumentsPass removes the actual UBO arguments that were
       // problematic to begin with now that they have no uses.
@@ -734,8 +757,8 @@ int ParseOptions(const int argc, const char *const argv[]) {
     }
 
     if (!clspv::Option::ClusterPodKernelArgs()) {
-      llvm::errs()
-          << "POD arguments must be clustered to be passed as push constants\n";
+      llvm::errs() << "POD arguments must be clustered to be passed as push "
+                      "constants\n";
       return -1;
     }
 
@@ -920,7 +943,8 @@ int CompileModule(const llvm::StringRef &input_filename,
   SmallVector<char, 10000> binary;
   llvm::raw_svector_ostream binaryStream(binary);
 
-  // If LLVM IR output format was requested, emit the file and stop compilation.
+  // If LLVM IR output format was requested, emit the file and stop
+  // compilation.
   if (OutputFormat == OutputFormatLLVMIR ||
       OutputFormat == OutputFormatLLVMIRBinary) {
     return GenerateIRFile(module, output_buffer);

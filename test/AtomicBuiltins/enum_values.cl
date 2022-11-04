@@ -1,4 +1,4 @@
-// RUN: clspv %target --cl-std=CL3.0 %s -o %t.spv
+// RUN: clspv %target --enable-feature-macros=__opencl_c_atomic_scope_all_devices,__opencl_c_atomic_order_seq_cst --cl-std=CL3.0 %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 //
