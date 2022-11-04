@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s
+// RUN: clspv %target -verify %s
 
 struct T;
 typedef struct S {

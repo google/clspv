@@ -136,7 +136,7 @@ def generate_run_section(args):
     clspv_options = ' '.join(args.clspv_options)
 
     runsec = ''
-    runsec += '// RUN: clspv {} %s -o %t.spv\n'.format(clspv_options)
+    runsec += '// RUN: clspv %target {} %s -o %t.spv\n'.format(clspv_options)
     runsec += '// RUN: spirv-dis -o %t2.spvasm %t.spv\n'
     runsec += '// RUN: FileCheck %s < %t2.spvasm\n'
     runsec += '// RUN: spirv-val --target-env vulkan1.0 %t.spv\n'

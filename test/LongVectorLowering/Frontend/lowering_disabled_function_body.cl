@@ -1,4 +1,4 @@
-// RUN: clspv %s -verify
+// RUN: clspv %target %s -verify
 //
 // Test that long-vector types are rejected when the support is not enabled.
 

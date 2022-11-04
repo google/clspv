@@ -1,6 +1,6 @@
 kernel void foo(int k, global int *A, int b) { *A = k + b; }
 
-// RUN: clspv %s -o %t.spv -pod-ubo -cluster-pod-kernel-args=0
+// RUN: clspv %target %s -o %t.spv -pod-ubo -cluster-pod-kernel-args=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map

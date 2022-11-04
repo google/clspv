@@ -1,6 +1,6 @@
 // We use -O0 here otherwise the compiler will optimize less than equal
 // to a less than operation!
-// RUN: clspv %s -O0 -o %t.spv
+// RUN: clspv %target %s -O0 -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

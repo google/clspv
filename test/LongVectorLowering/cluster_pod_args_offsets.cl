@@ -1,4 +1,4 @@
-// RUN: clspv %s -long-vector -o %t.spv -int8 -cluster-pod-kernel-args -std430-ubo-layout
+// RUN: clspv %target %s -long-vector -o %t.spv -int8 -cluster-pod-kernel-args -std430-ubo-layout
 // RUN: spirv-dis -o %t.spvasm %t.spv
 // RUN: FileCheck %s < %t.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map -d

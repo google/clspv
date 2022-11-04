@@ -52,11 +52,13 @@
 #include "clspv/Passes.h"
 #include "clspv/Sampler.h"
 #include "clspv/clspv_builtin_library.h"
+#include "clspv/clspv64_builtin_library.h"
 #include "clspv/opencl_builtins_header.h"
 
 #include "Builtins.h"
 #include "FrontendPlugin.h"
 #include "Passes.h"
+#include "Types.h"
 
 #include <cassert>
 #include <fstream>
@@ -68,6 +70,11 @@
 using namespace clang;
 
 namespace {
+enum class SPIRArch : uint32_t {
+  SPIR = 0,
+  SPIR64,
+};
+
 // This registration must be located in the same file as the execution of the
 // action.
 static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
@@ -165,6 +172,15 @@ static llvm::cl::opt<enum OutputFormat> OutputFormat(
             "Binary LLVM IR (Stop compilation before clspv specific passes)"),
         clEnumValN(OutputFormatC, "c",
                    "C initializer list (of Vulkan SPIR-V)")));
+
+static llvm::cl::opt<SPIRArch> target_arch(
+    "arch", llvm::cl::desc("Specify the target SPIR architecture"),
+    llvm::cl::init(SPIRArch::SPIR),
+    llvm::cl::values(
+        clEnumValN(SPIRArch::SPIR, "spir",
+                   "spir-unknown-unknown target (pointers are 32-bit)"),
+        clEnumValN(SPIRArch::SPIR64, "spir64",
+                   "spir64-unknown-unknown target (pointers are 64-bit)")));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
@@ -321,8 +337,9 @@ int SetCompilerInstanceOptions(CompilerInstance &instance,
         clang::codegenoptions::FullDebugInfo);
   }
 
-  // We use the 32-bit pointer-width SPIR triple
-  llvm::Triple triple("spir-unknown-unknown");
+  // Select the correct SPIR triple
+  llvm::Triple triple{target_arch == SPIRArch::SPIR64 ? "spir64-unknown-unknown"
+                                                      : "spir-unknown-unknown"};
 
   // We manually include the OpenCL headers below, so this vector is unused.
   std::vector<std::string> includes;
@@ -802,8 +819,16 @@ int GenerateIRFile(std::unique_ptr<llvm::Module> &module,
 }
 
 bool LinkBuiltinLibrary(llvm::Module *module) {
-  std::unique_ptr<llvm::MemoryBuffer> buffer(new OpenCLBuiltinMemoryBuffer(
-      clspv_builtin_library_data, clspv_builtin_library_size - 1));
+  auto library_data = clspv::PointersAre64Bit(*module)
+                          ? clspv64_builtin_library_data
+                          : clspv_builtin_library_data;
+
+  auto library_size = clspv::PointersAre64Bit(*module)
+                          ? clspv64_builtin_library_size
+                          : clspv_builtin_library_size;
+
+  std::unique_ptr<llvm::MemoryBuffer> buffer(
+      new OpenCLBuiltinMemoryBuffer(library_data, library_size - 1));
 
   llvm::SMDiagnostic Err;
   auto library = llvm::parseIR(*buffer, Err, module->getContext());

@@ -1,4 +1,4 @@
-// RUN: clspv %s -verify
+// RUN: clspv %target %s -verify
 
 #ifndef cl_khr_fp64
 #error FAIL

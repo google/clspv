@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -inline-entry-points -cl-std=CL2.0 -no-16bit-storage=pushconstant
+// RUN: clspv %target %s -o %t.spv -inline-entry-points -cl-std=CL2.0 -no-16bit-storage=pushconstant
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map

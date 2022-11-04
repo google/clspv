@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv -arch=spir
 // RUN: spirv-dis %t.spv -o %t.spvasm
-// RUN: FileCheck %s < %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK-NOT: OpCapability Int64
+// RUN: clspv %target %s -o %t.spv -arch=spir64
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// CHECK-32-NOT: OpCapability Int64
 // CHECK: OpCompositeExtract
 
 const sampler_t SAMPLER =

@@ -1,4 +1,4 @@
-// RUN: clspv -w -constant-args-ubo -verify -inline-entry-points %s
+// RUN: clspv %target -w -constant-args-ubo -verify -inline-entry-points %s
 
 struct dt {
   int x[2]; //expected-note{{here}}

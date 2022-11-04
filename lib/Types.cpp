@@ -370,3 +370,7 @@ bool clspv::IsUintImageType(StructType *type) {
     return true;
   return false;
 }
+
+bool clspv::PointersAre64Bit(llvm::Module &m) {
+  return m.getTargetTriple() == "spir64-unknown-unknown";
+}

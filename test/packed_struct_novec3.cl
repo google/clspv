@@ -1,6 +1,11 @@
-// RUN: clspv %s -o %t.spv -vec3-to-vec4
+// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 struct S1{
@@ -43,6 +48,7 @@ __kernel void test(__global int *a) {
 
 // CHECK-DAG: [[uchar:%[^ ]+]] = OpTypeInt 8 0
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
+// CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uintv3:%[^ ]+]] = OpTypeVector [[uint]] 3
 // CHECK-DAG: [[uintv4:%[^ ]+]] = OpTypeVector [[uint]] 4
 // CHECK-DAG: [[uintinput:%[^ ]+]] = OpTypePointer Input [[uint]]
@@ -52,6 +58,7 @@ __kernel void test(__global int *a) {
 // CHECK-DAG: [[uintv4workgroup:%[^ ]+]] = OpTypePointer Workgroup [[uintv4]]
 // CHECK-DAG: [[uint12:%[^ ]+]] = OpConstant [[uint]] 12
 // CHECK-DAG: [[uint64:%[^ ]+]] = OpConstant [[uint]] 64
+// CHECK-64-DAG: [[ulong0:%[^ ]+]] = OpConstant [[ulong]] 0
 // CHECK-DAG: [[uchararray12:%[^ ]+]] = OpTypeArray [[uchar]] [[uint12]]
 // CHECK-DAG: [[S1:%[^ ]+]] = OpTypeStruct [[uintv3]] [[uint]]
 // CHECK-DAG: [[S2:%[^ ]+]] = OpTypeStruct [[uintv4]] [[uint]] [[uchararray12]]
@@ -64,9 +71,15 @@ __kernel void test(__global int *a) {
 // CHECK: [[s1:%[^ ]+]] = OpVariable [[S1arrayptr]] Workgroup
 // CHECK: [[s2:%[^ ]+]] = OpVariable [[S2arrayptr]] Workgroup
 // CHECK: [[gidptr:%[^ ]+]] = OpVariable [[uintv3input]] Input
-// CHECK: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[uint0]]
+// CHECK-64: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[ulong0]]
+// CHECK-32: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[uint0]]
 // CHECK: [[gid:%[^ ]+]] = OpLoad [[uint]] [[gidgep]]
-// CHECK: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid]] [[uint0]]
-// CHECK: [[_1:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s1]] [[gid]] [[uint1]]
-// CHECK: [[_2:%[^ ]+]] = OpAccessChain [[uintv4workgroup]] [[s2]] [[gid]] [[uint0]]
-// CHECK: [[_3:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid]] [[uint1]]
+// CHECK-64: [[gid_long:%[^ ]+]] = OpSConvert [[ulong]] [[gid]]
+// CHECK-64: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid_long]] [[uint0]]
+// CHECK-32: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid]] [[uint0]]
+// CHECK-64: [[_1:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s1]] [[gid_long]] [[uint1]]
+// CHECK-32: [[_1:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s1]] [[gid]] [[uint1]]
+// CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintv4workgroup]] [[s2]] [[gid_long]] [[uint0]]
+// CHECK-32: [[_2:%[^ ]+]] = OpAccessChain [[uintv4workgroup]] [[s2]] [[gid]] [[uint0]]
+// CHECK-64: [[_3:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid_long]] [[uint1]]
+// CHECK-32: [[_3:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid]] [[uint1]]

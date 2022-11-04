@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s -w
+// RUN: clspv %target -verify %s -w
 // expected-no-diagnostics
 
 struct T {

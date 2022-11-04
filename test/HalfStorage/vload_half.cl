@@ -1,6 +1,11 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %target %s -o %t.spv -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 __kernel void test(__global half *a, int b, __global float *dst) {
@@ -12,6 +17,7 @@ __kernel void test(__global half *a, int b, __global float *dst) {
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
 // CHECK-DAG: [[ushort:%[^ ]+]] = OpTypeInt 16 0
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
+// CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uint0:%[^ ]+]] = OpConstant [[uint]] 0
 
 // CHECK-DAG: [[half_array:%[^ ]+]] = OpTypeRuntimeArray [[half]]
@@ -20,7 +26,9 @@ __kernel void test(__global half *a, int b, __global float *dst) {
 
 // CHECK: [[a:%[^ ]+]] = OpVariable [[global_half_ptr]] StorageBuffer
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
-// CHECK: [[addr:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint0]] [[b]]
+// CHECK-32: [[addr:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint0]] [[b]]
+// CHECK-64: [[b_long:%[^ ]+]] = OpSConvert [[ulong]] [[b]]
+// CHECK-64: [[addr:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint0]] [[b_long]]
 // CHECK: [[valh:%[^ ]+]] = OpLoad [[half]] [[addr]]
 // CHECK: [[vali16:%[^ ]+]] = OpBitcast [[ushort]] [[valh]]
 // CHECK: [[vali32:%[^ ]+]] = OpUConvert [[uint]] [[vali16]]

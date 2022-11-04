@@ -1,4 +1,4 @@
-// RUN: clspv -cluster-pod-kernel-args %s -o %t.spv
+// RUN: clspv %target -cluster-pod-kernel-args %s -o %t.spv
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck %s < %t.map -check-prefix=MAP
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

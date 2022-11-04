@@ -1,4 +1,4 @@
-// RUN: clspv %s -verify -cluster-pod-kernel-args -pod-pushconstant -w
+// RUN: clspv %target %s -verify -cluster-pod-kernel-args -pod-pushconstant -w
 
 struct A {
   int a[4];

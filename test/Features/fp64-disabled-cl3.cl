@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL3.0 -fp64=0 %s -verify
+// RUN: clspv %target -cl-std=CL3.0 -fp64=0 %s -verify
 
 #ifdef cl_khr_fp64
 #error FAIL

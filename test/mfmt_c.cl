@@ -1,4 +1,4 @@
-// RUN: clspv %s --output-format=c -o %t.inc
+// RUN: clspv %target %s --output-format=c -o %t.inc
 // RUN: FileCheck %s < %t.inc
 
 // The first three words in the header.

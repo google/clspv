@@ -1,4 +1,4 @@
-// RUN: clspv -int8 -constant-args-ubo -inline-entry-points %s -o %t.spv -vec3-to-vec4
+// RUN: clspv %target -int8 -constant-args-ubo -inline-entry-points %s -o %t.spv -vec3-to-vec4
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map

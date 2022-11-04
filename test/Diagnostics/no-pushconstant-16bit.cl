@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s -no-16bit-storage=pushconstant -w -pod-pushconstant
+// RUN: clspv %target -verify %s -no-16bit-storage=pushconstant -w -pod-pushconstant
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 

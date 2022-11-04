@@ -1,4 +1,4 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -max-ubo-size=64 -int8=0
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -max-ubo-size=64 -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t2.map

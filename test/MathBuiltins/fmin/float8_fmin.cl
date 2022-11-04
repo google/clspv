@@ -1,4 +1,4 @@
-// RUN: clspv --long-vector %s -o %t.spv
+// RUN: clspv %target --long-vector %s -o %t.spv
 // RUN: spirv-dis %t.spv -o - | FileCheck %s
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 

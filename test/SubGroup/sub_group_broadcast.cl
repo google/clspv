@@ -1,5 +1,5 @@
 // CHECK: %[[BROADCAST_ID:[a-zA-Z0-9_]*]] = OpGroupNonUniformBroadcast %float %uint_3 %[[REG_ID:[0-9]*]] %[[LANE_ID:[0-9]*]]
-// RUN: clspv %s -cl-std=CL2.0 -spv-version=1.3 -inline-entry-points -o %t.spv
+// RUN: clspv %target %s -cl-std=CL2.0 -spv-version=1.3 -inline-entry-points -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.2 %t.spv

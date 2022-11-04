@@ -1,4 +1,4 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t2.map
@@ -31,7 +31,7 @@ __kernel void foo(__global inner* data, __constant outer* c) {
 // CHECK-DAG: OpDecorate [[data]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[c:%[0-9a-zA-Z_]+]] Binding 1
 // CHECK-DAG: OpDecorate [[c]] DescriptorSet 0
-// CHECK: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK: [[inner]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]]
 // CHECK: [[inner_runtime]] = OpTypeRuntimeArray [[inner]]
 // CHECK: [[data_struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[inner_runtime]]

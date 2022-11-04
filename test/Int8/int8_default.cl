@@ -1,7 +1,7 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck --check-prefix=ON %s < %t.spvasm
-// RUN: clspv %s -o %t2.spv -int8=0
+// RUN: clspv %target %s -o %t2.spv -int8=0
 // RUN: spirv-dis %t2.spv -o %t2.spvasm
 // RUN: FileCheck --check-prefix=OFF %s < %t2.spvasm
 

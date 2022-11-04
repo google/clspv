@@ -1,4 +1,4 @@
-// RUN: clspv -work-dim %s -o %t.spv
+// RUN: clspv %target -work-dim %s -o %t.spv -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.dmap

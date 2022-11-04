@@ -1,4 +1,4 @@
-// RUN: clspv -work-dim -global-offset -cl-std=CL2.0 -inline-entry-points %s -o %t.spv
+// RUN: clspv %target -work-dim -global-offset -cl-std=CL2.0 -inline-entry-points %s -o %t.spv
 // RUN: clspv-reflection %t.spv -o %t.dmap
 // RUN: FileCheck --check-prefix=DMAP %s < %t.dmap
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

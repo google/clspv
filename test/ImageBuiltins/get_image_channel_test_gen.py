@@ -18,7 +18,7 @@ from string import Template
 import os
 
 TEMPLATE_CL=Template("""
-// RUN: clspv %s -o %t.spv${clspv_additional_arg}
+// RUN: clspv %target %s -o %t.spv${clspv_additional_arg}
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

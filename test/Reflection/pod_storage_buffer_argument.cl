@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -no-16bit-storage=ubo -max-pushconstant-size=1
+// RUN: clspv %target %s -o %t.spv -no-16bit-storage=ubo -max-pushconstant-size=1
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

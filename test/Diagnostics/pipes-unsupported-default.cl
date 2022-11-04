@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s
+// RUN: clspv %target -verify %s
 
 kernel void pipes(read_only pipe int in, write_only pipe int out) {
     //expected-error@3{{type specifier missing, defaults to 'int'; ISO C99 and later do not support implicit int}}

@@ -1,4 +1,4 @@
-// RUN: clspv -verify %s -no-16bit-storage=ssbo -w
+// RUN: clspv %target -verify %s -no-16bit-storage=ssbo -w
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 

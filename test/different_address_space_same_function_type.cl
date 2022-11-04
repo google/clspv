@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv -no-inline-single -no-dra
+// RUN: clspv %target %s -o %t.spv -no-inline-single -no-dra
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

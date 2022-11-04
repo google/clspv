@@ -42,6 +42,19 @@ get_filename_component(FILECHECK_PATH ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR} A
 
 add_custom_target(check-spirv
   COMMAND ${PYTHON_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
+    -DCLSPV_TARGET="-arch=spir"
+    --path ${FILECHECK_PATH}
+    --path ${SPIRV_TOOLS_BINARY_DIR}/
+    --path "$<TARGET_FILE_DIR:clspv>"
+    ${CLSPV_TEST_ADDITIONAL_PATH}
+  DEPENDS ${CLSPV_TEST_DEPENDS}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  USES_TERMINAL
+)
+
+add_custom_target(check-spirv-64
+  COMMAND ${PYTHON_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
+    -DCLSPV_TARGET="-arch=spir64"
     --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"

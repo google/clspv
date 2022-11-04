@@ -30,3 +30,7 @@ config.test_source_root = "@CMAKE_CURRENT_SOURCE_DIR@"
 config.test_exec_root = "@CMAKE_CURRENT_BINARY_DIR@"
 
 config.target_triple = '(unused)'
+
+# clspv target argument, i.e. one of -arch=spir,-arch=spir64
+if 'CLSPV_TARGET' in lit_config.params:
+    config.substitutions.append(('%target', lit_config.params['CLSPV_TARGET']))

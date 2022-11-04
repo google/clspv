@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // CHECK: OpDecorate [[mul:%[a-zA-Z0-9_]+]] NoContraction
@@ -6,7 +6,7 @@
 // CHECK: [[mul]] = OpFMul
 // CHECK: OpFAdd %{{.*}} [[mul]]
 
-// RUN: clspv %s -o %t2.spv -cl-unsafe-math-optimizations
+// RUN: clspv %target %s -o %t2.spv -cl-unsafe-math-optimizations
 // RUN: spirv-dis %t2.spv -o %t2.spvasm
 // RUN: FileCheck --check-prefix=FAST %s < %t2.spvasm
 // FAST-NOT: OpDecorate [[mul:%[a-zA-Z0-9_]+]] NoContraction

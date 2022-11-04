@@ -1,9 +1,9 @@
-// RUN: clspv %s -o %t.spv -cluster-pod-kernel-args=0
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %s -o %t4.spv
+// RUN: clspv %target %s -o %t4.spv
 // RUN: spirv-dis -o %t4.spvasm %t4.spv
 // RUN: FileCheck %s < %t4.spvasm -check-prefix=CLUSTER
 // RUN: spirv-val --target-env vulkan1.0 %t4.spv

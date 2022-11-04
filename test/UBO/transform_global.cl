@@ -1,6 +1,13 @@
-// RUN: clspv -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
+// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: FileCheck -check-prefix=MAP %s < %t2.map
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir64
+// RUN: spirv-dis -o %t2.spvasm %t.spv
+// RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -31,6 +38,7 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: OpDecorate [[n:%[0-9a-zA-Z_]+]] Binding 2
 // CHECK-DAG: OpDecorate [[n]] DescriptorSet 0
 // CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-64-DAG: [[long:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[data_type]] = OpTypeStruct [[int]] [[int]]
 // CHECK-DAG: [[runtime]] = OpTypeRuntimeArray [[data_type]]
 // CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
@@ -55,10 +63,14 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 //     CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
 //     CHECK: [[n_load:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[int]]
-//     CHECK: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[n_load]] [[zero]]
+//  CHECK-64: [[n_load_long:%[0-9a-zA-Z_]+]] = OpSConvert [[long]] [[n_load]]
+//  CHECK-64: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[n_load_long]] [[zero]]
+//  CHECK-32: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[n_load]] [[zero]]
 //     CHECK: [[c_load:%[0-9a-zA-Z_]+]] = OpLoad [[int]] [[c_arg_gep]]
-//     CHECK: [[priv_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_var_ele_ptr]] [[c_var]] [[n_load]] [[zero]]
+//  CHECK-64: [[priv_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_var_ele_ptr]] [[c_var]] [[n_load_long]] [[zero]]
+//  CHECK-32: [[priv_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_var_ele_ptr]] [[c_var]] [[n_load]] [[zero]]
 //     CHECK: [[priv_load:%[0-9a-zA-Z_]+]] = OpLoad [[int]] [[priv_gep]]
 //     CHECK: [[add:%[0-9a-zA-Z_]+]] = OpIAdd [[int]] [[priv_load]] [[c_load]]
-//     CHECK: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[n_load]] [[zero]]
+//  CHECK-64: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[n_load_long]] [[zero]]
+//  CHECK-32: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[n_load]] [[zero]]
 //     CHECK: OpStore [[data_gep]] [[add]]

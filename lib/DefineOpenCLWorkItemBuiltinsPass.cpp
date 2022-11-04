@@ -24,6 +24,7 @@
 #include "Constants.h"
 #include "DefineOpenCLWorkItemBuiltinsPass.h"
 #include "PushConstant.h"
+#include "Types.h"
 
 using namespace llvm;
 using namespace clspv;
@@ -132,7 +133,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     ArrayRef<StringRef> dependents) {
 
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(IT, IT, false);
+  IntegerType *SizeT =
+      clspv::PointersAre64Bit(M) ? IntegerType::get(M.getContext(), 64) : IT;
+  auto FType = FunctionType::get(SizeT, IT, false);
   Function *F = getFunctionIfNeeded(M, FuncName, dependents, FType);
 
   // If the builtin was not used in the module, don't create it!
@@ -164,6 +167,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
 
   Value *Select2 =
       inBoundsDimensionOrDefaultValue(Builder, Dim, Result, DefaultValue);
+
+  Select2 = Builder.CreateZExt(Select2, SizeT);
   Builder.CreateRet(Select2);
 
   return true;
@@ -171,7 +176,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(IT, IT, false);
+  IntegerType *I64T = IntegerType::get(M.getContext(), 64);
+  auto FType =
+      FunctionType::get(clspv::PointersAre64Bit(M) ? I64T : IT, IT, false);
 
   Function *F = getFunctionIfNeeded(M, global_id_mangled_name,
                                     {global_linear_id_mangled_name}, FType);
@@ -199,12 +206,21 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
   auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
 
+  // The underlying GlobalInvocationId will always be 32-bit, but this needs
+  // to be promoted when size_t is 64-bit.
+  if (clspv::PointersAre64Bit(M)) {
+    GidBase = Builder.CreateZExt(GidBase, I64T);
+  }
+
   Value *Ret = GidBase;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::RegionOffset);
     auto DimPtr = Builder.CreateInBoundsGEP(VT, Ptr, Indices);
     auto Size = Builder.CreateLoad(IT, DimPtr);
     auto RegOff = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 0);
+    if (clspv::PointersAre64Bit(M)) {
+      RegOff = Builder.CreateZExt(RegOff, I64T);
+    }
     Ret = Builder.CreateAdd(Ret, RegOff);
   } else {
     // If we have a global offset we need to add it
@@ -224,7 +240,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   IntegerType *IT = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(IT, IT, false);
+  IntegerType *SizeT =
+      clspv::PointersAre64Bit(M) ? IntegerType::get(M.getContext(), 64) : IT;
+  auto FType = FunctionType::get(SizeT, IT, false);
   Function *F = getFunctionIfNeeded(M, global_size_mangled_name,
                                     {global_linear_id_mangled_name}, FType);
 
@@ -284,6 +302,12 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   }
 
   GlobalSize = inBoundsDimensionOrDefaultValue(Builder, Dim, GlobalSize, 1);
+
+  if (clspv::PointersAre64Bit(M)) {
+    GlobalSize =
+        Builder.CreateZExt(GlobalSize, IntegerType::get(M.getContext(), 64));
+  }
+
   Builder.CreateRet(GlobalSize);
 
   return true;
@@ -319,6 +343,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
   auto NumGroupsPtr = Builder.CreateInBoundsGEP(VT, NumGroupsVarPtr, Indices);
   auto NumGroups = Builder.CreateLoad(IT, NumGroupsPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, NumGroups, 1);
+
+  if (clspv::PointersAre64Bit(M)) {
+    Ret = Builder.CreateZExt(Ret, IntegerType::get(M.getContext(), 64));
+  }
+
   Builder.CreateRet(Ret);
 
   return true;
@@ -362,6 +391,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
     Ret = Builder.CreateAdd(Ret, RegionGroupOffset);
   }
 
+  if (clspv::PointersAre64Bit(M)) {
+    Ret = Builder.CreateZExt(Ret, IntegerType::get(M.getContext(), 64));
+  }
+
   Builder.CreateRet(Ret);
 
   return true;
@@ -369,7 +402,10 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
 
 bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   auto Int32Ty = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+  auto Int64Ty = IntegerType::get(M.getContext(), 64);
+  auto FRetType = clspv::PointersAre64Bit(M) ? Int64Ty : Int32Ty;
+  auto FType = FunctionType::get(FRetType, Int32Ty, false);
+
   Function *F = getFunctionIfNeeded(
       M, global_offset_mangled_name,
       {global_id_mangled_name, global_linear_id_mangled_name}, FType);
@@ -386,6 +422,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "body", F);
   IRBuilder<> Builder(BB);
 
+  Value *Ret;
   if (isSupportEnabled) {
     auto Dim = &*F->arg_begin();
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
@@ -405,12 +442,18 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
       gep = Builder.CreateInBoundsGEP(VecTy, offset_var, Indices);
     }
     auto load = Builder.CreateLoad(Int32Ty, gep);
-    auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
-    Builder.CreateRet(Ret);
+    Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
   } else {
     // Get global offset is easy for us as it only returns 0.
-    Builder.CreateRet(Builder.getInt32(0));
+    Ret =
+        clspv::PointersAre64Bit(M) ? Builder.getInt64(0) : Builder.getInt32(0);
   }
+
+  if (clspv::PointersAre64Bit(M)) {
+    Ret = Builder.CreateZExt(Ret, IntegerType::get(M.getContext(), 64));
+  }
+
+  Builder.CreateRet(Ret);
 
   return true;
 }
@@ -551,7 +594,9 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
     Module &M) {
 
   auto Int32Ty = IntegerType::get(M.getContext(), 32);
-  auto FType = FunctionType::get(Int32Ty, Int32Ty, false);
+  auto Int64Ty = IntegerType::get(M.getContext(), 64);
+  auto FRetTy = clspv::PointersAre64Bit(M) ? Int64Ty : Int32Ty;
+  auto FType = FunctionType::get(FRetTy, Int32Ty, false);
   Function *F =
       getFunctionIfNeeded(M, enqueued_local_size_mangled_name,
                           {enqueued_num_sub_groups_mangled_name}, FType);
@@ -570,6 +615,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
   auto DimPtr = Builder.CreateInBoundsGEP(Ty, Ptr, Indices);
   auto Size = Builder.CreateLoad(Ty->getScalarType(), DimPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
+
+  if (clspv::PointersAre64Bit(M)) {
+    Ret = Builder.CreateZExt(Ret, Int64Ty);
+  }
+
   Builder.CreateRet(Ret);
 
   return true;
@@ -614,14 +664,21 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedNumSubGroupsBuiltin(
 
   auto FELS = M.getFunction(enqueued_local_size_mangled_name);
 
-  auto ELS0 = Builder.CreateCall(FELS, Builder.getInt32(0));
-  ELS0->setCallingConv(CallingConv::SPIR_FUNC);
-  auto ELS1 = Builder.CreateCall(FELS, Builder.getInt32(1));
-  ELS1->setCallingConv(CallingConv::SPIR_FUNC);
-  auto ELS2 = Builder.CreateCall(FELS, Builder.getInt32(2));
-  ELS2->setCallingConv(CallingConv::SPIR_FUNC);
+  Value *ELS0 = Builder.CreateCall(FELS, Builder.getInt32(0));
+  cast<CallInst>(ELS0)->setCallingConv(CallingConv::SPIR_FUNC);
+  Value *ELS1 = Builder.CreateCall(FELS, Builder.getInt32(1));
+  cast<CallInst>(ELS1)->setCallingConv(CallingConv::SPIR_FUNC);
+  Value *ELS2 = Builder.CreateCall(FELS, Builder.getInt32(2));
+  cast<CallInst>(ELS2)->setCallingConv(CallingConv::SPIR_FUNC);
+
   auto ELS = Builder.CreateMul(ELS0, ELS1);
   ELS = Builder.CreateMul(ELS, ELS2);
+
+  // get_enqueued_local size returns size_t but this builtin and
+  // get_max_sub_group_size return uint, so truncate if needed
+  if (clspv::PointersAre64Bit(M)) {
+    ELS = Builder.CreateTrunc(ELS, Builder.getInt32Ty());
+  }
 
   auto MaxSubgroupSize =
       Builder.CreateCall(M.getFunction(max_sub_group_size_mangled_name));
