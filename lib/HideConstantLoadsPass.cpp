@@ -82,7 +82,7 @@ PreservedAnalyses clspv::HideConstantLoadsPass::run(Module &M,
       FunctionType *fnTy = FunctionType::get(loadedTy, {loadedTy}, false);
       auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
       fn = cast<Function>(fn_constant.getCallee());
-      fn->addFnAttr(Attribute::ReadOnly);
+      fn->setOnlyReadsMemory();
     }
 
     // Wrap the load

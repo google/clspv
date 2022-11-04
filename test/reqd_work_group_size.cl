@@ -7,7 +7,7 @@
 // CHECK:     OpExecutionMode %[[__original_id_4]] LocalSize 1 2 3
 // CHECK-DAG: %[[void:[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: %[[__original_id_3:[0-9]+]] = OpTypeFunction %[[void]]
-// CHECK:     %[[__original_id_4]] = OpFunction %[[void]] Const %[[__original_id_3]]
+// CHECK:     %[[__original_id_4]] = OpFunction %[[void]] Pure|Const %[[__original_id_3]]
 
 void kernel __attribute__((reqd_work_group_size(1,2,3))) test() {}
 

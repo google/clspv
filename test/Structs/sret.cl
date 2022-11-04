@@ -23,7 +23,7 @@ struct test boo(void) {
   return sret;
 }
 
-// CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] Const %[[FOO_TYPE_ID]]
+// CHECK: %[[FOO_ID]] = OpFunction %[[VOID_TYPE_ID]] Pure|Const %[[FOO_TYPE_ID]]
 // CHECK: %[[FOO_LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK:         OpReturn
 // CHECK:         OpFunctionEnd

@@ -68,6 +68,8 @@ echo "Build Completed %DATE% %TIME%"
 echo "Run tests... %DATE% %TIME%"
 cmake --build . --target check-spirv --config %BUILD_TYPE%
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
+cmake --build . --target check-spirv-64 --config %BUILD_TYPE%
+if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Tests Completed %DATE% %TIME%"
 
 :: Clean up some directories.

@@ -23,7 +23,7 @@
 // CHECK-DAG: %[[__original_id_13]] = OpSpecConstant %[[uint]] 1
 // CHECK-DAG: %[[gl_WorkGroupSize]] = OpSpecConstantComposite %[[v3uint]] %[[__original_id_11]] %[[__original_id_12]] %[[__original_id_13]]
 // CHECK-DAG: %[[__original_id_15:[0-9]+]] = OpVariable %[[_ptr_Private_v3uint]] Private %[[gl_WorkGroupSize]]
-// CHECK:     %[[__original_id_16]] = OpFunction %[[void]] Const %[[__original_id_3]]
+// CHECK:     %[[__original_id_16]] = OpFunction %[[void]] Pure|Const %[[__original_id_3]]
 
 void kernel __attribute__((reqd_work_group_size(1,2,3))) test() {}
 

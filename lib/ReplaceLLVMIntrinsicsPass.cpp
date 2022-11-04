@@ -67,7 +67,7 @@ Type *descend_type(Type *InType) {
   }
 
   return OutType;
-};
+}
 } // namespace
 
 PreservedAnalyses
@@ -716,8 +716,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceAddSubSat(Function &F,
       auto clamp_value =
           is_add ? Constant::getAllOnesValue(ty) : Constant::getNullValue(ty);
       auto struct_ty = StructType::get(ty->getContext(), {ty, ty});
-      auto call = clspv::InsertSPIRVOp(Call, op, {Attribute::ReadNone},
-                                       struct_ty, {a, b});
+      auto call = clspv::InsertSPIRVOp(Call, op, {}, struct_ty, {a, b},
+                                       MemoryEffects::none());
 
       auto add_sub = builder.CreateExtractValue(call, {0});
       auto carry_borrow = builder.CreateExtractValue(call, {1});

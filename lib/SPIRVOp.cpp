@@ -28,7 +28,8 @@ using namespace llvm;
 
 Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
-                           Type *RetType, ArrayRef<Value *> Args) {
+                           Type *RetType, ArrayRef<Value *> Args,
+                           const MemoryEffects &MemEffects) {
 
   // Prepare mangled name
   std::string MangledName = clspv::SPIRVOpIntrinsicFunction();
@@ -54,6 +55,8 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
     for (auto A : Attributes) {
       func->addFnAttr(A);
     }
+    if (MemEffects != MemoryEffects::unknown())
+      func->setMemoryEffects(MemEffects);
   }
 
   // Now call it with the values we were passed

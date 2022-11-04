@@ -50,6 +50,7 @@ echo $(date): Starting unit tests...
 if [ $SKIP_TESTS = "False" ]
 then
   ninja check-spirv
+  ninja check-spirv-64
 fi
 echo $(date): Unit tests completed.
 
