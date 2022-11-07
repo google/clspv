@@ -708,8 +708,8 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
   if (!Option::HackMulExtended()) {
     spv::Op opcode = IsSigned ? spv::OpSMulExtended : spv::OpUMulExtended;
 
-    return clspv::InsertSPIRVOp(InsertPoint, opcode, {Attribute::ReadNone},
-                                RetTy, {a, b});
+    return clspv::InsertSPIRVOp(InsertPoint, opcode, {}, RetTy, {a, b},
+                                MemoryEffects::none());
   }
 
   unsigned int ScalarSizeInBits = Ty->getScalarSizeInBits();
@@ -841,9 +841,9 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
       // res_neg.
       auto mul_lo_xor =
           Builder.CreateXor(mul_lo, Constant::getAllOnesValue(Ty));
-      auto mul_lo_xor_add =
-          InsertSPIRVOp(InsertPoint, spv::OpIAddCarry, {Attribute::ReadNone},
-                        RetTy, {mul_lo_xor, ConstantInt::get(Ty, 1)});
+      auto mul_lo_xor_add = InsertSPIRVOp(
+          InsertPoint, spv::OpIAddCarry, {}, RetTy,
+          {mul_lo_xor, ConstantInt::get(Ty, 1)}, MemoryEffects::none());
       auto mul_lo_inv = Builder.CreateExtractValue(mul_lo_xor_add, {0});
       auto carry = Builder.CreateExtractValue(mul_lo_xor_add, {1});
       auto mul_hi_inv = Builder.CreateAdd(
@@ -1149,8 +1149,8 @@ bool ReplaceOpenCLBuiltinPass::replaceDot(Function &F) {
 
     Value *V = nullptr;
     if (Op0->getType()->isVectorTy()) {
-      V = clspv::InsertSPIRVOp(CI, spv::OpDot, {Attribute::ReadNone},
-                               CI->getType(), {Op0, Op1});
+      V = clspv::InsertSPIRVOp(CI, spv::OpDot, {}, CI->getType(), {Op0, Op1},
+                               MemoryEffects::none());
     } else {
       V = BinaryOperator::Create(Instruction::FMul, Op0, Op1, "", CI);
     }
@@ -1472,8 +1472,9 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
                                CIVecTy->getElementCount().getKnownMinValue());
     }
 
-    auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {Attribute::ReadNone},
-                                      CorrespondingBoolTy, {CI->getOperand(0)});
+    auto NewCI =
+        clspv::InsertSPIRVOp(CI, SPIRVOp, {}, CorrespondingBoolTy,
+                             {CI->getOperand(0)}, MemoryEffects::none());
 
     return SelectInst::Create(NewCI, TrueValue, FalseValue, "", CI);
   });
@@ -1558,8 +1559,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Function &F, spv::Op SPIRVOp) {
 
         const auto BoolTy = Type::getInt1Ty(M.getContext());
 
-        const auto NewCI = clspv::InsertSPIRVOp(
-            CI, SPIRVOp, {Attribute::ReadNone}, BoolTy, {Cmp});
+        const auto NewCI = clspv::InsertSPIRVOp(CI, SPIRVOp, {}, BoolTy, {Cmp},
+                                                MemoryEffects::none());
         SelectSource = NewCI;
 
       } else {
@@ -3612,7 +3613,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
           FunctionType::get(result_ty, {result_ty, result_ty}, false);
       fmin_fn =
           cast<Function>(M.getOrInsertFunction(fmin_name, fn_ty).getCallee());
-      fmin_fn->addFnAttr(Attribute::ReadNone);
+      fmin_fn->setDoesNotAccessMemory();
       fmin_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
@@ -3624,7 +3625,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
       FunctionType *fn_ty = FunctionType::get(result_ty, {result_ty}, false);
       floor_fn =
           cast<Function>(M.getOrInsertFunction(floor_name, fn_ty).getCallee());
-      floor_fn->addFnAttr(Attribute::ReadNone);
+      floor_fn->setDoesNotAccessMemory();
       floor_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
@@ -3636,7 +3637,7 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
       FunctionType *fn_ty = FunctionType::get(result_ty, {result_ty}, false);
       clspv_fract_fn = cast<Function>(
           M.getOrInsertFunction(clspv_fract_name, fn_ty).getCallee());
-      clspv_fract_fn->addFnAttr(Attribute::ReadNone);
+      clspv_fract_fn->setDoesNotAccessMemory();
       clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
@@ -3965,9 +3966,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMadSat(Function &F, bool is_signed) {
       auto mul_ext = InsertOpMulExtended(Call, a, b, false);
       auto mul_lo = builder.CreateExtractValue(mul_ext, {0});
       auto mul_hi = builder.CreateExtractValue(mul_ext, {1});
-      auto add_carry =
-          InsertSPIRVOp(Call, spv::OpIAddCarry, {Attribute::ReadNone},
-                        struct_ty, {mul_lo, c});
+      auto add_carry = InsertSPIRVOp(Call, spv::OpIAddCarry, {}, struct_ty,
+                                     {mul_lo, c}, MemoryEffects::none());
       auto add = builder.CreateExtractValue(add_carry, {0});
       auto carry = builder.CreateExtractValue(add_carry, {1});
       auto or_value = builder.CreateOr(mul_hi, carry);
@@ -4106,7 +4106,7 @@ bool ReplaceOpenCLBuiltinPass::replaceRound(Function &F) {
           F.getParent()
               ->getOrInsertFunction(clspv_fract_name, F.getFunctionType())
               .getCallee());
-      clspv_fract_fn->addFnAttr(Attribute::ReadNone);
+      clspv_fract_fn->setDoesNotAccessMemory();
       clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 

@@ -15,6 +15,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/ModRef.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 
@@ -36,8 +37,10 @@ using namespace llvm;
 // Since this function may modify the symbol table of the module containing
 // Insert, it shouldn't be used while iterating over the symbols of that module
 // unless the caller knows that no new function will be created.
-Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
-                           ArrayRef<Attribute::AttrKind> Attributes,
-                           Type *RetType, ArrayRef<Value *> Args);
+Instruction *
+InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
+              ArrayRef<Attribute::AttrKind> Attributes, Type *RetType,
+              ArrayRef<Value *> Args,
+              const MemoryEffects &MemEffects = MemoryEffects::unknown());
 
 } // namespace clspv

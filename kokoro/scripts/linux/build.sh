@@ -47,4 +47,5 @@ echo $(date): Build completed.
 
 echo $(date): Starting unit tests...
 ninja check-spirv
+ninja check-spirv-64
 echo $(date): Unit tests completed.

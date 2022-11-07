@@ -345,6 +345,9 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
        i++) {
     if (i > 0) {
       Value *LastAddrIdx = AddrIdxs.pop_back_val();
+      auto *IndexTy = GetIndexTy(Builder);
+      if (LastAddrIdx->getType() != IndexTy)
+        LastAddrIdx = Builder.CreateZExt(LastAddrIdx, IndexTy);
       LastAddrIdx = Builder.CreateAdd(LastAddrIdx, GetIndexTyConst(Builder, 1));
       AddrIdxs.push_back(LastAddrIdx);
     }
@@ -488,6 +491,9 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
     if (i > 0) {
       // Calculate next store address
       Value *LastAddrIdx = AddrIdxs.pop_back_val();
+      auto *IndexTy = GetIndexTy(Builder);
+      if (LastAddrIdx->getType() != IndexTy)
+        LastAddrIdx = Builder.CreateZExt(LastAddrIdx, IndexTy);
       LastAddrIdx = Builder.CreateAdd(LastAddrIdx, GetIndexTyConst(Builder, 1));
       AddrIdxs.push_back(LastAddrIdx);
     }

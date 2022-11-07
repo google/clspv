@@ -28,7 +28,7 @@ clspv::AddFunctionAttributesPass::run(Module &M, ModuleAnalysisManager &) {
   // Add ReadNone and Speculatable to literal sampler functions to avoid loop
   // optimizations producing phis with them.
   if (auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction())) {
-    F->addFnAttr(Attribute::AttrKind::ReadNone);
+    F->setDoesNotAccessMemory();
     F->addFnAttr(Attribute::AttrKind::Speculatable);
   }
 

@@ -2923,11 +2923,11 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
     FuncControl |= spv::FunctionControlDontInlineMask;
   }
   // TODO: Check llvm attribute for Function Control Pure.
-  if (F.hasFnAttribute(Attribute::ReadOnly)) {
+  if (F.onlyReadsMemory()) {
     FuncControl |= spv::FunctionControlPureMask;
   }
   // TODO: Check llvm attribute for Function Control Const.
-  if (F.hasFnAttribute(Attribute::ReadNone)) {
+  if (F.doesNotAccessMemory()) {
     FuncControl |= spv::FunctionControlConstMask;
   }
 

@@ -20,7 +20,7 @@ void kernel __attribute__((reqd_work_group_size(1, 2, 3))) foo(void) {
 // CHECK:  OpExecutionMode [[_4]] LocalSize 1 2 3
 // CHECK:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK:  [[_3:%[0-9a-zA-Z_]+]] = OpTypeFunction [[_void]]
-// CHECK:  [[_4]] = OpFunction [[_void]] Const [[_3]]
+// CHECK:  [[_4]] = OpFunction [[_void]] Pure|Const [[_3]]
 // CHECK:  [[_5:%[0-9a-zA-Z_]+]] = OpLabel
 // CHECK:  OpReturn
 // CHECK:  OpFunctionEnd
