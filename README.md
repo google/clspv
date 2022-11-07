@@ -1,4 +1,4 @@
-# clspv
+# clspv [![Discord Shield](https://discordapp.com/api/guilds/1002628585250631681/widget.png?style=shield)](https://discord.gg/xsVdjmhFM9)
 
 **Clspv** is a prototype compiler for a subset of OpenCL C to Vulkan
 compute shaders.
