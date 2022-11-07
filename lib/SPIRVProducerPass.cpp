@@ -3093,9 +3093,8 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
 
       // If the kernel uses the global push constant interface it will not be
       // covered by the resource variable iteration above.
-      if (GetPodArgsImpl(*F) == PodArgImpl::kGlobalPushConstant) {
-        auto *PC =
-            module->getGlobalVariable(clspv::PushConstantsVariableName());
+      if (auto *PC =
+              module->getGlobalVariable(clspv::PushConstantsVariableName())) {
         assert(PC);
         Ops << getValueMap()[PC];
       }
