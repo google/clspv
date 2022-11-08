@@ -97,6 +97,7 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kConvert,
      Builtins::kAtomicLoad,
      Builtins::kAtomicLoadExplicit,
+     Builtins::kAtomicInit,
      Builtins::kAtomicStore,
      Builtins::kAtomicStoreExplicit,
      Builtins::kAtomicExchange,
@@ -511,6 +512,7 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kAtomicLoad:
   case Builtins::kAtomicLoadExplicit:
     return replaceAtomicLoad(F);
+  case Builtins::kAtomicInit:
   case Builtins::kAtomicStore:
   case Builtins::kAtomicStoreExplicit:
     return replaceExplicitAtomics(F, spv::OpAtomicStore,
