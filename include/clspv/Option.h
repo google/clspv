@@ -136,6 +136,11 @@ bool KeepUnusedArguments();
 // Returns true if clspv should allow 8-bit integers.
 bool Int8Support();
 
+// Returns true if we should apply a workaround to make the alignment of packed structs
+// that were passed as a storage buffer match with the wrapper runtime array
+// stride.
+bool RewritePackedStructs();
+
 // Returns true if clspv should lower long-vector types and instructions.
 bool LongVectorSupport();
 

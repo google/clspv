@@ -69,6 +69,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceOpenCLBuiltinPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplacePointerBitcastPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/RewriteInsertsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/RewritePackedStructs.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ScalarizePass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ShareModuleScopeVariables.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SignedCompareFixupPass.cpp

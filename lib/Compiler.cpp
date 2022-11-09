@@ -598,6 +598,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
 
+    if (clspv::Option::RewritePackedStructs()) {
+      if (!clspv::Option::Int8Support()) {
+        llvm_unreachable("Int8 has to be supported with rewrite-packed-structs option");
+      }
+      pm.addPass(clspv::RewritePackedStructs());
+    }
+
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {

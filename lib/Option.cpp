@@ -125,6 +125,12 @@ llvm::cl::opt<bool> hack_inserts(
         "into struct types by using complete composite construction and "
         "extractions"));
 
+llvm::cl::opt<bool> rewrite_packed_structs(
+    "rewrite-packed-structs", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Rewrite packed structs passed as buffers to a new packed structs with "
+        "an array of i8 of equal size to reduce struct alignment"));
+
 llvm::cl::opt<bool> hack_signed_compare_fixup(
     "hack-scf", llvm::cl::init(false),
     llvm::cl::desc("Rewrite signed integer comparisons to use other kinds of "
@@ -412,6 +418,7 @@ bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
 bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
+bool RewritePackedStructs() { return rewrite_packed_structs; }
 bool LongVectorSupport() { return long_vector_support; }
 bool ImageSupport() { return images; }
 SourceLanguage Language() { return cl_std; }
