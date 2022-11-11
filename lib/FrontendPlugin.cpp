@@ -500,12 +500,15 @@ private:
         "atomic_flag_test_and_set",
         "atomic_flag_clear",
     };
-    const auto declName =
-        cast<FunctionDecl>(C->getCalleeDecl())->getDeclName().getAsString();
-    if (std::count(atomic_funcs.begin(), atomic_funcs.end(), declName)) {
-      Instance.getDiagnostics().Report(
-          C->getSourceRange().getBegin(),
-          CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+    const auto calleeDecl = C->getCalleeDecl();
+    if (calleeDecl) {
+      const auto declName =
+          cast<FunctionDecl>(C->getCalleeDecl())->getDeclName().getAsString();
+      if (std::count(atomic_funcs.begin(), atomic_funcs.end(), declName)) {
+        Instance.getDiagnostics().Report(
+            C->getSourceRange().getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+      }
     }
     return true;
   }
