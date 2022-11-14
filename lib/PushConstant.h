@@ -54,8 +54,11 @@ bool ShouldDeclareNumWorkgroupsPushConstant(llvm::Module &);
 // Returns true if non-uniform NDRange region group offset is needed.
 bool ShouldDeclareRegionGroupOffsetPushConstant(llvm::Module &);
 
-// Returns the size of global push constants.
-uint64_t GlobalPushConstantsSize(llvm::Module &);
+// Returns true if module-scope constants pointer is needed.
+bool ShouldDeclareModuleConstantsPointerPushConstant(llvm::Module &);
+
+// Returns the type of the global push constants struct.
+llvm::StructType *GlobalPushConstantsType(llvm::Module &);
 
 // (Re-)Declares the global push constant variable with |mangled_struct_ty|
 // as the last member.

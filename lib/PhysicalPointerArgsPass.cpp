@@ -52,7 +52,8 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
                               clspv::IsSamplerType(ArgStructTy);
         }
 
-        if (PtrTy->getAddressSpace() == clspv::AddressSpace::Global &&
+        if ((PtrTy->getAddressSpace() == clspv::AddressSpace::Global ||
+             PtrTy->getAddressSpace() == clspv::AddressSpace::Constant) &&
             !IsBuiltinStructTy) {
           NewParamTypes.push_back(PtrIntTy);
           UpdateNeeded = true;

@@ -31,11 +31,13 @@
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
+#include "clspv/PushConstant.h"
 
 #include "ArgKind.h"
 #include "ClusterConstants.h"
 #include "Constants.h"
 #include "NormalizeGlobalVariable.h"
+#include "PushConstant.h"
 
 using namespace llvm;
 
@@ -123,6 +125,8 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
     }
 
     StructType *type = StructType::get(Context, types);
+    PointerType *ptr_type =
+        PointerType::get(type, clspv::AddressSpace::Constant);
 
     Constant *clustered_initializer =
         ConstantStruct::get(type, initializers_as_vec);
@@ -145,10 +149,31 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
           // This is the original global variable declaration.  Skip it.
         } else if (auto *inst = dyn_cast<Instruction>(user)) {
           unsigned index = initializers.idFor(GV->getInitializer()) - 1;
-          Instruction *gep = GetElementPtrInst::CreateInBounds(
-              clustered_gv->getValueType(), clustered_gv,
-              {zero, Builder.getInt32(index)}, "", inst);
-          user->replaceUsesOfWith(GV, gep);
+
+          if (clspv::Option::PhysicalStorageBuffers()) {
+            auto *bb = inst->getParent();
+            auto *clustered_ptr_ty = clspv::GetPushConstantType(
+                M, clspv::PushConstant::ModuleConstantsPointer);
+            auto *ptr_to_ptr = clspv::GetPushConstantPointer(
+                bb, clspv::PushConstant::ModuleConstantsPointer);
+            Value *indices[] = {zero};
+            auto *ptr_gep = Builder.CreateInBoundsGEP(clustered_ptr_ty,
+                                                      ptr_to_ptr, indices);
+            auto *clustered_ptr_val =
+                new LoadInst(clustered_ptr_ty, ptr_gep, "", inst);
+            auto *clustered_ptr =
+                CastInst::Create(Instruction::CastOps::IntToPtr,
+                                  clustered_ptr_val, ptr_type, "", inst);
+            Instruction *gep = GetElementPtrInst::CreateInBounds(
+                type, clustered_ptr, {zero, Builder.getInt32(index)}, "",
+                inst);
+            user->replaceUsesOfWith(GV, gep);
+          } else {
+            Instruction *gep = GetElementPtrInst::CreateInBounds(
+                clustered_gv->getValueType(), clustered_gv,
+                {zero, Builder.getInt32(index)}, "", inst);
+            user->replaceUsesOfWith(GV, gep);
+          }
         } else {
           errs() << "Don't know how to handle updating user of __constant: "
                  << *user << "\n";
