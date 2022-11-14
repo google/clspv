@@ -15,9 +15,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instruction.h"
-#include "llvm/IR/ModRef.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/ModRef.h"
 
 #include "spirv/unified1/spirv.hpp"
 
