@@ -104,11 +104,32 @@ __kernel void test3(__global struct S3* a, __global struct S4* b) {
 // CHECK: [[S2_buffer_runtime_arr]] = OpTypeRuntimeArray [[S2]]
 // CHECK: [[S2_buffer_runtime_arr_struct]] = OpTypeStruct [[S2_buffer_runtime_arr]]
 
-// CHECK: [[S3_original:%[a-zA-Z0-9_]+]] = OpTypeStruct [[uint]] [[uchar]] [[uchar]] [[uchar]]
-// CHECK: [[S1_original:%[a-zA-Z0-9_]+]] = OpTypeStruct [[uint]] [[uchar]]
+// CHECK: [[ptr_StorageBuffer_uchar:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[uchar]]
+// CHECK: [[uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
+// CHECK: [[uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 1
+// CHECK: [[uint_4:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 4
+// CHECK: [[uint_2:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 2
+// CHECK: [[ptr_StorageBuffer_uint:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[uint]]
+// CHECK: [[v4uchar:%[a-zA-Z0-9_]+]] = OpTypeVector [[uchar]] 4
+// CHECK: [[uint_3:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 3
+// CHECK: [[uint_6:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 6
+// CHECK: [[ptr_StorageBuffer_arr_uchar_uint_5:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[arr_uchar_uint_5]]
+// CHECK: [[ptr_StorageBuffer_arr_uchar_uint_7:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[arr_uchar_uint_7]]
 
-// In function bitcasts
-// CHECK: {{.*}} = OpBitcast [[ptr_S3_original:%[a-zA-Z0-9_]+]] [[test3_ptr_S3_transformed:%[a-zA-Z0-9_]+]]
-// CHECK: {{.*}} = OpBitcast [[ptr_S1_original:%[a-zA-Z0-9_]+]] [[test2_ptr_S1_transformed:%[a-zA-Z0-9_]+]]
-// CHECK: {{.*}} = OpBitcast [[ptr_S3_original]] [[test2_ptr_S3_transformed:%[a-zA-Z0-9_]+]]
-// CHECK: {{.*}} = OpBitcast [[ptr_S1_original]] [[test1_ptr_S1_transformed:%[a-zA-Z0-9_]+]]
+// In functions
+// CHECK: {{.*}} = OpFunction %void None {{.*}}
+// CHECK: {{.*}} = OpFunction %void None {{.*}}
+// CHECK: {{.*}} = OpFunction %void None {{.*}}
+// CHECK: [[a_0_x_new_type:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_StorageBuffer_arr_uchar_uint_5]] {{.*}} [[uint_0]] [[uint_0]] [[uint_0]]
+// CHECK: [[a_0_x_loaded:%[a-zA-Z0-9_]+]] = OpLoad [[arr_uchar_uint_5]] [[a_0_x_new_type]]
+// CHECK: [[first_uchar_from_v4uchar:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[uchar]] [[a_0_x_loaded]] 0
+// CHECK: [[second_uchar_from_v4uchar:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[uchar]] [[a_0_x_loaded]] 1
+// CHECK: [[third_uchar_from_v4uchar:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[uchar]] [[a_0_x_loaded]] 2
+// CHECK: [[forth_uchar_from_v4uchar:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[uchar]] [[a_0_x_loaded]] 3
+// CHECK: {{.*}} = OpCompositeInsert [[v4uchar]] [[first_uchar_from_v4uchar]] {{.*}} 0
+// CHECK: {{.*}} = OpCompositeInsert [[v4uchar]] [[second_uchar_from_v4uchar]] {{.*}} 1
+// CHECK: {{.*}} = OpCompositeInsert [[v4uchar]] [[third_uchar_from_v4uchar]] {{.*}} 2
+// CHECK: {{.*}} = OpCompositeInsert [[v4uchar]] [[forth_uchar_from_v4uchar]] {{.*}} 3
+// CHECK: [[a_0_x:%[a-zA-Z0-9_]+]] = OpBitcast [[uint]] {{.*}}
+// CHECK: [[b_0_x:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_StorageBuffer_uint]] {{.*}} [[uint_0]] [[uint_0]] [[uint_1]]
+// CHECK: OpStore [[b_0_x]] [[a_0_x]]
