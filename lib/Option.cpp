@@ -382,6 +382,11 @@ static llvm::cl::opt<bool>
                     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+    vulkan_memory_model("vulkan-memory-model",
+                        llvm::cl::desc("Use vulkan memory model"),
+                        llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
     debug_info("g", llvm::cl::init(false),
                llvm::cl::desc("Produce debug information."));
 
@@ -499,6 +504,8 @@ Vec3ToVec4SupportClass Vec3ToVec4() {
 }
 
 bool OpaquePointers() { return opaque_pointers; }
+
+bool VulkanMemoryModel() { return vulkan_memory_model; }
 
 bool DebugInfo() { return debug_info; }
 

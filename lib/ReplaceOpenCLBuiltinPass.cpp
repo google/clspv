@@ -3510,9 +3510,21 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
-    const auto ConstantMemorySemantics = ConstantInt::get(
-        IntTy, spv::MemorySemanticsUniformMemoryMask |
-                   spv::MemorySemanticsSequentiallyConsistentMask);
+    auto EqualMemorySemanticsMask =
+        clspv::Option::VulkanMemoryModel()
+            ? spv::MemorySemanticsAcquireReleaseMask
+            : spv::MemorySemanticsSequentiallyConsistentMask;
+    auto UnEqualMemorySemanticsMask =
+        clspv::Option::VulkanMemoryModel()
+            ? spv::MemorySemanticsAcquireMask
+            : spv::MemorySemanticsSequentiallyConsistentMask;
+
+    const auto EqualConstantMemorySemantics =
+        ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                    EqualMemorySemanticsMask);
+    const auto UnEqualConstantMemorySemantics =
+        ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                    UnEqualMemorySemanticsMask);
 
     SmallVector<Value *, 5> Params;
 
@@ -3523,11 +3535,11 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
     Params.push_back(ConstantScopeDevice);
 
     // The memory semantics.
-    Params.push_back(ConstantMemorySemantics);
+    Params.push_back(EqualConstantMemorySemantics);
 
     if (2 < CI->arg_size()) {
       // The unequal memory semantics.
-      Params.push_back(ConstantMemorySemantics);
+      Params.push_back(UnEqualConstantMemorySemantics);
 
       // The value.
       Params.push_back(CI->getArgOperand(2));
@@ -3548,9 +3560,12 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F,
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     auto align = F.getParent()->getDataLayout().getABITypeAlign(
         CI->getArgOperand(1)->getType());
+    auto MemorySemantics = clspv::Option::VulkanMemoryModel()
+                               ? AtomicOrdering::AcquireRelease
+                               : AtomicOrdering::SequentiallyConsistent;
+
     return new AtomicRMWInst(Op, CI->getArgOperand(0), CI->getArgOperand(1),
-                             align, AtomicOrdering::SequentiallyConsistent,
-                             SyncScope::System, CI);
+                             align, MemorySemantics, SyncScope::System, CI);
   });
 }
 

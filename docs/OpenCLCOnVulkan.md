@@ -199,9 +199,14 @@ shader is as follows:
   ID is reported in the descriptor map file, generated via the `-descriptormap`
   option.
 
-The shaders produced use the GLSL450 memory model. As such, there is an assumption of
+#### Memory Model
+
+The default shaders produced use the GLSL450 memory model. As such, there is an assumption of
 no aliasing by default. The compiler does not generate *Aliased* decorations
 currently. Users should be aware of this and ensure they are not relying on aliasing.
+
+`vulkan-memory-model` option could be used to produce Vulkan memory model shaders. Memory scopes for loads and stores in this mode will be decided
+according to the pointer type.
 
 #### Embedded Reflection Instructions
 
