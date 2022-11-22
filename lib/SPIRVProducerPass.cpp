@@ -6237,11 +6237,12 @@ bool SPIRVProducerPassImpl::isPointerUniform(Value *ptr) {
     return true;
   }
 
-  if (NonUniformPointers.count(ptr) > 0)
-    return false;
-
   while (auto gep = dyn_cast<GetElementPtrInst>(ptr)) {
     ptr = gep->getPointerOperand();
+  }
+
+  if (NonUniformPointers.count(ptr) > 0) {
+    return false;
   }
 
   bool uniformPointer = true;
