@@ -659,6 +659,7 @@ private:
   std::vector<SPIRVID> BuiltinDimensionVec;
   bool HasVariablePointersStorageBuffer;
   bool HasVariablePointers;
+  std::set<Value *> NonUniformPointers;
   bool HasNonUniformPointers;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
@@ -819,6 +820,8 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   }
 
   binaryOut = outputCInitList ? &binaryTempOut : out;
+
+  NonUniformPointers.clear();
 
   PopulateUBOTypeMaps();
   PopulateStructuredCFGMaps();
@@ -6234,8 +6237,7 @@ bool SPIRVProducerPassImpl::isPointerUniform(Value *ptr) {
     return true;
   }
 
-  static std::set<Value *> nonUniformPointer;
-  if (nonUniformPointer.count(ptr) > 0)
+  if (NonUniformPointers.count(ptr) > 0)
     return false;
 
   while (auto gep = dyn_cast<GetElementPtrInst>(ptr)) {
@@ -6249,7 +6251,7 @@ bool SPIRVProducerPassImpl::isPointerUniform(Value *ptr) {
     uniformPointer = selectFromSameObject(inst);
   }
   if (!uniformPointer) {
-    nonUniformPointer.insert(ptr);
+    NonUniformPointers.insert(ptr);
   }
   return uniformPointer;
 }
