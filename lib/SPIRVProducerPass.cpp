@@ -436,8 +436,6 @@ struct SPIRVProducerPassImpl {
 
   bool PointerRequiresLayout(unsigned aspace);
 
-  void DecoratePtrIfNonUniform(Value *ptr);
-
   SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
 
   void GenerateModuleInfo();
@@ -3408,16 +3406,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
   return RID;
 }
 
-void SPIRVProducerPassImpl::DecoratePtrIfNonUniform(Value *ptr) {
-  if (clspv::Option::DecorateNonUniform() && !isPointerUniform(ptr)) {
-    setNonUniformPointers();
-
-    SPIRVOperandVec Ops;
-    Ops << getSPIRVValue(ptr) << spv::DecorationNonUniform;
-    addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
-  }
-}
-
 SPIRVID
 SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
                                                 const FunctionInfo &FuncInfo) {
@@ -4418,8 +4406,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     addSPIRVInst(spv::OpNoLine);
   }
 
-  for (auto &op : I.operands()) {
-    DecoratePtrIfNonUniform(op);
+  if (clspv::Option::DecorateNonUniform()) {
+    for (auto &op : I.operands()) {
+      if (!isPointerUniform(op)) {
+        setNonUniformPointers();
+
+        SPIRVOperandVec Ops;
+        Ops << getSPIRVValue(op) << spv::DecorationNonUniform;
+        addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+      }
+    }
   }
 
   switch (I.getOpcode()) {
