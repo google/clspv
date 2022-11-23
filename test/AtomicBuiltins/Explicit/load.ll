@@ -37,5 +37,5 @@ declare spir_func i32 @_Z20atomic_load_explicitPU3AS4VU7_Atomici12memory_order12
 ; CHECK-LABEL: local
 ; CHECK: call i32 @_Z8spirv.op.227.{{.*}}(i32 227, i32 addrspace(3)* %atomic, i32 2, i32 258)
 ; CHECK: call i32 @_Z8spirv.op.227.{{.*}}(i32 227, i32 addrspace(3)* %atomic, i32 2, i32 256)
-; CHECK: call i32 @_Z8spirv.op.227.{{.*}}(i32 227, i32 addrspace(3)* %atomic, i32 2, i32 258)
+; CHECK: call i32 @_Z8spirv.op.227.{{.*}}(i32 227, i32 addrspace(3)* %atomic, i32 3, i32 258)
 ; CHECK: call i32 @_Z8spirv.op.227.{{.*}}(i32 227, i32 addrspace(3)* @local_mem, i32 2, i32 258)

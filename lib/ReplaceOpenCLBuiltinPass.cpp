@@ -304,6 +304,7 @@ Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
   const auto InvocationScope = builder.getInt32(spv::ScopeInvocation);
   const auto WorkgroupScope = builder.getInt32(spv::ScopeWorkgroup);
   const auto DeviceScope = builder.getInt32(spv::ScopeDevice);
+  const auto SubgroupScope = builder.getInt32(spv::ScopeSubgroup);
 
   auto base_scope = is_global ? DeviceScope : WorkgroupScope;
   if (scope == nullptr)
@@ -316,7 +317,7 @@ Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
 
   scope = builder.CreateSelect(is_work_item, InvocationScope, base_scope);
   scope = builder.CreateSelect(is_work_group, WorkgroupScope, scope);
-  scope = builder.CreateSelect(is_sub_group, WorkgroupScope, scope);
+  scope = builder.CreateSelect(is_sub_group, SubgroupScope, scope);
   scope = builder.CreateSelect(is_device, DeviceScope, scope);
 
   return scope;
