@@ -69,7 +69,6 @@ private:
     CustomDiagnosticUnsupported8BitStorage,
     CustomDiagnosticUnsupportedPipes,
     CustomDiagnosticMemoryOrderSeqCst,
-    CustomDiagnosticMemoryScopeSubGroup,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -520,11 +519,6 @@ private:
             D->getSourceRange().getBegin(),
             CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
       }
-      if (enumConstant->getName() == "memory_scope_sub_group") {
-        Instance.getDiagnostics().Report(
-            D->getSourceRange().getBegin(),
-            CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeSubGroup]);
-      }
     }
     return true;
   }
@@ -663,10 +657,6 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Warning,
             "memory_order_seq_cst is treated as memory_order_acq_rel");
-    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeSubGroup] =
-        DE.getCustomDiagID(DiagnosticsEngine::Warning,
-                           "memory_scope_sub_group is strengthened to "
-                           "memory_order_work_group");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
