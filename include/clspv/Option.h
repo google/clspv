@@ -269,6 +269,10 @@ std::set<FeatureMacro> EnabledFeatureMacros();
 // NonUniform decoration.
 bool DecorateNonUniform();
 
+// Returns true if physical storage buffers are used instead of regular storage
+// buffers
+bool PhysicalStorageBuffers();
+
 } // namespace Option
 } // namespace clspv
 

@@ -365,7 +365,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg, inferred_ty) != clspv::ArgKind::PodPushConstant) {
+          if (clspv::GetArgKind(Arg, inferred_ty) !=
+                  clspv::ArgKind::PodPushConstant &&
+              clspv::GetArgKind(Arg, inferred_ty) !=
+                  clspv::ArgKind::PointerPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }
@@ -394,7 +397,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           auto *inferred_ty = clspv::InferType(&*f_ptr->getArg(arg_index), M.getContext(), &type_cache_);
           const bool is_push_constant_arg =
               clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
-              clspv::ArgKind::PodPushConstant;
+                  clspv::ArgKind::PodPushConstant ||
+              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
+                  clspv::ArgKind::PointerPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
                   kernels_with_bodies.size() ||
@@ -563,7 +568,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         }
         case clspv::ArgKind::Pod:
         case clspv::ArgKind::PodUBO:
-        case clspv::ArgKind::PodPushConstant: {
+        case clspv::ArgKind::PodPushConstant:
+        case clspv::ArgKind::PointerUBO:
+        case clspv::ArgKind::PointerPushConstant: {
           // If original argument is:
           //   Elem %arg
           // Then make a StorageBuffer struct whose element is pod-type:
@@ -572,9 +579,11 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //
           // Use unnamed struct types so we generate less SPIR-V code.
           resource_type = StructType::get(argTy);
-          if (arg_kind == clspv::ArgKind::PodUBO)
+          if (arg_kind == clspv::ArgKind::PodUBO ||
+              arg_kind == clspv::ArgKind::PointerUBO)
             addr_space = clspv::AddressSpace::Uniform;
-          else if (arg_kind == clspv::ArgKind::PodPushConstant)
+          else if (arg_kind == clspv::ArgKind::PodPushConstant ||
+                   arg_kind == clspv::ArgKind::PointerPushConstant)
             addr_space = clspv::AddressSpace::PushConstant;
           else
             addr_space = clspv::AddressSpace::Global;
@@ -652,7 +661,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           break;
         case clspv::ArgKind::Pod:
         case clspv::ArgKind::PodUBO:
-        case clspv::ArgKind::PodPushConstant: {
+        case clspv::ArgKind::PodPushConstant:
+        case clspv::ArgKind::PointerUBO:
+        case clspv::ArgKind::PointerPushConstant: {
           // Replace with a load of the start of the (virtual) variable.
           auto *gep = Builder.CreateGEP(
               resource_type, call,

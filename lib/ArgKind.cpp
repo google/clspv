@@ -110,9 +110,32 @@ ArgKind GetArgKindForPodArgs(Function &F) {
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
+ArgKind GetArgKindForPointerPodArgs(Function &F) {
+  auto impl = GetPodArgsImpl(F);
+  switch (impl) {
+  case kUBO:
+    return ArgKind::PointerUBO;
+  case kPushConstant:
+  case kGlobalPushConstant:
+    return ArgKind::PointerPushConstant;
+  case kSSBO:
+    llvm_unreachable("SSBO PODs not supported with physical pointer arguments!");
+  }
+  llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
+}
+
 ArgKind GetArgKind(Argument &Arg, Type *data_type) {
   if (!isa<PointerType>(Arg.getType()) &&
       Arg.getParent()->getCallingConv() == CallingConv::SPIR_KERNEL) {
+
+    for (auto *Use : Arg.users()) {
+      if (auto *Instr = dyn_cast<Instruction>(Use)) {
+        if (Instr->getMetadata(clspv::PointerPodArgMetadataName())) {
+          return GetArgKindForPointerPodArgs(*Arg.getParent());
+        }
+      }
+    }
+
     return GetArgKindForPodArgs(*Arg.getParent());
   }
 
@@ -141,6 +164,10 @@ const char *GetArgKindName(ArgKind kind) {
     return "wo_image";
   case ArgKind::Sampler:
     return "sampler";
+  case ArgKind::PointerPushConstant:
+    return "pointer_pushconstant";
+  case ArgKind::PointerUBO:
+    return "pointer_ubo";
   }
   errs() << "Unhandled case in clspv::GetArgKindForType: " << int(kind) << "\n";
   llvm_unreachable("Unhandled case in clspv::GetArgKindForType");
@@ -166,8 +193,11 @@ ArgKind GetArgKindFromName(const std::string &name) {
     return ArgKind::StorageImage;
   } else if (name == "sampler") {
     return ArgKind::Sampler;
+  } else if (name == "pointer_pushconstant") {
+    return ArgKind::PointerPushConstant;
+  } else if (name == "pointer_ubo") {
+    return ArgKind::PointerUBO;
   }
-
   llvm_unreachable("Unhandled case in clspv::GetArgKindFromName");
   return ArgKind::Buffer;
 }
