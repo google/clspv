@@ -69,6 +69,7 @@ private:
     CustomDiagnosticUnsupported8BitStorage,
     CustomDiagnosticUnsupportedPipes,
     CustomDiagnosticMemoryOrderSeqCst,
+    CustomDiagnosticMemoryOrderScopeConstant,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -495,18 +496,43 @@ private:
   }
 
   bool isSupportedFunctionCall(CallExpr *C) {
-    constexpr std::array<StringRef, 2> atomic_funcs{
+    constexpr std::array<StringRef, 2> implicit_atomic_funcs{
         "atomic_flag_test_and_set",
         "atomic_flag_clear",
     };
-    const auto calleeDecl = C->getCalleeDecl();
-    if (calleeDecl) {
-      const auto declName =
+    constexpr std::array<StringRef, 2> explicit_atomic_funcs{
+        "atomic_flag_test_and_set_explicit",
+        "atomic_flag_clear_explicit",
+    };
+    const auto callee_decl = C->getCalleeDecl();
+    if (callee_decl) {
+      const auto decl_name =
           cast<FunctionDecl>(C->getCalleeDecl())->getDeclName().getAsString();
-      if (std::count(atomic_funcs.begin(), atomic_funcs.end(), declName)) {
+      if (std::count(implicit_atomic_funcs.begin(), implicit_atomic_funcs.end(),
+                     decl_name)) {
         Instance.getDiagnostics().Report(
             C->getSourceRange().getBegin(),
             CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+      }
+
+      if (std::count(explicit_atomic_funcs.begin(), explicit_atomic_funcs.end(),
+                     decl_name)) {
+        const auto order = C->getArg(1);
+        clang::Expr::EvalResult result;
+        if (!order->EvaluateAsInt(result, callee_decl->getASTContext())) {
+          Instance.getDiagnostics().Report(
+              order->getSourceRange().getBegin(),
+              CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
+          return true;
+        }
+
+        const auto scope = C->getArg(2);
+        if (!scope->EvaluateAsInt(result, callee_decl->getASTContext())) {
+          Instance.getDiagnostics().Report(
+              scope->getSourceRange().getBegin(),
+              CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
+          return true;
+        }
       }
     }
     return true;
@@ -657,6 +683,11 @@ public:
         DE.getCustomDiagID(
             DiagnosticsEngine::Warning,
             "memory_order_seq_cst is treated as memory_order_acq_rel");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "Memory order and scope must be constant expressions when using "
+            "the SPIR-V shader capability.");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {

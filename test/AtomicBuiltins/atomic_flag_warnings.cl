@@ -8,7 +8,6 @@ kernel void flag_global(global int *out, global atomic_flag *flag) {
 
 //expected-warning@+1{{memory_order_seq_cst is treated as memory_order_acq_rel}}
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
-
 //expected-warning@+1{{memory_order_seq_cst is treated as memory_order_acq_rel}}
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
 
@@ -31,7 +30,6 @@ kernel void flag_local(global int *out, local atomic_flag *flag) {
 
 //expected-warning@+1{{memory_order_seq_cst is treated as memory_order_acq_rel}}
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
-
 //expected-warning@+1{{memory_order_seq_cst is treated as memory_order_acq_rel}}
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
 
