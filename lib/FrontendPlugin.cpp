@@ -70,6 +70,9 @@ private:
     CustomDiagnosticUnsupportedPipes,
     CustomDiagnosticMemoryOrderSeqCst,
     CustomDiagnosticMemoryOrderScopeConstant,
+    CustomDiagnosticMemoryScopeAllDevices,
+    CustomDiagnosticMemoryScopeWorkItem,
+    CustomDiagnosticAtomicClearAcquire,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -524,6 +527,14 @@ private:
               order->getSourceRange().getBegin(),
               CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
           return true;
+        } else if (decl_name == explicit_atomic_funcs[1]) {
+          const auto value = result.Val.getInt();
+          if (value == 2 || value == 4) {
+            Instance.getDiagnostics().Report(
+                order->getSourceRange().getBegin(),
+                CustomDiagnosticsIDMap[CustomDiagnosticAtomicClearAcquire]);
+            return true;
+          }
         }
 
         if (C->getNumArgs() > 2) {
@@ -534,6 +545,20 @@ private:
                 CustomDiagnosticsIDMap
                     [CustomDiagnosticMemoryOrderScopeConstant]);
             return true;
+          } else {
+            const auto value = result.Val.getInt();
+            if (value == 0) {
+              Instance.getDiagnostics().Report(
+                  scope->getSourceRange().getBegin(),
+                  CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeWorkItem]);
+              return true;
+            } else if (value == 3) {
+              Instance.getDiagnostics().Report(
+                  scope->getSourceRange().getBegin(),
+                  CustomDiagnosticsIDMap
+                      [CustomDiagnosticMemoryScopeAllDevices]);
+              return true;
+            }
           }
         }
       }
@@ -691,6 +716,19 @@ public:
             DiagnosticsEngine::Error,
             "Memory order and scope must be constant expressions when using "
             "the SPIR-V shader capability.");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeAllDevices] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "memory_scope_all_svm_devices/"
+                           "memory_scope_all_devices is not supported.");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeWorkItem] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "memory_scope_work_item can only be used with "
+            "atomic_work_item_fence with flags set to CLK_IMAGE_MEM_FENCE.");
+    CustomDiagnosticsIDMap[CustomDiagnosticAtomicClearAcquire] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "The order of atomic_flag_clear_explicit cannot be "
+                           "memory_order_acquire/memory_order_acq_rel.");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {

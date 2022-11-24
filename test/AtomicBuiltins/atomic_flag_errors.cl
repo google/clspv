@@ -108,4 +108,3 @@ kernel void atomic_flag_clear_order_local(local atomic_flag *flag) {
   atomic_flag_clear_explicit(flag, memory_order_acq_rel, memory_scope_work_group);
 }
 
-
