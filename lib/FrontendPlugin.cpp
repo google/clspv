@@ -526,12 +526,15 @@ private:
           return true;
         }
 
-        const auto scope = C->getArg(2);
-        if (!scope->EvaluateAsInt(result, callee_decl->getASTContext())) {
-          Instance.getDiagnostics().Report(
-              scope->getSourceRange().getBegin(),
-              CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
-          return true;
+        if (C->getNumArgs() > 2) {
+          const auto scope = C->getArg(2);
+          if (!scope->EvaluateAsInt(result, callee_decl->getASTContext())) {
+            Instance.getDiagnostics().Report(
+                scope->getSourceRange().getBegin(),
+                CustomDiagnosticsIDMap
+                    [CustomDiagnosticMemoryOrderScopeConstant]);
+            return true;
+          }
         }
       }
     }
