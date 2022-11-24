@@ -16,8 +16,8 @@
 #define CLSPV_LIB_FEATUREMACRO_H
 
 #include <array>
-#include <utility>
 #include <string>
+#include <utility>
 
 namespace clspv {
 
