@@ -526,14 +526,13 @@ private:
           Instance.getDiagnostics().Report(
               order->getSourceRange().getBegin(),
               CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
-          return true;
         } else if (decl_name == explicit_atomic_funcs[1]) {
           const auto value = result.Val.getInt();
-          if (value == 2 || value == 4) {
+          if (value == 2 ||
+              value == 4) { // memory_order_acquire/memory_order_acq_rel
             Instance.getDiagnostics().Report(
                 order->getSourceRange().getBegin(),
                 CustomDiagnosticsIDMap[CustomDiagnosticAtomicClearAcquire]);
-            return true;
           }
         }
 
@@ -544,20 +543,17 @@ private:
                 scope->getSourceRange().getBegin(),
                 CustomDiagnosticsIDMap
                     [CustomDiagnosticMemoryOrderScopeConstant]);
-            return true;
           } else {
             const auto value = result.Val.getInt();
-            if (value == 0) {
+            if (value == 0) { // memory_scope_work_item
               Instance.getDiagnostics().Report(
                   scope->getSourceRange().getBegin(),
                   CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeWorkItem]);
-              return true;
-            } else if (value == 3) {
+            } else if (value == 3) { // memory_scope_all(_svm)_devices
               Instance.getDiagnostics().Report(
                   scope->getSourceRange().getBegin(),
                   CustomDiagnosticsIDMap
                       [CustomDiagnosticMemoryScopeAllDevices]);
-              return true;
             }
           }
         }

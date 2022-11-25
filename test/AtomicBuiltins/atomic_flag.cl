@@ -1,4 +1,4 @@
-// RUN: clspv %s --cl-std=CL3.0 --use-native-builtins=atomic_flag_test_and_set,atomic_flag_clear -o %t.spv
+// RUN: clspv %s --cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_order_seq_cst,__opencl_c_atomic_scope_device --use-native-builtins=atomic_flag_test_and_set,atomic_flag_clear -o %t.spv
 // RUN: spirv-val --target-env vulkan1.1 %t.spv
 // RUN: spirv-dis %t.spv | FileCheck %s
 

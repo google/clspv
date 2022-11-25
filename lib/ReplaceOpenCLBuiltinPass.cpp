@@ -3854,31 +3854,6 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
     const auto num_args = Call->arg_size();
     auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
     auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
-    if (scope_arg) {
-      // order_arg and scope_arg are always OpConstants
-      // see "Validation Rules for Shader Capabilities" in SPIR-V spec
-      auto scope_const = llvm::cast<ConstantInt>(scope_arg);
-
-      if (scope_const->equalsInt(static_cast<uint64_t>(
-              AtomicMemoryScope::kMemoryScopeAllSVMDevices))) {
-        llvm::errs() << "Error when replacing call to function: ";
-        Call->print(llvm::errs());
-        llvm::errs() << '\n';
-        llvm::report_fatal_error("memory_scope_all_devices/"
-                                 "memory_scope_all_svm_devices not supported!",
-                                 false);
-      }
-
-      if (scope_const->equalsInt(
-              static_cast<uint64_t>(AtomicMemoryScope::kMemoryScopeWorkItem))) {
-        llvm::errs() << "Error when replacing call to function: ";
-        Call->print(llvm::errs());
-        llvm::errs() << '\n';
-        llvm::report_fatal_error("memory_scope_work_item can only be used with "
-                                 "atomic_work_item_fence.",
-                                 false);
-      }
-    }
 
     bool is_global = flag_pointer->getType()->getPointerAddressSpace() ==
                      clspv::AddressSpace::Global;
@@ -3905,43 +3880,6 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
     const auto num_args = Call->arg_size();
     auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
     auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
-
-    if (scope_arg) {
-      // order_arg and scope_arg are always OpConstants
-      // see "Validation Rules for Shader Capabilities" in SPIR-V spec
-      auto scope_const = llvm::cast<ConstantInt>(scope_arg);
-      auto order_const = llvm::cast<ConstantInt>(order_arg);
-      if (scope_const->equalsInt(static_cast<uint64_t>(
-              AtomicMemoryScope::kMemoryScopeAllSVMDevices))) {
-        llvm::errs() << "Error when replacing call to function: ";
-        Call->print(llvm::errs());
-        llvm::errs() << '\n';
-        llvm::report_fatal_error("memory_scope_all_devices/"
-                                 "memory_scope_all_svm_devices not supported!",
-                                 false);
-      }
-      if (scope_const->equalsInt(
-              static_cast<uint64_t>(AtomicMemoryScope::kMemoryScopeWorkItem))) {
-        llvm::errs() << "Error when replacing call to function: ";
-        Call->print(llvm::errs());
-        llvm::errs() << '\n';
-        llvm::report_fatal_error("memory_scope_work_item can only be used with "
-                                 "atomic_work_item_fence.",
-                                 false);
-      }
-      if (order_const->equalsInt(
-              static_cast<uint64_t>(AtomicMemoryOrder::kMemoryOrderAcqRel)) ||
-          order_const->equalsInt(
-              static_cast<uint64_t>(AtomicMemoryOrder::kMemoryOrderAcquire))) {
-        llvm::errs() << "Error when replacing call to function: ";
-        Call->print(llvm::errs());
-        llvm::errs() << '\n';
-        llvm::report_fatal_error(
-            "The order argument shall not be memory_order_acquire nor "
-            "memory_order_acq_rel for atomic_flag_clear.",
-            false);
-      }
-    }
 
     bool is_global = flag_pointer->getType()->getPointerAddressSpace() ==
                      clspv::AddressSpace::Global;

@@ -1,6 +1,8 @@
-// RUN: clspv %s --cl-std=CL3.0 --use-native-builtins=atomic_flag_test_and_set,atomic_flag_clear -o %t.spv -verify
+// RUN: clspv %s --cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_scope_all_devices --use-native-builtins=atomic_flag_test_and_set,atomic_flag_clear -o %t.spv -verify
 
 kernel void not_constant(global int* out, global atomic_flag *flag, global int *test) {
+  // "All <id> used for Scope <id> and Memory Semantics <id> must be of an OpConstant."
+  // (when using shader capabilities)
   memory_order order = memory_order_relaxed;
   const memory_order const_order = memory_order_relaxed;
   const memory_order unknown_order =
@@ -23,6 +25,7 @@ kernel void not_constant(global int* out, global atomic_flag *flag, global int *
   // expected-error@+1{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, unknown_scope);
 
+  // expected-error@+2{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   // expected-error@+1{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   *out = atomic_flag_test_and_set_explicit(flag, order, scope);
 
@@ -40,6 +43,7 @@ kernel void not_constant(global int* out, global atomic_flag *flag, global int *
   // expected-error@+1{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   atomic_flag_clear_explicit(flag, memory_order_relaxed, unknown_scope);
 
+  // expected-error@+2{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   // expected-error@+1{{Memory order and scope must be constant expressions when using the SPIR-V shader capability.}}
   atomic_flag_clear_explicit(flag, order, scope);
 }
