@@ -18,6 +18,7 @@
 #include "llvm/IR/Instructions.h"
 
 #include "Constants.h"
+#include "PushConstant.h"
 
 #include "PrintfPass.h"
 
@@ -98,7 +99,6 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   auto *ConstantAllocSize = ConstantInt::get(Int32Ty, AllocSizeInts);
   auto *ConstantBuffSize =
       ConstantInt::get(Int32Ty, clspv::Option::PrintfBufferSize());
-  auto *Buffer = M.getNamedGlobal(clspv::PrintfBufferVariableName());
   const auto &DL = M.getDataLayout();
 
   auto *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
@@ -106,11 +106,23 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   auto *ExitBB = BasicBlock::Create(Ctx, "exit", Func);
   IRBuilder<> IR{EntryBB};
 
+  auto *BufferArrayTy = ArrayType::get(Int32Ty, 0);
+  auto *BufferTy = StructType::get(BufferArrayTy);
+  Value *Buffer;
+  if (clspv::Option::PhysicalStorageBuffers()) {
+    auto *BufferAddressPtr = clspv::GetPushConstantPointer(
+        EntryBB, clspv::PushConstant::PrintfBufferPointer);
+    auto *BufferAddress = IR.CreateLoad(IR.getInt64Ty(), BufferAddressPtr);
+    Buffer = IR.CreateIntToPtr(
+        BufferAddress, PointerType::get(BufferTy, clspv::AddressSpace::Global));
+  } else {
+    Buffer = M.getNamedGlobal(clspv::PrintfBufferVariableName());
+  }
+
   // Try to reserve a block of the printf buffer. The first i32 of the buffer
   // stores the offset of the next available memory
-  auto *GEP =
-      GetElementPtrInst::Create(Buffer->getValueType(), Buffer,
-                                {ConstantZero, ConstantZero, ConstantZero});
+  auto *GEP = GetElementPtrInst::Create(
+      BufferTy, Buffer, {ConstantZero, ConstantZero, ConstantZero});
   IR.Insert(GEP);
   Value *Offset =
       IR.CreateAtomicRMW(AtomicRMWInst::Add, GEP, ConstantAllocSize,
@@ -125,7 +137,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   IR.SetInsertPoint(BodyBB);
   // Store the printf ID
   auto *PrintfIDGEP = GetElementPtrInst::Create(
-      Buffer->getValueType(), Buffer, {ConstantZero, ConstantZero, Offset});
+      BufferTy, Buffer, {ConstantZero, ConstantZero, Offset});
   IR.Insert(PrintfIDGEP);
   IR.CreateStore(ConstantPrintfID, PrintfIDGEP);
   Offset = IR.CreateAdd(Offset, ConstantOne);
@@ -152,12 +164,13 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
     }
 
     Value *ArgStoreGEP = GetElementPtrInst::Create(
-        Buffer->getValueType(), Buffer, {ConstantZero, ConstantZero, Offset});
+        BufferTy, Buffer, {ConstantZero, ConstantZero, Offset});
     IR.Insert(ArgStoreGEP);
 
     // If the integer is now anything but i32, bitcast the pointer
     if (Arg->getType() != Int32Ty) {
-      auto *NewTy = PointerType::get(Arg->getType(), Buffer->getAddressSpace());
+      auto *NewTy =
+          PointerType::get(Arg->getType(), clspv::AddressSpace::Global);
       ArgStoreGEP = IR.CreatePointerCast(ArgStoreGEP, NewTy);
     }
 
@@ -195,28 +208,36 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
   auto *Int32Ty = IntegerType::getInt32Ty(Ctx);
   auto *BufferTy = ArrayType::get(Int32Ty, 0);
   auto *PrintfBufferTy = StructType::get(BufferTy);
-  M.getOrInsertGlobal(PrintfBufferVariableName(), PrintfBufferTy, [&] {
-    GlobalVariable *GV = new GlobalVariable(
-        M, PrintfBufferTy, /*isConstant=*/false, GlobalValue::ExternalLinkage,
-        nullptr, PrintfBufferVariableName(), nullptr,
-        GlobalValue::NotThreadLocal, clspv::AddressSpace::Global);
-    GV->setAlignment(Align(1));
-    return GV;
-  });
+  if (!clspv::Option::PhysicalStorageBuffers()) {
+    M.getOrInsertGlobal(PrintfBufferVariableName(), PrintfBufferTy, [&] {
+      GlobalVariable *GV = new GlobalVariable(
+          M, PrintfBufferTy, /*isConstant=*/false, GlobalValue::ExternalLinkage,
+          nullptr, PrintfBufferVariableName(), nullptr,
+          GlobalValue::NotThreadLocal, clspv::AddressSpace::Global);
+      GV->setAlignment(Align(1));
+      return GV;
+    });
+  }
 
   unsigned PrintfID = 0;
 
+  SmallVector<Function *, 8> FunctionsUsingPrintf;
   SmallVector<CallInst *, 8> PrintfsToProcess;
   for (auto &F : M) {
+    bool UsesPrintf = false;
     for (auto &BB : F) {
       for (auto &Inst : BB) {
         if (auto *CI = dyn_cast<CallInst>(&Inst)) {
           auto *Callee = CI->getCalledFunction();
           if (Callee->getName() == "printf") {
             PrintfsToProcess.push_back(CI);
+            UsesPrintf = true;
           }
         }
       }
+    }
+    if (UsesPrintf) {
+      FunctionsUsingPrintf.push_back(&F);
     }
   }
 
@@ -262,6 +283,23 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     }
 
     DefinePrintfInstance(M, CI, PrintfCallID);
+  }
+
+  for (auto &F : FunctionsUsingPrintf) {
+    if (F->getCallingConv() == CallingConv::SPIR_KERNEL) {
+      if (!F->getMetadata(clspv::PrintfKernelMetadataName())) {
+        F->addMetadata(clspv::PrintfKernelMetadataName(),
+                       *MDNode::get(M.getContext(), {}));
+      }
+    } else {
+      for (auto &F : M) {
+        if (!F.getMetadata(clspv::PrintfKernelMetadataName())) {
+          F.addMetadata(clspv::PrintfKernelMetadataName(),
+                        *MDNode::get(M.getContext(), {}));
+        }
+        break;
+      }
+    }
   }
 
   // Tidy up metadata if there were no printfs

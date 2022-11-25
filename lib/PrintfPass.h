@@ -19,11 +19,11 @@
 #define _CLSPV_LIB_PRINTF_PASS_H
 
 namespace clspv {
-struct PrintfPass
-    : llvm::PassInfoMixin<PrintfPass> {
+struct PrintfPass : llvm::PassInfoMixin<PrintfPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 private:
-  // Find the underlying compile-time string literal, if any, for the given value
+  // Find the underlying compile-time string literal, if any, for the given
+  // value
   std::string GetStringLiteral(llvm::Value *);
 
   // Get the printf buffer storage size for the given type
