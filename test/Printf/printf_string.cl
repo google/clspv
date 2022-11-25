@@ -25,6 +25,6 @@ kernel void test() {
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[zero]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[one]]
 
-// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferInfo
+// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[zero]] %[[string0]] %[[four]]
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[one]] %[[string1]]

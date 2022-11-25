@@ -31,5 +31,5 @@ kernel void test() {
 // CHECK: %[[printf_st_access:[0-9a-zA-Z_]+]] = OpAccessChain %{{[0-9a-zA-Z_]+}} %[[printf_buffer]] %[[zero]] %[[printf_st_offset]]
 // CHECK: OpStore %[[printf_st_access]] %[[zero]]
 
-// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferInfo
+// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[zero]] %[[string0]]

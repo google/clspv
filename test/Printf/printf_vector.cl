@@ -105,5 +105,5 @@ kernel void test(char2 c, short2 s, int2 i, float8 f, long4 l) {
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_l_b_2]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_l_b_3]]
 
-// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferInfo
+// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[zero]] %[[string0]] %[[four]] %[[four]] %[[eight]] %[[const_32]] %[[const_32]]

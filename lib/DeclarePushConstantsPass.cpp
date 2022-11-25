@@ -64,6 +64,10 @@ clspv::DeclarePushConstantsPass::run(Module &M, ModuleAnalysisManager &) {
     PushConstants.push_back(clspv::PushConstant::ModuleConstantsPointer);
   }
 
+  if (clspv::ShouldDeclarePrintfBufferPointerPushConstant(M)) {
+    PushConstants.push_back(clspv::PushConstant::PrintfBufferPointer);
+  }
+
   if (PushConstants.size() > 0) {
 
     std::vector<Type *> Members;

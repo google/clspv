@@ -18,4 +18,4 @@ kernel void test() {
 // CHECK: %[[ReflectionImport:[0-9a-zA-Z_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32
 // CHECK: %[[uint128:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 128
-// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferInfo %{{[0-9a-zA-Z_]+}} %{{[0-9a-zA-Z_]+}} %[[uint128]]
+// CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer %{{[0-9a-zA-Z_]+}} %{{[0-9a-zA-Z_]+}} %[[uint128]]

@@ -6691,6 +6691,9 @@ void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
       case PushConstant::RegionGroupOffset:
         pc_inst = reflection::ExtInstPushConstantRegionGroupOffset;
         break;
+      case PushConstant::PrintfBufferPointer:
+        pc_inst = reflection::ExtInstPrintfBufferPointerPushConstant;
+        break;
       default:
         llvm_unreachable("Unhandled push constant");
         break;
@@ -6702,6 +6705,10 @@ void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
       Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
           << pc_inst << getSPIRVInt32Constant(offset)
           << getSPIRVInt32Constant(size);
+
+      if (pc == PushConstant::PrintfBufferPointer) {
+        Ops << getSPIRVInt32Constant(clspv::Option::PrintfBufferSize());
+      }
       addSPIRVInst(spv::OpExtInst, Ops);
     }
   }
@@ -6814,15 +6821,22 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
       num_args = F.getFunctionType()->getNumParams();
     }
 
+    uint32_t kernel_flags = reflection::ExtKernelPropertyFlags::None;
+    if (F.hasMetadata(clspv::PrintfKernelMetadataName())) {
+      kernel_flags |= reflection::ExtKernelPropertyFlags::MayUsePrintf;
+    }
+
     // Kernel declaration
     // Ops[0] = void type
     // Ops[1] = reflection ext import
     // Ops[2] = function id
     // Ops[3] = kernel name
     // Ops[4] = number of arguments
+    // Ops[5] = kernel property flags
     SPIRVOperandVec Ops;
     Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
-        << kernel_name << getSPIRVInt32Constant(num_args);
+        << kernel_name << getSPIRVInt32Constant(num_args)
+        << getSPIRVInt32Constant(kernel_flags);
     auto kernel_decl = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
     // Generate the required workgroup size property if it was specified.
