@@ -28,6 +28,7 @@ enum class PushConstant : int {
   KernelArgument,
   ImageMetadata,
   ModuleConstantsPointer,
+  PrintfBufferPointer,
 };
 
 enum class ImageMetadata : int {

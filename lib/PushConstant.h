@@ -57,6 +57,9 @@ bool ShouldDeclareRegionGroupOffsetPushConstant(llvm::Module &);
 // Returns true if module-scope constants pointer is needed.
 bool ShouldDeclareModuleConstantsPointerPushConstant(llvm::Module &);
 
+// Returns true if printf buffer pointer is needed.
+bool ShouldDeclarePrintfBufferPointerPushConstant(llvm::Module &);
+
 // Returns the type of the global push constants struct.
 llvm::StructType *GlobalPushConstantsType(llvm::Module &);
 

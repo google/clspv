@@ -158,6 +158,9 @@ inline std::string PointerPodArgMetadataName() {
 inline std::string CLSPVBuiltinsUsed() { return "clspv.builtins.used"; }
 
 inline std::string PrintfMetadataName() { return "clspv.printf_metadata"; }
+
+inline std::string PrintfKernelMetadataName() {
+  return "clspv.kernel_uses_printf";
 }
 
 inline std::string PrintfBufferVariableName() {
