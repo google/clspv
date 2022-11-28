@@ -176,15 +176,12 @@ enum class AtomicMemoryOrder : uint32_t {
   kMemoryOrderSeqCst = 5
 };
 
-// https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/vkspec.html#shaders-execution-memory-ordering
-// The SPIR-V SubgroupMemory, CrossWorkgroupMemory, and AtomicCounterMemory
-// memory semantics are ignored.
 enum class AtomicMemoryScope : uint32_t {
   kMemoryScopeWorkItem = 0,
   kMemoryScopeWorkGroup = 1,
   kMemoryScopeDevice = 2,
   kMemoryScopeAllSVMDevices = 3, // not supported
-  kMemoryScopeSubGroup = 4       // not supported
+  kMemoryScopeSubGroup = 4
 };
 
 uint32_t clz(uint32_t v) {
@@ -3863,9 +3860,9 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
     auto scope = MemoryScope(scope_arg, is_global, Call);
     IRBuilder<> builder(Call);
     auto set_value = builder.getInt32(1);
-    auto previous_value = InsertSPIRVOp(
-        Call, spv::OpAtomicExchange, {Attribute::Convergent},
-        set_value->getType(), {flag_pointer, scope, semantics, set_value});
+    auto previous_value =
+        InsertSPIRVOp(Call, spv::OpAtomicExchange, {}, set_value->getType(),
+                      {flag_pointer, scope, semantics, set_value});
     return builder.CreateICmpEQ(previous_value, set_value);
   });
 }
@@ -3891,8 +3888,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
 
     IRBuilder<> builder(Call);
     auto clear_value = builder.getInt32(0);
-    return InsertSPIRVOp(Call, spv::OpAtomicStore, {Attribute::Convergent},
-                         builder.getVoidTy(),
+    return InsertSPIRVOp(Call, spv::OpAtomicStore, {}, builder.getVoidTy(),
                          {flag_pointer, scope, semantics, clear_value});
   });
 }
