@@ -509,6 +509,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::DeclarePushConstantsPass());
     pm.addPass(clspv::DefineOpenCLWorkItemBuiltinsPass());
 
+    // RewritePackedStructsPass will rewrite packed struct types, and
+    // ReplacePointerBitcastPass will lower the new packed struct type. So,
+    // RewritePackedStructsPass must come before ReplacePointerBitcastPass.
+    if (clspv::Option::RewritePackedStructs()) {
+      pm.addPass(clspv::RewritePackedStructs());
+    }
+
     if (level.getSpeedupLevel() > 0) {
       pm.addPass(clspv::OpenCLInlinerPass());
     }
@@ -627,15 +634,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-
-    if (clspv::Option::RewritePackedStructs()) {
-      if (!clspv::Option::Int8Support()) {
-        llvm_unreachable(
-            "Int8 has to be supported with rewrite-packed-structs option");
-      }
-      pm.addPass(clspv::RewritePackedStructs());
-    }
-
+  
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {
@@ -753,6 +752,12 @@ int ParseOptions(const int argc, const char *const argv[]) {
 
   if (clspv::Option::ScalarBlockLayout()) {
     llvm::errs() << "scalar block layout support unimplemented\n";
+    return -1;
+  }
+
+  if (clspv::Option::RewritePackedStructs() && !clspv::Option::Int8Support()) {
+    llvm::errs()
+        << "Int8 has to be supported with rewrite-packed-structs option";
     return -1;
   }
 

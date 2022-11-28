@@ -293,7 +293,7 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
   if (!IsGEPUser) {
     while (true) {
       OutAddrIdxs.push_back(Builder.getInt32(0));
-      if ((SrcTy->isArrayTy() || SrcTy->isVectorTy()) &&
+      if ((SrcTy->isArrayTy() || SrcTy->isVectorTy() || SrcTy->isStructTy()) &&
           SrcTyBitWidth > DstTyBitWidth && SrcEleTyBitWidth >= DstTyBitWidth) {
         SrcTy = GetEleType(SrcTy);
         SrcTyBitWidth = SrcEleTyBitWidth;
@@ -308,8 +308,9 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
       OutAddrIdxs.push_back(OrgGEPIdx);
     } else {
       OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
-      while ((SrcTy->isVectorTy() || SrcTy->isArrayTy()) &&
-             SrcTyBitWidth > DstTyBitWidth) {
+      while (
+          (SrcTy->isVectorTy() || SrcTy->isArrayTy() || SrcTy->isStructTy()) &&
+          SrcTyBitWidth > DstTyBitWidth) {
         SrcTy = GetEleType(SrcTy);
         SrcTyBitWidth = SrcEleTyBitWidth;
         SrcEleTy = GetEleType(SrcTy);
@@ -337,6 +338,12 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
                    Value *Src, Type *SrcTy, Type *DstTy,
                    SmallVector<Value *, 4> &NewAddrIdxs,
                    WeakInstructions &ToBeDeleted) {
+  bool isPackedStructSrc = false;
+
+  if (auto StructTy = dyn_cast<StructType>(SrcTy)) {
+    isPackedStructSrc = StructTy->isPacked();
+  }
+
   Type *DstEleTy = GetEleType(DstTy);
   unsigned DstTyBitWidth = SizeInBits(Builder, DstTy);
   unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
@@ -370,7 +377,12 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
 
   // If load values are array, extract scalar elements from them.
   if (SrcTy->isArrayTy()) {
-    ExtractFromArray(Builder, LDValues);
+    // If the main source of the array was from a packed struct, extract values
+    if (isPackedStructSrc) {
+      ExtractFromArray(Builder, LDValues, isPackedStructSrc, DstEleTyBitWidth);
+    } else {
+      ExtractFromArray(Builder, LDValues);
+    }
     SrcTy = SrcEleTy;
     SrcTyBitWidth = SrcEleTyBitWidth;
   }
@@ -472,8 +484,9 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
     }
     // SrcTy: <N x s> - DstTy: <M x d>
     // we have: N*s > M*d && s <= M*d
-    // thus: N > 1, which means that source is either a vector or an array.
-    assert(SrcTy->isVectorTy() || SrcTy->isArrayTy());
+    // thus: N > 1, which means that source is either a vector or an array or a
+    // struct.
+    assert(SrcTy->isVectorTy() || SrcTy->isArrayTy() || SrcTy->isStructTy());
 
     // SrcTy: <4 x i32> - DstTy: i64
     // Let's convert i64 into the element type (i32) as we could not store a
@@ -660,6 +673,15 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
                 break;
               }
             }
+            // Skip bitcasts that would have a src type of opaque or packed
+            // (having more than one type) structs.
+            if (auto StructTy = dyn_cast<StructType>(
+                    Src->getType()->getNonOpaquePointerElementType())) {
+              if (StructTy->isOpaque() ||
+                  (StructTy->isPacked() && StructTy->getNumElements() != 1)) {
+                ok = false;
+              }
+            }
             if (!ok) {
               continue;
             }
@@ -742,6 +764,11 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       if (auto GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
         IRBuilder<> Builder(GEP);
         unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
+
+        // TODO: handle GEPs with multiple indexes
+        if (GEP->getNumOperands() > 2) {
+          continue;
+        }
 
         // Build new src/dst address.
         Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);

@@ -29,7 +29,9 @@ size_t SizeInBits(IRBuilder<> &builder, Type *Ty);
 Type *GetEleType(Type *Ty);
 unsigned GetNumEle(Type *Ty);
 
-void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values);
+void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
+                      bool isPackedStructSource = false,
+                      unsigned DstTySize = 0);
 void ExtractFromVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values);
 void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
                        unsigned NumElePerVec, Type *Ty);

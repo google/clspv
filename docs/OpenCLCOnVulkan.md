@@ -551,7 +551,6 @@ The following attributes are ignored in the OpenCL C source, and thus have
 no functional impact on the produced SPIR-V:
 
 - `__attribute__((work_group_size_hint(X, Y, Z)))`
-- `__attribute__((packed))`
 - `__attribute__ ((endian(host)))`
 - `__attribute__ ((endian(device)))`
 - `__attribute__((vec_type_hint(<typen>)))`
@@ -602,6 +601,13 @@ instructions.
 
 Signed integer types are mapped down onto their unsigned equivalents in SPIR-V
 as produced from OpenCL C.
+
+#### Packed Structs
+
+Packed structs are not normally mapped to Vulkan shaders. If the `-rewrite-packed-structs` option is passed,
+packed structs will be transformed to another struct that holds one member which is an array
+of chars of the same size of the original packed struct, so that we preserve the struct size and layout on compilation. 
+eg: <{ int, char }> -> <{ [5 x char] }>.
 
 ### OpenCL C Built-In Functions
 

@@ -43,13 +43,19 @@ size_t SizeInBits(IRBuilder<> &builder, Type *Ty) {
       builder.GetInsertBlock()->getParent()->getParent()->getDataLayout(), Ty);
 }
 
-// Returns the element type when 'Ty' is a vector or an array, otherwise returns
-// 'Ty'.
+// Returns the element type when 'Ty' is a vector, an array, or a packed struct
+// with only one type, otherwise returns 'Ty'.
 Type *GetEleType(Type *Ty) {
   if (auto VecTy = dyn_cast<VectorType>(Ty)) {
     return VecTy->getElementType();
   } else if (auto ArrTy = dyn_cast<ArrayType>(Ty)) {
     return ArrTy->getElementType();
+  } else if (auto StructTy = dyn_cast<StructType>(Ty)) {
+    if (!StructTy->isOpaque() && StructTy->isPacked() &&
+        StructTy->getNumElements() == 1) {
+      return StructTy->getContainedType(0);
+    }
+    return Ty;
   } else {
     return Ty;
   }
@@ -287,13 +293,18 @@ void ExtractFromVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
 // 'Values' is expected to contain arrays.
 // 'Values is also the output of this function, containing all the elements of
 // the input arrays.
-void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values) {
+void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
+                      bool isPackedStructSrc, unsigned DstTySize) {
   DEBUG_FCT_VALUES(Values);
   SmallVector<Value *, 8> ScalarValues;
   Type *ValueTy = Values[0]->getType();
+  unsigned CharSize = 8;
+  unsigned NumElements =
+      isPackedStructSrc ? DstTySize / CharSize : GetNumEle(ValueTy);
+  assert(NumElements != 0);
   assert(ValueTy->isArrayTy());
   for (unsigned i = 0; i < Values.size(); i++) {
-    for (unsigned j = 0; j < GetNumEle(ValueTy); j++) {
+    for (unsigned j = 0; j < NumElements; j++) {
       ScalarValues.push_back(Builder.CreateExtractValue(Values[i], j));
     }
   }
@@ -673,7 +684,7 @@ void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
 
 // Convert values contained in 'Values' into values of type 'Ty'.
 // Input values are expected to be either vectors or scalars.
-// 'Ty' is expected to be either a vector, an array or a scalar type.
+// 'Ty' is expected to be either a vector, an array, a struct or a scalar type.
 // Return the converted values into 'Values'.
 void ConvertInto(Type *Ty, IRBuilder<> &Builder,
                  SmallVector<Value *, 8> &Values) {
@@ -689,6 +700,8 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
     } else {
       ConvertScalarIntoVector(VecTy, Builder, Values);
     }
+  } else if (auto StructTy = dyn_cast<StructType>(Ty)) {
+    ConvertScalarIntoScalar(StructTy, Builder, Values);
   } else {
     Type *EleTy = GetEleType(Ty);
     if (ValueTy->isVectorTy()) {
