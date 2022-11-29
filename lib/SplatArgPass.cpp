@@ -105,6 +105,13 @@ void clspv::SplatArgPass::replaceCall(Function *NewCallee, CallInst *Call) {
           Builder.CreateVectorSplat(VTy->getElementCount().getKnownMinValue(),
                                     Call->getArgOperand(i), "arg_splat");
       Call->setArgOperand(i, NewArg);
+      // We might have just replaced a scalar integer type with a vector type
+      // and carried across some attributes which are illegal for vector types,
+      // so drop those now.
+      if(NewArg->getType()->getScalarType()->isIntegerTy()) {
+        Call->removeParamAttr(i, Attribute::SExt);
+        Call->removeParamAttr(i, Attribute::ZExt);
+      }
     }
   }
 
