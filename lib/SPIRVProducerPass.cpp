@@ -4439,7 +4439,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     addSPIRVInst(spv::OpNoLine);
   }
 
-  if (clspv::Option::DecorateNonUniform()) {
+  if (clspv::Option::DecorateNonUniform() &&
+      I.getOpcode() != Instruction::PHI) {
     for (auto &op : I.operands()) {
       if (!isPointerUniform(op)) {
         setNonUniformPointers();
