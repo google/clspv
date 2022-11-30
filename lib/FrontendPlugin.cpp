@@ -27,6 +27,7 @@
 #include "Constants.h"
 #include "FrontendPlugin.h"
 
+#include <algorithm>
 #include <unordered_set>
 
 using namespace clang;
@@ -67,6 +68,11 @@ private:
     CustomDiagnosticUnsupported16BitStorage,
     CustomDiagnosticUnsupported8BitStorage,
     CustomDiagnosticUnsupportedPipes,
+    CustomDiagnosticMemoryOrderSeqCst,
+    CustomDiagnosticMemoryOrderScopeConstant,
+    CustomDiagnosticMemoryScopeAllDevices,
+    CustomDiagnosticMemoryScopeWorkItem,
+    CustomDiagnosticAtomicClearAcquire,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -177,9 +183,10 @@ private:
 
     // Reject Pipe types with an error
     if (Ty->getTypeClass() == Type::Pipe) {
-        Instance.getDiagnostics().Report(
-            SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes]);
-        return false;
+      Instance.getDiagnostics().Report(
+          SR.getBegin(),
+          CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes]);
+      return false;
     }
 
     // First check if we have a pointer type.
@@ -252,7 +259,7 @@ private:
     }
 
     if (QT->isEnumeralType()) {
-        return true;
+      return true;
     }
 
     if (QT->isBuiltinType()) {
@@ -491,6 +498,81 @@ private:
     return true;
   }
 
+  bool isSupportedFunctionCall(CallExpr *C) {
+    constexpr std::array<StringRef, 2> implicit_atomic_funcs{
+        "atomic_flag_test_and_set",
+        "atomic_flag_clear",
+    };
+    constexpr std::array<StringRef, 2> explicit_atomic_funcs{
+        "atomic_flag_test_and_set_explicit",
+        "atomic_flag_clear_explicit",
+    };
+    const auto callee_decl = C->getCalleeDecl();
+    if (callee_decl) {
+      const auto decl_name =
+          cast<FunctionDecl>(C->getCalleeDecl())->getDeclName().getAsString();
+      if (std::count(implicit_atomic_funcs.begin(), implicit_atomic_funcs.end(),
+                     decl_name)) {
+        Instance.getDiagnostics().Report(
+            C->getSourceRange().getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+      }
+
+      if (std::count(explicit_atomic_funcs.begin(), explicit_atomic_funcs.end(),
+                     decl_name)) {
+        const auto order = C->getArg(1);
+        clang::Expr::EvalResult result;
+        if (!order->EvaluateAsInt(result, callee_decl->getASTContext())) {
+          Instance.getDiagnostics().Report(
+              order->getSourceRange().getBegin(),
+              CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant]);
+        } else if (decl_name == explicit_atomic_funcs[1]) {
+          const auto value = result.Val.getInt();
+          if (value == 2 ||
+              value == 4) { // memory_order_acquire/memory_order_acq_rel
+            Instance.getDiagnostics().Report(
+                order->getSourceRange().getBegin(),
+                CustomDiagnosticsIDMap[CustomDiagnosticAtomicClearAcquire]);
+          }
+        }
+
+        if (C->getNumArgs() > 2) {
+          const auto scope = C->getArg(2);
+          if (!scope->EvaluateAsInt(result, callee_decl->getASTContext())) {
+            Instance.getDiagnostics().Report(
+                scope->getSourceRange().getBegin(),
+                CustomDiagnosticsIDMap
+                    [CustomDiagnosticMemoryOrderScopeConstant]);
+          } else {
+            const auto value = result.Val.getInt();
+            if (value == 0) { // memory_scope_work_item
+              Instance.getDiagnostics().Report(
+                  scope->getSourceRange().getBegin(),
+                  CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeWorkItem]);
+            } else if (value == 3) { // memory_scope_all(_svm)_devices
+              Instance.getDiagnostics().Report(
+                  scope->getSourceRange().getBegin(),
+                  CustomDiagnosticsIDMap
+                      [CustomDiagnosticMemoryScopeAllDevices]);
+            }
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  bool isSupportedDeclRef(DeclRefExpr *D) {
+    if (auto enumConstant = dyn_cast<EnumConstantDecl>(D->getDecl())) {
+      if (enumConstant->getName() == "memory_order_seq_cst") {
+        Instance.getDiagnostics().Report(
+            D->getSourceRange().getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst]);
+      }
+    }
+    return true;
+  }
+
   // This will be used to check the inside of function bodies.
   class DeclVisitor : public RecursiveASTVisitor<DeclVisitor> {
   private:
@@ -512,6 +594,13 @@ private:
     bool VisitValueDecl(TypeDecl *TD) {
       QualType DefinedType = TD->getASTContext().getTypeDeclType(TD);
       return consumer.IsSupportedType(DefinedType, TD->getSourceRange(), false);
+    }
+
+    bool VisitCallExpr(CallExpr *C) {
+      return consumer.isSupportedFunctionCall(C);
+    }
+    bool VisitDeclRefExpr(DeclRefExpr *D) {
+      return consumer.isSupportedDeclRef(D);
     }
   };
 
@@ -613,8 +702,29 @@ public:
                            "8-bit storage is not supported for "
                            "%select{SSBOs|UBOs|push constants}0");
     CustomDiagnosticsIDMap[CustomDiagnosticUnsupportedPipes] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error, "pipes are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderSeqCst] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Warning,
+            "memory_order_seq_cst is treated as memory_order_acq_rel");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryOrderScopeConstant] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "Memory order and scope must be constant expressions when using "
+            "the SPIR-V shader capability.");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeAllDevices] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
-                           "pipes are not supported");
+                           "memory_scope_all_svm_devices/"
+                           "memory_scope_all_devices is not supported.");
+    CustomDiagnosticsIDMap[CustomDiagnosticMemoryScopeWorkItem] =
+        DE.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "memory_scope_work_item can only be used with "
+            "atomic_work_item_fence with flags set to CLK_IMAGE_MEM_FENCE.");
+    CustomDiagnosticsIDMap[CustomDiagnosticAtomicClearAcquire] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "The order of atomic_flag_clear_explicit cannot be "
+                           "memory_order_acquire/memory_order_acq_rel.");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
