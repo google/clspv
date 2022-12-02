@@ -3559,10 +3559,10 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
         PointerRequiresLayout(dst->getType()->getPointerAddressSpace());
     auto src_layout =
         PointerRequiresLayout(src->getType()->getPointerAddressSpace());
-    auto dst_id =
-        getSPIRVType(dst->getType()->getPointerElementType(), dst_layout);
-    auto src_id =
-        getSPIRVType(src->getType()->getPointerElementType(), src_layout);
+    auto dst_id = getSPIRVType(
+        InferType(dst, module->getContext(), &InferredTypeCache), dst_layout);
+    auto src_id = getSPIRVType(
+        InferType(src, module->getContext(), &InferredTypeCache), src_layout);
     SPIRVOperandVec Ops;
     if (dst_id.get() != src_id.get()) {
       assert(Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4);
@@ -3570,16 +3570,13 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
       // OpLoad
       // OpCopyLogical
       // OpStore
-      auto load_type_id =
-          getSPIRVType(src->getType()->getPointerElementType(), src_layout);
-      Ops << load_type_id << src << MemoryAccess
+
+      Ops << src_id << src << MemoryAccess
           << static_cast<uint32_t>(SrcAlignment);
       auto load = addSPIRVInst(spv::OpLoad, Ops);
 
-      auto copy_type_id =
-          getSPIRVType(dst->getType()->getPointerElementType(), dst_layout);
       Ops.clear();
-      Ops << copy_type_id << load;
+      Ops << dst_id << load;
       auto copy = addSPIRVInst(spv::OpCopyLogical, Ops);
 
       Ops.clear();
@@ -6046,19 +6043,11 @@ bool SPIRVProducerPassImpl::IsTypeNullable(const Type *type) const {
   case Type::IntegerTyID:
   case Type::FixedVectorTyID:
     return true;
-  case Type::PointerTyID: {
-    const PointerType *pointer_type = cast<PointerType>(type);
-    if (pointer_type->getPointerAddressSpace() !=
-        AddressSpace::UniformConstant) {
-      auto pointee_type = pointer_type->getPointerElementType();
-      if (pointee_type->isStructTy() &&
-          cast<StructType>(pointee_type)->isOpaque()) {
-        // Images and samplers are not nullable.
-        return false;
-      }
-    }
+  case Type::PointerTyID:
+    // TODO(#816): samplers and images should not be nulled, but we lack that
+    // information here. That said, an undef image/sampler is likely already
+    // problematic (e.g. due to a phi).
     return true;
-  }
   case Type::ArrayTyID:
     return IsTypeNullable(type->getArrayElementType());
   case Type::StructTyID: {
