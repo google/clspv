@@ -6043,11 +6043,21 @@ bool SPIRVProducerPassImpl::IsTypeNullable(const Type *type) const {
   case Type::IntegerTyID:
   case Type::FixedVectorTyID:
     return true;
-  case Type::PointerTyID:
+  case Type::PointerTyID: {
     // TODO(#816): samplers and images should not be nulled, but we lack that
     // information here. That said, an undef image/sampler is likely already
     // problematic (e.g. due to a phi).
-    return true;
+    const PointerType *pointer_type = cast<PointerType>(type);
+    if (!pointer_type->isOpaquePointerTy() &&
+        pointer_type->getPointerAddressSpace() !=
+            AddressSpace::UniformConstant) {
+      auto pointee_type = pointer_type->getPointerElementType();
+      if (pointee_type->isStructTy() &&
+          cast<StructType>(pointee_type)->isOpaque()) {
+        // Images and samplers are not nullable.
+        return false;
+      }
+    }
   case Type::ArrayTyID:
     return IsTypeNullable(type->getArrayElementType());
   case Type::StructTyID: {
