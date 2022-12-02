@@ -135,12 +135,14 @@ Or if you are using Ninja:
 [SPIRV-Headers]: https://github.com/KhronosGroup/SPIRV-Headers
 [SPIRV-Tools]: https://github.com/KhronosGroup/SPIRV-Tools
 
-## Builtin Library
+## Builtin Libraries
 
-Clspv includes an LLVM IR library (cmake/clspv--.bc) containing implementations
-of some OpenCL builtin functions. This file is distributed under the LLVM
-license (included in LICENSE) as it is generated from the LLVM sub-project
-[libclc](https://libclc.llvm.org). Refer to the source for the relevant copyrights.
+Clspv includes two LLVM IR libraries (cmake/clspv--.bc, cmake/clspv64--.bc)
+containing implementations of some OpenCL builtin functions, for the spir and
+spir64 targets respectively. These files are distributed under the LLVM license
+(included in LICENSE) as they are generated from the LLVM sub-project
+[libclc](https://libclc.llvm.org). Refer to the source for the relevant
+copyrights.
 
 ### Rebuilding the Library
 
@@ -153,7 +155,8 @@ your system, CMake, and (optionally) Ninja.
 
 To rebuild the library run the following commands:
 
-    cmake -GNinja <libclc dir> -DLIBCLC_TARGETS_TO_BUILD="clspv--" -DLLVM_CONFIG=<path to llvm-config>
+    cmake -GNinja <libclc dir> -DLIBCLC_TARGETS_TO_BUILD="clspv--;clspv64--" -DLLVM_CMAKE_DIR=</path/to/llvm_installation/lib/cmake/>
     ninja
 
-Copy the resulting `clspv--.bc` into the cmake/ directory and rebuild clspv.
+Copy the resulting `clspv--.bc` and `clspv64--.bc` files into the cmake/
+directory and rebuild clspv.
