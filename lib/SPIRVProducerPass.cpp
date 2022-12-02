@@ -6058,6 +6058,7 @@ bool SPIRVProducerPassImpl::IsTypeNullable(const Type *type) const {
         return false;
       }
     }
+  }
   case Type::ArrayTyID:
     return IsTypeNullable(type->getArrayElementType());
   case Type::StructTyID: {
