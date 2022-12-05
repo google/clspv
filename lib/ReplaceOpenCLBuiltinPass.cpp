@@ -36,6 +36,7 @@
 
 #include "Builtins.h"
 #include "Constants.h"
+#include "MemFence.h"
 #include "ReplaceOpenCLBuiltinPass.h"
 #include "SPIRVOp.h"
 #include "Types.h"
@@ -74,6 +75,7 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kWorkGroupBarrier,
      Builtins::kSubGroupBarrier,
      Builtins::kAtomicWorkItemFence,
+     Builtins::kGetFence,
      Builtins::kMemFence,
      Builtins::kReadMemFence,
      Builtins::kWriteMemFence,
@@ -512,6 +514,8 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kAtomicLoad:
   case Builtins::kAtomicLoadExplicit:
     return replaceAtomicLoad(F);
+  case Builtins::kGetFence:
+    return replaceGetFence(F);
   case Builtins::kAtomicInit:
   case Builtins::kAtomicStore:
   case Builtins::kAtomicStoreExplicit:
@@ -872,20 +876,14 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
    *
    */
 
-  enum {
-    CLK_LOCAL_MEM_FENCE = 0x01,
-    CLK_GLOBAL_MEM_FENCE = 0x02,
-    CLK_IMAGE_MEM_FENCE = 0x04
-  };
-
   return replaceCallsWithValue(F, [](CallInst *CI) {
     IRBuilder<> Builder(CI);
 
     const auto ConstantScopeWorkgroup = Builder.getInt32(spv::ScopeWorkgroup);
     const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
-        Instruction::Shl, Builder.getInt32(CLK_LOCAL_MEM_FENCE),
+        Instruction::Shl, Builder.getInt32(MemFence::CLK_LOCAL_MEM_FENCE),
         Builder.getInt32(clz(spv::MemorySemanticsWorkgroupMemoryMask) -
-                         clz(CLK_LOCAL_MEM_FENCE)),
+                         clz(MemFence::CLK_LOCAL_MEM_FENCE)),
         "", CI);
     auto MemorySemantics = BinaryOperator::Create(
         Instruction::Or, MemorySemanticsWorkgroup,
@@ -1240,22 +1238,16 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
 
 bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 
-  enum {
-    CLK_LOCAL_MEM_FENCE = 0x01,
-    CLK_GLOBAL_MEM_FENCE = 0x02,
-    CLK_IMAGE_MEM_FENCE = 0x04
-  };
-
   return replaceCallsWithValue(F, [subgroup](CallInst *CI) {
     auto Arg = CI->getOperand(0);
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
     const auto LocalMemFence =
-        ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_LOCAL_MEM_FENCE);
     const auto GlobalMemFence =
-        ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto ImageMemFence =
-        ConstantInt::get(Arg->getType(), CLK_IMAGE_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_IMAGE_MEM_FENCE);
     const auto ConstantAcquireRelease = ConstantInt::get(
         Arg->getType(), spv::MemorySemanticsAcquireReleaseMask);
     const auto ConstantScopeDevice =
@@ -1269,7 +1261,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
     const auto LocalMemFenceMask =
         BinaryOperator::Create(Instruction::And, LocalMemFence, Arg, "", CI);
     const auto WorkgroupShiftAmount =
-        clz(spv::MemorySemanticsWorkgroupMemoryMask) - clz(CLK_LOCAL_MEM_FENCE);
+        clz(spv::MemorySemanticsWorkgroupMemoryMask) -
+        clz(MemFence::CLK_LOCAL_MEM_FENCE);
     const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
         Instruction::Shl, LocalMemFenceMask,
         ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
@@ -1277,8 +1270,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
     // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
     const auto GlobalMemFenceMask =
         BinaryOperator::Create(Instruction::And, GlobalMemFence, Arg, "", CI);
-    const auto UniformShiftAmount =
-        clz(spv::MemorySemanticsUniformMemoryMask) - clz(CLK_GLOBAL_MEM_FENCE);
+    const auto UniformShiftAmount = clz(spv::MemorySemanticsUniformMemoryMask) -
+                                    clz(MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto MemorySemanticsUniform = BinaryOperator::Create(
         Instruction::Shl, GlobalMemFenceMask,
         ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
@@ -1287,8 +1280,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
     // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
     const auto ImageMemFenceMask =
         BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
-    const auto ImageShiftAmount =
-        clz(spv::MemorySemanticsImageMemoryMask) - clz(CLK_IMAGE_MEM_FENCE);
+    const auto ImageShiftAmount = clz(spv::MemorySemanticsImageMemoryMask) -
+                                  clz(MemFence::CLK_IMAGE_MEM_FENCE);
     const auto MemorySemanticsImage = BinaryOperator::Create(
         Instruction::Shl, ImageMemFenceMask,
         ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
@@ -1346,21 +1339,15 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     Function &F, spv::MemorySemanticsMask semantics) {
 
   return replaceCallsWithValue(F, [&](CallInst *CI) {
-    enum {
-      CLK_LOCAL_MEM_FENCE = 0x01,
-      CLK_GLOBAL_MEM_FENCE = 0x02,
-      CLK_IMAGE_MEM_FENCE = 0x04,
-    };
-
     auto Arg = CI->getOperand(0);
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
     const auto LocalMemFence =
-        ConstantInt::get(Arg->getType(), CLK_LOCAL_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_LOCAL_MEM_FENCE);
     const auto GlobalMemFence =
-        ConstantInt::get(Arg->getType(), CLK_GLOBAL_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto ImageMemFence =
-        ConstantInt::get(Arg->getType(), CLK_IMAGE_MEM_FENCE);
+        ConstantInt::get(Arg->getType(), MemFence::CLK_IMAGE_MEM_FENCE);
     const auto ConstantMemorySemantics =
         ConstantInt::get(Arg->getType(), semantics);
     const auto ConstantScopeWorkgroup =
@@ -1370,7 +1357,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     const auto LocalMemFenceMask =
         BinaryOperator::Create(Instruction::And, LocalMemFence, Arg, "", CI);
     const auto WorkgroupShiftAmount =
-        clz(spv::MemorySemanticsWorkgroupMemoryMask) - clz(CLK_LOCAL_MEM_FENCE);
+        clz(spv::MemorySemanticsWorkgroupMemoryMask) -
+        clz(MemFence::CLK_LOCAL_MEM_FENCE);
     const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
         Instruction::Shl, LocalMemFenceMask,
         ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
@@ -1378,8 +1366,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
     const auto GlobalMemFenceMask =
         BinaryOperator::Create(Instruction::And, GlobalMemFence, Arg, "", CI);
-    const auto UniformShiftAmount =
-        clz(spv::MemorySemanticsUniformMemoryMask) - clz(CLK_GLOBAL_MEM_FENCE);
+    const auto UniformShiftAmount = clz(spv::MemorySemanticsUniformMemoryMask) -
+                                    clz(MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto MemorySemanticsUniform = BinaryOperator::Create(
         Instruction::Shl, GlobalMemFenceMask,
         ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
@@ -1388,8 +1376,8 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
     const auto ImageMemFenceMask =
         BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
-    const auto ImageShiftAmount =
-        clz(spv::MemorySemanticsImageMemoryMask) - clz(CLK_IMAGE_MEM_FENCE);
+    const auto ImageShiftAmount = clz(spv::MemorySemanticsImageMemoryMask) -
+                                  clz(MemFence::CLK_IMAGE_MEM_FENCE);
     const auto MemorySemanticsImage = BinaryOperator::Create(
         Instruction::Shl, ImageMemFenceMask,
         ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
@@ -3750,6 +3738,28 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicLoad(Function &F) {
     auto scope = MemoryScope(scope_arg, is_global, Call);
     return InsertSPIRVOp(Call, spv::OpAtomicLoad, {Attribute::Convergent},
                          Call->getType(), {pointer, scope, order});
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceGetFence(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    auto pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(pointer)) {
+      pointer = cast->getPointerOperand();
+    }
+
+    IRBuilder<> builder(Call);
+
+    switch (pointer->getType()->getPointerAddressSpace()) {
+    case (clspv::AddressSpace::Global):
+      return builder.getInt32(MemFence::CLK_GLOBAL_MEM_FENCE);
+    case (clspv::AddressSpace::Local):
+      return builder.getInt32(MemFence::CLK_LOCAL_MEM_FENCE);
+    default:
+      return builder.getInt32(MemFence::CLK_NO_MEM_FENCE);
+    }
   });
 }
 

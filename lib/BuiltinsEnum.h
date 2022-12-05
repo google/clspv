@@ -106,6 +106,7 @@ enum BuiltinType : unsigned int {
   kType_Event_End,
 
   kType_MemoryFence_Start,
+  kGetFence,
   kMemFence,
   kReadMemFence,
   kWriteMemFence,
