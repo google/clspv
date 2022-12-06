@@ -5108,7 +5108,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         auto op1 = I.getOperand(1);
         auto vec_ty = dyn_cast<VectorType>(op0->getType());
         auto num_eles = vec_ty->getElementCount().getFixedValue();
-        bool use_op0 = mask < num_eles;
+        bool use_op0 = mask < (int)num_eles;
         auto op = use_op0 ? op0 : op1;
         auto mask_byte = mask % num_eles;
         if (!isa<UndefValue>(op) && !isa<PoisonValue>(op)) {
