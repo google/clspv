@@ -4511,6 +4511,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         Ops << OpTy << I.getOperand(0) << getSPIRVInt32Constant(255);
 
         RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+      } else if (!clspv::Option::Int8Support() &&
+                 I.getOpcode() == Instruction::BitCast &&
+                 ((Ty->isIntOrIntVectorTy(8) && OpTy->isIntOrIntVectorTy(32)) ||
+                  (Ty->isIntOrIntVectorTy(32) &&
+                   OpTy->isIntOrIntVectorTy(8)))) {
+        // Without int8 support, <4 x i8> is represented as i32.
+        // The only valid bitcast involving i8 and i32 is <4 x i8> <--> i32
+        // because Vulkan's max vector size is 4 and the total bitwidth must
+        // match.
+        RID = getSPIRVValue(I.getOperand(0));
       } else if (Ty->isIntOrIntVectorTy(1) &&
                  I.getOpcode() == Instruction::Trunc) {
         // We usually map trunc to OpUConvert.
@@ -5085,25 +5095,71 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // Ops[3] ... Ops[n] = Components (Literal Number)
     SPIRVOperandVec Ops;
 
-    Ops << I.getType() << I.getOperand(0) << I.getOperand(1);
+    if (!clspv::Option::Int8Support() && I.getType()->isIntOrIntVectorTy(8)) {
+      // <4 x i8> is translated as i32. So shufflevector on <4 x i8> must be
+      // implemented as bit operations.
+      // This could be optimized, but it is a legacy support case.
+      auto int32_ty = Type::getInt32Ty(module->getContext());
+      auto tmp = getSPIRVConstant(Constant::getNullValue(int32_ty));
+      const auto shuffle = dyn_cast<ShuffleVectorInst>(&I);
+      uint32_t i = 0;
+      for (auto mask : shuffle->getShuffleMask()) {
+        auto op0 = I.getOperand(0);
+        auto op1 = I.getOperand(1);
+        auto vec_ty = dyn_cast<VectorType>(op0->getType());
+        auto num_eles = vec_ty->getElementCount().getFixedValue();
+        bool use_op0 = mask < (int)num_eles;
+        auto op = use_op0 ? op0 : op1;
+        auto mask_byte = mask % num_eles;
+        if (!isa<UndefValue>(op) && !isa<PoisonValue>(op)) {
+          Ops.clear();
 
-    auto shuffle = cast<ShuffleVectorInst>(&I);
-    SmallVector<int, 4> mask;
-    shuffle->getShuffleMask(mask);
-    for (auto i : mask) {
-      if (i == UndefMaskElem) {
-        if (clspv::Option::HackUndef())
-          // Use 0 instead of undef.
-          Ops << 0;
-        else
-          // Undef for shuffle in SPIR-V.
-          Ops << 0xffffffff;
-      } else {
-        Ops << i;
+          // This element goes in the |i|'th byte using the |mask_byte| byte of
+          // |op|.
+          const uint32_t bitmask = 0xff << (mask_byte * 8);
+          auto bitmask_const =
+              getSPIRVConstant(ConstantInt::get(int32_ty, bitmask));
+          Ops << op->getType() << op << bitmask_const;
+          auto and_mask = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+          Ops.clear();
+
+          const int32_t shift_amount = i * 8 - mask_byte * 8;
+          const bool shl = shift_amount > 0;
+          if (shift_amount != 0) {
+            Ops << op->getType() << and_mask
+                << getSPIRVConstant(ConstantInt::get(int32_ty, shift_amount));
+            and_mask = addSPIRVInst(
+                shl ? spv::OpShiftLeftLogical : spv::OpShiftRightLogical, Ops);
+            Ops.clear();
+          }
+
+          Ops << I.getType() << tmp << and_mask;
+          tmp = addSPIRVInst(spv::OpBitwiseOr, Ops);
+        }
+        ++i;
       }
-    }
+      RID = tmp;
+    } else {
+      Ops << I.getType() << I.getOperand(0) << I.getOperand(1);
 
-    RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+      auto shuffle = cast<ShuffleVectorInst>(&I);
+      SmallVector<int, 4> mask;
+      shuffle->getShuffleMask(mask);
+      for (auto i : mask) {
+        if (i == UndefMaskElem) {
+          if (clspv::Option::HackUndef())
+            // Use 0 instead of undef.
+            Ops << 0;
+          else
+            // Undef for shuffle in SPIR-V.
+            Ops << 0xffffffff;
+        } else {
+          Ops << i;
+        }
+      }
+
+      RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+    }
     break;
   }
   case Instruction::ICmp:

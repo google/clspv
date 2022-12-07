@@ -32,7 +32,18 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 
 // With undef mapping to 0 byte, (undef,1,2,3) maps to 66051.
 // CHECK-DAG: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
+// CHECK-DAG: [[int_65280:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 65280
+// CHECK-DAG: [[int_16711680:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 16711680
+// CHECK-DAG: [[int_4278190080:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 4278190080
+// CHECK-DAG: [[int_255:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 255
 
 // no longer checked: [[undef_struct:%[_a-zA-Z0-9]+]] = OpUndef [[struct]]
 
-// CHECK: OpBitwiseAnd [[uint]] [[theconst]] {{%[_a-zA-Z0-9]+}}
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[uint]] %{{.*}} [[int_255]]
+// CHECK: [[or1:%[a-zA-Z0-9_]+]] = OpBitwiseOr [[uint]] %{{.*}} [[and]]
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[uint]] [[theconst]] [[int_65280]]
+// CHECK: [[or2:%[a-zA-Z0-9_]+]] = OpBitwiseOr [[uint]] [[or1]] [[and]]
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[uint]] [[theconst]] [[int_16711680]]
+// CHECK: [[or3:%[a-zA-Z0-9_]+]] = OpBitwiseOr [[uint]] [[or2]] [[and]]
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[uint]] [[theconst]] [[int_4278190080]]
+// CHECK: OpBitwiseOr [[uint]] [[or3]] [[and]]
