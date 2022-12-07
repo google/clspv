@@ -1069,9 +1069,9 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto DstI = Builder.CreateGEP(GenType, Dst, DstIterator);
   auto SrcI = Builder.CreateGEP(GenType, Src, SrcIterator);
   auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
+  auto Ld = Builder.CreateLoad(GenType, SrcI);
+  Builder.CreateStore(Ld, DstI);
   auto Br = Builder.CreateBr(CmpBB);
-  clspv::InsertSPIRVOp(Br, spv::OpCopyMemory, {}, Builder.getVoidTy(),
-                       {DstI, SrcI});
 
   // Set PHIIterator for CmpBB now that we have NewIterator
   PHIIterator->addIncoming(StartId, BB);

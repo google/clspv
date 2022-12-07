@@ -62,7 +62,8 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copy${async_mangling}j9
 ; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${dst_addrspace})* %dst, i32 [[phiiterator]]
 ; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${src_addrspace})* %src, i32 [[phiiterator]]
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
-; CHECK: call void @_Z8spirv.op.63.${op_copy_mangling}(i32 63, ${type} addrspace(${dst_addrspace})* [[dsti]], ${type} addrspace(${src_addrspace})* [[srci]])
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load ${type}, ${type} addrspace(${src_addrspace})* [[srci]]
+; CHECK: store ${type} [[ld]], ${type} addrspace(${dst_addrspace})* [[dsti]]
 ; CHECK: br label %[[cmp]]
 """)
 

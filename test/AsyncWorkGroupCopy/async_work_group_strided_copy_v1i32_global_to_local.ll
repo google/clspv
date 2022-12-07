@@ -46,5 +46,6 @@ declare spir_func %opencl.event_t* @_Z29async_work_group_strided_copyPU3AS3iPU3A
 ; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr i32, i32 addrspace(1)* %src, i32 [[srciterator]]
 
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
-; CHECK: call void @_Z8spirv.op.63.PU3AS3jPU3AS1j(i32 63, i32 addrspace(3)* [[dsti]], i32 addrspace(1)* [[srci]])
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(1)* [[srci]]
+; CHECK: store i32 [[ld]], i32 addrspace(3)* [[dsti]]
 ; CHECK: br label %[[cmp]]

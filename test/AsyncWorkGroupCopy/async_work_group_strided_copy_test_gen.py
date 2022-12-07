@@ -62,7 +62,8 @@ declare spir_func %opencl.event_t* @_Z29async_work_group_strided_copy${async_man
 ; CHECK: [[loop]]:
 ${stride_block}
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
-; CHECK: call void @_Z8spirv.op.63.${op_copy_mangling}(i32 63, ${type} addrspace(${dst_addrspace})* [[dsti]], ${type} addrspace(${src_addrspace})* [[srci]])
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load ${type}, ${type} addrspace(${src_addrspace})* [[srci]]
+; CHECK: store ${type} [[ld]], ${type} addrspace(${dst_addrspace})* [[dsti]]
 ; CHECK: br label %[[cmp]]
 """)
 
