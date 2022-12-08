@@ -753,6 +753,12 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         // separately, don't handle it now.
         continue;
       }
+      if (SrcTy->isOpaquePointerTy() &&
+          clspv::InferType(start, M.getContext(), &type_cache) ==
+              clspv::InferType(BitCastUser, M.getContext(), &type_cache)) {
+        // This user is not a bitcast.
+        continue;
+      }
 
       LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
       SmallVector<Value *, 4> NewAddrIdxs;
