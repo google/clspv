@@ -537,6 +537,21 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
+    // Lower longer vectors when requested. Note that this pass depends on
+    // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
+    // afterwards.
+    if (clspv::Option::LongVectorSupport()) {
+      pm.addPass(clspv::LongVectorLoweringPass());
+    }
+    // Volatile information on loads and stores are not used inside
+    // SPIRVProducer pass, so it doesn't have any effect on the generated code,
+    // but they stop the mem2reg pass from optimizing them. CLSPV try to get rid
+    // of generic address spaces by inferring them and optimizing them through
+    // "InferAddressSpacePass" and "mem2reg" pass. However, volatile loads and
+    // stores will stop mem2reg. So, we remove volatile info on loads and stores
+    // so that we could use mem2reg optimization on them and remove generic
+    // address spaces.
+    pm.addPass(clspv::TransformGenericVolatileMemoryAccess());
     // We need to run mem2reg and inst combine early because our
     // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
     // pattern

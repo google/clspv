@@ -30,7 +30,6 @@ enum class FeatureMacro {
   __opencl_c_subgroups,
   // following items are not supported
   __opencl_c_device_enqueue,
-  __opencl_c_generic_address_space,
   __opencl_c_pipes,
   __opencl_c_program_scope_global_variables,
   // following items are always enabled, but no point in complaining if they are
@@ -44,7 +43,8 @@ enum class FeatureMacro {
   __opencl_c_read_write_images,
   __opencl_c_atomic_scope_device,
   __opencl_c_atomic_scope_all_devices,
-  __opencl_c_work_group_collective_functions
+  __opencl_c_work_group_collective_functions,
+  __opencl_c_generic_address_space,
 };
 
 #define FeatureStr(f) std::make_pair(FeatureMacro::f, #f)
@@ -53,6 +53,7 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 15>
         FeatureStr(__opencl_c_3d_image_writes),
         FeatureStr(__opencl_c_atomic_order_acq_rel),
         FeatureStr(__opencl_c_fp64), FeatureStr(__opencl_c_images),
+        FeatureStr(__opencl_c_generic_address_space),
         FeatureStr(__opencl_c_subgroups),
         // following items are always enabled by clang
         FeatureStr(__opencl_c_int64),
@@ -62,9 +63,7 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 15>
         FeatureStr(__opencl_c_atomic_scope_all_devices),
         FeatureStr(__opencl_c_work_group_collective_functions),
         // following items cannot be enabled so are automatically disabled
-        FeatureStr(__opencl_c_device_enqueue),
-        FeatureStr(__opencl_c_generic_address_space),
-        FeatureStr(__opencl_c_pipes),
+        FeatureStr(__opencl_c_device_enqueue), FeatureStr(__opencl_c_pipes),
         FeatureStr(__opencl_c_program_scope_global_variables)};
 #undef FeatureStr
 

@@ -23,7 +23,6 @@ namespace clspv {
 FeatureMacro FeatureMacroLookup(const std::string &name) {
   constexpr std::array<FeatureMacro, 4> NotSuppported{
       FeatureMacro::__opencl_c_pipes,
-      FeatureMacro::__opencl_c_generic_address_space,
       FeatureMacro::__opencl_c_device_enqueue,
       FeatureMacro::__opencl_c_program_scope_global_variables};
 
