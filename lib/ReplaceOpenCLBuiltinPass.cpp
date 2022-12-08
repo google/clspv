@@ -1071,7 +1071,7 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
   auto Ld = Builder.CreateLoad(GenType, SrcI);
   Builder.CreateStore(Ld, DstI);
-  auto Br = Builder.CreateBr(CmpBB);
+  Builder.CreateBr(CmpBB);
 
   // Set PHIIterator for CmpBB now that we have NewIterator
   PHIIterator->addIncoming(StartId, BB);
