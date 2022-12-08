@@ -113,6 +113,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
       } else if (!isa<ConstantPointerNull>(store->getValueOperand())) {
         isPointerTy = true;
       }
+    } else if (auto *rmw = dyn_cast<AtomicRMWInst>(user)) {
+      return CacheType(rmw->getValOperand()->getType());
     } else if (auto *call = dyn_cast<CallInst>(user)) {
       auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
       // TODO: remaining builtins

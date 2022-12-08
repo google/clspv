@@ -70,10 +70,8 @@ ${copy_memory}
 """)
 
 COPY_MEMORY=Template("""
-;CHECK: [[gepsrc${id}:%[a-zA-Z0-9_.]+]] = getelementptr ${check_type}, ${check_type} addrspace(${src_addrspace})* [[srci]], i32 0, i32 ${id}
-;CHECK: [[loadsrc${id}:%[a-zA-Z0-9_.]+]] = load ${scalar_type}, ${scalar_type} addrspace(${src_addrspace})* [[gepsrc${id}]], align ${type_size}
-;CHECK: [[gepdst${id}:%[a-zA-Z0-9_.]+]] = getelementptr ${check_type}, ${check_type} addrspace(${dst_addrspace})* [[dsti]], i32 0, i32 ${id}
-;CHECK: store ${scalar_type} [[loadsrc${id}]], ${scalar_type} addrspace(${dst_addrspace})* [[gepdst${id}]], align ${type_size}
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load ${check_type}, ${check_type} addrspace(${src_addrspace})* [[srci]]
+; CHECK: store ${check_type} [[ld]], ${check_type} addrspace(${dst_addrspace})* [[dsti]]
 """)
 
 SPIRV_VARIABLES="""
@@ -117,13 +115,9 @@ def get_async_mangling(dst, src, width, vector_size):
         + get_addr_mangling(src) + get_async_mangling_suffix(width, vector_size)
 
 def get_copy_memory(check_type, dst_addrspace, src_addrspace, vector_size, width):
-    copy_memory = ""
-    for id in range(vector_size):
-        copy_memory += COPY_MEMORY.substitute(
+    copy_memory = COPY_MEMORY.substitute(
             id = str(id),
             check_type = check_type,
-            scalar_type = get_scalar_type(width),
-            type_size = str(int(width / 8)),
             src_addrspace = src_addrspace,
             dst_addrspace = dst_addrspace)
     return copy_memory

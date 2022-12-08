@@ -50,44 +50,7 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS3Dv8_cPU3AS1KS
 ; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* %src, i32 [[phiiterator]]
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
 
-;CHECK: [[gepsrc0:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 0
-;CHECK: [[loadsrc0:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc0]], align 1
-;CHECK: [[gepdst0:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 0
-;CHECK: store i8 [[loadsrc0]], i8 addrspace(3)* [[gepdst0]], align 1
-
-;CHECK: [[gepsrc1:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 1
-;CHECK: [[loadsrc1:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc1]], align 1
-;CHECK: [[gepdst1:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 1
-;CHECK: store i8 [[loadsrc1]], i8 addrspace(3)* [[gepdst1]], align 1
-
-;CHECK: [[gepsrc2:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 2
-;CHECK: [[loadsrc2:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc2]], align 1
-;CHECK: [[gepdst2:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 2
-;CHECK: store i8 [[loadsrc2]], i8 addrspace(3)* [[gepdst2]], align 1
-
-;CHECK: [[gepsrc3:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 3
-;CHECK: [[loadsrc3:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc3]], align 1
-;CHECK: [[gepdst3:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 3
-;CHECK: store i8 [[loadsrc3]], i8 addrspace(3)* [[gepdst3]], align 1
-
-;CHECK: [[gepsrc4:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 4
-;CHECK: [[loadsrc4:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc4]], align 1
-;CHECK: [[gepdst4:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 4
-;CHECK: store i8 [[loadsrc4]], i8 addrspace(3)* [[gepdst4]], align 1
-
-;CHECK: [[gepsrc5:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 5
-;CHECK: [[loadsrc5:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc5]], align 1
-;CHECK: [[gepdst5:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 5
-;CHECK: store i8 [[loadsrc5]], i8 addrspace(3)* [[gepdst5]], align 1
-
-;CHECK: [[gepsrc6:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 6
-;CHECK: [[loadsrc6:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc6]], align 1
-;CHECK: [[gepdst6:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 6
-;CHECK: store i8 [[loadsrc6]], i8 addrspace(3)* [[gepdst6]], align 1
-
-;CHECK: [[gepsrc7:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(1)* [[srci]], i32 0, i32 7
-;CHECK: [[loadsrc7:%[a-zA-Z0-9_.]+]] = load i8, i8 addrspace(1)* [[gepsrc7]], align 1
-;CHECK: [[gepdst7:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i8], [8 x i8] addrspace(3)* [[dsti]], i32 0, i32 7
-;CHECK: store i8 [[loadsrc7]], i8 addrspace(3)* [[gepdst7]], align 1
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load [8 x i8], [8 x i8] addrspace(1)* [[srci]]
+; CHECK: store [8 x i8] [[ld]], [8 x i8] addrspace(3)* [[dsti]]
 
 ; CHECK: br label %[[cmp]]
