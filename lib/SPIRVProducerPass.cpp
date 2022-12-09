@@ -3910,8 +3910,9 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     auto i32 = IntegerType::get(module->getContext(), 32);
 
     SPIRVOperandVec Ops;
-    Ops << getSPIRVType(
-               PointerType::get(i32, GV->getType()->getPointerAddressSpace()))
+    Ops << getSPIRVPointerType(
+               PointerType::get(i32, GV->getType()->getPointerAddressSpace()),
+               i32)
         << getSPIRVValue(GV)
         << getSPIRVInt32Constant(GV->getValueType()->getStructNumElements() - 1)
         << offset;
