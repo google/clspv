@@ -76,6 +76,9 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kSubGroupBarrier,
      Builtins::kAtomicWorkItemFence,
      Builtins::kGetFence,
+     Builtins::kToGlobal,
+     Builtins::kToLocal,
+     Builtins::kToPrivate,
      Builtins::kMemFence,
      Builtins::kReadMemFence,
      Builtins::kWriteMemFence,
@@ -528,6 +531,12 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceAtomicLoad(F);
   case Builtins::kGetFence:
     return replaceGetFence(F);
+  case Builtins::kToGlobal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Global);
+  case Builtins::kToLocal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Local);
+  case Builtins::kToPrivate:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Private);
   case Builtins::kAtomicInit:
   case Builtins::kAtomicStore:
   case Builtins::kAtomicStoreExplicit:
@@ -3780,6 +3789,17 @@ bool ReplaceOpenCLBuiltinPass::replaceGetFence(Function &F) {
     default:
       return builder.getInt32(MemFence::CLK_NO_MEM_FENCE);
     }
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAddressSpaceQualifiers(Function &F, unsigned ToAddressSpace) {
+  return replaceCallsWithValue(F, [=](CallInst *Call) {
+    auto pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+
+    IRBuilder<> builder(Call);
+    return builder.CreateAddrSpaceCast(pointer, PointerType::get(pointer->getType()->getNonOpaquePointerElementType(), ToAddressSpace));
   });
 }
 

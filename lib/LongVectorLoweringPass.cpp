@@ -949,7 +949,11 @@ Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
     V = B.CreateIntToPtr(EquivalentValue, EquivalentDestTy, I.getName());
     break;
   }
-
+  case Instruction::AddrSpaceCast: {
+    IRBuilder<> B(&I);
+    V = B.CreateAddrSpaceCast(EquivalentValue, EquivalentDestTy, I.getName());
+    break;
+  }
   default:
     llvm_unreachable("Cast unsupported.");
     break;

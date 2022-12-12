@@ -54,6 +54,7 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 15>
         FeatureStr(__opencl_c_atomic_order_acq_rel),
         FeatureStr(__opencl_c_fp64), FeatureStr(__opencl_c_images),
         FeatureStr(__opencl_c_generic_address_space),
+        FeatureStr(__opencl_c_program_scope_global_variables),
         FeatureStr(__opencl_c_subgroups),
         // following items are always enabled by clang
         FeatureStr(__opencl_c_int64),
@@ -63,8 +64,7 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 15>
         FeatureStr(__opencl_c_atomic_scope_all_devices),
         FeatureStr(__opencl_c_work_group_collective_functions),
         // following items cannot be enabled so are automatically disabled
-        FeatureStr(__opencl_c_device_enqueue), FeatureStr(__opencl_c_pipes),
-        FeatureStr(__opencl_c_program_scope_global_variables)};
+        FeatureStr(__opencl_c_device_enqueue), FeatureStr(__opencl_c_pipes)};
 #undef FeatureStr
 
 FeatureMacro FeatureMacroLookup(const std::string &name);
