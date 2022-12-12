@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -534,6 +535,8 @@ PreservedAnalyses
 clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
+  errs() << M << "\n";
+
   WeakInstructions ToBeDeleted;
   SmallVector<Instruction *, 16> WorkList;
   SmallVector<User *, 16> UserWorkList;
@@ -702,7 +705,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
-
   for (Instruction *Inst : WorkList) {
     LLVM_DEBUG(dbgs() << "## Inst: "; Inst->dump());
     Value *Src = nullptr;
@@ -746,17 +748,21 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
     // Investigate pointer bitcast's users.
     // TODO(#816): remove after final transition.
-    Value *start = isa<BitCastInst>(Inst) ? Inst : Src;
-    for (User *BitCastUser : start->users()) {
+    // For implicit pointer casts we only want to examine |Inst| because other
+    // uses of |Src| might be casts to different types than |DstTy| or not
+    // pointer casts at all.
+    SmallVector<User *, 4> Users;
+    if (isa<BitCastInst>(Inst)) {
+      for (auto *U : Inst->users()) {
+        Users.push_back(U);
+      }
+    } else {
+      Users.push_back(Inst);
+    }
+    for (User *BitCastUser : Users) {
       if (ImplicitCasts.count(BitCastUser)) {
         // If this user was queued on the worklist as an implicit cast
         // separately, don't handle it now.
-        continue;
-      }
-      if (SrcTy->isOpaquePointerTy() &&
-          clspv::InferType(start, M.getContext(), &type_cache) ==
-              clspv::InferType(BitCastUser, M.getContext(), &type_cache)) {
-        // This user is not a bitcast.
         continue;
       }
 
