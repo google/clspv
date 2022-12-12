@@ -5305,7 +5305,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // Ops[1] : Storage Class
     SPIRVOperandVec Ops;
 
-    Ops << I.getType() << spv::StorageClassFunction;
+    Ops << getSPIRVPointerType(I.getType(),
+                               cast<AllocaInst>(&I)->getAllocatedType())
+        << spv::StorageClassFunction;
 
     RID = addSPIRVInst(spv::OpVariable, Ops);
     break;
