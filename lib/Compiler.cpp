@@ -587,7 +587,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
     // SROA pass is run because it will fold structs/unions that are
     // problematic on Vulkan SPIR-V away.
-    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::SROAPass()));
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::SROAPass(llvm::SROAOptions::PreserveCFG)));
 
     // InstructionCombining pass folds bitcast and gep instructions which are
     // not supported by Vulkan SPIR-V.

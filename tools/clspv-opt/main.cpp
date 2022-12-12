@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
 
   llvm::PassInstrumentationCallbacks PIC;
   clspv::RegisterClspvPasses(&PIC);
-  llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), llvm::None,
+  llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt,
                        &PIC);
   clspv::RegisterClspvPassBuilderCallback(&PB);
 
