@@ -535,8 +535,6 @@ PreservedAnalyses
 clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
-  errs() << M << "\n";
-
   WeakInstructions ToBeDeleted;
   SmallVector<Instruction *, 16> WorkList;
   SmallVector<User *, 16> UserWorkList;
