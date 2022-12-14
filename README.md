@@ -148,7 +148,7 @@ copyrights.
 
 #### Required Tools
 
-You will need a pre-built version of [LLVM](github.com/llvm/llvm-project) for
+You will need a pre-built version of [LLVM](https://github.com/llvm/llvm-project) for
 your system, CMake, and (optionally) Ninja.
 
 #### Build
