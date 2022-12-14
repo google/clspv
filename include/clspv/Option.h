@@ -82,6 +82,10 @@ bool HackClampWidth();
 // around a driver bug.
 bool HackMulExtended();
 
+// Returns true if ptrtoint on logical address spaces should be emulated using
+// compile-time constants when it is safe to do so.
+bool HackLogicalPtrtoint();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
