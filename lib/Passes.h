@@ -17,6 +17,7 @@
 
 #include "AddFunctionAttributesPass.h"
 #include "AllocateDescriptorsPass.h"
+#include "AnnotationToMetadataPass.h"
 #include "AutoPodArgsPass.h"
 #include "ClusterConstants.h"
 #include "ClusterPodKernelArgumentsPass.h"

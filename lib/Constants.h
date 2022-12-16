@@ -20,6 +20,10 @@
 
 namespace clspv {
 
+// Name for module level metadata storing annotations that were present on
+// entrypoints in the source OpenCL C
+const std::string &EntryPointAttributesMetadataName();
+
 // Name for module level metadata storing workgroup argument spec ids.
 const std::string &LocalSpecIdMetadataName();
 
