@@ -166,6 +166,23 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         else
           return CacheType(int32Ty);
       }
+      case clspv::Builtins::kSpirvOp: {
+        auto *op_param = call->getArgOperand(0);
+        auto op =
+            static_cast<spv::Op>(cast<ConstantInt>(op_param)->getZExtValue());
+        switch (op) {
+        case spv::Op::OpAtomicIIncrement:
+        case spv::Op::OpAtomicIDecrement:
+        case spv::Op::OpAtomicCompareExchange:
+          // Data type is return type.
+          return CacheType(call->getType());
+          break;
+        default:
+          // No other current uses of SPIRVOp deal with pointers, but this
+          // code should be expanded if any are added.
+          break;
+        }
+      }
       case clspv::Builtins::kBuiltinNone:
         if (!call->getCalledFunction()->isDeclaration()) {
           // See if the type can be inferred from the use in the called
