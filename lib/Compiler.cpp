@@ -80,6 +80,8 @@ enum class SPIRArch : uint32_t {
 static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
     X("extra-validation",
       "Perform extra validation on OpenCL C when targeting Vulkan");
+static FrontendPluginRegistry::Add<clspv::PrintAttrsASTAction>
+    Y("print the attributes", "find those attributes and print em");
 
 static llvm::cl::opt<bool> cl_single_precision_constants(
     "cl-single-precision-constant", llvm::cl::init(false),

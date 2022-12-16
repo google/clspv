@@ -907,10 +907,47 @@ public:
 };
 } // namespace
 
+namespace {
+using namespace clang;
+class PrintAttrsConsumer final : public clang::ASTConsumer {
+public:
+  explicit PrintAttrsConsumer(
+      ASTContext *Context,
+      std::unordered_map<std::string, std::string> functionAttrs)
+      : Context(Context), m_functionAttrs(functionAttrs) {}
+  virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
+    for (auto *D : DG) {
+      if (auto *FD = llvm::dyn_cast<FunctionDecl>(D)) {
+        if (FD->hasBody()) {
+          std::string str;
+          llvm::raw_string_ostream ss(str);
+          for (auto &A : FD->getAttrs()) {
+            A->printPretty(ss, Context->getPrintingPolicy());
+          }
+
+          m_functionAttrs[FD->getName().str()] = ss.str();
+        }
+      }
+    }
+    return true; // TODO why true
+  }
+
+private:
+  ASTContext *Context;
+  std::unordered_map<std::string, std::string> &m_functionAttrs;
+};
+} // namespace
+
 namespace clspv {
 std::unique_ptr<ASTConsumer>
 ExtraValidationASTAction::CreateASTConsumer(CompilerInstance &CI,
                                             llvm::StringRef InFile) {
   return std::unique_ptr<ASTConsumer>(new ExtraValidationConsumer(CI, InFile));
+}
+std::unique_ptr<ASTConsumer>
+PrintAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
+                                       llvm::StringRef InFile) {
+  return std::unique_ptr<ASTConsumer>(
+      new PrintAttrsConsumer(&CI.getASTContext(), m_functionAttrs));
 }
 } // namespace clspv
