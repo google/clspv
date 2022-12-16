@@ -37,6 +37,10 @@ using namespace llvm;
 // Since this function may modify the symbol table of the module containing
 // Insert, it shouldn't be used while iterating over the symbols of that module
 // unless the caller knows that no new function will be created.
+//
+// If using this function to insert an instruction that has pointer operands
+// ensure that InferType also handles type inference for that instruction (see
+// lib/Types.cpp).
 Instruction *
 InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
               ArrayRef<Attribute::AttrKind> Attributes, Type *RetType,
