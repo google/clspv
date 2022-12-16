@@ -225,6 +225,11 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     NewFunc->setCallingConv(F->getCallingConv());
     F->setCallingConv(CallingConv::SPIR_FUNC);
 
+    for (auto user : F->users()) {
+      if (auto call = dyn_cast<CallInst>(user))
+        call->setCallingConv(CallingConv::SPIR_FUNC);
+    }
+
     // Transfer attributes that don't apply to the POD arguments
     // to the new functions.
     auto Attributes = F->getAttributes();
