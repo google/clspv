@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenAction.h"
@@ -693,7 +692,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass depends on the inlining of the image metadata getter from
     // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
-
     pm.addPass(
         clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
   });

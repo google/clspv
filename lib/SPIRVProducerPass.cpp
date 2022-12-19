@@ -6681,14 +6681,22 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     auto kernel_name =
         addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
 
+    std::string mock_attributes = "kernel fake_attribute(1, 2,3)";
+    auto attributes_op_string = 
+        addSPIRVInst<kDebug>(spv::OpString, mock_attributes.c_str());
+
     // Kernel declaration
     // Ops[0] = void type
     // Ops[1] = reflection ext import
     // Ops[2] = function id
     // Ops[3] = kernel name
+    // Ops[4] = NumArguments
+    // Ops[5] = Flags
+    // Ops[6] = Attributes
     SPIRVOperandVec Ops;
     Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
-        << kernel_name;
+        << kernel_name << getSPIRVInt32Constant(0) << getSPIRVInt32Constant(0)
+        << attributes_op_string;
     auto kernel_decl = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
     // Generate the required workgroup size property if it was specified.

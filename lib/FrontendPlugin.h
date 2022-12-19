@@ -44,8 +44,5 @@ class PrintAttrsASTAction final : public clang::PluginASTAction {
   virtual clang::PluginASTAction::ActionType getActionType() override {
     return clang::PluginASTAction::AddBeforeMainAction;
   }
-
-private:
-  std::unordered_map<std::string, std::string> m_functionAttrs;
 };
 } // namespace clspv

@@ -911,30 +911,39 @@ namespace {
 using namespace clang;
 class PrintAttrsConsumer final : public clang::ASTConsumer {
 public:
-  explicit PrintAttrsConsumer(
-      ASTContext *Context,
-      std::unordered_map<std::string, std::string> functionAttrs)
-      : Context(Context), m_functionAttrs(functionAttrs) {}
+  explicit PrintAttrsConsumer(ASTContext *Context) : Context(Context) {}
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
     for (auto *D : DG) {
       if (auto *FD = llvm::dyn_cast<FunctionDecl>(D)) {
-        if (FD->hasBody()) {
+        if (FD->hasBody() && FD->hasAttrs()) {
           std::string str;
           llvm::raw_string_ostream ss(str);
+          bool kernel_attr_present = false;
           for (auto &A : FD->getAttrs()) {
+            kernel_attr_present |= std::strcmp(A->getSpelling(), "kernel");
+            // TODO maybe trim string
             A->printPretty(ss, Context->getPrintingPolicy());
           }
-
-          m_functionAttrs[FD->getName().str()] = ss.str();
+          if (kernel_attr_present){
+            auto attr_str = ss.str();
+            // inline newlines should be removed
+            attr_str.erase(remove(attr_str.begin(), attr_str.end(), '\n'),
+                           attr_str.end());
+            functionAttrs[FD->getName().str()] = std::move(attr_str);
+            llvm::errs() << FD->getName().str() << '\''
+                         << functionAttrs[FD->getName().str()] << '\'' << '\n';
+          } else {
+            functionAttrs[FD->getName().str()] = "";
+          }
         }
       }
     }
     return true; // TODO why true
   }
 
+  std::unordered_map<std::string, std::string> functionAttrs;
 private:
   ASTContext *Context;
-  std::unordered_map<std::string, std::string> &m_functionAttrs;
 };
 } // namespace
 
@@ -948,6 +957,6 @@ std::unique_ptr<ASTConsumer>
 PrintAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
                                        llvm::StringRef InFile) {
   return std::unique_ptr<ASTConsumer>(
-      new PrintAttrsConsumer(&CI.getASTContext(), m_functionAttrs));
+      new PrintAttrsConsumer(&CI.getASTContext()));
 }
 } // namespace clspv
