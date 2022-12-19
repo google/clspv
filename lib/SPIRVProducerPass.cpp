@@ -466,6 +466,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID GenerateInstructionFromCall(CallInst *Call);
   SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
                                    Value *Mask);
+  SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -4158,6 +4159,69 @@ SPIRVID SPIRVProducerPassImpl::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
   return RID;
 }
 
+SPIRVID SPIRVProducerPassImpl::GeneratePopcount(Type *Ty, Value *BaseValue,
+                                                LLVMContext &Context) {
+  // The Base operand of any OpBitCount, OpBitReverse, OpBitFieldInsert,
+  // OpBitFieldSExtract, or OpBitFieldUExtract instruction must be a 32-bit
+  // integer scalar or a vector of 32-bit integers.
+  // https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/chap46.html#VUID-StandaloneSpirv-Base-04781
+  // Thus, non 32-bit types need to be managed explicitly.
+  SPIRVID RID;
+  const int BitcountSize = 32;
+  Type *Int32Ty = Ty->getInt32Ty(Context);
+  if (Ty->isVectorTy())
+    Int32Ty = VectorType::get(Int32Ty, dyn_cast<VectorType>(Ty));
+  auto TyBitWidth = Ty->getScalarSizeInBits();
+
+  SPIRVOperandVec Ops;
+  if (TyBitWidth == BitcountSize * 2) {
+    Ops.clear();
+    Ops << Int32Ty << BaseValue;
+    auto convertLower = addSPIRVInst(spv::OpUConvert, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << convertLower;
+    auto bitcountLower = addSPIRVInst(spv::OpBitCount, Ops);
+
+    Ops.clear();
+    Ops << Ty << BaseValue << ConstantInt::get(Ty, BitcountSize);
+    auto UpperValue = addSPIRVInst(spv::OpShiftRightLogical, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << UpperValue;
+    auto convertUpper = addSPIRVInst(spv::OpUConvert, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << convertUpper;
+    auto bitcountUpper = addSPIRVInst(spv::OpBitCount, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << bitcountLower << bitcountUpper;
+    RID = addSPIRVInst(spv::OpIAdd, Ops);
+
+    Ops.clear();
+    Ops << Ty << RID;
+    RID = addSPIRVInst(spv::OpUConvert, Ops);
+  } else if (TyBitWidth == BitcountSize) {
+    Ops << Ty << BaseValue;
+    RID = addSPIRVInst(spv::OpBitCount, Ops);
+  } else if (TyBitWidth < BitcountSize) {
+    Ops << Int32Ty << BaseValue;
+    RID = addSPIRVInst(spv::OpUConvert, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << RID;
+    RID = addSPIRVInst(spv::OpBitCount, Ops);
+
+    Ops.clear();
+    Ops << Ty << RID;
+    RID = addSPIRVInst(spv::OpUConvert, Ops);
+  } else {
+    llvm_unreachable("Unsupported type width for kpopcount");
+  }
+  return RID;
+}
+
 SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
@@ -4219,6 +4283,9 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     Ops << Call->getType() << cmp << width << find_lsb;
     return addSPIRVInst(spv::OpSelect, Ops);
   }
+  case Intrinsic::ctpop: {
+    return GeneratePopcount(Call->getType(), Call->getArgOperand(0), Context);
+  }
 
   default:
     break;
@@ -4226,66 +4293,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
 
   switch (func_type) {
   case Builtins::kPopcount: {
-    // The Base operand of any OpBitCount, OpBitReverse, OpBitFieldInsert,
-    // OpBitFieldSExtract, or OpBitFieldUExtract instruction must be a 32-bit
-    // integer scalar or a vector of 32-bit integers.
-    // https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/chap46.html#VUID-StandaloneSpirv-Base-04781
-    // Thus, non 32-bit types need to be managed explicitly.
-    const int BitcountSize = 32;
-    auto Ty = Call->getType();
-    auto BaseValue = Call->getOperand(0);
-    Type *Int32Ty = Ty->getInt32Ty(Context);
-    if (Ty->isVectorTy())
-      Int32Ty = VectorType::get(Int32Ty, dyn_cast<VectorType>(Ty));
-    auto TyBitWidth = Ty->getScalarSizeInBits();
-
-    SPIRVOperandVec Ops;
-    if (TyBitWidth == BitcountSize * 2) {
-      Ops.clear();
-      Ops << Int32Ty << BaseValue;
-      auto convertLower = addSPIRVInst(spv::OpUConvert, Ops);
-
-      Ops.clear();
-      Ops << Int32Ty << convertLower;
-      auto bitcountLower = addSPIRVInst(spv::OpBitCount, Ops);
-
-      Ops.clear();
-      Ops << Ty << BaseValue << ConstantInt::get(Ty, BitcountSize);
-      auto UpperValue = addSPIRVInst(spv::OpShiftRightLogical, Ops);
-
-      Ops.clear();
-      Ops << Int32Ty << UpperValue;
-      auto convertUpper = addSPIRVInst(spv::OpUConvert, Ops);
-
-      Ops.clear();
-      Ops << Int32Ty << convertUpper;
-      auto bitcountUpper = addSPIRVInst(spv::OpBitCount, Ops);
-
-      Ops.clear();
-      Ops << Int32Ty << bitcountLower << bitcountUpper;
-      RID = addSPIRVInst(spv::OpIAdd, Ops);
-
-      Ops.clear();
-      Ops << Ty << RID;
-      RID = addSPIRVInst(spv::OpUConvert, Ops);
-    } else if (TyBitWidth == BitcountSize) {
-      Ops << Ty << BaseValue;
-      RID = addSPIRVInst(spv::OpBitCount, Ops);
-    } else if (TyBitWidth < BitcountSize) {
-      Ops << Int32Ty << BaseValue;
-      RID = addSPIRVInst(spv::OpUConvert, Ops);
-
-      Ops.clear();
-      Ops << Int32Ty << RID;
-      RID = addSPIRVInst(spv::OpBitCount, Ops);
-
-      Ops.clear();
-      Ops << Ty << RID;
-      RID = addSPIRVInst(spv::OpUConvert, Ops);
-    } else {
-      llvm_unreachable("Unsupported type width for kpopcount");
-    }
-    break;
+    return GeneratePopcount(Call->getType(), Call->getOperand(0), Context);
   }
   case Builtins::kShuffle: {
     auto Src = Call->getOperand(0);
