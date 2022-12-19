@@ -578,9 +578,11 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
         if (source_ty && dest_ty && source_ty != dest_ty) {
           int Steps = 0;
-          if (!isa<GetElementPtrInst>(I) &&
-              FindAliasingContainedType(source_ty, dest_ty, Steps)) {
-            if (Steps > 0) {
+          if (FindAliasingContainedType(source_ty, dest_ty, Steps)) {
+            // Single level GEP is ok to transform, but beyond that the address
+            // math must be divided among other entries.
+            if ((Steps > 0 && !isa<GetElementPtrInst>(I)) ||
+                (Steps == 1)) {
               ImplicitGEPs.insert({&I, Steps});
               continue;
             }
