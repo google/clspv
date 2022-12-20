@@ -537,13 +537,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
-    // Lower longer vectors when requested. Note that this pass depends on
-    // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
-    // afterwards.
-    if (clspv::Option::LongVectorSupport()) {
-      pm.addPass(clspv::LongVectorLoweringPass());
-    }
-
     // We need to run mem2reg and inst combine early because our
     // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
     // pattern
@@ -552,6 +545,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     //   %2 = bitcast float* %1
     //   %3 = load float %2
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+
+    // Lower longer vectors when requested. Note that this pass depends on
+    // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
+    // afterwards.
+    if (clspv::Option::LongVectorSupport()) {
+      pm.addPass(clspv::LongVectorLoweringPass());
+    }
 
     // Try to deal with pointer bitcasts early. This can prevent problems like
     // issue #409 where LLVM is looser about access chain addressing than
