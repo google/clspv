@@ -80,7 +80,7 @@ static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
     X("extra-validation",
       "Perform extra validation on OpenCL C when targeting Vulkan");
 static FrontendPluginRegistry::Add<clspv::PrintAttrsASTAction>
-    Y("print the attributes", "find those attributes and print em");
+    Y("attr-information-getting", "get those attrs");
 
 static llvm::cl::opt<bool> cl_single_precision_constants(
     "cl-single-precision-constant", llvm::cl::init(false),
@@ -245,7 +245,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
           enabled) {
         instance.getPreprocessorOpts().addMacroDef(str);
       }
-      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled){
+      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled) {
         instance.getPreprocessorOpts().addMacroUndef(str);
       }
     }
@@ -635,7 +635,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-  
+
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {

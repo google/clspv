@@ -31,6 +31,7 @@ struct SPIRVProducerPass : llvm::PassInfoMixin<SPIRVProducerPass> {
 private:
   llvm::raw_pwrite_stream *out;
   bool outputCInitList;
+  std::unordered_map<std::string, std::string> functionAttrStrings;
 };
 } // namespace clspv
 

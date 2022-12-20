@@ -905,16 +905,12 @@ public:
     return true;
   }
 };
-} // namespace
 
-namespace {
-using namespace clang;
 class PrintAttrsConsumer final : public clang::ASTConsumer {
 public:
-  explicit PrintAttrsConsumer(ASTContext *Context) : Context(Context) {}
-  virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
+  virtual bool HandleTopLevelDecl(clang::DeclGroupRef DG) override {
     for (auto *D : DG) {
-      if (auto *FD = llvm::dyn_cast<FunctionDecl>(D)) {
+      if (auto *FD = llvm::dyn_cast<clang::FunctionDecl>(D)) {
         if (FD->hasBody() && FD->hasAttrs()) {
           std::string str;
           llvm::raw_string_ostream ss(str);
@@ -922,29 +918,25 @@ public:
           for (auto &A : FD->getAttrs()) {
             kernel_attr_present |= std::strcmp(A->getSpelling(), "kernel");
             // TODO maybe trim string
-            A->printPretty(ss, Context->getPrintingPolicy());
+
+            // TODO stop the formatting
+            A->printPretty(ss, D->getASTContext().getPrintingPolicy());
           }
-          if (kernel_attr_present){
+          if (kernel_attr_present) {
             auto attr_str = ss.str();
             // inline newlines should be removed
             attr_str.erase(remove(attr_str.begin(), attr_str.end(), '\n'),
                            attr_str.end());
-            functionAttrs[FD->getName().str()] = std::move(attr_str);
-            llvm::errs() << FD->getName().str() << '\''
-                         << functionAttrs[FD->getName().str()] << '\'' << '\n';
-          } else {
-            functionAttrs[FD->getName().str()] = "";
+            FD->addAttr(AnnotateAttr::Create(FD->getASTContext(), attr_str,
+                                             nullptr, 0, FD->getSourceRange()));
           }
         }
       }
     }
     return true; // TODO why true
   }
-
-  std::unordered_map<std::string, std::string> functionAttrs;
-private:
-  ASTContext *Context;
 };
+
 } // namespace
 
 namespace clspv {
@@ -956,7 +948,6 @@ ExtraValidationASTAction::CreateASTConsumer(CompilerInstance &CI,
 std::unique_ptr<ASTConsumer>
 PrintAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
                                        llvm::StringRef InFile) {
-  return std::unique_ptr<ASTConsumer>(
-      new PrintAttrsConsumer(&CI.getASTContext()));
+  return std::unique_ptr<ASTConsumer>(new PrintAttrsConsumer());
 }
 } // namespace clspv

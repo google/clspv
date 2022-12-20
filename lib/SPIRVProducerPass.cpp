@@ -395,7 +395,11 @@ struct SPIRVProducerPassImpl {
   SmallPtrSet<Value *, 16> &getGlobalConstArgSet() {
     return GlobalConstArgumentSet;
   }
-  StrideTypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
+  StrideTypeList &getTypesNeedingArrayStride() {
+    return TypesNeedingArrayStride;
+  }
+
+  void ReadFunctionAttributes();
 
   void GenerateLLVMIRInfo();
   // Populate GlobalConstFuncTypeMap. Also, if module-scope __constant will
@@ -774,6 +778,8 @@ private:
   SPIRVID ReflectionID;
   DenseMap<Function *, SPIRVID> KernelDeclarations;
 
+  StringMap<std::string> functionAttrStrings;
+
 public:
   static SPIRVProducerPassImpl *Ptr;
 };
@@ -797,6 +803,24 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Value *v) {
 }
 
 } // namespace
+
+void SPIRVProducerPassImpl::ReadFunctionAttributes() {
+  for (auto &I : module->globals()) {
+    if (I.getName() == "llvm.global.annotations") {
+      ConstantArray *CA = dyn_cast<ConstantArray>(I.getOperand(0));
+      for (auto &OI : CA->operands()) {
+        ConstantStruct *CS = dyn_cast<ConstantStruct>(OI.get());
+        Function *FUNC = dyn_cast<Function>(CS->getOperand(0)->getOperand(0));
+        GlobalVariable *AnnotationGL =
+            dyn_cast<GlobalVariable>(CS->getOperand(1)->getOperand(0));
+        StringRef annotation =
+            dyn_cast<ConstantDataArray>(AnnotationGL->getInitializer())
+                ->getAsCString();
+        functionAttrStrings[FUNC->getName().str()] = annotation.str();
+      }
+    }
+  }
+}
 
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
@@ -826,6 +850,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
 
   NonUniformPointers.clear();
 
+  ReadFunctionAttributes();
   PopulateUBOTypeMaps();
   PopulateStructuredCFGMaps();
 
@@ -991,7 +1016,7 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
   SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : module->globals()) {
     if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
-      if (GV.use_empty()) {
+      if (GV.use_empty() && GV.getSection() != "llvm.metadata") {
         DeadGVList.push_back(&GV);
       } else {
         GVList.push_back(&GV);
@@ -1023,6 +1048,8 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
     // Change global constant variable's address space to ModuleScopePrivate.
     auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
     for (auto GV : GVList) {
+      if (GV->getSection() == "llvm.metadata")
+        continue;
       // Create new gv with ModuleScopePrivate address space.
       Type *NewGVTy = GV->getValueType();
       GlobalVariable *NewGV = new GlobalVariable(
@@ -1263,8 +1290,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
       if (module_scope_constant_external_init &&
           spv::BuiltInMax == BuiltinType) {
-        StructTypesNeedingBlock.insert(
-            cast<StructType>(GV.getValueType()));
+        StructTypesNeedingBlock.insert(cast<StructType>(GV.getValueType()));
       }
     }
   }
@@ -1524,7 +1550,8 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
       auto *ptr_ty = cast<PointerType>(type);
       unsigned AddrSpace = ptr_ty->getAddressSpace();
       if (AddressSpace::Constant == AddrSpace) {
-        if (!clspv::Option::ConstantArgsInUniformBuffer() && !clspv::Option::PhysicalStorageBuffers()) {
+        if (!clspv::Option::ConstantArgsInUniformBuffer() &&
+            !clspv::Option::PhysicalStorageBuffers()) {
           AddrSpace = AddressSpace::Global;
           // The canonical type of __constant is __global unless constants are
           // passed in uniform buffers.
@@ -2302,14 +2329,14 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
   } else if (Cst->isNullValue()) {
     Opcode = spv::OpConstantNull;
-  } else if(const Function *Fn = dyn_cast<Function>(Cst)) {
+  } else if (const Function *Fn = dyn_cast<Function>(Cst)) {
     if (Fn->isIntrinsic()) {
       Fn->print(errs());
       llvm_unreachable("Unsupported llvm intrinsic");
     }
     Fn->print(errs());
     llvm_unreachable("Unhandled function declaration/definition");
- } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
+  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
     // If there is exactly one use we know where to insert the instruction
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
@@ -2631,8 +2658,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
         SPIRVID ZDimCstID =
             getSPIRVValue(mdconst::extract<ConstantInt>(MD->getOperand(2)));
 
-        Ops << GV.getValueType() << XDimCstID << YDimCstID
-            << ZDimCstID;
+        Ops << GV.getValueType() << XDimCstID << YDimCstID << ZDimCstID;
 
         InitializerID =
             addSPIRVInst<kGlobalVariables>(spv::OpConstantComposite, Ops);
@@ -2807,7 +2833,8 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
 
   if (GV.hasInitializer()) {
     auto GVInit = GV.getInitializer();
-    if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init) {
+    if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init &&
+        GV.getSection() != "llvm.metadata") {
       InitializerID = getSPIRVValue(GVInit);
     }
   }
@@ -3361,7 +3388,7 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVCastOpcode(Instruction &I) {
       {Instruction::BitCast, spv::OpBitcast},
       {Instruction::PtrToInt, spv::OpConvertPtrToU},
       {Instruction::IntToPtr, spv::OpConvertUToPtr},
-      };
+  };
 
   assert(0 != Map.count(I.getOpcode()));
 
@@ -3825,8 +3852,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 
     Value *Image = Call->getArgOperand(0);
     const uint32_t dim = ImageNumDimensions(image_ty);
-    const uint32_t components =
-        dim + (IsArrayImageType(image_ty) ? 1 : 0);
+    const uint32_t components = dim + (IsArrayImageType(image_ty) ? 1 : 0);
     if (components == 1) {
       SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
     } else {
@@ -6681,9 +6707,8 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     auto kernel_name =
         addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
 
-    std::string mock_attributes = "kernel fake_attribute(1, 2,3)";
-    auto attributes_op_string = 
-        addSPIRVInst<kDebug>(spv::OpString, mock_attributes.c_str());
+    auto attributes_op_string = addSPIRVInst<kDebug>(
+        spv::OpString, functionAttrStrings[F.getName()].c_str());
 
     // Kernel declaration
     // Ops[0] = void type
@@ -6839,7 +6864,8 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
 
     // Generate the reflection for the image channel getter function if it is
     // used in this kernel.
-    auto *image_getter_md = F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
+    auto *image_getter_md =
+        F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
     if (image_getter_md) {
       auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
       auto STy = cast<StructType>(GV->getValueType());
@@ -6909,10 +6935,9 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
 
   if (clspv::Option::KernelArgInfo()) {
     assert(kernelFn.getMetadata("kernel_arg_type") &&
-            kernelFn.getMetadata("kernel_arg_addr_space") &&
-            kernelFn.getMetadata("kernel_arg_access_qual") &&
-            kernelFn.getMetadata("kernel_arg_type_qual")
-          );
+           kernelFn.getMetadata("kernel_arg_addr_space") &&
+           kernelFn.getMetadata("kernel_arg_access_qual") &&
+           kernelFn.getMetadata("kernel_arg_type_qual"));
     auto const &type_op =
         kernelFn.getMetadata("kernel_arg_type")->getOperand(ordinal);
     auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
@@ -6970,7 +6995,6 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     }
     auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
     Ops << type_qual_enum;
-  
   }
 
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
