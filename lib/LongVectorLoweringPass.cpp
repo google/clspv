@@ -672,6 +672,7 @@ PreservedAnalyses clspv::LongVectorLoweringPass::run(Module &M,
   }
 
   cleanDeadFunctions();
+
   cleanDeadGlobals();
 
   return PA;
@@ -682,6 +683,14 @@ Value *clspv::LongVectorLoweringPass::visit(Value *V) {
   auto it = ValueMap.find(V);
   if (it != ValueMap.end()) {
     return it->second;
+  }
+
+  // TODO(#816): change to isPointerTy().
+  if (V->getType()->isOpaquePointerTy()) {
+    auto where = GlobalVariableMap.find(dyn_cast_or_null<GlobalVariable>(V));
+    if (where != GlobalVariableMap.end()) {
+      return where->second;
+    }
   }
 
   if (isa<Argument>(V)) {
@@ -1103,6 +1112,13 @@ clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
                ->getNonOpaquePointerElementType();
   } else if (!Type) {
     return nullptr;
+  } else {
+    // For an opaque pointer check if the pass rewrote the pointer already and
+    // use the value if it did. This occurs with global variables
+    auto *tmp = visit(I.getPointerOperand());
+    if (tmp) {
+      EquivalentPointer = tmp;
+    }
   }
 
   IRBuilder<> B(&I);
@@ -1184,6 +1200,13 @@ Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
     EquivalentPointer = visit(I.getPointerOperand());
     assert(EquivalentPointer && "pointer not lowered");
+  } else {
+    // For an opaque pointer check if the pass rewrote the pointer already and
+    // use the value if it did. This occurs with global variables
+    auto *tmp = visit(I.getPointerOperand());
+    if (tmp) {
+      EquivalentPointer = tmp;
+    }
   }
 
   IRBuilder<> B(&I);
@@ -1353,6 +1376,13 @@ Value *clspv::LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
     EquivalentPointer = visit(I.getPointerOperand());
     assert(EquivalentPointer && "pointer not lowered");
+  } else {
+    // For an opaque pointer check if the pass rewrote the pointer already and
+    // use the value if it did. This occurs with global variables
+    auto *tmp = visit(I.getPointerOperand());
+    if (tmp) {
+      EquivalentPointer = tmp;
+    }
   }
 
   IRBuilder<> B(&I);
