@@ -24,7 +24,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
@@ -80,7 +79,7 @@ enum class SPIRArch : uint32_t {
 static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
     X("extra-validation",
       "Perform extra validation on OpenCL C when targeting Vulkan");
-static FrontendPluginRegistry::Add<clspv::PrintAttrsASTAction>
+static FrontendPluginRegistry::Add<clspv::EntryPointAttrsASTAction>
     Y("attr-information-getting", "get those attrs");
 
 static llvm::cl::opt<bool> cl_single_precision_constants(
@@ -506,9 +505,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
-    pm.addPass(llvm::PrintModulePass());
     pm.addPass(clspv::AnnotationToMetadataPass());
-    pm.addPass(llvm::PrintModulePass());
     pm.addPass(clspv::AddFunctionAttributesPass());
     pm.addPass(clspv::AutoPodArgsPass());
     pm.addPass(clspv::DeclarePushConstantsPass());
@@ -696,6 +693,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass depends on the inlining of the image metadata getter from
     // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
+
     pm.addPass(
         clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
   });

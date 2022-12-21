@@ -1082,8 +1082,6 @@ bool clspv::ThreeElementVectorLoweringPass::runOnFunction(Function &F) {
     // Use the Value overload of visit to ensure cache is used.
     Modified |= (visit(static_cast<Value *>(&I)) != nullptr);
   }
-  F.mutateType(FunctionToVisit->getType()); // TODO dark art
-  F.replaceAllUsesWith(FunctionToVisit);
 
   return Modified;
 }

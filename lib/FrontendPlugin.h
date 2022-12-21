@@ -32,7 +32,7 @@ struct ExtraValidationASTAction final : public clang::PluginASTAction {
   }
 };
 
-class PrintAttrsASTAction final : public clang::PluginASTAction {
+class EntryPointAttrsASTAction final : public clang::PluginASTAction {
   virtual std::unique_ptr<clang::ASTConsumer>
   CreateASTConsumer(clang::CompilerInstance &CI,
                     llvm::StringRef InFile) override;

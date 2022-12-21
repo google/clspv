@@ -805,22 +805,13 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Value *v) {
 } // namespace
 
 void SPIRVProducerPassImpl::ReadFunctionAttributes() {
-  for (auto &I : module->globals()) {
-    if (I.getName() == "llvm.global.annotations") {
-      ConstantArray *CA = dyn_cast<ConstantArray>(I.getOperand(0));
-      for (auto &OI : CA->operands()) {
-        ConstantStruct *CS = dyn_cast<ConstantStruct>(OI.get());
-        Function *FUNC = dyn_cast<Function>(CS->getOperand(0)->getOperand(0));
-        GlobalVariable *AnnotationGL =
-            dyn_cast<GlobalVariable>(CS->getOperand(1)->getOperand(0));
-        StringRef annotation =
-            dyn_cast<ConstantDataArray>(AnnotationGL->getInitializer())
-                ->getAsCString();
-        functionAttrStrings[FUNC->getName().str()] = annotation.str();
-      }
-      I.eraseFromParent(); // TODO this might make all the looking for
-                           // "llvm.metadata" redundant
-      break;
+  auto md_node =
+      module->getNamedMetadata(clspv::EntryPointAttributesMetadataName());
+  if (md_node) {
+    for (auto *operand : md_node->operands()) {
+      auto key = cast<MDString>(operand->getOperand(0).get())->getString();
+      auto value = cast<MDString>(operand->getOperand(1).get())->getString();
+      functionAttrStrings[key] = value;
     }
   }
 }
@@ -1019,7 +1010,7 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
   SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : module->globals()) {
     if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
-      if (GV.use_empty() && GV.getSection() != "llvm.metadata") {
+      if (GV.use_empty()) {
         DeadGVList.push_back(&GV);
       } else {
         GVList.push_back(&GV);
@@ -1051,8 +1042,6 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
     // Change global constant variable's address space to ModuleScopePrivate.
     auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
     for (auto GV : GVList) {
-      if (GV->getSection() == "llvm.metadata")
-        continue;
       // Create new gv with ModuleScopePrivate address space.
       Type *NewGVTy = GV->getValueType();
       GlobalVariable *NewGV = new GlobalVariable(
@@ -2836,8 +2825,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
 
   if (GV.hasInitializer()) {
     auto GVInit = GV.getInitializer();
-    if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init &&
-        GV.getSection() != "llvm.metadata") {
+    if (!isa<UndefValue>(GVInit) && !module_scope_constant_external_init) {
       InitializerID = getSPIRVValue(GVInit);
     }
   }

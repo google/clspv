@@ -906,8 +906,9 @@ public:
   }
 };
 
-class PrintAttrsConsumer final : public clang::ASTConsumer {
+class EntryPointAttrsConsumer final : public clang::ASTConsumer {
 public:
+  EntryPointAttrsConsumer(ASTContext *c) : context(c) {}
   virtual bool HandleTopLevelDecl(clang::DeclGroupRef DG) override {
     for (auto *D : DG) {
       if (auto *FD = llvm::dyn_cast<clang::FunctionDecl>(D)) {
@@ -917,10 +918,11 @@ public:
           bool kernel_attr_present = false;
           for (auto &A : FD->getAttrs()) {
             kernel_attr_present |= std::strcmp(A->getSpelling(), "kernel");
+            kernel_attr_present |= std::strcmp(A->getSpelling(), "spir_kernel");
             // TODO maybe trim string
 
             // TODO stop the formatting
-            A->printPretty(ss, D->getASTContext().getPrintingPolicy());
+            A->printPretty(ss, context->getPrintingPolicy());
           }
           if (kernel_attr_present) {
             auto attr_str = ss.str();
@@ -935,6 +937,9 @@ public:
     }
     return true; // TODO why true
   }
+
+  private:
+  ASTContext* context;
 };
 
 } // namespace
@@ -946,8 +951,8 @@ ExtraValidationASTAction::CreateASTConsumer(CompilerInstance &CI,
   return std::unique_ptr<ASTConsumer>(new ExtraValidationConsumer(CI, InFile));
 }
 std::unique_ptr<ASTConsumer>
-PrintAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
+EntryPointAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
                                        llvm::StringRef InFile) {
-  return std::unique_ptr<ASTConsumer>(new PrintAttrsConsumer());
+  return std::unique_ptr<ASTConsumer>(new EntryPointAttrsConsumer(&CI.getASTContext()));
 }
 } // namespace clspv
