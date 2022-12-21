@@ -17,6 +17,12 @@
 
 namespace clspv {
 
+const std::string &EntryPointAttributesMetadataName() {
+  static std::string func_name =
+      Builtins::GetMangledFunctionName("clspv.entry_point_attributes");
+  return func_name;
+}
+
 const std::string &LocalSpecIdMetadataName() {
   static std::string func_name =
       Builtins::GetMangledFunctionName("clspv.local_spec_ids");

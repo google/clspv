@@ -24,6 +24,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/LinkAllPasses.h"
@@ -505,6 +506,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
+    pm.addPass(llvm::PrintModulePass());
+    pm.addPass(clspv::AnnotationToMetadataPass());
+    pm.addPass(llvm::PrintModulePass());
     pm.addPass(clspv::AddFunctionAttributesPass());
     pm.addPass(clspv::AutoPodArgsPass());
     pm.addPass(clspv::DeclarePushConstantsPass());

@@ -818,6 +818,9 @@ void SPIRVProducerPassImpl::ReadFunctionAttributes() {
                 ->getAsCString();
         functionAttrStrings[FUNC->getName().str()] = annotation.str();
       }
+      I.eraseFromParent(); // TODO this might make all the looking for
+                           // "llvm.metadata" redundant
+      break;
     }
   }
 }

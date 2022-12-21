@@ -18,6 +18,7 @@
 #define MODULE_PASS(NAME, CREATE_PASS)
 #endif // MODULE_PASS
 MODULE_PASS("add-function-attributes", clspv::AddFunctionAttributesPass)
+MODULE_PASS("annotation-to-metadata", clspv::AnnotationToMetadataPass)
 MODULE_PASS("allocate-descriptors", clspv::AllocateDescriptorsPass)
 MODULE_PASS("auto-pod-args", clspv::AutoPodArgsPass)
 MODULE_PASS("cluster-constants", clspv::ClusterModuleScopeConstantVars)
