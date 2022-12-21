@@ -253,15 +253,15 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
 }
 
 // Sets |instance|'s options for compiling. Returns 0 if successful.
-int SetCompilerInstanceOptions(CompilerInstance &instance,
-                               const llvm::StringRef &overiddenInputFilename,
-                               clang::FrontendInputFile &kernelFile,
-                               const std::string &program,
-                               llvm::raw_string_ostream *diagnosticsStream) {
+int SetCompilerInstanceOptions(
+    CompilerInstance &instance, const llvm::StringRef &overiddenInputFilename,
+    clang::FrontendInputFile &kernelFile, const std::string &program,
+    std::unique_ptr<llvm::MemoryBuffer> &file_memory_buffer,
+    llvm::raw_string_ostream *diagnosticsStream) {
   if (program.empty()) {
     return -1;
   }
-  std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer =
+  file_memory_buffer =
       llvm::MemoryBuffer::getMemBuffer(program, overiddenInputFilename);
 
   if (verify) {
@@ -909,8 +909,10 @@ ProgramToModule(llvm::LLVMContext &context,
                                       clang::InputKind(InputLanguage));
   std::string log;
   llvm::raw_string_ostream diagnosticsStream(log);
+  std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer;
   if (auto error = SetCompilerInstanceOptions(
-          instance, inputFilename, kernelFile, program, &diagnosticsStream)) {
+          instance, inputFilename, kernelFile, program, file_memory_buffer,
+          &diagnosticsStream)) {
     *err = error;
     return nullptr;
   }
