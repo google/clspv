@@ -5,10 +5,12 @@
 
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[v4uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 4
+// CHECK-DAG: %[[v2uint:[0-9a-zA-Z_]+]] = OpTypeVector %[[uint]] 2
 // CHECK-DAG: %[[ushort:[0-9a-zA-Z_]+]] = OpTypeInt 16 0
 // CHECK-DAG: %[[v4ushort:[0-9a-zA-Z_]+]] = OpTypeVector %[[ushort]] 4
 // CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
-// CHECK:     %[[__original_id_23:[0-9]+]] = OpUConvert %[[v4uint]] %[[__original_id_22:[0-9]+]]
+// CHECK:     OpUConvert %[[v2uint]] %[[src_01:[0-9]+]]
+// CHECK:     OpUConvert %[[v2uint]] %[[src_23:[0-9]+]]
 
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint4* dst, global ushort4* src)
