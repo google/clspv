@@ -379,7 +379,7 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool>
     opaque_pointers("enable-opaque-pointers",
                     llvm::cl::desc("Use opaque pointers"),
-                    llvm::cl::init(true));
+                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
     debug_info("g", llvm::cl::init(false),
