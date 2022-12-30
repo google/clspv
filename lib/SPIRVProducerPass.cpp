@@ -991,7 +991,7 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
   SmallVector<GlobalVariable *, 8> GVList;
   SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : module->globals()) {
-    if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
+    if (GV.getType()->getAddressSpace() == AddressSpace::Global) {
       if (GV.use_empty()) {
         DeadGVList.push_back(&GV);
       } else {
@@ -1260,7 +1260,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       PointerType *PTy = cast<PointerType>(GV.getType());
       const auto AS = PTy->getAddressSpace();
       const bool module_scope_constant_external_init =
-          (AS == AddressSpace::Constant) && GV.hasInitializer();
+          (AS == AddressSpace::Global || AS == AddressSpace::Constant) && GV.hasInitializer();
       const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
       if (module_scope_constant_external_init &&
           spv::BuiltInMax == BuiltinType) {
@@ -2803,7 +2803,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   const auto spvSC = GetStorageClass(AS);
 
   const bool module_scope_constant_external_init =
-      (AS == AddressSpace::Constant) && GV.hasInitializer() &&
+      (AS == AddressSpace::Global || AS == AddressSpace::Constant) && GV.hasInitializer() &&
       clspv::Option::ModuleConstantsInStorageBuffer();
 
   if (GV.hasInitializer()) {
