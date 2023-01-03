@@ -61,6 +61,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     }
   } else if (auto *gv = dyn_cast<GlobalVariable>(v)) {
     return CacheType(gv->getValueType());
+  } else if (auto *func = dyn_cast<Function>(v)) {
+    return CacheType(func->getFunctionType());
   }
 
   // Special resource-related functions. The last parameter of each function is
