@@ -828,6 +828,9 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"set_user_event_status", Builtins::kSetUserEventStatus},
 
         // MemoryFence
+        {"__to_global", Builtins::kToGlobal},
+        {"__to_local", Builtins::kToLocal},
+        {"__to_private", Builtins::kToPrivate},
         {"get_fence", Builtins::kGetFence},
         {"mem_fence", Builtins::kMemFence},
         {"read_mem_fence", Builtins::kReadMemFence},

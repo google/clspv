@@ -65,6 +65,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVOp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/RemoveUnusedArguments.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/TransformGenericVolatileMemoryAccess.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReorderBasicBlocksPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceLLVMIntrinsicsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ReplaceOpenCLBuiltinPass.cpp

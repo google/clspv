@@ -65,6 +65,20 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
         initializers_alignment[GV.getInitializer()] = GV.getAlignment();
       }
     }
+    else if (GV.getType()->getPointerAddressSpace() == clspv::AddressSpace::Global) {
+      if (GV.use_empty()) {
+        dead_global_constants.push_back(&GV);
+      } else {
+        global_constants.push_back(&GV);
+        if (GV.hasInitializer()) {
+          initializers.insert(GV.getInitializer());
+          initializers_alignment[GV.getInitializer()] = GV.getAlignment();
+        } else {
+          initializers.insert(Constant::getNullValue(GV.getType()));
+          initializers_alignment[Constant::getNullValue(GV.getType())] = GV.getAlignment();
+        }
+      }
+    }
   }
 
   for (GlobalVariable *GV : dead_global_constants) {
@@ -127,10 +141,10 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
     Constant *clustered_initializer =
         ConstantStruct::get(type, initializers_as_vec);
     GlobalVariable *clustered_gv = new GlobalVariable(
-        M, type, true, GlobalValue::InternalLinkage, clustered_initializer,
+        M, type, false, GlobalValue::InternalLinkage, clustered_initializer,
         clspv::ClusteredConstantsVariableName(), nullptr,
         GlobalValue::ThreadLocalMode::NotThreadLocal,
-        clspv::AddressSpace::Constant);
+        clspv::AddressSpace::Global);
     assert(clustered_gv);
     clustered_gv->setAlignment(MaybeAlign(max_alignment));
 
@@ -148,7 +162,10 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
           Instruction *gep = GetElementPtrInst::CreateInBounds(
               clustered_gv->getValueType(), clustered_gv,
               {zero, Builder.getInt32(index)}, "", inst);
+          // TODO: Handle cases for module constants where we have the user is a gep and a load user for the gep. This case happens when we have a module constant and a global variable in the same opencl module.
           user->replaceUsesOfWith(GV, gep);
+        } else if (dyn_cast<ConstantExpr>(user)) {
+          // Will be handled with instructions.
         } else {
           errs() << "Don't know how to handle updating user of __constant: "
                  << *user << "\n";

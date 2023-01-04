@@ -231,7 +231,7 @@ void NormalizeGlobalVariables(Module &M) {
   SmallVector<GlobalVariable *, 8> globals;
   for (auto &GV : M.globals()) {
     if (GV.hasInitializer() && GV.getType()->getPointerAddressSpace() ==
-                                   clspv::AddressSpace::Constant) {
+                                   clspv::AddressSpace::Global) {
       globals.push_back(&GV);
     }
   }

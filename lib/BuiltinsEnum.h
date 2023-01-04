@@ -107,6 +107,9 @@ enum BuiltinType : unsigned int {
 
   kType_MemoryFence_Start,
   kGetFence,
+  kToGlobal,
+  kToLocal,
+  kToPrivate,
   kMemFence,
   kReadMemFence,
   kWriteMemFence,

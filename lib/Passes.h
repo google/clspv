@@ -55,6 +55,7 @@
 #include "SplatSelectCondition.h"
 #include "StripFreezePass.h"
 #include "ThreeElementVectorLoweringPass.h"
+#include "TransformGenericVolatileMemoryAccess.h"
 #include "UBOTypeTransformPass.h"
 #include "UndoBoolPass.h"
 #include "UndoByvalPass.h"
