@@ -6523,7 +6523,7 @@ SPIRVID SPIRVProducerPassImpl::getReflectionImport() {
       addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_non_semantic_info");
     }
     ReflectionID = addSPIRVInst<kImports>(spv::OpExtInstImport,
-                                          "NonSemantic.ClspvReflection.2");
+                                          "NonSemantic.ClspvReflection.4");
   }
   return ReflectionID;
 }

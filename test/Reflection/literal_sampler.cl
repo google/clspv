@@ -19,7 +19,7 @@ kernel void foo(global float4* data, read_only image2d_t im) {
   data[3] = read_imagef(im, s4, (float2)(0.0f, 0.0f));
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
 // CHECK-DAG: OpDecorate [[s1:%[a-zA-Z0-9_]+]] Binding 3
 // CHECK-DAG: OpDecorate [[s1]] DescriptorSet 0
 // CHECK-DAG: OpDecorate [[s2:%[a-zA-Z0-9_]+]] Binding 2
