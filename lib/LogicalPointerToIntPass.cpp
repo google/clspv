@@ -96,7 +96,9 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
     auto *IntTy = cast<IntegerType>(Instr->getType());
 
     auto *PtrOp = Instr->getOperand(0);
-    APInt Offset(64, 0);
+    APInt Offset(M.getDataLayout().getPointerSizeInBits(
+                     PtrOp->getType()->getPointerAddressSpace()),
+                 0);
     Value *MemBase = nullptr;
 
     if (processValue(M.getDataLayout(), PtrOp, Offset, MemBase)) {
