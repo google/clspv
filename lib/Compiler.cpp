@@ -539,6 +539,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
+    if (clspv::Option::HackLogicalPtrtoint()) {
+      pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+      pm.addPass(clspv::LogicalPointerToIntPass());
+    }
+
     // We need to run mem2reg and inst combine early because our
     // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
     // pattern

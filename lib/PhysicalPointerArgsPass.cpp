@@ -30,6 +30,7 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
 
   PreservedAnalyses PA;
   DenseMap<Value *, Type *> TypeCache;
+  SmallVector<Function *, 8> FuncsToDelete;
 
   for (auto &F : M) {
     if (F.getCallingConv() != CallingConv::SPIR_KERNEL)
@@ -122,7 +123,12 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
 
     // Inline the function into the wrapper
     InlineFunctionInfo info;
-    InlineFunction(*CallInst, info);
+    if (InlineFunction(*CallInst, info).isSuccess())
+      FuncsToDelete.push_back(&F);
+  }
+
+  for (auto *F : FuncsToDelete) {
+    F->eraseFromParent();
   }
 
   return PA;
