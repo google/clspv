@@ -9,7 +9,7 @@ kernel void test(global ulong *a, global int *b)
     a[tid] = (ulong) &b[tid];
 }
 
-// CHECK: [[clspv_reflection:%[0-9a-zA-Z_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[clspv_reflection:%[0-9a-zA-Z_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK-DAG: OpDecorate [[ptr_physical_uint:%[a-zA-Z0-9_]+]] ArrayStride 4
 // CHECK-DAG: OpDecorate [[ptr_physical_ulong:%[a-zA-Z0-9_]+]] ArrayStride 8
 // CHECK-DAG: OpDecorate [[global_id:%[a-zA-Z0-9_]+]] BuiltIn GlobalInvocationId

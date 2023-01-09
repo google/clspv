@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK-DAG: [[foo_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[bar_name:%[a-zA-Z0-9_]+]] = OpString "bar"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid

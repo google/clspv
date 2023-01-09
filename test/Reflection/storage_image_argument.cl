@@ -6,7 +6,7 @@
 kernel void foo(write_only image2d_t data) {
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
 // CHECK-DAG: [[foo_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[data_name:%[a-zA-Z0-9_]+]] = OpString "data"

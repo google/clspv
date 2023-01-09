@@ -11,7 +11,7 @@ kernel void test(global int *result) {
 }
 
 // CHECK: OpExtension "SPV_KHR_physical_storage_buffer"
-// CHECK: [[ClspvReflection:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[ClspvReflection:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpMemoryModel PhysicalStorageBuffer64
 // CHECK: [[Initializer:%[a-zA-Z0-9_]+]] = OpString "0000000000000000000000000000000000000000"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid

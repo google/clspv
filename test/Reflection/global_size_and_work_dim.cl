@@ -7,7 +7,7 @@ kernel void foo(global int* data) {
   *data = get_global_size(0) + get_work_dim();
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0

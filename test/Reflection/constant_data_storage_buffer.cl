@@ -9,7 +9,7 @@ kernel void foo(global int* data) {
   *data = x[get_global_id(0)];
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: [[x_data:%[a-zA-Z0-9_]+]] = OpString "01000000020000000300000004000000"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0

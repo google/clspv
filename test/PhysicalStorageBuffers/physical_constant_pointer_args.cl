@@ -14,7 +14,7 @@ kernel void copy(constant short *a, global int *b, int x, int y) {
 }
 
 // CHECK: OpExtension "SPV_KHR_physical_storage_buffer"
-// CHECK: [[ClspvReflection:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[ClspvReflection:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpMemoryModel PhysicalStorageBuffer64
 // CHECK-DAG: OpDecorate [[ptr_physical_ushort:%[a-zA-Z0-9_]+]] ArrayStride 2
 // CHECK-DAG: OpDecorate [[ptr_physical_uint:%[a-zA-Z0-9_]+]] ArrayStride 4
