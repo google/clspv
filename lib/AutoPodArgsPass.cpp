@@ -98,7 +98,8 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
 
     if (auto *ptr_ty = dyn_cast<PointerType>(arg_type)) {
       if (!(clspv::Option::PhysicalStorageBuffers() &&
-            ptr_ty->getAddressSpace() == clspv::AddressSpace::Global))
+            (ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
+             ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant)))
         continue;
     }
 
@@ -165,7 +166,10 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   // TODO: We should generate a better pod struct by default (e.g. { i32, i8 }
   // is preferable to { i8, i32 }). Also we could support packed structs as
   // fallback to fit arguments depending on the performance cost.
-  const auto global_size = clspv::GlobalPushConstantsSize(M) + pod_struct_size;
+  const auto global_pc_type = clspv::GlobalPushConstantsType(M);
+  const auto global_pc_size =
+      DL.getTypeStoreSize(global_pc_type).getKnownMinSize();
+  const auto global_size = global_pc_size + pod_struct_size;
   const auto fits_global_size =
       global_size <= clspv::Option::MaxPushConstantsSize();
   // Leave some extra room for other push constants.

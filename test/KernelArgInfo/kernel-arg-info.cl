@@ -5,7 +5,7 @@
 
 void kernel foo(global int4 *A, local float* SEC, constant short2* TER, int QUA, read_only image2d_t im0, write_only image2d_t im1, const volatile global int * restrict ptr){}
 
-// CHECK: [[extinst:%[a-zA-A0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.4"
+// CHECK: [[extinst:%[a-zA-A0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 
 // CHECK-DAG: [[kernel_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[arg0name:%[a-zA-Z0-9_]+]] = OpString "A"

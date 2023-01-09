@@ -570,7 +570,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
             clspv::Option::PhysicalStorageBuffers()) {
           if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
             if (source_ptr_ty->getAddressSpace() ==
-                clspv::AddressSpace::Global) {
+                    clspv::AddressSpace::Global ||
+                source_ptr_ty->getAddressSpace() ==
+                    clspv::AddressSpace::Constant) {
               continue;
             }
           }

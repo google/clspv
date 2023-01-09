@@ -8,7 +8,7 @@
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-UBO
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-kernel void copy(global short *a, global int *b, int x, int y) {
+kernel void copy(constant short *a, global int *b, int x, int y) {
     size_t gid = get_global_id(0);
     b[gid] = (int) a[gid] + x + y;
 }

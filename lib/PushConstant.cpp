@@ -50,6 +50,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "kernel_argument";
   case PushConstant::ImageMetadata:
     return "image_metadata";
+  case PushConstant::ModuleConstantsPointer:
+    return "module_constants_pointer";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -74,6 +76,8 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
     return FixedVectorType::get(IntegerType::get(C, 32), 3);
   case PushConstant::ImageMetadata:
     return IntegerType::get(C, 32);
+  case PushConstant::ModuleConstantsPointer:
+    return IntegerType::get(C, 64);
   default:
     break;
   }
@@ -126,7 +130,8 @@ bool UsesGlobalPushConstants(Module &M) {
          ShouldDeclareGlobalSizePushConstant(M) ||
          ShouldDeclareRegionOffsetPushConstant(M) ||
          ShouldDeclareNumWorkgroupsPushConstant(M) ||
-         ShouldDeclareRegionGroupOffsetPushConstant(M);
+         ShouldDeclareRegionGroupOffsetPushConstant(M) ||
+         ShouldDeclareModuleConstantsPointerPushConstant(M);
 }
 
 bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
@@ -172,41 +177,61 @@ bool ShouldDeclareRegionGroupOffsetPushConstant(Module &M) {
   return isEnabled && isUsed;
 }
 
-uint64_t GlobalPushConstantsSize(Module &M) {
-  const auto &DL = M.getDataLayout();
-  if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
-    auto block_ty = GV->getValueType();
-    return DL.getTypeStoreSize(block_ty).getKnownMinSize();
-  } else {
-    SmallVector<Type *, 8> types;
-    if (ShouldDeclareGlobalOffsetPushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::GlobalOffset);
-      types.push_back(type);
-    }
-    if (ShouldDeclareEnqueuedLocalSizePushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::EnqueuedLocalSize);
-      types.push_back(type);
-    }
-    if (ShouldDeclareGlobalSizePushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::GlobalSize);
-      types.push_back(type);
-    }
-    if (ShouldDeclareRegionOffsetPushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::RegionOffset);
-      types.push_back(type);
-    }
-    if (ShouldDeclareNumWorkgroupsPushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::NumWorkgroups);
-      types.push_back(type);
-    }
-    if (ShouldDeclareRegionGroupOffsetPushConstant(M)) {
-      auto type = GetPushConstantType(M, PushConstant::RegionGroupOffset);
-      types.push_back(type);
-    }
+bool ShouldDeclareModuleConstantsPointerPushConstant(Module &M) {
+  bool isEnabled = clspv::Option::ModuleConstantsInStorageBuffer() &&
+                   clspv::Option::PhysicalStorageBuffers();
 
-    auto block_ty = StructType::get(M.getContext(), types, false);
-    return DL.getTypeStoreSize(block_ty).getKnownMinSize();
+  bool moduleHasGlobals = false;
+  for (GlobalVariable &GV : M.globals()) {
+    if (GV.hasInitializer() && GV.getType()->getPointerAddressSpace() ==
+                                   clspv::AddressSpace::Constant) {
+      if (!GV.use_empty()) {
+        moduleHasGlobals = true;
+        break;
+      }
+    }
   }
+
+  return isEnabled && moduleHasGlobals;
+}
+
+StructType *GlobalPushConstantsType(Module &M) {
+  if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
+    if (auto *STy = dyn_cast<StructType>(GV->getValueType())) {
+      return STy;
+    }
+  }
+  SmallVector<Type *, 8> types;
+  if (ShouldDeclareGlobalOffsetPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::GlobalOffset);
+    types.push_back(type);
+  }
+  if (ShouldDeclareEnqueuedLocalSizePushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::EnqueuedLocalSize);
+    types.push_back(type);
+  }
+  if (ShouldDeclareGlobalSizePushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::GlobalSize);
+    types.push_back(type);
+  }
+  if (ShouldDeclareRegionOffsetPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::RegionOffset);
+    types.push_back(type);
+  }
+  if (ShouldDeclareNumWorkgroupsPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::NumWorkgroups);
+    types.push_back(type);
+  }
+  if (ShouldDeclareRegionGroupOffsetPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::RegionGroupOffset);
+    types.push_back(type);
+  }
+  if (ShouldDeclareModuleConstantsPointerPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::ModuleConstantsPointer);
+    types.push_back(type);
+  }
+
+  return StructType::get(M.getContext(), types, false);
 }
 
 const uint64_t kIntBytes = 4;
