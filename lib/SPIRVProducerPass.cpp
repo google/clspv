@@ -6730,6 +6730,17 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     auto kernel_name =
         addSPIRVInst<kDebug>(spv::OpString, F.getName().str().c_str());
 
+    // If we've clustered POD arguments, then argument details are in metadata.
+    // If an argument maps to a resource variable, then get descriptor set and
+    // binding from the resource variable.  Other info comes from the metadata.
+    const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
+    uint32_t num_args = 0;
+    if (arg_map) {
+      num_args = arg_map->getNumOperands();
+    } else {
+      num_args = F.getFunctionType()->getNumParams();
+    }
+
     // Kernel declaration
     // Ops[0] = void type
     // Ops[1] = reflection ext import
@@ -6737,7 +6748,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     // Ops[3] = kernel name
     SPIRVOperandVec Ops;
     Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
-        << kernel_name;
+        << kernel_name << getSPIRVInt32Constant(num_args);
     auto kernel_decl = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
     // Generate the required workgroup size property if it was specified.
@@ -6760,10 +6771,6 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
 
     auto &resource_var_at_index = FunctionToResourceVarsMap[&F];
 
-    // If we've clustered POD arguments, then argument details are in metadata.
-    // If an argument maps to a resource variable, then get descriptor set and
-    // binding from the resource variable.  Other info comes from the metadata.
-    const auto *arg_map = F.getMetadata(clspv::KernelArgMapMetadataName());
     auto local_spec_id_md =
         module->getNamedMetadata(clspv::LocalSpecIdMetadataName());
 
