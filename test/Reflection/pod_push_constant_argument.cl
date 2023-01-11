@@ -3,7 +3,8 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-kernel void foo(short data) {
+kernel void foo(short data, global short* out) {
+  *out = data;
 }
 
 // CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"

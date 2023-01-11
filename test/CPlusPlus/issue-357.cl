@@ -42,13 +42,17 @@ class InstanceTest
 };
 
 // Copy a global instance to local
-__kernel void testCopyInstance1(const __global InstanceTest* src)
+__kernel void testCopyInstance1(const __global InstanceTest* src, __global InstanceTest* dst)
 {
   __local InstanceTest instances[16];
 
   const size_t index = get_global_id(0);
   if (index < 16) {
     instances[index] = src[index];
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
+  if (index < 16) {
+    *dst = instances[index];
   }
 }
 
@@ -129,11 +133,17 @@ __kernel void testLocalInstanceMethod2(__global InstanceTest* dst)
 }
 
 // Get a value from local instance
-__kernel void testLocalInstance3(__global uint* dst)
+__kernel void testLocalInstance3(__global uint* dst, __global uint* src)
 {
   __local InstanceTest instances[16];
 
   const size_t index = get_global_id(0);
+  if (index < 16) {
+    __local InstanceTest* instance = instances + index;
+    InstanceTest tmp;
+    instance->setValue(src[index]);
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
   if (index < 16) {
     const __local InstanceTest* instance = instances + index;
     dst[index] = instance->getValue();
@@ -141,11 +151,15 @@ __kernel void testLocalInstance3(__global uint* dst)
 }
 
 // Get a value from local instance
-__kernel void testLocalInstance4(__global uint* dst)
+__kernel void testLocalInstance4(__global uint* dst, __global uint* src)
 {
   __local InstanceTest instances[16];
 
   const size_t index = get_global_id(0);
+  if (index < 16) {
+    instances[index].setValue(src[index]);
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
   if (index < 16) {
     dst[index] = instances[index].getValue();
   }

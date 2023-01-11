@@ -3,7 +3,9 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-void kernel foo(float16 a, char8 b){}
+void kernel foo(float16 a, char8 b, global int* data) {
+  *data = (int)a.x + (int)b.x;
+}
 
 // CHECK-DAG: [[int:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32

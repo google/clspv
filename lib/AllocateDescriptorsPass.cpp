@@ -265,6 +265,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
+      if (Arg.use_empty()) {
+        arg_index++;
+        continue;
+      }
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       Type *argTy = Arg.getType();
       const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
@@ -362,6 +366,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       unsigned binding = 0;
       int arg_index = 0;
       for (Argument &Arg : f_ptr->args()) {
+        if (Arg.use_empty()) {
+          continue;
+        }
         auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
@@ -386,11 +393,15 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       auto &discriminants_list = discriminants_used_by_function[f_ptr];
 
       int arg_index = 0;
+      int discriminant_index = 0;
 
       auto &set_and_binding_list = set_and_binding_pairs_for_function[f_ptr];
       for (auto &info : discriminants_used_by_function[f_ptr]) {
+        while (f_ptr->getArg(arg_index)->use_empty()) {
+          arg_index++;
+        }
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
-        if (discriminants_list[arg_index].index >= 0) {
+        if (discriminants_list[discriminant_index].index >= 0) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
@@ -436,6 +447,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           set_and_binding_list.back().first = set;
           set_and_binding_list.back().second = binding;
         }
+        discriminant_index++;
         arg_index++;
       }
     }
@@ -453,33 +465,25 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
              << discriminants_list.size() << "\n";
       llvm_unreachable("Bad accounting in descriptor allocation");
     }
-    const auto num_fun_args = unsigned(f_ptr->arg_end() - f_ptr->arg_begin());
-    if (num_fun_args != num_args) {
-      errs() << f_ptr->getName() << " has " << num_fun_args
-             << " params but we have set_and_binding list of length "
-             << num_args << "\n";
-      errs() << *f_ptr << "\n";
-      errs() << *(f_ptr->getType()) << "\n";
-      for (auto &arg : f_ptr->args()) {
-        errs() << "   " << arg << "\n";
-      }
-      llvm_unreachable("Bad accounting in descriptor allocation. Mismatch with "
-                       "function param list");
-    }
 
     // Prepare to insert arg remapping instructions at the start of the
     // function.
     Builder.SetInsertPoint(f_ptr->getEntryBlock().getFirstNonPHI());
 
+    int discriminant_index = 0;
     int arg_index = 0;
     for (Argument &Arg : f_ptr->args()) {
+      if (Arg.use_empty()) {
+        arg_index++;
+        continue;
+      }
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
-      if (discriminants_list[arg_index].index >= 0) {
+      if (discriminants_list[discriminant_index].index >= 0) {
         Changed = true;
         // This argument needs to be rewritten.
 
-        const auto set = set_and_binding_list[arg_index].first;
-        const auto binding = set_and_binding_list[arg_index].second;
+        const auto set = set_and_binding_list[discriminant_index].first;
+        const auto binding = set_and_binding_list[discriminant_index].second;
 #if 0
         // TODO(dneto) Should we ignore unused arguments?  It's probably not an
         // issue in practice.  Adding this condition would change a bunch of our
@@ -489,9 +493,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         }
 #endif
 
-        Type *argTy = discriminants_list[arg_index].discriminant.type;
+        Type *argTy = discriminants_list[discriminant_index].discriminant.type;
         assert(arg_index ==
-               discriminants_list[arg_index].discriminant.arg_index);
+               discriminants_list[discriminant_index].discriminant.arg_index);
 
         if (ShowDescriptors) {
           outs() << "DBA: Function " << f_ptr->getName() << " arg " << arg_index
@@ -603,8 +607,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         assert(resource_type);
 
-        auto fn_name = clspv::ResourceAccessorFunction() + "." +
-                       std::to_string(discriminants_list[arg_index].index);
+        auto fn_name =
+            clspv::ResourceAccessorFunction() + "." +
+            std::to_string(discriminants_list[discriminant_index].index);
 
         Function *var_fn = M.getFunction(fn_name);
 
@@ -639,9 +644,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         auto *arg_kind_arg = Builder.getInt32(unsigned(arg_kind));
         auto *arg_index_arg = Builder.getInt32(arg_index);
         auto *discriminant_index_arg =
-            Builder.getInt32(discriminants_list[arg_index].index);
+            Builder.getInt32(discriminants_list[discriminant_index].index);
         auto *coherent_arg = Builder.getInt32(
-            discriminants_list[arg_index].discriminant.coherent);
+            discriminants_list[discriminant_index].discriminant.coherent);
         auto *resource_type_arg = Constant::getNullValue(resource_type);
         auto *call = Builder.CreateCall(
             var_fn, {set_arg, binding_arg, arg_kind_arg, arg_index_arg,
@@ -687,8 +692,9 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         if (ShowDescriptors) {
           outs() << "DBA: Map " << *argTy << " " << arg_index << "\n"
-                 << "DBA:   index " << discriminants_list[arg_index].index
-                 << " -> (" << set << "," << binding << ")"
+                 << "DBA:   index "
+                 << discriminants_list[discriminant_index].index << " -> ("
+                 << set << "," << binding << ")"
                  << "\n";
           outs() << "DBA:   resource type        " << *resource_type << "\n";
           outs() << "DBA:   var fn               " << var_fn->getName() << "\n";
@@ -701,6 +707,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         Arg.replaceAllUsesWith(replacement);
       }
+      discriminant_index++;
       arg_index++;
     }
   }
@@ -761,6 +768,10 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     function_spec_ids.clear();
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
+      if (Arg.use_empty()) {
+        arg_index++;
+        continue;
+      }
       Type *argTy = Arg.getType();
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);

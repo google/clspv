@@ -8,9 +8,8 @@ int bar(float a, int b, float c, int d) { return b + d; }
 void kernel foo(global int* x, global float* y) { x[0] = bar(1.0f, x[1], 1.0f, x[2]); }
 
 // CHECK: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
-// CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
-// CHECK-NOT: OpFunctionParameter [[float]]
+// CHECK-NOT: OpFunctionParameter
 // CHECK: OpFunctionParameter [[int]]
 // CHECK-NEXT: OpFunctionParameter [[int]]
-// CHECK-NOT: OpFunctionParameter [[float]]
+// CHECK-NOT: OpFunctionParameter
 

@@ -3,7 +3,8 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-kernel void foo(read_only image2d_t data) {
+kernel void foo(read_only image2d_t data, global float4* out) {
+  *out = read_imagef(data, (int2)(0, 0));
 }
 
 // CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"

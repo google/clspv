@@ -6,6 +6,7 @@
 // CHECK: %[[SAMPLER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeSampler
 // CHECK: %[[UINT_ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[SAMPLER_TYPE_ID]]
 // CHECK: OpVariable %[[UINT_ARG0_POINTER_TYPE_ID]] UniformConstant
-void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s)
+void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read_only image2d_t im, global float4* out)
 {
+  *out = read_imagef(im, s, (float2)(0.0,0.0));
 }

@@ -3,7 +3,16 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-void kernel foo(global int4 *A, local float* SEC, constant short2* TER, int QUA, read_only image2d_t im0, write_only image2d_t im1, const volatile global int * restrict ptr){}
+void kernel foo(global int4 *A, local float* SEC, constant short2* TER, int QUA, read_only image2d_t im0, write_only image2d_t im1, const volatile global int * restrict ptr) {
+  float4 tmp;
+  A[0] = (int4)(0,0,0,0);
+  *SEC = 0.0;
+  A[1] = (int4)((int)(*TER).x,0,0,0);
+  A[2] = (int4)QUA;
+  A[3] = (int4)(*ptr);
+  tmp = read_imagef(im0, (int2)(0, 0));
+  write_imagef(im1, (int2)(0, 0), tmp);
+}
 
 // CHECK: [[extinst:%[a-zA-A0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 

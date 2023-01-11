@@ -10,6 +10,7 @@
 // CHECK-DAG: %[[READ_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[FLOAT_TYPE_ID]] 2D 0 0 0 1 Unknown
 // CHECK-DAG: %[[ARG0_POINTER_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypePointer UniformConstant %[[READ_ONLY_IMAGE_TYPE_ID]]
 // CHECK: %[[ARG0_ID]] = OpVariable %[[ARG0_POINTER_TYPE_ID]] UniformConstant
-void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image2d_t a)
+void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image2d_t a, global float4* out)
 {
+  *out = read_imagef(a, (int2)(0,0));
 }

@@ -15,4 +15,7 @@
 // CHECK: %[[ARG1_ID]] = OpVariable %[[ARG1_POINTER_TYPE_ID]] UniformConstant
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image2d_t a, write_only image2d_t b)
 {
+  float4 tmp;
+  tmp = read_imagef(a, (int2)(0,0));
+  write_imagef(b, (int2)(0,0), tmp);
 }

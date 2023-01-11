@@ -21,4 +21,7 @@
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d_t a, write_only image3d_t b)
 {
+  float4 tmp;
+  tmp = read_imagef(a, (int4)(0,0,0,0));
+  write_imagef(b, (int4)(0,0,0,0), tmp);
 }

@@ -3,7 +3,9 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-kernel void foo(char c) { }
+kernel void foo(char c, global int* out) {
+  *out = (int)c;
+}
 
 // CHECK: OpCapability Int8
 // CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
