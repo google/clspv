@@ -20,8 +20,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
+#include "BitcastUtils.h"
 #include "InlineEntryPointsPass.h"
 
 using namespace llvm;
@@ -29,6 +31,10 @@ using namespace llvm;
 PreservedAnalyses clspv::InlineEntryPointsPass::run(Module &M,
                                                     ModuleAnalysisManager &) {
   PreservedAnalyses PA;
+  if (!RequiresInlining(M))
+    return PA;
+
+
   bool changed = true;
   while (changed) {
     changed &= InlineFunctions(M);
@@ -57,4 +63,40 @@ bool clspv::InlineEntryPointsPass::InlineFunctions(Module &M) {
   }
 
   return Changed;
+}
+
+bool clspv::InlineEntryPointsPass::RequiresInlining(Module &M) {
+  if (clspv::Option::InlineEntryPoints())
+    return true;
+
+  auto HasGeneric = [](const Type *ty) {
+    if (ty->isPointerTy() &&
+        ty->getPointerAddressSpace() == clspv::AddressSpace::Generic)
+      return true;
+    return false;
+  };
+
+  for (auto &F : M) {
+    // Remove constant expressions to find the generic address space more
+    // easily. This is also useful throughout the flow.
+    BitcastUtils::RemoveCstExprFromFunction(&F);
+
+    auto f_ty = F.getFunctionType();
+    for (auto *p_ty : f_ty->params()) {
+      if (HasGeneric(p_ty))
+        return true;
+    }
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        if (HasGeneric(I.getType()))
+          return true;
+        for (auto *op : I.operand_values()) {
+          if (HasGeneric(op->getType()))
+            return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }

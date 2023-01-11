@@ -66,7 +66,7 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
   SmallVector<Instruction *, 8> InstrsToProcess;
   for (auto &F : M) {
-    BitcastUtils::RemovedCstExprFromFunction(&F);
+    BitcastUtils::RemoveCstExprFromFunction(&F);
 
     for (auto &BB : F) {
       for (auto &I : BB) {

@@ -578,14 +578,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    if (clspv::Option::InlineEntryPoints()) {
-      pm.addPass(clspv::InlineEntryPointsPass());
-    } else {
-      pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
-      pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
-      pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
-      pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
-    }
+    pm.addPass(clspv::InlineEntryPointsPass());
+    pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
+    pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
+    pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
+    pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
 
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
@@ -602,10 +599,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
-      pm.addPass(llvm::createModuleToFunctionPassAdaptor(
-          llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
-    }
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
   });
 
   // Run the following passes after the default LLVM pass pipeline.

@@ -24,6 +24,7 @@ struct InlineEntryPointsPass : llvm::PassInfoMixin<InlineEntryPointsPass> {
 
 private:
   bool InlineFunctions(llvm::Module &M);
+  bool RequiresInlining(llvm::Module &M);
 };
 } // namespace clspv
 

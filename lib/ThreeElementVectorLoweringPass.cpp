@@ -200,7 +200,7 @@ Function *createFunctionWithMappedTypes(Function &F,
 
   // Inlining a function can introduce constant expression that we could not
   // handle afterwards.
-  BitcastUtils::RemovedCstExprFromFunction(Wrapper);
+  BitcastUtils::RemoveCstExprFromFunction(Wrapper);
 
   return Wrapper;
 }
@@ -242,7 +242,7 @@ clspv::ThreeElementVectorLoweringPass::run(Module &M, ModuleAnalysisManager &) {
 
   runOnGlobals(M);
   for (auto &F : M.functions()) {
-    BitcastUtils::RemovedCstExprFromFunction(&F);
+    BitcastUtils::RemoveCstExprFromFunction(&F);
     runOnFunction(F);
   }
 
