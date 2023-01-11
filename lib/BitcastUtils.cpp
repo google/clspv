@@ -715,7 +715,7 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
-bool RemovedCstExprFromFunction(Function *F) {
+bool RemoveCstExprFromFunction(Function *F) {
   SmallVector<std::pair<Instruction *, unsigned>, 16> WorkList;
 
   auto CheckInstruction = [&WorkList](Instruction *I) {

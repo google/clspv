@@ -54,7 +54,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 // TODO(#816): remove function after final transition.
 void clspv::SimplifyPointerBitcastPass::runOnInstFromCstExpr(Module &M) const {
   for (Function &F : M) {
-    BitcastUtils::RemovedCstExprFromFunction(&F);
+    BitcastUtils::RemoveCstExprFromFunction(&F);
   }
 }
 
