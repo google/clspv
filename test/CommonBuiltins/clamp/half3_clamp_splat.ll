@@ -1,9 +1,9 @@
 ; RUN: clspv-opt --passes=splat-arg %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: [[x_in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x half> {{.*}}, half %x, i32 0
+; CHECK: [[x_in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x half> {{.*}}, half %x, i64 0
 ; CHECK: [[x_shuffle:%[a-zA-Z0-9_.]+]] = shufflevector <3 x half> [[x_in0]], <3 x half> {{.*}}, <3 x i32> zeroinitializer
-; CHECK: [[y_in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x half> {{.*}}, half %y, i32 0
+; CHECK: [[y_in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x half> {{.*}}, half %y, i64 0
 ; CHECK: [[y_shuffle:%[a-zA-Z0-9_.]+]] = shufflevector <3 x half> [[y_in0]], <3 x half> {{.*}}, <3 x i32> zeroinitializer
 ; CHECK: [[call:%[a-zA-Z0-9_.]+]] = call spir_func <3 x half> @_Z5clampDv2_DhS_S_(<3 x half> %in, <3 x half> [[x_shuffle]], <3 x half> [[y_shuffle]])
 ; CHECK: ret <3 x half> [[call]]
