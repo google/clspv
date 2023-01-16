@@ -1805,6 +1805,13 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     // Ops[1] = Element Type ID
     SPIRVOperandVec Ops;
 
+    SPIRVID pointee_id;
+    // TODO(#816): no way to infer the data type here.
+    if (PointeeTy->isPointerTy()) {
+      pointee_id = getSPIRVType(PointeeTy);
+    } else {
+      pointee_id = getSPIRVType(PointeeTy, needs_layout);
+    }
     Ops << GetStorageClass(AddrSpace) << getSPIRVType(PointeeTy, needs_layout);
 
     RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
