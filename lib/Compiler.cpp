@@ -746,6 +746,10 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
+  if (!clspv::Option::OpaquePointers()) {
+    llvm::errs() << "warning: transparent pointer support is deprecated\n";
+  }
+
   if (clspv::Option::LanguageUsesGenericAddressSpace() &&
       !clspv::Option::InlineEntryPoints()) {
     llvm::errs() << "cannot compile languages that use the generic address "

@@ -9,11 +9,13 @@
 // CHECK-DAG: [[LOCAL_MEM_FENCE:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 1
 
 __kernel void testKernelGlobalFence(__global uint *ptr, __local uint *fence) {
+    *ptr = 0;
     // CHECK: OpStore {{.*}} [[GLOBAL_MEM_FENCE]]
     *fence = get_fence(ptr);
 }
 
 __kernel void testKernelLocalFence(__local uint *ptr, __local uint *fence) {
+    *ptr = 0;
     // CHECK: OpStore {{.*}} [[LOCAL_MEM_FENCE]]
     *fence = get_fence(ptr);
 }

@@ -176,9 +176,13 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         case spv::Op::OpAtomicIIncrement:
         case spv::Op::OpAtomicIDecrement:
         case spv::Op::OpAtomicCompareExchange:
+        case spv::Op::OpAtomicLoad:
+        case spv::Op::OpAtomicExchange:
           // Data type is return type.
           return CacheType(call->getType());
-          break;
+        case spv::Op::OpAtomicStore:
+          // Data type is operand 4.
+          return CacheType(call->getArgOperand(4)->getType());
         default:
           // No other current uses of SPIRVOp deal with pointers, but this
           // code should be expanded if any are added.

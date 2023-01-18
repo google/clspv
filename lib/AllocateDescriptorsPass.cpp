@@ -270,6 +270,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         continue;
       }
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
+      assert(inferred_ty && "failed to infer argument type");
       Type *argTy = Arg.getType();
       const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
 
@@ -370,6 +371,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           continue;
         }
         auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
+        assert(inferred_ty && "failed to infer argument type");
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
           if (clspv::GetArgKind(Arg, inferred_ty) !=
@@ -406,6 +408,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
           auto *inferred_ty = clspv::InferType(&*f_ptr->getArg(arg_index), M.getContext(), &type_cache_);
+          assert(inferred_ty && "failed to infer argument type");
           const bool is_push_constant_arg =
               clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
                   clspv::ArgKind::PodPushConstant ||
@@ -478,6 +481,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         continue;
       }
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
+      assert(inferred_ty && "failed to infer argument type");
       if (discriminants_list[discriminant_index].index >= 0) {
         Changed = true;
         // This argument needs to be rewritten.
@@ -774,6 +778,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
       }
       Type *argTy = Arg.getType();
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
+      assert(inferred_ty && "failed to infer argument type");
       const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
       if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
