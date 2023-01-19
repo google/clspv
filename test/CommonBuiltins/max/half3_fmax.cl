@@ -5,7 +5,7 @@
 
 // CHECK: [[EXT:%[a-zA-Z0-9_]+]] = OpExtInstImport "GLSL.std.450"
 // CHECK-DAG: [[half:%[a-zA-Z0-9_]+]] = OpTypeFloat 16
-// CHECK-DAG: [[half3:%[a-zA-Z0-9_]+]] = OpTypeVector [[half]] 3
+// CHECK-DAG: [[half3:%[a-zA-Z0-9_]+]] = OpTypeVector [[half]] 4
 // CHECK-DAG: [[ld0:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
 // CHECK-DAG: [[ld1:%[a-zA-Z0-9_]+]] = OpLoad [[half3]]
 // CHECK: OpExtInst [[half3]] [[EXT]] NMax [[ld0]] [[ld1]]

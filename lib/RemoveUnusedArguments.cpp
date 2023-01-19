@@ -29,9 +29,6 @@ using namespace llvm;
 PreservedAnalyses clspv::RemoveUnusedArguments::run(Module &M,
                                                     ModuleAnalysisManager &) {
   PreservedAnalyses PA;
-  if (clspv::Option::KeepUnusedArguments())
-    return PA;
-
   std::vector<Candidate> candidates;
   findCandidates(M, &candidates);
   removeUnusedParameters(M, candidates);
@@ -50,7 +47,6 @@ bool clspv::RemoveUnusedArguments::findCandidates(
     if (F.getFunctionType()->isVarArg())
       continue;
 
-    size_t i = 0;
     bool local_changed = false;
     SmallVector<Value *, 8> args;
     for (auto &Arg : F.args()) {
@@ -58,7 +54,6 @@ bool clspv::RemoveUnusedArguments::findCandidates(
         local_changed = true;
         args.push_back(nullptr);
       } else {
-        ++i;
         args.push_back(&Arg);
       }
     }

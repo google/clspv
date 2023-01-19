@@ -749,6 +749,9 @@ int ParseOptions(const int argc, const char *const argv[]) {
   if (!clspv::Option::OpaquePointers()) {
     llvm::errs() << "warning: transparent pointer support is deprecated\n";
   }
+  if (clspv::Option::KeepUnusedArguments()) {
+    llvm::errs() << "warning: -keep-unused-arguments has been removed\n";
+  }
 
   if (clspv::Option::LanguageUsesGenericAddressSpace() &&
       !clspv::Option::InlineEntryPoints()) {

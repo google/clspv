@@ -8,10 +8,9 @@
 // CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 3
 // CHECK-DAG: %[[CONSTANT_FLOAT_0_5_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0.5
 // CHECK-DAG: %[[COMPOSITE_FLOAT_0_5_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[FLOAT_VECTOR_TYPE_ID]] %[[CONSTANT_FLOAT_0_5_ID]] %[[CONSTANT_FLOAT_0_5_ID]] %[[CONSTANT_FLOAT_0_5_ID]]
-// CHECK: %[[LOADA_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]]
-// CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]]
-// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] FMix %[[LOADA_ID]] %[[LOADB_ID]] %[[COMPOSITE_FLOAT_0_5_ID]]
-// CHECK: OpStore {{.*}} %[[OP_ID]]
+// CHECK: %[[shufflea:[a-zA-Z0-9_]+]] = OpVectorShuffle %[[FLOAT_VECTOR_TYPE_ID]] %{{.*}} %{{.*}} 0 1 2
+// CHECK: %[[shuffleb:[a-zA-Z0-9_]+]] = OpVectorShuffle %[[FLOAT_VECTOR_TYPE_ID]] %{{.*}} %{{.*}} 0 1 2
+// CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] FMix %[[shufflea]] %[[shuffleb]] %[[COMPOSITE_FLOAT_0_5_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float3* a, global float3* b)
 {

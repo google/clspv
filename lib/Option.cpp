@@ -211,6 +211,7 @@ llvm::cl::opt<bool> std430_ubo_layout(
                    "requirements. This does not generate valid SPIR-V for the "
                    "Vulkan environment; however, some drivers may accept it."));
 
+// TODO(#816): dead option
 llvm::cl::opt<bool> keep_unused_arguments(
     "keep-unused-arguments", llvm::cl::init(false),
     llvm::cl::desc("Do not remove unused non-kernel function arguments."));

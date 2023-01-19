@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments -cluster-pod-kernel-args=0
+// RUN: clspv %target %s -o %t.spv -no-inline-single -cluster-pod-kernel-args=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -27,27 +27,19 @@ kernel void bar(global S *A, int n, global int *B) { apple(B, A->arr, n); }
 
 // CHECK:  OpEntryPoint GLCompute [[_49:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpEntryPoint GLCompute [[_56:%[0-9a-zA-Z_]+]] "bar"
-// CHECK:  OpDecorate [[_28:%[0-9a-zA-Z_]+]] DescriptorSet 0
-// CHECK:  OpDecorate [[_28]] Binding 0
-// CHECK:  OpDecorate [[_29:%[0-9a-zA-Z_]+]] DescriptorSet 0
-// CHECK:  OpDecorate [[_29]] Binding 2
+// CHECK:  OpDecorate [[_28:%[0-9a-zA-Z_]+]] Binding 0
+// CHECK:  OpDecorate [[_29:%[0-9a-zA-Z_]+]] Binding 2
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG:  [[_28]] = OpVariable {{.*}} StorageBuffer
 // CHECK-DAG:  [[_29]] = OpVariable {{.*}} StorageBuffer
+// CHECK:  [[_49]] = OpFunction [[_void]]
+// CHECK:  [[_55:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_40:%[a-zA-Z0-9_]+]]
+// CHECK:  [[_56]] = OpFunction [[_void]]
+// CHECK:  [[_62:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_40]]
 // CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
 // CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]] [[_uint_0]]
-// CHECK:  [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]] [[_uint_0]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
-// CHECK:  [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]] [[_uint_0]] [[_uint_0]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_46:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_48:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_31]] [[_45]] {{.*}} [[_46]]
-// CHECK:  [[_49]] = OpFunction [[_void]]
-// CHECK:  [[_53:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_54:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]] [[_uint_0]] [[_uint_0]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_55:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_40]] [[_53]] [[_54]]
-// CHECK:  [[_56]] = OpFunction [[_void]]
-// CHECK:  [[_60:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_61:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]] [[_uint_0]] [[_uint_0]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_62:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_40]] [[_60]] [[_61]]
+// CHECK:  [[_39:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]] [[_uint_0]]
+// CHECK:  [[_40]] = OpFunction [[_void]]
+// CHECK:  [[_48:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_31]]
