@@ -24,37 +24,37 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[bitcast6:%[^ ]+]] = bitcast i32 [[extract6]] to <2 x half>
 ; CHECK: [[bitcast7:%[^ ]+]] = bitcast i32 [[extract7]] to <2 x half>
 
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[shr]]
-; CHECK: store <2 x half> [[bitcast0]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[shr]]
+; CHECK: store <2 x half> [[bitcast0]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add:%[^ ]+]] = add i32 [[shr]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add]]
-; CHECK: store <2 x half> [[bitcast1]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add]]
+; CHECK: store <2 x half> [[bitcast1]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add2:%[^ ]+]] = add i32 [[add]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add2]]
-; CHECK: store <2 x half> [[bitcast2]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add2]]
+; CHECK: store <2 x half> [[bitcast2]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add3:%[^ ]+]] = add i32 [[add2]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add3]]
-; CHECK: store <2 x half> [[bitcast3]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add3]]
+; CHECK: store <2 x half> [[bitcast3]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add4:%[^ ]+]] = add i32 [[add3]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add4]]
-; CHECK: store <2 x half> [[bitcast4]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add4]]
+; CHECK: store <2 x half> [[bitcast4]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add5:%[^ ]+]] = add i32 [[add4]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add5]]
-; CHECK: store <2 x half> [[bitcast5]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add5]]
+; CHECK: store <2 x half> [[bitcast5]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add6:%[^ ]+]] = add i32 [[add5]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add6]]
-; CHECK: store <2 x half> [[bitcast6]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add6]]
+; CHECK: store <2 x half> [[bitcast6]], ptr addrspace(1) [[gep]]
 ; CHECK: [[add7:%[^ ]+]] = add i32 [[add6]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, <2 x half> addrspace(1)* %a, i32 [[add7]]
-; CHECK: store <2 x half> [[bitcast7]], <2 x half> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x half>, ptr addrspace(1) %1, i32 [[add7]]
+; CHECK: store <2 x half> [[bitcast7]], ptr addrspace(1) [[gep]]
 
 
-define spir_kernel void @foo(<2 x half> addrspace(1)* %a, [8 x i32] addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = load [8 x i32], [8 x i32] addrspace(1)* %b, align 8
-  %1 = bitcast <2 x half> addrspace(1)* %a to [8 x i32] addrspace(1)*
-  %arrayidx = getelementptr inbounds [8 x i32], [8 x i32] addrspace(1)* %1, i32 %i
-  store [8 x i32] %0, [8 x i32] addrspace(1)* %arrayidx, align 8
+  %0 = load [8 x i32], ptr addrspace(1) %b, align 8
+  %1 = getelementptr <2 x half>, ptr addrspace(1) %a, i32 0
+  %arrayidx = getelementptr inbounds [8 x i32], ptr addrspace(1) %1, i32 %i
+  store [8 x i32] %0, ptr addrspace(1) %arrayidx, align 8
   ret void
 }
 

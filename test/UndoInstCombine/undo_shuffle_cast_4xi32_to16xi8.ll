@@ -4,7 +4,7 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-define void @test(<4 x i32> %in, <4 x i8> addrspace(1)* %out) {
+define void @test(<4 x i32> %in, ptr addrspace(1) %out) {
 entry:
   ; CHECK-NOT: bitcast
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractelement <4 x i32> %in, i32 0
@@ -22,7 +22,7 @@ entry:
   ; CHECK: store <4 x i8> [[insert3]]
   %cast = bitcast <4 x i32> %in to <16 x i8>
   %conv = shufflevector <16 x i8> %cast, <16 x i8> undef, <4 x i32> <i32 0, i32 4, i32 8, i32 12>
-  store <4 x i8> %conv, <4 x i8> addrspace(1)* %out, align 1
+  store <4 x i8> %conv, ptr addrspace(1) %out, align 1
   ret void
 }
 

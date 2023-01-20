@@ -3,10 +3,10 @@
 
 ; Cluster the original variable and the rewritten version.
 ; CHECK: [[global:@[a-zA-Z0-9_.]+]] = internal addrspace(2) constant { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] }
-; CHECK: [[gep:%[a-zA-Z0-9_]+]] = getelementptr inbounds { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] }, { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] } addrspace(2)* [[global]], i32 0, i32 1
-; CHECK: getelementptr inbounds [4 x [17 x i32]], [4 x [17 x i32]] addrspace(2)* [[gep]], i32 0, i32 0, i32 0
-; CHECK: [[gep:%[a-zA-Z0-9_]+]] = getelementptr inbounds { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] }, { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] } addrspace(2)* [[global]], i32 0, i32 0
-; CHECK: getelementptr inbounds <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }> addrspace(2)* [[gep]], i32 0, i32 0, i32 0, i32 0
+; CHECK: [[gep:%[a-zA-Z0-9_]+]] = getelementptr inbounds { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] }, ptr addrspace(2) [[global]], i32 0, i32 1
+; CHECK: getelementptr inbounds [4 x [17 x i32]], ptr addrspace(2) [[gep]], i32 0, i32 0, i32 0
+; CHECK: [[gep:%[a-zA-Z0-9_]+]] = getelementptr inbounds { <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, [4 x [17 x i32]] }, ptr addrspace(2) [[global]], i32 0, i32 0
+; CHECK: getelementptr inbounds <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, ptr addrspace(2) [[gep]], i32 0, i32 0, i32 0, i32 0
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
@@ -15,10 +15,10 @@ target triple = "spir-unknown-unknown"
 @__spirv_WorkgroupSize = addrspace(8) global <3 x i32> zeroinitializer
 
 ; Function Attrs: convergent nounwind
-define spir_kernel void @foo(i32 addrspace(1)* %in, i32 addrspace(1)* %out) #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
+define spir_kernel void @foo(ptr addrspace(1) %in, ptr addrspace(1) %out) #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
 entry:
-  %gep1 = getelementptr inbounds [4 x [17 x i32]], [4 x [17 x i32]] addrspace(2)* bitcast (<{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }> addrspace(2)* @data to [4 x [17 x i32]] addrspace(2)*), i32 0, i32 0, i32 0
-  %gep2 = getelementptr inbounds <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }> addrspace(2)* @data, i32 0, i32 0, i32 0, i32 0
+  %gep1 = getelementptr inbounds [4 x [17 x i32]], ptr addrspace(2) @data, i32 0, i32 0, i32 0
+  %gep2 = getelementptr inbounds <{ <{ [9 x i32], [8 x i32] }>, [17 x i32], [17 x i32], [17 x i32] }>, ptr addrspace(2) @data, i32 0, i32 0, i32 0, i32 0
   ret void
 }
 

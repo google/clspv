@@ -28,25 +28,22 @@ TEMPLATE=Template("""
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-%opencl.event_t = type opaque
-
 ${spirv_variables}
 
-define dso_local spir_func %opencl.event_t* @foo(${type} addrspace(${dst_addrspace})* %dst, ${type} addrspace(${src_addrspace})* %src, i32 %num_gentypes, i32 %stride, %opencl.event_t* %event) {
+define dso_local spir_func ptr @foo(ptr addrspace(${dst_addrspace}) %dst, ptr addrspace(${src_addrspace}) %src, i32 %num_gentypes, i32 %stride, ptr %event) {
 entry:
-  %call = call spir_func %opencl.event_t* @_Z29async_work_group_strided_copy${async_mangling}jj9ocl_event(${type} addrspace(${dst_addrspace})* %dst, ${type} addrspace(${src_addrspace})* %src, i32 %num_gentypes, i32 %stride, %opencl.event_t* %event)
-  ret %opencl.event_t* %call
+  %call = call spir_func ptr @_Z29async_work_group_strided_copy${async_mangling}jj9ocl_event(ptr addrspace(${dst_addrspace}) %dst, ptr addrspace(${src_addrspace}) %src, i32 %num_gentypes, i32 %stride, ptr %event)
+  ret ptr %call
 }
 
-declare spir_func %opencl.event_t* @_Z29async_work_group_strided_copy${async_mangling}jj9ocl_event(${type} addrspace(${dst_addrspace})*, ${type} addrspace(${src_addrspace})*, i32, i32, %opencl.event_t*)
+declare spir_func ptr @_Z29async_work_group_strided_copy${async_mangling}jj9ocl_event(ptr addrspace(${dst_addrspace}), ptr addrspace(${src_addrspace}), i32, i32, ptr)
 
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 0
-; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 1
-; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 2
-; CHECK: [[localid2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[groupsizevec:%[a-zA-Z0-9_.]+]] = load <3 x i32>, <3 x i32> addrspace(8)* @__spirv_WorkgroupSize, align 16
+; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) @__spirv_LocalInvocationId, align
+; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 1
+; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
+; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 2
+; CHECK: [[localid2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
+; CHECK: [[groupsizevec:%[a-zA-Z0-9_.]+]] = load <3 x i32>, ptr addrspace(8) @__spirv_WorkgroupSize, align 16
 ; CHECK: [[groupsize0:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 0
 ; CHECK: [[groupsize1:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 1
 ; CHECK: [[groupsize2:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 2
@@ -70,18 +67,18 @@ ${copy_memory}
 
 STRIDE_DST_TEMPLATE=Template("""
 ; CHECK: [[dstiterator:%[a-zA-Z0-9_.]+]] = mul i32 [[phiiterator]], %stride
-; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${dst_addrspace})* %dst, i32 [[dstiterator]]
-; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${src_addrspace})* %src, i32 [[phiiterator]]
+; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ptr addrspace(${dst_addrspace}) %dst, i32 [[dstiterator]]
+; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ptr addrspace(${src_addrspace}) %src, i32 [[phiiterator]]
 """)
 STRIDE_SRC_TEMPLATE=Template("""
 ; CHECK: [[srciterator:%[a-zA-Z0-9_.]+]] = mul i32 [[phiiterator]], %stride
-; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${dst_addrspace})* %dst, i32 [[phiiterator]]
-; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ${type} addrspace(${src_addrspace})* %src, i32 [[srciterator]]
+; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ptr addrspace(${dst_addrspace}) %dst, i32 [[phiiterator]]
+; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr ${type}, ptr addrspace(${src_addrspace}) %src, i32 [[srciterator]]
 """)
 
 COPY_MEMORY=Template("""
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load ${check_type}, ${check_type} addrspace(${src_addrspace})* [[srci]]
-; CHECK: store ${check_type} [[ld]], ${check_type} addrspace(${dst_addrspace})* [[dsti]]
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load ${check_type}, ptr addrspace(${src_addrspace}) [[srci]]
+; CHECK: store ${check_type} [[ld]], ptr addrspace(${dst_addrspace}) [[dsti]]
 """)
 
 SPIRV_VARIABLES="""

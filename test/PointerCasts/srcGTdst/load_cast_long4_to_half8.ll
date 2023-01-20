@@ -7,11 +7,11 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[shl:%[^ ]+]] = shl i32 %i, 1
 ; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[shl]], 2
 ; CHECK:  [[and:%[^ ]+]] = and i32 [[shl]], 3
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i64>, <4 x i64> addrspace(1)* %b, i32 [[lshr]], i32 [[and]]
-; CHECK:  [[load0:%[^ ]+]] = load i64, i64 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) %0, i32 [[lshr]], i32 [[and]]
+; CHECK:  [[load0:%[^ ]+]] = load i64, ptr addrspace(1) [[gep]]
 ; CHECK:  [[add:%[^ ]+]] = add i32 [[and]], 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i64>, <4 x i64> addrspace(1)* %b, i32 [[lshr]], i32 [[add]]
-; CHECK:  [[load1:%[^ ]+]] = load i64, i64 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i64>, ptr addrspace(1) %0, i32 [[lshr]], i32 [[add]]
+; CHECK:  [[load1:%[^ ]+]] = load i64, ptr addrspace(1) [[gep]]
 ; CHECK:  [[bitcast0:%[^ ]+]] = bitcast i64 [[load0]] to <4 x half>
 ; CHECK:  [[bitcast1:%[^ ]+]] = bitcast i64 [[load1]] to <4 x half>
 ; CHECK:  [[extract0:%[^ ]+]] = extractelement <4 x half> [[bitcast0]], i64 0
@@ -31,12 +31,12 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[insert6:%[^ ]+]] = insertvalue [8 x half] [[insert5]], half [[extract6]], 6
 ; CHECK:  insertvalue [8 x half] [[insert6]], half [[extract7]], 7
 
-define spir_kernel void @foo([8 x half] addrspace(1)* %a, <4 x i64> addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = bitcast <4 x i64> addrspace(1)* %b to [8 x half] addrspace(1)*
-  %arrayidx = getelementptr inbounds [8 x half], [8 x half] addrspace(1)* %0, i32 %i
-  %1 = load [8 x half], [8 x half] addrspace(1)* %arrayidx, align 8
-  store [8 x half] %1, [8 x half] addrspace(1)* %a, align 8
+  %0 = getelementptr <4 x i64>, ptr addrspace(1) %b, i32 0
+  %arrayidx = getelementptr inbounds [8 x half], ptr addrspace(1) %0, i32 %i
+  %1 = load [8 x half], ptr addrspace(1) %arrayidx, align 8
+  store [8 x half] %1, ptr addrspace(1) %a, align 8
   ret void
 }
 

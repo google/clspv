@@ -6,12 +6,12 @@ target triple = "spir-unknown-unknown"
 
 ; max push constant size prevents push constants.
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, i32 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, i32 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
 ; CHECK: [[MD]] = !{i32 1}
-define spir_kernel void @foo(i32 addrspace(1)* %out, i32 %pod) {
+define spir_kernel void @foo(ptr addrspace(1) %out, i32 %pod) {
 entry:
-  %gep0 = getelementptr i32, i32 addrspace(1)* %out, i32 0
-  store i32 %pod, i32 addrspace(1)* %gep0
+  %gep0 = getelementptr i32, ptr addrspace(1) %out, i32 0
+  store i32 %pod, ptr addrspace(1) %gep0
   ret void
 }
 

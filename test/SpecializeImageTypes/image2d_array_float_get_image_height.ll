@@ -1,12 +1,11 @@
 ; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
-; CHECK: %[[IMAGE:opencl.image2d_array_wo_t.float]] = type opaque
-; CHECK-DAG: declare spir_func void @_Z12write_imagef31[[IMAGE]]Dv4_iDv4_f(%[[IMAGE]] addrspace(1)*, <4 x i32>, <4 x float>) [[ATTRS1:#[0-9]+]]
-; CHECK-DAG: declare spir_func i32 @_Z16get_image_height31[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
 ; CHECK: define spir_kernel void @write_float
-; CHECK: call spir_func void @_Z12write_imagef31[[IMAGE]]Dv4_iDv4_f(%[[IMAGE]] addrspace(1)* %image
-; CHECK: call spir_func i32 @_Z16get_image_height31[[IMAGE]](%[[IMAGE]] addrspace(1)* %image)
+; CHECK: call spir_func void @_Z12write_imagef26[[IMAGE:ocl_image2d_array_wo.float]]Dv4_iDv4_f(ptr addrspace(1) %image
+; CHECK: call spir_func i32 @_Z16get_image_height26[[IMAGE]](ptr addrspace(1) %image)
+; CHECK-DAG: declare spir_func void @_Z12write_imagef26[[IMAGE]]Dv4_iDv4_f(ptr addrspace(1), <4 x i32>, <4 x float>) [[ATTRS1:#[0-9]+]]
+; CHECK-DAG: declare spir_func i32 @_Z16get_image_height26[[IMAGE]](ptr addrspace(1)) [[ATTRS2:#[0-9]+]]
 ; CHECK-DAG: attributes [[ATTRS1]] = { convergent nounwind }
 ; CHECK-DAG: attributes [[ATTRS2]] = { convergent nobuiltin nounwind memory(read) }
 
@@ -15,17 +14,17 @@ target triple = "spir-unknown-unknown"
 
 %opencl.image2d_array_wo_t = type opaque
 
-define spir_kernel void @write_float(%opencl.image2d_array_wo_t addrspace(1)* %image, <4 x i32> %coord, <4 x float> addrspace(1)* nocapture %data) local_unnamed_addr #0 {
+define spir_kernel void @write_float(ptr addrspace(1) %image, <4 x i32> %coord, ptr addrspace(1) nocapture %data) local_unnamed_addr #0 {
 entry:
-  %ld = load <4 x float>, <4 x float> addrspace(1)* %data, align 16
-  call spir_func void @_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f(%opencl.image2d_array_wo_t addrspace(1)* %image, <4 x i32> %coord, <4 x float> %ld) #2
-  %h = tail call spir_func i32 @_Z16get_image_height20ocl_image2d_array_wo(%opencl.image2d_array_wo_t addrspace(1)* %image)
+  %ld = load <4 x float>, ptr addrspace(1) %data, align 16
+  call spir_func void @_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f(ptr addrspace(1) %image, <4 x i32> %coord, <4 x float> %ld) #2
+  %h = tail call spir_func i32 @_Z16get_image_height20ocl_image2d_array_wo(ptr addrspace(1) %image)
   ret void
 }
 
-declare spir_func void @_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f(%opencl.image2d_array_wo_t addrspace(1)*, <4 x i32>, <4 x float>) local_unnamed_addr #1
+declare spir_func void @_Z12write_imagef20ocl_image2d_array_woDv4_iDv4_f(ptr addrspace(1), <4 x i32>, <4 x float>) local_unnamed_addr #1
 
-declare spir_func i32 @_Z16get_image_height20ocl_image2d_array_wo(%opencl.image2d_array_wo_t addrspace(1)*) #2
+declare spir_func i32 @_Z16get_image_height20ocl_image2d_array_wo(ptr addrspace(1)) #2
 
 attributes #0 = { convergent }
 attributes #1 = { convergent nounwind }

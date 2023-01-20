@@ -8,10 +8,11 @@ target triple = "spir-unknown-unknown"
 
 define void @test() {
 entry:
-  %load = load <3 x i32>, <3 x i32>* getelementptr (<3 x i32>, <3 x i32>* @gv, i32 1), align 32
-  %load2 = load i32, i32* getelementptr (<3 x i32>, <3 x i32>* @gv, i32 1, i32 0), align 32
+  %load = load <3 x i32>, ptr getelementptr (<3 x i32>, ptr @gv, i32 1), align 32
+  %load2 = load i32, ptr getelementptr (<3 x i32>, ptr @gv, i32 1, i32 0), align 32
   ret void
 }
 
-; CHECK:  %load = load <4 x i32>, <4 x i32>* getelementptr inbounds (<4 x i32>, <4 x i32>* @gv, i32 1), align 32
-; CHECK:  %load2 = load i32, i32* getelementptr inbounds (<4 x i32>, <4 x i32>* @gv, i32 1, i32 0), align 32
+; CHECK:  %load = load <4 x i32>, ptr getelementptr inbounds (<4 x i32>, ptr @gv, i32 1), align 32
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr <3 x i32>, ptr @gv, i32 1, i32 0
+; CHECK:  %load2 = load i32, ptr [[gep]], align 32

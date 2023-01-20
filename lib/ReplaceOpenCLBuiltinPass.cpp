@@ -3400,8 +3400,9 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
                                                    .getKnownMinValue()),
                           types, false);
 
-    std::string NewFName =
-        Builtins::GetMangledFunctionName("read_imagef", NewFType);
+    // Due to opaque pointers, we have to do some manual mangling
+    std::string NewFName = Builtins::GetMangledFunctionName("read_imagef");
+    NewFName += F.getName().substr(NewFName.size());
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
@@ -3437,8 +3438,11 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     auto NewFType =
         FunctionType::get(Type::getVoidTy(M.getContext()), types, false);
 
-    std::string NewFName =
-        Builtins::GetMangledFunctionName("write_imagef", NewFType);
+    // Due to opaque pointers, we have to do some manual mangling
+    std::string NewFName = Builtins::GetMangledFunctionName("write_imagef");
+    NewFName += F.getName().substr(NewFName.size());
+    NewFName[NewFName.size() - 2] = 'f';
+    NewFName.resize(NewFName.size() - 1);
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 

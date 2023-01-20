@@ -7,17 +7,17 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[shl:%[^ ]+]] = shl i32 %i, 2
 ; CHECK:  [[shr:%[^ ]+]] = lshr i32 [[shl]], 3
 ; CHECK:  [[and:%[^ ]+]] = and i32 [[shl]], 7
-; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* %b, i32 [[shr]], i32 [[and]]
-; CHECK:  [[ld0:%[^ ]+]] = load i32, i32 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], ptr addrspace(1) %0, i32 [[shr]], i32 [[and]]
+; CHECK:  [[ld0:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]]
 ; CHECK:  [[add:%[^ ]+]] = add i32 [[and]], 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* %b, i32 [[shr]], i32 [[add]]
-; CHECK:  [[ld1:%[^ ]+]] = load i32, i32 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], ptr addrspace(1) %0, i32 [[shr]], i32 [[add]]
+; CHECK:  [[ld1:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]]
 ; CHECK:  [[add2:%[^ ]+]] = add i32 [[add]], 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* %b, i32 [[shr]], i32 [[add2]]
-; CHECK:  [[ld2:%[^ ]+]] = load i32, i32 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], ptr addrspace(1) %0, i32 [[shr]], i32 [[add2]]
+; CHECK:  [[ld2:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]]
 ; CHECK:  [[add3:%[^ ]+]] = add i32 [[add2]], 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], [8 x i32] addrspace(1)* %b, i32 [[shr]], i32 [[add3]]
-; CHECK:  [[ld3:%[^ ]+]] = load i32, i32 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i32], ptr addrspace(1) %0, i32 [[shr]], i32 [[add3]]
+; CHECK:  [[ld3:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]]
 ; CHECK:  [[bitcast0:%[^ ]+]] = bitcast i32 [[ld0]] to <2 x i16>
 ; CHECK:  [[bitcast1:%[^ ]+]] = bitcast i32 [[ld1]] to <2 x i16>
 ; CHECK:  [[bitcast2:%[^ ]+]] = bitcast i32 [[ld2]] to <2 x i16>
@@ -39,12 +39,12 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[in6:%[^ ]+]] = insertvalue [8 x i16] [[in5]], i16 [[ex6]], 6
 ; CHECK:  insertvalue [8 x i16] [[in6]], i16 [[ex7]], 7
 
-define spir_kernel void @foo([8 x i16] addrspace(1)* %a, [8 x i32] addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = bitcast [8 x i32] addrspace(1)* %b to [8 x i16] addrspace(1)*
-  %arrayidx = getelementptr inbounds [8 x i16], [8 x i16] addrspace(1)* %0, i32 %i
-  %1 = load [8 x i16], [8 x i16] addrspace(1)* %arrayidx, align 8
-  store [8 x i16] %1, [8 x i16] addrspace(1)* %a, align 8
+  %0 = getelementptr [8 x i32], ptr addrspace(1) %b
+  %arrayidx = getelementptr inbounds [8 x i16], ptr addrspace(1) %0, i32 %i
+  %1 = load [8 x i16], ptr addrspace(1) %arrayidx, align 8
+  store [8 x i16] %1, ptr addrspace(1) %a, align 8
   ret void
 }
 

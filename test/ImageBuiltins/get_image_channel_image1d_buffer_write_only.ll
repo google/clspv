@@ -11,41 +11,41 @@ target triple = "spir-unknown-unknown"
 
 %opencl.image1d_buffer_wo_t.float = type opaque
 
-declare spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float(%opencl.image1d_buffer_wo_t.float addrspace(1)* %0)
+declare spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) %0)
 
-declare spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float(%opencl.image1d_buffer_wo_t.float addrspace(1)* %0)
+declare spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) %0)
 
-define spir_kernel void @order(i32 addrspace(1)* nocapture writeonly align 4 %dst, %opencl.image1d_buffer_wo_t.float addrspace(1)* %image) {
+define spir_kernel void @order(ptr addrspace(1) nocapture writeonly align 4 %dst, ptr addrspace(1) %image) {
 entry:
-  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-  %1 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call %opencl.image1d_buffer_wo_t.float addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_buffer_wo_t.float zeroinitializer)
-  %call = tail call spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float(%opencl.image1d_buffer_wo_t.float addrspace(1)* %2)
-  store i32 %call, i32 addrspace(1)* %1, align 4
+  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
+  %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_buffer_wo_t.float zeroinitializer)
+  %call = tail call spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) %2)
+  store i32 %call, ptr addrspace(1) %1, align 4
   ret void
 }
 
-define spir_kernel void @data_type(i32 addrspace(1)* nocapture writeonly align 4 %dst, %opencl.image1d_buffer_wo_t.float addrspace(1)* %image) {
+define spir_kernel void @data_type(ptr addrspace(1) nocapture writeonly align 4 %dst, ptr addrspace(1) %image) {
 entry:
-  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-  %1 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call %opencl.image1d_buffer_wo_t.float addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_buffer_wo_t.float zeroinitializer)
-  %call = tail call spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float(%opencl.image1d_buffer_wo_t.float addrspace(1)* %2)
-  store i32 %call, i32 addrspace(1)* %1, align 4
+  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
+  %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_buffer_wo_t.float zeroinitializer)
+  %call = tail call spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) %2)
+  store i32 %call, ptr addrspace(1) %1, align 4
   ret void
 }
 
-declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, { [0 x i32] } %6)
+declare ptr addrspace(1) @_Z14clspv.resource.0(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, { [0 x i32] } %6)
 
-declare %opencl.image1d_buffer_wo_t.float addrspace(1)* @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, %opencl.image1d_buffer_wo_t.float %6)
+declare ptr addrspace(1) @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, %opencl.image1d_buffer_wo_t.float %6)
 
 ; CHECK: @__push_constants = addrspace(9) global %0 zeroinitializer, !push_constants [[pc:![^ ]+]]
 
-; CHECK: define spir_kernel void @order(i32 addrspace(1)* nocapture writeonly align 4 {{.*}}, {{.*}} addrspace(1)* {{.*}}) !push_constants_image_channel [[order_kernel:![^ ]+]]
-; CHECK: tail call spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float({{.*}} addrspace(1)* {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
+; CHECK: define spir_kernel void @order(ptr addrspace(1) nocapture writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[order_kernel:![^ ]+]]
+; CHECK: tail call spir_func i32 @_Z23get_image_channel_order32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
 
-; CHECK: define spir_kernel void @data_type(i32 addrspace(1)* nocapture writeonly align 4 {{.*}}, {{.*}} addrspace(1)* {{.*}}) !push_constants_image_channel [[data_type_kernel:![^ ]+]]
-; CHECK: tail call spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float({{.*}} addrspace(1)* {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
+; CHECK: define spir_kernel void @data_type(ptr addrspace(1) nocapture writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[data_type_kernel:![^ ]+]]
+; CHECK: tail call spir_func i32 @_Z27get_image_channel_data_type32opencl.image1d_buffer_wo_t.float(ptr addrspace(1) {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
 
 ; CHECK: [[pc]] = !{i32 {{.*}}}
 ; CHECK: [[order_kernel]] = !{i32 [[ordinal:[^ ]+]], i32 [[order_offset:[^ ]+]], i32 [[order_pc:[^ ]+]]}

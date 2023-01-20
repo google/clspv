@@ -7,30 +7,30 @@ target triple = "spir-unknown-unknown"
 %s1 = type { i16 }
 %s2 = type { <4 x half> }
 
-; CHECK: define spir_kernel void @foo(i16 addrspace(1)* %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
-define spir_kernel void @foo(i16 addrspace(1)* %out, i16 %pod) {
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) {
 entry:
-  %gep0 = getelementptr i16, i16 addrspace(1)* %out, i32 0
-  store i16 %pod, i16 addrspace(1)* %gep0
+  %gep0 = getelementptr i16, ptr addrspace(1) %out, i32 0
+  store i16 %pod, ptr addrspace(1) %gep0
   ret void
 }
 
-; CHECK: define spir_kernel void @bar(i16 addrspace(1)* %out, %s1 %pod) !clspv.pod_args_impl [[MD]]
-define spir_kernel void @bar(i16 addrspace(1)* %out, %s1 %pod) {
+; CHECK: define spir_kernel void @bar(ptr addrspace(1) %out, %s1 %pod) !clspv.pod_args_impl [[MD]]
+define spir_kernel void @bar(ptr addrspace(1) %out, %s1 %pod) {
 entry:
-  %gep0 = getelementptr i16, i16 addrspace(1)* %out, i32 0
+  %gep0 = getelementptr i16, ptr addrspace(1) %out, i32 0
   %ex = extractvalue %s1 %pod, 0
-  store i16 %ex, i16 addrspace(1)* %gep0
+  store i16 %ex, ptr addrspace(1) %gep0
   ret void
 }
 
-; CHECK: define spir_kernel void @baz(half addrspace(1)* %out, %s2 %pod) !clspv.pod_args_impl [[MD]]
-define spir_kernel void @baz(half addrspace(1)* %out, %s2 %pod) {
+; CHECK: define spir_kernel void @baz(ptr addrspace(1) %out, %s2 %pod) !clspv.pod_args_impl [[MD]]
+define spir_kernel void @baz(ptr addrspace(1) %out, %s2 %pod) {
 entry:
-  %gep0 = getelementptr half, half addrspace(1)* %out, i32 0
+  %gep0 = getelementptr half, ptr addrspace(1) %out, i32 0
   %ex = extractvalue %s2 %pod, 0
   %ex2 = extractelement <4 x half> %ex, i32 3
-  store half %ex2, half addrspace(1)* %gep0
+  store half %ex2, ptr addrspace(1) %gep0
   ret void
 }
 

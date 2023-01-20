@@ -9,22 +9,22 @@ target triple = "spir-unknown-unknown"
 %opencl.image1d_array_wo_t.float = type opaque
 
 ; Function Attrs: convergent mustprogress nofree nounwind readnone willreturn
-declare spir_func i32 @_Z20get_image_array_size31opencl.image1d_array_wo_t.float(%opencl.image1d_array_wo_t.float addrspace(1)*)
+declare spir_func i32 @_Z20get_image_array_size31opencl.image1d_array_wo_t.float(ptr addrspace(1))
 
 ; Function Attrs: argmemonly convergent mustprogress nofree norecurse nounwind willreturn writeonly
-define spir_kernel void @foo(i32 addrspace(1)* nocapture writeonly align 4 %out, %opencl.image1d_array_wo_t.float addrspace(1)* %img) {
+define spir_kernel void @foo(ptr addrspace(1) nocapture writeonly align 4 %out, ptr addrspace(1) %img) {
 entry:
-  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-  %1 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call %opencl.image1d_array_wo_t.float addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, %opencl.image1d_array_wo_t.float zeroinitializer)
-  %call = tail call spir_func i32 @_Z20get_image_array_size31opencl.image1d_array_wo_t.float(%opencl.image1d_array_wo_t.float addrspace(1)* %2)
-  store i32 %call, i32 addrspace(1)* %1, align 4
+  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
+  %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, %opencl.image1d_array_wo_t.float zeroinitializer)
+  %call = tail call spir_func i32 @_Z20get_image_array_size31opencl.image1d_array_wo_t.float(ptr addrspace(1) %2)
+  store i32 %call, ptr addrspace(1) %1, align 4
   ret void
 }
 
-declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
+declare ptr addrspace(1) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
 
-declare %opencl.image1d_array_wo_t.float addrspace(1)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, %opencl.image1d_array_wo_t.float)
+declare ptr addrspace(1) @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, %opencl.image1d_array_wo_t.float)
 
 
 ; CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0

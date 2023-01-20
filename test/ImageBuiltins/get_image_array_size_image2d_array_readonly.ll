@@ -8,21 +8,21 @@ target triple = "spir-unknown-unknown"
 
 %opencl.image2d_array_ro_t.float.sampled = type opaque
 
-declare spir_func i32 @_Z20get_image_array_size39opencl.image2d_array_ro_t.float.sampled(%opencl.image2d_array_ro_t.float.sampled addrspace(1)*)
+declare spir_func i32 @_Z20get_image_array_size39opencl.image2d_array_ro_t.float.sampled(ptr addrspace(1))
 
-define spir_kernel void @foo(i32 addrspace(1)* nocapture writeonly align 4 %out, %opencl.image2d_array_ro_t.float.sampled addrspace(1)* %img) {
+define spir_kernel void @foo(ptr addrspace(1) nocapture writeonly align 4 %out, ptr addrspace(1) %img) {
 entry:
-  %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-  %1 = getelementptr { [0 x i32] }, { [0 x i32] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call %opencl.image2d_array_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image2d_array_ro_t.float.sampled zeroinitializer)
-  %call = tail call spir_func i32 @_Z20get_image_array_size39opencl.image2d_array_ro_t.float.sampled(%opencl.image2d_array_ro_t.float.sampled addrspace(1)* %2)
-  store i32 %call, i32 addrspace(1)* %1, align 4
+  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
+  %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image2d_array_ro_t.float.sampled zeroinitializer)
+  %call = tail call spir_func i32 @_Z20get_image_array_size39opencl.image2d_array_ro_t.float.sampled(ptr addrspace(1) %2)
+  store i32 %call, ptr addrspace(1) %1, align 4
   ret void
 }
 
-declare { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
+declare ptr addrspace(1) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
 
-declare %opencl.image2d_array_ro_t.float.sampled addrspace(1)* @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, %opencl.image2d_array_ro_t.float.sampled)
+declare ptr addrspace(1) @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, %opencl.image2d_array_ro_t.float.sampled)
 
 ; CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 ; CHECK-DAG: [[v3uint:%[^ ]+]] = OpTypeVector [[uint]] 3

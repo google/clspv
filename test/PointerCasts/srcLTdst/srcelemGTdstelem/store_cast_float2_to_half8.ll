@@ -24,18 +24,18 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[ins7:%[^ ]+]] = insertelement <4 x half> [[ins6]], half [[ext7]], i32 3
 ; CHECK:  [[bitcast0:%[^ ]+]] = bitcast <4 x half> [[ins3]] to <2 x float>
 ; CHECK:  [[bitcast1:%[^ ]+]] = bitcast <4 x half> [[ins7]] to <2 x float>
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x float>, <2 x float> addrspace(1)* %a, i32 [[shr]]
-; CHECK:  store <2 x float> [[bitcast0]], <2 x float> addrspace(1)* [[gep]], align 8
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x float>, ptr addrspace(1) %1, i32 [[shr]]
+; CHECK:  store <2 x float> [[bitcast0]], ptr addrspace(1) [[gep]], align 8
 ; CHECK:  [[add:%[^ ]+]] = add i32 [[shr]], 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x float>, <2 x float> addrspace(1)* %a, i32 [[add]]
-; CHECK:  store <2 x float> [[bitcast1]], <2 x float> addrspace(1)* [[gep]], align 8
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x float>, ptr addrspace(1) %1, i32 [[add]]
+; CHECK:  store <2 x float> [[bitcast1]], ptr addrspace(1) [[gep]], align 8
 
-define spir_kernel void @foo(<2 x float> addrspace(1)* %a, [8 x half] addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = load [8 x half], [8 x half] addrspace(1)* %b, align 8
-  %1 = bitcast <2 x float> addrspace(1)* %a to [8 x half] addrspace(1)*
-  %arrayidx = getelementptr inbounds [8 x half], [8 x half] addrspace(1)* %1, i32 %i
-  store [8 x half] %0, [8 x half] addrspace(1)* %arrayidx, align 8
+  %0 = load [8 x half], ptr addrspace(1) %b, align 8
+  %1 = getelementptr <2 x float>, ptr addrspace(1) %a, i32 0
+  %arrayidx = getelementptr inbounds [8 x half], ptr addrspace(1) %1, i32 %i
+  store [8 x half] %0, ptr addrspace(1) %arrayidx, align 8
   ret void
 }
 

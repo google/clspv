@@ -8,16 +8,16 @@ target triple = "spir-unknown-unknown"
 
 ; Max push constant size prevents push constants and layout prevents UBOs.
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, %s %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, %s %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
 ; CHECK: [[MD]] = !{i32 0}
-define spir_kernel void @foo(i32 addrspace(1)* %out, %s %pod) {
+define spir_kernel void @foo(ptr addrspace(1) %out, %s %pod) {
 entry:
   %ex = extractvalue %s %pod, 2
-  %gep0 = getelementptr i32, i32 addrspace(1)* %out, i32 0
-  store i32 %ex, i32 addrspace(1)* %gep0
-  %gep1 = getelementptr i32, i32 addrspace(1)* %out, i32 1
+  %gep0 = getelementptr i32, ptr addrspace(1) %out, i32 0
+  store i32 %ex, ptr addrspace(1) %gep0
+  %gep1 = getelementptr i32, ptr addrspace(1) %out, i32 1
   %enqueued = call i32 @_Z23get_enqueued_local_sizej(i32 0)
-  store i32 %enqueued, i32 addrspace(1)* %gep1
+  store i32 %enqueued, ptr addrspace(1) %gep1
   ret void
 }
 

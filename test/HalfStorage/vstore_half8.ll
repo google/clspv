@@ -4,13 +4,13 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-define void @foo(half addrspace(1)* %a, <8 x float> %b, i32 %c) {
+define void @foo(ptr addrspace(1) %a, <8 x float> %b, i32 %c) {
 entry:
-  call spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float> %b, i32 %c, half addrspace(1)* %a)
+  call spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float> %b, i32 %c, ptr addrspace(1) %a)
   ret void
 }
 
-declare spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float>, i32, half addrspace(1)*)
+declare spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float>, i32, ptr addrspace(1))
 
 ; CHECK:  [[b01:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 0, i32 1>
 ; CHECK:  [[b23:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 2, i32 3>
@@ -24,6 +24,5 @@ declare spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float>, i32, half ad
 ; CHECK:  [[bv1:%[^ ]+]] = insertelement <4 x i32> [[bv0]], i32 [[b23i32]], i32 1
 ; CHECK:  [[bv2:%[^ ]+]] = insertelement <4 x i32> [[bv1]], i32 [[b45i32]], i32 2
 ; CHECK:  [[bv3:%[^ ]+]] = insertelement <4 x i32> [[bv2]], i32 [[b67i32]], i32 3
-; CHECK:  [[av4i32:%[^ ]+]] = bitcast half addrspace(1)* %a to <4 x i32> addrspace(1)*
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i32>, <4 x i32> addrspace(1)* [[av4i32]], i32 %c
-; CHECK:  store <4 x i32> [[bv3]], <4 x i32> addrspace(1)* [[gep]], align 16
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 %c
+; CHECK:  store <4 x i32> [[bv3]], ptr addrspace(1) [[gep]], align 16

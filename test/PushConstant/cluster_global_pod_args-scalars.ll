@@ -5,32 +5,32 @@
 ; CHECK: [[inner]] = type { i32, i32, i32, i32, i32, i32, i32, i32 }
 ; CHECK: @__push_constants = addrspace(9) global [[outer]] zeroinitializer, !push_constants [[pc_md:![0-9]+]]
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out) !clspv.pod_args_impl [[pod_args_md:![0-9]+]] !kernel_arg_map [[arg_map_md:![0-9]+]]
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 0), align 4
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out) !clspv.pod_args_impl [[pod_args_md:![0-9]+]] !kernel_arg_map [[arg_map_md:![0-9]+]]
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
 ; CHECK: trunc i32 [[ld]] to i8
 
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 0), align 4
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <2 x i16>
 ; CHECK: extractelement <2 x i16> [[cast]], i64 1
 
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 1), align 4
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 1), align 4
 
-; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 2), align 4
-; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 3), align 4
+; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 2), align 4
+; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 3), align 4
 ; CHECK: [[zext0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld0]] to i64
 ; CHECK: [[zext1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld1]] to i64
 ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[zext1]], 32
 ; CHECK: or i64 [[zext0]], [[shl]]
 
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 4), align 4
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 4), align 4
 ; CHECK: bitcast i32 [[ld]] to float
 
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 5), align 4
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 5), align 4
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <2 x half>
 ; CHECK: extractelement <2 x half> [[cast]], i64 0
 
-; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 6), align 4
-; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 2, i32 7), align 4
+; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 6), align 4
+; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 7), align 4
 ; CHECK: [[zext0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld0]] to i64
 ; CHECK: [[zext1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld1]] to i64
 ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[zext1]], 32
@@ -56,8 +56,9 @@ target triple = "spir-unknown-unknown"
 
 @__push_constants = addrspace(9) global %0 zeroinitializer, !push_constants !0
 
-define spir_kernel void @foo(i32 addrspace(1)* %out, i8 %char_arg, i16 %short_arg, i32 %int_arg, i64 %long_arg, float %float_arg, half %half_arg, double %double_arg) !clspv.pod_args_impl !1 {
+define spir_kernel void @foo(ptr addrspace(1) %out, i8 %char_arg, i16 %short_arg, i32 %int_arg, i64 %long_arg, float %float_arg, half %half_arg, double %double_arg) !clspv.pod_args_impl !1 {
 entry:
+  store i32 %int_arg, ptr addrspace(1) %out
   ret void
 }
 
