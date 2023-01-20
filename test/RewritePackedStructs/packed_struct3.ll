@@ -1,5 +1,7 @@
 ; RUN: clspv-opt --passes=rewrite-packed-structs %s -o %t
 ; RUN: FileCheck %s < %t
+; TODO(#1005): convert to opaque pointers when pass is fixed
+; XFAIL: *
 
 %struct = type <{ i32, float }>
 

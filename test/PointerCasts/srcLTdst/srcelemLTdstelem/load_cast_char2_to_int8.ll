@@ -6,53 +6,53 @@ target triple = "spir-unknown-unknown"
 
 ; CHECK: [[shl:%[^ ]+]] = shl i32 %i, 5
 ; CHECK: [[shr:%[^ ]+]] = lshr i32 [[shl]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[shr]]
-; CHECK: [[ld0:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[shr]]
+; CHECK: [[ld0:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add:%[^ ]+]] = add i32 [[shr]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add]]
-; CHECK: [[ld1:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add]]
+; CHECK: [[ld1:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add2:%[^ ]+]] = add i32 [[add]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add2]]
-; CHECK: [[ld2:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add2]]
+; CHECK: [[ld2:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add3:%[^ ]+]] = add i32 [[add2]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add3]]
-; CHECK: [[ld3:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add3]]
+; CHECK: [[ld3:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add4:%[^ ]+]] = add i32 [[add3]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add4]]
-; CHECK: [[ld4:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add4]]
+; CHECK: [[ld4:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add5:%[^ ]+]] = add i32 [[add4]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add5]]
-; CHECK: [[ld5:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add5]]
+; CHECK: [[ld5:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add6:%[^ ]+]] = add i32 [[add5]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add6]]
-; CHECK: [[ld6:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add6]]
+; CHECK: [[ld6:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add7:%[^ ]+]] = add i32 [[add6]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add7]]
-; CHECK: [[ld7:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add7]]
+; CHECK: [[ld7:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add8:%[^ ]+]] = add i32 [[add7]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add8]]
-; CHECK: [[ld8:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add8]]
+; CHECK: [[ld8:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add9:%[^ ]+]] = add i32 [[add8]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add9]]
-; CHECK: [[ld9:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add9]]
+; CHECK: [[ld9:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add10:%[^ ]+]] = add i32 [[add9]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add10]]
-; CHECK: [[ld10:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add10]]
+; CHECK: [[ld10:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add11:%[^ ]+]] = add i32 [[add10]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add11]]
-; CHECK: [[ld11:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add11]]
+; CHECK: [[ld11:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add12:%[^ ]+]] = add i32 [[add11]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add12]]
-; CHECK: [[ld12:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add12]]
+; CHECK: [[ld12:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add13:%[^ ]+]] = add i32 [[add12]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add13]]
-; CHECK: [[ld13:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add13]]
+; CHECK: [[ld13:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add14:%[^ ]+]] = add i32 [[add13]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add14]]
-; CHECK: [[ld14:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add14]]
+; CHECK: [[ld14:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 ; CHECK: [[add15:%[^ ]+]] = add i32 [[add14]], 1
-; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, <2 x i8> addrspace(1)* %a, i32 [[add15]]
-; CHECK: [[ld15:%[^ ]+]] = load <2 x i8>, <2 x i8> addrspace(1)* [[gep]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr <2 x i8>, ptr addrspace(1) %0, i32 [[add15]]
+; CHECK: [[ld15:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) [[gep]]
 
 ; CHECK: [[in1:%[^ ]+]] = shufflevector <2 x i8> [[ld0]], <2 x i8> [[ld1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK: [[in2:%[^ ]+]] = shufflevector <2 x i8> [[ld2]], <2 x i8> [[ld3]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
@@ -78,12 +78,12 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[ret5:%[^ ]+]] = insertvalue [8 x i32] [[ret4]], i32 [[in6cast]], 5
 ; CHECK: [[ret6:%[^ ]+]] = insertvalue [8 x i32] [[ret5]], i32 [[in7cast]], 6
 ; CHECK: [[ret7:%[^ ]+]] = insertvalue [8 x i32] [[ret6]], i32 [[in8cast]], 7
-define spir_kernel void @foo(<2 x i8> addrspace(1)* %a, [8 x i32] addrspace(1)* %b, i32 %i) {
-entry:
-  %0 = bitcast <2 x i8> addrspace(1)* %a to [8 x i32] addrspace(1)*
-  %arrayidx = getelementptr inbounds [8 x i32], [8 x i32] addrspace(1)* %0, i32 %i
-  %1 = load [8 x i32], [8 x i32] addrspace(1)* %arrayidx, align 8
-  store [8 x i32] %1, [8 x i32] addrspace(1)* %b, align 8
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
+entry:  
+  %0 = getelementptr <2 x i8>, ptr addrspace(1) %a, i32 0
+  %arrayidx = getelementptr inbounds [8 x i32], ptr addrspace(1) %0, i32 %i
+  %1 = load [8 x i32], ptr addrspace(1) %arrayidx, align 8
+  store [8 x i32] %1, ptr addrspace(1) %b, align 8
   ret void
 }
 

@@ -4,15 +4,15 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-define spir_func void @test(<8 x float>* %src, <16 x float>* %dst) {
+define spir_func void @test(ptr %src, ptr %dst) {
 entry:
-  %0 = load <8 x float>, <8 x float>* %src, align 32
+  %0 = load <8 x float>, ptr %src, align 32
   %1 = shufflevector <8 x float> %0, <8 x float> <float 0.000000e+00, float undef, float undef, float undef, float undef, float undef, float undef, float undef>, <16 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 0, i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
-  store <16 x float> %1, <16 x float>* %dst, align 32
+  store <16 x float> %1, ptr %dst, align 32
   ret void
 }
 
-; CHECK: [[load:%[^ ]+]] = load [8 x float], [8 x float]* %src, align 32
+; CHECK: [[load:%[^ ]+]] = load [8 x float], ptr %src, align 32
 ; CHECK: [[ld0:%[^ ]+]] = extractvalue [8 x float] [[load]], 0
 ; CHECK: [[ins0:%[^ ]+]] = insertvalue [16 x float] undef, float [[ld0]], 0
 ; CHECK: [[ld1:%[^ ]+]] = extractvalue [8 x float] [[load]], 1

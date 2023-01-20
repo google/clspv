@@ -7,15 +7,15 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[bitcast:%[a-zA-Z0-9_.]+]] = bitcast i64 %s to <2 x i32>
 ; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[bitcast]], i64 0
 ; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[bitcast]], i64 1
-; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr i32, i32 addrspace(1)* %a, i32 0
-; CHECK: store i32 [[trunc0]], i32 addrspace(1)* [[gep0]]
-; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr i32, i32 addrspace(1)* %a, i32 1
-; CHECK: store i32 [[trunc1]], i32 addrspace(1)* [[gep1]]
-define spir_kernel void @foo(i32 addrspace(1)* %a, i64 %s) {
+; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr i32, ptr addrspace(1) %0, i32 0
+; CHECK: store i32 [[trunc0]], ptr addrspace(1) [[gep0]]
+; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr i32, ptr addrspace(1) %0, i32 1
+; CHECK: store i32 [[trunc1]], ptr addrspace(1) [[gep1]]
+define spir_kernel void @foo(ptr addrspace(1) %a, i64 %s) {
 entry:
-  %0 = bitcast i32 addrspace(1)* %a to i64 addrspace(1)*
-  %arrayidx = getelementptr inbounds i64, i64 addrspace(1)* %0, i32 0
-  store i64 %s, i64 addrspace(1)* %arrayidx, align 2
+  %0 = getelementptr i32, ptr addrspace(1) %a, i32 0
+  %arrayidx = getelementptr inbounds i64, ptr addrspace(1) %0, i32 0
+  store i64 %s, ptr addrspace(1) %arrayidx, align 2
   ret void
 }
 

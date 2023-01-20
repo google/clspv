@@ -7,14 +7,14 @@ target triple = "spir-unknown-unknown"
 ; Storage restrictions prevent per-kernel push constants and the use of other
 ; push constants prevents global push constants.
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
 ; CHECK: [[MD]] = !{i32 {{[01]}}}
-define spir_kernel void @foo(i32 addrspace(1)* %out, i16 %pod) {
+define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) {
 entry:
   %ext = zext i16 %pod to i32
   %gid = call i32 @_Z13get_global_idj(i32 0)
   %add = add i32 %ext, %gid
-  store i32 %add, i32 addrspace(1)* %out
+  store i32 %add, ptr addrspace(1) %out
   ret void
 }
 

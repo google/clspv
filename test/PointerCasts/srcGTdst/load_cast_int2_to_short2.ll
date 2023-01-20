@@ -6,16 +6,16 @@ target triple = "spir-unknown-unknown"
 
 ; CHECK:  [[lshr:%[^ ]+]] = lshr i32 %i, 1
 ; CHECK:  [[and:%[^ ]+]] = and i32 %i, 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i32>, <2 x i32> addrspace(1)* %b, i32 [[lshr]], i32 [[and]]
-; CHECK:  [[load:%[^ ]+]] = load i32, i32 addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i32>, ptr addrspace(1) %0, i32 [[lshr]], i32 [[and]]
+; CHECK:  [[load:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]]
 ; CHECK:  [[bitcast:%[^ ]+]] = bitcast i32 [[load]] to <2 x i16>
 
-define spir_kernel void @foo(<2 x i16> addrspace(1)* %a, <2 x i32> addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = bitcast <2 x i32> addrspace(1)* %b to <2 x i16> addrspace(1)*
-  %arrayidx = getelementptr inbounds <2 x i16>, <2 x i16> addrspace(1)* %0, i32 %i
-  %1 = load <2 x i16>, <2 x i16> addrspace(1)* %arrayidx, align 8
-  store <2 x i16> %1, <2 x i16> addrspace(1)* %a, align 8
+  %0 = getelementptr <2 x i32>, ptr addrspace(1) %b, i32 0
+  %arrayidx = getelementptr inbounds <2 x i16>, ptr addrspace(1) %0, i32 %i
+  %1 = load <2 x i16>, ptr addrspace(1) %arrayidx, align 8
+  store <2 x i16> %1, ptr addrspace(1) %a, align 8
   ret void
 }
 

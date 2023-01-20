@@ -5224,10 +5224,33 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     Type *ArgTy = CmpI->getOperand(0)->getType();
     if (isa<PointerType>(ArgTy)) {
       if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
-        SPIRVID cmp_lhs = getSPIRVValue(CmpI->getOperand(0));
-        SPIRVID cmp_rhs = getSPIRVValue(CmpI->getOperand(1));
-        spv::Op Opcode;
         SPIRVOperandVec Ops;
+        auto *lhs = CmpI->getOperand(0);
+        auto *rhs = CmpI->getOperand(1);
+        auto *lhs_ty = clspv::InferType(lhs, Context, &InferredTypeCache);
+        auto *rhs_ty = clspv::InferType(rhs, Context, &InferredTypeCache);
+        SPIRVID cmp_lhs, cmp_rhs;
+        // TODO(#816): need a better way to handle pointer constants
+        if (!lhs_ty && !rhs_ty) {
+          llvm_unreachable("neither pointer type can be inferred");
+        }
+        if (lhs_ty && isa<ConstantPointerNull>(rhs)) {
+          cmp_lhs = getSPIRVValue(lhs);
+          auto type_id = getSPIRVPointerType(lhs->getType(), lhs_ty);
+          Ops.clear();
+          Ops << type_id;
+          cmp_rhs = addSPIRVInst<kConstants>(spv::Op::OpConstantNull, Ops);
+        } else if (rhs_ty && isa<ConstantPointerNull>(rhs)) {
+          cmp_rhs = getSPIRVValue(rhs);
+          auto type_id = getSPIRVPointerType(rhs->getType(), rhs_ty);
+          Ops.clear();
+          Ops << type_id;
+          cmp_lhs = addSPIRVInst<kConstants>(spv::Op::OpConstantNull, Ops);
+        } else {
+          cmp_lhs = getSPIRVValue(lhs);
+          cmp_rhs = getSPIRVValue(rhs);
+        }
+        spv::Op Opcode;
         switch (CmpI->getPredicate()) {
         case CmpInst::ICMP_NE:
           Opcode = spv::OpPtrNotEqual;
@@ -5240,6 +5263,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         case CmpInst::ICMP_ULT:
         case CmpInst::ICMP_ULE:
           Opcode = GetSPIRVPointerCmpOpcode(CmpI);
+          Ops.clear();
           Ops << getSPIRVType(Type::getInt32Ty(Context)) << cmp_lhs << cmp_rhs;
           RID = addSPIRVInst(spv::OpPtrDiff, Ops);
           cmp_lhs = RID;

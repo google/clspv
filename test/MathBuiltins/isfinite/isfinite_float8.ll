@@ -6,16 +6,16 @@ target triple = "spir64-unknown-unknown"
 
 declare spir_func <8 x i32> @_Z8isfiniteDv8_f(<8 x float>)
 
-define spir_kernel void @test(<8 x float> %val, <8 x i32> addrspace(1)* nocapture %out) {
+define spir_kernel void @test(<8 x float> %val, ptr addrspace(1) nocapture %out) {
 entry:
   %call = tail call spir_func <8 x i32> @_Z8isfiniteDv8_f(<8 x float> %val)
-  store <8 x i32> %call, <8 x i32> addrspace(1)* %out, align 32
+  store <8 x i32> %call, ptr addrspace(1) %out, align 32
   ret void
 }
 
 ; CHECK-LABEL: define spir_kernel void @test(
 ; CHECK-SAME: [[FLOAT8:\[8 x float\]]] [[VAL:%[^ ,]+]],
-; CHECK-SAME: [[INT8:\[8 x i32\]]] addrspace(1)* nocapture [[OUT:%[^ )]+]]
+; CHECK-SAME: ptr addrspace(1) nocapture [[OUT:%[^ )]+]]
 ; CHECK-SAME: )
 
 ; CHECK-DAG: [[V0:%[^ ]+]] = extractvalue [[FLOAT8]] [[VAL]], 0
@@ -63,23 +63,22 @@ entry:
 ; CHECK-DAG: [[D6:%[^ ]+]] = sext i1 [[C6]] to i32
 ; CHECK-DAG: [[D7:%[^ ]+]] = sext i1 [[C7]] to i32
 
-; CHECK-DAG: [[E0:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 0
-; CHECK-DAG: [[E1:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 1
-; CHECK-DAG: [[E2:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 2
-; CHECK-DAG: [[E3:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 3
-; CHECK-DAG: [[E4:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 4
-; CHECK-DAG: [[E5:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 5
-; CHECK-DAG: [[E6:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 6
-; CHECK-DAG: [[E7:%[^ ]+]] = getelementptr inbounds [[INT8]], [[INT8]] addrspace(1)* [[OUT]], i64 0, i64 7
+; CHECK-DAG: [[E1:%[^ ]+]] = getelementptr inbounds [[INT8:\[8 x i32\]]], ptr addrspace(1) [[OUT]], i64 0, i64 1
+; CHECK-DAG: [[E2:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 2
+; CHECK-DAG: [[E3:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 3
+; CHECK-DAG: [[E4:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 4
+; CHECK-DAG: [[E5:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 5
+; CHECK-DAG: [[E6:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 6
+; CHECK-DAG: [[E7:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 0, i64 7
 
-; CHECK-DAG: store i32 [[D0]], i32 addrspace(1)* [[E0]]
-; CHECK-DAG: store i32 [[D1]], i32 addrspace(1)* [[E1]]
-; CHECK-DAG: store i32 [[D2]], i32 addrspace(1)* [[E2]]
-; CHECK-DAG: store i32 [[D3]], i32 addrspace(1)* [[E3]]
-; CHECK-DAG: store i32 [[D4]], i32 addrspace(1)* [[E4]]
-; CHECK-DAG: store i32 [[D5]], i32 addrspace(1)* [[E5]]
-; CHECK-DAG: store i32 [[D6]], i32 addrspace(1)* [[E6]]
-; CHECK-DAG: store i32 [[D7]], i32 addrspace(1)* [[E7]]
+; CHECK-DAG: store i32 [[D0]], ptr addrspace(1) %out
+; CHECK-DAG: store i32 [[D1]], ptr addrspace(1) [[E1]]
+; CHECK-DAG: store i32 [[D2]], ptr addrspace(1) [[E2]]
+; CHECK-DAG: store i32 [[D3]], ptr addrspace(1) [[E3]]
+; CHECK-DAG: store i32 [[D4]], ptr addrspace(1) [[E4]]
+; CHECK-DAG: store i32 [[D5]], ptr addrspace(1) [[E5]]
+; CHECK-DAG: store i32 [[D6]], ptr addrspace(1) [[E6]]
+; CHECK-DAG: store i32 [[D7]], ptr addrspace(1) [[E7]]
 
 ; CHECK: ret void
 

@@ -8,13 +8,13 @@ target triple = "spir-unknown-unknown"
 
 %struct = type { [4 x i32] }
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, %struct %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, %struct %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
 ; CHECK: [[MD]] = !{i32 {{[013]}}}
-define spir_kernel void @foo(i32 addrspace(1)* %out, %struct %pod) {
+define spir_kernel void @foo(ptr addrspace(1) %out, %struct %pod) {
 entry:
-  %gep0 = getelementptr i32, i32 addrspace(1)* %out, i32 0
+  %gep0 = getelementptr i32, ptr addrspace(1) %out, i32 0
   %ex = extractvalue %struct %pod, 0, 1
-  store i32 %ex, i32 addrspace(1)* %gep0
+  store i32 %ex, ptr addrspace(1) %gep0
   ret void
 }
 

@@ -6,9 +6,9 @@ target triple = "spir-unknown-unknown"
 
 %struct = type { i8, <8 x i32> }
 
-define void @test1(%struct addrspace(1)* %ptr) {
+define void @test1(ptr addrspace(1) %ptr) {
 entry:
-    %0 = getelementptr %struct, %struct addrspace(1)* %ptr, i32 0, i32 1
+    %0 = getelementptr %struct, ptr addrspace(1) %ptr, i32 0, i32 1
     ret void
 }
 
@@ -37,4 +37,4 @@ entry:
 ; CHECK: extractvalue { i8, [7 x i32], [8 x i32] } %s, 2
 
 ; CHECK-LABEL: @test1(
-; CHECK: getelementptr { i8, [7 x i32], [8 x i32] }, { i8, [7 x i32], [8 x i32] } addrspace(1)* %ptr, i32 0, i32 2
+; CHECK: getelementptr { i8, [7 x i32], [8 x i32] }, ptr addrspace(1) %ptr, i32 0, i32 2

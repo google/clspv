@@ -1,12 +1,11 @@
 ; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
-; CHECK: %[[IMAGE:opencl.image1d_ro_t.float.sampled]] = type opaque
-; CHECK-DAG: declare spir_func <4 x float> @_Z11read_imagef33[[IMAGE]]11ocl_samplerf(%[[IMAGE]] addrspace(1)*, %opencl.sampler_t addrspace(2)*, float) [[ATTRS1:#[0-9]+]]
-; CHECK-DAG: declare spir_func i32 @_Z15get_image_width33[[IMAGE]](%[[IMAGE]] addrspace(1)*) [[ATTRS2:#[0-9]+]]
 ; CHECK: define spir_kernel void @read_float
-; CHECK: call spir_func <4 x float> @_Z11read_imagef33[[IMAGE]]11ocl_samplerf(%[[IMAGE]] addrspace(1)* %image
-; CHECK: call spir_func i32 @_Z15get_image_width33[[IMAGE]](%[[IMAGE]] addrspace(1)* %image
+; CHECK: call spir_func <4 x float> @_Z11read_imagef28[[IMAGE:ocl_image1d_ro.float.sampled]]11ocl_samplerf(ptr addrspace(1) %image
+; CHECK: call spir_func i32 @_Z15get_image_width28[[IMAGE]](ptr addrspace(1) %image
+; CHECK-DAG: declare spir_func <4 x float> @_Z11read_imagef28[[IMAGE]]11ocl_samplerf(ptr addrspace(1), ptr addrspace(2), float) [[ATTRS1:#[0-9]+]]
+; CHECK-DAG: declare spir_func i32 @_Z15get_image_width28[[IMAGE]](ptr addrspace(1)) [[ATTRS2:#[0-9]+]]
 ; CHECK-DAG: attributes [[ATTRS1]] = { convergent nounwind }
 ; CHECK-DAG: attributes [[ATTRS2]] = { nounwind }
 
@@ -16,20 +15,20 @@ target triple = "spir-unknown-unknown"
 %opencl.image1d_ro_t = type opaque
 %opencl.sampler_t = type opaque
 
-define spir_kernel void @read_float(%opencl.image1d_ro_t addrspace(1)* %image, float %coord, <4 x float> addrspace(1)* nocapture %data) local_unnamed_addr #0 {
+define spir_kernel void @read_float(ptr addrspace(1) %image, float %coord, ptr addrspace(1) nocapture %data) local_unnamed_addr #0 {
 entry:
-  %0 = tail call %opencl.sampler_t addrspace(2)* @__translate_sampler_initializer(i32 23) #2
-  %call = tail call spir_func <4 x float> @_Z11read_imagef14ocl_image1d_ro11ocl_samplerf(%opencl.image1d_ro_t addrspace(1)* %image, %opencl.sampler_t addrspace(2)* %0, float %coord) #3
-  %w = tail call spir_func i32 @_Z15get_image_width14ocl_image1d_ro(%opencl.image1d_ro_t addrspace(1)* %image)
-  store <4 x float> %call, <4 x float> addrspace(1)* %data, align 16
+  %0 = tail call ptr addrspace(2) @__translate_sampler_initializer(i32 23) #2
+  %call = tail call spir_func <4 x float> @_Z11read_imagef14ocl_image1d_ro11ocl_samplerf(ptr addrspace(1) %image, ptr addrspace(2) %0, float %coord) #3
+  %w = tail call spir_func i32 @_Z15get_image_width14ocl_image1d_ro(ptr addrspace(1) %image)
+  store <4 x float> %call, ptr addrspace(1) %data, align 16
   ret void
 }
 
-declare spir_func <4 x float> @_Z11read_imagef14ocl_image1d_ro11ocl_samplerf(%opencl.image1d_ro_t addrspace(1)*, %opencl.sampler_t addrspace(2)*, float) local_unnamed_addr #1
+declare spir_func <4 x float> @_Z11read_imagef14ocl_image1d_ro11ocl_samplerf(ptr addrspace(1), ptr addrspace(2), float) local_unnamed_addr #1
 
-declare spir_func i32 @_Z15get_image_width14ocl_image1d_ro(%opencl.image1d_ro_t addrspace(1)*) #2
+declare spir_func i32 @_Z15get_image_width14ocl_image1d_ro(ptr addrspace(1)) #2
 
-declare %opencl.sampler_t addrspace(2)* @__translate_sampler_initializer(i32) local_unnamed_addr
+declare ptr addrspace(2) @__translate_sampler_initializer(i32) local_unnamed_addr
 
 attributes #0 = { convergent }
 attributes #1 = { convergent nounwind }

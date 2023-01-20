@@ -50,57 +50,10 @@ define spir_func <2 x i32> @s2v_B(i64 %x) {
     ret <2 x i32> %y
 }
 
-define spir_func <8 x i32>* @ps2ps_A(<8 x float>* %x) {
-    %y = bitcast <8 x float>* %x to <8 x i32>*
-    ret <8 x i32>* %y
-}
-
-define spir_func <16 x i32> addrspace(5)* @ps2ps_B(<16 x float> addrspace(5)* %x) {
-    %y = bitcast <16 x float> addrspace(5)* %x to <16 x i32> addrspace(5)*
-    ret <16 x i32> addrspace(5)* %y
-}
-
-; This function is unchanged.
-define spir_func <2 x i32> addrspace(5)* @ps2ps_C(<2 x float> addrspace(5)* %x) {
-    %y = bitcast <2 x float> addrspace(5)* %x to <2 x i32> addrspace(5)*
-    ret <2 x i32> addrspace(5)* %y
-}
-
-; define spir_func <8 x i32*> @pv2pv_A(<8 x float*> %x) {
-;     %y = bitcast <8 x float*> %x to <8 x i32*>
-;     ret <8 x i32*> %y
-; }
-
-; define spir_func <16 x i16 addrspace(5)*> @pv2pv_B(<16 x half addrspace(5)*> %x) {
-;     %y = bitcast <16 x half addrspace(5)*> %x to <16 x i16 addrspace(5)*>
-;     ret <16 x i16 addrspace(5)*> %y
-; }
-
-; This function is unchanged.
-define spir_func <2 x i32 addrspace(5)*> @pv2pv_C(<2 x float addrspace(5)*> %x) {
-    %y = bitcast <2 x float addrspace(5)*> %x to <2 x i32 addrspace(5)*>
-    ret <2 x i32 addrspace(5)*> %y
-}
 
 ; Note, the order of tests is dictated by the lowering phase: some functions
 ; are lowered and replaced by an equivalent, others are kept as-is. This
 ; process re-orders functions in the module.
-
-; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:\[16 x i32\] addrspace\(5\)\*]]
-; CHECK-SAME: @ps2ps_B(
-; CHECK-SAME: [[IN:\[16 x float\] addrspace\(5\)\*]]
-; CHECK-SAME: [[X:%[^ ]+]])
-; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
-; CHECK-NEXT: ret [[OUT]] [[Y]]
-
-; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:\[8 x i32\]\*]]
-; CHECK-SAME: @ps2ps_A(
-; CHECK-SAME: [[IN:\[8 x float\]\*]]
-; CHECK-SAME: [[X:%[^ ]+]])
-; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
-; CHECK-NEXT: ret [[OUT]] [[Y]]
 
 ; CHECK-LABEL: define spir_func
 ; CHECK-SAME: [[OUT:\[8 x i8\]]]
@@ -289,22 +242,6 @@ define spir_func <2 x i32 addrspace(5)*> @pv2pv_C(<2 x float addrspace(5)*> %x) 
 ; CHECK-SAME: [[OUT:<2 x i32>]]
 ; CHECK-SAME: @s2v_B(
 ; CHECK-SAME: [[IN:i64]]
-; CHECK-SAME: [[X:%[^ ]+]])
-; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
-; CHECK-NEXT: ret [[OUT]] [[Y]]
-
-; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:<2 x i32> addrspace\(5\)\*]]
-; CHECK-SAME: @ps2ps_C(
-; CHECK-SAME: [[IN:<2 x float> addrspace\(5\)\*]]
-; CHECK-SAME: [[X:%[^ ]+]])
-; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
-; CHECK-NEXT: ret [[OUT]] [[Y]]
-
-; CHECK-LABEL: define spir_func
-; CHECK-SAME: [[OUT:<2 x i32 addrspace\(5\)\*>]]
-; CHECK-SAME: @pv2pv_C(
-; CHECK-SAME: [[IN:<2 x float addrspace\(5\)\*>]]
 ; CHECK-SAME: [[X:%[^ ]+]])
 ; CHECK-NEXT: [[Y:%[^ ]+]] = bitcast [[IN]] [[X]] to [[OUT]]
 ; CHECK-NEXT: ret [[OUT]] [[Y]]

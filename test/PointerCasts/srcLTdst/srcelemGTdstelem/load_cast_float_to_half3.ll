@@ -6,22 +6,22 @@ target triple = "spir-unknown-unknown"
 
 
 ; CHECK: [[shl:%[^ ]+]] = shl i32 %i, 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float addrspace(1)* %a, i32 [[shl]]
-; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load float, float addrspace(1)* [[gep]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr addrspace(1) %0, i32 [[shl]]
+; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load float, ptr addrspace(1) [[gep]]
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[shl]], 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, float addrspace(1)* %a, i32 [[add]]
-; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load float, float addrspace(1)* [[gep]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr addrspace(1) %0, i32 [[add]]
+; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load float, ptr addrspace(1) [[gep]]
 ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> undef, float [[ld0]], i32 0
 ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> [[in0]], float [[ld1]], i32 1
 ; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x float> [[in1]] to <4 x half>
 ; CHECK: shufflevector <4 x half> [[bitcast]], <4 x half> poison, <3 x i32> <i32 0, i32 1, i32 2>
 
-define spir_kernel void @foo(float addrspace(1)* %a, <3 x half> addrspace(1)* %b, i32 %i) {
+define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {
 entry:
-  %0 = bitcast float addrspace(1)* %a to <3 x half> addrspace(1)*
-  %arrayidx = getelementptr inbounds <3 x half>, <3 x half> addrspace(1)* %0, i32 %i
-  %1 = load <3 x half>, <3 x half> addrspace(1)* %arrayidx, align 8
-  store <3 x half> %1, <3 x half> addrspace(1)* %b, align 8
+  %0 = getelementptr float, ptr addrspace(1) %a, i32 0
+  %arrayidx = getelementptr inbounds <3 x half>, ptr addrspace(1) %0, i32 %i
+  %1 = load <3 x half>, ptr addrspace(1) %arrayidx, align 8
+  store <3 x half> %1, ptr addrspace(1) %b, align 8
   ret void
 }
 
