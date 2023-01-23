@@ -21,6 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "clspv/AddressSpace.h"
+#include "Constants.h"
 
 #include "NormalizeGlobalVariable.h"
 
@@ -218,7 +219,8 @@ void NormalizeVariableUsers(GlobalVariable *GV) {
   }
 
   GV->removeDeadConstantUsers();
-  if (GV->use_empty()) {
+  if (GV->use_empty() &&
+      GV->getName() != clspv::ClusteredConstantsVariableName()) {
     GV->eraseFromParent();
   }
 }

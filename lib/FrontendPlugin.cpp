@@ -786,7 +786,8 @@ public:
               }
               auto array_type = FD->getASTContext().getIncompleteArrayType(
                   type->getPointeeType(), clang::ArrayType::Normal, 0);
-              if (!IsSupportedLayout(array_type, 0, layout, FD->getASTContext(),
+              if (!clspv::Option::RewritePackedStructs() &&
+                  !IsSupportedLayout(array_type, 0, layout, FD->getASTContext(),
                                      P->getSourceRange(),
                                      P->getSourceRange())) {
                 return false;

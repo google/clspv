@@ -27,6 +27,7 @@ enum class PushConstant : int {
   RegionGroupOffset,
   KernelArgument,
   ImageMetadata,
+  ModuleConstantsPointer,
 };
 
 enum class ImageMetadata : int {

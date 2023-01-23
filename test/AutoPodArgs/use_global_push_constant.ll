@@ -6,19 +6,19 @@ target triple = "spir-unknown-unknown"
 
 ; Type-mangled arguments don't need to worry about 8- or 16-bit storage restrictions.
 
-; CHECK: define spir_kernel void @foo(i32 addrspace(1)* %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
-define spir_kernel void @foo(i32 addrspace(1)* %out, i16 %pod) {
+; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+define spir_kernel void @foo(ptr addrspace(1) %out, i16 %pod) {
 entry:
   %ext = zext i16 %pod to i32
-  store i32 %ext, i32 addrspace(1)* %out
+  store i32 %ext, ptr addrspace(1) %out
   ret void
 }
 
-; CHECK: define spir_kernel void @bar(i32 addrspace(1)* %out, i8 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
-define spir_kernel void @bar(i32 addrspace(1)* %out, i8 %pod) {
+; CHECK: define spir_kernel void @bar(ptr addrspace(1) %out, i8 %pod) !clspv.pod_args_impl [[MD:![0-9]+]]
+define spir_kernel void @bar(ptr addrspace(1) %out, i8 %pod) {
 entry:
   %ext = zext i8 %pod to i32
-  store i32 %ext, i32 addrspace(1)* %out
+  store i32 %ext, ptr addrspace(1) %out
   ret void
 }
 

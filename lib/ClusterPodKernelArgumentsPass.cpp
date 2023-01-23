@@ -83,9 +83,14 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
 
   // If any of the kernels call for type-mangled push constants, we need to
   // know the right type and base offset.
-  const uint64_t global_push_constant_size = clspv::GlobalPushConstantsSize(M);
-  assert(global_push_constant_size % 16 == 0 &&
+  auto *global_push_constant_ty = clspv::GlobalPushConstantsType(M);
+#ifndef NDEBUG
+  const auto &DL = M.getDataLayout();
+  const uint64_t global_push_constant_size =
+      DL.getTypeStoreSize(global_push_constant_ty).getKnownMinSize();
+  assert(global_push_constant_size % 8 == 0 &&
          "Global push constants size changed");
+#endif
   auto mangled_struct_ty = GetTypeMangledPodArgsStruct(M);
   if (mangled_struct_ty) {
     clspv::RedeclareGlobalPushConstants(
@@ -193,6 +198,18 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     {
       const DataLayout DL(&M);
       const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
+      // Construct the updated struct
+      uint64_t global_push_constant_kernel_args_offset = 0;
+      if (pod_arg_impl == clspv::PodArgImpl::kGlobalPushConstant) {
+        SmallVector<Type*, 8> new_global_pc_elems {global_push_constant_ty->elements()};
+        new_global_pc_elems.push_back(PodArgsStructTy);
+        auto *new_global_push_constant_ty =
+            StructType::get(M.getContext(), new_global_pc_elems, false);
+        global_push_constant_kernel_args_offset =
+            DL.getStructLayout(new_global_push_constant_ty)
+                ->getElementOffset(new_global_pc_elems.size() - 1);
+      }
+
       arg_index = 0;
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
@@ -202,7 +219,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
           unsigned offset = StructLayout->getElementOffset(PodIndexMap[&Arg]);
           int remapped_index = new_index;
           if (pod_arg_impl == clspv::PodArgImpl::kGlobalPushConstant) {
-            offset += global_push_constant_size;
+            offset += global_push_constant_kernel_args_offset;
             remapped_index = -1;
           }
           RemapInfo.push_back({std::string(Arg.getName()), arg_index,

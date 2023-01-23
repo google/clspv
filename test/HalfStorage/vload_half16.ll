@@ -4,21 +4,20 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-define <16 x float> @foo(half addrspace(1)* %a, i32 %b) {
+define <16 x float> @foo(ptr addrspace(1) %a, i32 %b) {
 entry:
-  %0 = call spir_func <16 x float> @_Z12vload_half16jPU3AS1KDh(i32 %b, half addrspace(1)* %a)
+  %0 = call spir_func <16 x float> @_Z12vload_half16jPU3AS1KDh(i32 %b, ptr addrspace(1) %a)
   ret <16 x float> %0
 }
 
-declare spir_func <16 x float> @_Z12vload_half16jPU3AS1KDh(i32, half addrspace(1)*)
+declare spir_func <16 x float> @_Z12vload_half16jPU3AS1KDh(i32, ptr addrspace(1))
 
-; CHECK:  [[a4i32:%[^ ]+]] = bitcast half addrspace(1)* %a to <4 x i32> addrspace(1)*
 ; CHECK:  [[bx2:%[^ ]+]] = shl i32 %b, 1
-; CHECK:  [[gep0:%[^ ]+]] = getelementptr <4 x i32>, <4 x i32> addrspace(1)* [[a4i32]], i32 [[bx2]]
+; CHECK:  [[gep0:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 [[bx2]]
 ; CHECK:  [[idx1:%[^ ]+]] = add i32 [[bx2]], 1
-; CHECK:  [[gep1:%[^ ]+]] = getelementptr <4 x i32>, <4 x i32> addrspace(1)* [[a4i32]], i32 [[idx1]]
-; CHECK:  [[load0:%[^ ]+]] = load <4 x i32>, <4 x i32> addrspace(1)* [[gep0]], align 16
-; CHECK:  [[load1:%[^ ]+]] = load <4 x i32>, <4 x i32> addrspace(1)* [[gep1]], align 16
+; CHECK:  [[gep1:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 [[idx1]]
+; CHECK:  [[load0:%[^ ]+]] = load <4 x i32>, ptr addrspace(1) [[gep0]], align 16
+; CHECK:  [[load1:%[^ ]+]] = load <4 x i32>, ptr addrspace(1) [[gep1]], align 16
 ; CHECK:  [[val0:%[^ ]+]] = extractelement <4 x i32> [[load0]], i32 0
 ; CHECK:  [[val1:%[^ ]+]] = extractelement <4 x i32> [[load0]], i32 1
 ; CHECK:  [[val2:%[^ ]+]] = extractelement <4 x i32> [[load0]], i32 2

@@ -9,15 +9,15 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo() {
 entry:
-  %0 = getelementptr [3 x i8], [3 x i8] addrspace(2)* @mem0, i32 0
-  %1 = getelementptr [3 x [8 x i8]], [3 x [8 x i8]] addrspace(2)* @mem8, i32 0
+  %0 = getelementptr [3 x i8], ptr addrspace(2) @mem0, i32 0
+  %1 = getelementptr [3 x [8 x i8]], ptr addrspace(2) @mem8, i32 0
   ret void
 }
 
 ; CHECK: [[clustered_constants:@[^ ]+]] = internal addrspace(2) constant { [3 x i8], [5 x i8], [3 x [8 x i8]] } zeroinitializer, align 8
 
-; CHECK: [[mem0:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, { [3 x i8], [5 x i8], [3 x [8 x i8]] } addrspace(2)* [[clustered_constants]], i32 0, i32 0
-; CHECK: getelementptr [3 x i8], [3 x i8] addrspace(2)* [[mem0]], i32 0
+; CHECK: [[mem0:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 0
+; CHECK: getelementptr [3 x i8], ptr addrspace(2) [[mem0]], i32 0
 
-; CHECK: [[mem8:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, { [3 x i8], [5 x i8], [3 x [8 x i8]] } addrspace(2)* [[clustered_constants]], i32 0, i32 2
-; CHECK: getelementptr [3 x [8 x i8]], [3 x [8 x i8]] addrspace(2)* [[mem8]], i32 0
+; CHECK: [[mem8:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 2
+; CHECK: getelementptr [3 x [8 x i8]], ptr addrspace(2) [[mem8]], i32 0

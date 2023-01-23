@@ -13,21 +13,20 @@ target triple = "spir-unknown-unknown"
 
 
 
-define dso_local spir_func %opencl.event_t* @foo(<16 x i8> addrspace(3)* %dst, <16 x i8> addrspace(1)* %src, i32 %num_gentypes, %opencl.event_t* %event) {
+define dso_local spir_func ptr @foo(ptr addrspace(3) %dst, ptr addrspace(1) %src, i32 %num_gentypes, ptr %event) {
 entry:
-  %call = call spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS3Dv16_cPU3AS1KS_j9ocl_event(<16 x i8> addrspace(3)* %dst, <16 x i8> addrspace(1)* %src, i32 %num_gentypes, %opencl.event_t* %event)
-  ret %opencl.event_t* %call
+  %call = call spir_func ptr @_Z21async_work_group_copyPU3AS3Dv16_cPU3AS1KS_j9ocl_event(ptr addrspace(3) %dst, ptr addrspace(1) %src, i32 %num_gentypes, ptr %event)
+  ret ptr %call
 }
 
-declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS3Dv16_cPU3AS1KS_j9ocl_event(<16 x i8> addrspace(3)*, <16 x i8> addrspace(1)*, i32, %opencl.event_t*)
+declare spir_func ptr @_Z21async_work_group_copyPU3AS3Dv16_cPU3AS1KS_j9ocl_event(ptr addrspace(3), ptr addrspace(1), i32, ptr)
 
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 0
-; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 1
-; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, <3 x i32> addrspace(5)* @__spirv_LocalInvocationId, i32 0, i32 2
-; CHECK: [[localid2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(5)* [[gep]], align
-; CHECK: [[groupsizevec:%[a-zA-Z0-9_.]+]] = load <3 x i32>, <3 x i32> addrspace(8)* @__spirv_WorkgroupSize, align 16
+; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5)  @__spirv_LocalInvocationId, align
+; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 1
+; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
+; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 2
+; CHECK: [[localid2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
+; CHECK: [[groupsizevec:%[a-zA-Z0-9_.]+]] = load <3 x i32>, ptr addrspace(8) @__spirv_WorkgroupSize, align 16
 ; CHECK: [[groupsize0:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 0
 ; CHECK: [[groupsize1:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 1
 ; CHECK: [[groupsize2:%[a-zA-Z0-9_.]+]] = extractelement <3 x i32> [[groupsizevec]], i32 2
@@ -43,11 +42,11 @@ declare spir_func %opencl.event_t* @_Z21async_work_group_copyPU3AS3Dv16_cPU3AS1K
 ; CHECK: [[icmp:%[a-zA-Z0-9_.]+]] = icmp ult i32 [[phiiterator]], %num_gentypes
 ; CHECK: br i1 [[icmp]], label %[[loop]], label %[[exit:[a-zA-Z0-9_.]+]]
 ; CHECK: [[loop]]:
-; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(3)* %dst, i32 [[phiiterator]]
-; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], [16 x i8] addrspace(1)* %src, i32 [[phiiterator]]
+; CHECK: [[dsti:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], ptr addrspace(3) %dst, i32 [[phiiterator]]
+; CHECK: [[srci:%[a-zA-Z0-9_.]+]] = getelementptr [16 x i8], ptr addrspace(1) %src, i32 [[phiiterator]]
 ; CHECK: [[nextiterator]] = add i32 [[phiiterator]], [[incr]]
 
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load [16 x i8], [16 x i8] addrspace(1)* [[srci]]
-; CHECK: store [16 x i8] [[ld]], [16 x i8] addrspace(3)* [[dsti]]
+; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load [16 x i8], ptr addrspace(1) [[srci]]
+; CHECK: store [16 x i8] [[ld]], ptr addrspace(3) [[dsti]]
 
 ; CHECK: br label %[[cmp]]

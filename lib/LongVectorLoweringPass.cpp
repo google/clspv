@@ -537,7 +537,7 @@ Function *createFunctionWithMappedTypes(Function &F,
 
   // Inlining a function can introduce constant expression that we could not
   // handle afterwards.
-  BitcastUtils::RemovedCstExprFromFunction(Wrapper);
+  BitcastUtils::RemoveCstExprFromFunction(Wrapper);
 
   return Wrapper;
 }
@@ -667,7 +667,7 @@ PreservedAnalyses clspv::LongVectorLoweringPass::run(Module &M,
   runOnGlobals(M);
 
   for (auto &F : M.functions()) {
-    BitcastUtils::RemovedCstExprFromFunction(&F);
+    BitcastUtils::RemoveCstExprFromFunction(&F);
     runOnFunction(F);
   }
 
@@ -1075,11 +1075,13 @@ void clspv::LongVectorLoweringPass::reworkIndices(
   Indices.push_back(Idxs[0]);
   for (unsigned i = 1; i < Idxs.size(); i++) {
     Indices.push_back(Idxs[i]);
-    auto IndexedTy = GetElementPtrInst::getIndexedType(Ty, Indices);
+    // Get original indices up to ith element for below:
+    auto CumulativeOldIdxs = ArrayRef<Value*>(Idxs.begin(), Idxs.begin() + i);
+    auto IndexedTy = GetElementPtrInst::getIndexedType(Ty, CumulativeOldIdxs);
     if (getEquivalentType(IndexedTy)) {
       auto Idx = Indices.pop_back_val();
       if (auto STy = dyn_cast<StructType>(
-              GetElementPtrInst::getIndexedType(Ty, Indices))) {
+              GetElementPtrInst::getIndexedType(Ty, CumulativeOldIdxs))) {
         auto Cst = dyn_cast<ConstantInt>(Idx);
         if (!Cst) {
           llvm_unreachable("unexpected index for gep on struct type");

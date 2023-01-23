@@ -9,20 +9,20 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast float %conv to <2 x i16>
 ; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = extractelement <2 x i16> [[cast]], i64 0
 ; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = extractelement <2 x i16> [[cast]], i64 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i16, i16 addrspace(1)* %soa, i32 %2
-; CHECK: store i16 [[trunc0]], i16 addrspace(1)* [[gep]]
-; CHECK: [[add1:%[a-zA-Z0-9_.]+]] = add i32 %2, 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i16, i16 addrspace(1)* %soa, i32 [[add1]]
-; CHECK: store i16 [[trunc1]], i16 addrspace(1)* [[gep]]
-define spir_kernel void @writeToSoaBuffer(i16 addrspace(1)* %soa) {
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i16, ptr addrspace(1) %cast, i32
+; CHECK: store i16 [[trunc0]], ptr addrspace(1) [[gep]]
+; CHECK: [[add1:%[a-zA-Z0-9_.]+]] = add i32 %{{.*}}, 1
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i16, ptr addrspace(1) %cast, i32 [[add1]]
+; CHECK: store i16 [[trunc1]], ptr addrspace(1) [[gep]]
+define spir_kernel void @writeToSoaBuffer(ptr addrspace(1) %soa) {
 entry:
-  %0 = load i32, i32 addrspace(5)* getelementptr (<3 x i32>, <3 x i32> addrspace(5)* @__spirv_GlobalInvocationId, i32 0, i32 0)
+  %0 = load i32, ptr addrspace(5) getelementptr (<3 x i32>, ptr addrspace(5) @__spirv_GlobalInvocationId, i32 0, i32 0)
   %mul = mul i32 4, %0
   %1 = sdiv i32 %mul, 4
-  %2 = bitcast i16 addrspace(1)* %soa to float addrspace(1)*
-  %3 = getelementptr float, float addrspace(1)* %2, i32 %1
+  %cast = getelementptr i16, ptr addrspace(1) %soa, i32 0
+  %2 = getelementptr float, ptr addrspace(1) %cast, i32 %1
   %conv = uitofp i32 %0 to float
-  store float %conv, float addrspace(1)* %3, align 4
+  store float %conv, ptr addrspace(1) %2, align 4
   ret void
 }
 

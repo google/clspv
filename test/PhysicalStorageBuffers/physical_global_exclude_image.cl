@@ -15,7 +15,7 @@ kernel void test(read_only image2d_t srcimg, global float4 *dst, sampler_t sampl
     dst[indx] = read_imagef(srcimg, sampler, (int2)(tid_x, tid_y));
 }
 
-// CHECK: [[clspv_reflection:%[0-9a-zA-Z_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[clspv_reflection:%[0-9a-zA-Z_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: [[void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG: OpExtInst [[void]] [[clspv_reflection]] ArgumentSampledImage
 // CHECK-DAG: OpExtInst [[void]] [[clspv_reflection]] ArgumentSampler

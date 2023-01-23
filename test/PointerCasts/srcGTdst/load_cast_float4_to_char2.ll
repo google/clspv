@@ -7,8 +7,8 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[lshr:%[^ ]+]] = lshr i32 %i, 1
 ; CHECK:  [[lshr2:%[^ ]+]] = lshr i32 [[lshr]], 2
 ; CHECK:  [[and:%[^ ]+]] = and i32 [[lshr]], 3
-; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x float>, <4 x float> addrspace(1)* %b, i32 [[lshr2]], i32 [[and]]
-; CHECK:  [[load:%[^ ]+]] = load float, float addrspace(1)* [[gep]]
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x float>, ptr addrspace(1) %0, i32 [[lshr2]], i32 [[and]]
+; CHECK:  [[load:%[^ ]+]] = load float, ptr addrspace(1) [[gep]]
 ; CHECK:  [[and:%[^ ]+]] = and i32 %i, 1
 ; CHECK:  [[bitcast:%[^ ]+]] = bitcast float [[load]] to <4 x i8>
 ; CHECK:  [[shuffle0:%[^ ]+]] = shufflevector <4 x i8> [[bitcast]], <4 x i8> poison, <2 x i32> <i32 0, i32 1>
@@ -18,10 +18,10 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @foo(<2 x i8> addrspace(1)* %a, <4 x float> addrspace(1)* %b, i32 %i) {
 entry:
-  %0 = bitcast <4 x float> addrspace(1)* %b to <2 x i8> addrspace(1)*
-  %arrayidx = getelementptr inbounds <2 x i8>, <2 x i8> addrspace(1)* %0, i32 %i
-  %1 = load <2 x i8>, <2 x i8> addrspace(1)* %arrayidx, align 8
-  store <2 x i8> %1, <2 x i8> addrspace(1)* %a, align 8
+  %0 = getelementptr <4 x float>, ptr addrspace(1) %b, i32 0
+  %arrayidx = getelementptr inbounds <2 x i8>, ptr addrspace(1) %0, i32 %i
+  %1 = load <2 x i8>, ptr addrspace(1) %arrayidx, align 8
+  store <2 x i8> %1, ptr addrspace(1) %a, align 8
   ret void
 }
 

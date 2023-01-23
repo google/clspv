@@ -9,17 +9,17 @@ target triple = "spir64-unknown-unknown"
 @__spirv_GlobalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
-define spir_kernel void @copy(i16 addrspace(1)* %a, i32 addrspace(1)* %b, i32 %x, i32 %y) !clspv.pod_args_impl !0 {
+define spir_kernel void @copy(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %x, i32 %y) !clspv.pod_args_impl !0 {
 entry:
-  %0 = load i32, i32 addrspace(5)* getelementptr (<3 x i32>, <3 x i32> addrspace(5)* @__spirv_GlobalInvocationId, i64 0, i64 0), align 16
+  %0 = load i32, ptr addrspace(5) @__spirv_GlobalInvocationId, align 16
   %1 = zext i32 %0 to i64
-  %arrayidx = getelementptr inbounds i16, i16 addrspace(1)* %a, i64 %1
-  %2 = load i16, i16 addrspace(1)* %arrayidx, align 2
+  %arrayidx = getelementptr inbounds i16, ptr addrspace(1) %a, i64 %1
+  %2 = load i16, ptr addrspace(1) %arrayidx, align 2
   %conv = sext i16 %2 to i32
   %add = add i32 %y, %x
   %add1 = add i32 %add, %conv
-  %arrayidx2 = getelementptr inbounds i32, i32 addrspace(1)* %b, i64 %1
-  store i32 %add1, i32 addrspace(1)* %arrayidx2, align 4
+  %arrayidx2 = getelementptr inbounds i32, ptr addrspace(1) %b, i64 %1
+  store i32 %add1, ptr addrspace(1) %arrayidx2, align 4
   ret void
 }
 
@@ -27,7 +27,7 @@ entry:
 
 ; Check the pointer args are converted and used correctly
 ; CHECK: @copy(i64 %0, i64 %1, i32 %2, i32 %3)
-; CHECK: %[[ptr_a:[0-9a-z]+]] = inttoptr i64 %0 to i16 addrspace(1)*, !clspv.pointer_from_pod
-; CHECK: %[[ptr_b:[0-9a-z]+]] = inttoptr i64 %1 to i32 addrspace(1)*, !clspv.pointer_from_pod
-; CHECK: getelementptr inbounds i16, i16 addrspace(1)* %[[ptr_a]]
-; CHECK: getelementptr inbounds i32, i32 addrspace(1)* %[[ptr_b]]
+; CHECK: %[[ptr_a:[0-9a-z]+]] = inttoptr i64 %0 to ptr addrspace(1), !clspv.pointer_from_pod
+; CHECK: %[[ptr_b:[0-9a-z]+]] = inttoptr i64 %1 to ptr addrspace(1), !clspv.pointer_from_pod
+; CHECK: getelementptr inbounds i16, ptr addrspace(1) %[[ptr_a]]
+; CHECK: getelementptr inbounds i32, ptr addrspace(1) %[[ptr_b]]

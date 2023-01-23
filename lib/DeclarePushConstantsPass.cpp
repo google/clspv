@@ -60,6 +60,10 @@ clspv::DeclarePushConstantsPass::run(Module &M, ModuleAnalysisManager &) {
     PushConstants.push_back(clspv::PushConstant::RegionGroupOffset);
   }
 
+  if (clspv::ShouldDeclareModuleConstantsPointerPushConstant(M)) {
+    PushConstants.push_back(clspv::PushConstant::ModuleConstantsPointer);
+  }
+
   if (PushConstants.size() > 0) {
 
     std::vector<Type *> Members;

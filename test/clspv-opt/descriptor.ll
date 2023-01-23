@@ -1,7 +1,7 @@
 ; RUN: clspv-opt %s --passes=allocate-descriptors -o %t.ll 2> %t.out.txt
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: %0 = call { [0 x i32] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
+; CHECK: %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
@@ -9,10 +9,10 @@ target triple = "spir-unknown-unknown"
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(7) global <3 x i32> zeroinitializer
 
 ; Function Attrs: norecurse nounwind
-define spir_kernel void @foo(i32 addrspace(1)* nocapture readonly %in, i32 addrspace(1)* nocapture %out) local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
+define spir_kernel void @foo(ptr addrspace(1) nocapture readonly %in, ptr addrspace(1) nocapture %out) local_unnamed_addr #0 !kernel_arg_addr_space !3 !kernel_arg_access_qual !4 !kernel_arg_type !5 !kernel_arg_base_type !5 !kernel_arg_type_qual !6 {
 entry:
-  %0 = load i32, i32 addrspace(1)* %in, align 4
-  store i32 %0, i32 addrspace(1)* %out, align 4
+  %0 = load i32, ptr addrspace(1) %in, align 4
+  store i32 %0, ptr addrspace(1) %out, align 4
   ret void
 }
 

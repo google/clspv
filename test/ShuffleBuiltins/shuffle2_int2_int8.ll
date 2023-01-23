@@ -4,10 +4,10 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-define spir_kernel void @test(<2 x i32> %srcA, <2 x i32> %srcB, <8 x i32> addrspace(1)* noundef align 32 %dst, <8 x i32> %mask) {
+define spir_kernel void @test(<2 x i32> %srcA, <2 x i32> %srcB, ptr addrspace(1) noundef align 32 %dst, <8 x i32> %mask) {
 entry:
   %0 = call spir_func <8 x i32> @_Z8shuffle2Dv2_iS_Dv8_j(<2 x i32> %srcA, <2 x i32> %srcB, <8 x i32> %mask)
-  store <8 x i32> %0, <8 x i32> addrspace(1)* %dst, align 32
+  store <8 x i32> %0, ptr addrspace(1) %dst, align 32
   ret void
 }
 
@@ -102,4 +102,4 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv2_iS_Dv8_j(<2 x i32> noundef, <2 x i32
 ; CHECK: [[val7:%[^ ]+]] = select i1 [[cmp7]], i32 [[srcB7]], i32 [[srcA7]]
 ; CHECK: [[res7:%[^ ]+]] = insertvalue [8 x i32] [[res6]], i32 [[val7]], 7
 
-; CHECK: store [8 x i32] [[res7]], [8 x i32] addrspace(1)* %dst, align 32
+; CHECK: store [8 x i32] [[res7]], ptr addrspace(1) %dst, align 32

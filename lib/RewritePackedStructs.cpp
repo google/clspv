@@ -123,7 +123,7 @@ Function *createFunctionWithMappedTypes(Function &F,
 
   // Inlining a function can introduce constant expression that we could not
   // handle afterwards.
-  BitcastUtils::RemovedCstExprFromFunction(Wrapper);
+  BitcastUtils::RemoveCstExprFromFunction(Wrapper);
 
   return Wrapper;
 }

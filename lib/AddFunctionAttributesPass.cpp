@@ -25,6 +25,11 @@ PreservedAnalyses
 clspv::AddFunctionAttributesPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
+  // Clspv can't respect the optnone attribute.
+  for (auto &F : M) {
+    F.removeFnAttr(Attribute::AttrKind::OptimizeNone);
+  }
+
   // Add ReadNone and Speculatable to literal sampler functions to avoid loop
   // optimizations producing phis with them.
   if (auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction())) {

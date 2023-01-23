@@ -7,7 +7,7 @@ __attribute__((reqd_work_group_size(1,2,3)))
 kernel void foo(global int* data) {
 }
 
-// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
 // CHECK-DAG: [[foo_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid

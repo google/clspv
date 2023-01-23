@@ -570,7 +570,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
             clspv::Option::PhysicalStorageBuffers()) {
           if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
             if (source_ptr_ty->getAddressSpace() ==
-                clspv::AddressSpace::Global) {
+                    clspv::AddressSpace::Global ||
+                source_ptr_ty->getAddressSpace() ==
+                    clspv::AddressSpace::Constant) {
               continue;
             }
           }
@@ -581,6 +583,10 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
           if (FindAliasingContainedType(source_ty, dest_ty, Steps)) {
             // Single level GEP is ok to transform, but beyond that the address
             // math must be divided among other entries.
+            //
+            // TODO(#1004): something is wrong here. This passes the cts
+            // basic/kernel_preprocessor_macros, but fails
+            // test/PointerCasts/srcGTdst/load_cast_float2_to_float.ll
             if ((Steps > 0 && !isa<GetElementPtrInst>(I)) ||
                 (Steps == 1)) {
               ImplicitGEPs.insert({&I, Steps});

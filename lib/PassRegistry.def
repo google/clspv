@@ -33,6 +33,7 @@ MODULE_PASS("inline-func-with-image-metadata-getter", clspv::InlineFuncWithImage
 MODULE_PASS("inline-func-with-pointer-cast-arg", clspv::InlineFuncWithPointerBitCastArgPass)
 MODULE_PASS("inline-func-with-pointer-function-arg", clspv::InlineFuncWithPointerToFunctionArgPass)
 MODULE_PASS("inline-func-with-single-call-site", clspv::InlineFuncWithSingleCallSitePass)
+MODULE_PASS("logical-pointer-to-int", clspv::LogicalPointerToIntPass)
 MODULE_PASS("long-vector-lowering", clspv::LongVectorLoweringPass)
 MODULE_PASS("set-image-channel-metadata", clspv::SetImageChannelMetadataPass)
 MODULE_PASS("multi-version-ubo-functions", clspv::MultiVersionUBOFunctionsPass)

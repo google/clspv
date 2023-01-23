@@ -10,7 +10,7 @@ void kernel test(global uint *c)
   *c = get_max_sub_group_size();
 }
 
-// CHECK: [[extinst:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.2"
+// CHECK: [[extinst:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpDecorate [[max_subgroup_size_constant:%[a-zA-Z0-9_]+]] SpecId 3
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid

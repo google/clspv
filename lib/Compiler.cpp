@@ -312,6 +312,8 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
   instance.getCodeGenOpts().OpaquePointers = clspv::Option::OpaquePointers();
   instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
+  // TODO(#995): Re-enable this warning.
+  instance.getDiagnosticOpts().Warnings.push_back("no-unsafe-buffer-usage");
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
@@ -537,6 +539,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
+    if (clspv::Option::HackLogicalPtrtoint()) {
+      pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+      pm.addPass(clspv::LogicalPointerToIntPass());
+    }
+
     // We need to run mem2reg and inst combine early because our
     // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
     // pattern
@@ -571,14 +578,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    if (clspv::Option::InlineEntryPoints()) {
-      pm.addPass(clspv::InlineEntryPointsPass());
-    } else {
-      pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
-      pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
-      pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
-      pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
-    }
+    pm.addPass(clspv::InlineEntryPointsPass());
+    pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
+    pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
+    pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
+    pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
 
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
@@ -595,10 +599,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
-      pm.addPass(llvm::createModuleToFunctionPassAdaptor(
-          llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
-    }
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
   });
 
   // Run the following passes after the default LLVM pass pipeline.
