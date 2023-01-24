@@ -13,7 +13,9 @@ typedef struct S {
   char g[4];
 } S;
 
-kernel void foo(global S* data) { }
+kernel void foo(global S* data) {
+  (*data).a = 0;
+}
 
 // CHECK: OpCapability Int8
 // CHECK: OpMemberDecorate [[struct:%[a-zA-Z0-9_]+]] 0 Offset 0

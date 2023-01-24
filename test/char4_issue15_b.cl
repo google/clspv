@@ -2,7 +2,10 @@
 // Use of <4 x 18> was generating a duplicate of OpTypeInt 32 0.
 
 // In this example, the char4 is mentioned before the uint.
-kernel void dup(global char4* A, global uint *B) {}
+kernel void dup(global char4* A, global uint *B) {
+  *A = (char4)(0,0,0,0);
+  *B = 0;
+}
 
 // RUN: clspv %target %s -o %t.spv -int8=0
 // RUN: spirv-dis -o %t2.spvasm %t.spv

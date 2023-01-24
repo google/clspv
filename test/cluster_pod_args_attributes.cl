@@ -11,5 +11,7 @@
 
 kernel void test_restrict(global int* restrict ptr1, int pod1, int pod2, global int* ptr2, global int* restrict ptr3)
 {
+  *ptr1 = pod1 + pod2;
+  *ptr2 = *ptr3;
 }
 

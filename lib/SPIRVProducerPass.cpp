@@ -6777,6 +6777,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     // Ops[1] = reflection ext import
     // Ops[2] = function id
     // Ops[3] = kernel name
+    // Ops[4] = number of arguments
     SPIRVOperandVec Ops;
     Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
         << kernel_name << getSPIRVInt32Constant(num_args);
@@ -6832,7 +6833,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         // If this is a local memory argument, find the right spec id for this
         // argument.
         int64_t spec_id = -1;
-        if (argKind == clspv::ArgKind::Local) {
+        if (argKind == clspv::ArgKind::Local && local_spec_id_md) {
           for (auto spec_id_arg : local_spec_id_md->operands()) {
             if ((&F == dyn_cast<Function>(
                            dyn_cast<ValueAsMetadata>(spec_id_arg->getOperand(0))
@@ -6860,6 +6861,12 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
           elem_size = static_cast<uint32_t>(
               GetTypeAllocSize(local_arg_info.elem_type, DL));
         } else if (new_index >= 0) {
+          if (static_cast<uint64_t>(new_index) >=
+                  resource_var_at_index.size() ||
+              !resource_var_at_index[new_index]) {
+            // Unused
+            continue;
+          }
           auto *info = resource_var_at_index[new_index];
           assert(info);
           descriptor_set = info->descriptor_set;

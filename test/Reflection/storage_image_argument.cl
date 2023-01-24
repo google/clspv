@@ -4,6 +4,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 kernel void foo(write_only image2d_t data) {
+  write_imagef(data, (int2)(0, 0), (float4)(0.0,0.0,0.0,0.0));
 }
 
 // CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"

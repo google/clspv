@@ -4,6 +4,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 kernel void foo(global int* data) {
+  *data = 0;
 }
 
 // CHECK: [[import:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"

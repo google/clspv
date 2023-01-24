@@ -25,4 +25,9 @@
 // CLUSTER-NOT: foo
 
 kernel void foo(global int *A, read_only image2d_t RO, write_only image2d_t WO,
-                sampler_t SAM, int c, int d) {}
+                sampler_t SAM, int c, int d) {
+  float4 tmp;
+  tmp = read_imagef(RO, SAM, (float2)(0.0,0.0));
+  write_imagef(WO, (int2)(c,d), tmp);
+  *A = 0;
+}
