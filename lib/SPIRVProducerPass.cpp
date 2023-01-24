@@ -6861,7 +6861,8 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
           elem_size = static_cast<uint32_t>(
               GetTypeAllocSize(local_arg_info.elem_type, DL));
         } else if (new_index >= 0) {
-          if (new_index >= resource_var_at_index.size() ||
+          if (static_cast<uint64_t>(new_index) >=
+                  resource_var_at_index.size() ||
               !resource_var_at_index[new_index]) {
             // Unused
             continue;
