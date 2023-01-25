@@ -14,7 +14,7 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
-// CHECK-DAG: [[float4:%[^ ]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG: [[float3:%[^ ]+]] = OpTypeVector [[float]] 3
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpTypeVector [[uint]] 2
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
@@ -35,11 +35,11 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK-32: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[b]]
 // CHECK: [[val0:%[^ ]+]] = OpLoad [[uint2]] [[addr0]]
 
-// CHECK: [[ex0:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 0
-// CHECK: [[ex1:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 1
+// CHECK: [[val01i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 0
+// CHECK: [[val23i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 1
 
-// CHECK: [[val01:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[ex0]]
-// CHECK: [[val23:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[ex1]]
+// CHECK: [[val01:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val01i32]]
+// CHECK: [[val23:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val23i32]]
 
-// CHECK: [[val:%[^ ]+]] = OpVectorShuffle [[float4]] [[val01]] [[val23]] 0 1 2
+// CHECK: [[val:%[^ ]+]] = OpVectorShuffle [[float3]] [[val01]] [[val23]] 0 1 2
 // CHECK:       OpStore {{.*}} [[val]]

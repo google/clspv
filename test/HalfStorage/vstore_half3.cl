@@ -14,7 +14,7 @@ __kernel void test(__global half *a, float3 b, int c) {
 
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
-// CHECK-DAG: [[float4:%[^ ]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG: [[float3:%[^ ]+]] = OpTypeVector [[float]] 3
 // CHECK-DAG: [[ushort:%[^ ]+]] = OpTypeInt 16 0
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
@@ -26,7 +26,7 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-32-DAG: [[uint3:%[^ ]+]] = OpConstant [[uint]] 3
 // CHECK-64-DAG: [[ulong3:%[^ ]+]] = OpConstant [[ulong]] 3
 
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float4]] {{.*}} 0
+// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float3]] {{.*}} 0
 // CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
 // CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
 

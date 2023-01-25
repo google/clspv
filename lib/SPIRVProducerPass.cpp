@@ -4589,7 +4589,15 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         // Ops[1] = Source Value ID
         SPIRVOperandVec Ops;
 
-        Ops << I.getType() << I.getOperand(0);
+        if (I.getOpcode() == Instruction::IntToPtr) {
+          auto *inferred_ty =
+              clspv::InferType(&I, module->getContext(), &InferredTypeCache);
+          assert(inferred_ty);
+          Ops << getSPIRVPointerType(I.getType(), inferred_ty);
+        } else {
+          Ops << I.getType();
+        }
+        Ops << I.getOperand(0);
 
         RID = addSPIRVInst(GetSPIRVCastOpcode(I), Ops);
       }

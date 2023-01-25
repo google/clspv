@@ -532,6 +532,15 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::PhysicalPointerArgsPass());
     }
 
+    // We need to run mem2reg and inst combine early because some of our passes
+    // (e.g. ThreeElementVectorLowering and InlineFuncWithBitCastArgsPass)
+    // cannot handle the pattern:
+    //
+    //   %1 = alloca i32 1
+    //        store <something> %1
+    //   %2 = bitcast float* %1
+    //   %3 = load float %2
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
@@ -543,15 +552,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
       pm.addPass(clspv::LogicalPointerToIntPass());
     }
-
-    // We need to run mem2reg and inst combine early because our
-    // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
-    // pattern
-    //   %1 = alloca i32 1
-    //        store <something> %1
-    //   %2 = bitcast float* %1
-    //   %3 = load float %2
-    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
 
     // Lower longer vectors when requested. Note that this pass depends on
     // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run

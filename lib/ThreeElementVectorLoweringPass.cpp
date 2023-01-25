@@ -291,39 +291,36 @@ bool clspv::ThreeElementVectorLoweringPass::vec3BitcastInFunction(Function &F) {
     }
   }
 
-  // Implicit casts with opaque pointers.
-  for (auto &arg : F.args()) {
-    if (arg.getType()->isOpaquePointerTy()) {
-      if (haveImplicitCast(&arg)) {
-        return true;
-      }
-    }
-  }
-
   for (Instruction &I : instructions(F)) {
-    if (I.getType()->isOpaquePointerTy()) {
-      if (haveImplicitCast(&I)) {
-        return true;
-      }
+    if (haveImplicitCast(&I)) {
+      return true;
     }
   }
   return false;
 }
 
 bool clspv::ThreeElementVectorLoweringPass::haveImplicitCast(Value *Value) {
-  auto InferredType =
-      clspv::InferType(Value, Value->getContext(), &type_cache_);
-  if (InferredType && InferredType->isVectorTy()) {
-    auto *VectorType = dyn_cast<FixedVectorType>(InferredType);
-    if (VectorType && VectorType->getElementCount().getKnownMinValue() == 3) {
-      for (auto user : Value->users()) {
-        auto userInferredType =
-            clspv::InferType(user, Value->getContext(), &type_cache_);
-        if (userInferredType && userInferredType != InferredType) {
-          return true;
-        }
+  Type *source_ty = nullptr;
+  Type *dest_ty = nullptr;
+  if (auto *gep = dyn_cast<GetElementPtrInst>(Value)) {
+      source_ty = clspv::InferType(gep->getPointerOperand(),
+                                   Value->getContext(), &type_cache_);
+      dest_ty = gep->getSourceElementType();
+  } else if (auto *ld = dyn_cast<LoadInst>(Value)) {
+      source_ty = clspv::InferType(ld->getPointerOperand(), Value->getContext(),
+                                   &type_cache_);
+      dest_ty = ld->getType();
+  } else if (auto *st = dyn_cast<StoreInst>(Value)) {
+      source_ty = clspv::InferType(st->getPointerOperand(), Value->getContext(),
+                                   &type_cache_);
+      dest_ty = st->getValueOperand()->getType();
+  }
+
+  if (source_ty && source_ty->isVectorTy() &&
+      cast<VectorType>(source_ty)->getElementCount().getKnownMinValue() == 3) {
+      if (dest_ty && dest_ty != source_ty) {
+        return true;
       }
-    }
   }
   return false;
 }

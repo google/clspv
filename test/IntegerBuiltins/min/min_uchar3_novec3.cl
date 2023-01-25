@@ -3,11 +3,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 --enable-opaque-pointers
-// RUN: spirv-dis -o %t2.spvasm %t.spv
-// RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
-
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uchar3* a, global uchar3* b, global uchar3* c)
 {
     *a = min(*b, *c);

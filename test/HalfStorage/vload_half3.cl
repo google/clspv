@@ -14,7 +14,7 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
-// CHECK-DAG: [[float4:%[^ ]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG: [[float3:%[^ ]+]] = OpTypeVector [[float]] 3
 // CHECK-DAG: [[undef_float2:%[^ ]+]] = OpUndef [[float2]]
 // CHECK-DAG: [[ushort:%[^ ]+]] = OpTypeInt 16 0
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
@@ -27,11 +27,11 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK-32-DAG: [[uint_3:%[^ ]+]] = OpConstant [[uint]] 3
 // CHECK-64-DAG: [[ulong_3:%[^ ]+]] = OpConstant [[ulong]] 3
 
-// CHECK-DAG: [[ushort_array:%[^ ]+]] = OpTypeRuntimeArray [[ushort]]
-// CHECK-DAG: [[ushort_ptr:%[^ ]+]] = OpTypeStruct [[ushort_array]]
-// CHECK-DAG: [[global_ushort_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[ushort_ptr]]
+// CHECK-DAG: [[half_array:%[^ ]+]] = OpTypeRuntimeArray [[ushort]]
+// CHECK-DAG: [[half_ptr:%[^ ]+]] = OpTypeStruct [[half_array]]
+// CHECK-DAG: [[global_half_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[half_ptr]]
 
-// CHECK: [[a:%[^ ]+]] = OpVariable [[global_ushort_ptr]] StorageBuffer
+// CHECK: [[a:%[^ ]+]] = OpVariable [[global_half_ptr]] StorageBuffer
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
 
 // CHECK-64: [[b_ulong:%[^ ]+]] = OpSConvert [[ulong]] [[b]]
@@ -59,8 +59,8 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK: [[val1:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val1i32]]
 // CHECK: [[val2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val2i32]]
 
-// CHECK: [[val0f3:%[^ ]+]] = OpVectorShuffle [[float4]] [[val2]] [[undef_float2]] 0 4294967295 4294967295 4294967295
-// CHECK: [[val1f3:%[^ ]+]] = OpVectorShuffle [[float4]] [[val0]] [[val1]] 0 2 4294967295 4294967295
-// CHECK: [[val:%[^ ]+]] = OpVectorShuffle [[float4]] [[val1f3]] [[val0f3]] 0 1 4 4294967295
+// CHECK: [[val0f3:%[^ ]+]] = OpVectorShuffle [[float3]] [[val2]] [[undef_float2]] 0 4294967295 4294967295
+// CHECK: [[val1f3:%[^ ]+]] = OpVectorShuffle [[float3]] [[val0]] [[val1]] 0 2 4294967295
+// CHECK: [[val:%[^ ]+]] = OpVectorShuffle [[float3]] [[val1f3]] [[val0f3]] 0 1 3
 
 // CHECK: OpStore {{.*}} [[val]]

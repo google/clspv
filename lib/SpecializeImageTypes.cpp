@@ -176,6 +176,9 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
 
     auto *struct_ty =
       StructType::getTypeByName(call->getContext(), name);
+    if (!struct_ty) {
+      struct_ty = StructType::create(call->getContext(), name);
+    }
 
     if (specialized_images_.count(struct_ty))
       return std::make_pair(ResultType::kSpecialized, struct_ty);
