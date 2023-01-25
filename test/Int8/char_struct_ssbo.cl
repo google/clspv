@@ -14,6 +14,14 @@ typedef struct S {
 
 kernel void foo(global S* data) {
   (*data).a = 0;
+  (*data).b = 0;
+  (*data).c = (char2)(0,0);
+  (*data).d = (char3)(0,0,0);
+  (*data).e = (char4)(0,0,0,0);
+  (*data).f[0] = 0;
+  (*data).f[1] = 0;
+  (*data).f[2] = 0;
+  (*data).f[3] = 0;
 }
 
 // CHECK: OpCapability Int8
@@ -28,11 +36,10 @@ kernel void foo(global S* data) {
 // CHECK: OpDecorate [[array:%[a-zA-Z0-9_]+]] ArrayStride 1
 // CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
 // CHECK: [[char2:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 2
-// CHECK: [[char3:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 3
 // CHECK: [[char4:%[a-zA-Z0-9_]+]] = OpTypeVector [[char]] 4
 // CHECK: [[four:%[a-zA-Z0-9_]+]] = OpConstant {{.*}} 4
 // CHECK: [[array:%[a-zA-Z0-9_]+]] = OpTypeArray [[char]] [[four]]
-// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]] [[char]] [[char2]] [[char3]] [[char4]] [[array]]
+// CHECK: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[char]] [[char]] [[char2]] [[char4]] [[char4]] [[array]]
 // CHECK: [[rta:%[a-zA-Z0-9_]+]] = OpTypeRuntimeArray [[struct]]
 // CHECK: [[block:%[a-zA-Z0-9_]+]] = OpTypeStruct [[rta]]
 // CHECK: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[block]]

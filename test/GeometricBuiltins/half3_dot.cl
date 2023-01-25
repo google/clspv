@@ -5,10 +5,9 @@
 
 // CHECK-DAG: %[[HALF_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 16
 // CHECK-DAG: %[[HALF3_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[HALF_TYPE_ID]] 3
-// CHECK: %[[LOADB0_ID:[a-zA-Z0-9_]*]] = OpLoad %[[HALF3_TYPE_ID]]
-// CHECK: %[[LOADB1_ID:[a-zA-Z0-9_]*]] = OpLoad %[[HALF3_TYPE_ID]]
+// CHECK: %[[LOADB0_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[HALF3_TYPE_ID]] %{{.*}} %{{.*}} 0 1 2
+// CHECK: %[[LOADB1_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[HALF3_TYPE_ID]] %{{.*}} %{{.*}} 0 1 2
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpDot %[[HALF_TYPE_ID]] %[[LOADB0_ID]] %[[LOADB1_ID]]
-// CHECK: OpStore {{.*}} %[[OP_ID]]
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 

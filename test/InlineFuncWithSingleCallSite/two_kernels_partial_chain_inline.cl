@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -7,15 +7,15 @@
 // but func_2 and func_3 will both be inlined into func_1.
 // CHECK: OpEntryPoint GLCompute [[k1:%[0-9a-zA-Z_]+]] "kernel_1"
 // CHECK: OpEntryPoint GLCompute [[k2:%[0-9a-zA-Z_]+]] "kernel_2"
-// CHECK: [[func:%[0-9a-zA-Z_]+]] = OpFunction
-// CHECK-NOT: OpFunctionCall
-// CHECK: OpFunctionEnd
 // CHECK: [[k1]] = OpFunction
-// CHECK: OpFunctionCall {{%[0-9a-zA-Z_]+}} [[func]]
+// CHECK: OpFunctionCall {{%[0-9a-zA-Z_]+}} [[func:%[0-9a-zA-Z_]+]]
 // CHECK-NOT: OpFunctionCall
 // CHECK: [[k2]] = OpFunction
 // CHECK: OpFunctionCall {{%[0-9a-zA-Z_]+}} [[func]]
 // CHECK-NOT: OpFunctionCall
+// CHECK: [[func]] = OpFunction
+// CHECK-NOT: OpFunctionCall
+// CHECK: OpFunctionEnd
 
 __attribute__((noinline))
 int func_3(local int *in, int n) { return in[n]; }

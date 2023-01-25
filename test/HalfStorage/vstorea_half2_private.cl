@@ -23,11 +23,9 @@ kernel void foo(global uint* A, float2 val, uint n) {
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK-DAG: [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
-// CHECK-64-DAG: [[_ulong_0:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 0
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2float]]
 // CHECK: [[_41:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
-// CHECK-64: [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr:%[0-9a-zA-Z_]+]] [[_ulong_0]]
-// CHECK-32: [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr:%[0-9a-zA-Z_]+]] [[_uint_0]]
+// CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr:%[0-9a-zA-Z_]+]] [[_uint_0]]
 // CHECK-64: [[_41_long:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]] [[_41]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_39]]
 // CHECK-64: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr]] [[_41_long]]
@@ -45,4 +43,3 @@ kernel void foo(global uint* A, float2 val, uint n) {
 // CHECK-64: [[_50:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr]] [[_48_long]]
 // CHECK-32: [[_50:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[arr]] [[_48]]
 // CHECK: OpStore [[_50]] [[_49]]
-// CHECK: [[_51:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_42]]

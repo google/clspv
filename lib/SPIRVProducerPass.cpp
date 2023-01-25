@@ -2562,7 +2562,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
       auto *struct_ty = cast<StructType>(info->data_type);
       // TODO(alan-baker): This is conservative. If compiling for OpenCL 2.0 or
       // above, the compiler treats all write_only images as read_write images.
-      if (struct_ty->getName().contains("_wo_t")) {
+      if (struct_ty->getName().contains("_wo")) {
         Ops.clear();
         Ops << info->var_id << spv::DecorationNonReadable;
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);

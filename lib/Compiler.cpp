@@ -687,6 +687,16 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       // DCE cleans up callers of the specialized functions.
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
     }
+    // Last minute pointer simplification. With opaque pointers, we can often
+    // end up in a situation where LLVM has simplified GEPs by removing zero
+    // indices where an equivalent address would be computed. These lead to
+    // situations that are awkward for clspv. The following passes canonicalize
+    // GEPs into forms easier to codegen in SPIR-V, including those more likely
+    // to avoid extra functionality (e.g. VariablePointers).
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+    pm.addPass(clspv::ReplacePointerBitcastPass());
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+
     // This pass mucks with types to point where you shouldn't rely on
     // DataLayout anymore so leave this right before SPIR-V generation.
     pm.addPass(clspv::UBOTypeTransformPass());

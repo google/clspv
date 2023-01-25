@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -28,16 +28,12 @@ __kernel void local_memory(__global int* in, __global int* out) {
 // CHECK-DAG: [[_21:%[0-9a-zA-Z_]+]] = OpVariable {{.*}} Workgroup
 // CHECK-DAG: [[_28]] = OpVariable {{.*}} StorageBuffer
 // CHECK-DAG: [[_29]] = OpVariable {{.*}} StorageBuffer
-// CHECK: [[_30:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
+// CHECK: [[_46]] = OpFunction [[_void]]
+// CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_30:%[0-9a-zA-Z_]+]]
+// CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_38:%[0-9a-zA-Z_]+]]
+// CHECK: [[_30]] = OpFunction [[_void]]
 // CHECK: [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_21]]
-// CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
+// CHECK: [[_38]] = OpFunction [[_void]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_21]]
 // CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]]
-// CHECK: [[_46]] = OpFunction [[_void]]
-// CHECK: [[_48:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_28]]
-// CHECK: [[_49:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_29]]
-// CHECK: [[_52:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_21]]
-// CHECK: [[_53:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_30]] [[_48]] [[_52]]
-// CHECK: [[_54:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_21]]
-// CHECK: [[_55:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_38]] [[_49]] [[_54]]
