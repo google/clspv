@@ -373,21 +373,14 @@ bool clspv::UBOTypeTransformPass::RemapUser(User *user, Module &M) {
 bool clspv::UBOTypeTransformPass::RemapValue(Value *value, Module &M) {
   auto *original_type = value->getType();
   Type *remapped = RebuildType(original_type, M);
-  if (remapped == original_type)
-    return false;
 
   if (auto *gep = dyn_cast<GetElementPtrInst>(value)) {
-    // if we're using opaque pointers then the result of a gep is always an
-    // opaque pointer
-    // TODO: #816 remove after final switch.
-    auto result_ty = gep->getResultElementType();
-    if (!result_ty->isOpaquePointerTy()) {
-      auto *remapped_ele_ty = RebuildType(result_ty, M);
-      if (remapped_ele_ty != result_ty) {
-        gep->setResultElementType(remapped->getNonOpaquePointerElementType());
-      }
-    }
+    auto *remapped_res_ty = RebuildType(gep->getResultElementType(), M);
+    gep->setResultElementType(remapped_res_ty);
   }
+
+  if (remapped == original_type)
+    return false;
 
   value->mutateType(remapped);
   return true;

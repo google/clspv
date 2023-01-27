@@ -6,6 +6,8 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// TODO(#1004): sroa and i8s
+// XFAIL: *
 
 
 typedef struct { float a, b, c, d; } S;

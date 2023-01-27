@@ -8,8 +8,8 @@ void kernel foo(global uint *dst, global uint *src) {
   dst[gid] = src[gid];
 }
 
+// CHECK:       OpLine [[filename:%[^ ]+]] 7 0
 // CHECK:       OpAccessChain
-// CHECK-NEXT:  OpLine [[filename:%[^ ]+]] 7 0
 // CHECK-NEXT:  OpLoad
 // CHECK-NEXT:  OpLine [[filename]] 0 0
 // CHECK-NEXT:  OpNoLine

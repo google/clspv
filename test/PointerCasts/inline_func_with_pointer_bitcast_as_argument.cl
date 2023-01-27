@@ -8,8 +8,13 @@ void boo(__global float* outDest) {
 }
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(__global uint* outDest) {
+  ((global int*)outDest)[1] = 1;
   boo(outDest);
 }
-// CHECK:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK:  [[_uint_1065353216:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1065353216
-// CHECK:  OpStore {{.*}} [[_uint_1065353216]]
+// CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[float_1:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 1
+// CHECK-DAG: [[float_const:%[a-zA-Z0-9_]+]] = OpConstant [[float]]
+// CHECK-NOT: OpFunctionCall
+// CHECK: OpStore {{.*}} [[float_const]]
+// CHECK: OpStore {{.*}} [[float_1]]
+// CHECK-NOT: OpFunctionCall

@@ -532,6 +532,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::PhysicalPointerArgsPass());
     }
 
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+
     // We need to run mem2reg and inst combine early because some of our passes
     // (e.g. ThreeElementVectorLowering and InlineFuncWithBitCastArgsPass)
     // cannot handle the pattern:
@@ -687,6 +690,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       // DCE cleans up callers of the specialized functions.
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
     }
+
     // Last minute pointer simplification. With opaque pointers, we can often
     // end up in a situation where LLVM has simplified GEPs by removing zero
     // indices where an equivalent address would be computed. These lead to
@@ -1100,6 +1104,10 @@ int Compile(const int argc, const char *const argv[]) {
   } else if (InputsFilename.size() == 1) {
     llvm::StringRef inputFilename = InputsFilename[0];
     std::ifstream stream(inputFilename.str(), openMode);
+    if (!stream.is_open()) {
+      llvm::errs() << "Failed to open '" << inputFilename << "'\n";
+      return -1;
+    }
     std::string program((std::istreambuf_iterator<char>(stream)),
                         std::istreambuf_iterator<char>());
     return CompileProgram(inputFilename, program, nullptr, nullptr);
@@ -1108,6 +1116,10 @@ int Compile(const int argc, const char *const argv[]) {
     programs.reserve(InputsFilename.size());
     for (auto InputFilename : InputsFilename) {
       std::ifstream stream(InputFilename, openMode);
+      if (!stream.is_open()) {
+        llvm::errs() << "Failed to open '" << InputFilename << "'\n";
+        return -1;
+      }
       programs.emplace_back(std::istreambuf_iterator<char>(stream),
                             std::istreambuf_iterator<char>());
     }

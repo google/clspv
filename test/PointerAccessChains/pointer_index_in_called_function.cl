@@ -1,15 +1,15 @@
-// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir
+// RUN: clspv %target %s -o %t.spv -no-inline-single -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm -check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments -arch=spir64
+// RUN: clspv %target %s -o %t.spv -no-inline-single -arch=spir64
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm -check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 
-// RUN: clspv %target %s -o %t.spv -no-dra -no-inline-single -keep-unused-arguments -arch=spir
+// RUN: clspv %target %s -o %t.spv -no-dra -no-inline-single -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm -check-prefix=NODRA
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -39,21 +39,19 @@ foo(global Thing* a, global float *b, int n) {
 // CHECK-DAG:  [[__runtimearr__struct_5:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[__struct_5]]
 // CHECK-DAG:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr__struct_5]]
 // CHECK-DAG:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CHECK-DAG:  [[__ptr_StorageBuffer__struct_5:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_5]]
 // CHECK-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG:  [[_uint_7:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 7
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
-// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpFunction
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunction
+// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
+// CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_25:%[0-9a-zA-Z_]+]] [[_36]]
+// CHECK:  [[_25]] = OpFunction
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_uint]]
 // CHECK-64:  [[_27_long:%[0-9a-zA-Z_]+]] = OpSConvert [[_ulong]] [[_27]]
 // CHECK-64:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_22]] [[_uint_0]] [[_27_long]] [[_uint_0]] [[_uint_7]]
 // CHECK-32:  [[_29:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_22]] [[_uint_0]] [[_27]] [[_uint_0]] [[_uint_7]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_29]]
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunction
-// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_5]] [[_22]] [[_uint_0]] [[_uint_0]]
-// CHECK:  [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
-// CHECK:  [[_37:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_25]] [[_33]] [[_36]]
 
 
 

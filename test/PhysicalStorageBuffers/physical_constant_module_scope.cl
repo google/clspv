@@ -24,13 +24,12 @@ kernel void test(global int *result) {
 // CHECK-DAG: [[arr_int_5_struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[arr_int_5]]
 // CHECK-DAG: [[module_consts_pc_ptr_type:%[a-zA-Z0-9_]+]] = OpTypePointer PushConstant %ulong
 // CHECK-DAG: [[module_consts_type:%[a-zA-Z0-9_]+]] = OpTypePointer PhysicalStorageBuffer [[arr_int_5_struct]]
-// CHECK-DAG: [[physical_int_ptr_type0:%[a-zA-Z0-9_]+]] = OpTypePointer PhysicalStorageBuffer [[uint]]
-// CHECK-DAG: [[physical_int_ptr_type1:%[a-zA-Z0-9_]+]] = OpTypePointer PhysicalStorageBuffer [[uint]]
+// CHECK-DAG: [[physical_int_ptr_type:%[a-zA-Z0-9_]+]] = OpTypePointer PhysicalStorageBuffer [[uint]]
 
 // CHECK: [[module_consts_pc_ptr:%[a-zA-Z0-9_]+]] = OpAccessChain [[module_consts_pc_ptr_type]]
 // CHECK: [[module_consts_ptr:%[a-zA-Z0-9_]+]] = OpLoad [[ulong]] [[module_consts_pc_ptr]] Aligned 8
 // CHECK: [[module_consts_ptr_converted:%[a-zA-Z0-9_]+]] = OpConvertUToPtr [[module_consts_type]] [[module_consts_ptr]]
-// CHECK: [[module_consts_gep:%[a-zA-Z0-9_]+]] = OpAccessChain [[physical_int_ptr_type1]] [[module_consts_ptr_converted]]
+// CHECK: [[module_consts_gep:%[a-zA-Z0-9_]+]] = OpAccessChain [[physical_int_ptr_type]] [[module_consts_ptr_converted]]
 // CHECK: OpLoad [[uint]] [[module_consts_gep]] Aligned 4
 
 // CHECK: OpExtInst [[void]] [[ClspvReflection]] ConstantDataPointerPushConstant [[uint_0]] [[uint_8]] [[Initializer]]

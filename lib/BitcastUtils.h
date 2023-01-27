@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef _CLSPV_LIB_BITCAST_UTILS_PASS_H
+#define _CLSPV_LIB_BITCAST_UTILS_PASS_H
+
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-
-#ifndef _CLSPV_LIB_BITCAST_UTILS_PASS_H
-#define _CLSPV_LIB_BITCAST_UTILS_PASS_H
 
 using namespace llvm;
 

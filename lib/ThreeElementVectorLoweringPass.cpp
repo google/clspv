@@ -303,17 +303,17 @@ bool clspv::ThreeElementVectorLoweringPass::haveImplicitCast(Value *Value) {
   Type *source_ty = nullptr;
   Type *dest_ty = nullptr;
   if (auto *gep = dyn_cast<GetElementPtrInst>(Value)) {
-      source_ty = clspv::InferType(gep->getPointerOperand(),
-                                   Value->getContext(), &type_cache_);
-      dest_ty = gep->getSourceElementType();
+    source_ty = clspv::InferType(gep->getPointerOperand(), Value->getContext(),
+                                 &type_cache_);
+    dest_ty = gep->getSourceElementType();
   } else if (auto *ld = dyn_cast<LoadInst>(Value)) {
-      source_ty = clspv::InferType(ld->getPointerOperand(), Value->getContext(),
-                                   &type_cache_);
-      dest_ty = ld->getType();
+    source_ty = clspv::InferType(ld->getPointerOperand(), Value->getContext(),
+                                 &type_cache_);
+    dest_ty = ld->getType();
   } else if (auto *st = dyn_cast<StoreInst>(Value)) {
-      source_ty = clspv::InferType(st->getPointerOperand(), Value->getContext(),
-                                   &type_cache_);
-      dest_ty = st->getValueOperand()->getType();
+    source_ty = clspv::InferType(st->getPointerOperand(), Value->getContext(),
+                                 &type_cache_);
+    dest_ty = st->getValueOperand()->getType();
   }
 
   if (source_ty && source_ty->isVectorTy() &&

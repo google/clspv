@@ -729,6 +729,7 @@ bool RemoveCstExprFromFunction(Function *F) {
         // having to simplify it. Trying to simplify would make it very
         // complicated for the ReplacePointerBitcast pass.
         if (CE->getOpcode() == Instruction::BitCast &&
+            CE->getOperand(0)->getType()->isPointerTy() &&
             !CE->getOperand(0)->getType()->isOpaquePointerTy() &&
             CE->getOperand(0)
                 ->getType()

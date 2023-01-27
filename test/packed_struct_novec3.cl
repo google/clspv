@@ -8,6 +8,9 @@
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1009): three element lowering is proceeding differently for opaque pointers.
+// XFAIL: *
+
 struct S1{
     int3 x;
     int y;

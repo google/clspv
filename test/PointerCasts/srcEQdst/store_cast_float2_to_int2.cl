@@ -9,8 +9,5 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float2* a,
 }
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
-// CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_v2uint]]
-// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpBitcast [[_v2float]] [[_28]]
-// CHECK:  OpStore {{.*}} [[_29]]
+// CHECK:  OpStore {{.*}} [[_28]]

@@ -1,4 +1,4 @@
-; RUN: clspv -x ir %s -o %t.spv -opaque-pointers=0
+; RUN: clspv -x ir %s -o %t.spv
 ; RUN: spirv-val --target-env vulkan1.0 %t.spv
 ; RUN: spirv-dis %t.spv -o - | FileCheck %s
 

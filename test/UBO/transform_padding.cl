@@ -12,7 +12,7 @@ typedef struct {
 } data_type;
 
 __kernel void foo(__global data_type *data, __constant data_type *c_arg) {
-  data->x = c_arg->x;
+  data[2].x = c_arg[2].x;
 }
 
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
@@ -37,10 +37,11 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg) {
 //     CHECK: [[c_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[ubo_struct]]
 //     CHECK: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 //     CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
+//     CHECK: [[two:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
 //     CHECK: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 //     CHECK: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 //     CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
-//     CHECK: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[zero]] [[zero]]
+//     CHECK: [[c_arg_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[c_arg_ele_ptr]] [[c_arg]] [[zero]] [[two]] [[zero]]
 //     CHECK: [[load:%[0-9a-zA-Z_]+]] = OpLoad [[int]] [[c_arg_gep]]
-//     CHECK: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[zero]] [[zero]]
+//     CHECK: [[data_gep:%[0-9a-zA-Z_]+]] = OpAccessChain [[data_ele_ptr]] [[data]] [[zero]] [[two]] [[zero]]
 //     CHECK: OpStore [[data_gep]] [[load]]
