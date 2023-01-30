@@ -143,6 +143,8 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
       for (auto &Arg : F.args()) {
         if (Arg.getType()->isOpaquePointerTy()) {
           isOpaqueFn = true;
+          // TODO(#1005): disabling rewrite packed structs with opaque pointers.
+          return PA;
         }
 
         // process the function if it has an input buffer with a packed struct
