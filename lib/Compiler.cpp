@@ -452,7 +452,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   llvm::StandardInstrumentations si(M.getContext(), false /*DebugLogging*/);
   clspv::RegisterClspvPasses(&PIC);
   si.registerCallbacks(PIC, &fam);
-  llvm::PassBuilder pb(nullptr, llvm::PipelineTuningOptions(), llvm::None,
+  llvm::PassBuilder pb(nullptr, llvm::PipelineTuningOptions(), std::nullopt,
                        &PIC);
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);

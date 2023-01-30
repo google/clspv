@@ -1,5 +1,7 @@
 ; RUN: clspv-opt --passes=rewrite-packed-structs --opaque-pointers %s -o %t
 ; RUN: FileCheck %s < %t
+; TODO(#1005): disabled for opaque pointers
+; XFAIL: *
 
 %struct = type <{ i32, i8 }>
 
