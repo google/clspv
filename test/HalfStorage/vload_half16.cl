@@ -12,11 +12,10 @@ __kernel void test(__global half *a, int b, __global float16 *dst) {
     *dst = vload_half16(b, a);
 }
 
-// CHECK-DAG: [[half:%[^ ]+]] = OpTypeFloat 16
-// CHECK-DAG: [[half4:%[^ ]+]] = OpTypeVector [[half]] 4
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[uint4:%[^ ]+]] = OpTypeVector [[uint]] 4
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uint_16:%[^ ]+]] = OpConstant [[uint]] 16
 // CHECK-DAG: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
@@ -36,139 +35,43 @@ __kernel void test(__global half *a, int b, __global float16 *dst) {
 // CHECK-DAG: [[uint_14:%[^ ]+]] = OpConstant [[uint]] 14
 // CHECK-DAG: [[uint_15:%[^ ]+]] = OpConstant [[uint]] 15
 // CHECK-64-DAG: [[ulong_1:%[^ ]+]] = OpConstant [[ulong]] 1
-// CHECK-64-DAG: [[ulong_2:%[^ ]+]] = OpConstant [[ulong]] 2
-// CHECK-64-DAG: [[ulong_3:%[^ ]+]] = OpConstant [[ulong]] 3
-// CHECK-64-DAG: [[ulong_4:%[^ ]+]] = OpConstant [[ulong]] 4
-// CHECK-64-DAG: [[ulong_5:%[^ ]+]] = OpConstant [[ulong]] 5
-// CHECK-64-DAG: [[ulong_6:%[^ ]+]] = OpConstant [[ulong]] 6
-// CHECK-64-DAG: [[ulong_7:%[^ ]+]] = OpConstant [[ulong]] 7
-// CHECK-64-DAG: [[ulong_8:%[^ ]+]] = OpConstant [[ulong]] 8
-// CHECK-64-DAG: [[ulong_9:%[^ ]+]] = OpConstant [[ulong]] 9
-// CHECK-64-DAG: [[ulong_10:%[^ ]+]] = OpConstant [[ulong]] 10
-// CHECK-64-DAG: [[ulong_11:%[^ ]+]] = OpConstant [[ulong]] 11
-// CHECK-64-DAG: [[ulong_12:%[^ ]+]] = OpConstant [[ulong]] 12
-// CHECK-64-DAG: [[ulong_13:%[^ ]+]] = OpConstant [[ulong]] 13
-// CHECK-64-DAG: [[ulong_14:%[^ ]+]] = OpConstant [[ulong]] 14
-// CHECK-64-DAG: [[ulong_15:%[^ ]+]] = OpConstant [[ulong]] 15
 
-// CHECK-DAG: [[half_array:%[^ ]+]] = OpTypeRuntimeArray [[half]]
-// CHECK-DAG: [[half_ptr:%[^ ]+]] = OpTypeStruct [[half_array]]
-// CHECK-DAG: [[global_half_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[half_ptr]]
+// CHECK-DAG: [[uint4_array:%[^ ]+]] = OpTypeRuntimeArray [[uint4]]
+// CHECK-DAG: [[uint4_ptr:%[^ ]+]] = OpTypeStruct [[uint4_array]]
+// CHECK-DAG: [[global_uint4_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[uint4_ptr]]
 
-// CHECK: [[a:%[^ ]+]] = OpVariable [[global_half_ptr]] StorageBuffer
+// CHECK: [[a:%[^ ]+]] = OpVariable [[global_uint4_ptr]] StorageBuffer
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
 
 // CHECK-64: [[b_long:%[^ ]+]] = OpSConvert [[ulong]] [[b]]
-// CHECK-64: [[bx16:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[b_long]] [[ulong_4]]
-// CHECK-32: [[bx16:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[b]] [[uint_4]]
-// CHECK-64: [[idx8:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_8]]
-// CHECK-32: [[idx8:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_8]]
+// CHECK-64-DAG: [[bx16:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[b_long]] [[ulong_1]]
+// CHECK-32-DAG: [[bx16:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[b]] [[uint_1]]
+// CHECK-64-DAG: [[idx8:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_1]]
+// CHECK-32-DAG: [[idx8:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_1]]
 
-// CHECK: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[bx16]]
-// CHECK: [[val0:%[^ ]+]] = OpLoad [[half]] [[addr0]]
+// CHECK-DAG: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[bx16]]
+// CHECK-DAG: [[addr1:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx8]]
+// CHECK: [[val0:%[^ ]+]] = OpLoad [[uint4]] [[addr0]]
+// CHECK: [[val1:%[^ ]+]] = OpLoad [[uint4]] [[addr1]]
 
-// CHECK-64: [[idx1:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_1]]
-// CHECK-32: [[idx1:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_1]]
-// CHECK: [[addr1:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx1]]
-// CHECK: [[val1:%[^ ]+]] = OpLoad [[half]] [[addr1]]
+// CHECK: [[val00i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 0
+// CHECK: [[val01i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 1
+// CHECK: [[val02i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 2
+// CHECK: [[val03i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 3
 
-// CHECK-64: [[idx2:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_2]]
-// CHECK-32: [[idx2:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_2]]
-// CHECK: [[addr2:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx2]]
-// CHECK: [[val2:%[^ ]+]] = OpLoad [[half]] [[addr2]]
-
-// CHECK-64: [[idx3:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_3]]
-// CHECK-32: [[idx3:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] %uint_3
-// CHECK: [[addr3:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx3]]
-// CHECK: [[val3:%[^ ]+]] = OpLoad [[half]] [[addr3]]
-
-// CHECK-64: [[idx4:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_4]]
-// CHECK-32: [[idx4:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_4]]
-// CHECK: [[addr4:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx4]]
-// CHECK: [[val4:%[^ ]+]] = OpLoad [[half]] [[addr4]]
-
-// CHECK-64: [[idx5:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_5]]
-// CHECK-32: [[idx5:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_5]]
-// CHECK: [[addr5:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx5]]
-// CHECK: [[val5:%[^ ]+]] = OpLoad [[half]] [[addr5]]
-
-// CHECK-64: [[idx6:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_6]]
-// CHECK-32: [[idx6:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_6]]
-// CHECK: [[addr6:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx6]]
-// CHECK: [[val6:%[^ ]+]] = OpLoad [[half]] [[addr6]]
-
-// CHECK-64: [[idx7:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_7]]
-// CHECK-32: [[idx7:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_7]]
-// CHECK: [[addr7:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx7]]
-// CHECK: [[val7:%[^ ]+]] = OpLoad [[half]] [[addr7]]
-
-// CHECK: [[val0h4:%[^ ]+]] = OpCompositeConstruct [[half4]] [[val0]] [[val1]] [[val2]] [[val3]]
-// CHECK: [[val1h4:%[^ ]+]] = OpCompositeConstruct [[half4]] [[val4]] [[val5]] [[val6]] [[val7]]
-// CHECK: [[val0i32:%[^ ]+]] = OpBitcast %v2uint [[val0h4]]
-// CHECK: [[val1i32:%[^ ]+]] = OpBitcast %v2uint [[val1h4]]
-
-// CHECK: [[addr8:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx8]]
-// CHECK: [[val8:%[^ ]+]] = OpLoad [[half]] [[addr8]]
-
-// CHECK-64: [[idx9:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_9]]
-// CHECK-32: [[idx9:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_9]]
-// CHECK: [[addr9:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx9]]
-// CHECK: [[val9:%[^ ]+]] = OpLoad [[half]] [[addr9]]
-
-// CHECK-64: [[idx10:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_10]]
-// CHECK-32: [[idx10:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_10]]
-// CHECK: [[addr10:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx10]]
-// CHECK: [[val10:%[^ ]+]] = OpLoad [[half]] [[addr10]]
-
-// CHECK-64: [[idx11:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_11]]
-// CHECK-32: [[idx11:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_11]]
-// CHECK: [[addr11:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx11]]
-// CHECK: [[val11:%[^ ]+]] = OpLoad [[half]] [[addr11]]
-
-// CHECK-64: [[idx12:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_12]]
-// CHECK-32: [[idx12:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_12]]
-// CHECK: [[addr12:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx12]]
-// CHECK: [[val12:%[^ ]+]] = OpLoad [[half]] [[addr12]]
-
-// CHECK-64: [[idx13:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_13]]
-// CHECK-32: [[idx13:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_13]]
-// CHECK: [[addr13:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx13]]
-// CHECK: [[val13:%[^ ]+]] = OpLoad [[half]] [[addr13]]
-
-// CHECK-64: [[idx14:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_14]]
-// CHECK-32: [[idx14:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_14]]
-// CHECK: [[addr14:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx14]]
-// CHECK: [[val14:%[^ ]+]] = OpLoad [[half]] [[addr14]]
-
-// CHECK-64: [[idx15:%[^ ]+]] = OpBitwiseOr [[ulong]] [[bx16]] [[ulong_15]]
-// CHECK-32: [[idx15:%[^ ]+]] = OpBitwiseOr [[uint]] [[bx16]] [[uint_15]]
-// CHECK: [[addr15:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[idx15]]
-// CHECK: [[val15:%[^ ]+]] = OpLoad [[half]] [[addr15]]
-
-// CHECK: [[val2h4:%[^ ]+]] = OpCompositeConstruct [[half4]] [[val8]] [[val9]] [[val10]] [[val11]]
-// CHECK: [[val3h4:%[^ ]+]] = OpCompositeConstruct [[half4]] [[val12]] [[val13]] [[val14]] [[val15]]
-// CHECK: [[val2i32:%[^ ]+]] = OpBitcast %v2uint [[val2h4]]
-// CHECK: [[val3i32:%[^ ]+]] = OpBitcast %v2uint [[val3h4]]
-
-
-// CHECK: [[val00i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0i32]] 0
-// CHECK: [[val01i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0i32]] 1
-// CHECK: [[val10i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1i32]] 0
-// CHECK: [[val11i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1i32]] 1
-
-// CHECK: [[val20i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val2i32]] 0
-// CHECK: [[val21i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val2i32]] 1
-// CHECK: [[val30i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val3i32]] 0
-// CHECK: [[val31i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val3i32]] 1
+// CHECK: [[val10i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1]] 0
+// CHECK: [[val11i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1]] 1
+// CHECK: [[val12i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1]] 2
+// CHECK: [[val13i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val1]] 3
 
 // CHECK: [[val0f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val00i32]]
 // CHECK: [[val1f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val01i32]]
-// CHECK: [[val2f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val10i32]]
-// CHECK: [[val3f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val11i32]]
-// CHECK: [[val4f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val20i32]]
-// CHECK: [[val5f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val21i32]]
-// CHECK: [[val6f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val30i32]]
-// CHECK: [[val7f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val31i32]]
+// CHECK: [[val2f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val02i32]]
+// CHECK: [[val3f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val03i32]]
+// CHECK: [[val4f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val10i32]]
+// CHECK: [[val5f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val11i32]]
+// CHECK: [[val6f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val12i32]]
+// CHECK: [[val7f2:%[^ ]+]] = OpExtInst [[float2]] {{.*}} UnpackHalf2x16 [[val13i32]]
 
 // CHECK: [[val0:%[^ ]+]] = OpCompositeExtract [[float]] [[val0f2]] 0
 // CHECK: [[val1:%[^ ]+]] = OpCompositeExtract [[float]] [[val0f2]] 1

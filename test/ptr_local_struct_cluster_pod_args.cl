@@ -17,7 +17,7 @@ typedef struct S {
 } S;
 
 kernel void foo(local float *L, global float* A, S local* LS, constant float* C, float f, float g ) {
- *A = *L + *C + f + g + LS->a;
+ *A = *L + *C + f + g + LS[2].a + LS[2].b;
 }
 
 //      MAP: kernel,foo,arg,L,argOrdinal,0,argKind,local,arrayElemSize,4,arrayNumElemSpecId,3
@@ -49,18 +49,19 @@ kernel void foo(local float *L, global float* A, S local* LS, constant float* C,
 // CHECK-DAG:  [[__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypeArray [[__struct_24]] [[_7]]
 // CHECK-DAG:  [[__ptr_Workgroup__arr__struct_24_7:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[__arr__struct_24_7]]
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
+// CHECK-DAG:  [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
 // CHECK-DAG:  [[_37]] = OpVariable [[__ptr_Uniform__struct_16]] Uniform
 // CHECK-DAG:  [[_1:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr_float_2]] Workgroup
 // CHECK-DAG:  [[_6:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Workgroup__arr__struct_24_7]] Workgroup
 // CHECK-64-DAG: [[_ulong:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
-// CHECK-64-DAG: [[_ulong_0:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 0
+// CHECK-64-DAG: [[_ulong_2:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 2
 // CHECK:      [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_float]] [[_1]] [[_uint_0]]
 // CHECK:      [[_42:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Uniform__struct_15]] [[_37]] [[_uint_0]]
 // CHECK:      [[_43:%[0-9a-zA-Z_]+]] = OpLoad [[__struct_15]] [[_42]]
 // CHECK:      [[_44:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 0
 // CHECK:      [[_45:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]] [[_43]] 1
 // CHECK:      [[_46:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_5]]
-// CHECK-64:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_ulong_0]] [[_uint_0]]
-// CHECK-32:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_uint_0]] [[_uint_0]]
+// CHECK-64:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_ulong_2]] [[_uint_0]]
+// CHECK-32:   [[_51:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Workgroup_uint]] [[_6]] [[_uint_2]] [[_uint_0]]
 // CHECK:      [[_52:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_51]]
 // CHECK:      [[_53:%[0-9a-zA-Z_]+]] = OpConvertSToF [[_float]] [[_52]]

@@ -4,7 +4,7 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // Null pointer for SSBO requires VariablePointersStorageBuffer.
-kernel void foo(global int* out) {
+kernel void foo(global int* out, int n) {
   global int* x = 0;
   *out = *x;
 }

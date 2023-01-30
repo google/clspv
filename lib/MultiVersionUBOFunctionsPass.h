@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -55,6 +56,8 @@ private:
   llvm::Function *
   AddExtraArguments(llvm::Function *fn,
                     const std::vector<llvm::Value *> &extra_args);
+
+  llvm::DenseMap<llvm::Value *, llvm::Type *> type_cache_;
 };
 } // namespace clspv
 

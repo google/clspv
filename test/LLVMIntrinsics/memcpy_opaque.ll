@@ -111,10 +111,9 @@ declare void @llvm.memcpy.p1.p1.i32(ptr addrspace(1) noalias nocapture writeonly
 
 ; CHECK-LABEL: @fct6
 ; CHECK:  [[gep_dst:%[^ ]+]] = getelementptr inbounds %struct.outer, ptr addrspace(1) %dst, i32 0, i32 0, i32 1
-; CHECK:  [[gep_src:%[^ ]+]] = getelementptr %struct.inner, ptr addrspace(1) %src, i32 0
-; CHECK:  [[gep_inner_src:%[^ ]+]] = getelementptr inbounds %struct.inner, ptr addrspace(1) [[gep_src]], i32 0
+; CHECK:  [[gep_src:%[^ ]+]] = getelementptr inbounds %struct.inner, ptr addrspace(1) %src, i32 0
 ; CHECK:  [[gep_inner_dst:%[^ ]+]] = getelementptr %struct.inner, ptr addrspace(1) [[gep_dst]], i32 0
-; CHECK:  call void @_Z17spirv.copy_memory.5(ptr addrspace(1) [[gep_inner_dst]], ptr addrspace(1) [[gep_inner_src]], i32 16, i32 0)
+; CHECK:  call void @_Z17spirv.copy_memory.5(ptr addrspace(1) [[gep_inner_dst]], ptr addrspace(1) [[gep_src]], i32 16, i32 0)
 
 ; CHECK-LABEL: @fct7
 ; CHECK:  [[gep_src:%[^ ]+]] = getelementptr %struct.outer, ptr addrspace(1) %src, i32 0, i32 0, i32 %n, i32 1

@@ -16,6 +16,7 @@ typedef struct {
 
 __kernel void foo(__global outer* data, __constant outer* c) {
   data->i[0].x = c->i[0].x;
+  data->i[0].y = c->i[0].y;
 }
 
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer

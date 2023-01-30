@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-dis -o %t2.spvasm %t.spv
@@ -38,16 +38,13 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(global float* B, 
 // CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
 // CHECK-DAG:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG:  [[_16]] = OpVariable {{.*}} StorageBuffer
+// CHECK:  [[_33]] = OpFunction [[_void]]
+// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24:%[a-zA-Z0-9_]+]]
+// CHECK:  [[_39]] = OpFunction [[_void]]
+// CHECK:  [[_44:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24]]
+// CHECK:  [[_46:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24]]
 // CHECK:  [[_18:%[0-9a-zA-Z_]+]] = OpFunction [[_float]]
 // CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_16]]
-// CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunction [[_float]]
-// CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_16]]
-// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_18]] [[_28]]
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_18]] [[_28]]
-// CHECK:  [[_33]] = OpFunction [[_void]]
-// CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_16]]
-// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24]] [[_35]]
-// CHECK:  [[_39]] = OpFunction [[_void]]
-// CHECK:  [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_16]]
-// CHECK:  [[_44:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24]] [[_41]]
-// CHECK:  [[_46:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_24]] [[_41]]
+// CHECK:  [[_24]] = OpFunction [[_float]]
+// CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_18]]
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_18]]

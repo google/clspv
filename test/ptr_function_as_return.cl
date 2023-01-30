@@ -31,11 +31,10 @@ kernel void foo(global int* A, int n) {
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[__ptr_Function_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Function [[_uint]]
 // CHECK-64:  [[_ulong:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
-// CHECK-64:  [[_ulong_0:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 0
 // CHECK:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Function__arr_uint_uint_2]] Function
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
-// CHECK-64: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_uint]] [[_27]] [[_ulong_0]]
+// CHECK-64: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_uint]] [[_27]] [[_uint_0]]
 // CHECK-32: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_Function_uint]] [[_27]] [[_uint_0]]
 // CHECK:  OpStore [[_31]] [[_uint_0]]
 // CHECK-64: [[_30_long:%[0-9a-zA-Z_]+]] = OpSConvert [[_ulong]] [[_30]]

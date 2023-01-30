@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -no-inline-single -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -22,18 +22,14 @@ kernel void bar(global int *A, int n, local int *B) { apple(B, A, n); }
 // CHECK-DAG:  [[_void:%[0-9a-zA-Z_]+]] = OpTypeVoid
 // CHECK-DAG:      [[_33]] = OpVariable {{.*}} StorageBuffer
 // CHECK-DAG:      [[_1:%[0-9a-zA-Z_]+]] = OpVariable {{.*}} Workgroup
+// CHECK:      [[_52]] = OpFunction [[_void]]
+// CHECK:      [[_57:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_44:%[0-9a-zA-Z_]+]]
+// CHECK:      [[_58]] = OpFunction [[_void]]
+// CHECK:      [[_63:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_44]]
 // CHECK:      [[_35:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
 // CHECK:      [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
 // CHECK:      [[_43:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_33]]
-// CHECK:      [[_44:%[0-9a-zA-Z_]+]] = OpFunction [[_void]]
-// CHECK:      [[_49:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_33]]
-// CHECK:      [[_n45:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
-// CHECK:      [[_51:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_35]] [[_49]] {{.*}} [[_n45]]
-// CHECK:      [[_52]] = OpFunction [[_void]]
-// CHECK:      [[_5:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
-// CHECK:      [[_54:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_33]]
-// CHECK:      [[_57:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_44]] [[_5]] [[_54]]
-// CHECK:      [[_58]] = OpFunction [[_void]]
-// CHECK:      [[_10:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_1]]
-// CHECK:      [[_60:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_33]]
-// CHECK:      [[_63:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_44]] [[_10]] [[_60]]
+// CHECK:      [[_44]] = OpFunction [[_void]]
+// CHECK:      [[apple_param:%[a-zA-Z0-9_]+]] = OpFunctionParameter [[_uint]]
+// CHECK:      [[add:%[a-zA-Z0-9_]+]] = OpIAdd [[_uint]] [[apple_param]]
+// CHECK:      [[_51:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_void]] [[_35]] [[add]]

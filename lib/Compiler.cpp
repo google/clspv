@@ -532,6 +532,18 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::PhysicalPointerArgsPass());
     }
 
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+
+    // We need to run mem2reg and inst combine early because some of our passes
+    // (e.g. ThreeElementVectorLowering and InlineFuncWithBitCastArgsPass)
+    // cannot handle the pattern:
+    //
+    //   %1 = alloca i32 1
+    //        store <something> %1
+    //   %2 = bitcast float* %1
+    //   %3 = load float %2
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
@@ -543,15 +555,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
       pm.addPass(clspv::LogicalPointerToIntPass());
     }
-
-    // We need to run mem2reg and inst combine early because our
-    // createInlineFuncWithPointerBitCastArgPass pass cannot handle the
-    // pattern
-    //   %1 = alloca i32 1
-    //        store <something> %1
-    //   %2 = bitcast float* %1
-    //   %3 = load float %2
-    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
 
     // Lower longer vectors when requested. Note that this pass depends on
     // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
@@ -687,6 +690,17 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       // DCE cleans up callers of the specialized functions.
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
     }
+
+    // Last minute pointer simplification. With opaque pointers, we can often
+    // end up in a situation where LLVM has simplified GEPs by removing zero
+    // indices where an equivalent address would be computed. These lead to
+    // situations that are awkward for clspv. The following passes canonicalize
+    // GEPs into forms easier to codegen in SPIR-V, including those more likely
+    // to avoid extra functionality (e.g. VariablePointers).
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+    pm.addPass(clspv::ReplacePointerBitcastPass());
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
+
     // This pass mucks with types to point where you shouldn't rely on
     // DataLayout anymore so leave this right before SPIR-V generation.
     pm.addPass(clspv::UBOTypeTransformPass());
@@ -745,6 +759,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
   llvm::cl::ParseCommandLineOptions(argc, argv);
+
+  if (!clspv::Option::OpaquePointers()) {
+    llvm::errs() << "warning: transparent pointer support is deprecated\n";
+  }
+  if (clspv::Option::KeepUnusedArguments()) {
+    llvm::errs() << "warning: -keep-unused-arguments has been removed\n";
+  }
 
   if (clspv::Option::LanguageUsesGenericAddressSpace() &&
       !clspv::Option::InlineEntryPoints()) {
@@ -1083,6 +1104,10 @@ int Compile(const int argc, const char *const argv[]) {
   } else if (InputsFilename.size() == 1) {
     llvm::StringRef inputFilename = InputsFilename[0];
     std::ifstream stream(inputFilename.str(), openMode);
+    if (!stream.is_open()) {
+      llvm::errs() << "Failed to open '" << inputFilename << "'\n";
+      return -1;
+    }
     std::string program((std::istreambuf_iterator<char>(stream)),
                         std::istreambuf_iterator<char>());
     return CompileProgram(inputFilename, program, nullptr, nullptr);
@@ -1091,6 +1116,10 @@ int Compile(const int argc, const char *const argv[]) {
     programs.reserve(InputsFilename.size());
     for (auto InputFilename : InputsFilename) {
       std::ifstream stream(InputFilename, openMode);
+      if (!stream.is_open()) {
+        llvm::errs() << "Failed to open '" << InputFilename << "'\n";
+        return -1;
+      }
       programs.emplace_back(std::istreambuf_iterator<char>(stream),
                             std::istreambuf_iterator<char>());
     }

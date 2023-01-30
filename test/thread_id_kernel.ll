@@ -11,7 +11,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[_void:%[a-zA-Z0-9_]+]] = OpTypeVoid
 ; CHECK: {{.*}} = OpTypeFunction [[_void]]
 ; CHECK: [[__ptr_StorageBuffer_uint:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer {{.*}}
-define spir_kernel void @_Z16thread_id_kernelPKiPi(i32 addrspace(1)* %input.coerce, i32 addrspace(1)* %output.coerce) #0 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_type_qual !7 !kernel_arg_base_type !6 {
+define spir_kernel void @_Z16thread_id_kernelPKiPi(ptr addrspace(1) %input.coerce, ptr addrspace(1) %output.coerce) #0 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_type_qual !7 !kernel_arg_base_type !6 {
 entry:
   %input = alloca i32 addrspace(4)*, align 4
   %output = alloca i32 addrspace(4)*, align 4

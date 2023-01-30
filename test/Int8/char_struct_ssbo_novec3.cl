@@ -14,6 +14,14 @@ typedef struct S {
 
 kernel void foo(global S* data) {
   (*data).a = 0;
+  (*data).b = 0;
+  (*data).c = (char2)(0,0);
+  (*data).d = (char3)(0,0,0);
+  (*data).e = (char4)(0,0,0,0);
+  (*data).f[0] = 0;
+  (*data).f[1] = 0;
+  (*data).f[2] = 0;
+  (*data).f[3] = 0;
 }
 
 // CHECK: OpCapability Int8

@@ -37,6 +37,7 @@
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
 #include "MultiVersionUBOFunctionsPass.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -82,7 +83,8 @@ clspv::MultiVersionUBOFunctionsPass::run(Module &M, ModuleAnalysisManager &) {
 bool clspv::MultiVersionUBOFunctionsPass::AnalyzeCall(
     Function *fn, CallInst *user, std::vector<ResourceInfo> *resources) {
   for (auto &arg : fn->args()) {
-    if (clspv::GetArgKind(arg) != clspv::ArgKind::BufferUBO)
+    auto *inferred_ty = clspv::InferType(&arg, fn->getContext(), &type_cache_);
+    if (clspv::GetArgKind(arg, inferred_ty) != clspv::ArgKind::BufferUBO)
       continue;
 
     Value *arg_operand = user->getOperand(arg.getArgNo());

@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 
@@ -36,11 +37,6 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   // Non-opaque pointer use the element type.
   if (!v->getType()->isOpaquePointerTy())
     return v->getType()->getNonOpaquePointerElementType();
-
-  // Null ptr constants cannot be inferred from other uses.
-  if (isa<ConstantPointerNull>(*v)) {
-    return nullptr;
-  }
 
   auto iter = cache->find(v);
   if (iter != cache->end()) {
@@ -92,6 +88,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
   }
 
+  Type *backup_ty = nullptr;
   DenseSet<Value *> seen;
   while (!worklist.empty()) {
     User *user = worklist.back().first;
@@ -117,6 +114,28 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
       }
     } else if (auto *rmw = dyn_cast<AtomicRMWInst>(user)) {
       return CacheType(rmw->getValOperand()->getType());
+    } else if (auto *memcpy = dyn_cast<MemCpyInst>(user)) {
+      auto other_op = operand == 0 ? 1 : 0;
+      // See if the type can be inferred from the other pointer operand as a
+      // last resort.
+      // Cache a nullptr to avoid infinite recursion.
+      CacheType(nullptr);
+      if (auto other_ty =
+              InferType(memcpy->getArgOperand(other_op), context, cache)) {
+        backup_ty = other_ty;
+      }
+    } else if (auto *select = dyn_cast<SelectInst>(user)) {
+      isPointerTy = true;
+
+      // See if the type can be inferred from the other pointer operand as a
+      // last resort.
+      // Cache a nullptr to avoid infinite recursion.
+      auto other_op = operand == 1 ? 2 : 1;
+      CacheType(nullptr);
+      if (auto other_ty =
+              InferType(select->getOperand(other_op), context, cache)) {
+        backup_ty = other_ty;
+      }
     } else if (auto *call = dyn_cast<CallInst>(user)) {
       auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
       // TODO: remaining builtins
@@ -176,9 +195,13 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         case spv::Op::OpAtomicIIncrement:
         case spv::Op::OpAtomicIDecrement:
         case spv::Op::OpAtomicCompareExchange:
+        case spv::Op::OpAtomicLoad:
+        case spv::Op::OpAtomicExchange:
           // Data type is return type.
           return CacheType(call->getType());
-          break;
+        case spv::Op::OpAtomicStore:
+          // Data type is operand 4.
+          return CacheType(call->getArgOperand(4)->getType());
         default:
           // No other current uses of SPIRVOp deal with pointers, but this
           // code should be expanded if any are added.
@@ -234,6 +257,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
       }
     }
+  }
+  if (backup_ty) {
+    return CacheType(backup_ty);
   }
   return nullptr;
 }

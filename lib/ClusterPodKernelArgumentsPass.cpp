@@ -132,8 +132,14 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       Type *ArgTy = Arg.getType();
       if (isa<PointerType>(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
-        auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache);
-        const auto kind = clspv::GetArgKind(Arg, inferred_ty);
+        // The kind only matter if the argument is used, otherwise we just need
+        // to track that there was an argument.
+        auto kind = clspv::ArgKind::Buffer;
+        if (!Arg.use_empty()) {
+          auto *inferred_ty =
+              clspv::InferType(&Arg, M.getContext(), &type_cache);
+          kind = clspv::GetArgKind(Arg, inferred_ty);
+        }
         RemapInfo.push_back(
             {std::string(Arg.getName()), arg_index, new_index++, 0u, 0u, kind});
       } else {

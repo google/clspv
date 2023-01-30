@@ -20,6 +20,17 @@ The following subjects are covered:
 
 ## Deprecation Notice
 
+Jan 2023:
+
+Transparent pointers are deprecated. Usage of opaque pointers in LLVM are
+enabled by default. Soon the option will be removed. If you encounter
+regressions in behaviour, please open an issue.
+
+You may use -enable-opaque-pointers=0 for now, but that option will be removed
+when LLVM removes support for transparent pointers.
+
+Older:
+
 The descriptor map and it's C++ API are deprecated. Clspv is transitioning to
 embedding equivalent information directly into the SPIR-V binary via a
 [non-semantic instruction

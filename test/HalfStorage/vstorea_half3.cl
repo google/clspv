@@ -12,10 +12,9 @@ __kernel void test(__global half *a, float3 b, int c) {
     vstorea_half3(b, c, a);
 }
 
-// CHECK-DAG: [[half:%[^ ]+]] = OpTypeFloat 16
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
 // CHECK-DAG: [[float2:%[^ ]+]] = OpTypeVector [[float]] 2
-// CHECK-DAG: [[float4:%[^ ]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG: [[float3:%[^ ]+]] = OpTypeVector [[float]] 3
 // CHECK-DAG: [[ushort:%[^ ]+]] = OpTypeInt 16 0
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
@@ -25,7 +24,7 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1
 // CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2
 
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float4]] {{.*}} 0
+// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float3]] {{.*}} 0
 // CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
 // CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
 
@@ -43,18 +42,15 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-64: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[c_long]] [[ulong2]]
 // CHECK-32: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[c]] [[uint2]]
 
-// CHECK: [[val1:%[^ ]+]] = OpBitcast [[half]] [[val1i16]]
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[cx4]]
-// CHECK: OpStore [[addr1]] [[val1]]
+// CHECK: OpStore [[addr1]] [[val1i16]]
 
 // CHECK-64: [[idx1:%[^ ]+]] = OpBitwiseOr [[ulong]] [[cx4]] [[ulong1]]
 // CHECK-32: [[idx1:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx4]] [[uint1]]
-// CHECK: [[val2:%[^ ]+]] = OpBitcast [[half]] [[val2i16]]
 // CHECK: [[addr2:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx1]]
-// CHECK: OpStore [[addr2]] [[val2]]
+// CHECK: OpStore [[addr2]] [[val2i16]]
 
 // CHECK-64: [[idx2:%[^ ]+]] = OpBitwiseOr [[ulong]] [[cx4]] [[ulong2]]
 // CHECK-32: [[idx2:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx4]] [[uint2]]
-// CHECK: [[val3:%[^ ]+]] = OpBitcast [[half]] [[val3i16]]
 // CHECK: [[addr3:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx2]]
-// CHECK: OpStore [[addr3]] [[val3]]
+// CHECK: OpStore [[addr3]] [[val3i16]]

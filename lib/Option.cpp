@@ -211,6 +211,7 @@ llvm::cl::opt<bool> std430_ubo_layout(
                    "requirements. This does not generate valid SPIR-V for the "
                    "Vulkan environment; however, some drivers may accept it."));
 
+// TODO(#816): dead option
 llvm::cl::opt<bool> keep_unused_arguments(
     "keep-unused-arguments", llvm::cl::init(false),
     llvm::cl::desc("Do not remove unused non-kernel function arguments."));
@@ -379,7 +380,7 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool>
     opaque_pointers("enable-opaque-pointers",
                     llvm::cl::desc("Use opaque pointers"),
-                    llvm::cl::init(false));
+                    llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
     debug_info("g", llvm::cl::init(false),

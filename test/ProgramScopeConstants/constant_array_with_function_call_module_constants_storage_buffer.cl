@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -module-constants-in-storage-buffer -no-inline-single -keep-unused-arguments
+// RUN: clspv %target %s -o %t.spv -module-constants-in-storage-buffer -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map
@@ -34,7 +34,6 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK-DAG:  [[__ptr_StorageBuffer__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_10]]
 // CHECK-DAG:  [[__ptr_Input_uint:%[0-9a-zA-Z_]+]] = OpTypePointer Input [[_uint]]
 // CHECK-DAG:  [[_18]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
-// CHECK:  [[bar:%[0-9a-zA-Z_]+]] = OpFunction {{.*}}
 // CHECK:  = OpFunction {{.*}}
-// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[_18]]
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[bar]] [[_30]]
+// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[bar:%[0-9a-zA-Z_]+]]
+// CHECK:  [[bar]] = OpFunction {{.*}}

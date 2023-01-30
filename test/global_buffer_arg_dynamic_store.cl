@@ -15,13 +15,12 @@
 // CHECK-64-DAG: %[[ULONG_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 64 0
 // CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 // CHECK-DAG: %[[CONSTANT_42_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 42
-// CHECK-64-DAG: %[[CONSTANT_LONG_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[ULONG_TYPE_ID]] 0
 // CHECK: %[[GLOBAL_ID_VAR_ID]] = OpVariable {{.*}} Input
 // CHECK: %[[ARG0_ID]] = OpVariable {{.*}} StorageBuffer
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint* a)
 {
 // CHECK-32: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[GLOBAL_ID_VAR_ID]] %[[CONSTANT_0_ID]]
-// CHECK-64: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[GLOBAL_ID_VAR_ID]] %[[CONSTANT_LONG_0_ID]]
+// CHECK-64: %[[ACCESS_CHAIN1_ID:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[GLOBAL_ID_VAR_ID]] %[[CONSTANT_0_ID]]
 // CHECK:    %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]] %[[ACCESS_CHAIN1_ID]]
 // CHECK-64: %[[LOAD_ID_LONG:[a-zA-Z0-9_]*]] = OpUConvert %[[ULONG_TYPE_ID]] %[[LOAD_ID]]
 // CHECK-64: %[[ACCESS_CHAIN2_ID:[a-zA-Z0-9_]*]] = OpAccessChain {{.*}} %[[ARG0_ID]] %[[CONSTANT_0_ID]] %[[LOAD_ID_LONG]]

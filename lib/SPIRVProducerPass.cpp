@@ -1518,25 +1518,22 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
       bit_width = ((bit_width + 7) / 8) * 8;
     }
     return IntegerType::get(type->getContext(), bit_width);
+  } else if (auto *ptr_ty = dyn_cast<PointerType>(type)) {
+    // For the purposes of our Vulkan SPIR-V type system, constant and global
+    // are conflated.
+    unsigned AddrSpace = ptr_ty->getAddressSpace();
+    if (AddressSpace::Constant == AddrSpace) {
+      if (!clspv::Option::ConstantArgsInUniformBuffer() &&
+          !clspv::Option::PhysicalStorageBuffers()) {
+        AddrSpace = AddressSpace::Global;
+        // The canonical type of __constant is __global unless constants are
+        // passed in uniform buffers.
+        auto *GlobalTy = PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
+        return GlobalTy;
+      }
+    }
   } else if (type->getNumContainedTypes() != 0) {
     switch (type->getTypeID()) {
-    case Type::PointerTyID: {
-      // For the purposes of our Vulkan SPIR-V type system, constant and global
-      // are conflated.
-      auto *ptr_ty = cast<PointerType>(type);
-      unsigned AddrSpace = ptr_ty->getAddressSpace();
-      if (AddressSpace::Constant == AddrSpace) {
-        if (!clspv::Option::ConstantArgsInUniformBuffer() && !clspv::Option::PhysicalStorageBuffers()) {
-          AddrSpace = AddressSpace::Global;
-          // The canonical type of __constant is __global unless constants are
-          // passed in uniform buffers.
-          auto *GlobalTy =
-              PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
-          return GlobalTy;
-        }
-      }
-      break;
-    }
     case Type::StructTyID: {
       SmallVector<Type *, 8> subtypes;
       bool changed = false;
@@ -1673,6 +1670,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
   SmallVector<Type *, 8> placeholder_param_tys;
   int i = 0;
   for (auto *param_ty : FTy->params()) {
+    param_ty = CanonicalType(param_ty);
     placeholder_param_tys.push_back(param_ty);
     if (param_ty->isPointerTy()) {
       // Generate a representative type for the parameter type.
@@ -1685,13 +1683,15 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
   }
   if (auto ptr_ty = dyn_cast<PointerType>(FTy->getReturnType())) {
     // Generate a representative type for the return type.
-    unsigned aspace = ptr_ty->getPointerAddressSpace();
+    auto *ty = CanonicalType(ptr_ty);
+    unsigned aspace = ty->getPointerAddressSpace();
     auto *rep_ty = ArrayType::get(RetTy, aspace);
     placeholder_param_tys.push_back(rep_ty);
   }
 
-  auto *placeholder_ty = FunctionType::get(
-      FTy->getReturnType(), placeholder_param_tys, FTy->isVarArg());
+  auto *placeholder_ty =
+      FunctionType::get(CanonicalType(FTy->getReturnType()),
+                        placeholder_param_tys, FTy->isVarArg());
   auto where = FunctionTypeMap.find(placeholder_ty);
   if (where != FunctionTypeMap.end()) {
     return where->second;
@@ -2194,7 +2194,13 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
   // Ops[1] .. Ops[n] = Values LiteralNumber
   SPIRVOperandVec Ops;
 
-  Ops << Cst->getType();
+  if (Cst->getType()->isPointerTy()) {
+    auto *inferred_ty =
+        clspv::InferType(Cst, Cst->getContext(), &InferredTypeCache);
+    Ops << getSPIRVPointerType(Cst->getType(), inferred_ty);
+  } else {
+    Ops << Cst->getType();
+  }
 
   std::vector<uint32_t> LiteralNum;
   spv::Op Opcode = spv::OpNop;
@@ -2562,7 +2568,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
       auto *struct_ty = cast<StructType>(info->data_type);
       // TODO(alan-baker): This is conservative. If compiling for OpenCL 2.0 or
       // above, the compiler treats all write_only images as read_write images.
-      if (struct_ty->getName().contains("_wo_t")) {
+      if (struct_ty->getName().contains("_wo")) {
         Ops.clear();
         Ops << info->var_id << spv::DecorationNonReadable;
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -4589,7 +4595,15 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         // Ops[1] = Source Value ID
         SPIRVOperandVec Ops;
 
-        Ops << I.getType() << I.getOperand(0);
+        if (I.getOpcode() == Instruction::IntToPtr) {
+          auto *inferred_ty =
+              clspv::InferType(&I, module->getContext(), &InferredTypeCache);
+          assert(inferred_ty);
+          Ops << getSPIRVPointerType(I.getType(), inferred_ty);
+        } else {
+          Ops << I.getType();
+        }
+        Ops << I.getOperand(0);
 
         RID = addSPIRVInst(GetSPIRVCastOpcode(I), Ops);
       }
