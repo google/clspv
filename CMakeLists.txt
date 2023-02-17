@@ -177,7 +177,8 @@ endif()
 # TODO: remove this when the Windows bots are upgraded.
 if(MSVC)
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    append("/Zc:preprocessor-" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+    string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+    string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
   endif()
 endif()
 
