@@ -174,6 +174,13 @@ elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable -Werror-switch")
 endif()
 
+# TODO: remove this when the Windows bots are upgraded.
+if(MSVC)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    append("/Zc:preprocessor-" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+  endif()
+endif()
+
 # Bring in our cmake folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
