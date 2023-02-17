@@ -191,7 +191,8 @@ endif()
 
 # TODO: remove this when the Windows bots are upgraded.
 message(CXX Flags before '${CMAKE_CXX_FLAGS}')
-string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+string(REPLACE "/Zc:preprocessor" "/Zc:preprocessor-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 message(CXX Flags after '${CMAKE_CXX_FLAGS}')
 message(C Flags before '${CMAKE_C_FLAGS}')
-string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+string(REPLACE "/Zc:preprocessor" "/Zc:preprocessor-" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+message(C Flags after '${CMAKE_C_FLAGS}')
