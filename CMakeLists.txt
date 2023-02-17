@@ -174,10 +174,6 @@ elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable -Werror-switch")
 endif()
 
-# TODO: remove this when the Windows bots are upgraded.
-string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-
 # Bring in our cmake folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -192,3 +188,10 @@ if (CLSPV_BUILD_TESTS)
   # Bring in our test folder
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
 endif()
+
+# TODO: remove this when the Windows bots are upgraded.
+message(CXX Flags before '${CMAKE_CXX_FLAGS}')
+string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+message(CXX Flags after '${CMAKE_CXX_FLAGS}')
+message(C Flags before '${CMAKE_C_FLAGS}')
+string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
