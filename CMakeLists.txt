@@ -175,12 +175,8 @@ elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
 endif()
 
 # TODO: remove this when the Windows bots are upgraded.
-if(MSVC)
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-    string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-  endif()
-endif()
+string(REPLACE "/Zc:preprocessor" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+string(REPLACE "/Zc:preprocessor" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
 
 # Bring in our cmake folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake)
