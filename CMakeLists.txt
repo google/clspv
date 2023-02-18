@@ -95,14 +95,14 @@ set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
 option(ENABLE_CLSPV_OPT "Enable the clspv-opt driver." ON)
 
-if(MSVC)
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_FLAGS "/Zc:preprocessor- ${CMAKE_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "/Zc:preprocessor- ${CMAKE_C_FLAGS}")
-  endif()
-endif()
-message(CXX Flags after '${CMAKE_CXX_FLAGS}')
-message(C Flags after '${CMAKE_C_FLAGS}')
+#if(MSVC)
+#  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#    set(CMAKE_CXX_FLAGS "/Zc:preprocessor- ${CMAKE_CXX_FLAGS}")
+#    set(CMAKE_C_FLAGS "/Zc:preprocessor- ${CMAKE_C_FLAGS}")
+#  endif()
+#endif()
+#message(CXX Flags after '${CMAKE_CXX_FLAGS}')
+#message(C Flags after '${CMAKE_C_FLAGS}')
 
 if (NOT DEFINED EXTERNAL_LLVM)
   set(EXTERNAL_LLVM 0)
@@ -147,6 +147,13 @@ else()
   # Ensure clspv and LLVM use the same build options (e.g. -D_FILE_OFFSET_BITS=64).
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/llvm/cmake/modules/)
   include(HandleLLVMOptions)
+
+  # TODO: remove when bots are fixed
+  # Force non-conformant preprocessor.
+  message(CXX Flags before '${CMAKE_CXX_FLAGS}')
+  string(REPLACE "/Zc:preprocessor" "/Zc:preprocessor-" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+  message(CXX Flags after '${CMAKE_CXX_FLAGS}')
+  string(REPLACE "/Zc:preprocessor" "/Zc:preprocessor-" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
 endif()
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
