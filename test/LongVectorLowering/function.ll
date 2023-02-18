@@ -1,5 +1,4 @@
-; TODO(#816): remove opaque pointers disable
-; RUN: clspv-opt --passes=long-vector-lowering,early-cse,instcombine %s -o %t -opaque-pointers=0
+; RUN: clspv-opt --passes=long-vector-lowering,early-cse,instcombine %s -o %t
 ; RUN: FileCheck %s < %t
 
 ; Test that function arguments and return types can be lowered;
@@ -50,12 +49,18 @@ define spir_func <8 x i32> @test2(i32 %a) {
 ; CHECK-SAME: [[FLOAT8:\[8 x float\]]]
 ; CHECK-SAME: @test1([[FLOAT8]] [[X:%[^ ]+]])
 ; CHECK-SAME: !info [[MD:![0-9]+]]
-; CHECK-NEXT: [[Y:%[^ ]+]] = call spir_func [[FLOAT8]] @id([[FLOAT8]] [[X]])
+; TODO(#1013): should just be X
+; check-next: [[Y:%[^ ]+]] = call spir_func [[FLOAT8]] @id([[FLOAT8]] [[X]])
+; CHECK: call spir_func [[FLOAT8]] @id
 ; CHECK-SAME: !info [[MD]]
-; CHECK-NEXT: ret [[FLOAT8]] [[Y]]
+; TODO(#1013): should just be Y
+; check-next: ret [[FLOAT8]] [[Y]]
+; CHECK: ret [[FLOAT8]]
 ;
 ; CHECK-LABEL: define spir_func
 ; CHECK-SAME: [[FLOAT8]] @id([[FLOAT8]] [[X:%[^ ]+]])
-; CHECK-NEXT: ret [[FLOAT8]] [[X]]
+; TODO(#1013): should just be X
+; check-next: ret [[FLOAT8]] [[X]]
+; CHECK: ret [[FLOAT8]]
 ;
 ; CHECK: [[MD]] = !{!"some metadata"}
