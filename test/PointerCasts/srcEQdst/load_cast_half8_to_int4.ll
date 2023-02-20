@@ -16,11 +16,11 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[extract6:%[^ ]+]] = extractvalue [8 x half] [[ld]], 6
 ; CHECK: [[extract7:%[^ ]+]] = extractvalue [8 x half] [[ld]], 7
 
-; CHECK: [[insert0:%[^ ]+]] = insertelement <4 x half> undef, half [[extract0]], i32 0
+; CHECK: [[insert0:%[^ ]+]] = insertelement <4 x half> poison, half [[extract0]], i32 0
 ; CHECK: [[insert1:%[^ ]+]] = insertelement <4 x half> [[insert0]], half [[extract1]], i32 1
 ; CHECK: [[insert2:%[^ ]+]] = insertelement <4 x half> [[insert1]], half [[extract2]], i32 2
 ; CHECK: [[insertA:%[^ ]+]] = insertelement <4 x half> [[insert2]], half [[extract3]], i32 3
-; CHECK: [[insert0:%[^ ]+]] = insertelement <4 x half> undef, half [[extract4]], i32 0
+; CHECK: [[insert0:%[^ ]+]] = insertelement <4 x half> poison, half [[extract4]], i32 0
 ; CHECK: [[insert1:%[^ ]+]] = insertelement <4 x half> [[insert0]], half [[extract5]], i32 1
 ; CHECK: [[insert2:%[^ ]+]] = insertelement <4 x half> [[insert1]], half [[extract6]], i32 2
 ; CHECK: [[insertB:%[^ ]+]] = insertelement <4 x half> [[insert2]], half [[extract7]], i32 3

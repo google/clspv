@@ -30,22 +30,22 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[ext14:%[^ ]+]] = extractvalue [8 x half] [[ld1]], 6
 ; CHECK:  [[ext15:%[^ ]+]] = extractvalue [8 x half] [[ld1]], 7
 
-; CHECK:  [[ins0:%[^ ]+]] = insertelement <4 x half> undef, half [[ext0]], i32 0
+; CHECK:  [[ins0:%[^ ]+]] = insertelement <4 x half> poison, half [[ext0]], i32 0
 ; CHECK:  [[ins1:%[^ ]+]] = insertelement <4 x half> [[ins0]], half [[ext1]], i32 1
 ; CHECK:  [[ins2:%[^ ]+]] = insertelement <4 x half> [[ins1]], half [[ext2]], i32 2
 ; CHECK:  [[ins3:%[^ ]+]] = insertelement <4 x half> [[ins2]], half [[ext3]], i32 3
 
-; CHECK:  [[ins4:%[^ ]+]] = insertelement <4 x half> undef, half [[ext4]], i32 0
+; CHECK:  [[ins4:%[^ ]+]] = insertelement <4 x half> poison, half [[ext4]], i32 0
 ; CHECK:  [[ins5:%[^ ]+]] = insertelement <4 x half> [[ins4]], half [[ext5]], i32 1
 ; CHECK:  [[ins6:%[^ ]+]] = insertelement <4 x half> [[ins5]], half [[ext6]], i32 2
 ; CHECK:  [[ins7:%[^ ]+]] = insertelement <4 x half> [[ins6]], half [[ext7]], i32 3
 
-; CHECK:  [[ins8:%[^ ]+]] = insertelement <4 x half> undef, half [[ext8]], i32 0
+; CHECK:  [[ins8:%[^ ]+]] = insertelement <4 x half> poison, half [[ext8]], i32 0
 ; CHECK:  [[ins9:%[^ ]+]] = insertelement <4 x half> [[ins8]], half [[ext9]], i32 1
 ; CHECK:  [[ins10:%[^ ]+]] = insertelement <4 x half> [[ins9]], half [[ext10]], i32 2
 ; CHECK:  [[ins11:%[^ ]+]] = insertelement <4 x half> [[ins10]], half [[ext11]], i32 3
 
-; CHECK:  [[ins12:%[^ ]+]] = insertelement <4 x half> undef, half [[ext12]], i32 0
+; CHECK:  [[ins12:%[^ ]+]] = insertelement <4 x half> poison, half [[ext12]], i32 0
 ; CHECK:  [[ins13:%[^ ]+]] = insertelement <4 x half> [[ins12]], half [[ext13]], i32 1
 ; CHECK:  [[ins14:%[^ ]+]] = insertelement <4 x half> [[ins13]], half [[ext14]], i32 2
 ; CHECK:  [[ins15:%[^ ]+]] = insertelement <4 x half> [[ins14]], half [[ext15]], i32 3

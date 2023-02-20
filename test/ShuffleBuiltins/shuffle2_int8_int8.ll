@@ -17,7 +17,7 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv8_iS_Dv8_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[srcB_alloca:%[^ ]+]] = alloca [8 x i32], align 4
 
 ; CHECK: [[_srcA0:%[^ ]+]] = extractvalue [8 x i32] %srcA, 0
-; CHECK: [[_srcAi0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_srcA0]], 0
+; CHECK: [[_srcAi0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[_srcA0]], 0
 ; CHECK: [[_srcA1:%[^ ]+]] = extractvalue [8 x i32] %srcA, 1
 ; CHECK: [[_srcAi1:%[^ ]+]] = insertvalue [8 x i32] [[_srcAi0]], i32 [[_srcA1]], 1
 ; CHECK: [[_srcA2:%[^ ]+]] = extractvalue [8 x i32] %srcA, 2
@@ -34,7 +34,7 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv8_iS_Dv8_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[_srcAi7:%[^ ]+]] = insertvalue [8 x i32] [[_srcAi6]], i32 [[_srcA7]], 7
 
 ; CHECK: [[_srcB0:%[^ ]+]] = extractvalue [8 x i32] %srcB, 0
-; CHECK: [[_srcBi0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_srcB0]], 0
+; CHECK: [[_srcBi0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[_srcB0]], 0
 ; CHECK: [[_srcB1:%[^ ]+]] = extractvalue [8 x i32] %srcB, 1
 ; CHECK: [[_srcBi1:%[^ ]+]] = insertvalue [8 x i32] [[_srcBi0]], i32 [[_srcB1]], 1
 ; CHECK: [[_srcB2:%[^ ]+]] = extractvalue [8 x i32] %srcB, 2
@@ -51,7 +51,7 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv8_iS_Dv8_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[_srcBi7:%[^ ]+]] = insertvalue [8 x i32] [[_srcBi6]], i32 [[_srcB7]], 7
 
 ; CHECK: [[_mask0:%[^ ]+]] = extractvalue [8 x i32] %mask, 0
-; CHECK: [[_maski0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_mask0]], 0
+; CHECK: [[_maski0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[_mask0]], 0
 ; CHECK: [[_mask1:%[^ ]+]] = extractvalue [8 x i32] %mask, 1
 ; CHECK: [[_maski1:%[^ ]+]] = insertvalue [8 x i32] [[_maski0]], i32 [[_mask1]], 1
 ; CHECK: [[_mask2:%[^ ]+]] = extractvalue [8 x i32] %mask, 2
@@ -126,7 +126,7 @@ declare spir_func <8 x i32> @_Z8shuffle2Dv8_iS_Dv8_j(<8 x i32> noundef, <8 x i32
 ; CHECK: [[mask0mod2:%[^ ]+]] = urem i32 [[mask0]], 16
 ; CHECK: [[cmp0:%[^ ]+]] = icmp sge i32 [[mask0mod2]], 8
 ; CHECK: [[val0:%[^ ]+]] = select i1 [[cmp0]], i32 [[srcB0]], i32 [[srcA0]]
-; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[val0]], 0
+; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[val0]], 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 1
 ; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 8

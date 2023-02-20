@@ -34,11 +34,11 @@
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[or4]], [[shl]]
 
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[or]] to i32
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } undef, i32 [[trunc]], 0
-; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] undef, { i32 } [[insert]], 0
+; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[trunc]], 0
+; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] poison, { i32 } [[insert]], 0
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 32
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i32
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } undef, i32 [[trunc]], 0
+; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[trunc]], 0
 ; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] [[insert0]], { i32 } [[insert]], 1
 ; CHECK: store [[out]] [[insert1]], ptr addrspace(1)
 

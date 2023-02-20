@@ -10,7 +10,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[shl]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr addrspace(1) %0, i32 [[add]]
 ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load float, ptr addrspace(1) [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> undef, float [[ld0]], i32 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> poison, float [[ld0]], i32 0
 ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> [[in0]], float [[ld1]], i32 1
 ; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x float> [[in1]] to <4 x i16>
 ; CHECK: shufflevector <4 x i16> [[bitcast]], <4 x i16> poison, <3 x i32> <i32 0, i32 1, i32 2>

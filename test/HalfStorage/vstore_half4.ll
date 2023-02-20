@@ -12,11 +12,11 @@ entry:
 
 declare spir_func void @_Z12vstore_half4Dv4_fjPU3AS1Dh(<4 x float>, i32, ptr addrspace(1))
 
-; CHECK:  [[b01:%[^ ]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 0, i32 1>
-; CHECK:  [[b23:%[^ ]+]] = shufflevector <4 x float> %b, <4 x float> undef, <2 x i32> <i32 2, i32 3>
+; CHECK:  [[b01:%[^ ]+]] = shufflevector <4 x float> %b, <4 x float> poison, <2 x i32> <i32 0, i32 1>
+; CHECK:  [[b23:%[^ ]+]] = shufflevector <4 x float> %b, <4 x float> poison, <2 x i32> <i32 2, i32 3>
 ; CHECK:  [[b01i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b01]])
 ; CHECK:  [[b23i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b23]])
-; CHECK:  [[b01v2i32:%[^ ]+]] = insertelement <2 x i32> undef, i32 [[b01i32]], i32 0
+; CHECK:  [[b01v2i32:%[^ ]+]] = insertelement <2 x i32> poison, i32 [[b01i32]], i32 0
 ; CHECK:  [[b0123v2i32:%[^ ]+]] = insertelement <2 x i32> [[b01v2i32]], i32 [[b23i32]], i32 1
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i32>, ptr addrspace(1) %a, i32 %c
 ; CHECK:  store <2 x i32> [[b0123v2i32]], ptr addrspace(1) [[gep]], align 8

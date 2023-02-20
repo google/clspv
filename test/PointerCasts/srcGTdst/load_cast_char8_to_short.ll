@@ -12,7 +12,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[add:%[^ ]+]] = add i32 [[and]], 1
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr [8 x i8], ptr addrspace(1) %0, i32 [[lshr]], i32 [[add]]
 ; CHECK:  [[ld1:%[^ ]+]] = load i8, ptr addrspace(1) [[gep]]
-; CHECK:  [[insert0:%[^ ]+]] = insertelement <2 x i8> undef, i8 [[ld0]], i32 0
+; CHECK:  [[insert0:%[^ ]+]] = insertelement <2 x i8> poison, i8 [[ld0]], i32 0
 ; CHECK:  [[insert1:%[^ ]+]] = insertelement <2 x i8> [[insert0]], i8 [[ld1]], i32 1
 ; CHECK:  bitcast <2 x i8> [[insert1]] to i16
 

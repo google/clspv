@@ -13,7 +13,7 @@ entry:
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 1
   ; CHECK: [[ex2:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 2
   ; CHECK: [[ex3:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 3
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> undef, float [[ex0]], i32 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> poison, float [[ex0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in0]], float [[ex1]], i32 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in1]], float [[ex2]], i32 2
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in2]], float [[ex3]], i32 3
@@ -26,7 +26,7 @@ entry:
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 1
   ; CHECK: [[ex2:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 2
   ; CHECK: [[ex3:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 3
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> undef, float [[ex0]], i32 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> poison, float [[ex0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in0]], float [[ex1]], i32 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in1]], float [[ex2]], i32 2
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in2]], float [[ex3]], i32 3
@@ -39,7 +39,7 @@ entry:
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 1
   ; CHECK: [[ex2:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 2
   ; CHECK: [[ex3:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 3
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> undef, float [[ex0]], i32 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> poison, float [[ex0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in0]], float [[ex1]], i32 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in1]], float [[ex2]], i32 2
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in2]], float [[ex3]], i32 3
@@ -52,7 +52,7 @@ entry:
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 1
   ; CHECK: [[ex2:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 2
   ; CHECK: [[ex3:%[a-zA-Z0-9_.]+]] = extractvalue [4 x float] [[load4]], 3
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> undef, float [[ex0]], i32 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> poison, float [[ex0]], i32 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in0]], float [[ex1]], i32 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in1]], float [[ex2]], i32 2
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertelement <4 x float> [[in2]], float [[ex3]], i32 3

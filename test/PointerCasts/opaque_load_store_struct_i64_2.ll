@@ -20,7 +20,7 @@
 ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[zext3]], 48
 ; CHECK: [[or3:%[a-zA-Z0-9_.]+]] = or i64 [[or2]], [[shl]]
 ; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = trunc i64 [[or3]] to i16
-; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i16] undef, i16 [[trunc0]], 0
+; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i16] poison, i16 [[trunc0]], 0
 ; CHECK: [[lshr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or3]], 16
 ; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = trunc i64 [[lshr]] to i16
 ; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i16] [[insert0]], i16 [[trunc1]], 1
@@ -30,7 +30,7 @@
 ; CHECK: [[lshr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or3]], 48
 ; CHECK: [[trunc3:%[a-zA-Z0-9_.]+]] = trunc i64 [[lshr]] to i16
 ; CHECK: [[insert3:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i16] [[insert2]], i16 [[trunc3]], 3
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue [[struct]] undef, [4 x i16] [[insert3]], 0
+; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue [[struct]] poison, [4 x i16] [[insert3]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr [[struct]], ptr addrspace(1) %1, i32 0
 ; CHECK: store [[struct]] [[insert]], ptr addrspace(1) [[gep]]
 

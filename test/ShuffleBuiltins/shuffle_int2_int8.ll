@@ -14,7 +14,7 @@ entry:
 declare spir_func <8 x i32> @_Z7shuffleDv2_iDv8_j(<2 x i32> noundef, <8 x i32> noundef)
 
 ; CHECK: [[_mask0:%[^ ]+]] = extractvalue [8 x i32] %mask, 0
-; CHECK: [[_maski0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[_mask0]], 0
+; CHECK: [[_maski0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[_mask0]], 0
 ; CHECK: [[_mask1:%[^ ]+]] = extractvalue [8 x i32] %mask, 1
 ; CHECK: [[_maski1:%[^ ]+]] = insertvalue [8 x i32] [[_maski0]], i32 [[_mask1]], 1
 ; CHECK: [[_mask2:%[^ ]+]] = extractvalue [8 x i32] %mask, 2
@@ -33,7 +33,7 @@ declare spir_func <8 x i32> @_Z7shuffleDv2_iDv8_j(<2 x i32> noundef, <8 x i32> n
 ; CHECK: [[mask0:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 0
 ; CHECK: [[mask0mod:%[^ ]+]] = urem i32 [[mask0]], 2
 ; CHECK: [[src0:%[^ ]+]] = extractelement <2 x i32> %src, i32 [[mask0mod]]
-; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] undef, i32 [[src0]], 0
+; CHECK: [[res0:%[^ ]+]] = insertvalue [8 x i32] poison, i32 [[src0]], 0
 
 ; CHECK: [[mask1:%[^ ]+]] = extractvalue [8 x i32] [[mask]], 1
 ; CHECK: [[mask1mod:%[^ ]+]] = urem i32 [[mask1]], 2

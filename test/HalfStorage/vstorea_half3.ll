@@ -14,11 +14,11 @@ declare spir_func void @_Z13vstorea_half3Dv3_fjPU3AS1Dh(<3 x float>, i32, ptr ad
 
 
 ; CHECK:  [[b0:%[^ ]+]] = extractelement <3 x float> %b, i32 0
-; CHECK:  [[b0f2:%[^ ]+]] = insertelement <2 x float> undef, float [[b0]], i32 0
+; CHECK:  [[b0f2:%[^ ]+]] = insertelement <2 x float> poison, float [[b0]], i32 0
 ; CHECK:  [[b1:%[^ ]+]] = extractelement <3 x float> %b, i32 1
-; CHECK:  [[b1f2:%[^ ]+]] = insertelement <2 x float> undef, float [[b1]], i32 0
+; CHECK:  [[b1f2:%[^ ]+]] = insertelement <2 x float> poison, float [[b1]], i32 0
 ; CHECK:  [[b2:%[^ ]+]] = extractelement <3 x float> %b, i32 2
-; CHECK:  [[b2f2:%[^ ]+]] = insertelement <2 x float> undef, float [[b2]], i32 0
+; CHECK:  [[b2f2:%[^ ]+]] = insertelement <2 x float> poison, float [[b2]], i32 0
 ; CHECK:  [[b0i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b0f2]])
 ; CHECK:  [[b0i16:%[^ ]+]] = trunc i32 [[b0i32]] to i16
 ; CHECK:  [[b1i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b1f2]])

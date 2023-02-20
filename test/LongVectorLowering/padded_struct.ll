@@ -26,14 +26,14 @@ entry:
 
 ; CHECK-LABEL: @test3(
 ; CHECK:  extractvalue { i8, [7 x i32], [8 x i32] } %s, 0
-; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } undef, i8 {{.*}}, 0
+; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } poison, i8 {{.*}}, 0
 ; CHECK:  extractvalue { i8, [7 x i32], [8 x i32] } %s, 2
 ; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
 ; CHECK:  insertvalue { i8, [7 x i32], [8 x i32] } {{.*}}, [8 x i32] {{.*}}, 2
 
 ; CHECK-LABEL: @test2(
 ; CHECK: extractvalue { i8, [7 x i32], [8 x i32] } %s, 0
-; CHECK: insertvalue { i8, [7 x i32], [8 x i32] } undef, i8 {{.*}}, 0
+; CHECK: insertvalue { i8, [7 x i32], [8 x i32] } poison, i8 {{.*}}, 0
 ; CHECK: extractvalue { i8, [7 x i32], [8 x i32] } %s, 2
 
 ; CHECK-LABEL: @test1(

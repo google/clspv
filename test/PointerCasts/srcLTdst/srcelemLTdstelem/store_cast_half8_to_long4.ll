@@ -33,7 +33,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[ext14:%[^ ]+]] = extractelement <4 x half> [[bitcast3]], i64 2
 ; CHECK:  [[ext15:%[^ ]+]] = extractelement <4 x half> [[bitcast3]], i64 3
 
-; CHECK:  [[ins0:%[^ ]+]] = insertvalue [8 x half] undef, half [[ext0]], 0
+; CHECK:  [[ins0:%[^ ]+]] = insertvalue [8 x half] poison, half [[ext0]], 0
 ; CHECK:  [[ins1:%[^ ]+]] = insertvalue [8 x half] [[ins0]], half [[ext1]], 1
 ; CHECK:  [[ins2:%[^ ]+]] = insertvalue [8 x half] [[ins1]], half [[ext2]], 2
 ; CHECK:  [[ins3:%[^ ]+]] = insertvalue [8 x half] [[ins2]], half [[ext3]], 3
@@ -42,7 +42,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[ins6:%[^ ]+]] = insertvalue [8 x half] [[ins5]], half [[ext6]], 6
 ; CHECK:  [[ins7:%[^ ]+]] = insertvalue [8 x half] [[ins6]], half [[ext7]], 7
 
-; CHECK:  [[ins8:%[^ ]+]] = insertvalue [8 x half] undef, half [[ext8]], 0
+; CHECK:  [[ins8:%[^ ]+]] = insertvalue [8 x half] poison, half [[ext8]], 0
 ; CHECK:  [[ins9:%[^ ]+]] = insertvalue [8 x half] [[ins8]], half [[ext9]], 1
 ; CHECK:  [[ins10:%[^ ]+]] = insertvalue [8 x half] [[ins9]], half [[ext10]], 2
 ; CHECK:  [[ins11:%[^ ]+]] = insertvalue [8 x half] [[ins10]], half [[ext11]], 3

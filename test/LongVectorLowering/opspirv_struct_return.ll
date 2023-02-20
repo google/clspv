@@ -28,7 +28,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 ; CHECK: [[b0:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 0
 ; CHECK: [[addc0:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a0]], i32 [[b0]])
 ; CHECK: [[addc0val:%[^ ]+]] = extractvalue [[rettype]] [[addc0]], 0
-; CHECK: [[res0:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } undef, i32 [[addc0val]], 0, 0
+; CHECK: [[res0:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } poison, i32 [[addc0val]], 0, 0
 ; CHECK: [[addc0carry:%[^ ]+]] = extractvalue [[rettype]] [[addc0]], 1
 ; CHECK: [[res00:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res0]], i32 [[addc0carry]], 1, 0
 

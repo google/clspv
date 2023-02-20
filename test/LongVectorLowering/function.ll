@@ -50,17 +50,14 @@ define spir_func <8 x i32> @test2(i32 %a) {
 ; CHECK-SAME: @test1([[FLOAT8]] [[X:%[^ ]+]])
 ; CHECK-SAME: !info [[MD:![0-9]+]]
 ; TODO(#1013): should just be X
-; check-next: [[Y:%[^ ]+]] = call spir_func [[FLOAT8]] @id([[FLOAT8]] [[X]])
-; CHECK: call spir_func [[FLOAT8]] @id
+; CHECK-NEXT: [[Y:%[^ ]+]] = call spir_func [[FLOAT8]] @id([[FLOAT8]] [[X]])
 ; CHECK-SAME: !info [[MD]]
 ; TODO(#1013): should just be Y
-; check-next: ret [[FLOAT8]] [[Y]]
-; CHECK: ret [[FLOAT8]]
+; CHECK-NEXT: ret [[FLOAT8]] [[Y]]
 ;
 ; CHECK-LABEL: define spir_func
 ; CHECK-SAME: [[FLOAT8]] @id([[FLOAT8]] [[X:%[^ ]+]])
 ; TODO(#1013): should just be X
-; check-next: ret [[FLOAT8]] [[X]]
-; CHECK: ret [[FLOAT8]]
+; CHECK-NEXT: ret [[FLOAT8]] [[X]]
 ;
 ; CHECK: [[MD]] = !{!"some metadata"}

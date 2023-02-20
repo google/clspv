@@ -7,14 +7,14 @@ target triple = "spir-unknown-unknown"
 define spir_func void @test(ptr %src, ptr %dst) {
 entry:
   %0 = load <8 x float>, ptr %src, align 32
-  %1 = shufflevector <8 x float> %0, <8 x float> <float 0.000000e+00, float undef, float undef, float undef, float undef, float undef, float undef, float undef>, <16 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 0, i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
+  %1 = shufflevector <8 x float> %0, <8 x float> <float 0.000000e+00, float poison, float undef, float undef, float undef, float undef, float undef, float undef>, <16 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 0, i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
   store <16 x float> %1, ptr %dst, align 32
   ret void
 }
 
 ; CHECK: [[load:%[^ ]+]] = load [8 x float], ptr %src, align 32
 ; CHECK: [[ld0:%[^ ]+]] = extractvalue [8 x float] [[load]], 0
-; CHECK: [[ins0:%[^ ]+]] = insertvalue [16 x float] undef, float [[ld0]], 0
+; CHECK: [[ins0:%[^ ]+]] = insertvalue [16 x float] poison, float [[ld0]], 0
 ; CHECK: [[ld1:%[^ ]+]] = extractvalue [8 x float] [[load]], 1
 ; CHECK: [[ins1:%[^ ]+]] = insertvalue [16 x float] [[ins0]], float [[ld1]], 1
 ; CHECK: [[ld2:%[^ ]+]] = extractvalue [8 x float] [[load]], 2

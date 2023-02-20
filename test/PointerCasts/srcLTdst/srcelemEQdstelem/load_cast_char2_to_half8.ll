@@ -39,7 +39,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[ld6cast:%[^ ]+]] = bitcast <2 x i8> [[ld6]] to half
 ; CHECK: [[ld7cast:%[^ ]+]] = bitcast <2 x i8> [[ld7]] to half
 
-; CHECK: [[ret0:%[^ ]+]] = insertvalue [8 x half] undef, half [[ld0cast]], 0
+; CHECK: [[ret0:%[^ ]+]] = insertvalue [8 x half] poison, half [[ld0cast]], 0
 ; CHECK: [[ret1:%[^ ]+]] = insertvalue [8 x half] [[ret0]], half [[ld1cast]], 1
 ; CHECK: [[ret2:%[^ ]+]] = insertvalue [8 x half] [[ret1]], half [[ld2cast]], 2
 ; CHECK: [[ret3:%[^ ]+]] = insertvalue [8 x half] [[ret2]], half [[ld3cast]], 3

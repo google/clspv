@@ -17,7 +17,7 @@ declare <2 x float> @_Z6vload2Dv2_jPU3AS0f(i32, ptr addrspace(0))
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load float, ptr [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> undef, float [[ld]], i64 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> poison, float [[ld]], i64 0
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load float, ptr [[gep]]

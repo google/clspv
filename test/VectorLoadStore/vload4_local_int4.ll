@@ -17,7 +17,7 @@ declare <4 x i32> @_Z6vload4Dv4_jPU3AS3j(i32, ptr addrspace(3))
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i32, ptr addrspace(3) %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(3) [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x i32> undef, i32 [[ld]], i64 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <4 x i32> poison, i32 [[ld]], i64 0
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i32, ptr addrspace(3) %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(3) [[gep]]

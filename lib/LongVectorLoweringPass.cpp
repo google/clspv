@@ -338,7 +338,7 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy,
   assert(EquivalentTy->isVectorTy() || EquivalentTy->isArrayTy() ||
          EquivalentTy->isStructTy());
 
-  Value *NewValue = UndefValue::get(EquivalentTy);
+  Value *NewValue = PoisonValue::get(EquivalentTy);
 
   if (EquivalentTy->isStructTy()) {
     StructType *StructTy = dyn_cast<StructType>(EquivalentTy);
@@ -420,7 +420,7 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
     Arity = EquivalentReturnTy->getArrayNumElements();
   }
 
-  Value *ReturnValue = UndefValue::get(EquivalentReturnTy);
+  Value *ReturnValue = PoisonValue::get(EquivalentReturnTy);
 
   auto &C = I.getContext();
   auto *IntTy = IntegerType::get(C, 32);
@@ -622,7 +622,7 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
 
   IRBuilder<> B(&VectorCall);
   Value *ReturnValue = nullptr;
-  Value *Vector = UndefValue::get(DstType);
+  Value *Vector = PoisonValue::get(DstType);
   unsigned int InitNumElements = FixedVectorTy->getNumElements();
   unsigned int DstNumElements = DstType->getNumElements();
   // for each sub-vector calls
@@ -734,6 +734,9 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return Constant::getNullValue(EquivalentTy);
   }
 
+  if (isa<PoisonValue>(Cst)) {
+    return PoisonValue::get(EquivalentTy);
+  }
   if (isa<UndefValue>(Cst)) {
     return UndefValue::get(EquivalentTy);
   }
@@ -1349,14 +1352,14 @@ clspv::LongVectorLoweringPass::visitShuffleVectorInst(ShuffleVectorInst &I) {
   unsigned LHSArity = LHSTy->getElementCount().getFixedValue();
 
   // Construct the equivalent shuffled vector, as an array or a vector.
-  Value *V = UndefValue::get(EquivalentType);
+  Value *V = PoisonValue::get(EquivalentType);
   for (unsigned i = 0; i < Arity; ++i) {
     int Mask = I.getMaskValue(i);
     assert(-1 <= Mask && "Unexpected mask value.");
 
     Value *Scalar = nullptr;
     if (Mask == -1) {
-      Scalar = UndefValue::get(ScalarTy);
+      Scalar = PoisonValue::get(ScalarTy);
     } else if (static_cast<unsigned>(Mask) < LHSArity) {
       Scalar = getScalar(EquivalentLHS, Mask);
     } else {
@@ -1798,7 +1801,7 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
     }
   };
 
-  Value *Res = UndefValue::get(EquivalentReturnTy);
+  Value *Res = PoisonValue::get(EquivalentReturnTy);
   for (unsigned i = 0; i < MaskArity; ++i) {
 
     Value *NumElementsVal = B.getIntN(MaskElementSizeInBits, NumElements);

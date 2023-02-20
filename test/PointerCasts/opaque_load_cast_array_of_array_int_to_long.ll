@@ -23,7 +23,7 @@ entry:
 ; CHECK: [[rem8p:%[^ ]+]] = add i32 [[rem8]], 1
 ; CHECK: [[gep2:%[^ ]+]] = getelementptr [4 x [8 x i32]], ptr addrspace(3) %cast, i32 [[div32]], i32 [[div8]], i32 [[rem8p]]
 ; CHECK: [[ld2:%[^ ]+]] = load i32, ptr addrspace(3) [[gep2]], align 4
-; CHECK: [[ins0:%[^ ]+]] = insertelement <2 x i32> undef, i32 [[ld1]], i32 0
+; CHECK: [[ins0:%[^ ]+]] = insertelement <2 x i32> poison, i32 [[ld1]], i32 0
 ; CHECK: [[ins1:%[^ ]+]] = insertelement <2 x i32> [[ins0]], i32 [[ld2]], i32 1
 ; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x i32> [[ins1]] to i64
 ; CHECK: store i64 [[bitcast]], ptr addrspace(1) %a, align 8
