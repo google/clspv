@@ -6,23 +6,16 @@
 
 // CHECK-DAG: [[CHAR:%[0-9a-zA-Z_]+]]  = OpTypeInt 8
 // CHECK-DAG: [[FLOAT:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[CHAR_VEC:%[0-9a-zA-Z_]+]] = OpTypeVector [[CHAR]] 2
 //
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
-// CHECK: OpConvertFToS [[CHAR]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
+// CHECK: OpConvertFToS [[CHAR_VEC]]
 
 void kernel test(global float16 *in, global char16 *out) {
   *out = convert_char16(*in);
