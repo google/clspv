@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-constant int myconst[5] = { 0 };
+constant int myconst[5] = { 5, 4, 3, 2, 1 };
 
 kernel void test(global int *result) {
   size_t tid = get_global_id(0);
@@ -13,7 +13,7 @@ kernel void test(global int *result) {
 // CHECK: OpExtension "SPV_KHR_physical_storage_buffer"
 // CHECK: [[ClspvReflection:%[a-zA-Z0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK: OpMemoryModel PhysicalStorageBuffer64
-// CHECK: [[Initializer:%[a-zA-Z0-9_]+]] = OpString "0000000000000000000000000000000000000000"
+// CHECK: [[Initializer:%[a-zA-Z0-9_]+]] = OpString "0500000004000000030000000200000001000000"
 // CHECK-DAG: [[void:%[a-zA-Z0-9_]+]] = OpTypeVoid
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32
 // CHECK-DAG: [[ulong:%[a-zA-Z0-9_]+]] = OpTypeInt 64
