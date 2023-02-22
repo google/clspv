@@ -542,6 +542,8 @@ void GroupVectorUntilSizeEquals(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
+void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
+                             SmallVector<Value *, 8> &Values);
 // 'Values' is expected to contain vectors.
 // Return the converted vectors of type 'Ty' into 'Values'.
 void ConvertVectorIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
@@ -571,7 +573,36 @@ void ConvertVectorIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
   // Adjust the number of element per vector
   unsigned ValueNumEle = GetNumEle(ValueTy);
   unsigned TyNumEle = GetNumEle(Ty);
-  if (ValueNumEle > TyNumEle) {
+  if (ValueNumEle == 4 && TyNumEle == 3) {
+    // This case can happen since opaque pointers are used.
+    // We can now have packed structure having their vec3 implicitly casted to
+    // vec4 that needs to be handled by replacepointercast pass. For this very
+    // case, just drop the 4th value as it should be poisoned.
+    SmallVector<Value *, 8> scalarValues;
+    ExtractFromVector(Builder, Values);
+    for (unsigned i = 0; i < Values.size(); i++) {
+      if (i % 4 != 3) {
+        scalarValues.push_back(Values[i]);
+      }
+    }
+    Values = scalarValues;
+    ConvertScalarIntoVector(Ty, Builder, Values);
+  } else if (ValueNumEle == 3 && TyNumEle == 4) {
+    // This case can happen since opaque pointers are used.
+    // We can now have packed structure having their vec3 implicitly casted to
+    // vec4 that needs to be handled by replacepointercast pass. For this very
+    // case, just add in 4th place a poison value that should never be used.
+    SmallVector<Value *, 8> scalarValues;
+    ExtractFromVector(Builder, Values);
+    for (unsigned i = 0; i < Values.size(); i++) {
+      scalarValues.push_back(Values[i]);
+      if (i % 3 == 2) {
+        scalarValues.push_back(PoisonValue::get(GetEleType(ValueTy)));
+      }
+    }
+    Values = scalarValues;
+    ConvertScalarIntoVector(Ty, Builder, Values);
+  } else if (ValueNumEle > TyNumEle) {
     assert(ValueNumEle == 4 && TyNumEle == 2);
     SplitVectorValuesInPair(Builder, Values, TyEle);
   } else if (ValueNumEle < TyNumEle) {
@@ -635,7 +666,9 @@ void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
 
   unsigned TySize = SizeInBits(Builder, Ty);
   unsigned ValueSize = SizeInBits(Builder, ValueTy);
-  if (TySize > ValueSize) {
+  if (SizeInBits(Builder, GetEleType(Ty)) == ValueSize) {
+    GroupScalarValuesIntoVector(Builder, Values, GetNumEle(Ty));
+  } else if (TySize > ValueSize) {
     assert(TySize % ValueSize == 0);
     unsigned NumElements = std::min(TySize / ValueSize, (unsigned)4);
     GroupScalarValuesIntoVector(Builder, Values, NumElements);

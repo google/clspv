@@ -56,7 +56,7 @@
 // CHECK-64-DAG: %[[goff1_ptr:[0-9]+]] = OpAccessChain %[[push_ptr_int]] %[[push]] {{.*}} %[[ulong_1]]
 // CHECK-64-DAG: %[[goff2_ptr:[0-9]+]] = OpAccessChain %[[push_ptr_int]] %[[push]] {{.*}} %[[ulong_2]]
 // CHECK-64-DAG: %[[gsize0_ptr:[0-9]+]] = OpAccessChain %[[push_ptr_int]] %[[push]] {{.*}} %[[uint_0]]
-// CHECK-64-DAG: %[[gsize1_ptr:[0-9]+]] = OpAccessChain %[[push_ptr_int]] %[[push]] {{.*}} %[[uint_1]]
+// CHECK-64-DAG: %[[gsize1_ptr:[0-9]+]] = OpAccessChain %[[push_ptr_int]] %[[push]] {{.*}} %[[ulong_1]]
 // CHECK-DAG: %{{[0-9]+}} = OpLoad %[[uint]] %[[goff0_ptr]]
 // CHECK-DAG: %{{[0-9]+}} = OpLoad %[[uint]] %[[goff1_ptr]]
 // CHECK-DAG: %{{[0-9]+}} = OpLoad %[[uint]] %[[goff2_ptr]]
