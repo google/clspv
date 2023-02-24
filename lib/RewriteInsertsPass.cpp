@@ -369,7 +369,9 @@ bool clspv::RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
       for (unsigned i = 0; i < num_members; ++i) {
         if (!members[i]) {
           Type *memberTy = resultTy->getTypeAtIndex(i);
-          if (isa<UndefValue>(base)) {
+          if (isa<PoisonValue>(base)) {
+            members[i] = PoisonValue::get(memberTy);
+          } else if (isa<UndefValue>(base)) {
             members[i] = UndefValue::get(memberTy);
           } else if (const auto *caz = dyn_cast<ConstantAggregateZero>(base)) {
             members[i] = caz->getElementValue(i);

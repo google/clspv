@@ -13,41 +13,41 @@ entry:
 
 declare <8 x i8> @_Z7add_satDv8_cS_(<8 x i8>, <8 x i8>)
 
-; CHECK: [[ex_a0:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 0
-; CHECK: [[ex_a1:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 1
-; CHECK: [[ex_a2:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 2
-; CHECK: [[ex_a3:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 3
-; CHECK: [[ex_a4:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 4
-; CHECK: [[ex_a5:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 5
-; CHECK: [[ex_a6:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 6
-; CHECK: [[ex_a7:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 7
+; CHECK-DAG: [[ex_a0:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 0
+; CHECK-DAG: [[ex_a1:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 1
+; CHECK-DAG: [[ex_a2:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 2
+; CHECK-DAG: [[ex_a3:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 3
+; CHECK-DAG: [[ex_a4:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 4
+; CHECK-DAG: [[ex_a5:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 5
+; CHECK-DAG: [[ex_a6:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 6
+; CHECK-DAG: [[ex_a7:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %a, 7
 
-; CHECK: [[ex_b0:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 0
-; CHECK: [[ex_b1:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 1
-; CHECK: [[ex_b2:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 2
-; CHECK: [[ex_b3:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 3
-; CHECK: [[ex_b4:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 4
-; CHECK: [[ex_b5:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 5
-; CHECK: [[ex_b6:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 6
-; CHECK: [[ex_b7:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 7
+; CHECK-DAG: [[ex_b0:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 0
+; CHECK-DAG: [[ex_b1:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 1
+; CHECK-DAG: [[ex_b2:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 2
+; CHECK-DAG: [[ex_b3:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 3
+; CHECK-DAG: [[ex_b4:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 4
+; CHECK-DAG: [[ex_b5:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 5
+; CHECK-DAG: [[ex_b6:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 6
+; CHECK-DAG: [[ex_b7:%[a-zA-Z0-9_.]+]] = extractvalue [8 x i8] %b, 7
 
-; CHECK: [[sext_a0:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a0]] to i16
-; CHECK: [[sext_a1:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a1]] to i16
-; CHECK: [[sext_a2:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a2]] to i16
-; CHECK: [[sext_a3:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a3]] to i16
-; CHECK: [[sext_a4:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a4]] to i16
-; CHECK: [[sext_a5:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a5]] to i16
-; CHECK: [[sext_a6:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a6]] to i16
-; CHECK: [[sext_a7:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a7]] to i16
+; CHECK-DAG: [[sext_a0:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a0]] to i16
+; CHECK-DAG: [[sext_a1:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a1]] to i16
+; CHECK-DAG: [[sext_a2:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a2]] to i16
+; CHECK-DAG: [[sext_a3:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a3]] to i16
+; CHECK-DAG: [[sext_a4:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a4]] to i16
+; CHECK-DAG: [[sext_a5:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a5]] to i16
+; CHECK-DAG: [[sext_a6:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a6]] to i16
+; CHECK-DAG: [[sext_a7:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_a7]] to i16
 
-; CHECK: [[sext_b0:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b0]] to i16
-; CHECK: [[sext_b1:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b1]] to i16
-; CHECK: [[sext_b2:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b2]] to i16
-; CHECK: [[sext_b3:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b3]] to i16
-; CHECK: [[sext_b4:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b4]] to i16
-; CHECK: [[sext_b5:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b5]] to i16
-; CHECK: [[sext_b6:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b6]] to i16
-; CHECK: [[sext_b7:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b7]] to i16
+; CHECK-DAG: [[sext_b0:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b0]] to i16
+; CHECK-DAG: [[sext_b1:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b1]] to i16
+; CHECK-DAG: [[sext_b2:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b2]] to i16
+; CHECK-DAG: [[sext_b3:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b3]] to i16
+; CHECK-DAG: [[sext_b4:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b4]] to i16
+; CHECK-DAG: [[sext_b5:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b5]] to i16
+; CHECK-DAG: [[sext_b6:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b6]] to i16
+; CHECK-DAG: [[sext_b7:%[a-zA-Z0-9_.]+]] = sext i8 [[ex_b7]] to i16
 
 ; CHECK: [[add0:%[a-zA-Z0-9_.]+]] = add nuw nsw i16 [[sext_a0]], [[sext_b0]]
 ; CHECK: [[add1:%[a-zA-Z0-9_.]+]] = add nuw nsw i16 [[sext_a1]], [[sext_b1]]
@@ -76,7 +76,7 @@ declare <8 x i8> @_Z7add_satDv8_cS_(<8 x i8>, <8 x i8>)
 ; CHECK: [[trunc6:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp6]] to i8
 ; CHECK: [[trunc7:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp7]] to i8
 
-; CHECK:  [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] undef, i8 [[trunc0]], 0
+; CHECK:  [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] poison, i8 [[trunc0]], 0
 ; CHECK:  [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in0]], i8 [[trunc1]], 1
 ; CHECK:  [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in1]], i8 [[trunc2]], 2
 ; CHECK:  [[in3:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in2]], i8 [[trunc3]], 3

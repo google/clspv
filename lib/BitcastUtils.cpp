@@ -119,7 +119,7 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
     for (uint64_t i = 0; i != dst_array_ty->getNumElements(); ++i) {
       auto *tmp_value =
           BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
-      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      auto *prev = dst ? dst : PoisonValue::get(dst_type);
       dst = builder.CreateInsertValue(prev, tmp_value,
                                       {static_cast<unsigned>(i)});
     }
@@ -133,7 +133,7 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
       auto *ele_ty = dst_struct_ty->getElementType(i);
       auto *tmp_value =
           BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
-      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      auto *prev = dst ? dst : PoisonValue::get(dst_type);
       dst = builder.CreateInsertValue(prev, tmp_value, {i});
     }
   } else if (auto *dst_vec_ty = dyn_cast<VectorType>(dst_type)) {
@@ -142,7 +142,7 @@ Value *BuildFromElements(Type *dst_type, const ArrayRef<Value *> &src_elements,
          ++i) {
       auto *tmp_value =
           BuildFromElements(ele_ty, src_elements, used_bits, index, builder);
-      auto *prev = dst ? dst : UndefValue::get(dst_type);
+      auto *prev = dst ? dst : PoisonValue::get(dst_type);
       dst = builder.CreateInsertElement(prev, tmp_value, i);
     }
   } else {
@@ -264,7 +264,7 @@ void InsertInArray(IRBuilder<> &Builder, ArrayType *Ty,
   assert(Values.size() % ArrayNumEles == 0);
   unsigned NumArrays = Values.size() / ArrayNumEles;
   for (unsigned i = 0; i < NumArrays; i++) {
-    Value *Ret = UndefValue::get(Ty);
+    Value *Ret = PoisonValue::get(Ty);
     for (unsigned j = 0; j < ArrayNumEles; j++) {
       Ret = Builder.CreateInsertValue(Ret, Values[i * ArrayNumEles + j], {j});
     }
@@ -372,7 +372,7 @@ void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
   unsigned int NumVector = Values.size() / NumElePerVec;
   for (unsigned i = 0; i < NumVector; i++) {
     unsigned idx = i * NumElePerVec;
-    Value *Vec = UndefValue::get(DstTy);
+    Value *Vec = PoisonValue::get(DstTy);
     for (unsigned j = 0; j < NumElePerVec; j++) {
       Vec = Builder.CreateInsertElement(Vec, Values[idx + j],
                                         Builder.getInt32(j));

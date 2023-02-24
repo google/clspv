@@ -17,7 +17,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[gep:%[^ ]+]] = getelementptr half, ptr addrspace(1) %0, i32 [[add3]]
 ; CHECK: [[ld3:%[^ ]+]] = load half, ptr addrspace(1) [[gep]]
 
-; CHECK: [[ret0:%[^ ]+]] = insertelement <4 x half> undef, half [[ld0]], i32 0
+; CHECK: [[ret0:%[^ ]+]] = insertelement <4 x half> poison, half [[ld0]], i32 0
 ; CHECK: [[ret1:%[^ ]+]] = insertelement <4 x half> [[ret0]], half [[ld1]], i32 1
 ; CHECK: [[ret2:%[^ ]+]] = insertelement <4 x half> [[ret1]], half [[ld2]], i32 2
 ; CHECK: [[ret3:%[^ ]+]] = insertelement <4 x half> [[ret2]], half [[ld3]], i32 3

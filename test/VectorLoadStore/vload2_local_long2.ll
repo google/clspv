@@ -17,7 +17,7 @@ declare <2 x i64> @_Z6vload2Dv2_jPU3AS3m(i32, ptr addrspace(3))
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i64, ptr addrspace(3) %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i64, ptr addrspace(3) [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x i64> undef, i64 [[ld]], i64 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x i64> poison, i64 [[ld]], i64 0
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i64, ptr addrspace(3) %in, i32 [[add]]
 ;* CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i64, ptr addrspace(3) [[gep]]

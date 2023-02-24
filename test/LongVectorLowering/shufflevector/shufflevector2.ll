@@ -20,7 +20,7 @@ entry:
 ; CHECK-DAG: [[S0:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 1
 ; CHECK-DAG: [[S1:%[^ ]+]] = extractvalue [[FLOAT8]] [[A]], 4
 ; CHECK-DAG: [[S2:%[^ ]+]] = extractvalue [[FLOAT8]] [[B]], 7
-; CHECK-DAG: [[TMP0:%[^ ]+]] = insertelement <3 x float> undef, float [[S0]], i64 0
+; CHECK-DAG: [[TMP0:%[^ ]+]] = insertelement <3 x float> poison, float [[S0]], i64 0
 ; CHECK-DAG: [[TMP1:%[^ ]+]] = insertelement <3 x float> [[TMP0]], float [[S1]], i64 1
 ; CHECK-DAG: [[TMP2:%[^ ]+]] = insertelement <3 x float> [[TMP1]], float [[S2]], i64 2
 ; CHECK: ret <3 x float> [[TMP2]]

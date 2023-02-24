@@ -8,9 +8,9 @@ target triple = "spir-unknown-unknown"
 
 define spir_func <2 x i32> @test() {
 entry:
-  %x = shufflevector <2 x i32> undef, <2 x i32> undef, <2 x i32> zeroinitializer
+  %x = shufflevector <2 x i32> poison, <2 x i32> undef, <2 x i32> zeroinitializer
   ret <2 x i32> %x
 }
 
 ; CHECK-LABEL: @test
-; CHECK: %x = shufflevector <2 x i32> undef, <2 x i32> undef, <2 x i32> zeroinitializer
+; CHECK: %x = shufflevector <2 x i32> poison, <2 x i32> undef, <2 x i32> zeroinitializer

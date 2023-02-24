@@ -65,7 +65,7 @@ entry:
 ; CHECK-DAG:  [[SELECT_6:%[^ ]+]] = select i1 [[CMP_6]], float [[B_6]], float [[A_6]]
 ; CHECK-DAG:  [[SELECT_7:%[^ ]+]] = select i1 [[CMP_7]], float [[B_7]], float [[A_7]]
 
-; CHECK-DAG:  [[TMP_0:%[^ ]+]] = insertvalue [[FLOAT8]] undef,     float [[SELECT_0]], 0
+; CHECK-DAG:  [[TMP_0:%[^ ]+]] = insertvalue [[FLOAT8]] poison,     float [[SELECT_0]], 0
 ; CHECK-DAG:  [[TMP_1:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP_0]], float [[SELECT_1]], 1
 ; CHECK-DAG:  [[TMP_2:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP_1]], float [[SELECT_2]], 2
 ; CHECK-DAG:  [[TMP_3:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP_2]], float [[SELECT_3]], 3

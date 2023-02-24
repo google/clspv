@@ -353,7 +353,7 @@ Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
       const auto offset = (base_offset + ele_offset) % kIntBytes;
 
       auto tmp = BuildFromElements(M, builder, ele_ty, offset, index, elements);
-      dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type),
+      dst = builder.CreateInsertValue(dst ? dst : PoisonValue::get(dst_type),
                                       tmp, {i});
     }
   } else if (dst_array_ty || dst_vec_ty) {
@@ -449,10 +449,10 @@ Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
                                      elements);
         if (dst_vec_ty) {
           dst = builder.CreateInsertElement(
-              dst ? dst : UndefValue::get(dst_type), tmp, i);
+              dst ? dst : PoisonValue::get(dst_type), tmp, i);
         } else {
-          dst = builder.CreateInsertValue(dst ? dst : UndefValue::get(dst_type),
-                                          tmp, {i});
+          dst = builder.CreateInsertValue(
+              dst ? dst : PoisonValue::get(dst_type), tmp, {i});
         }
 
         // Track consumed bytes.

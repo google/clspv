@@ -12,7 +12,7 @@ entry:
 
 declare spir_func void @_Z11vstore_halffjPU3AS1Dh(float, i32, ptr addrspace(1))
 
-; CHECK: [[float2:%[^ ]+]] = insertelement <2 x float> undef, float %b, i32 0
+; CHECK: [[float2:%[^ ]+]] = insertelement <2 x float> poison, float %b, i32 0
 ; CHECK: [[half2:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[float2]])
 ; CHECK: [[half:%[^ ]+]] = trunc i32 [[half2]] to i16
 ; CHECK: [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %a, i32 %c

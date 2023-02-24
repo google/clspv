@@ -31,6 +31,6 @@ declare spir_func <3 x float> @_Z11vload_half3jPU3AS1KDh(i32, ptr addrspace(1))
 ; CHECK:  [[val1:%[^ ]+]] = extractelement <2 x float> [[val2f1]], i32 0
 ; CHECK:  [[val2f2:%[^ ]+]] = call <2 x float> @_Z18spirv.unpack.v2f16(i32 [[val2i32]])
 ; CHECK:  [[val2:%[^ ]+]] = extractelement <2 x float> [[val2f2]], i32 0
-; CHECK:  [[ret0:%[^ ]+]] = insertelement <3 x float> undef, float [[val0]], i32 0
+; CHECK:  [[ret0:%[^ ]+]] = insertelement <3 x float> poison, float [[val0]], i32 0
 ; CHECK:  [[ret01:%[^ ]+]] = insertelement <3 x float> [[ret0]], float [[val1]], i32 1
 ; CHECK:  [[ret:%[^ ]+]] = insertelement <3 x float> [[ret01]], float [[val2]], i32 2

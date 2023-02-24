@@ -10,7 +10,7 @@ target triple = "spir-unknown-unknown"
 
 define spir_func <8 x float> @test(<3 x float> %a, <3 x float> %b) {
 entry:
-  %x = shufflevector <3 x float> %a, <3 x float> %b, <8 x i32> <i32 0, i32 1, i32 2, i32 undef, i32 undef, i32 5, i32 4, i32 3>
+  %x = shufflevector <3 x float> %a, <3 x float> %b, <8 x i32> <i32 0, i32 1, i32 2, i32 poison, i32 poison, i32 5, i32 4, i32 3>
   ret <8 x float> %x
 }
 
@@ -22,12 +22,10 @@ entry:
 ; CHECK-DAG: [[S5:%[^ ]+]] = extractelement <3 x float> [[B]], i64 2
 ; CHECK-DAG: [[S6:%[^ ]+]] = extractelement <3 x float> [[B]], i64 1
 ; CHECK-DAG: [[S7:%[^ ]+]] = extractelement <3 x float> [[B]], i64 0
-; CHECK-DAG: [[TMP0:%[^ ]+]] = insertvalue [[FLOAT8]] undef, float [[S0]], 0
+; CHECK-DAG: [[TMP0:%[^ ]+]] = insertvalue [[FLOAT8]] poison, float [[S0]], 0
 ; CHECK-DAG: [[TMP1:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP0]], float [[S1]], 1
 ; CHECK-DAG: [[TMP2:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP1]], float [[S2]], 2
-; CHECK-DAG: [[TMP3:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP2]], float undef,  3
-; CHECK-DAG: [[TMP4:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP3]], float undef,  4
-; CHECK-DAG: [[TMP5:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP4]], float [[S5]], 5
+; CHECK-DAG: [[TMP5:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP2]], float [[S5]], 5
 ; CHECK-DAG: [[TMP6:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP5]], float [[S6]], 6
 ; CHECK-DAG: [[TMP7:%[^ ]+]] = insertvalue [[FLOAT8]] [[TMP6]], float [[S7]], 7
 ; CHECK: ret [[FLOAT8]] [[TMP7]]

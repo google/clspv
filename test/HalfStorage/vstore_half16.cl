@@ -26,33 +26,32 @@ __kernel void test(__global half *a, float16 b, int c) {
 
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract {{.*}} {{.*}} 0
 
-// CHECK: [[b0:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 0
-// CHECK: [[b1:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 1
-// CHECK: [[b2:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 2
-// CHECK: [[b3:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 3
-// CHECK: [[b4:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 4
-// CHECK: [[b5:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 5
-// CHECK: [[b6:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 6
-// CHECK: [[b7:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 7
-// CHECK: [[b8:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 8
-// CHECK: [[b9:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 9
-// CHECK: [[b10:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 10
-// CHECK: [[b11:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 11
-// CHECK: [[b12:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 12
-// CHECK: [[b13:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 13
-// CHECK: [[b14:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 14
-// CHECK: [[b15:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 15
-
 // CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
 // CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
 
+// CHECK: [[b0:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 0
+// CHECK: [[b1:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 1
 // CHECK: [[b01:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b0]] [[b1]]
+// CHECK: [[b2:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 2
+// CHECK: [[b3:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 3
 // CHECK: [[b23:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b2]] [[b3]]
+// CHECK: [[b4:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 4
+// CHECK: [[b5:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 5
 // CHECK: [[b45:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b4]] [[b5]]
+// CHECK: [[b6:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 6
+// CHECK: [[b7:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 7
 // CHECK: [[b67:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b6]] [[b7]]
+// CHECK: [[b8:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 8
+// CHECK: [[b9:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 9
 // CHECK: [[b89:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b8]] [[b9]]
+// CHECK: [[b10:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 10
+// CHECK: [[b11:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 11
 // CHECK: [[b1011:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b10]] [[b11]]
+// CHECK: [[b12:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 12
+// CHECK: [[b13:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 13
 // CHECK: [[b1213:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b12]] [[b13]]
+// CHECK: [[b14:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 14
+// CHECK: [[b15:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 15
 // CHECK: [[b1415:%[^ ]+]] = OpCompositeConstruct [[float2]] [[b14]] [[b15]]
 
 // CHECK: [[b01f:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[b01]]

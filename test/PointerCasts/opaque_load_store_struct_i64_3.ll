@@ -15,16 +15,16 @@
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[zext0]], [[shl]]
 
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[or]] to i16
-; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i16] undef, i16 [[trunc]], 0
+; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i16] poison, i16 [[trunc]], 0
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 16
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i16
 ; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i16] [[insert0]], i16 [[trunc]], 1
-; CHECK: [[insert00:%[a-zA-Z0-9_.]+]] = insertvalue { [2 x i16] } undef, [2 x i16] [[insert1]], 0
-; CHECK: [[insert000:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] undef, { [2 x i16] } [[insert00]], 0
+; CHECK: [[insert00:%[a-zA-Z0-9_.]+]] = insertvalue { [2 x i16] } poison, [2 x i16] [[insert1]], 0
+; CHECK: [[insert000:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] poison, { [2 x i16] } [[insert00]], 0
 
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 32
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i8
-; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertelement <4 x i8> undef, i8 [[trunc]], i64 0
+; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertelement <4 x i8> poison, i8 [[trunc]], i64 0
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 40
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i8
 ; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertelement <4 x i8> [[insert0]], i8 [[trunc]], i64 1
@@ -34,7 +34,7 @@
 ; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 56
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i8
 ; CHECK: [[insert3:%[a-zA-Z0-9_.]+]] = insertelement <4 x i8> [[insert2]], i8 [[trunc]], i64 3
-; CHECK: [[insert11:%[a-zA-Z0-9_.]+]] = insertvalue { <4 x i8> } undef, <4 x i8> [[insert3]], 0
+; CHECK: [[insert11:%[a-zA-Z0-9_.]+]] = insertvalue { <4 x i8> } poison, <4 x i8> [[insert3]], 0
 ; CHECK: [[insert111:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] [[insert000]], { <4 x i8> } [[insert11]], 1
 ; CHECK: store [[out]] [[insert111]], ptr addrspace(1)
 

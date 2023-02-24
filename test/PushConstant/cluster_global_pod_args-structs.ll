@@ -25,19 +25,19 @@ entry:
 
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld]] to i8
-  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] undef, i8 [[cast]], 0
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] undef, %3 [[in]], 0
+  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] poison, i8 [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] poison, %3 [[in]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <4 x i8>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast]], i64 1
-  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] undef, i8 [[ex]], 0
+  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] poison, i8 [[ex]], 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] [[in0]], %3 [[in]], 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <4 x i8>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast]], i64 2
-  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] undef, i8 [[ex]], 0
+  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] poison, i8 [[ex]], 0
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] [[in1]], %3 [[in]], 2
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld]] to <4 x i8>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast]], i64 3
-  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] undef, i8 [[ex]], 0
+  ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] poison, i8 [[ex]], 0
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] [[in2]], %3 [[in]], 3
   ret void
 }
@@ -53,9 +53,9 @@ entry:
   ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 4), align 4
   ; CHECK: [[ld5:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 5), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s3]] undef, i8 [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s3]] poison, i8 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld2]] to i8
-  ; CHECK: [[in00:%[a-zA-Z0-9_.]+]] = insertvalue [[s2]] undef, i8 [[cast]], 0
+  ; CHECK: [[in00:%[a-zA-Z0-9_.]+]] = insertvalue [[s2]] poison, i8 [[cast]], 0
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld4]] to i64
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld5]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32

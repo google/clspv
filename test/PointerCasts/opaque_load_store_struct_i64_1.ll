@@ -12,11 +12,11 @@
 ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[zext1]], 32
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[zext0]], [[shl]]
 ; CHECK-DAG: [[trunc0:%[a-zA-Z0-9_.]+]] = trunc i64 [[or]] to i32
-; CHECK-DAG: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i32] undef, i32 [[trunc0]], 0
+; CHECK-DAG: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i32] poison, i32 [[trunc0]], 0
 ; CHECK-DAG: [[lshr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 32
 ; CHECK-DAG: [[trunc1:%[a-zA-Z0-9_.]+]] = trunc i64 [[lshr]] to i32
 ; CHECK-DAG: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i32] [[insert0]], i32 [[trunc1]], 1
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue [[struct]] undef, [2 x i32] [[insert1]], 0
+; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue [[struct]] poison, [2 x i32] [[insert1]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr [[struct]], ptr addrspace(1) %1, i32 0
 ; CHECK: store [[struct]] [[insert]], ptr addrspace(1) [[gep]]
 

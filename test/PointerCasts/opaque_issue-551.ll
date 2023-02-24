@@ -5,7 +5,7 @@
 ; CHECK: [[val1:%[a-zA-Z0-9_]+]] = load i8, ptr addrspace(1) [[gep1]]
 ; CHECK: [[gep2:%[a-zA-Z0-9_]+]] = getelementptr i8, ptr addrspace(1) %0, i32 1
 ; CHECK: [[val2:%[a-zA-Z0-9_]+]] = load i8, ptr addrspace(1) [[gep2]]
-; CHECK: [[insert1:%[^ ]+]] = insertelement <2 x i8> undef, i8 [[val1]], i32 0
+; CHECK: [[insert1:%[^ ]+]] = insertelement <2 x i8> poison, i8 [[val1]], i32 0
 ; CHECK: [[insert2:%[^ ]+]] = insertelement <2 x i8> [[insert1]], i8 [[val2]], i32 1
 ; CHECK: [[bitcast:%[^ ]+]] = bitcast <2 x i8> [[insert2]] to i16
 ; CHECK: store i16 [[bitcast]], ptr addrspace(1) %out, align 2

@@ -21,11 +21,11 @@ entry:
   ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 4), align 4
 
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
-  ; CHECK: [[s_in0:%[a-zA-Z0-9_.]+]] = insertvalue %original undef, i8 [[cast]], 0
+  ; CHECK: [[s_in0:%[a-zA-Z0-9_.]+]] = insertvalue %original poison, i8 [[cast]], 0
 
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x i16>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <2 x i16> [[cast]], i64 1
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] undef, i16 [[ex]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] poison, i16 [[ex]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld1]] to i16
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] [[in0]], i16 [[cast]], 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld1]] to <2 x i16>

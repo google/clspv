@@ -12,15 +12,15 @@ entry:
 
 declare spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float>, i32, ptr addrspace(1))
 
-; CHECK:  [[b01:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 0, i32 1>
-; CHECK:  [[b23:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 2, i32 3>
-; CHECK:  [[b45:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 4, i32 5>
-; CHECK:  [[b67:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> undef, <2 x i32> <i32 6, i32 7>
+; CHECK:  [[b01:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> poison, <2 x i32> <i32 0, i32 1>
+; CHECK:  [[b23:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> poison, <2 x i32> <i32 2, i32 3>
+; CHECK:  [[b45:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> poison, <2 x i32> <i32 4, i32 5>
+; CHECK:  [[b67:%[^ ]+]] = shufflevector <8 x float> %b, <8 x float> poison, <2 x i32> <i32 6, i32 7>
 ; CHECK:  [[b01i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b01]])
 ; CHECK:  [[b23i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b23]])
 ; CHECK:  [[b45i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b45]])
 ; CHECK:  [[b67i32:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[b67]])
-; CHECK:  [[bv0:%[^ ]+]] = insertelement <4 x i32> undef, i32 [[b01i32]], i32 0
+; CHECK:  [[bv0:%[^ ]+]] = insertelement <4 x i32> poison, i32 [[b01i32]], i32 0
 ; CHECK:  [[bv1:%[^ ]+]] = insertelement <4 x i32> [[bv0]], i32 [[b23i32]], i32 1
 ; CHECK:  [[bv2:%[^ ]+]] = insertelement <4 x i32> [[bv1]], i32 [[b45i32]], i32 2
 ; CHECK:  [[bv3:%[^ ]+]] = insertelement <4 x i32> [[bv2]], i32 [[b67i32]], i32 3

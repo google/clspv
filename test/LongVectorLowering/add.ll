@@ -19,11 +19,11 @@ entry:
 
   %add = add <8 x i32> %a, %b
 
-  %c = shufflevector <8 x i32> %add, <8 x i32> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+  %c = shufflevector <8 x i32> %add, <8 x i32> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
   %ptr4 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 4
   store <4 x i32> %c, <4 x i32> addrspace(1)* %ptr4, align 16
 
-  %d = shufflevector <8 x i32> %add, <8 x i32> undef, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
+  %d = shufflevector <8 x i32> %add, <8 x i32> poison, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
   %ptr5 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 5
   store <4 x i32> %d, <4 x i32> addrspace(1)* %ptr5, align 16
 
@@ -59,19 +59,19 @@ entry:
 
   %add = add <16 x i32> %c, <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14, i32 15>
 
-  %d = shufflevector <16 x i32> %add, <16 x i32> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+  %d = shufflevector <16 x i32> %add, <16 x i32> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
   %ptr4 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 4
   store <4 x i32> %d, <4 x i32> addrspace(1)* %ptr4, align 16
 
-  %e = shufflevector <16 x i32> %add, <16 x i32> undef, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
+  %e = shufflevector <16 x i32> %add, <16 x i32> poison, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
   %ptr5 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 5
   store <4 x i32> %e, <4 x i32> addrspace(1)* %ptr5, align 16
 
-  %f = shufflevector <16 x i32> %add, <16 x i32> undef, <4 x i32> <i32 8, i32 9, i32 10, i32 11>
+  %f = shufflevector <16 x i32> %add, <16 x i32> poison, <4 x i32> <i32 8, i32 9, i32 10, i32 11>
   %ptr6 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 6
   store <4 x i32> %f, <4 x i32> addrspace(1)* %ptr6, align 16
 
-  %g = shufflevector <16 x i32> %add, <16 x i32> undef, <4 x i32> <i32 12, i32 13, i32 14, i32 15>
+  %g = shufflevector <16 x i32> %add, <16 x i32> poison, <4 x i32> <i32 12, i32 13, i32 14, i32 15>
   %ptr7 = getelementptr <4 x i32>, <4 x i32> addrspace(1)* %ptr, i32 7
   store <4 x i32> %g, <4 x i32> addrspace(1)* %ptr7, align 16
 

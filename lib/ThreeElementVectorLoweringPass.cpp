@@ -88,7 +88,7 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy) {
     return B.CreateBitCast(V, EquivalentTy);
   }
 
-  Value *NewValue = UndefValue::get(EquivalentTy);
+  Value *NewValue = PoisonValue::get(EquivalentTy);
 
   if (EquivalentTy->isStructTy()) {
     StructType *StructTy = dyn_cast<StructType>(EquivalentTy);
@@ -367,6 +367,9 @@ Value *clspv::ThreeElementVectorLoweringPass::visitConstant(Constant &Cst) {
     return Constant::getNullValue(EquivalentTy);
   }
 
+  if (isa<PoisonValue>(Cst)) {
+    return PoisonValue::get(EquivalentTy);
+  }
   if (isa<UndefValue>(Cst)) {
     return UndefValue::get(EquivalentTy);
   }
@@ -794,14 +797,14 @@ Value *clspv::ThreeElementVectorLoweringPass::visitShuffleVectorInst(
   unsigned LHSArity = LHSTy->getElementCount().getFixedValue();
 
   // Construct the equivalent shuffled vector, as a struct or a vector.
-  Value *V = UndefValue::get(EquivalentType);
+  Value *V = PoisonValue::get(EquivalentType);
   for (unsigned i = 0; i < Arity; ++i) {
     int Mask = I.getMaskValue(i);
     assert(-1 <= Mask && "Unexpected mask value.");
 
     Value *Scalar = nullptr;
     if (Mask == -1) {
-      Scalar = UndefValue::get(ScalarTy);
+      Scalar = PoisonValue::get(ScalarTy);
     } else if (static_cast<unsigned>(Mask) < LHSArity) {
       Scalar = getScalar(EquivalentLHS, Mask);
     } else {

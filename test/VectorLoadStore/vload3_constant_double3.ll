@@ -17,7 +17,7 @@ declare <3 x double> @_Z6vload3Dv3_jPU3AS2d(i32, ptr addrspace(2))
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 0
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr double, ptr addrspace(2) %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load double, ptr addrspace(2) [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x double> undef, double [[ld]], i64 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <3 x double> poison, double [[ld]], i64 0
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add i32 [[mul]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr double, ptr addrspace(2) %in, i32 [[add]]
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load double, ptr addrspace(2) [[gep]]

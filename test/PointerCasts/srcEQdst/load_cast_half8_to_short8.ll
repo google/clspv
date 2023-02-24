@@ -25,7 +25,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[bitcast6:%[^ ]+]] = bitcast half [[extract6]] to i16
 ; CHECK: [[bitcast7:%[^ ]+]] = bitcast half [[extract7]] to i16
 
-; CHECK: [[insert0:%[^ ]+]] = insertvalue [8 x i16] undef, i16 [[bitcast0]], 0
+; CHECK: [[insert0:%[^ ]+]] = insertvalue [8 x i16] poison, i16 [[bitcast0]], 0
 ; CHECK: [[insert1:%[^ ]+]] = insertvalue [8 x i16] [[insert0]], i16 [[bitcast1]], 1
 ; CHECK: [[insert2:%[^ ]+]] = insertvalue [8 x i16] [[insert1]], i16 [[bitcast2]], 2
 ; CHECK: [[insert3:%[^ ]+]] = insertvalue [8 x i16] [[insert2]], i16 [[bitcast3]], 3

@@ -774,7 +774,7 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
         Builder.CreateTrunc(Builder.CreateLShr(mul, ScalarSizeInBits), Ty);
 
     return Builder.CreateInsertValue(
-        Builder.CreateInsertValue(UndefValue::get(RetTy), mul_lo, {0}), mul_hi,
+        Builder.CreateInsertValue(PoisonValue::get(RetTy), mul_lo, {0}), mul_hi,
         {1});
   } else if (ScalarSizeInBits == 64 || (ScalarSizeInBits == 32 && !Int64)) {
     /*
@@ -879,7 +879,7 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
     }
 
     return Builder.CreateInsertValue(
-        Builder.CreateInsertValue(UndefValue::get(RetTy), mul_lo, {0}), mul_hi,
+        Builder.CreateInsertValue(PoisonValue::get(RetTy), mul_lo, {0}), mul_hi,
         {1});
   } else {
     llvm_unreachable("Unexpected type for InsertOpMulExtended");
@@ -1968,7 +1968,7 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
     auto VecType = cast<VectorType>(VectorArg->getType());
 
     for (auto arg : ArgsToSplat) {
-      Value *NewVectorArg = UndefValue::get(VecType);
+      Value *NewVectorArg = PoisonValue::get(VecType);
       for (size_t i = 0; i < VecType->getElementCount().getKnownMinValue();
            i++) {
         auto index = ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
@@ -2090,7 +2090,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
     auto elems_const = clspv::PointersAre64Bit(*F.getParent())
                            ? builder.getInt64(elems)
                            : builder.getInt32(elems);
-    V = UndefValue::get(ret_type);
+    V = PoisonValue::get(ret_type);
     auto adjust = builder.CreateMul(offset, elems_const);
     for (unsigned i = 0; i < elems; ++i) {
       auto idx = clspv::PointersAre64Bit(*F.getParent()) ? builder.getInt64(i)
@@ -2367,7 +2367,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
 
     // Create the final float3 to be returned
     auto Combine =
-        InsertElementInst::Create(UndefValue::get(Float3Ty), Y0, Int0, "", CI);
+        InsertElementInst::Create(PoisonValue::get(Float3Ty), Y0, Int0, "", CI);
     Combine = InsertElementInst::Create(Combine, Y1, Int1, "", CI);
     Combine = InsertElementInst::Create(Combine, Y2, Int2, "", CI);
 
@@ -2793,7 +2793,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
 
     // Insert our value into a float2 so that we can pack it.
     auto TempVec = InsertElementInst::Create(
-        UndefValue::get(Float2Ty), Arg0, ConstantInt::get(IntTy, 0), "", CI);
+        PoisonValue::get(Float2Ty), Arg0, ConstantInt::get(IntTy, 0), "", CI);
 
     // Pack the float2 -> half2 (in an int).
     auto X = CallInst::Create(NewF, TempVec, "", CI);
@@ -3005,13 +3005,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
     auto X0 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
     auto X1 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
     auto X2 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
 
     // Our intrinsic to pack a float2 to an int.
@@ -3084,13 +3084,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
     auto X0 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
     auto X1 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
     auto X2 = InsertElementInst::Create(
-        UndefValue::get(Float2Ty),
+        PoisonValue::get(Float2Ty),
         ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
 
     // Our intrinsic to pack a float2 to an int.
@@ -3156,14 +3156,14 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
                                   ConstantInt::get(IntTy, 1)};
 
     // Extract out the x & y components of our to store value.
-    auto Lo = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto Lo = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(LoShuffleMask), "", CI);
 
     Constant *HiShuffleMask[2] = {ConstantInt::get(IntTy, 2),
                                   ConstantInt::get(IntTy, 3)};
 
     // Extract out the z & w components of our to store value.
-    auto Hi = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto Hi = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(HiShuffleMask), "", CI);
 
     // Our intrinsic to pack a float2 to an int.
@@ -3178,7 +3178,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
     auto Y = CallInst::Create(NewF, Hi, "", CI);
 
     auto Combine = InsertElementInst::Create(
-        UndefValue::get(Int2Ty), X, ConstantInt::get(IntTy, 0), "", CI);
+        PoisonValue::get(Int2Ty), X, ConstantInt::get(IntTy, 0), "", CI);
     Combine = InsertElementInst::Create(Combine, Y, ConstantInt::get(IntTy, 1),
                                         "", CI);
 
@@ -3219,22 +3219,22 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
     Constant *ShuffleMask01[2] = {ConstantInt::get(IntTy, 0),
                                   ConstantInt::get(IntTy, 1)};
     auto X01 =
-        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                               ConstantVector::get(ShuffleMask01), "", CI);
     Constant *ShuffleMask23[2] = {ConstantInt::get(IntTy, 2),
                                   ConstantInt::get(IntTy, 3)};
     auto X23 =
-        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                               ConstantVector::get(ShuffleMask23), "", CI);
     Constant *ShuffleMask45[2] = {ConstantInt::get(IntTy, 4),
                                   ConstantInt::get(IntTy, 5)};
     auto X45 =
-        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                               ConstantVector::get(ShuffleMask45), "", CI);
     Constant *ShuffleMask67[2] = {ConstantInt::get(IntTy, 6),
                                   ConstantInt::get(IntTy, 7)};
     auto X67 =
-        new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                               ConstantVector::get(ShuffleMask67), "", CI);
 
     // Our intrinsic to pack a float2 to an int.
@@ -3248,7 +3248,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
     auto Y67 = CallInst::Create(NewF, X67, "", CI);
 
     auto Combine = InsertElementInst::Create(
-        UndefValue::get(Int4Ty), Y01, ConstantInt::get(IntTy, 0), "", CI);
+        PoisonValue::get(Int4Ty), Y01, ConstantInt::get(IntTy, 0), "", CI);
     Combine = InsertElementInst::Create(Combine, Y23,
                                         ConstantInt::get(IntTy, 1), "", CI);
     Combine = InsertElementInst::Create(Combine, Y45,
@@ -3294,35 +3294,35 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
 
     Constant *ShuffleMask0[2] = {ConstantInt::get(IntTy, 0),
                                  ConstantInt::get(IntTy, 1)};
-    auto X0 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X0 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask0), "", CI);
     Constant *ShuffleMask1[2] = {ConstantInt::get(IntTy, 2),
                                  ConstantInt::get(IntTy, 3)};
-    auto X1 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X1 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask1), "", CI);
     Constant *ShuffleMask2[2] = {ConstantInt::get(IntTy, 4),
                                  ConstantInt::get(IntTy, 5)};
-    auto X2 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X2 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask2), "", CI);
     Constant *ShuffleMask3[2] = {ConstantInt::get(IntTy, 6),
                                  ConstantInt::get(IntTy, 7)};
-    auto X3 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X3 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask3), "", CI);
     Constant *ShuffleMask4[2] = {ConstantInt::get(IntTy, 8),
                                  ConstantInt::get(IntTy, 9)};
-    auto X4 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X4 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask4), "", CI);
     Constant *ShuffleMask5[2] = {ConstantInt::get(IntTy, 10),
                                  ConstantInt::get(IntTy, 11)};
-    auto X5 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X5 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask5), "", CI);
     Constant *ShuffleMask6[2] = {ConstantInt::get(IntTy, 12),
                                  ConstantInt::get(IntTy, 13)};
-    auto X6 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X6 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask6), "", CI);
     Constant *ShuffleMask7[2] = {ConstantInt::get(IntTy, 14),
                                  ConstantInt::get(IntTy, 15)};
-    auto X7 = new ShuffleVectorInst(Arg0, UndefValue::get(Arg0->getType()),
+    auto X7 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
                                     ConstantVector::get(ShuffleMask7), "", CI);
 
     // Our intrinsic to pack a float2 to an int.
@@ -3340,7 +3340,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     auto Y7 = CallInst::Create(NewF, X7, "", CI);
 
     auto Combine1 = InsertElementInst::Create(
-        UndefValue::get(Int4Ty), Y0, ConstantInt::get(IntTy, 0), "", CI);
+        PoisonValue::get(Int4Ty), Y0, ConstantInt::get(IntTy, 0), "", CI);
     Combine1 = InsertElementInst::Create(Combine1, Y1,
                                          ConstantInt::get(IntTy, 1), "", CI);
     Combine1 = InsertElementInst::Create(Combine1, Y2,
@@ -3349,7 +3349,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
                                          ConstantInt::get(IntTy, 3), "", CI);
 
     auto Combine2 = InsertElementInst::Create(
-        UndefValue::get(Int4Ty), Y4, ConstantInt::get(IntTy, 0), "", CI);
+        PoisonValue::get(Int4Ty), Y4, ConstantInt::get(IntTy, 0), "", CI);
     Combine2 = InsertElementInst::Create(Combine2, Y5,
                                          ConstantInt::get(IntTy, 1), "", CI);
     Combine2 = InsertElementInst::Create(Combine2, Y6,
@@ -3561,15 +3561,15 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
         ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
 
     Constant *FloatVec[3] = {ConstantFP::get(FloatTy, 0.0f),
-                             UndefValue::get(FloatTy),
-                             UndefValue::get(FloatTy)};
+                             PoisonValue::get(FloatTy),
+                             PoisonValue::get(FloatTy)};
 
     auto Vec4Ty = CI->getArgOperand(0)->getType();
     auto Arg0 =
-        new ShuffleVectorInst(CI->getArgOperand(0), UndefValue::get(Vec4Ty),
+        new ShuffleVectorInst(CI->getArgOperand(0), PoisonValue::get(Vec4Ty),
                               ConstantVector::get(DownShuffleMask), "", CI);
     auto Arg1 =
-        new ShuffleVectorInst(CI->getArgOperand(1), UndefValue::get(Vec4Ty),
+        new ShuffleVectorInst(CI->getArgOperand(1), PoisonValue::get(Vec4Ty),
                               ConstantVector::get(DownShuffleMask), "", CI);
     auto Vec3Ty = Arg0->getType();
 

@@ -10,7 +10,7 @@ target triple = "spir-unknown-unknown"
 ; CHECK: [[add0:%[a-zA-Z0-9_.]+]] = add i32 [[shl]], 1
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr addrspace(1) %0, i32 [[add0]]
 ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load float, ptr addrspace(1) [[gep]]
-; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> undef, float [[ld0]], i32 0
+; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> poison, float [[ld0]], i32 0
 ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x float> [[in0]], float [[ld1]], i32 1
 ; CHECK: bitcast <2 x float> [[in1]] to <4 x i16>
 define spir_kernel void @foo(ptr addrspace(1) %a, ptr addrspace(1) %b, i32 %i) {

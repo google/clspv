@@ -19,7 +19,7 @@ entry:
   ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
   ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [16 x i8] undef, i8 [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [16 x i8] poison, i8 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <4 x i8>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast]], i64 1
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [16 x i8] [[in0]], i8 [[ex]], 1
@@ -74,7 +74,7 @@ entry:
   ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
   ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i16
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] undef, i16 [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] poison, i16 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x i16>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <2 x i16> [[cast]], i64 1
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] [[in0]], i16 [[ex]], 1
@@ -104,7 +104,7 @@ entry:
   ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
   ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
   ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] undef, i32 [[ld0]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] poison, i32 [[ld0]], 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] [[in0]], i32 [[ld1]], 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] [[in1]], i32 [[ld2]], 2
   ; CHECK: [[in3:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] [[in2]], i32 [[ld3]], 3
@@ -123,7 +123,7 @@ entry:
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld1]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32
   ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[ex0]], [[shl]]
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i64] undef, i64 [[or]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x i64] poison, i64 [[or]], 0
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld2]] to i64
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld3]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32
@@ -142,7 +142,7 @@ entry:
   ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x half>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <2 x half> [[cast]], i64 0
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x half] undef, half [[ex]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x half] poison, half [[ex]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x half>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <2 x half> [[cast]], i64 1
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x half] [[in0]], half [[ex]], 1
@@ -176,7 +176,7 @@ entry:
   ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
   ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to float
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x float] undef, float [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x float] poison, float [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld1]] to float
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [4 x float] [[in0]], float [[cast]], 1
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld2]] to float
@@ -199,7 +199,7 @@ entry:
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32
   ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[ex0]], [[shl]]
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i64 [[or]] to double
-  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x double] undef, double [[cast]], 0
+  ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [2 x double] poison, double [[cast]], 0
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld2]] to i64
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld3]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32
