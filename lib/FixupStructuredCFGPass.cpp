@@ -24,6 +24,51 @@ using namespace llvm;
 PreservedAnalyses
 clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
   // Assumes CFG has been structurized.
+  breakConditionalHeader(F, FAM);
+  isolateContinue(F, FAM);
+
+  PreservedAnalyses PA;
+  return PA;
+}
+
+void clspv::FixupStructuredCFGPass::breakConditionalHeader(
+    Function &F, FunctionAnalysisManager &FAM) {
+  auto &LI = FAM.getResult<LoopAnalysis>(F);
+
+  std::vector<BasicBlock *> blocks;
+  blocks.reserve(F.size());
+  for (auto &BB : F) {
+    blocks.push_back(&BB);
+  }
+
+  // Loop for loop headers that are terminated by a conditional branch with both
+  // edges entering the body of the loop. In such a case, split the header so
+  // that the conditional branch occurs in the body of the loop.
+  for (auto *BB : blocks) {
+    if (!LI.isLoopHeader(BB))
+      continue;
+
+    auto *terminator = dyn_cast_or_null<BranchInst>(BB->getTerminator());
+    if (!terminator || !terminator->isConditional())
+      continue;
+
+    auto *loop = LI.getLoopFor(BB);
+    auto *latch = loop->getLoopLatch();
+    auto *exit = loop->getUniqueExitBlock();
+
+    auto *succ1 = terminator->getSuccessor(0);
+    auto *succ2 = terminator->getSuccessor(1);
+    bool succ1_in_body = succ1 != latch && succ1 != exit;
+    bool succ2_in_body = succ2 != latch && succ2 != exit;
+
+    if (succ1_in_body && succ2_in_body) {
+      BB->splitBasicBlockBefore(terminator);
+    }
+  }
+}
+
+void clspv::FixupStructuredCFGPass::isolateContinue(
+    Function &F, FunctionAnalysisManager &FAM) {
   auto &LI = FAM.getResult<LoopAnalysis>(F);
 
   SmallVector<Loop *, 16> loops;
@@ -99,7 +144,4 @@ clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
       }
     }
   }
-
-  PreservedAnalyses PA;
-  return PA;
 }

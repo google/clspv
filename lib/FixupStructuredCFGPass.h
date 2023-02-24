@@ -21,7 +21,12 @@
 namespace clspv {
 struct FixupStructuredCFGPass : llvm::PassInfoMixin<FixupStructuredCFGPass> {
   llvm::PreservedAnalyses run(llvm::Function &F,
-                              llvm::FunctionAnalysisManager &);
+                              llvm::FunctionAnalysisManager &FAM);
+
+private:
+  void breakConditionalHeader(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
+  void isolateContinue(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
+
 };
 } // namespace clspv
 
