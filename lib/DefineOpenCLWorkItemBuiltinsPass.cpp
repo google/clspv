@@ -426,19 +426,19 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
   if (isSupportEnabled) {
     auto Dim = &*F->arg_begin();
     auto InBoundsDim = inBoundsDimensionIndex(Builder, Dim);
-    Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
     Value *gep = nullptr;
     auto *VecTy = FixedVectorType::get(Int32Ty, 3);
     const bool uses_push_constant =
         clspv::ShouldDeclareGlobalOffsetPushConstant(M);
     if (uses_push_constant) {
-      auto GoffPtr =
-          GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset);
-      gep = Builder.CreateInBoundsGEP(VecTy, GoffPtr, Indices);
+      Value *Indices[] = {InBoundsDim};
+      gep = GetPushConstantPointer(BB, clspv::PushConstant::GlobalOffset,
+                                   Indices);
     } else {
       StringRef name = "__spirv_GlobalOffset";
       auto offset_var = createGlobalVariable(M, name, VecTy,
                                              AddressSpace::ModuleScopePrivate);
+      Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
       gep = Builder.CreateInBoundsGEP(VecTy, offset_var, Indices);
     }
     auto load = Builder.CreateLoad(Int32Ty, gep);
