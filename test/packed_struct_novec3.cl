@@ -8,9 +8,6 @@
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// TODO(#1009): three element lowering is proceeding differently for opaque pointers.
-// XFAIL: *
-
 struct S1{
     int3 x;
     int y;
@@ -61,7 +58,6 @@ __kernel void test(__global int *a) {
 // CHECK-DAG: [[uintv4workgroup:%[^ ]+]] = OpTypePointer Workgroup [[uintv4]]
 // CHECK-DAG: [[uint12:%[^ ]+]] = OpConstant [[uint]] 12
 // CHECK-DAG: [[uint64:%[^ ]+]] = OpConstant [[uint]] 64
-// CHECK-64-DAG: [[ulong0:%[^ ]+]] = OpConstant [[ulong]] 0
 // CHECK-DAG: [[uchararray12:%[^ ]+]] = OpTypeArray [[uchar]] [[uint12]]
 // CHECK-DAG: [[S1:%[^ ]+]] = OpTypeStruct [[uintv3]] [[uint]]
 // CHECK-DAG: [[S2:%[^ ]+]] = OpTypeStruct [[uintv4]] [[uint]] [[uchararray12]]
@@ -74,8 +70,7 @@ __kernel void test(__global int *a) {
 // CHECK: [[s1:%[^ ]+]] = OpVariable [[S1arrayptr]] Workgroup
 // CHECK: [[s2:%[^ ]+]] = OpVariable [[S2arrayptr]] Workgroup
 // CHECK: [[gidptr:%[^ ]+]] = OpVariable [[uintv3input]] Input
-// CHECK-64: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[ulong0]]
-// CHECK-32: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[uint0]]
+// CHECK: [[gidgep:%[^ ]+]] = OpAccessChain [[uintinput]] [[gidptr]] [[uint0]]
 // CHECK: [[gid:%[^ ]+]] = OpLoad [[uint]] [[gidgep]]
 // CHECK-64: [[gid_long:%[^ ]+]] = OpSConvert [[ulong]] [[gid]]
 // CHECK-64: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid_long]] [[uint0]]
