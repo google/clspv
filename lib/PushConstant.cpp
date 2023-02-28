@@ -287,7 +287,12 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
         auto new_gep = ConstantExpr::getGetElementPtr(
             push_constant_ty, new_GV, indices, gep_operator->isInBounds());
         user->replaceAllUsesWith(new_gep);
+      } else if (auto load = dyn_cast<LoadInst>(user)) {
+        auto new_load = new LoadInst(load->getType(), new_GV, "", load);
+        load->replaceAllUsesWith(new_load);
+        load->eraseFromParent();
       } else {
+        user->print(errs());
         assert(false && "unexpected global use");
       }
     }
