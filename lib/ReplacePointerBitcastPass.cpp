@@ -148,12 +148,22 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
 // type. Descends through the first element of the `ContainingTy` until it is
 // found or it cannot descend any further. Writes out levels of indirection to
 // `Steps`.
-bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps) {
+bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
+                               bool &PerfectMatch, const DataLayout &DL) {
   int StepCount = 0;
 
+  auto IsIntegerOrFloatTy = [](Type *Ty) {
+    return Ty->isIntegerTy() || Ty->isFloatTy();
+  };
+  auto SimilarType = [&DL, &IsIntegerOrFloatTy](Type *Ty1, Type *Ty2) {
+    return Ty1 == Ty2 || (SizeInBits(DL, Ty1) == SizeInBits(DL, Ty2) &&
+                          IsIntegerOrFloatTy(Ty1) && IsIntegerOrFloatTy(Ty2));
+  };
+
   do {
-    if (ContainingTy == TargetTy) {
+    if (SimilarType(ContainingTy, TargetTy)) {
       Steps = StepCount;
+      PerfectMatch = ContainingTy == TargetTy;
       return true;
     }
     StepCount++;
@@ -170,7 +180,7 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps) {
       break;
     }
   } while (ContainingTy->isAggregateType() || ContainingTy->isVectorTy() ||
-           ContainingTy == TargetTy);
+           SimilarType(ContainingTy, TargetTy));
 
   return false;
 }
@@ -311,7 +321,7 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
       OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
       while (
           (SrcTy->isVectorTy() || SrcTy->isArrayTy() || SrcTy->isStructTy()) &&
-          SrcTyBitWidth > DstTyBitWidth) {
+          SrcTyBitWidth > DstTyBitWidth && InAddrIdxs.size() > InIdx) {
         SrcTy = GetEleType(SrcTy);
         SrcTyBitWidth = SrcEleTyBitWidth;
         SrcEleTy = GetEleType(SrcTy);
@@ -529,90 +539,108 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   }
 }
 
+bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
+                     Instruction &I, Value *&source, Type *&source_ty,
+                     Type *&dest_ty) {
+  // The following checks use InferType to distinguish when a pointer's
+  // interpretation changes between instructions. This requires the input
+  // to be an instruction whose result provides a clear type for a
+  // pointer (e.g. gep, alloca, or global variable).
+  if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+    source = gep->getPointerOperand();
+    source_ty =
+        clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = gep->getSourceElementType();
+  } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
+    source = ld->getPointerOperand();
+    source_ty =
+        clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = ld->getType();
+  } else if (auto *st = dyn_cast<StoreInst>(&I)) {
+    source = st->getPointerOperand();
+    source_ty =
+        clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = st->getValueOperand()->getType();
+  }
+
+  // Skip pointer transforms when physical addressing will be used
+  if (source && !ReplacePhysicalPointerBitcasts &&
+      clspv::Option::PhysicalStorageBuffers()) {
+    if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
+      if (source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
+          source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant) {
+        return false;
+      }
+    }
+  }
+  return source_ty && dest_ty && source_ty != dest_ty;
+}
+
+void CleanModule(WeakInstructions &ToBeDeleted) {
+  // Remove all dead instructions, including their dead operands. Proceed with a
+  // fixed-point algorithm to handle dependencies.
+  for (bool Progress = true; Progress;) {
+    std::size_t PreviousSize = ToBeDeleted.size();
+
+    WeakInstructions Deads;
+    WeakInstructions NextBatch;
+    for (WeakTrackingVH Handle : ToBeDeleted) {
+      if (!Handle.pointsToAliveValue() || !isa<Instruction>(Handle))
+        continue;
+
+      auto *Inst = cast<Instruction>(Handle);
+
+      // We need to remove stores manually given they are never trivially dead.
+      if (auto *Store = dyn_cast<StoreInst>(Inst)) {
+        Store->eraseFromParent();
+        continue;
+      }
+
+      if (isInstructionTriviallyDead(Inst)) {
+        Deads.push_back(Handle);
+      } else {
+        NextBatch.push_back(Handle);
+      }
+    }
+
+    RecursivelyDeleteTriviallyDeadInstructions(Deads);
+
+    ToBeDeleted = std::move(NextBatch);
+    Progress = (ToBeDeleted.size() < PreviousSize);
+  }
+}
+
 } // namespace
 
 PreservedAnalyses
 clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
-  WeakInstructions ToBeDeleted;
-  SmallVector<Instruction *, 16> WorkList;
-  SmallVector<User *, 16> UserWorkList;
   DenseMap<Value *, Type *> type_cache;
-  DenseSet<Value *> ImplicitCasts;
-  DenseMap<Instruction *, int> ImplicitGEPs;
+  DenseMap<Instruction *, std::pair<int, bool>> ImplicitGEPs;
+  const DataLayout &DL = M.getDataLayout();
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        // The following checks use InferType to distinguish when a pointer's
-        // interpretation changes between instructions. This requires the input
-        // to be an instruction whose result provides a clear type for a
-        // pointer (e.g. gep, alloca, or global variable).
-        if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
-          source = gep->getPointerOperand();
-          source_ty = clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
-          dest_ty = gep->getSourceElementType();
-        } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
-          source = ld->getPointerOperand();
-          source_ty = clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
-          dest_ty = ld->getType();
-        } else if (auto *st = dyn_cast<StoreInst>(&I)) {
-          source = st->getPointerOperand();
-          source_ty = clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
-          dest_ty = st->getValueOperand()->getType();
-        }
-
-        // Skip pointer transforms when physical addressing will be used
-        if (source && !ReplacePhysicalPointerBitcasts &&
-            clspv::Option::PhysicalStorageBuffers()) {
-          if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
-            if (source_ptr_ty->getAddressSpace() ==
-                    clspv::AddressSpace::Global ||
-                source_ptr_ty->getAddressSpace() ==
-                    clspv::AddressSpace::Constant) {
-              continue;
-            }
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty))
+          continue;
+        int Steps = 0;
+        bool PerfectMatch;
+        if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
+                                      DL)) {
+          // Single level GEP is ok to transform, but beyond
+          // that the address math must be divided among other
+          // entries.
+          //
+          // TODO(#1004): something is wrong here. This passes
+          // the cts basic/kernel_preprocessor_macros, but fails
+          // test/PointerCasts/srcGTdst/load_cast_float2_to_float.ll
+          if ((Steps > 0 && !isa<GetElementPtrInst>(I)) || (Steps == 1)) {
+            ImplicitGEPs.insert({&I, std::make_pair(Steps, PerfectMatch)});
           }
-        }
-
-        if (source_ty && dest_ty && source_ty != dest_ty) {
-          int Steps = 0;
-          if (FindAliasingContainedType(source_ty, dest_ty, Steps)) {
-            // Single level GEP is ok to transform, but beyond that the address
-            // math must be divided among other entries.
-            //
-            // TODO(#1004): something is wrong here. This passes the cts
-            // basic/kernel_preprocessor_macros, but fails
-            // test/PointerCasts/srcGTdst/load_cast_float2_to_float.ll
-            if ((Steps > 0 && !isa<GetElementPtrInst>(I)) ||
-                (Steps == 1)) {
-              ImplicitGEPs.insert({&I, Steps});
-              continue;
-            }
-          }
-
-          bool ok = true;
-          UserWorkList.push_back(&I);
-          while (!UserWorkList.empty()) {
-            auto *user = UserWorkList.back();
-            UserWorkList.pop_back();
-
-            if (isa<GetElementPtrInst>(user)) {
-              for (auto *U : user->users())
-                UserWorkList.push_back(U);
-            } else if (!isa<StoreInst>(user) && !isa<LoadInst>(user)) {
-              ok = false;
-              break;
-            }
-          }
-          if (!ok)
-            continue;
-
-          ImplicitCasts.insert(source);
-          WorkList.push_back(&I);
         }
       }
     }
@@ -620,14 +648,17 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
   // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
   // handled by explcitly inserting the GEP.
+  WeakInstructions ToBeDeleted;
   for (auto GEPInfo : ImplicitGEPs) {
     auto *I = GEPInfo.first;
-    auto Steps = GEPInfo.second;
+    auto Steps = GEPInfo.second.first;
+    auto PerfectMatch = GEPInfo.second.second;
     IRBuilder<> Builder{I};
     SmallVector<Value *, 8> GEPIndices{};
     unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
 
-    if (!isa<LoadInst>(I) && !isa<StoreInst>(I) && !isa<GetElementPtrInst>(I)) {
+    if ((!isa<LoadInst>(I) && !isa<StoreInst>(I) &&
+         !isa<GetElementPtrInst>(I))) {
       continue;
     }
 
@@ -639,12 +670,95 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     auto *PointerOpType =
         clspv::InferType(PointerOp, M.getContext(), &type_cache);
     auto *NewGEP =
-        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices);
-    Builder.Insert(NewGEP);
-    I->setOperand(PointerOperandNum, NewGEP);
+      GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
+
+    if (!PerfectMatch) {
+      // Typical usecase here is a GEP on a struct of float, followed by a GEP
+      // on a int. Replace the last GEP by a GEP on a float.
+      if (auto gep = dyn_cast<GetElementPtrInst>(I)) {
+        assert(gep);
+        auto *NewCastGEP = GetElementPtrInst::Create(
+            NewGEP->getResultElementType(), NewGEP,
+            SmallVector<Value *, 1>(gep->indices()), "", I);
+        I->replaceAllUsesWith(NewCastGEP);
+        ToBeDeleted.push_back(I);
+      }
+    } else {
+      I->setOperand(PointerOperandNum, NewGEP);
+    }
   }
 
-  const DataLayout &DL = M.getDataLayout();
+  CleanModule(ToBeDeleted);
+
+  SmallVector<Instruction *, 16> WorkList;
+  DenseSet<Value *> ImplicitCasts;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty))
+          continue;
+        bool ok = true;
+        SmallVector<User *, 16> UserWorkList;
+        UserWorkList.push_back(&I);
+        while (!UserWorkList.empty()) {
+          auto *user = UserWorkList.back();
+          UserWorkList.pop_back();
+
+          if (isa<GetElementPtrInst>(user)) {
+            for (auto *U : user->users())
+              UserWorkList.push_back(U);
+          } else if (!isa<StoreInst>(user) && !isa<LoadInst>(user)) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok)
+          continue;
+
+        // For some reason, with opaque pointer, LLVM tends to transform
+        // memcpy/memset into a series of gep and load/store. But while the
+        // load/store are on i32 for example, it keeps the gep on i8 but with
+        // index multiples of sizeof(i32). To avoid such bitcast which leads to
+        // trying to store an i8 into a i32 element (which is not supported),
+        // upgrade those gep into gep on i32 with the appropriate indexes.
+        if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
+          SmallVector<Value *, 2> Indices(gep->indices());
+          if (Indices.size() == 1) {
+            if (auto cst = dyn_cast<ConstantInt>(Indices[0])) {
+              auto source_ty_size = SizeInBits(DL, source_ty);
+              auto dest_ty_size = SizeInBits(DL, dest_ty);
+              auto value = cst->getZExtValue();
+              unsigned new_source_ty_size = source_ty_size;
+              while (dest_ty_size > source_ty_size &&
+                     dest_ty_size % source_ty_size == 0 && value > 0 &&
+                     value % 2 == 0 && new_source_ty_size < 32) {
+                value /= 2;
+                new_source_ty_size *= 2;
+              }
+              if (source_ty_size != new_source_ty_size) {
+                Indices.clear();
+                Indices.push_back(
+                    ConstantInt::get(Type::getInt32Ty(M.getContext()), value));
+                auto new_type =
+                    Type::getIntNTy(M.getContext(), new_source_ty_size);
+                auto new_gep = GetElementPtrInst::Create(
+                    new_type, gep->getPointerOperand(), Indices, "", &I);
+
+                unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+                I.setOperand(PointerOperandNum, new_gep);
+              }
+            }
+          }
+        }
+
+        ImplicitCasts.insert(source);
+        WorkList.push_back(&I);
+      }
+    }
+  }
 
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
@@ -663,7 +777,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
                 SrcPtrTy->getAddressSpace() == clspv::AddressSpace::Global) {
               continue;
             }
-            UserWorkList.clear();
+            SmallVector<User *, 16> UserWorkList;
             for (auto User : I.users()) {
               UserWorkList.push_back(User);
             }
@@ -860,37 +974,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
-  // Remove all dead instructions, including their dead operands. Proceed with a
-  // fixed-point algorithm to handle dependencies.
-  for (bool Progress = true; Progress;) {
-    std::size_t PreviousSize = ToBeDeleted.size();
-
-    WeakInstructions Deads;
-    WeakInstructions NextBatch;
-    for (WeakTrackingVH Handle : ToBeDeleted) {
-      if (!Handle.pointsToAliveValue() || !isa<Instruction>(Handle))
-        continue;
-
-      auto *Inst = cast<Instruction>(Handle);
-
-      // We need to remove stores manually given they are never trivially dead.
-      if (auto *Store = dyn_cast<StoreInst>(Inst)) {
-        Store->eraseFromParent();
-        continue;
-      }
-
-      if (isInstructionTriviallyDead(Inst)) {
-        Deads.push_back(Handle);
-      } else {
-        NextBatch.push_back(Handle);
-      }
-    }
-
-    RecursivelyDeleteTriviallyDeadInstructions(Deads);
-
-    ToBeDeleted = std::move(NextBatch);
-    Progress = (ToBeDeleted.size() < PreviousSize);
-  }
+  CleanModule(ToBeDeleted);
 
   return PA;
 }
