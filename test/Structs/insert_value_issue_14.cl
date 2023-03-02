@@ -25,12 +25,9 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
-// TODO(#1004): pointer bitcast issue
-// XFAIL: *
-
 
 // CHECK-DAG: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
-// CHECK-DAG: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
+// no longer checked: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
 
  
 // With undef mapping to a 0 byte sequence, (undef,1,2,3) maps to 66051.

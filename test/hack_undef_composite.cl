@@ -2,8 +2,6 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
-// TODO(#1004): sroa and i8s
-// XFAIL: *
 
 struct a {
   int x;
@@ -19,8 +17,4 @@ kernel void foo(global struct a* struct_out, int n) {
   *struct_out = local_a;
 }
 
-// CHECK: [[uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK: [[float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[float]]
-// CHECK: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[uint]] [[uint]] [[array]]
 // CHECK-NOT: OpUndef

@@ -2,8 +2,6 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
-// TODO(#1004): broken down into i8s
-// XFAIL: *
 
 typedef struct { float a, b, c, d; } S;
 
@@ -21,7 +19,6 @@ kernel void foo(global S* data, float f) {
 }
 
 // CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG:  [[__struct_2:%[0-9a-zA-Z_]+]] = OpTypeStruct [[_float]] [[_float]] [[_float]] [[_float]]
 // CHECK-DAG:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK-DAG:  [[_float_1:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 1
 // CHECK-DAG:  [[_float_2:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 2

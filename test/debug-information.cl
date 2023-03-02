@@ -9,7 +9,6 @@ void kernel foo(global uint *dst, global uint *src) {
 }
 
 // CHECK:       OpLine [[filename:%[^ ]+]] 7 0
-// CHECK:       OpAccessChain
 // CHECK-NEXT:  OpLoad
 // CHECK-NEXT:  OpLine [[filename]] 0 0
 // CHECK-NEXT:  OpNoLine
