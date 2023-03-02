@@ -192,6 +192,15 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         auto op =
             static_cast<spv::Op>(cast<ConstantInt>(op_param)->getZExtValue());
         switch (op) {
+        case spv::Op::OpAtomicIAdd:
+        case spv::Op::OpAtomicISub:
+        case spv::Op::OpAtomicSMin:
+        case spv::Op::OpAtomicUMin:
+        case spv::Op::OpAtomicSMax:
+        case spv::Op::OpAtomicUMax:
+        case spv::Op::OpAtomicAnd:
+        case spv::Op::OpAtomicOr:
+        case spv::Op::OpAtomicXor:
         case spv::Op::OpAtomicIIncrement:
         case spv::Op::OpAtomicIDecrement:
         case spv::Op::OpAtomicCompareExchange:
