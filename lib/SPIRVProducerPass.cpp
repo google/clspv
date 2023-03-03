@@ -4290,7 +4290,6 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   SPIRVID RID;
 
   switch (Call->getCalledFunction()->getIntrinsicID()) {
-  case Intrinsic::dbg_addr:
   case Intrinsic::dbg_label:
   case Intrinsic::dbg_value:
   case Intrinsic::dbg_declare: {
