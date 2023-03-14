@@ -908,7 +908,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
 
     SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
-    // SmallVector<size_t, 4> DstTyBitWidths = getEleTypesBitWidths(DstTy, DL);
 
     // If we detect a private memory, the first index of the GEP will need to be
     // zero (meaning that we are not explicitly trying to access private memory
