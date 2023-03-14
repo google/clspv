@@ -610,6 +610,21 @@ void CleanModule(WeakInstructions &ToBeDeleted) {
   }
 }
 
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
+                                            Type *BaseTy) {
+  SmallVector<size_t, 4> TyBitWidths;
+  TyBitWidths.push_back(SizeInBits(DL, Ty));
+  while ((Ty->isArrayTy() || Ty->isVectorTy()) && Ty != BaseTy) {
+    Ty = GetEleType(Ty);
+    TyBitWidths.push_back(SizeInBits(DL, Ty));
+  }
+  return TyBitWidths;
+}
+
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL) {
+  return getEleTypesBitWidths(Ty, DL, nullptr);
+}
+
 } // namespace
 
 PreservedAnalyses
@@ -618,6 +633,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
   DenseMap<Value *, Type *> type_cache;
   DenseMap<Instruction *, std::pair<int, bool>> ImplicitGEPs;
+  DenseSet<GetElementPtrInst *> UnneededCasts;
   const DataLayout &DL = M.getDataLayout();
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -627,6 +643,14 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         Type *dest_ty = nullptr;
         if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty))
           continue;
+
+        if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+          if (source_ty == gep->getResultElementType()) {
+            UnneededCasts.insert(gep);
+            continue;
+          }
+        }
+
         int Steps = 0;
         bool PerfectMatch;
         if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
@@ -646,9 +670,41 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
+  WeakInstructions ToBeDeleted;
+  for (auto *GEP : UnneededCasts) {
+    Type *source = GEP->getSourceElementType();
+    Type *result = GEP->getResultElementType();
+    auto TyBitWidths = getEleTypesBitWidths(source, DL, result);
+
+    IRBuilder<> Builder(GEP);
+    Value *GEPIdx = nullptr;
+    assert(TyBitWidths.size() == (GEP->getNumOperands() - 1));
+    auto smallerTySize = TyBitWidths[TyBitWidths.size() - 1];
+    for (unsigned int i = 0; i < TyBitWidths.size(); i++) {
+      Value *Id = GEP->getOperand(i + 1);
+      if (auto cst = dyn_cast<ConstantInt>(Id)) {
+        if (cst->getZExtValue() == 0) {
+          continue;
+        }
+      }
+      Value *Mul = CreateMul(Builder, TyBitWidths[i] / smallerTySize, Id);
+      if (GEPIdx == nullptr) {
+        GEPIdx = Mul;
+      } else {
+        GEPIdx = Builder.CreateAdd(Mul, GEPIdx);
+      }
+    }
+    if (GEPIdx == nullptr) {
+      GEPIdx = Builder.getInt32(0);
+    }
+    SmallVector<Value *, 1> Indices{GEPIdx};
+    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(), Indices, "", GEP);
+    GEP->replaceAllUsesWith(NewGEP);
+    ToBeDeleted.push_back(GEP);
+  }
+
   // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
   // handled by explcitly inserting the GEP.
-  WeakInstructions ToBeDeleted;
   for (auto GEPInfo : ImplicitGEPs) {
     auto *I = GEPInfo.first;
     auto Steps = GEPInfo.second.first;
@@ -851,13 +907,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
     }
 
-    SmallVector<size_t, 4> SrcTyBitWidths;
-    Type *TmpTy = SrcTy;
-    SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
-    while (TmpTy->isArrayTy() || TmpTy->isVectorTy()) {
-      TmpTy = GetEleType(TmpTy);
-      SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
-    }
+    SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
+    // SmallVector<size_t, 4> DstTyBitWidths = getEleTypesBitWidths(DstTy, DL);
 
     // If we detect a private memory, the first index of the GEP will need to be
     // zero (meaning that we are not explicitly trying to access private memory
