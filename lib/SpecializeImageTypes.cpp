@@ -53,6 +53,7 @@ PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
         if (res == kNotSpecialized) {
           // Argument is an image, but no specializing information was found.
           // Assume the image is sampled with a float type.
+          // TODO(#1036): remove opaque struct support
           if (auto *ext_ty = dyn_cast<TargetExtType>(new_ty)) {
             SmallVector<Type *, 1> types(1, Type::getFloatTy(M.getContext()));
             SmallVector<uint32_t, 8> ints(ext_ty->int_params());

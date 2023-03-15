@@ -42,6 +42,7 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
     Type *inner_type = ptrTy->isOpaquePointerTy()
                            ? data_type
                            : ptrTy->getNonOpaquePointerElementType();
+    // TODO(#1036): remove opaque struct support
     if (clspv::IsSamplerType(inner_type)) {
       return clspv::ArgKind::Sampler;
     }

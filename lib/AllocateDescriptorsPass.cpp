@@ -97,6 +97,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   IRBuilder<> Builder(M.getContext());
   Type *sampler_ty = nullptr;
   Type *sampler_data_ty = nullptr;;
+  // TODO(#1036): remove opaque struct support
   if (init_fn->getReturnType()->isTargetExtTy()) {
     sampler_ty = init_fn->getReturnType();
     sampler_data_ty = init_fn->getReturnType();

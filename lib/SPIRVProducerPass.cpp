@@ -1941,6 +1941,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     StructType *STy = cast<StructType>(Canonical);
 
     // Handle sampler type.
+    // TODO(#1036): remove image and sampler opaque struct support
     if (STy->isOpaque()) {
       if (IsSamplerType(STy)) {
         //
