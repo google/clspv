@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll --passes="replace-pointer-bitcast,simplify-pointer-bitcast"
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr [8 x i32], ptr addrspace(2) @global, i32 0, i32 %n

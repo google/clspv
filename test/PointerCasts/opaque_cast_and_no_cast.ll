@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll --passes=replace-pointer-bitcast
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: for.body:

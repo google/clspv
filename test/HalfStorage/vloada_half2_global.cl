@@ -13,49 +13,46 @@ kernel void foo(global float2* A, global uint* B, uint n) {
   A[1] = vloada_half2(0, (global half*)B+2);
 }
 
-// CHECK-DAG: [[_half:%[a-zA-Z0-9_]+]] = OpTypeFloat 16
-// CHECK-DAG: [[_half2:%[a-zA-Z0-9_]+]] = OpTypeVector [[_half]] 2
-// CHECK-DAG: [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG: [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
-// CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK-64-DAG: [[_ulong:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
-// CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK-DAG: [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
-// CHECK-DAG: [[_uint_3:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 3
-// CHECK-64-DAG: [[_ulong_1:%[0-9a-zA-Z_]+]] = OpConstant [[_ulong]] 1
-// CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
-// CHECK: [[_33:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
+// CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32
+// CHECK-DAG: [[v2float:%[^ ]+]] = OpTypeVector [[float]] 2
+// CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
+// CHECK-DAG: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
+// CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
 
-// CHECK-64: [[_33_ulong:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]] [[_33]]
-// CHECK-64: [[shl:%[a-zA-Z0-9_]+]] = OpShiftLeftLogical [[_ulong]] [[_33_ulong]] [[_ulong_1]]
-// CHECK-64: [[shr:%[a-zA-Z0-9_]+]] = OpShiftRightLogical [[_ulong]] [[shl]] [[_ulong_1]]
-// CHECK-32: [[shl:%[a-zA-Z0-9_]+]] = OpShiftLeftLogical [[_uint]] [[_33]] [[_uint_1]]
-// CHECK-32: [[shr:%[a-zA-Z0-9_]+]] = OpShiftRightLogical [[_uint]] [[shl]] [[_uint_1]]
-// CHECK: [[gep:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} [[B:%[a-zA-Z0-9_]+]] [[_uint_0]] [[shr]]
-// CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[_uint]] [[gep]]
-// CHECK-64: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[_ulong]] [[shl]] [[_ulong_1]]
-// CHECK-32: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[_uint]] [[shl]] [[_uint_1]]
-// CHECK: [[cast:%[a-zA-Z0-9_]+]] = OpBitcast [[_half2]] [[ld]]
-// CHECK: [[ld0:%[a-zA-Z0-9_]+]] = OpVectorExtractDynamic [[_half]] [[cast]] [[and]]
+// CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 
-// CHECK-64: [[or:%[a-zA-Z0-9_]+]] = OpBitwiseOr [[_ulong]] [[shl]] [[_ulong_1]]
-// CHECK-64: [[shr:%[a-zA-Z0-9_]+]] = OpShiftRightLogical [[_ulong]] [[or]] [[_ulong_1]]
-// CHECK-32: [[or:%[a-zA-Z0-9_]+]] = OpBitwiseOr [[_uint]] [[shl]] [[_uint_1]]
-// CHECK-32: [[shr:%[a-zA-Z0-9_]+]] = OpShiftRightLogical [[_uint]] [[or]] [[_uint_1]]
-// CHECK: [[gep:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} [[B]] [[_uint_0]] [[shr]]
-// CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[_uint]] [[gep]]
-// CHECK-64: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[_ulong]] [[or]] [[_ulong_1]]
-// CHECK-32: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[_uint]] [[or]] [[_uint_1]]
-// CHECK: [[cast:%[a-zA-Z0-9_]+]] = OpBitcast [[_half2]] [[ld]]
-// CHECK: [[ld1:%[a-zA-Z0-9_]+]] = OpVectorExtractDynamic [[_half]] [[cast]] [[and]]
+// CHECK-DAG: [[_runtimearr_v2float:%[^ ]+]] = OpTypeRuntimeArray [[v2float]]
+// CHECK-DAG: [[_runtimearr_uint:%[^ ]+]] = OpTypeRuntimeArray [[uint]]
+// CHECK-DAG: [[_struct_12:%[^ ]+]] = OpTypeStruct [[_runtimearr_v2float]]
+// CHECK-DAG: [[_struct_16:%[^ ]+]] = OpTypeStruct [[_runtimearr_uint]]
+// CHECK-DAG: [[_struct_19:%[^ ]+]] = OpTypeStruct [[uint]]
+// CHECK-DAG: [[_struct_20:%[^ ]+]] = OpTypeStruct [[_struct_19]]
+// CHECK-DAG: [[_ptr_StorageBuffer__struct_12:%[^ ]+]] = OpTypePointer StorageBuffer [[_struct_12]]
+// CHECK-DAG: [[_ptr_StorageBuffer_v2float:%[^ ]+]] = OpTypePointer StorageBuffer [[v2float]]
+// CHECK-DAG: [[_ptr_StorageBuffer__struct_16:%[^ ]+]] = OpTypePointer StorageBuffer [[_struct_16]]
+// CHECK-DAG: [[_ptr_PushConstant__struct_20:%[^ ]+]] = OpTypePointer PushConstant [[_struct_20]]
+// CHECK-DAG: [[_ptr_PushConstant__struct_19:%[^ ]+]] = OpTypePointer PushConstant [[_struct_19]]
+// CHECK-DAG: [[_ptr_StorageBuffer_uint:%[^ ]+]] = OpTypePointer StorageBuffer [[uint]]
 
-// CHECK: [[construct:%[a-zA-Z0-9_]+]] = OpCompositeConstruct [[_half2]] [[ld0]] [[ld1]]
-// CHECK: [[cast:%[a-zA-Z0-9_]+]] = OpBitcast [[_uint]] [[construct]]
-// CHECK: [[unpack:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[cast]]
-// CHECK: OpStore {{.*}} [[unpack]]
+// CHECK-DAG: [[A:%[^ ]+]] = OpVariable [[_ptr_StorageBuffer__struct_12]] StorageBuffer
+// CHECK-DAG: [[B:%[^ ]+]] = OpVariable [[_ptr_StorageBuffer__struct_16]] StorageBuffer
+// CHECK-DAG: [[n:%[^ ]+]] = OpVariable [[_ptr_PushConstant__struct_20]] PushConstant
 
-// CHECK: [[gep:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} [[B]] [[_uint_0]] [[_uint_1]]
-// CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[_uint]] [[gep]]
-// CHECK: [[unpack:%[a-zA-Z0-9_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[ld]]
-// CHECK: OpStore {{.*}} [[unpack]]
+// CHECK-DAG: [[A0:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_v2float]] [[A]] [[uint_0]] [[uint_0]]
+// CHECK-DAG: [[A1:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_v2float]] [[A]] [[uint_0]] [[uint_1]]
+// CHECK-DAG: [[n0:%[^ ]+]] = OpAccessChain [[_ptr_PushConstant__struct_19]] [[n]] [[uint_0]]
+// CHECK-DAG: [[n0s:%[^ ]+]] = OpLoad [[_struct_19]] [[n0]]
+// CHECK-DAG: [[nVal:%[^ ]+]] = OpCompositeExtract [[uint]] [[n0s]] 0
+
+// CHECK-64-DAG: [[nValL:%[^ ]+]] = OpUConvert [[ulong]] [[nVal]]
+
+// CHECK-32-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]] [[nVal]]
+// CHECK-64-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]] [[nValL]]
+// CHECK-DAG: [[Bn:%[^ ]+]] = OpLoad [[uint]] [[BnPtr]]
+// CHECK-DAG: [[Bn2f:%[^ ]+]] = OpExtInst [[v2float]] {{.*}} UnpackHalf2x16 [[Bn]]
+// CHECK-DAG: OpStore [[A0]] [[Bn2f]]
+
+// CHECK-DAG: [[B1Ptr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]] [[uint_1]]
+// CHECK-DAG: [[B1:%[^ ]+]] = OpLoad [[uint]] [[B1Ptr]]
+// CHECK-DAG: [[B12f:%[^ ]+]] = OpExtInst [[v2float]] {{.*}} UnpackHalf2x16 [[B1]]
+// CHECK-DAG: OpStore [[A1]] [[B12f]]
