@@ -34,6 +34,7 @@ using namespace llvm;
 
 PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
                                                 ModuleAnalysisManager &) {
+  llvm::errs() << M << "\n";
   PreservedAnalyses PA;
   SmallVector<Function *, 8> kernels;
   for (auto &F : M) {
@@ -50,26 +51,46 @@ PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
       std::tie(res, new_ty) = RemapType(&Arg);
       if (res != ResultType::kNotImage) {
         if (res == kNotSpecialized) {
-          // Argument is an image, but not specializing information was found.
+          // Argument is an image, but no specializing information was found.
           // Assume the image is sampled with a float type.
-          std::string name = cast<StructType>(new_ty)->getName().str();
-          name += ".float";
-          if (name.find("_ro") != std::string::npos) {
-            name += ".sampled";
-          } else if (Option::Language() >= Option::SourceLanguage::OpenCL_C_20) {
-            // Treat write-only images as read-write images in OpenCL 2.0 or
-            // later to avoid duplicate image types getting generated in the
-            // SPIR.V.
-            auto pos = name.find("_wo");
-            if (pos != std::string::npos) {
-              name = name.substr(0, pos) + "_rw" + name.substr(pos + 3);
+          if (auto *ext_ty = dyn_cast<TargetExtType>(new_ty)) {
+            SmallVector<Type *, 1> types(1, Type::getFloatTy(M.getContext()));
+            SmallVector<uint32_t, 8> ints(ext_ty->int_params());
+            auto &access = ints[SpvImageTypeOperand::kAccessQualifier];
+            if (access == 0) {
+              ints[SpvImageTypeOperand::kSampled] = 1;
+            } else {
+              ints[SpvImageTypeOperand::kSampled] = 2;
             }
+
+            if (Option::Language() >= Option::SourceLanguage::OpenCL_C_20 && access == 1) {
+              // In OpenCL 2.0 treat write_only as read_write.
+              access = 2;
+            }
+            ints.push_back(0); // unsigned
+            new_ty = TargetExtType::get(M.getContext(), "spirv.Image", types, ints);
+          } else if (auto *struct_ty = dyn_cast<StructType>(new_ty)) {
+            std::string name = struct_ty->getName().str();
+            name += ".float";
+            if (name.find("_ro") != std::string::npos) {
+              name += ".sampled";
+            } else if (Option::Language() >=
+                       Option::SourceLanguage::OpenCL_C_20) {
+              // Treat write-only images as read-write images in OpenCL 2.0 or
+              // later to avoid duplicate image types getting generated in the
+              // SPIR.V.
+              auto pos = name.find("_wo");
+              if (pos != std::string::npos) {
+                name = name.substr(0, pos) + "_rw" + name.substr(pos + 3);
+              }
+            }
+            StructType *new_struct =
+                StructType::getTypeByName(M.getContext(), name);
+            if (!new_struct) {
+              new_struct = StructType::create(M.getContext(), name);
+            }
+            new_ty = new_struct;
           }
-          StructType *new_struct = StructType::getTypeByName(M.getContext(), name);
-          if (!new_struct) {
-            new_struct = StructType::create(M.getContext(), name);
-          }
-          new_ty = new_struct;
         }
         specialized_images_.insert(new_ty);
         SpecializeArg(f, &Arg, new_ty);
@@ -163,10 +184,14 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
     // not, see if it can be specialized by this builtin.
     std::string name;
     auto *operand = call->getArgOperand(operand_no);
-    // TODO(#816): remove after final transition.
-    if (!operand->getType()->isOpaquePointerTy()) {
-      auto *ele_ty = dyn_cast<PointerType>(operand->getType())
-                         ->getNonOpaquePointerElementType();
+    auto *operand_ty = operand->getType();
+    if (isa<TargetExtType>(operand_ty)) {
+      // This is an image.
+      assert(clspv::IsImageType(operand_ty));
+    } else if (!operand_ty->isOpaquePointerTy()) {
+      // TODO(#816): remove after final transition.
+      auto *ele_ty =
+          dyn_cast<PointerType>(operand_ty)->getNonOpaquePointerElementType();
       name = dyn_cast<StructType>(ele_ty)->getName().str();
     } else {
       auto param = info.getParameter(operand_no);
@@ -174,15 +199,23 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       name = param.name;
     }
 
-    auto *struct_ty =
-      StructType::getTypeByName(call->getContext(), name);
-    if (!struct_ty) {
-      struct_ty = StructType::create(call->getContext(), name);
+    Type *image_ty = nullptr;
+    if (name.empty()) {
+      image_ty = operand_ty;
+    } else {
+      auto *struct_ty =
+        StructType::getTypeByName(call->getContext(), name);
+      if (!struct_ty) {
+        struct_ty = StructType::create(call->getContext(), name);
+      }
+      image_ty = struct_ty;
     }
 
-    if (specialized_images_.count(struct_ty))
-      return std::make_pair(ResultType::kSpecialized, struct_ty);
+    if (specialized_images_.count(image_ty))
+      return std::make_pair(ResultType::kSpecialized, image_ty);
 
+    Type *sampled_ty = nullptr;
+    uint32_t uint = 0;
     switch (info.getType()) {
     // Specializable cases: reads and writes.
     case Builtins::kReadImagef:
@@ -195,40 +228,68 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       case Builtins::kReadImagef:
       case Builtins::kWriteImagef:
         name += ".float";
+        sampled_ty = Type::getFloatTy(image_ty->getContext());
         break;
       case Builtins::kReadImagei:
       case Builtins::kWriteImagei:
         name += ".int";
+        sampled_ty = Type::getInt32Ty(image_ty->getContext());
         break;
       case Builtins::kReadImageui:
       case Builtins::kWriteImageui:
         name += ".uint";
+        sampled_ty = Type::getInt32Ty(image_ty->getContext());
+        uint = 1;
         break;
       default:
         break;
       }
 
-      const auto wo_pos = name.find("_wo");
-      const auto ro_pos = name.find("_ro");
-      if (ro_pos != std::string::npos) {
-        name += ".sampled";
-      } else if (Option::Language() >= Option::SourceLanguage::OpenCL_C_20 &&
-                 wo_pos != std::string::npos) {
-        // In OpenCL 2.0 (or later), treat write_only images as read_write
-        // images. This prevents the compiler from generating duplicate image
-        // types (invalid SPIR-V).
-        name = name.substr(0, wo_pos) + "_rw" + name.substr(wo_pos + 3);
-      }
+      if (auto *ext_ty = dyn_cast<TargetExtType>(image_ty)) {
+        SmallVector<Type *, 1> types({sampled_ty});
+        SmallVector<uint32_t, 8> ints(ext_ty->int_params());
+        ints.push_back(uint);
+        uint32_t sampled = 1;
+        if (clspv::IsSampledImageType(ext_ty)) {
+          // Sampled image
+          sampled = 1;
+        } else {
+          // Storage image
+          sampled = 2;
+        }
+        ints[clspv::SpvImageTypeOperand::kSampled] = sampled;
+        auto &access = ints[clspv::SpvImageTypeOperand::kAccessQualifier];
+        if (Option::Language() >= Option::SourceLanguage::OpenCL_C_20 &&
+            access == 1) {
+          access = 2;
+        }
+        auto *spec_ty = TargetExtType::get(image_ty->getContext(),
+                                           "spirv.Image", types, ints);
+        image_ty = spec_ty;
+      } else {
+        const auto wo_pos = name.find("_wo");
+        const auto ro_pos = name.find("_ro");
+        if (ro_pos != std::string::npos) {
+          name += ".sampled";
+        } else if (Option::Language() >= Option::SourceLanguage::OpenCL_C_20 &&
+                   wo_pos != std::string::npos) {
+          // In OpenCL 2.0 (or later), treat write_only images as read_write
+          // images. This prevents the compiler from generating duplicate image
+          // types (invalid SPIR-V).
+          name = name.substr(0, wo_pos) + "_rw" + name.substr(wo_pos + 3);
+        }
 
-      struct_ty = StructType::getTypeByName(call->getContext(), name);
-      if (!struct_ty) {
-        struct_ty = StructType::create(call->getContext(), name);
+        auto *struct_ty = StructType::getTypeByName(call->getContext(), name);
+        if (!struct_ty) {
+          struct_ty = StructType::create(call->getContext(), name);
+        }
+        image_ty = struct_ty;
       }
-      return std::make_pair(ResultType::kSpecialized, struct_ty);
+      return std::make_pair(ResultType::kSpecialized, image_ty);
     }
     // Non-specializable cases: queries.
     default:
-      return std::make_pair(ResultType::kNotSpecialized, struct_ty);
+      return std::make_pair(ResultType::kNotSpecialized, image_ty);
       break;
     }
   } else if (value->getType()->isPointerTy()) {
@@ -262,8 +323,6 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
   remapped_args_[arg] = new_type;
   if (transparent) functions_to_modify_.insert(f);
 
-  auto *struct_ty = cast<StructType>(new_type);
-
   // Fix all uses of |arg|.
   std::vector<Value *> stack;
   stack.push_back(arg);
@@ -271,23 +330,33 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
     Value *value = stack.back();
     stack.pop_back();
 
-    if (transparent &&
-        cast<PointerType>(value->getType())->getNonOpaquePointerElementType() ==
-            new_type) {
+    if (value->getType() == new_type) {
+      continue;
+    } else if (transparent && isa<PointerType>(value->getType()) &&
+               cast<PointerType>(value->getType())
+                       ->getNonOpaquePointerElementType() == new_type) {
+      // TODO(#816): remove after final transition.
       continue;
     }
+    //if (transparent &&
+    //    cast<PointerType>(value->getType())->getNonOpaquePointerElementType() ==
+    //        new_type) {
+    //  continue;
+    //}
 
     auto old_type = value->getType();
-    if (transparent) {
+    if (transparent && isa<PointerType>(old_type)) {
       value->mutateType(
           PointerType::get(new_type, old_type->getPointerAddressSpace()));
+    } else if (!isa<PointerType>(old_type)) {
+      value->mutateType(new_type);
     }
     for (auto &u : value->uses()) {
       if (auto call = dyn_cast<CallInst>(u.getUser())) {
         auto called = call->getCalledFunction();
         auto &func_info = Builtins::Lookup(called);
         if (BUILTIN_IN_GROUP(func_info.getType(), Image)) {
-          auto new_func = ReplaceImageBuiltin(called, func_info, struct_ty);
+          auto new_func = ReplaceImageBuiltin(called, func_info, new_type);
           call->setCalledFunction(new_func);
           if (called->getNumUses() == 0)
             called->eraseFromParent();
@@ -307,11 +376,68 @@ void SpecializeImageTypesPass::SpecializeArg(Function *f, Argument *arg,
 
 Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
                                                         Builtins::FunctionInfo info,
-                                                        StructType *type) {
+                                                        Type *type) {
   // Update the parameter name and produce a new mangling of the function to
   // match.
   auto &image_param = info.getParameter(0);
-  image_param.name = type->getName().str();
+  if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    image_param.name = struct_ty->getName().str();
+  } else {
+    // Construct a struct name.
+    auto *ext_ty = dyn_cast<TargetExtType>(type);
+    std::string name = "ocl_image";
+    switch (ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kDim)) {
+    case 0:
+      name += "1d";
+      break;
+    case 1:
+      name += "2d";
+      break;
+    case 2:
+      name += "3d";
+      break;
+    case 5:
+      name += "1d_buffer";
+      break;
+    default:
+      llvm_unreachable("Unknown dim");
+      break;
+    }
+    name += "_";
+    if (ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kArrayed) == 1) {
+      name += "array_";
+    }
+    switch (
+        ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kAccessQualifier)) {
+    case 0:
+      name += "ro_t";
+      break;
+    case 1:
+      if (clspv::Option::Language() >= Option::SourceLanguage::OpenCL_C_20)
+        name += "rw_t";
+      else
+        name += "wo_t";
+      break;
+    case 2:
+      name += "rw_t";
+      break;
+    default:
+      llvm_unreachable("Unknown access qualifier");
+      break;
+    }
+    if (ext_ty->getTypeParameter(0)->isFloatTy()) {
+      name += ".float";
+    } else if (ext_ty->getIntParameter(
+                   clspv::SpvImageTypeOperand::kClspvUnsigned) == 1) {
+      name += ".uint";
+    } else {
+      name += ".int";
+    }
+    if (ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kSampled) == 1) {
+      name += ".sampled";
+    }
+    image_param.name = name;
+  }
   std::string new_name = Builtins::GetMangledFunctionName(info);
 
   // TODO(#816): remove after transition
@@ -325,7 +451,11 @@ Function *SpecializeImageTypesPass::ReplaceImageBuiltin(Function *f,
     for (auto &Arg : f->args()) {
       param_tys.push_back(Arg.getType());
     }
-    param_tys[0] = PointerType::get(type, param_tys[0]->getPointerAddressSpace());
+    if (type->isStructTy()) {
+      param_tys[0] = PointerType::get(type, param_tys[0]->getPointerAddressSpace());
+    } else {
+      param_tys[0] = type;
+    }
 
     auto func_ty =
         FunctionType::get(f->getReturnType(), param_tys, f->isVarArg());
@@ -345,11 +475,14 @@ void SpecializeImageTypesPass::RewriteFunction(Function *f) {
   SmallVector<Type *, 8> arg_types;
   for (auto &arg : f->args()) {
     auto where = remapped_args_.find(&arg);
-    if (where == remapped_args_.end())
+    if (where == remapped_args_.end()) {
       arg_types.push_back(arg.getType());
-    else
+    } else if (where->second->isStructTy()) {
       arg_types.push_back(PointerType::get(
           where->second, arg.getType()->getPointerAddressSpace()));
+    } else {
+      arg_types.push_back(where->second);
+    }
   }
 
   auto func_type =

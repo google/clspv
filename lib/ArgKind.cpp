@@ -42,18 +42,23 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
     Type *inner_type = ptrTy->isOpaquePointerTy()
                            ? data_type
                            : ptrTy->getNonOpaquePointerElementType();
-    StructType *struct_ty = dyn_cast<StructType>(inner_type);
-    if (clspv::IsSamplerType(struct_ty)) {
+    if (clspv::IsSamplerType(inner_type)) {
       return clspv::ArgKind::Sampler;
     }
-    if (clspv::IsImageType(struct_ty)) {
-      StringRef name = struct_ty->getName();
+    if (clspv::IsImageType(inner_type)) {
+      assert(isa<StructType>(inner_type));
       // OpenCL 1.2 only has read-only and write-only images.
       // OpenCL 2.0 (and later) also has read-write images.
       // Read-only images are translated to sampled images, while write-only
       // and read-write images are translated as storage images.
-      return name.contains("_ro") ? clspv::ArgKind::SampledImage
-                                  : clspv::ArgKind::StorageImage;
+      //
+      // Can't rely on IsSampledImageType here because it requires specialization.
+      auto name = cast<StructType>(inner_type)->getName();
+      if (name.contains("_ro")) {
+        return clspv::ArgKind::SampledImage;
+      } else {
+        return clspv::ArgKind::StorageImage;
+      }
     }
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
@@ -69,6 +74,18 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
     default:
       break;
     }
+  } else if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    if (clspv::IsSamplerType(ext_ty))
+      return clspv::ArgKind::Sampler;
+    if (clspv::IsImageType(ext_ty)) {
+      if (clspv::IsSampledImageType(ext_ty)) {
+        return clspv::ArgKind::SampledImage;
+      } else {
+        return clspv::ArgKind::StorageImage;
+      }
+    }
+    errs() << "Unhandled target ext type: " << *type << "\n";
+    llvm_unreachable("Unhandled target ext type");
   } else {
     if (clspv::Option::PodArgsInUniformBuffer())
       return clspv::ArgKind::PodUBO;
@@ -125,7 +142,9 @@ ArgKind GetArgKindForPointerPodArgs(Function &F) {
 }
 
 ArgKind GetArgKind(Argument &Arg, Type *data_type) {
-  if (!isa<PointerType>(Arg.getType()) &&
+  if (isa<TargetExtType>(Arg.getType())) {
+    return GetArgKindForType(Arg.getType(), data_type);
+  } else if (!isa<PointerType>(Arg.getType()) &&
       Arg.getParent()->getCallingConv() == CallingConv::SPIR_KERNEL) {
 
     for (auto *Use : Arg.users()) {

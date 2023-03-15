@@ -17,6 +17,8 @@
 #include "Types.h"
 #include "spirv/unified1/spirv.hpp"
 
+#include "clspv/Option.h"
+
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
@@ -273,8 +275,12 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   return nullptr;
 }
 
-bool clspv::IsSamplerType(llvm::StructType *STy) {
-  if (!STy) return false;
+// TODO(#1036): Remove support for opaque struct OpenCL types.
+namespace Deprecated {
+
+bool IsSamplerType(llvm::StructType *STy) {
+  if (!STy)
+    return false;
   if (STy->isOpaque()) {
     if (STy->getName().equals("opencl.sampler_t") ||
         STy->getName().equals("ocl_sampler")) {
@@ -284,8 +290,9 @@ bool clspv::IsSamplerType(llvm::StructType *STy) {
   return false;
 }
 
-bool clspv::IsImageType(llvm::StructType *STy) {
-  if (!STy) return false;
+bool IsImageType(llvm::StructType *STy) {
+  if (!STy)
+    return false;
   if (STy->isOpaque()) {
     if (STy->getName().startswith("opencl.image1d_ro_t") ||
         STy->getName().startswith("opencl.image1d_rw_t") ||
@@ -329,7 +336,7 @@ bool clspv::IsImageType(llvm::StructType *STy) {
   return false;
 }
 
-spv::Dim clspv::ImageDimensionality(StructType *STy) {
+spv::Dim ImageDimensionality(StructType *STy) {
   if (!STy->isOpaque())
     return spv::DimMax;
 
@@ -347,21 +354,7 @@ spv::Dim clspv::ImageDimensionality(StructType *STy) {
   return spv::DimMax;
 }
 
-uint32_t clspv::ImageNumDimensions(StructType *STy) {
-  switch (ImageDimensionality(STy)) {
-  case spv::Dim1D:
-  case spv::DimBuffer:
-    return 1;
-  case spv::Dim2D:
-    return 2;
-  case spv::Dim3D:
-    return 3;
-  default:
-    return 0;
-  }
-}
-
-bool clspv::IsArrayImageType(StructType *type) {
+bool IsArrayImageType(StructType *type) {
   if (!type->isOpaque())
     return false;
   if (!IsImageType(type))
@@ -383,7 +376,7 @@ bool clspv::IsArrayImageType(StructType *type) {
   return false;
 }
 
-bool clspv::IsSampledImageType(StructType *STy) {
+bool IsSampledImageType(StructType *STy) {
   if (!STy->isOpaque())
     return false;
   if (!IsImageType(STy))
@@ -391,23 +384,18 @@ bool clspv::IsSampledImageType(StructType *STy) {
   return STy->getName().contains(".sampled");
 }
 
-bool clspv::IsStorageImageType(StructType *type) {
+bool IsStorageImageType(StructType *type) {
   if (!type->isOpaque())
     return false;
   if (!IsImageType(type))
     return false;
-  if (type->getName().contains("_wo") ||
-      type->getName().contains("_rw")) {
+  if (type->getName().contains("_wo") || type->getName().contains("_rw")) {
     return true;
   }
   return false;
 }
 
-bool clspv::IsFloatImageType(StructType *type) {
-  return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
-}
-
-bool clspv::IsIntImageType(StructType *type) {
+bool IsIntImageType(StructType *type) {
   if (!type->isOpaque())
     return false;
   if (!IsImageType(type))
@@ -417,7 +405,7 @@ bool clspv::IsIntImageType(StructType *type) {
   return false;
 }
 
-bool clspv::IsUintImageType(StructType *type) {
+bool IsUintImageType(StructType *type) {
   if (!type->isOpaque())
     return false;
   if (!IsImageType(type))
@@ -427,6 +415,173 @@ bool clspv::IsUintImageType(StructType *type) {
   return false;
 }
 
+} // namespace Deprecated
+
 bool clspv::PointersAre64Bit(llvm::Module &m) {
   return m.getTargetTriple() == "spir64-unknown-unknown";
+}
+
+bool clspv::IsResourceType(Type *type) {
+  if (type->isPointerTy())
+    return true;
+  if (IsSamplerType(type))
+    return true;
+  if (IsImageType(type))
+    return true;
+  return false;
+}
+
+bool clspv::IsPhysicalSSBOType(Type *type) {
+  if (auto ptr_ty = dyn_cast<PointerType>(type)) {
+    if (clspv::Option::PhysicalStorageBuffers() &&
+        (ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
+         ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool clspv::IsSamplerType(Type *type) {
+  if (!type)
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    if (ext_ty->getName() == "spirv.Sampler")
+      return true;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsSamplerType(struct_ty);
+  }
+  return false;
+}
+
+bool clspv::IsImageType(Type *type) {
+  if (!type)
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    if (ext_ty->getName() == "spirv.Image")
+      return true;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsImageType(struct_ty);
+  }
+  return false;
+}
+
+bool clspv::IsSampledImageType(Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    return ext_ty->getIntParameter(SpvImageTypeOperand::kAccessQualifier) == 0;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsSampledImageType(struct_ty);
+  }
+  return true;
+}
+
+bool clspv::IsStorageImageType(Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    const auto access =
+        ext_ty->getIntParameter(SpvImageTypeOperand::kAccessQualifier);
+    return access == 1 || access == 2;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsStorageImageType(struct_ty);
+  }
+  return true;
+}
+
+spv::Dim clspv::ImageDimensionality(Type *type) {
+  if (!IsImageType(type))
+    return spv::DimMax;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    return static_cast<spv::Dim>(
+        ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kDim));
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::ImageDimensionality(struct_ty);
+  }
+
+  return spv::DimMax;
+}
+
+uint32_t clspv::ImageNumDimensions(Type *type) {
+  switch (ImageDimensionality(type)) {
+  case spv::Dim1D:
+  case spv::DimBuffer:
+    return 1;
+  case spv::Dim2D:
+    return 2;
+  case spv::Dim3D:
+    return 3;
+  default:
+    return 0;
+  }
+}
+
+bool clspv::IsArrayImageType(llvm::Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    return ext_ty->getIntParameter(clspv::SpvImageTypeOperand::kArrayed) == 1;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsArrayImageType(struct_ty);
+  }
+  return false;
+}
+
+bool clspv::IsFloatImageType(llvm::Type *type) {
+  return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
+}
+
+bool clspv::IsIntImageType(llvm::Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    const bool int_sampled = ext_ty->getTypeParameter(0)->isIntegerTy(32);
+    const bool uint = ext_ty->getNumIntParameters() >
+                              clspv::SpvImageTypeOperand::kClspvUnsigned
+                          ? ext_ty->getIntParameter(
+                                clspv::SpvImageTypeOperand::kClspvUnsigned) == 1
+                          : false;
+    return int_sampled && !uint;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsIntImageType(struct_ty);
+  }
+}
+
+bool clspv::IsUintImageType(llvm::Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    const bool int_sampled = ext_ty->getTypeParameter(0)->isIntegerTy(32);
+    const bool uint = ext_ty->getNumIntParameters() >
+                              clspv::SpvImageTypeOperand::kClspvUnsigned
+                          ? ext_ty->getIntParameter(
+                                clspv::SpvImageTypeOperand::kClspvUnsigned) == 1
+                          : false;
+    return int_sampled && uint;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return Deprecated::IsUintImageType(struct_ty);
+  }
+}
+
+bool clspv::IsWriteOnlyImageType(llvm::Type *type) {
+  if (!IsImageType(type))
+    return false;
+
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    return ext_ty->getIntParameter(
+               clspv::SpvImageTypeOperand::kAccessQualifier) == 1;
+  } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
+    return struct_ty->getName().contains("_wo");
+  }
+
+  return false;
 }

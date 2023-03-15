@@ -72,7 +72,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       continue;
     }
     for (Argument &Arg : F.args()) {
-      if (!isa<PointerType>(Arg.getType())) {
+      if (!clspv::IsResourceType(Arg.getType())) {
         WorkList.push_back(&F);
         break;
       }
@@ -130,7 +130,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     unsigned pod_index = 0;
     for (Argument &Arg : F->args()) {
       Type *ArgTy = Arg.getType();
-      if (isa<PointerType>(ArgTy)) {
+      if (clspv::IsResourceType(ArgTy)) {
         PtrArgTys.push_back(ArgTy);
         // The kind only matter if the argument is used, otherwise we just need
         // to track that there was an argument.
@@ -162,7 +162,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       unsigned pod_index = 0;
       for (auto &Arg : F->args()) {
         auto arg_type = Arg.getType();
-        if (arg_type->isPointerTy())
+        if (clspv::IsResourceType(arg_type))
           continue;
 
         // The frontend has validated individual POD arguments. When the
@@ -219,7 +219,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       arg_index = 0;
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
-        if (!isa<PointerType>(ArgTy)) {
+        if (!clspv::IsResourceType(ArgTy)) {
           auto pod_arg_kind = clspv::GetArgKind(Arg, ArgTy);
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           unsigned offset = StructLayout->getElementOffset(PodIndexMap[&Arg]);
@@ -370,7 +370,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     unsigned podCount = 0;
     unsigned ptrIndex = 0;
     for (Argument &Arg : F->args()) {
-      if (isa<PointerType>(Arg.getType())) {
+      if (clspv::IsResourceType(Arg.getType())) {
         CalleeArgs.push_back(CallerArgs[ptrIndex++]);
       } else {
         podCount++;
@@ -423,7 +423,7 @@ clspv::ClusterPodKernelArgumentsPass::GetTypeMangledPodArgsStruct(Module &M) {
 
     SmallVector<Type *, 8> PodArgTys;
     for (auto &Arg : F.args()) {
-      if (!Arg.getType()->isPointerTy()) {
+      if (!clspv::IsResourceType(Arg.getType())) {
         PodArgTys.push_back(Arg.getType());
       }
     }

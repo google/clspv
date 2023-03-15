@@ -3468,8 +3468,7 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(
     // The coordinate (integer type that we can't handle).
     auto Arg2 = CI->getOperand(2);
 
-    auto *image_ty =
-        cast<StructType>(InferType(Arg0, M.getContext(), &InferredTypeCache));
+    auto *image_ty = InferType(Arg0, M.getContext(), &InferredTypeCache);
     uint32_t dim = clspv::ImageNumDimensions(image_ty);
     uint32_t components = dim + (clspv::IsArrayImageType(image_ty) ? 1 : 0);
     Type *float_ty = nullptr;

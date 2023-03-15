@@ -28,6 +28,7 @@
 #include "Constants.h"
 #include "Layout.h"
 #include "PushConstant.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -96,11 +97,8 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
       arg_type = Arg.getParamByValType();
     }
 
-    if (auto *ptr_ty = dyn_cast<PointerType>(arg_type)) {
-      if (!(clspv::Option::PhysicalStorageBuffers() &&
-            (ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
-             ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant)))
-        continue;
+    if (IsResourceType(arg_type) && !IsPhysicalSSBOType(arg_type)) {
+      continue;
     }
 
     pod_types.push_back(arg_type);
