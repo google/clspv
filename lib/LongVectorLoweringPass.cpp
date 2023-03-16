@@ -1466,7 +1466,8 @@ Type *clspv::LongVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy()) {
+      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy() ||
+      Ty->isTargetExtTy()) {
     // No lowering required.
     return nullptr;
   }
