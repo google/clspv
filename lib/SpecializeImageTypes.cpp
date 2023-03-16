@@ -34,7 +34,6 @@ using namespace llvm;
 
 PreservedAnalyses SpecializeImageTypesPass::run(Module &M,
                                                 ModuleAnalysisManager &) {
-  llvm::errs() << M << "\n";
   PreservedAnalyses PA;
   SmallVector<Function *, 8> kernels;
   for (auto &F : M) {
