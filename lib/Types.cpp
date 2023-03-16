@@ -553,6 +553,8 @@ bool clspv::IsIntImageType(llvm::Type *type) {
   } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
     return Deprecated::IsIntImageType(struct_ty);
   }
+
+  return false;
 }
 
 bool clspv::IsUintImageType(llvm::Type *type) {
@@ -570,6 +572,8 @@ bool clspv::IsUintImageType(llvm::Type *type) {
   } else if (auto *struct_ty = dyn_cast<StructType>(type)) {
     return Deprecated::IsUintImageType(struct_ty);
   }
+
+  return false;
 }
 
 bool clspv::IsWriteOnlyImageType(llvm::Type *type) {
