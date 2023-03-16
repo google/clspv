@@ -910,7 +910,8 @@ Type *clspv::ThreeElementVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *clspv::ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy()) {
+      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy() ||
+      Ty->isTargetExtTy()) {
     // No lowering required.
     return nullptr;
   }

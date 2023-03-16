@@ -44,6 +44,20 @@ enum ClspvOperand {
   kSamplerDataType = 3,
 };
 
+// Operands for "spirv.Image" target ext type.
+// Except for kClspvUnsigned they match SPIR-V image operands after the sampled
+// type.
+enum SpvImageTypeOperand {
+  kDim = 0,
+  kDepth = 1,
+  kArrayed = 2,
+  kMS = 3,
+  kSampled = 4,
+  kImageFormat = 5,
+  kAccessQualifier = 6,
+  kClspvUnsigned = 7, // Not a SPIR-V image operand
+};
+
 // Base name for workgroup variable accessor function.
 const std::string &WorkgroupAccessorFunction();
 

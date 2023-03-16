@@ -704,7 +704,8 @@ private:
         : index(index_arg), descriptor_set(set_arg), binding(binding_arg),
           var_fn(fn), arg_kind(arg_kind_arg), coherent(coherent_arg),
           data_type(type),
-          addr_space(fn->getReturnType()->getPointerAddressSpace()) {}
+          addr_space(type->isPointerTy() ? type->getPointerAddressSpace() : 0) {
+    }
     const int index; // Index into ResourceVarInfoList
     const unsigned descriptor_set;
     const unsigned binding;
@@ -1532,6 +1533,8 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
         return GlobalTy;
       }
     }
+  } else if (type->isTargetExtTy()) {
+    // Nothing
   } else if (type->getNumContainedTypes() != 0) {
     switch (type->getTypeID()) {
     case Type::StructTyID: {
@@ -1817,10 +1820,128 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
     break;
   }
+  case Type::TargetExtTyID: {
+    auto *ext_ty = cast<TargetExtType>(Canonical);
+    if (IsImageType(ext_ty)) {
+      const auto dim = ImageDimensionality(ext_ty);
+      const auto sampled = IsSampledImageType(ext_ty);
+      switch (dim) {
+        case spv::Dim1D:
+          if (sampled) {
+            addCapability(spv::CapabilitySampled1D);
+          } else {
+            addCapability(spv::CapabilityImage1D);
+          }
+          break;
+        case spv::DimBuffer:
+          if (sampled) {
+            addCapability(spv::CapabilitySampledBuffer);
+          } else {
+            addCapability(spv::CapabilityImageBuffer);
+          }
+          break;
+        default:
+          break;
+      }
+
+      //
+      // Generate OpTypeImage
+      //
+      // Ops[0] = Sampled Type ID
+      // Ops[1] = Dim ID
+      // Ops[2] = Depth (Literal Number)
+      // Ops[3] = Arrayed (Literal Number)
+      // Ops[4] = MS (Literal Number)
+      // Ops[5] = Sampled (Literal Number)
+      // Ops[6] = Image Format ID
+      //
+      SPIRVOperandVec Ops;
+
+      SPIRVID SampledTyID;
+      // None of the sampled types have a layout.
+      if (IsFloatImageType(ext_ty)) {
+          SampledTyID =
+              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
+      } else if (IsUintImageType(ext_ty)) {
+          SampledTyID =
+              getSPIRVType(Type::getInt32Ty(Canonical->getContext()), false);
+      } else if (IsIntImageType(ext_ty)) {
+          // Generate a signed 32-bit integer if necessary.
+          if (int32ID == 0) {
+            SPIRVOperandVec intOps;
+            intOps << 32 << 1;
+            int32ID = addSPIRVInst<kTypes>(spv::OpTypeInt, intOps);
+          }
+          SampledTyID = int32ID;
+
+          // Generate a vec4 of the signed int if necessary.
+          if (v4int32ID == 0) {
+            SPIRVOperandVec vecOps;
+            vecOps << int32ID << 4;
+            v4int32ID = addSPIRVInst<kTypes>(spv::OpTypeVector, vecOps);
+          }
+      } else {
+          // This was likely an UndefValue.
+          SampledTyID =
+              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
+      }
+      Ops << SampledTyID;
+
+      spv::Dim DimID = ImageDimensionality(ext_ty);
+      Ops << DimID;
+
+      // TODO: Set up Depth.
+      Ops << 0;
+
+      uint32_t arrayed = IsArrayImageType(ext_ty) ? 1 : 0;
+      Ops << arrayed;
+
+      // TODO: Set up MS.
+      Ops << 0;
+
+      // Set up Sampled.
+      //
+      // From Spec
+      //
+      // 0 indicates this is only known at run time, not at compile time
+      // 1 indicates will be used with sampler
+      // 2 indicates will be used without a sampler (a storage image)
+      uint32_t Sampled = 1;
+      if (!IsSampledImageType(ext_ty)) {
+          Sampled = 2;
+      }
+      Ops << Sampled;
+
+      // TODO: Set up Image Format.
+      Ops << spv::ImageFormatUnknown;
+      RID = addSPIRVInst<kTypes>(spv::OpTypeImage, Ops);
+
+      // Only need a sampled version of the type if it is used with a sampler.
+      if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) {
+          Ops.clear();
+          Ops << RID;
+          getImageTypeMap()[Canonical] =
+              addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
+      }
+      break;
+    } else if (IsSamplerType(ext_ty)) {
+      //
+      // Generate OpTypeSampler
+      //
+      // Empty Ops.
+
+      RID = addSPIRVInst<kTypes>(spv::OpTypeSampler);
+      break;
+    } else {
+      llvm_unreachable("Unknown target ext type");
+    }
+    break;
+  }
   case Type::StructTyID: {
     StructType *STy = cast<StructType>(Canonical);
 
     // Handle sampler type.
+    // TODO(#1036): remove image and sampler opaque struct support
     if (STy->isOpaque()) {
       if (IsSamplerType(STy)) {
         //
@@ -2565,10 +2686,9 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
       }
       break;
     case clspv::ArgKind::StorageImage: {
-      auto *struct_ty = cast<StructType>(info->data_type);
       // TODO(alan-baker): This is conservative. If compiling for OpenCL 2.0 or
       // above, the compiler treats all write_only images as read_write images.
-      if (struct_ty->getName().contains("_wo")) {
+      if (IsWriteOnlyImageType(info->data_type)) {
         Ops.clear();
         Ops << info->var_id << spv::DecorationNonReadable;
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -3667,8 +3787,8 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     return 0;
   };
 
-  auto *image_ty = cast<StructType>(InferType(
-      Call->getArgOperand(0), module->getContext(), &InferredTypeCache));
+  auto *image_ty = InferType(Call->getArgOperand(0), module->getContext(),
+                             &InferredTypeCache);
   LLVMContext &Context = module->getContext();
   switch (FuncInfo.getType()) {
   case Builtins::kReadImagef:

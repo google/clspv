@@ -66,7 +66,8 @@ PreservedAnalyses clspv::UBOTypeTransformPass::run(Module &M,
       // specified in the function signature. This also works for non opaque
       // pointers, so the same solution is used.
       const auto *return_ty = F.getReturnType();
-      assert(return_ty->isPointerTy());
+      if (!return_ty->isPointerTy())
+        continue;
       if (clspv::Option::ConstantArgsInUniformBuffer() &&
           return_ty->getPointerAddressSpace() ==
               clspv::AddressSpace::Constant) {

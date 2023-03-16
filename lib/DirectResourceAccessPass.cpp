@@ -38,6 +38,7 @@
 #include "CallGraphOrderedFunctions.h"
 #include "Constants.h"
 #include "DirectResourceAccessPass.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -75,18 +76,23 @@ bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
   bool Changed = false;
   int arg_index = 0;
   for (Argument &arg : fn->args()) {
-    if (auto PtrTy = dyn_cast<PointerType>(arg.getType())) {
-      // Look for arguments that map to resources. They appear in the following
-      // address spaces.
-      switch (PtrTy->getPointerAddressSpace()) {
-      case clspv::AddressSpace::Global:
-      case clspv::AddressSpace::Constant:
-      case clspv::AddressSpace::Local:
-      case clspv::AddressSpace::UniformConstant:
+    if (clspv::IsResourceType(arg.getType())) {
+      if (auto PtrTy = dyn_cast<PointerType>(arg.getType())) {
+        // Look for arguments that map to resources. They appear in the
+        // following address spaces.
+        switch (PtrTy->getPointerAddressSpace()) {
+        case clspv::AddressSpace::Global:
+        case clspv::AddressSpace::Constant:
+        case clspv::AddressSpace::Local:
+        case clspv::AddressSpace::UniformConstant:
+          Changed |= RewriteAccessesForArg(fn, arg_index, arg);
+          break;
+        default:
+          break;
+        }
+      } else {
+        // Images and samplers.
         Changed |= RewriteAccessesForArg(fn, arg_index, arg);
-        break;
-      default:
-        break;
       }
     }
     arg_index++;

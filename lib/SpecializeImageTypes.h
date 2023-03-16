@@ -45,7 +45,7 @@ private:
   // |type|.
   llvm::Function *ReplaceImageBuiltin(llvm::Function *f,
                                       Builtins::FunctionInfo info,
-                                      llvm::StructType *type);
+                                      llvm::Type *type);
 
   // Rewrites |f| using the |remapped_args_| to determine to updated types.
   void RewriteFunction(llvm::Function *f);
