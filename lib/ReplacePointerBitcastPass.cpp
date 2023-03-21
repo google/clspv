@@ -50,65 +50,6 @@ using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
 
 namespace {
 
-bool IsPowerOfTwo(unsigned x) { return (x & (x - 1)) == 0; }
-
-Type *GetIndexTy(IRBuilder<> &Builder) {
-  auto* M = Builder.GetInsertBlock()->getParent()->getParent();
-  return clspv::PointersAre64Bit(*M) ? Builder.getInt64Ty()
-                                     : Builder.getInt32Ty();
-}
-
-ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C) {
-    auto* M = Builder.GetInsertBlock()->getParent()->getParent();
-    return clspv::PointersAre64Bit(*M) ? Builder.getInt64(C)
-                                       : Builder.getInt32(C);
-}
-
-Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val) {
-  if (div == 1) {
-    return Val;
-  }
-  auto *IndexTy = GetIndexTy(Builder);
-  if (Val->getType() != IndexTy) {
-    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
-  }
-  if (IsPowerOfTwo(div)) {
-    return Builder.CreateLShr(Val, GetIndexTyConst(Builder, std::log2(div)));
-  } else {
-    return Builder.CreateUDiv(Val, GetIndexTyConst(Builder, div));
-  }
-}
-
-Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val) {
-  if (mul == 1) {
-    return Val;
-  }
-  auto *IndexTy = GetIndexTy(Builder);
-  if (Val->getType() != IndexTy) {
-    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
-  }
-  if (IsPowerOfTwo(mul)) {
-    return Builder.CreateShl(Val, GetIndexTyConst(Builder, std::log2(mul)));
-  } else {
-    return Builder.CreateMul(Val, GetIndexTyConst(Builder, mul));
-  }
-}
-
-Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
-  if (rem == 1) {
-    return GetIndexTyConst(Builder, 0);
-  }
-  auto *IndexTy = GetIndexTy(Builder);
-  if (Val->getType() != IndexTy) {
-    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
-  }
-  if (IsPowerOfTwo(rem)) {
-    return Builder.CreateAnd(Val, GetIndexTyConst(Builder, rem - 1));
-  } else {
-    return Builder.CreateURem(Val, GetIndexTyConst(Builder, rem));
-  }
-}
-
 // 'Val' is expected to be a vector.
 // 'Idx' is the index where to extract the subvector, but in the casted type
 // coordinate. If null, just extract from the origin of the vector.
@@ -141,48 +82,6 @@ Value *ExtractSubVector(IRBuilder<> &Builder, Value *&Idx, Value *Val,
     Val = Builder.CreateSelect(Cmp, Val0, Val1);
   }
   return Val;
-}
-
-// Check whether a pointer to the type `ContainingTy` is also usable as a
-// pointer to the type `TargetTy` due to the layout of the vector or aggregrate
-// type. Descends through the first element of the `ContainingTy` until it is
-// found or it cannot descend any further. Writes out levels of indirection to
-// `Steps`.
-bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
-                               bool &PerfectMatch, const DataLayout &DL) {
-  int StepCount = 0;
-
-  auto IsIntegerOrFloatTy = [](Type *Ty) {
-    return Ty->isIntegerTy() || Ty->isFloatTy();
-  };
-  auto SimilarType = [&DL, &IsIntegerOrFloatTy](Type *Ty1, Type *Ty2) {
-    return Ty1 == Ty2 || (SizeInBits(DL, Ty1) == SizeInBits(DL, Ty2) &&
-                          IsIntegerOrFloatTy(Ty1) && IsIntegerOrFloatTy(Ty2));
-  };
-
-  do {
-    if (SimilarType(ContainingTy, TargetTy)) {
-      Steps = StepCount;
-      PerfectMatch = ContainingTy == TargetTy;
-      return true;
-    }
-    StepCount++;
-
-    if (auto *VectorTy = dyn_cast<VectorType>(ContainingTy)) {
-      ContainingTy = VectorTy->getElementType();
-    } else if (auto *ArrayTy = dyn_cast<ArrayType>(ContainingTy)) {
-      ContainingTy = ArrayTy->getArrayElementType();
-    } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
-      if (StructTy->isOpaque())
-        break;
-      ContainingTy = StructTy->getStructElementType(0);
-    } else {
-      break;
-    }
-  } while (ContainingTy->isAggregateType() || ContainingTy->isVectorTy() ||
-           SimilarType(ContainingTy, TargetTy));
-
-  return false;
 }
 
 // 'Values' is expected to contain either vectors or scalars.
@@ -539,43 +438,6 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   }
 }
 
-bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
-                     Instruction &I, Value *&source, Type *&source_ty,
-                     Type *&dest_ty) {
-  // The following checks use InferType to distinguish when a pointer's
-  // interpretation changes between instructions. This requires the input
-  // to be an instruction whose result provides a clear type for a
-  // pointer (e.g. gep, alloca, or global variable).
-  if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
-    source = gep->getPointerOperand();
-    source_ty =
-        clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
-    dest_ty = gep->getSourceElementType();
-  } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
-    source = ld->getPointerOperand();
-    source_ty =
-        clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
-    dest_ty = ld->getType();
-  } else if (auto *st = dyn_cast<StoreInst>(&I)) {
-    source = st->getPointerOperand();
-    source_ty =
-        clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
-    dest_ty = st->getValueOperand()->getType();
-  }
-
-  // Skip pointer transforms when physical addressing will be used
-  if (source && !ReplacePhysicalPointerBitcasts &&
-      clspv::Option::PhysicalStorageBuffers()) {
-    if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
-      if (source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
-          source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant) {
-        return false;
-      }
-    }
-  }
-  return source_ty && dest_ty && source_ty != dest_ty;
-}
-
 void CleanModule(WeakInstructions &ToBeDeleted) {
   // Remove all dead instructions, including their dead operands. Proceed with a
   // fixed-point algorithm to handle dependencies.
@@ -617,7 +479,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
   DenseMap<Value *, Type *> type_cache;
-  DenseMap<Instruction *, std::pair<int, bool>> ImplicitGEPs;
+  WeakInstructions ToBeDeleted;
+  SmallVector<Instruction *, 16> WorkList;
+  DenseSet<Value *> ImplicitCasts;
   const DataLayout &DL = M.getDataLayout();
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -625,80 +489,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty))
-          continue;
-        int Steps = 0;
-        bool PerfectMatch;
-        if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
-                                      DL)) {
-          // Single level GEP is ok to transform, but beyond
-          // that the address math must be divided among other
-          // entries.
-          //
-          // TODO(#1004): something is wrong here. This passes
-          // the cts basic/kernel_preprocessor_macros, but fails
-          // test/PointerCasts/srcGTdst/load_cast_float2_to_float.ll
-          if ((Steps > 0 && !isa<GetElementPtrInst>(I)) || (Steps == 1)) {
-            ImplicitGEPs.insert({&I, std::make_pair(Steps, PerfectMatch)});
-          }
-        }
-      }
-    }
-  }
-
-  // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
-  // handled by explcitly inserting the GEP.
-  WeakInstructions ToBeDeleted;
-  for (auto GEPInfo : ImplicitGEPs) {
-    auto *I = GEPInfo.first;
-    auto Steps = GEPInfo.second.first;
-    auto PerfectMatch = GEPInfo.second.second;
-    IRBuilder<> Builder{I};
-    SmallVector<Value *, 8> GEPIndices{};
-    unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
-
-    if ((!isa<LoadInst>(I) && !isa<StoreInst>(I) &&
-         !isa<GetElementPtrInst>(I))) {
-      continue;
-    }
-
-    for (int i = 0; i < Steps + 1; i++) {
-      GEPIndices.push_back(Builder.getInt32(0));
-    }
-
-    Value *PointerOp = I->getOperand(PointerOperandNum);
-    auto *PointerOpType =
-        clspv::InferType(PointerOp, M.getContext(), &type_cache);
-    auto *NewGEP =
-      GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
-
-    if (!PerfectMatch) {
-      // Typical usecase here is a GEP on a struct of float, followed by a GEP
-      // on a int. Replace the last GEP by a GEP on a float.
-      if (auto gep = dyn_cast<GetElementPtrInst>(I)) {
-        assert(gep);
-        auto *NewCastGEP = GetElementPtrInst::Create(
-            NewGEP->getResultElementType(), NewGEP,
-            SmallVector<Value *, 1>(gep->indices()), "", I);
-        I->replaceAllUsesWith(NewCastGEP);
-        ToBeDeleted.push_back(I);
-      }
-    } else {
-      I->setOperand(PointerOperandNum, NewGEP);
-    }
-  }
-
-  CleanModule(ToBeDeleted);
-
-  SmallVector<Instruction *, 16> WorkList;
-  DenseSet<Value *> ImplicitCasts;
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        Value *source = nullptr;
-        Type *source_ty = nullptr;
-        Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty))
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             ReplacePhysicalPointerBitcasts))
           continue;
         bool ok = true;
         SmallVector<User *, 16> UserWorkList;
@@ -717,42 +509,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         }
         if (!ok)
           continue;
-
-        // For some reason, with opaque pointer, LLVM tends to transform
-        // memcpy/memset into a series of gep and load/store. But while the
-        // load/store are on i32 for example, it keeps the gep on i8 but with
-        // index multiples of sizeof(i32). To avoid such bitcast which leads to
-        // trying to store an i8 into a i32 element (which is not supported),
-        // upgrade those gep into gep on i32 with the appropriate indexes.
-        if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
-          SmallVector<Value *, 2> Indices(gep->indices());
-          if (Indices.size() == 1) {
-            if (auto cst = dyn_cast<ConstantInt>(Indices[0])) {
-              auto source_ty_size = SizeInBits(DL, source_ty);
-              auto dest_ty_size = SizeInBits(DL, dest_ty);
-              auto value = cst->getZExtValue();
-              unsigned new_source_ty_size = source_ty_size;
-              while (dest_ty_size > source_ty_size &&
-                     dest_ty_size % source_ty_size == 0 && value > 0 &&
-                     value % 2 == 0 && new_source_ty_size < 32) {
-                value /= 2;
-                new_source_ty_size *= 2;
-              }
-              if (source_ty_size != new_source_ty_size) {
-                Indices.clear();
-                Indices.push_back(
-                    ConstantInt::get(Type::getInt32Ty(M.getContext()), value));
-                auto new_type =
-                    Type::getIntNTy(M.getContext(), new_source_ty_size);
-                auto new_gep = GetElementPtrInst::Create(
-                    new_type, gep->getPointerOperand(), Indices, "", &I);
-
-                unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
-                I.setOperand(PointerOperandNum, new_gep);
-              }
-            }
-          }
-        }
 
         ImplicitCasts.insert(source);
         WorkList.push_back(&I);
@@ -851,13 +607,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
     }
 
-    SmallVector<size_t, 4> SrcTyBitWidths;
-    Type *TmpTy = SrcTy;
-    SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
-    while (TmpTy->isArrayTy() || TmpTy->isVectorTy()) {
-      TmpTy = GetEleType(TmpTy);
-      SrcTyBitWidths.push_back(SizeInBits(DL, TmpTy));
-    }
+    SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
 
     // If we detect a private memory, the first index of the GEP will need to be
     // zero (meaning that we are not explicitly trying to access private memory
@@ -890,7 +640,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       SmallVector<Value *, 4> NewAddrIdxs;
 
       // It consist of User* and bool whether user is gep or not.
-      SmallVector<std::pair<User *, bool>, 32> Users;
+      SmallVector<std::pair<User *, bool>, 32> AllUsers;
 
       Value *OrgGEPIdx = nullptr;
       if (auto GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
@@ -930,18 +680,22 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
         // If bitcast's user is gep, investigate gep's users too.
         for (User *GEPUser : GEP->users()) {
-          Users.push_back(std::make_pair(GEPUser, true));
+          if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
+            if (GEPUserGEP->getSourceElementType() == GEP->getResultElementType())
+              continue;
+          }
+          AllUsers.push_back(std::make_pair(GEPUser, true));
         }
         if (!GEP->users().empty()) {
           ToBeDeleted.push_back(GEP);
         }
       } else {
-        Users.push_back(std::make_pair(BitCastUser, false));
+        AllUsers.push_back(std::make_pair(BitCastUser, false));
       }
 
       // Handle users.
       bool IsGEPUser = false;
-      for (auto UserIter : Users) {
+      for (auto UserIter : AllUsers) {
         User *U = UserIter.first;
         IsGEPUser = UserIter.second;
         LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";

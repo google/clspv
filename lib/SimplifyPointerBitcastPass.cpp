@@ -18,13 +18,17 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <tuple>
+
 #include "BitcastUtils.h"
 #include "SimplifyPointerBitcastPass.h"
 #include "Types.h"
 
+#include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 using namespace llvm;
+using namespace BitcastUtils;
 
 #define DEBUG_TYPE "SimplifyPointerBitcast"
 
@@ -46,6 +50,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed |= runOnBitcastFromGEP(M);
     changed |= runOnBitcastFromBitcast(M);
     changed |= runOnGEPFromGEP(M);
+    changed |= runOnGEPImplicitCasts(M);
   }
 
   return PA;
@@ -276,33 +281,118 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
 
     auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
 
-    SmallVector<Value *, 8> Idxs;
-
     Value *SrcLastIdxOp = OtherGEP->getOperand(OtherGEP->getNumOperands() - 1);
     Value *GEPIdxOp = GEP->getOperand(1);
-    Value *MergedIdx = GEPIdxOp;
 
     // Add the indices together, if the last one from before is not zero.
-    bool last_idx_is_zero = false;
-    if (auto *constant = dyn_cast<ConstantInt>(SrcLastIdxOp)) {
-      last_idx_is_zero = constant->isZero();
-    }
-    if (!last_idx_is_zero) {
-      if (clspv::PointersAre64Bit(M) && !OtherGEP->getType()->isStructTy()) {
-        if (GEPIdxOp->getType()->isIntegerTy(32)) {
-          GEPIdxOp = Builder.CreateZExt(GEPIdxOp,
-                                        IntegerType::get(M.getContext(), 64));
-        }
-        if (SrcLastIdxOp->getType()->isIntegerTy(32)) {
-          SrcLastIdxOp = Builder.CreateZExt(
-              SrcLastIdxOp, IntegerType::get(M.getContext(), 64));
-        }
+    auto *CstSrcLastIdxOp = dyn_cast<ConstantInt>(SrcLastIdxOp);
+    auto CstGEPIdxOp = dyn_cast<ConstantInt>(GEPIdxOp);
+
+    // We need to know the number of element of the commun type between GEP and
+    // OtherGEP to avoid generating a constant index greater than this size for
+    // private pointer
+    uint32_t VecOrArraySize = UINT32_MAX;
+    if (OtherGEP->getNumOperands() > 2) {
+      SmallVector<Value *, 8> Idxs;
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
+      unsigned numEle =
+          BitcastUtils::GetNumEle(GetElementPtrInst::getIndexedType(
+              OtherGEP->getSourceElementType(), Idxs));
+      if (numEle > 1) {
+        VecOrArraySize = numEle;
       }
-      MergedIdx = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
     }
 
-    Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
-    Idxs.push_back(MergedIdx);
+    SmallVector<Value *, 8> Idxs;
+    if (CstGEPIdxOp && CstGEPIdxOp->isZero()) {
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end());
+    } else if (CstSrcLastIdxOp && CstGEPIdxOp &&
+               (CstSrcLastIdxOp->getZExtValue() + CstGEPIdxOp->getZExtValue() <
+                VecOrArraySize)) {
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
+      if (CstGEPIdxOp->isZero()) {
+        Idxs.push_back(SrcLastIdxOp);
+      } else if (CstSrcLastIdxOp->isZero()) {
+        Idxs.push_back(GEPIdxOp);
+      } else {
+        Idxs.push_back(ConstantInt::get(
+            IntegerType::get(M.getContext(),
+                             clspv::PointersAre64Bit(M) &&
+                                     !OtherGEP->getType()->isStructTy()
+                                 ? 64
+                                 : 32),
+            CstGEPIdxOp->getZExtValue() + CstSrcLastIdxOp->getZExtValue()));
+      }
+    } else if (cast<PointerType>(OtherGEP->getPointerOperand()->getType())
+                       ->getAddressSpace() == clspv::AddressSpace::Private &&
+               (OtherGEP->getSourceElementType()->isArrayTy() ||
+                OtherGEP->getSourceElementType()->isStructTy() ||
+                OtherGEP->getSourceElementType()->isVectorTy())) {
+      auto TyBitWidths = BitcastUtils::getEleTypesBitWidths(
+          OtherGEP->getSourceElementType(), M.getDataLayout(),
+          OtherGEP->getResultElementType());
+      assert(TyBitWidths.size() == OtherGEP->getNumOperands() - 1);
+      size_t smallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
+      uint64_t cstVal = 0;
+      Value *dynVal = nullptr;
+      for (unsigned i = 0; i < TyBitWidths.size(); i++) {
+        size_t size = TyBitWidths[i] / smallerBitWidths;
+        Value *Op = OtherGEP->getOperand(i + 1);
+        if (auto Cst = dyn_cast<ConstantInt>(Op)) {
+          cstVal += Cst->getZExtValue() * size;
+        } else {
+          Value *Mul = CreateMul(Builder, size, Op);
+          if (dynVal) {
+            dynVal = Builder.CreateAdd(dynVal, Mul);
+          } else {
+            dynVal = Mul;
+          }
+        }
+      }
+      if (CstGEPIdxOp) {
+        cstVal += CstGEPIdxOp->getZExtValue();
+      } else if (dynVal) {
+        dynVal = Builder.CreateAdd(dynVal, GEPIdxOp);
+      } else {
+        dynVal = GEPIdxOp;
+      }
+      Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
+      if (dynVal == nullptr) {
+        for (unsigned i = 1; i < TyBitWidths.size(); i++) {
+          size_t size = TyBitWidths[i] / smallerBitWidths;
+          Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), cstVal / size));
+          cstVal %= size;
+        }
+      } else {
+        if (cstVal != 0) {
+          dynVal = Builder.CreateAdd(
+              dynVal, ConstantInt::get(Builder.getInt32Ty(), cstVal));
+        }
+        for (unsigned i = 1; i < TyBitWidths.size(); i++) {
+          size_t size = TyBitWidths[i] / smallerBitWidths;
+          Idxs.push_back(CreateDiv(Builder, size, dynVal));
+          if (i != TyBitWidths.size() - 1)
+            dynVal = CreateRem(Builder, size, dynVal);
+        }
+      }
+    } else {
+      if (!CstSrcLastIdxOp || !CstSrcLastIdxOp->isZero()) {
+        if (clspv::PointersAre64Bit(M) && !OtherGEP->getType()->isStructTy()) {
+          if (GEPIdxOp->getType()->isIntegerTy(32)) {
+            GEPIdxOp = Builder.CreateZExt(GEPIdxOp,
+                                          IntegerType::get(M.getContext(), 64));
+          }
+          if (SrcLastIdxOp->getType()->isIntegerTy(32)) {
+            SrcLastIdxOp = Builder.CreateZExt(
+                SrcLastIdxOp, IntegerType::get(M.getContext(), 64));
+          }
+        }
+        GEPIdxOp = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
+      }
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
+      Idxs.push_back(GEPIdxOp);
+    }
+
     Idxs.append(GEP->op_begin() + 2, GEP->op_end());
 
     // Struct types require i32 indexes, so fix up any constant i64s
@@ -357,4 +447,185 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
   }
 
   return Changed;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+
+  DenseSet<GetElementPtrInst *> UnneededCasts;
+  DenseMap<GetElementPtrInst *,
+           std::tuple<Instruction *, ConstantInt *, Type *, Type *>>
+      UpgradeCstCasts;
+  DenseMap<Instruction *, std::pair<int, GetElementPtrInst *>> ImplicitGEPs;
+  DenseMap<Value *, Type *> type_cache;
+
+  bool changed = false;
+
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true))
+          continue;
+
+        if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+          if (source_ty == gep->getResultElementType()) {
+            UnneededCasts.insert(gep);
+            continue;
+          }
+        }
+
+        int Steps = 0;
+        bool PerfectMatch;
+        if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
+                                      DL)) {
+          // Single level GEP is ok to transform, but beyond
+          // that the address math must be divided among other
+          // entries.
+          auto *gep = dyn_cast<GetElementPtrInst>(&I);
+          if ((Steps > 0 && !gep) || (Steps == 1)) {
+            if ((isa<LoadInst>(I) || isa<StoreInst>(I) || gep) &&
+                (gep || PerfectMatch)) {
+              ImplicitGEPs.insert(
+                  {&I, std::make_pair(Steps, PerfectMatch ? nullptr : gep)});
+              continue;
+            }
+          }
+        }
+
+        if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
+
+          if (UnneededCasts.count(gep) != 0 ||
+              UpgradeCstCasts.count(gep) != 0 || ImplicitGEPs.count(gep) != 0) {
+            continue;
+          }
+
+          // For some reason, with opaque pointer, LLVM tends to transform
+          // memcpy/memset into a series of gep and load/store. But while the
+          // load/store are on i32 for example, it keeps the gep on i8 but
+          // with index multiples of sizeof(i32). To avoid such bitcast which
+          // leads to trying to store an i8 into a i32 element (which is not
+          // supported), upgrade those gep into gep on i32 with the
+          // appropriate indexes.
+          SmallVector<Value *, 2> Indices(gep->indices());
+          if (Indices.size() == 1) {
+            if (auto cst = dyn_cast<ConstantInt>(Indices[0])) {
+              UpgradeCstCasts.insert(
+                  {gep, std::make_tuple(&I, cst, source_ty, dest_ty)});
+              continue;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (auto *GEP : UnneededCasts) {
+    Type *source = GEP->getSourceElementType();
+    Type *result = GEP->getResultElementType();
+    auto TyBitWidths = getEleTypesBitWidths(source, DL, result);
+
+    IRBuilder<> Builder(GEP);
+    Value *GEPIdx = nullptr;
+    assert(TyBitWidths.size() == (GEP->getNumOperands() - 1));
+    auto smallerTySize = TyBitWidths[TyBitWidths.size() - 1];
+    for (unsigned int i = 0; i < TyBitWidths.size(); i++) {
+      Value *Id = GEP->getOperand(i + 1);
+      if (auto cst = dyn_cast<ConstantInt>(Id)) {
+        if (cst->getZExtValue() == 0) {
+          continue;
+        }
+      }
+      Value *Mul = CreateMul(Builder, TyBitWidths[i] / smallerTySize, Id);
+      if (GEPIdx == nullptr) {
+        GEPIdx = Mul;
+      } else {
+        GEPIdx = Builder.CreateAdd(Mul, GEPIdx);
+      }
+    }
+    if (GEPIdx == nullptr) {
+      GEPIdx = Builder.getInt32(0);
+    }
+    SmallVector<Value *, 1> Indices{GEPIdx};
+    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(), Indices, "", GEP);
+    GEP->replaceAllUsesWith(NewGEP);
+    GEP->eraseFromParent();
+
+    changed = true;
+  }
+
+  for (auto GEPInfo : UpgradeCstCasts) {
+    auto *GEP = GEPInfo.first;
+    Instruction *I = std::get<0>(GEPInfo.second);
+    ConstantInt *cst = std::get<1>(GEPInfo.second);
+    Type *source_ty = std::get<2>(GEPInfo.second);
+    Type *dest_ty = std::get<3>(GEPInfo.second);
+    auto source_ty_size = SizeInBits(DL, source_ty);
+    auto dest_ty_size = SizeInBits(DL, dest_ty);
+    auto value = cst->getZExtValue();
+    unsigned new_source_ty_size = source_ty_size;
+    while (dest_ty_size > source_ty_size &&
+           dest_ty_size % source_ty_size == 0 && value > 0 && value % 2 == 0 &&
+           new_source_ty_size < 32) {
+      value /= 2;
+      new_source_ty_size *= 2;
+    }
+    if (source_ty_size != new_source_ty_size) {
+      SmallVector<Value *, 2> Indices;
+      Indices.clear();
+      Indices.push_back(
+          ConstantInt::get(Type::getInt32Ty(M.getContext()), value));
+      auto new_type = Type::getIntNTy(M.getContext(), new_source_ty_size);
+      auto new_gep = GetElementPtrInst::Create(
+          new_type, GEP->getPointerOperand(), Indices, "", I);
+
+      unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+      I->setOperand(PointerOperandNum, new_gep);
+
+      if (GEP->getNumUses() == 0) {
+        GEP->eraseFromParent();
+      }
+
+      changed = true;
+    }
+  }
+
+  // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
+  // handled by explcitly inserting the GEP.
+  for (auto GEPInfo : ImplicitGEPs) {
+    auto *I = GEPInfo.first;
+    auto Steps = GEPInfo.second.first;
+    auto *gep = GEPInfo.second.second;
+    IRBuilder<> Builder{I};
+    SmallVector<Value *, 8> GEPIndices{};
+    unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+
+    for (int i = 0; i < Steps + 1; i++) {
+      GEPIndices.push_back(Builder.getInt32(0));
+    }
+
+    Value *PointerOp = I->getOperand(PointerOperandNum);
+    auto *PointerOpType =
+        clspv::InferType(PointerOp, M.getContext(), &type_cache);
+    auto *NewGEP =
+        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
+
+    if (gep) {
+      // Typical usecase here is a GEP on a struct of float, followed by a GEP
+      // on a int. Replace the last GEP by a GEP on a float.
+      auto *NewCastGEP = GetElementPtrInst::Create(
+          NewGEP->getResultElementType(), NewGEP,
+          SmallVector<Value *, 1>(gep->indices()), "", I);
+      I->replaceAllUsesWith(NewCastGEP);
+      I->eraseFromParent();
+    } else {
+      I->setOperand(PointerOperandNum, NewGEP);
+    }
+    changed = true;
+  }
+
+  return changed;
 }

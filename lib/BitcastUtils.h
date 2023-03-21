@@ -39,6 +39,24 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
                  SmallVector<Value *, 8> &Values);
 
 bool RemoveCstExprFromFunction(Function *F);
+
+bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
+                     Instruction &I, Value *&source, Type *&source_ty,
+                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts);
+
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
+                                            Type *BaseTy);
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL);
+
+Type *GetIndexTy(IRBuilder<> &Builder);
+ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C);
+
+Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val);
+Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val);
+Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
+
+bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
+                               bool &PerfectMatch, const DataLayout &DL);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H

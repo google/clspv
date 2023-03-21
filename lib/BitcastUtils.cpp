@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/Support/Debug.h>
 #include "BitcastUtils.h"
+#include "Types.h"
+#include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
+#include <cmath>
+#include <llvm/Support/Debug.h>
 
 #define DEBUG_TYPE "bitcastutils"
 
@@ -51,8 +55,7 @@ Type *GetEleType(Type *Ty) {
   } else if (auto ArrTy = dyn_cast<ArrayType>(Ty)) {
     return ArrTy->getElementType();
   } else if (auto StructTy = dyn_cast<StructType>(Ty)) {
-    if (!StructTy->isOpaque() && StructTy->isPacked() &&
-        StructTy->getNumElements() == 1) {
+    if (!StructTy->isOpaque() && StructTy->getNumElements() == 1) {
       return StructTy->getContainedType(0);
     }
     return Ty;
@@ -795,6 +798,161 @@ bool RemoveCstExprFromFunction(Function *F) {
   }
 
   return Changed;
+}
+
+bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
+                     Instruction &I, Value *&source, Type *&source_ty,
+                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts) {
+  // The following checks use InferType to distinguish when a pointer's
+  // interpretation changes between instructions. This requires the input
+  // to be an instruction whose result provides a clear type for a
+  // pointer (e.g. gep, alloca, or global variable).
+  if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+    source = gep->getPointerOperand();
+    source_ty =
+        clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = gep->getSourceElementType();
+  } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
+    source = ld->getPointerOperand();
+    source_ty =
+        clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = ld->getType();
+  } else if (auto *st = dyn_cast<StoreInst>(&I)) {
+    source = st->getPointerOperand();
+    source_ty =
+        clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
+    dest_ty = st->getValueOperand()->getType();
+  }
+
+  // Skip pointer transforms when physical addressing will be used
+  if (source && !ReplacePhysicalPointerBitcasts &&
+      clspv::Option::PhysicalStorageBuffers()) {
+    if (auto *source_ptr_ty = dyn_cast<PointerType>(source->getType())) {
+      if (source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Global ||
+          source_ptr_ty->getAddressSpace() == clspv::AddressSpace::Constant) {
+        return false;
+      }
+    }
+  }
+  return source_ty && dest_ty && source_ty != dest_ty;
+}
+
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
+                                            Type *BaseTy) {
+  SmallVector<size_t, 4> TyBitWidths;
+  TyBitWidths.push_back(SizeInBits(DL, Ty));
+  while ((Ty->isArrayTy() || Ty->isVectorTy() ||
+          (Ty->isStructTy() && cast<StructType>(Ty)->getNumElements() == 0)) &&
+         Ty != BaseTy) {
+    Ty = GetEleType(Ty);
+    TyBitWidths.push_back(SizeInBits(DL, Ty));
+  }
+  return TyBitWidths;
+}
+
+SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL) {
+  return getEleTypesBitWidths(Ty, DL, nullptr);
+}
+
+bool IsPowerOfTwo(unsigned x) { return (x & (x - 1)) == 0; }
+
+Type *GetIndexTy(IRBuilder<> &Builder) {
+  auto *M = Builder.GetInsertBlock()->getParent()->getParent();
+  return clspv::PointersAre64Bit(*M) ? Builder.getInt64Ty()
+                                     : Builder.getInt32Ty();
+}
+
+ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C) {
+  auto *M = Builder.GetInsertBlock()->getParent()->getParent();
+  return clspv::PointersAre64Bit(*M) ? Builder.getInt64(C)
+                                     : Builder.getInt32(C);
+}
+
+Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val) {
+  if (div == 1) {
+    return Val;
+  }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
+  }
+  if (IsPowerOfTwo(div)) {
+    return Builder.CreateLShr(Val, GetIndexTyConst(Builder, std::log2(div)));
+  } else {
+    return Builder.CreateUDiv(Val, GetIndexTyConst(Builder, div));
+  }
+}
+
+Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val) {
+  if (mul == 1) {
+    return Val;
+  }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
+  }
+  if (IsPowerOfTwo(mul)) {
+    return Builder.CreateShl(Val, GetIndexTyConst(Builder, std::log2(mul)));
+  } else {
+    return Builder.CreateMul(Val, GetIndexTyConst(Builder, mul));
+  }
+}
+
+Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
+  if (rem == 1) {
+    return GetIndexTyConst(Builder, 0);
+  }
+  auto *IndexTy = GetIndexTy(Builder);
+  if (Val->getType() != IndexTy) {
+    Val = Builder.CreateZExtOrTrunc(Val, IndexTy);
+  }
+  if (IsPowerOfTwo(rem)) {
+    return Builder.CreateAnd(Val, GetIndexTyConst(Builder, rem - 1));
+  } else {
+    return Builder.CreateURem(Val, GetIndexTyConst(Builder, rem));
+  }
+}
+
+// Check whether a pointer to the type `ContainingTy` is also usable as a
+// pointer to the type `TargetTy` due to the layout of the vector or aggregrate
+// type. Descends through the first element of the `ContainingTy` until it is
+// found or it cannot descend any further. Writes out levels of indirection to
+// `Steps`.
+bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
+                               bool &PerfectMatch, const DataLayout &DL) {
+  int StepCount = 0;
+
+  auto IsIntegerOrFloatTy = [](Type *Ty) {
+    return Ty->isIntegerTy() || Ty->isFloatTy();
+  };
+  auto SimilarType = [&DL, &IsIntegerOrFloatTy](Type *Ty1, Type *Ty2) {
+    return Ty1 == Ty2 || (SizeInBits(DL, Ty1) == SizeInBits(DL, Ty2) &&
+                          IsIntegerOrFloatTy(Ty1) && IsIntegerOrFloatTy(Ty2));
+  };
+
+  do {
+    if (SimilarType(ContainingTy, TargetTy)) {
+      Steps = StepCount;
+      PerfectMatch = ContainingTy == TargetTy;
+      return true;
+    }
+    StepCount++;
+
+    if (auto *VectorTy = dyn_cast<VectorType>(ContainingTy)) {
+      ContainingTy = VectorTy->getElementType();
+    } else if (auto *ArrayTy = dyn_cast<ArrayType>(ContainingTy)) {
+      ContainingTy = ArrayTy->getArrayElementType();
+    } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
+      if (StructTy->isOpaque())
+        break;
+      ContainingTy = StructTy->getStructElementType(0);
+    } else {
+      break;
+    }
+  } while (ContainingTy->isAggregateType() || ContainingTy->isVectorTy() ||
+           SimilarType(ContainingTy, TargetTy));
+
+  return false;
 }
 
 } // namespace BitcastUtils
