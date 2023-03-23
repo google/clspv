@@ -24,6 +24,7 @@
 
 #include "clspv/Option.h"
 
+#include "BitcastUtils.h"
 #include "Constants.h"
 
 using namespace llvm;
@@ -279,7 +280,20 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
         gep->replaceAllUsesWith(new_gep);
         gep->eraseFromParent();
       } else if (auto gep_operator = dyn_cast<GEPOperator>(user)) {
+        int steps;
+        bool perfect_match;
+        bool alias_found = BitcastUtils::FindAliasingContainedType(
+            push_constant_ty, gep_operator->getSourceElementType(), steps,
+            perfect_match, M.getDataLayout());
+
         SmallVector<Constant *, 4> indices;
+        if (alias_found) {
+          for (int i = 0; i < steps; i++) {
+            indices.push_back(
+                ConstantInt::get(Type::getInt32Ty(M.getContext()), 0));
+          }
+        }
+
         for (auto iter = gep_operator->idx_begin();
              iter != gep_operator->idx_end(); ++iter) {
           indices.push_back(cast<Constant>(*iter));
