@@ -311,8 +311,6 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
   instance.getCodeGenOpts().OpaquePointers = clspv::Option::OpaquePointers();
   instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
-  // TODO(#995): Re-enable this warning.
-  instance.getDiagnosticOpts().Warnings.push_back("no-unsafe-buffer-usage");
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
