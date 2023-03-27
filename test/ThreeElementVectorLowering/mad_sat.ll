@@ -1,4 +1,5 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=three-element-vector-lowering
+; RUN: FileCheck %s < %t.ll
 
 ; CHECK: call { <4 x i8>, <4 x i8> } @_Z8spirv.op{{.*}}(i32 151, <4 x i8> %{{.*}}, <4 x i8>
 ; CHECK: call { <4 x i8>, <4 x i8> } @_Z8spirv.op{{.*}}(i32 149, <4 x i8> %{{.*}}, <4 x i8>
