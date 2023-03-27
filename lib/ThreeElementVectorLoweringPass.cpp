@@ -1217,6 +1217,7 @@ Value *clspv::ThreeElementVectorLoweringPass::convertSpirvOpBuiltinCall(
     switch (SpirvIdValue->getZExtValue()) {
     case 63: // OpCopyMemory
       return convertOpCopyMemoryOperation(VectorCall, EquivalentArgs);
+    case 149: // OpIAddCarry
     case 151: // OpUMulExtended
     case 152: // OpSMulExtended
     case 156: // OpIsNan
