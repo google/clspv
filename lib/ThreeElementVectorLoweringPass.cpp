@@ -918,7 +918,7 @@ Type *clspv::ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
 
   if (auto *VectorTy = dyn_cast<VectorType>(Ty)) {
     unsigned Arity = VectorTy->getElementCount().getKnownMinValue();
-    bool RequireLowering = (Arity == 3);
+    bool RequireLowering = (Arity % 3) == 0;
 
     if (RequireLowering) {
       assert(!VectorTy->getElementCount().isScalable() &&
@@ -930,7 +930,7 @@ Type *clspv::ThreeElementVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
       assert((ScalarTy->isFloatingPointTy() || ScalarTy->isIntegerTy()) &&
              "Unsupported scalar type");
 
-      return VectorType::get(ScalarTy, 4, false);
+      return VectorType::get(ScalarTy, (Arity / 3) * 4, false);
     }
 
     return nullptr;
