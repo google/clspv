@@ -24,6 +24,11 @@ set -x
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
+# This is required to run any git command in the docker since owner will
+# have changed between the clone environment, and the docker container.
+# Marking the root of the repo as safe for ownership changes.
+git config --global --add safe.directory $SRC
+
 using clang-8.0.0
 which clang-format
 
