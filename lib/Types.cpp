@@ -218,6 +218,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
           // code should be expanded if any are added.
           break;
         }
+        break;
       }
       case clspv::Builtins::kBuiltinNone:
         if (!call->getCalledFunction()->isDeclaration()) {
@@ -271,6 +272,74 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   }
   if (backup_ty) {
     return CacheType(backup_ty);
+  }
+
+  // If we have not figured out the type yet and the value is a kernel function
+  // argument, deduce it from the arg info metadata if enabled.
+  if (clspv::Option::KernelArgInfo() && isa<Argument>(v)) {
+    auto arg = cast<Argument>(v);
+    auto kernelFn = arg->getParent();
+    if (kernelFn->getCallingConv() == CallingConv::SPIR_KERNEL) {
+      unsigned ordinal = arg->getArgNo();
+      assert(kernelFn->getMetadata("kernel_arg_type") &&
+             kernelFn->getMetadata("kernel_arg_access_qual"));
+      auto const &type_op =
+          kernelFn->getMetadata("kernel_arg_type")->getOperand(ordinal);
+      auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
+
+      auto const &access_qual_op =
+          kernelFn->getMetadata("kernel_arg_access_qual")->getOperand(ordinal);
+      auto const &access_qual_str =
+          dyn_cast<MDString>(access_qual_op)->getString();
+
+      if (access_qual_str == "none") {
+        assert(type_name_str.endswith("*") && "Only expect pointer types here");
+        auto type_name = type_name_str.drop_back(1);
+        Type *base_ty = nullptr;
+        if (type_name.consume_front("char") ||
+            type_name.consume_front("uchar")) {
+          base_ty = IntegerType::get(context, 8);
+        } else if (type_name.consume_front("short") ||
+                   type_name.consume_front("ushort")) {
+          base_ty = IntegerType::get(context, 16);
+        } else if (type_name.consume_front("int") ||
+                   type_name.consume_front("uint")) {
+          base_ty = IntegerType::get(context, 32);
+        } else if (type_name.consume_front("long") ||
+                   type_name.consume_front("ulong")) {
+          base_ty = IntegerType::get(context, 64);
+        } else if (type_name.consume_front("half")) {
+          base_ty = Type::getHalfTy(context);
+        } else if (type_name.consume_front("float")) {
+          base_ty = Type::getFloatTy(context);
+        } else if (type_name.consume_front("double")) {
+          base_ty = Type::getDoubleTy(context);
+        } else if (type_name.consume_front("struct")) {
+          return CacheType(StructType::get(context));
+        } else {
+          assert(false && "Unhandled type");
+        }
+
+        if (type_name.size() == 0) {
+          return CacheType(base_ty);
+        }
+
+        uint32_t numComponents;
+        if (type_name.getAsInteger(10, numComponents) == false) {
+          // If the long vector pass is enabled, it would have rewritten all
+          // uses to arrays; return array types for those cases.
+          if ((numComponents > 4) && (clspv::Option::LongVectorSupport())) {
+            Type *arrty = ArrayType::get(base_ty, numComponents);
+            return CacheType(arrty);
+          } else {
+            Type *vecty = VectorType::get(base_ty, numComponents, false);
+            return CacheType(vecty);
+          }
+        } else {
+          assert(false && "Unhandled type");
+        }
+      }
+    }
   }
   return nullptr;
 }

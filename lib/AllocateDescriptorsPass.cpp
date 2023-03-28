@@ -272,7 +272,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
@@ -406,8 +406,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
       auto &set_and_binding_list = set_and_binding_pairs_for_function[f_ptr];
       for (auto &info : discriminants_used_by_function[f_ptr]) {
-        while (f_ptr->getArg(arg_index)->use_empty()) {
-          arg_index++;
+        if (!clspv::Option::KernelArgInfo()) {
+          while (f_ptr->getArg(arg_index)->use_empty()) {
+            arg_index++;
+          }
         }
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[discriminant_index].index >= 0) {
@@ -483,7 +485,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     int discriminant_index = 0;
     int arg_index = 0;
     for (Argument &Arg : f_ptr->args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
@@ -781,7 +783,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     function_spec_ids.clear();
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
