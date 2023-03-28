@@ -1419,7 +1419,10 @@ bool clspv::LongVectorLoweringPass::handlingRequired(User &U) {
       return true;
   } else if (auto *gep = dyn_cast<GetElementPtrInst>(&U)) {
     if (getEquivalentType(gep->getSourceElementType()) != nullptr)
-        return true;
+      return true;
+  } else if (auto *ptr = dyn_cast<PtrToIntInst>(&U)) {
+    if (visit(ptr->getPointerOperand()) != nullptr)
+      return true;
   }
 
   return false;
