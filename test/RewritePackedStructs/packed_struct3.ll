@@ -1,7 +1,5 @@
 ; RUN: clspv-opt --passes=rewrite-packed-structs %s -o %t
 ; RUN: FileCheck %s < %t
-; TODO(#1005): convert to opaque pointers when pass is fixed
-; XFAIL: *
 
 %struct = type <{ i32, float }>
 
@@ -14,4 +12,4 @@ define spir_kernel void @test(%struct addrspace(1)* nocapture %in) {
 
 declare spir_func i32 @_Z13get_global_idj(i32)
 
-; CHECK: define spir_kernel void @test(%struct addrspace(1)* nocapture %in) {
+; CHECK: define spir_kernel void @test(ptr addrspace(1) nocapture %in) {

@@ -45,8 +45,7 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts);
 
 SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
-                                            Type *BaseTy);
-SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL);
+                                            Type *BaseTy = nullptr);
 
 Type *GetIndexTy(IRBuilder<> &Builder);
 ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C);
@@ -57,6 +56,15 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
 
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool &PerfectMatch, const DataLayout &DL);
+
+void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
+                          GetElementPtrInst *GEP, uint64_t &CstVal,
+                          Value *&DynVal, size_t &SmallerBitWidths);
+
+SmallVector<Value *, 2>
+GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
+                       Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                       size_t SmallerBitWidths, bool IsPrivate);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H

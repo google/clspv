@@ -16,14 +16,14 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Operator.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
 
-#include "ReplacePointerBitcastPass.h"
 #include "BitcastUtils.h"
+#include "ReplacePointerBitcastPass.h"
 #include "Types.h"
 
 #include "clspv/AddressSpace.h"
@@ -280,8 +280,8 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
       AddrIdxs.push_back(LastAddrIdx);
     }
     auto *SrcAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
-    LoadInst *SrcVal = Builder.CreateLoad(
-        cast<GEPOperator>(SrcAddr)->getResultElementType(), SrcAddr);
+    Type *LoadTy = GetElementPtrInst::getIndexedType(OrigSrcTy, AddrIdxs);
+    LoadInst *SrcVal = Builder.CreateLoad(LoadTy, SrcAddr);
     LDValues.push_back(SrcVal);
   }
 
@@ -681,7 +681,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         // If bitcast's user is gep, investigate gep's users too.
         for (User *GEPUser : GEP->users()) {
           if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
-            if (GEPUserGEP->getSourceElementType() == GEP->getResultElementType())
+            if (GEPUserGEP->getSourceElementType() ==
+                GEP->getResultElementType())
               continue;
           }
           AllUsers.push_back(std::make_pair(GEPUser, true));

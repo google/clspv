@@ -52,6 +52,8 @@ private:
   /// buffers.
   llvm::Function *convertUserDefinedFunction(llvm::Function &F);
 
+  bool structsShouldBeLowered(llvm::Function &F);
+
 private:
   /// A map between struct types and their equivalent representation.
   llvm::DenseMap<llvm::Type *, llvm::Type *> TypeMap;

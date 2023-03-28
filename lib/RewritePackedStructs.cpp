@@ -138,13 +138,10 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
   SmallVector<Function *, 16> OldKernels;
   for (auto &F : M.functions()) {
     bool needRewriting = false;
-    bool isOpaqueFn = false;
     if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
       for (auto &Arg : F.args()) {
         if (Arg.getType()->isOpaquePointerTy()) {
-          isOpaqueFn = true;
-          // TODO(#1005): disabling rewrite packed structs with opaque pointers.
-          return PA;
+          continue;
         }
 
         // process the function if it has an input buffer with a packed struct
@@ -163,12 +160,12 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
     }
 
     if (needRewriting) {
-      if (isOpaqueFn) {
+      if (runOnFunction(F)) {
+        OldKernels.push_back(&F);
+      }
+    } else {
+      if (structsShouldBeLowered(F)) {
         runOnOpaqueFunction(F);
-      } else {
-        if (runOnFunction(F)) {
-          OldKernels.push_back(&F);
-        }
       }
     }
   }
@@ -179,6 +176,26 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
   }
 
   return PA;
+}
+
+bool clspv::RewritePackedStructs::structsShouldBeLowered(Function &F) {
+  for (Instruction &I : instructions(F)) {
+    if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
+      Type *source_ty = clspv::InferType(gep->getPointerOperand(),
+                                         F.getContext(), &type_cache_);
+      Type *dest_ty = gep->getSourceElementType();
+      if (auto STy = dyn_cast<StructType>(dest_ty)) {
+        if (STy->isPacked())
+          return true;
+      }
+      if (source_ty && dest_ty &&
+          (source_ty->isStructTy() || dest_ty->isStructTy()) &&
+          source_ty != dest_ty) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 Type *clspv::RewritePackedStructs::getEquivalentType(Type *Ty) {
@@ -224,11 +241,11 @@ Type *clspv::RewritePackedStructs::getEquivalentTypeImpl(Type *Ty) {
     uint32_t structSize = DL->getTypeAllocSize(StructTy);
     uint32_t structAlignment = getStructAlignment(StructTy, DL);
 
+    ArrayType *ArrayTy = ArrayType::get(Type::getInt8Ty(Ctx), structSize);
     if (Packed && structSize % structAlignment != 0) {
-      ArrayType* ArrayTy = ArrayType::get(Type::getInt8Ty(Ctx), structSize);
       return StructType::get(Ctx, {ArrayTy}, Packed);
     } else {
-      return nullptr;
+      return ArrayTy;
     }
   }
 
@@ -295,76 +312,44 @@ bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
     return false;
   }
 
-  bool Modified = false;
-
-  for (auto &Arg : F.args()) {
-    // Reduce alignment of packed struct by mapping struct types to an array of
-    // i8.
-    Type *ArgType =
-        clspv::InferType(&Arg, F.getParent()->getContext(), &type_cache_);
-    auto StructTy = dyn_cast<StructType>(ArgType);
-    if (StructTy && StructTy->isPacked()) {
-      const auto ArgKind = clspv::GetArgKind(Arg, Arg.getType());
-      if (ArgKind == clspv::ArgKind::Buffer ||
-          ArgKind == clspv::ArgKind::BufferUBO) {
-        Modified = true;
-        auto EquivalentStructTy = getEquivalentType(StructTy);
-
-        // Replace the input buffer uses with a local pointer of the same type
-        // at the beginning of the function so that we preserve the main type
-        // uses.
-        auto BeginInsertionPt = &*F.getEntryBlock().getFirstInsertionPt();
-        IRBuilder<> B(BeginInsertionPt);
-        auto LocalStructPtr =
-            B.CreateAlloca(StructTy, Arg.getType()->getPointerAddressSpace());
-        Arg.replaceAllUsesWith(LocalStructPtr);
-
-        // Store a zeroInitializer value of the new struct type inside the
-        // buffer so that opaque pointer is inferred as the new struct type.
-        B.CreateStore(Constant::getNullValue(EquivalentStructTy), &Arg);
-
-        // Extract the processed value from allocated local pointer, map them to
-        // i8 type vector and add these values to the input buffer.
-        auto EndInsertionPt = &*F.getEntryBlock().getTerminator();
-        B.SetInsertPoint(EndInsertionPt);
-
-        auto LocalStruct = B.CreateLoad(StructTy, LocalStructPtr);
-
-        unsigned StructArrayIdx = 0;
-        for (unsigned LocalStructIdx = 0;
-             LocalStructIdx < StructTy->getStructNumElements();
-             LocalStructIdx++) {
-          // Extract the processed value from allocated local pointer.
-          auto LocalStructValue =
-              B.CreateExtractValue(LocalStruct, {LocalStructIdx});
-          unsigned LocalStructTypeSize =
-              DL->getTypeAllocSize(StructTy->getContainedType(LocalStructIdx));
-
-          // Map values to i8 type vector.
-          auto bitcastedValue = B.CreateBitCast(
-              LocalStructValue,
-              FixedVectorType::get(
-                  Type::getInt8Ty(EquivalentStructTy->getContext()),
-                  LocalStructTypeSize));
-
-          // Add these values to the input buffer.
-          for (unsigned VecIdx = 0; VecIdx < LocalStructTypeSize; VecIdx++) {
-            auto VecValue = B.CreateExtractElement(bitcastedValue, VecIdx);
-            auto InputBufferPtr = B.CreateGEP(
-                EquivalentStructTy, &Arg,
-                {B.getInt32(0), B.getInt32(0), B.getInt32(StructArrayIdx)});
-            B.CreateStore(VecValue, InputBufferPtr);
-            StructArrayIdx++;
-          }
+  SmallVector<GetElementPtrInst *, 16> WorkList;
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : BB) {
+      if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
+        if (gep->getSourceElementType()->isStructTy()) {
+          WorkList.push_back(gep);
         }
       }
     }
   }
 
+  bool changed = false;
+
+  for (auto gep : WorkList) {
+    auto EquivalentTy = getEquivalentType(gep->getSourceElementType());
+    if (EquivalentTy == gep->getSourceElementType()) {
+      continue;
+    }
+    auto NewGEP = GetElementPtrInst::Create(
+        EquivalentTy, gep->getPointerOperand(), {gep->getOperand(1)}, "", gep);
+    if (gep->getNumOperands() > 2) {
+      SmallVector<Value *, 2> Indices;
+      Indices.push_back(ConstantInt::get(Type::getInt32Ty(F.getContext()), 0));
+      for (unsigned i = 2; i < gep->getNumOperands(); i++) {
+        Indices.push_back(gep->getOperand(i));
+      }
+      NewGEP = GetElementPtrInst::Create(gep->getSourceElementType(), NewGEP,
+                                         Indices, "", gep);
+    }
+    gep->replaceAllUsesWith(NewGEP);
+    gep->eraseFromParent();
+    changed = true;
+  }
+
   LLVM_DEBUG(dbgs() << "Final version for " << F.getName() << '\n');
   LLVM_DEBUG(dbgs() << F << '\n');
 
-  return Modified;
+  return changed;
 }
 
 Function *clspv::RewritePackedStructs::convertUserDefinedFunction(Function &F) {

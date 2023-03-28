@@ -328,27 +328,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                (OtherGEP->getSourceElementType()->isArrayTy() ||
                 OtherGEP->getSourceElementType()->isStructTy() ||
                 OtherGEP->getSourceElementType()->isVectorTy())) {
-      auto TyBitWidths = BitcastUtils::getEleTypesBitWidths(
-          OtherGEP->getSourceElementType(), M.getDataLayout(),
-          OtherGEP->getResultElementType());
-      assert(TyBitWidths.size() == OtherGEP->getNumOperands() - 1);
-      size_t smallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
-      uint64_t cstVal = 0;
-      Value *dynVal = nullptr;
-      for (unsigned i = 0; i < TyBitWidths.size(); i++) {
-        size_t size = TyBitWidths[i] / smallerBitWidths;
-        Value *Op = OtherGEP->getOperand(i + 1);
-        if (auto Cst = dyn_cast<ConstantInt>(Op)) {
-          cstVal += Cst->getZExtValue() * size;
-        } else {
-          Value *Mul = CreateMul(Builder, size, Op);
-          if (dynVal) {
-            dynVal = Builder.CreateAdd(dynVal, Mul);
-          } else {
-            dynVal = Mul;
-          }
-        }
-      }
+      uint64_t cstVal;
+      Value *dynVal;
+      size_t smallerBitWidths;
+      ExtractOffsetFromGEP(M.getDataLayout(), Builder, OtherGEP, cstVal, dynVal,
+                           smallerBitWidths);
       if (CstGEPIdxOp) {
         cstVal += CstGEPIdxOp->getZExtValue();
       } else if (dynVal) {
@@ -356,25 +340,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       } else {
         dynVal = GEPIdxOp;
       }
-      Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
-      if (dynVal == nullptr) {
-        for (unsigned i = 1; i < TyBitWidths.size(); i++) {
-          size_t size = TyBitWidths[i] / smallerBitWidths;
-          Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), cstVal / size));
-          cstVal %= size;
-        }
-      } else {
-        if (cstVal != 0) {
-          dynVal = Builder.CreateAdd(
-              dynVal, ConstantInt::get(Builder.getInt32Ty(), cstVal));
-        }
-        for (unsigned i = 1; i < TyBitWidths.size(); i++) {
-          size_t size = TyBitWidths[i] / smallerBitWidths;
-          Idxs.push_back(CreateDiv(Builder, size, dynVal));
-          if (i != TyBitWidths.size() - 1)
-            dynVal = CreateRem(Builder, size, dynVal);
-        }
-      }
+      auto NewGEPIdxs = GetIdxsForTyFromOffset(
+          M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
+          OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
+          true);
+      Idxs.append(NewGEPIdxs);
     } else {
       if (!CstSrcLastIdxOp || !CstSrcLastIdxOp->isZero()) {
         if (clspv::PointersAre64Bit(M) && !OtherGEP->getType()->isStructTy()) {
@@ -458,6 +428,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
       UpgradeCstCasts;
   DenseMap<Instruction *, std::pair<int, GetElementPtrInst *>> ImplicitGEPs;
   DenseMap<Value *, Type *> type_cache;
+  DenseMap<GetElementPtrInst *, GetElementPtrInst *> ImplicitCasts;
 
   bool changed = false;
 
@@ -503,6 +474,21 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
             continue;
           }
 
+          if (auto *inst_gep = dyn_cast<GetElementPtrInst>(&I)) {
+            auto VecSrcTy = dyn_cast<FixedVectorType>(source_ty);
+            auto VecDstTy = dyn_cast<FixedVectorType>(dest_ty);
+
+            // Do not lower implicit cast containing vec3, this would revert
+            // ThreeElementVectorLoweringPass and ReplacePointerBitcastPass
+            // should be able to deal with it without issues.
+            if (!(VecSrcTy && VecDstTy &&
+                  (VecSrcTy->getNumElements() == 3 ||
+                   VecDstTy->getNumElements() == 3))) {
+              ImplicitCasts.insert({gep, inst_gep});
+              continue;
+            }
+          }
+
           // For some reason, with opaque pointer, LLVM tends to transform
           // memcpy/memset into a series of gep and load/store. But while the
           // load/store are on i32 for example, it keeps the gep on i8 but
@@ -521,6 +507,28 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
         }
       }
     }
+  }
+
+  for (auto GEPs : ImplicitCasts) {
+    GetElementPtrInst *src_gep = GEPs.first;
+    GetElementPtrInst *inst_gep = GEPs.second;
+
+    IRBuilder<> Builder{inst_gep};
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
+                         SmallerBitWidths);
+    auto Idxs = GetIdxsForTyFromOffset(
+        DL, Builder, src_gep->getResultElementType(),
+        inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
+        cast<PointerType>(inst_gep->getPointerOperand()->getType())
+                ->getAddressSpace() == clspv::AddressSpace::Private);
+    auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
+                                             src_gep, Idxs, "", inst_gep);
+    inst_gep->replaceAllUsesWith(new_gep);
+    inst_gep->eraseFromParent();
+    changed = true;
   }
 
   for (auto *GEP : UnneededCasts) {
@@ -550,7 +558,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
       GEPIdx = Builder.getInt32(0);
     }
     SmallVector<Value *, 1> Indices{GEPIdx};
-    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(), Indices, "", GEP);
+    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(),
+                                             Indices, "", GEP);
     GEP->replaceAllUsesWith(NewGEP);
     GEP->eraseFromParent();
 

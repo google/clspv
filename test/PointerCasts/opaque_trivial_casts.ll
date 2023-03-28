@@ -80,9 +80,8 @@ entry:
 
 ; CHECK-LABEL: define void @test6(ptr %in) {
 ; CHECK: entry:
-; CHECK:   %gep1 = getelementptr float, ptr %in, i32 1
-; CHECK:   %gep2 = getelementptr i32, ptr %gep1, i32 1
-; CHECK:   ret void
+; CHECK:   getelementptr float, ptr %in, i32 1
+; CHECK-NEXT: ret void
 ; CHECK: }
 
 define void @test6(ptr %in) {
