@@ -103,7 +103,7 @@ clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
 
 namespace clspv {
 
-PodArgImpl GetPodArgsImpl(Function &F) {
+PodArgImpl GetPodArgsImpl(const Function &F) {
   assert(F.hasMetadata(PodArgsImplMetadataName()));
   auto md = F.getMetadata(PodArgsImplMetadataName());
   auto impl = static_cast<PodArgImpl>(
@@ -113,7 +113,7 @@ PodArgImpl GetPodArgsImpl(Function &F) {
   return impl;
 }
 
-ArgKind GetArgKindForPodArgs(Function &F) {
+ArgKind GetArgKindForPodArgs(const Function &F) {
   auto impl = GetPodArgsImpl(F);
   switch (impl) {
   case kUBO:
@@ -188,6 +188,8 @@ const char *GetArgKindName(ArgKind kind) {
     return "pointer_pushconstant";
   case ArgKind::PointerUBO:
     return "pointer_ubo";
+  case ArgKind::Unknown:
+    return "unknown";
   }
   errs() << "Unhandled case in clspv::GetArgKindForType: " << int(kind) << "\n";
   llvm_unreachable("Unhandled case in clspv::GetArgKindForType");

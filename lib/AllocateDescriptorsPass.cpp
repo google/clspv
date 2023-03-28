@@ -700,7 +700,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           replacement = call;
         } break;
         case clspv::ArgKind::Local:
-          llvm_unreachable("local is unhandled");
+        case clspv::ArgKind::Unknown:
+          llvm_unreachable("local/unknown are unhandled");
         }
 
         if (ShowDescriptors) {

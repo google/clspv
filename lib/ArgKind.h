@@ -35,10 +35,10 @@ enum PodArgImpl {
 };
 
 // Returns the style of pod args used by |F|. Note that |F| must be a kernel.
-PodArgImpl GetPodArgsImpl(llvm::Function &F);
+PodArgImpl GetPodArgsImpl(const llvm::Function &F);
 
 // Returns the ArgKind for pod args in kernel |F|.
-ArgKind GetArgKindForPodArgs(llvm::Function &F);
+ArgKind GetArgKindForPodArgs(const llvm::Function &F);
 
 // Returns the ArgKind for |Arg|.
 ArgKind GetArgKind(llvm::Argument &Arg, llvm::Type *data_type = nullptr);

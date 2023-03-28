@@ -1191,6 +1191,17 @@ void SPIRVProducerPassImpl::FindResourceVars() {
           ModuleOrderedResourceVars.insert(rv);
         }
       }
+      // Pad the vector of ResourceVarInfo* so it has one entry for each kernel
+      // argument. The logic above will have stopped at the last resource
+      // variable.
+      while (where->second.size() < F.arg_size()) {
+        where->second.push_back(nullptr);
+      }
+      // Make sure all kernel functions have got nullptr entries for all their
+      // arguments. This is how the arguement reflection instruction generation
+      // checks whether it's dealing with a resource variable or something else.
+    } else if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
+      FunctionToResourceVarsMap[&F].assign(F.arg_size(), nullptr);
     }
   }
   if (ShowResourceVars) {
@@ -6987,8 +6998,9 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
         uint32_t arg_offset = static_cast<uint32_t>(offset);
         const uint32_t arg_size = static_cast<uint32_t>(size);
         uint32_t elem_size = 0;
-        uint32_t descriptor_set = 0;
-        uint32_t binding = 0;
+        uint32_t descriptor_set = -1;
+        uint32_t binding = -1;
+        clspv::ArgKind argKindReflection = argKind;
         if (spec_id > 0) {
           auto &local_arg_info = LocalSpecIdInfoMap[spec_id];
           elem_size = static_cast<uint32_t>(
@@ -6997,32 +7009,29 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
           if (static_cast<uint64_t>(new_index) >=
                   resource_var_at_index.size() ||
               !resource_var_at_index[new_index]) {
-            // Unused
-            continue;
+            // Unused, let AddArgumentReflection figure out the argument kind
+            // from kernel arg info metadata, if present.
+            argKindReflection = clspv::ArgKind::Unknown;
+          } else {
+            auto *info = resource_var_at_index[new_index];
+            assert(info);
+            descriptor_set = info->descriptor_set;
+            binding = info->binding;
           }
-          auto *info = resource_var_at_index[new_index];
-          assert(info);
-          descriptor_set = info->descriptor_set;
-          binding = info->binding;
         }
-        AddArgumentReflection(F, kernel_decl, name.str(), argKind, ordinal,
-                              descriptor_set, binding, arg_offset, arg_size,
-                              static_cast<uint32_t>(spec_id), elem_size);
+        AddArgumentReflection(F, kernel_decl, name.str(), argKindReflection,
+                              ordinal, descriptor_set, binding, arg_offset,
+                              arg_size, static_cast<uint32_t>(spec_id),
+                              elem_size);
       }
     } else {
       // There is no argument map.
       // Take descriptor info from the resource variable calls.
       // Take argument name and size from the arguments list.
-
-      SmallVector<Argument *, 4> arguments;
-      for (auto &arg : F.args()) {
-        arguments.push_back(&arg);
-      }
-
-      unsigned arg_index = 0;
-      for (auto *info : resource_var_at_index) {
-        if (info) {
-          auto arg = arguments[arg_index];
+      for (unsigned arg_index = 0; arg_index < F.arg_size(); ++arg_index) {
+        auto arg = F.getArg(arg_index);
+        // Check whether we have a resource var.
+        if (auto *info = resource_var_at_index[arg_index]) {
           unsigned arg_size = 0;
           if (info->arg_kind == clspv::ArgKind::Pod ||
               info->arg_kind == clspv::ArgKind::PodUBO ||
@@ -7036,14 +7045,9 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
           AddArgumentReflection(F, kernel_decl, arg->getName().str(),
                                 info->arg_kind, arg_index, info->descriptor_set,
                                 info->binding, 0, arg_size, 0, 0);
-        }
-        arg_index++;
-      }
-      // Generate mappings for pointer-to-local arguments.
-      for (arg_index = 0; arg_index < arguments.size(); ++arg_index) {
-        Argument *arg = arguments[arg_index];
-        auto where = LocalArgSpecIds.find(arg);
-        if (where != LocalArgSpecIds.end()) {
+          // If not, is this a local argument?
+        } else if (auto where = LocalArgSpecIds.find(arg);
+                   where != LocalArgSpecIds.end()) {
           auto &local_arg_info = LocalSpecIdInfoMap[where->second];
 
           // descriptor_set, binding, offset and size are always 0.
@@ -7052,6 +7056,12 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
                                 static_cast<uint32_t>(local_arg_info.spec_id),
                                 static_cast<uint32_t>(GetTypeAllocSize(
                                     local_arg_info.elem_type, DL)));
+          // If not, it is an unused argument, let AddArgumentReflection figure
+          // out what argument reflection info to emit, if any.
+        } else {
+          AddArgumentReflection(F, kernel_decl, arg->getName().str(),
+                                ArgKind::Unknown, arg_index, -1, -1, 0, 0, -1,
+                                0);
         }
       }
     }
@@ -7189,7 +7199,36 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     }
     auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
     Ops << type_qual_enum;
-  
+
+    // Select the argument kind based on argument info if not known by the
+    // caller.
+    if (arg_kind == clspv::ArgKind::Unknown) {
+      if (access_qual_str == "read_only") {
+        arg_kind = clspv::ArgKind::SampledImage;
+      } else if ((access_qual_str == "write_only") ||
+                 (access_qual_str == "read_write")) {
+        arg_kind = clspv::ArgKind::StorageImage;
+      } else if (addrspace == clspv::AddressSpace::Global) {
+        arg_kind = clspv::ArgKind::Buffer;
+      } else if (addrspace == clspv::AddressSpace::Constant) {
+        arg_kind = clspv::Option::ConstantArgsInUniformBuffer()
+                       ? clspv::ArgKind::BufferUBO
+                       : clspv::ArgKind::Buffer;
+      } else if (addrspace == clspv::AddressSpace::Local) {
+        arg_kind = clspv::ArgKind::Local;
+      } else if (type_name_str == "sampler_t") {
+        arg_kind = clspv::ArgKind::Sampler;
+      } else if ((type_qual_str == "") &&
+                 (addrspace == clspv::AddressSpace::Private)) {
+        arg_kind = GetArgKindForPodArgs(kernelFn);
+      }
+    }
+  }
+
+  // We don't know what kind of argument we're dealing with, can't emit any
+  // reflection instruction.
+  if (arg_kind == clspv::ArgKind::Unknown) {
+    return;
   }
 
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
@@ -7231,6 +7270,8 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     break;
   case clspv::ArgKind::Sampler:
     ext_inst = reflection::ExtInstArgumentSampler;
+    break;
+  case clspv::ArgKind::Unknown:
     break;
   default:
     llvm_unreachable("Unhandled argument reflection");
