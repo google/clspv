@@ -21,7 +21,7 @@
 
 #define DEBUG_TYPE "bitcastutils"
 
-#define DEBUG_FCT_TY_VALUES(Ty, Values)                                 \
+#define DEBUG_FCT_TY_VALUES(Ty, Values)                                        \
   do {                                                                         \
     LLVM_DEBUG(fprintf(stderr, "%s: ", __func__); Ty->dump();                  \
                fprintf(stderr, "\tValues[0/%lu] = ", Values.size());           \
@@ -842,16 +842,12 @@ SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
   SmallVector<size_t, 4> TyBitWidths;
   TyBitWidths.push_back(SizeInBits(DL, Ty));
   while ((Ty->isArrayTy() || Ty->isVectorTy() ||
-          (Ty->isStructTy() && cast<StructType>(Ty)->getNumElements() == 0)) &&
+          (Ty->isStructTy() && cast<StructType>(Ty)->getNumElements() <= 1)) &&
          Ty != BaseTy) {
     Ty = GetEleType(Ty);
     TyBitWidths.push_back(SizeInBits(DL, Ty));
   }
   return TyBitWidths;
-}
-
-SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL) {
-  return getEleTypesBitWidths(Ty, DL, nullptr);
 }
 
 bool IsPowerOfTwo(unsigned x) { return (x & (x - 1)) == 0; }
@@ -953,6 +949,102 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
            SimilarType(ContainingTy, TargetTy));
 
   return false;
+}
+
+void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
+                          GetElementPtrInst *GEP, uint64_t &CstVal,
+                          Value *&DynVal, size_t &SmallerBitWidths) {
+  CstVal = 0;
+  DynVal = nullptr;
+
+  unsigned NbIdx = GEP->getNumOperands() - 1;
+  SmallerBitWidths = SizeInBits(DataLayout, GEP->getResultElementType());
+  SmallVector<Value *, 8> Idxs;
+
+  Type *PrevTy = GEP->getSourceElementType();
+  for (unsigned i = 0; i < NbIdx; i++) {
+    Value *Op = GEP->getOperand(i + 1);
+    Idxs.push_back(Op);
+    Type *NextTy =
+        GetElementPtrInst::getIndexedType(GEP->getSourceElementType(), Idxs);
+    if (auto STy = dyn_cast<StructType>(PrevTy)) {
+      auto Cst = dyn_cast<ConstantInt>(Op);
+      assert(Cst);
+      auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
+          Cst->getZExtValue());
+      if (offset < SmallerBitWidths) {
+        CstVal = CstVal * SmallerBitWidths + offset;
+        if (DynVal) {
+          DynVal = CreateMul(Builder, SmallerBitWidths, DynVal);
+        }
+        SmallerBitWidths = 8;
+      } else {
+        CstVal += offset / SmallerBitWidths;
+      }
+    } else {
+      auto size = SizeInBits(DataLayout, NextTy) / SmallerBitWidths;
+      if (auto Cst = dyn_cast<ConstantInt>(Op)) {
+        CstVal += Cst->getZExtValue() * size;
+      } else {
+        Value *Mul = CreateMul(Builder, size, Op);
+        if (DynVal) {
+          DynVal = Builder.CreateAdd(DynVal, Mul);
+        } else {
+          DynVal = Mul;
+        }
+      }
+    }
+    PrevTy = NextTy;
+  }
+}
+
+SmallVector<Value *, 2>
+GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
+                       Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                       size_t SmallerBitWidths, bool IsPrivate) {
+  SmallVector<Value *, 2> Idxs;
+  auto TyBitWidths =
+      BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
+  size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
+  if (NewSmallerBitWidths <= SmallerBitWidths) {
+    CstVal *= SmallerBitWidths / NewSmallerBitWidths;
+  } else {
+    CstVal /= NewSmallerBitWidths / SmallerBitWidths;
+  }
+
+  // For private pointer, the first Idx needs to be '0'
+  unsigned startIdx = 0;
+  if (IsPrivate) {
+    Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
+    startIdx = 1;
+  }
+
+  if (DynVal == nullptr) {
+    for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
+      size_t size = TyBitWidths[i] / NewSmallerBitWidths;
+      Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), CstVal / size));
+      CstVal %= size;
+    }
+  } else {
+    if (NewSmallerBitWidths <= SmallerBitWidths) {
+      DynVal =
+          CreateMul(Builder, SmallerBitWidths / NewSmallerBitWidths, DynVal);
+    } else {
+      DynVal =
+          CreateDiv(Builder, NewSmallerBitWidths / SmallerBitWidths, DynVal);
+    }
+    if (CstVal != 0) {
+      DynVal = Builder.CreateAdd(
+          DynVal, ConstantInt::get(Builder.getInt32Ty(), CstVal));
+    }
+    for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
+      size_t size = TyBitWidths[i] / NewSmallerBitWidths;
+      Idxs.push_back(CreateDiv(Builder, size, DynVal));
+      if (i != TyBitWidths.size() - 1)
+        DynVal = CreateRem(Builder, size, DynVal);
+    }
+  }
+  return Idxs;
 }
 
 } // namespace BitcastUtils

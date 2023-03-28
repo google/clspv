@@ -6,21 +6,20 @@ target triple = "spir-unknown-unknown"
 
 @__spirv_GlobalInvocationId = addrspace(5) global <3 x i32> zeroinitializer
 
+; CHECK: [[idx:%[^ ]+]] = shl i32 {{.*}}, 2
+; CHECK: [[gep_src:%[^ ]+]] = getelementptr i8, ptr addrspace(1) %soa, i32 [[idx]]
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast float %conv to <4 x i8>
 ; CHECK: [[trunc0:%[^ ]+]] = extractelement <4 x i8> [[cast]], i64 0
 ; CHECK: [[trunc1:%[^ ]+]] = extractelement <4 x i8> [[cast]], i64 1
 ; CHECK: [[trunc2:%[^ ]+]] = extractelement <4 x i8> [[cast]], i64 2
 ; CHECK: [[trunc3:%[^ ]+]] = extractelement <4 x i8> [[cast]], i64 3
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) %cast, i32
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) [[gep_src]], i32 0
 ; CHECK: store i8 [[trunc0]], ptr addrspace(1) [[gep]]
-; CHECK: [[add1:%[a-zA-Z0-9_.]+]] = add i32 %{{.*}}, 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) %cast, i32 [[add1]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) [[gep_src]], i32 1
 ; CHECK: store i8 [[trunc1]], ptr addrspace(1) [[gep]]
-; CHECK: [[add2:%[a-zA-Z0-9_.]+]] = add i32 [[add1]], 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) %cast, i32 [[add2]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) [[gep_src]], i32 2
 ; CHECK: store i8 [[trunc2]], ptr addrspace(1) [[gep]]
-; CHECK: [[add3:%[a-zA-Z0-9_.]+]] = add i32 [[add2]], 1
-; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) %cast, i32 [[add3]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr i8, ptr addrspace(1) [[gep_src]], i32 3
 ; CHECK: store i8 [[trunc3]], ptr addrspace(1) [[gep]]
 
 define spir_kernel void @writeToSoaBuffer(ptr addrspace(1) %soa) {

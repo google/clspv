@@ -1,44 +1,46 @@
-; RUN: clspv-opt --passes="rewrite-packed-structs" %s -o %t
+; RUN: clspv-opt --passes="rewrite-packed-structs,replace-pointer-bitcast" %s -o %t
 ; RUN: FileCheck %s < %t
-; TODO(#1005): pass is generating bad code
-; XFAIL: *
 
 %struct = type <{ i32, i16 }>
 
 define spir_kernel void @test(ptr addrspace(1) nocapture %in) {
-  %1 = call spir_func i32 @_Z13get_global_idj(i32 0)
-  %2 = getelementptr inbounds %struct, ptr addrspace(1) %in, i32 %1
-  store %struct <{ i32 2100483600, i16 127 }>, ptr addrspace(1) %2
+  %1 = load %struct, ptr addrspace(1) %in
+  %2 = call spir_func i32 @_Z13get_global_idj(i32 0)
+  %3 = getelementptr inbounds %struct, ptr addrspace(1) %in, i32 %2
+  store %struct %1, ptr addrspace(1) %3
   ret void
 }
 
 declare spir_func i32 @_Z13get_global_idj(i32)
 
-; CHECK: [[alloca:%[a-zA-Z0-9_.]+]] = alloca %struct
-; CHECK: store %struct <{ i32 2100483600, i16 127 }>, ptr addrspace(1) [[alloca]]
-; CHECK: [[gid:%[a-zA-Z0-9_.]+]] = call spir_func i32 @_Z13get_global_idj(i32 0)
-; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load %struct, ptr addrspace(1) [[alloca]]
+; CHECK:  [[load:%[^ ]+]] = load %struct, ptr addrspace(1) %in, align 1
+; CHECK:  [[gid:%[^ ]+]] = call spir_func i32 @_Z13get_global_idj(i32 0)
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]]
+; CHECK:  [[load0:%[^ ]+]] = extractvalue %struct [[load]], 0
+; CHECK:  [[load1:%[^ ]+]] = extractvalue %struct [[load]], 1
 
-; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractvalue %struct [[ld]], 0
-; CHECK: [[cast0:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ex0]] to <4 x i8>
-; CHECK: [[ex00:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast0]], i64 0
-; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 0
-; CHECK: store i8 [[ex00]], ptr addrspace(1) [[gep0]]
-; CHECK: [[ex01:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast0]], i64 1
-; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 1
-; CHECK: store i8 [[ex00]], ptr addrspace(1) [[gep1]]
-; CHECK: [[ex02:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast0]], i64 1
-; CHECK: [[gep2:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 2
-; CHECK: store i8 [[ex00]], ptr addrspace(1) [[gep2]]
-; CHECK: [[ex03:%[a-zA-Z0-9_.]+]] = extractelement <4 x i8> [[cast0]], i64 1
-; CHECK: [[gep3:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 3
-; CHECK: store i8 [[ex00]], ptr addrspace(1) [[gep3]]
+; CHECK:  [[trunc:%[^ ]+]] = trunc i32 [[load0]] to i8
+; CHECK:  [[arr0:%[^ ]+]] = insertvalue [6 x i8] poison, i8 [[trunc]], 0
 
-; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue %struct [[ld]], 1
-; CHECK: [[cast1:%[a-zA-Z0-9_.]+]] = bitcast i16 [[ex1]] to <2 x i8>
-; CHECK: [[ex10:%[a-zA-Z0-9_.]+]] = extractelement <2 x i8> [[cast1]], i64 0
-; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 4
-; CHECK: store i8 [[ex10]], ptr addrspace(1) [[gep]]
-; CHECK: [[ex11:%[a-zA-Z0-9_.]+]] = extractelement <2 x i8> [[cast1]], i64 1
-; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]], i32 0, i32 5
-; CHECK: store i8 [[ex11]], ptr addrspace(1) [[gep]]
+; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[load0]], 8
+; CHECK:  [[trunc:%[^ ]+]] = trunc i32 [[lshr]] to i8
+; CHECK:  [[arr1:%[^ ]+]] = insertvalue [6 x i8] [[arr0]], i8 [[trunc]], 1
+
+; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[load0]], 16
+; CHECK:  [[trunc:%[^ ]+]] = trunc i32 [[lshr]] to i8
+; CHECK:  [[arr2:%[^ ]+]] = insertvalue [6 x i8] [[arr1]], i8 [[trunc]], 2
+
+; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[load0]], 24
+; CHECK:  [[trunc:%[^ ]+]] = trunc i32 [[lshr]] to i8
+; CHECK:  [[arr3:%[^ ]+]] = insertvalue [6 x i8] [[arr2]], i8 [[trunc]], 3
+
+; CHECK:  [[trunc:%[^ ]+]] = trunc i16 [[load1]] to i8
+; CHECK:  [[arr4:%[^ ]+]] = insertvalue [6 x i8] [[arr3]], i8 [[trunc]], 4
+
+; CHECK:  [[lshr:%[^ ]+]] = lshr i16 [[load1]], 8
+; CHECK:  [[trunc:%[^ ]+]] = trunc i16 [[lshr]] to i8
+; CHECK:  [[arr5:%[^ ]+]] = insertvalue [6 x i8] [[arr4]], i8 [[trunc]], 5
+
+; CHECK:  [[struct:%[^ ]+]] = insertvalue <{ [6 x i8] }> poison, [6 x i8] [[arr5]], 0
+; CHECK:  [[addr:%[^ ]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) [[gep]], i32 0
+; CHECK:  store <{ [6 x i8] }> [[struct]], ptr addrspace(1) [[addr]], align 1
