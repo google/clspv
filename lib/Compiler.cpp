@@ -349,8 +349,7 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().OptimizationLevel = 0;
 
   if (clspv::Option::DebugInfo()) {
-    instance.getCodeGenOpts().setDebugInfo(
-        clang::codegenoptions::FullDebugInfo);
+    instance.getCodeGenOpts().setDebugInfo(llvm::codegenoptions::FullDebugInfo);
   }
 
   // Select the correct SPIR triple
