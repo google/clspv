@@ -1,16 +1,16 @@
-// RUN: clspv %target %s -cl-std=CL2.0 -inline-entry-points -cl-kernel-arg-info -o %t.spv
+// RUN: clspv %target %s -cl-std=CL2.0 -inline-entry-points -long-vector -cl-kernel-arg-info -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-void kernel foo(global int4 *A, local float* SEC, constant ushort2* TER, int QUA, read_only image2d_t im0, write_only image2d_t im1, read_write image3d_t im2, sampler_t smp) {
+void kernel foo(global int8 *A, local float* SEC, constant ushort2* TER, int QUA, read_only image2d_t im0, write_only image2d_t im1, read_write image3d_t im2, sampler_t smp) {
 }
 
 // CHECK: [[extinst:%[a-zA-A0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 
 // CHECK-DAG: [[kernel_name:%[a-zA-Z0-9_]+]] = OpString "foo"
 // CHECK-DAG: [[arg0name:%[a-zA-Z0-9_]+]] = OpString "A"
-// CHECK-DAG: [[arg0typename:%[a-zA-Z0-9_]+]] = OpString "int4*"
+// CHECK-DAG: [[arg0typename:%[a-zA-Z0-9_]+]] = OpString "int8*"
 // CHECK-DAG: [[arg1name:%[a-zA-Z0-9_]+]] = OpString "SEC"
 // CHECK-DAG: [[arg1typename:%[a-zA-Z0-9_]+]] = OpString "float*"
 // CHECK-DAG: [[arg2name:%[a-zA-Z0-9_]+]] = OpString "TER"
