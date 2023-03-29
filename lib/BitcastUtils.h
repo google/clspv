@@ -44,6 +44,8 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts);
 
+unsigned PointerOperandNum(Instruction *inst);
+
 SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
                                             Type *BaseTy = nullptr);
 

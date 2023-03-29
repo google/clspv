@@ -457,9 +457,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
           // that the address math must be divided among other
           // entries.
           auto *gep = dyn_cast<GetElementPtrInst>(&I);
+          auto *call = dyn_cast_or_null<CallInst>(&I);
+          bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if ((Steps > 0 && !gep) || (Steps == 1)) {
-            if ((isa<LoadInst>(I) || isa<StoreInst>(I) || gep) &&
-                (gep || PerfectMatch)) {
+            if (!userCall && (gep || PerfectMatch)) {
               ImplicitGEPs.insert(
                   {&I, std::make_pair(Steps, PerfectMatch ? nullptr : gep)});
               continue;
@@ -591,7 +592,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
       auto new_gep = GetElementPtrInst::Create(
           new_type, GEP->getPointerOperand(), Indices, "", I);
 
-      unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+      unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
       I->setOperand(PointerOperandNum, new_gep);
 
       if (GEP->getNumUses() == 0) {
@@ -610,7 +611,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     auto *gep = GEPInfo.second.second;
     IRBuilder<> Builder{I};
     SmallVector<Value *, 8> GEPIndices{};
-    unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
 
     for (int i = 0; i < Steps + 1; i++) {
       GEPIndices.push_back(Builder.getInt32(0));

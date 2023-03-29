@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "BitcastUtils.h"
+#include "Builtins.h"
 #include "Types.h"
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
@@ -800,6 +801,30 @@ bool RemoveCstExprFromFunction(Function *F) {
   return Changed;
 }
 
+unsigned PointerOperandNum(Instruction *inst) {
+  if (isa<StoreInst>(inst)) {
+    return 1;
+  } else if (auto *call = dyn_cast<CallInst>(inst)) {
+    auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
+    if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
+      return 0;
+    } else if (info.getType() == clspv::Builtins::kSpirvOp) {
+      auto opcode_op = call->getArgOperand(0);
+      auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
+      const bool atomic =
+          static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
+          opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor);
+      if (atomic) {
+        return 1;
+      }
+    }
+    llvm::errs() << "Instruction: " << *inst << "\n";
+    llvm_unreachable("Unexpected instruction");
+  }
+
+  return 0;
+}
+
 bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts) {
@@ -822,6 +847,33 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     source_ty =
         clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
     dest_ty = st->getValueOperand()->getType();
+  } else if (auto *call = dyn_cast<CallInst>(&I)) {
+    auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
+    if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
+      source = call->getArgOperand(0);
+      source_ty = clspv::InferType(source, M.getContext(), &type_cache);
+      if (info.getType() == clspv::Builtins::kAtomicStore ||
+          info.getType() == clspv::Builtins::kAtomicStoreExplicit) {
+        dest_ty = call->getArgOperand(1)->getType();
+      } else {
+        dest_ty = call->getType();
+      }
+    } else if (info.getType() == clspv::Builtins::kSpirvOp) {
+      auto opcode_op = call->getArgOperand(0);
+      auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
+      const bool atomic =
+          static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
+          opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor);
+      if (atomic) {
+        source = call->getArgOperand(1);
+        source_ty = clspv::InferType(source, M.getContext(), &type_cache);
+        if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
+          dest_ty = call->getArgOperand(4)->getType();
+        } else {
+          dest_ty = call->getType();
+        }
+      }
+    }
   }
 
   // Skip pointer transforms when physical addressing will be used
