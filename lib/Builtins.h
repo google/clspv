@@ -23,7 +23,7 @@
 #include "BuiltinsEnum.h"
 
 #define BUILTIN_IN_GROUP(BUILTIN, GROUP)                                       \
-  (BUILTIN > clspv::Builtins::kType_##GROUP##_Start &&                                \
+  (BUILTIN > clspv::Builtins::kType_##GROUP##_Start &&                         \
    BUILTIN < clspv::Builtins::kType_##GROUP##_End)
 
 namespace clspv {
