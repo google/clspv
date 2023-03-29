@@ -135,7 +135,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
         // The kind only matter if the argument is used, otherwise we just need
         // to track that there was an argument.
         auto kind = clspv::ArgKind::Buffer;
-        if (!Arg.use_empty()) {
+        if (!Arg.use_empty() || clspv::Option::KernelArgInfo()) {
           auto *inferred_ty =
               clspv::InferType(&Arg, M.getContext(), &type_cache);
           kind = clspv::GetArgKind(Arg, inferred_ty);
