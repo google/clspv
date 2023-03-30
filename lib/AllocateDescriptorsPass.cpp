@@ -96,26 +96,9 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   // Generate the function type for clspv::LiteralSamplerFunction()
   IRBuilder<> Builder(M.getContext());
   Type *sampler_ty = nullptr;
-  Type *sampler_data_ty = nullptr;;
-  // TODO(#1036): remove opaque struct support
-  if (init_fn->getReturnType()->isTargetExtTy()) {
-    sampler_ty = init_fn->getReturnType();
-    sampler_data_ty = init_fn->getReturnType();
-  } else {
-    sampler_data_ty =
-        StructType::getTypeByName(M.getContext(), "opencl.sampler_t");
-    if (!sampler_data_ty) {
-      sampler_data_ty = StructType::create(M.getContext(), "opencl.sampler_t");
-    }
-    // TODO: #816 remove after final switch.
-    if (init_fn->getType()->isOpaquePointerTy()) {
-      sampler_ty = PointerType::get(M.getContext(), clspv::AddressSpace::Constant);
-    } else {
-      sampler_ty = sampler_data_ty->getPointerTo(clspv::AddressSpace::Constant);
-    }
-  }
+  sampler_ty = init_fn->getReturnType();
   Type *i32 = Builder.getInt32Ty();
-  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32, sampler_data_ty}, false);
+  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32, sampler_ty}, false);
 
   auto var_fn = M.getOrInsertFunction(clspv::LiteralSamplerFunction(), fn_ty);
 
@@ -155,15 +138,13 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
         SmallVector<Value *, 3> args = {
             Builder.getInt32(descriptor_set), Builder.getInt32(binding),
             Builder.getInt32(third_param),
-            Constant::getNullValue(sampler_data_ty)};
+            Constant::getNullValue(sampler_ty)};
         if (ShowDescriptors) {
           outs() << "  translate literal sampler " << *const_val << " to ("
                  << descriptor_set << "," << binding << ")\n";
         }
         auto *new_call =
             CallInst::Create(var_fn, args, "", dyn_cast<Instruction>(call));
-        assert(clspv::InferType(new_call, M.getContext(), &type_cache_) ==
-               sampler_data_ty);
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();
       }
