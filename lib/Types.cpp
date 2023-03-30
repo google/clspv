@@ -23,6 +23,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 
@@ -281,6 +282,29 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     auto kernelFn = arg->getParent();
     if (kernelFn->getCallingConv() == CallingConv::SPIR_KERNEL) {
       unsigned ordinal = arg->getArgNo();
+      // If ClusterPodKernelArgumentsPass has transformed the kernel signature
+      // we need to refer to the argument map to know the index of arguments
+      // prior to remapping. The kernel arg info metadata is using the orignal
+      // argument indexing.
+      const auto *arg_map =
+          kernelFn->getMetadata(clspv::KernelArgMapMetadataName());
+      if (arg_map) {
+        for (const auto &arg : arg_map->operands()) {
+          const MDNode *arg_node = dyn_cast<MDNode>(arg.get());
+          // Remapped argument index
+          const auto new_index =
+              mdconst::dyn_extract<ConstantInt>(arg_node->getOperand(2))
+                  ->getZExtValue();
+          if (new_index != ordinal) {
+            continue;
+          }
+          const auto old_index =
+              mdconst::dyn_extract<ConstantInt>(arg_node->getOperand(1))
+                  ->getZExtValue();
+          ordinal = old_index;
+        }
+      }
+
       assert(kernelFn->getMetadata("kernel_arg_type") &&
              kernelFn->getMetadata("kernel_arg_access_qual"));
       auto const &type_op =
@@ -314,10 +338,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
           base_ty = Type::getFloatTy(context);
         } else if (type_name.consume_front("double")) {
           base_ty = Type::getDoubleTy(context);
-        } else if (type_name.consume_front("struct")) {
-          return CacheType(StructType::get(context));
+          // Default to int for all types we don't know
         } else {
-          assert(false && "Unhandled type");
+          return CacheType(IntegerType::get(context, 32));
         }
 
         if (type_name.size() == 0) {
@@ -336,7 +359,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
             return CacheType(vecty);
           }
         } else {
-          assert(false && "Unhandled type");
+          // Default to int for all types we don't know
+          return CacheType(IntegerType::get(context, 32));
         }
       }
     }

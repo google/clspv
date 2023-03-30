@@ -289,8 +289,10 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     NewFunc->setAttributes(newAttributes);
 
     // Move OpenCL kernel named attributes.
-    // TODO(dneto): Attributes starting with kernel_arg_* should be rewritten
-    // to reflect change in the argument shape.
+    // Do not rewrite the kernel_arg_* metadata as all of it needs to be
+    // preserved intact so it can be reported via clGetKernelArgInfo.
+    // Users of this metadata need to be aware that it may not map directly
+    // to kernel arguments after this pass.
     auto pod_md_name = clspv::PodArgsImplMetadataName();
     std::vector<const char *> Metadatas{
         "reqd_work_group_size",   "kernel_arg_addr_space",
