@@ -302,6 +302,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
               mdconst::dyn_extract<ConstantInt>(arg_node->getOperand(1))
                   ->getZExtValue();
           ordinal = old_index;
+          break;
         }
       }
 
