@@ -360,10 +360,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         }
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg) !=
-                  clspv::ArgKind::PodPushConstant &&
-              clspv::GetArgKind(Arg) !=
-                  clspv::ArgKind::PointerPushConstant) {
+          if (clspv::GetArgKind(Arg) != clspv::ArgKind::PodPushConstant &&
+              clspv::GetArgKind(Arg) != clspv::ArgKind::PointerPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }
