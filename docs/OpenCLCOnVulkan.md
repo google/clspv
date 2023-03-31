@@ -22,12 +22,8 @@ The following subjects are covered:
 
 Jan 2023:
 
-Transparent pointers are deprecated. Usage of opaque pointers in LLVM are
-enabled by default. Soon the option will be removed. If you encounter
-regressions in behaviour, please open an issue.
-
-You may use -enable-opaque-pointers=0 for now, but that option will be removed
-when LLVM removes support for transparent pointers.
+Transparent pointers are not supported anymore. clspv only supports opaque
+pointers. If you encounter regressions in behaviour, please open an issue.
 
 Older:
 
