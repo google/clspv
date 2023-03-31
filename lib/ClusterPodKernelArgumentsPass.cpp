@@ -136,9 +136,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
         // to track that there was an argument.
         auto kind = clspv::ArgKind::Buffer;
         if (!Arg.use_empty() || clspv::Option::KernelArgInfo()) {
-          auto *inferred_ty =
-              clspv::InferType(&Arg, M.getContext(), &type_cache);
-          kind = clspv::GetArgKind(Arg, inferred_ty);
+          kind = clspv::GetArgKind(Arg);
         }
         RemapInfo.push_back(
             {std::string(Arg.getName()), arg_index, new_index++, 0u, 0u, kind});
@@ -220,7 +218,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
         if (!clspv::IsResourceType(ArgTy)) {
-          auto pod_arg_kind = clspv::GetArgKind(Arg, ArgTy);
+          auto pod_arg_kind = clspv::GetArgKind(Arg);
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           unsigned offset = StructLayout->getElementOffset(PodIndexMap[&Arg]);
           int remapped_index = new_index;
