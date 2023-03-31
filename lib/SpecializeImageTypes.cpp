@@ -105,6 +105,10 @@ SpecializeImageTypesPass::RemapType(Argument *arg) {
       final_res = res;
     }
   }
+  if (arg->use_empty() && IsImageType(arg->getType())) {
+    final_res = ResultType::kNotSpecialized;
+    new_ty = arg->getType();
+  }
 
   return std::make_pair(final_res, new_ty);
 }
