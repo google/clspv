@@ -35,13 +35,10 @@ using namespace llvm;
 
 namespace {
 
+// TODO(#816): the second argument is no longer needed.
 // Maps an LLVM type for a kernel argument to an argument kind.
-clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
+clspv::ArgKind GetArgKindForType(Type *type, Type *) {
   if (auto ptrTy = dyn_cast<PointerType>(type)) {
-    // TODO: #816 remove after final transition
-    Type *inner_type = ptrTy->isOpaquePointerTy()
-                           ? data_type
-                           : ptrTy->getNonOpaquePointerElementType();
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
     // storage buffers.
@@ -123,6 +120,7 @@ ArgKind GetArgKindForPointerPodArgs(Function &F) {
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
+// TODO(#816): data_type is no longer necessary.
 ArgKind GetArgKind(Argument &Arg, Type *data_type) {
   if (isa<TargetExtType>(Arg.getType())) {
     return GetArgKindForType(Arg.getType(), data_type);
