@@ -37,7 +37,7 @@ namespace {
 
 // TODO(#816): the second argument is no longer needed.
 // Maps an LLVM type for a kernel argument to an argument kind.
-clspv::ArgKind GetArgKindForType(Type *type, Type *) {
+clspv::ArgKind GetArgKindForType(Type *type) {
   if (isa<PointerType>(type)) {
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
@@ -120,10 +120,9 @@ ArgKind GetArgKindForPointerPodArgs(Function &F) {
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
-// TODO(#816): data_type is no longer necessary.
-ArgKind GetArgKind(Argument &Arg, Type *data_type) {
+ArgKind GetArgKind(Argument &Arg) {
   if (isa<TargetExtType>(Arg.getType())) {
-    return GetArgKindForType(Arg.getType(), data_type);
+    return GetArgKindForType(Arg.getType());
   } else if (!isa<PointerType>(Arg.getType()) &&
       Arg.getParent()->getCallingConv() == CallingConv::SPIR_KERNEL) {
 
@@ -138,7 +137,7 @@ ArgKind GetArgKind(Argument &Arg, Type *data_type) {
     return GetArgKindForPodArgs(*Arg.getParent());
   }
 
-  return GetArgKindForType(Arg.getType(), data_type);
+  return GetArgKindForType(Arg.getType());
 }
 
 const char *GetArgKindName(ArgKind kind) {

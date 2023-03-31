@@ -150,7 +150,7 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
             clspv::InferType(&Arg, F.getParent()->getContext(), &type_cache_);
         auto StructTy = dyn_cast<StructType>(ArgType);
         if (StructTy && StructTy->isPacked()) {
-          const auto ArgKind = clspv::GetArgKind(Arg, Arg.getType());
+          const auto ArgKind = clspv::GetArgKind(Arg);
           if (ArgKind == clspv::ArgKind::Buffer ||
               ArgKind == clspv::ArgKind::BufferUBO) {
             needRewriting = true;

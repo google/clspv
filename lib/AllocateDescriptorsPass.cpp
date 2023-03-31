@@ -260,7 +260,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       assert(inferred_ty && "failed to infer argument type");
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+      const auto arg_kind = clspv::GetArgKind(Arg);
 
       int separation_token = 0;
       switch (arg_kind) {
@@ -358,13 +358,11 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         if (Arg.use_empty()) {
           continue;
         }
-        auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
-        assert(inferred_ty && "failed to infer argument type");
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg, inferred_ty) !=
+          if (clspv::GetArgKind(Arg) !=
                   clspv::ArgKind::PodPushConstant &&
-              clspv::GetArgKind(Arg, inferred_ty) !=
+              clspv::GetArgKind(Arg) !=
                   clspv::ArgKind::PointerPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
@@ -397,12 +395,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
-          auto *inferred_ty = clspv::InferType(&*f_ptr->getArg(arg_index), M.getContext(), &type_cache_);
-          assert(inferred_ty && "failed to infer argument type");
           const bool is_push_constant_arg =
-              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
                   clspv::ArgKind::PodPushConstant ||
-              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
                   clspv::ArgKind::PointerPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
@@ -496,7 +492,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
                  << " type " << *argTy << "\n";
         }
 
-        const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+        const auto arg_kind = clspv::GetArgKind(Arg);
 
         Type *resource_type = nullptr;
         unsigned addr_space = kUnallocated;
@@ -771,7 +767,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
       Type *argTy = Arg.getType();
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       assert(inferred_ty && "failed to infer argument type");
-      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+      const auto arg_kind = clspv::GetArgKind(Arg);
       if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
         int spec_id = GetSpecId(inferred_ty);

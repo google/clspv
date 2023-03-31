@@ -41,7 +41,7 @@ PodArgImpl GetPodArgsImpl(llvm::Function &F);
 ArgKind GetArgKindForPodArgs(llvm::Function &F);
 
 // Returns the ArgKind for |Arg|.
-ArgKind GetArgKind(llvm::Argument &Arg, llvm::Type *data_type = nullptr);
+ArgKind GetArgKind(llvm::Argument &Arg);
 
 // Returns true if the given type is a pointer-to-local type.
 bool IsLocalPtr(llvm::Type *type);
