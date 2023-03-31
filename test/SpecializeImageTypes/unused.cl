@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv --cl-std=CL2.0 -inline-entry-points
+// RUN: clspv %s -o %t.spv --cl-std=CL2.0 -inline-entry-points -cl-kernel-arg-info
 // RUN: spirv-val %t.spv
 
 kernel void foo(write_only image2d_t im1, read_write image2d_t im2) {
