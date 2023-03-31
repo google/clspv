@@ -98,7 +98,8 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   Type *sampler_ty = nullptr;
   sampler_ty = init_fn->getReturnType();
   Type *i32 = Builder.getInt32Ty();
-  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32, sampler_ty}, false);
+  FunctionType *fn_ty =
+      FunctionType::get(sampler_ty, {i32, i32, i32, sampler_ty}, false);
 
   auto var_fn = M.getOrInsertFunction(clspv::LiteralSamplerFunction(), fn_ty);
 
@@ -137,8 +138,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
 
         SmallVector<Value *, 3> args = {
             Builder.getInt32(descriptor_set), Builder.getInt32(binding),
-            Builder.getInt32(third_param),
-            Constant::getNullValue(sampler_ty)};
+            Builder.getInt32(third_param), Constant::getNullValue(sampler_ty)};
         if (ShowDescriptors) {
           outs() << "  translate literal sampler " << *const_val << " to ("
                  << descriptor_set << "," << binding << ")\n";
