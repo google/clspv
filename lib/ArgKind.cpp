@@ -38,7 +38,7 @@ namespace {
 // TODO(#816): the second argument is no longer needed.
 // Maps an LLVM type for a kernel argument to an argument kind.
 clspv::ArgKind GetArgKindForType(Type *type, Type *) {
-  if (auto ptrTy = dyn_cast<PointerType>(type)) {
+  if (isa<PointerType>(type)) {
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
     // storage buffers.
