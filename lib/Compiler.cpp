@@ -759,7 +759,8 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   if (!clspv::Option::OpaquePointers()) {
-    llvm::errs() << "warning: transparent pointer support is deprecated\n";
+    llvm::errs() << "transparent pointer is not supported anymore\n";
+    return -1;
   }
   if (clspv::Option::KeepUnusedArguments()) {
     llvm::errs() << "warning: -keep-unused-arguments has been removed\n";
