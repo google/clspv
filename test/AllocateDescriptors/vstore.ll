@@ -27,8 +27,8 @@ entry:
   call spir_func void @_Z7vstore2Dv2_ijPU3AS1i(<2 x i32> zeroinitializer, i32 0, ptr addrspace(1) %f)
   call spir_func void @_Z7vstore3Dv3_mjPU3AS1m(<3 x i64> zeroinitializer, i32 0, ptr addrspace(1) %g)
   call spir_func void @_Z7vstore4Dv4_ljPU3AS1l(<4 x i64> zeroinitializer, i32 0, ptr addrspace(1) %h)
-  call spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float> zeroinitializer, i32 0, ptr addrspace(1) %i1)
-  call spir_func void @_Z14vstorea_half16Dv16_fjPU3AS1Dh(<16 x float> zeroinitializer, i32 0, ptr addrspace(1) %i2)
+  call spir_func void @_Z13vstore_half_8Dv8_fjPU3AS1Dh(<8 x float> zeroinitializer, i32 0, ptr addrspace(1) %i1)
+  call spir_func void @_Z15vstorea_half_16Dv16_fjPU3AS1Dh(<16 x float> zeroinitializer, i32 0, ptr addrspace(1) %i2)
   call spir_func void @_Z7vstore2Dv2_fjPU3AS1f(<2 x float> zeroinitializer, i32 0, ptr addrspace(1) %j)
   call spir_func void @_Z7vstore3Dv3_djPU3AS1d(<3 x double> zeroinitializer, i32 0, ptr addrspace(1) %k)
   ret void
@@ -42,8 +42,8 @@ declare spir_func void @_Z8vstore16Dv16_jjPU3AS1j(<16 x i32>, i32, ptr addrspace
 declare spir_func void @_Z7vstore2Dv2_ijPU3AS1i(<2 x i32>, i32, ptr addrspace(1))
 declare spir_func void @_Z7vstore3Dv3_mjPU3AS1m(<3 x i64>, i32, ptr addrspace(1))
 declare spir_func void @_Z7vstore4Dv4_ljPU3AS1l(<4 x i64>, i32, ptr addrspace(1))
-declare spir_func void @_Z12vstore_half8Dv8_fjPU3AS1Dh(<8 x float>, i32, ptr addrspace(1))
-declare spir_func void @_Z14vstorea_half16Dv16_fjPU3AS1Dh(<16 x float>, i32, ptr addrspace(1))
+declare spir_func void @_Z13vstore_half_8Dv8_fjPU3AS1Dh(<8 x float>, i32, ptr addrspace(1))
+declare spir_func void @_Z15vstorea_half_16Dv16_fjPU3AS1Dh(<16 x float>, i32, ptr addrspace(1))
 declare spir_func void @_Z7vstore2Dv2_fjPU3AS1f(<2 x float>, i32, ptr addrspace(1))
 declare spir_func void @_Z7vstore3Dv3_djPU3AS1d(<3 x double>, i32, ptr addrspace(1))
 
