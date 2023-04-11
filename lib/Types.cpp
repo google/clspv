@@ -55,9 +55,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   if (auto *gep = dyn_cast<GEPOperator>(v)) {
     return CacheType(gep->getResultElementType());
   } else if (auto *alloca = dyn_cast<AllocaInst>(v)) {
-    if (!alloca->getAllocatedType()->isPointerTy()) {
-      return CacheType(alloca->getAllocatedType());
-    }
+    return CacheType(alloca->getAllocatedType());
   } else if (auto *gv = dyn_cast<GlobalVariable>(v)) {
     return CacheType(gv->getValueType());
   } else if (auto *func = dyn_cast<Function>(v)) {
