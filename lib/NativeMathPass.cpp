@@ -45,40 +45,18 @@ PreservedAnalyses clspv::NativeMathPass::run(Module &M,
 
   auto nativeBuiltins = clspv::Option::UseNativeBuiltins();
 
-  if (clspv::Option::NativeMath()) {
-    nativeBuiltins.insert({
-        Builtins::kDistance,
-        Builtins::kLength,
-        Builtins::kFma,
-        Builtins::kAcosh,
-        Builtins::kAsinh,
-        Builtins::kAtan,
-        Builtins::kAtan2,
-        Builtins::kAtanpi,
-        Builtins::kAtan2pi,
-        Builtins::kAtanh,
-        Builtins::kFmod,
-        Builtins::kFract,
-        Builtins::kLdexp,
-        Builtins::kRsqrt,
-        Builtins::kHalfSqrt,
-        Builtins::kSqrt,
-        Builtins::kTanh,
-    });
-  }
-
   for (auto &F : M) {
     auto info = clspv::Builtins::Lookup(F.getName());
-    if (nativeBuiltins.count(info.getType())) {
-      if (Builtins::getExtInstEnum(info) == Builtins::kGlslExtInstBad &&
-          ReplaceOpenCLBuiltinPass::ReplaceableBuiltins.count(info.getType()) ==
-              0) {
-        llvm::report_fatal_error(llvm::StringRef(
-            "--use-native-builtins: couldn't replace builtin '" +
-            info.getName() + "' with a native implementation!"));
-      }
-
+    bool have_native_impl =
+        Builtins::getExtInstEnum(info) != Builtins::kGlslExtInstBad ||
+        ReplaceOpenCLBuiltinPass::ReplaceableBuiltins.count(info.getType()) > 0;
+    if (have_native_impl &&
+        (nativeBuiltins.count(info.getType()) || clspv::Option::NativeMath())) {
       F.deleteBody();
+    } else if (!have_native_impl && nativeBuiltins.count(info.getType())) {
+      llvm::report_fatal_error(
+          llvm::StringRef("--use-native-builtins: couldn't replace builtin '" +
+                          info.getName() + "' with a native implementation!"));
     } else if (is_libclc_builtin(&F)) {
       // Those builtin has been marked with noinline to make sure that we
       // could replace them with native implementation. Now that we know
