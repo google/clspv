@@ -772,8 +772,7 @@ See [issue 6](https://github.com/google/clspv/issues/6).
 
 #### Miscellaneous Vector Functions
 
-The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions **must not**
-be used.
+The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions are supported.
 
 #### Printf
 
