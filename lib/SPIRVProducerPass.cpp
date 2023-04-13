@@ -4343,6 +4343,11 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   case Intrinsic::ctpop: {
     return GeneratePopcount(Call->getType(), Call->getArgOperand(0), Context);
   }
+  case Intrinsic::bitreverse: {
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << Call->getArgOperand(0);
+    return addSPIRVInst(spv::OpBitReverse, Ops);
+  }
 
   default:
     break;
@@ -6067,6 +6072,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpConvertPtrToU:
     case spv::OpConvertUToPtr:
     case spv::OpBitcast:
+    case spv::OpBitReverse:
     case spv::OpFNegate:
     case spv::OpIAdd:
     case spv::OpIAddCarry:
