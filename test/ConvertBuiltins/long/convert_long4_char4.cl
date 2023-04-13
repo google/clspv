@@ -4,14 +4,11 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[ulong:[0-9a-zA-Z_]+]] = OpTypeInt 64 0
-// CHECK-DAG: %[[v4ulong:[0-9a-zA-Z_]+]] = OpTypeVector %[[ulong]] 4
-// CHECK-DAG: %[[v2ulong:[0-9a-zA-Z_]+]] = OpTypeVector %[[ulong]] 2
 // CHECK-DAG: %[[uchar:[0-9a-zA-Z_]+]] = OpTypeInt 8 0
-// CHECK-DAG: %[[v4uchar:[0-9a-zA-Z_]+]] = OpTypeVector %[[uchar]] 4
-// CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
-// CHECK:     OpSConvert %[[v2ulong]] %[[src_01:[0-9]+]]
-// CHECK:     OpSConvert %[[v2ulong]] %[[src_23:[0-9]+]]
+// CHECK:     OpSConvert %[[ulong]]
+// CHECK:     OpSConvert %[[ulong]]
+// CHECK:     OpSConvert %[[ulong]]
+// CHECK:     OpSConvert %[[ulong]]
 
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global long4* dst, global char4* src)

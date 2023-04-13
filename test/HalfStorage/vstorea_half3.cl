@@ -19,28 +19,20 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uint0:%[^ ]+]] = OpConstant [[uint]] 0
-// CHECK-DAG: [[uint1:%[^ ]+]] = OpConstant [[uint]] 1
-// CHECK-DAG: [[uint2:%[^ ]+]] = OpConstant [[uint]] 2
-// CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1
-// CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2
+// CHECK-DAG: [[uint1:%[^ ]+]] = OpConstant [[uint]] 1{{$}}
+// CHECK-DAG: [[uint2:%[^ ]+]] = OpConstant [[uint]] 2{{$}}
+// CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1{{$}}
+// CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2{{$}}
 
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float3]] {{.*}} 0
-// CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
-// CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
-
-// CHECK: [[val1_2f32:%[^ ]+]] = OpVectorShuffle [[float2]] [[b]] {{.*}} 0 4294967295
-// CHECK: [[val2_2f32:%[^ ]+]] = OpVectorShuffle [[float2]] [[b]] {{.*}} 1 4294967295
-// CHECK: [[val3_2f32:%[^ ]+]] = OpVectorShuffle [[float2]] [[b]] {{.*}} 2 4294967295
-
-// CHECK: [[val1i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val1_2f32]]
+// CHECK: [[val1i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val1i16:%[^ ]+]] = OpUConvert [[ushort]] [[val1i32]]
-// CHECK: [[val2i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val2_2f32]]
+// CHECK: [[val2i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val2i16:%[^ ]+]] = OpUConvert [[ushort]] [[val2i32]]
-// CHECK: [[val3i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val3_2f32]]
+// CHECK: [[val3i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val3i16:%[^ ]+]] = OpUConvert [[ushort]] [[val3i32]]
 
-// CHECK-64: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[c_long]] [[ulong2]]
-// CHECK-32: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[c]] [[uint2]]
+// CHECK-64: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[ulong]] {{.*}} [[ulong2]]
+// CHECK-32: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[uint]] {{.*}} [[uint2]]
 
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[cx4]]
 // CHECK: OpStore [[addr1]] [[val1i16]]

@@ -6,11 +6,11 @@ target triple = "spir-unknown-unknown"
 
 define void @foo(ptr addrspace(1) %a, <16 x float> %b, i32 %c) {
 entry:
-  call spir_func void @_Z13vstore_half16Dv16_fjPU3AS1Dh(<16 x float> %b, i32 %c, ptr addrspace(1) %a)
+  call spir_func void @_Z14vstore_half_16Dv16_fjPU3AS1Dh(<16 x float> %b, i32 %c, ptr addrspace(1) %a)
   ret void
 }
 
-declare spir_func void @_Z13vstore_half16Dv16_fjPU3AS1Dh(<16 x float>, i32, ptr addrspace(1))
+declare spir_func void @_Z14vstore_half_16Dv16_fjPU3AS1Dh(<16 x float>, i32, ptr addrspace(1))
 
 ; CHECK:  [[b0:%[^ ]+]] = shufflevector <16 x float> %b, <16 x float> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK:  [[b1:%[^ ]+]] = shufflevector <16 x float> %b, <16 x float> poison, <2 x i32> <i32 2, i32 3>

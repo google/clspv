@@ -5,10 +5,7 @@
 
 // CHECK: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-COUNT-8: OpLoad %[[FLOAT_TYPE_ID]]
-// CHECK: OpFunctionCall %[[FLOAT_TYPE_ID]]
-// CHECK: OpFunctionCall %[[FLOAT_TYPE_ID]]
-// CHECK: OpFMul
-// CHECK-COUNT-6: OpFunctionCall
+// CHECK-COUNT-1: OpFunctionCall
 // CHECK-COUNT-8: OpStore
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float8* a, global float8* b)

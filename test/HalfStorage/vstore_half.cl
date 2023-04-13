@@ -20,12 +20,9 @@ __kernel void test(__global half *a, float b, int c) {
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uint0:%[^ ]+]] = OpConstant [[uint]] 0
 
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float]] {{.*}} 0
-// CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
-// CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
-// CHECK: [[val2f32:%[^ ]+]] = OpCompositeInsert [[float2]] [[b]] [[undef_float2]] 0
+// CHECK: [[val2f32:%[^ ]+]] = OpCompositeInsert [[float2]] {{.*}} [[undef_float2]] 0
 // CHECK: [[vali32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val2f32]]
 // CHECK: [[vali16:%[^ ]+]] = OpUConvert [[ushort]] [[vali32]]
-// CHECK-64: [[addr:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[c_long]]
-// CHECK-32: [[addr:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[c]]
+// CHECK-64: [[addr:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] {{.*}}
+// CHECK-32: [[addr:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] {{.*}}
 // CHECK: OpStore [[addr]] [[vali16]]

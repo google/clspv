@@ -707,6 +707,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
 
+    // This is needed to remove long vectors created by SROA passes. Especially
+    // with vstore_half, which tends to always recreate long vectors after the
+    // first iteration of the longvectorlowering pass
+    if (clspv::Option::LongVectorSupport()) {
+      pm.addPass(clspv::LongVectorLoweringPass());
+    }
+
     pm.addPass(
         clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
   });

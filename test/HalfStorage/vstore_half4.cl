@@ -19,23 +19,15 @@ __kernel void test(__global half *a, float4 b, int c) {
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpTypeVector [[uint]] 2
 // CHECK-DAG: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
-// CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
-// CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2
-// CHECK-32-DAG: [[uint_3:%[^ ]+]] = OpConstant [[uint]] 3
+// CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1{{$}}
+// CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2{{$}}
+// CHECK-32-DAG: [[uint_3:%[^ ]+]] = OpConstant [[uint]] 3{{$}}
 
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[float4]] {{.*}} 0
-// CHECK: [[c:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 1
-
-// CHECK-64: [[c_long:%[^ ]+]] = OpSConvert [[ulong]] [[c]]
-
-// CHECK: [[val_float01:%[^ ]+]] = OpVectorShuffle [[float2]] [[b]] {{.*}} 0 1
-// CHECK: [[val_float23:%[^ ]+]] = OpVectorShuffle [[float2]] [[b]] {{.*}} 2 3
-
-// CHECK: [[val1_int:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val_float01]]
-// CHECK: [[val2_int:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16 [[val_float23]]
+// CHECK: [[val1_int:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
+// CHECK: [[val2_int:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 
 // CHECK: [[construct:%[^ ]+]] = OpCompositeConstruct [[uint2]] [[val1_int]] [[val2_int]]
 
-// CHECK-64: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[c_long]]
-// CHECK-32: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[c]]
+// CHECK-64: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]]
+// CHECK-32: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]]
 // CHECK: OpStore [[gep]] [[construct]]
