@@ -757,23 +757,7 @@ bool RemoveCstExprFromFunction(Function *F) {
 
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
-      if (auto CE = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
-
-        // TODO(#816): remove after final transition.
-        // This case happen in some particular scenario, where it is not
-        // needed to simplify it. Mostly when using global array
-        // variables. In the end llvm managed to deal with it without us
-        // having to simplify it. Trying to simplify would make it very
-        // complicated for the ReplacePointerBitcast pass.
-        if (CE->getOpcode() == Instruction::BitCast &&
-            CE->getOperand(0)->getType()->isPointerTy() &&
-            !CE->getOperand(0)->getType()->isOpaquePointerTy() &&
-            CE->getOperand(0)
-                ->getType()
-                ->getNonOpaquePointerElementType()
-                ->isStructTy())
-          continue;
-
+      if (isa<ConstantExpr>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
       }
     }

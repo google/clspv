@@ -42,15 +42,8 @@ private:
 private:
   // High-level implementation details of runOnModule.
 
-  /// Rewrite non opaque functions.
+  /// Rewrite functions.
   bool runOnFunction(llvm::Function &F);
-
-  /// Rewrite opaque functions.
-  bool runOnOpaqueFunction(llvm::Function &F);
-
-  /// Create an alternative version of @p F that doesn't have mapped struct
-  /// buffers.
-  llvm::Function *convertUserDefinedFunction(llvm::Function &F);
 
   bool structsShouldBeLowered(llvm::Function &F);
 

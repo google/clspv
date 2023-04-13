@@ -315,78 +315,17 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
     }
   };
 
-  SmallPtrSet<Instruction *, 8> BitCastsToForget;
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memcpy")) {
       SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
 
       for (auto U : F.users()) {
         if (auto CI = dyn_cast<CallInst>(U)) {
-          auto DstBc =
-              dyn_cast<BitCastOperator>(CI->getArgOperand(0));
-          auto SrcBc =
-              dyn_cast<BitCastOperator>(CI->getArgOperand(1));
-
-          // TODO(#816): remove after final transition.
-          if (SrcBc && DstBc) {
-            auto Dst = DstBc->getOperand(0);
-            auto Src = SrcBc->getOperand(0);
-            // The original type of Dst we get from the argument to the bitcast
-            // instruction.
-            auto DstTy = Dst->getType();
-            assert(DstTy->isPointerTy());
-
-            // The original type of Src we get from the argument to the bitcast
-            // instruction.
-            auto SrcTy = Src->getType();
-            assert(SrcTy->isPointerTy());
-
-            // Check that the size is a constant integer.
-            assert(isa<ConstantInt>(CI->getArgOperand(2)));
-            auto Size =
-                dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
-
-            auto DstElemTy = DstTy->getNonOpaquePointerElementType();
-            auto SrcElemTy = SrcTy->getNonOpaquePointerElementType();
-            unsigned NumDstUnpackings = 0;
-            unsigned NumSrcUnpackings = 0;
-            match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
-                        &NumSrcUnpackings);
-
-            // Check that the pointee types match.
-            assert(DstElemTy == SrcElemTy);
-
-            auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
-            (void)DstElemSize;
-
-            // Check that the size is a multiple of the size of the pointee
-            // type.
-            assert(Size % DstElemSize == 0);
-
-            auto Alignment = cast<MemIntrinsic>(CI)->getDestAlignment();
-            auto TypeAlignment = Layout.getABITypeAlignment(DstElemTy);
-            (void)Alignment;
-            (void)TypeAlignment;
-
-            // Check that the alignment is at least the alignment of the pointee
-            // type.
-            assert(Alignment >= TypeAlignment);
-
-            // Check that the alignment is a multiple of the alignment of the
-            // pointee type.
-            assert(0 == (Alignment % TypeAlignment));
-
-            // Check that volatile is a constant.
-            assert(isa<ConstantInt>(CI->getArgOperand(3)));
-          }
-
           CallsToReplaceWithSpirvCopyMemory.push_back(CI);
         }
       }
 
       for (auto CI : CallsToReplaceWithSpirvCopyMemory) {
-        auto Arg0 = dyn_cast<BitCastOperator>(CI->getArgOperand(0));
-        auto Arg1 = dyn_cast<BitCastOperator>(CI->getArgOperand(1));
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
@@ -394,8 +333,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto SrcAlignment = cast<MemCpyInst>(CI)->getSourceAlignment();
         auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
 
-        auto Dst = !Arg0 ? CI->getArgOperand(0) : Arg0->getOperand(0);
-        auto Src = !Arg1 ? CI->getArgOperand(1) : Arg1->getOperand(0);
+        auto Dst = CI->getArgOperand(0);
+        auto Src = CI->getArgOperand(1);
 
         auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
         Type *DstElemTy = clspv::InferType(Dst, M.getContext(), &type_cache);
@@ -480,18 +419,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
         // Erase the call.
         CI->eraseFromParent();
-
-        // Erase the bitcasts.  A particular bitcast might be used
-        // in more than one memcpy, so defer actual deleting until later.
-        if (Arg0 && isa<BitCastInst>(Arg0))
-          BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg0));
-        if (Arg1 && isa<BitCastInst>(Arg1))
-          BitCastsToForget.insert(dyn_cast<BitCastInst>(Arg1));
       }
     }
-  }
-  for (auto *Inst : BitCastsToForget) {
-    Inst->eraseFromParent();
   }
 
   return Changed;

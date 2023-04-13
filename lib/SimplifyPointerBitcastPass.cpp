@@ -47,7 +47,6 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed = false;
 
     changed |= runOnTrivialBitcast(M);
-    changed |= runOnBitcastFromGEP(M);
     changed |= runOnBitcastFromBitcast(M);
     changed |= runOnGEPFromGEP(M);
     changed |= runOnGEPImplicitCasts(M);
@@ -56,7 +55,6 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   return PA;
 }
 
-// TODO(#816): remove function after final transition.
 void clspv::SimplifyPointerBitcastPass::runOnInstFromCstExpr(Module &M) const {
   for (Function &F : M) {
     BitcastUtils::RemoveCstExprFromFunction(&F);
@@ -99,93 +97,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
         // ... and remove it if we were its only user.
         SourceInst->eraseFromParent();
       }
-    }
-  }
-
-  return Changed;
-}
-
-// TODO(#816): remove function after final transition.
-bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
-  SmallVector<BitCastInst *, 16> WorkList;
-  for (Function &F : M) {
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        // If we have a bitcast instruction...
-        if (auto Bitcast = dyn_cast<BitCastInst>(&I)) {
-          // ... whose source is a GEP instruction...
-          if (auto GEP = dyn_cast<GetElementPtrInst>(Bitcast->getOperand(0))) {
-            // ... where the GEP is retrieving an element of the same type...
-            auto BitcastTy = Bitcast->getType();
-            if (!BitcastTy->isOpaquePointerTy() &&
-                GEP->getSourceElementType() == GEP->getResultElementType()) {
-              auto GEPTy = GEP->getResultElementType();
-              auto BitcastElementTy =
-                  BitcastTy->getNonOpaquePointerElementType();
-              // ... and the types have a known compile time size...
-              if ((0 != GEPTy->getPrimitiveSizeInBits()) &&
-                  (0 != BitcastElementTy->getPrimitiveSizeInBits())) {
-                // ... record the bitcast as something we need to process.
-                WorkList.push_back(Bitcast);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const bool Changed = !WorkList.empty();
-
-  for (auto Bitcast : WorkList) {
-    auto BitcastTy = Bitcast->getType();
-    auto BitcastElementTy = BitcastTy->getNonOpaquePointerElementType();
-
-    auto GEP = cast<GetElementPtrInst>(Bitcast->getOperand(0));
-
-    auto SrcTySize = GEP->getResultElementType()->getPrimitiveSizeInBits();
-    auto DstTySize = BitcastElementTy->getPrimitiveSizeInBits();
-
-    SmallVector<Value *, 4> GEPArgs(GEP->idx_begin(), GEP->idx_end());
-
-    // If the source type is smaller than the destination type...
-    if (SrcTySize < DstTySize) {
-      // ... we need to divide the last index of the GEP by the size difference.
-      auto LastIndex = GEPArgs.back();
-      GEPArgs.back() = BinaryOperator::Create(
-          Instruction::SDiv, LastIndex,
-          ConstantInt::get(LastIndex->getType(), DstTySize / SrcTySize), "",
-          Bitcast);
-    } else if (SrcTySize > DstTySize) {
-      // ... we need to multiply the last index of the GEP by the size
-      // difference.
-      auto LastIndex = GEPArgs.back();
-      GEPArgs.back() = BinaryOperator::Create(
-          Instruction::Mul, LastIndex,
-          ConstantInt::get(LastIndex->getType(), SrcTySize / DstTySize), "",
-          Bitcast);
-    } else {
-      // ... the arguments are the same size, nothing to do!
-    }
-
-    // Create a new bitcast from the GEP argument to the bitcast type.
-    auto NewBitcast = CastInst::CreatePointerCast(GEP->getPointerOperand(),
-                                                  BitcastTy, "", Bitcast);
-
-    // Create a new GEP from the (maybe modified) GEPArgs.
-    auto NewGEP = GetElementPtrInst::Create(BitcastElementTy, NewBitcast,
-                                            GEPArgs, "", Bitcast);
-
-    // And replace the original bitcast with our replacement GEP.
-    Bitcast->replaceAllUsesWith(NewGEP);
-
-    // Remove the bitcast as it has no users now.
-    Bitcast->eraseFromParent();
-
-    // Check if the old GEP had no other users...
-    if (0 == GEP->getNumUses()) {
-      // ... and remove it if we were its only user.
-      GEP->eraseFromParent();
     }
   }
 

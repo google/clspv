@@ -603,14 +603,11 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         if (!var_fn) {
           // Make the function
-          // TODO: #816 remove after final transition.
           Type *ret_ty = nullptr;
           if (Arg.getType()->isTargetExtTy()) {
             ret_ty = Arg.getType();
-          } else if (Arg.getType()->isOpaquePointerTy()) {
-            ret_ty = PointerType::get(M.getContext(), addr_space);
           } else {
-            ret_ty = resource_type->getPointerTo(addr_space);
+            ret_ty = PointerType::get(M.getContext(), addr_space);
           }
           // The parameters are:
           //  descriptor set
@@ -621,8 +618,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //  coherent
           //  data_type
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fnTy =
-              FunctionType::get(ret_ty, {i32, i32, i32, i32, i32, i32, resource_type}, false);
+          FunctionType *fnTy = FunctionType::get(
+              ret_ty, {i32, i32, i32, i32, i32, i32, resource_type}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
         }
@@ -784,12 +781,8 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
         auto *array_ty = ArrayType::get(inferred_ty, 0);
-        PointerType *ptr_ty = nullptr;
-        if (argTy->isOpaquePointerTy()) {
-          ptr_ty = PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
-        } else {
-          ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
-        }
+        PointerType *ptr_ty =
+            PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
