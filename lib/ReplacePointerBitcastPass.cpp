@@ -516,96 +516,24 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
   }
 
-  for (Function &F : M) {
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        // Find pointer bitcast instruction.
-        if (isa<BitCastInst>(&I) && isa<PointerType>(I.getType())) {
-          Value *Src = I.getOperand(0);
-          if (auto* SrcPtrTy = dyn_cast<PointerType>(Src->getType())) {
-            // Check if this bitcast is one that can be handled during this run
-            // of the pass. If not, just skip it and don't make changes to the
-            // module. These checks are coarse level checks that only the right
-            // instructions appear. Rejected bitcasts might be able to be
-            // handled later in the flow after further optimization.
-            if (!ReplacePhysicalPointerBitcasts &&
-                clspv::Option::PhysicalStorageBuffers() &&
-                SrcPtrTy->getAddressSpace() == clspv::AddressSpace::Global) {
-              continue;
-            }
-            SmallVector<User *, 16> UserWorkList;
-            for (auto User : I.users()) {
-              UserWorkList.push_back(User);
-            }
-            bool ok = true;
-            while (!UserWorkList.empty()) {
-              auto User = UserWorkList.back();
-              UserWorkList.pop_back();
-
-              if (isa<GetElementPtrInst>(User)) {
-                for (auto GEPUser : User->users()) {
-                  UserWorkList.push_back(GEPUser);
-                }
-              } else if (!isa<StoreInst>(User) && !isa<LoadInst>(User)) {
-                // Cannot handle this bitcast.
-                ok = false;
-                break;
-              }
-            }
-            // Skip bitcasts that would have a src type of opaque or packed
-            // (having more than one type) structs.
-            if (auto StructTy = dyn_cast<StructType>(
-                    Src->getType()->getNonOpaquePointerElementType())) {
-              if (StructTy->isOpaque() ||
-                  (StructTy->isPacked() && StructTy->getNumElements() != 1)) {
-                ok = false;
-              }
-            }
-            if (!ok) {
-              continue;
-            }
-
-            auto inst = &I;
-            if (inst->use_empty()) {
-              ToBeDeleted.push_back(inst);
-              continue;
-            }
-
-            WorkList.push_back(inst);
-
-          } else {
-            llvm_unreachable("Unsupported bitcast");
-          }
-        }
-      }
-    }
-  }
-
   for (Instruction *Inst : WorkList) {
     LLVM_DEBUG(dbgs() << "## Inst: "; Inst->dump());
     Value *Src = nullptr;
     Type *SrcTy = nullptr;
     Type *DstTy = nullptr;
-    // TODO(#816): remove after final transition.
-    if (isa<BitCastInst>(Inst)) {
-      Src = Inst->getOperand(0);
-      SrcTy = Src->getType()->getNonOpaquePointerElementType();
-      DstTy = Inst->getType()->getNonOpaquePointerElementType();
+    if (auto *gep = dyn_cast<GetElementPtrInst>(Inst)) {
+      Src = gep->getPointerOperand();
+      DstTy = gep->getSourceElementType();
+    } else if (auto *ld = dyn_cast<LoadInst>(Inst)) {
+      Src = ld->getPointerOperand();
+      DstTy = ld->getType();
+    } else if (auto *st = dyn_cast<StoreInst>(Inst)) {
+      Src = st->getPointerOperand();
+      DstTy = st->getValueOperand()->getType();
     } else {
-      if (auto *gep = dyn_cast<GetElementPtrInst>(Inst)) {
-        Src = gep->getPointerOperand();
-        DstTy = gep->getSourceElementType();
-      } else if (auto *ld = dyn_cast<LoadInst>(Inst)) {
-        Src = ld->getPointerOperand();
-        DstTy = ld->getType();
-      } else if (auto *st = dyn_cast<StoreInst>(Inst)) {
-        Src = st->getPointerOperand();
-        DstTy = st->getValueOperand()->getType();
-      } else {
-        llvm_unreachable("unsupported opaque pointer cast");
-      }
-      SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+      llvm_unreachable("unsupported opaque pointer cast");
     }
+    SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
     SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
 
@@ -616,110 +544,91 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     // at runtime (see https://github.com/KhronosGroup/SPIRV-Tools/issues/1585).
     bool isPrivateMemory = isa<AllocaInst>(Src);
 
-    // Investigate pointer bitcast's users.
-    // TODO(#816): remove after final transition.
-    // For implicit pointer casts we only want to examine |Inst| because other
-    // uses of |Src| might be casts to different types than |DstTy| or not
-    // pointer casts at all.
-    SmallVector<User *, 4> Users;
-    if (isa<BitCastInst>(Inst)) {
-      for (auto *U : Inst->users()) {
-        Users.push_back(U);
-      }
-    } else {
-      Users.push_back(Inst);
+    if (ImplicitCasts.count(Inst)) {
+      // If this user was queued on the worklist as an implicit cast
+      // separately, don't handle it now.
+      continue;
     }
-    for (User *BitCastUser : Users) {
-      if (ImplicitCasts.count(BitCastUser)) {
-        // If this user was queued on the worklist as an implicit cast
-        // separately, don't handle it now.
+
+    SmallVector<Value *, 4> NewAddrIdxs;
+
+    // It consist of User* and bool whether user is gep or not.
+    SmallVector<std::pair<User *, bool>, 32> AllUsers;
+
+    Value *OrgGEPIdx = nullptr;
+    if (auto GEP = dyn_cast<GetElementPtrInst>(Inst)) {
+      IRBuilder<> Builder(GEP);
+      unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
+
+      // TODO: handle GEPs with multiple indexes
+      if (GEP->getNumOperands() > 2) {
         continue;
       }
 
-      LLVM_DEBUG(dbgs() << "#### BitCastUser: "; BitCastUser->dump());
-      SmallVector<Value *, 4> NewAddrIdxs;
-
-      // It consist of User* and bool whether user is gep or not.
-      SmallVector<std::pair<User *, bool>, 32> AllUsers;
-
-      Value *OrgGEPIdx = nullptr;
-      if (auto GEP = dyn_cast<GetElementPtrInst>(BitCastUser)) {
-        IRBuilder<> Builder(GEP);
-        unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
-
-        // TODO: handle GEPs with multiple indexes
-        if (GEP->getNumOperands() > 2) {
+      // Build new src/dst address.
+      Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);
+      unsigned SmallerSrcBitWidth = SrcTyBitWidths[SrcTyBitWidths.size() - 1];
+      if (SmallerSrcBitWidth > DstTyBitWidth) {
+        GEPIdx = CreateDiv(Builder, SmallerSrcBitWidth / DstTyBitWidth, GEPIdx);
+      } else if (SmallerSrcBitWidth < DstTyBitWidth) {
+        GEPIdx = CreateMul(Builder, DstTyBitWidth / SmallerSrcBitWidth, GEPIdx);
+      }
+      for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
+        if (isPrivateMemory && i == 0) {
+          NewAddrIdxs.push_back(Builder.getInt32(0));
           continue;
         }
-
-        // Build new src/dst address.
-        Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);
-        unsigned SmallerSrcBitWidth = SrcTyBitWidths[SrcTyBitWidths.size() - 1];
-        if (SmallerSrcBitWidth > DstTyBitWidth) {
-          GEPIdx =
-              CreateDiv(Builder, SmallerSrcBitWidth / DstTyBitWidth, GEPIdx);
-        } else if (SmallerSrcBitWidth < DstTyBitWidth) {
-          GEPIdx =
-              CreateMul(Builder, DstTyBitWidth / SmallerSrcBitWidth, GEPIdx);
-        }
-        for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
-          if (isPrivateMemory && i == 0) {
-            NewAddrIdxs.push_back(Builder.getInt32(0));
-            continue;
-          }
-          Value *Idx;
-          unsigned div = SrcTyBitWidths[i] / SmallerSrcBitWidth;
-          if (div <= 1) {
-            Idx = GEPIdx;
-          } else {
-            Idx = CreateDiv(Builder, div, GEPIdx);
-            GEPIdx = CreateRem(Builder, div, GEPIdx);
-          }
-          NewAddrIdxs.push_back(Idx);
-        }
-
-        // If bitcast's user is gep, investigate gep's users too.
-        for (User *GEPUser : GEP->users()) {
-          if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
-            if (GEPUserGEP->getSourceElementType() ==
-                GEP->getResultElementType())
-              continue;
-          }
-          AllUsers.push_back(std::make_pair(GEPUser, true));
-        }
-        if (!GEP->users().empty()) {
-          ToBeDeleted.push_back(GEP);
-        }
-      } else {
-        AllUsers.push_back(std::make_pair(BitCastUser, false));
-      }
-
-      // Handle users.
-      bool IsGEPUser = false;
-      for (auto UserIter : AllUsers) {
-        User *U = UserIter.first;
-        IsGEPUser = UserIter.second;
-        LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";
-                   U->dump());
-
-        IRBuilder<> Builder(cast<Instruction>(U));
-
-        if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-          ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy, DstTy,
-                       NewAddrIdxs, ToBeDeleted);
-        } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
-          Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
-                                      DstTy, NewAddrIdxs, ToBeDeleted);
-          // Update LD's users with DstVal.
-          LD->replaceAllUsesWith(DstVal);
+        Value *Idx;
+        unsigned div = SrcTyBitWidths[i] / SmallerSrcBitWidth;
+        if (div <= 1) {
+          Idx = GEPIdx;
         } else {
-          U->print(errs());
-          llvm_unreachable(
-              "Handle above user of gep on ReplacePointerBitcastPass");
+          Idx = CreateDiv(Builder, div, GEPIdx);
+          GEPIdx = CreateRem(Builder, div, GEPIdx);
         }
-
-        ToBeDeleted.push_back(cast<Instruction>(U));
+        NewAddrIdxs.push_back(Idx);
       }
+
+      // If bitcast's user is gep, investigate gep's users too.
+      for (User *GEPUser : GEP->users()) {
+        if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
+          if (GEPUserGEP->getSourceElementType() == GEP->getResultElementType())
+            continue;
+        }
+        AllUsers.push_back(std::make_pair(GEPUser, true));
+      }
+      if (!GEP->users().empty()) {
+        ToBeDeleted.push_back(GEP);
+      }
+    } else {
+      AllUsers.push_back(std::make_pair(Inst, false));
+    }
+
+    // Handle users.
+    bool IsGEPUser = false;
+    for (auto UserIter : AllUsers) {
+      User *U = UserIter.first;
+      IsGEPUser = UserIter.second;
+      LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";
+                 U->dump());
+
+      IRBuilder<> Builder(cast<Instruction>(U));
+
+      if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
+        ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy, DstTy,
+                     NewAddrIdxs, ToBeDeleted);
+      } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
+        Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
+                                    DstTy, NewAddrIdxs, ToBeDeleted);
+        // Update LD's users with DstVal.
+        LD->replaceAllUsesWith(DstVal);
+      } else {
+        U->print(errs());
+        llvm_unreachable(
+            "Handle above user of gep on ReplacePointerBitcastPass");
+      }
+
+      ToBeDeleted.push_back(cast<Instruction>(U));
     }
 
     // Schedule for removal only if Inst has no users. If all its users are

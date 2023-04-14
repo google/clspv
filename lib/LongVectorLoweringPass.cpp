@@ -257,14 +257,6 @@ Function *getBIFScalarVersion(Function &Builtin) {
       Type *ScalarParamTy = nullptr;
       if (ParamTy->isPointerTy()) {
         ScalarParamTy = ParamTy;
-        // TODO(#816): remove after final transition.
-        if (!ParamTy->isOpaquePointerTy()) {
-          auto *PointeeTy = ParamTy->getNonOpaquePointerElementType();
-          assert(PointeeTy->isVectorTy() &&
-                 "Unsupported kind of pointer type.");
-          ScalarParamTy = PointerType::get(PointeeTy->getScalarType(),
-                                           ParamTy->getPointerAddressSpace());
-        }
       } else {
         assert((ParamTy->isVectorTy() || ParamTy->isFloatingPointTy() ||
                 ParamTy->isIntegerTy()) &&
@@ -685,8 +677,7 @@ Value *clspv::LongVectorLoweringPass::visit(Value *V) {
     return it->second;
   }
 
-  // TODO(#816): change to isPointerTy().
-  if (V->getType()->isOpaquePointerTy()) {
+  if (V->getType()->isPointerTy()) {
     auto where = GlobalVariableMap.find(dyn_cast_or_null<GlobalVariable>(V));
     if (where != GlobalVariableMap.end()) {
       return where->second;
@@ -770,10 +761,6 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
       auto *GEP = cast<GEPOperator>(CE);
       auto *EquivalentSourceTy = getEquivalentType(GEP->getSourceElementType());
       Constant *EquivalentPointer = cast<Constant>(GEP->getPointerOperand());
-      // TODO(#816): remove after final transition, but see also #874.
-      if (!GEP->getType()->isOpaquePointerTy()) {
-        EquivalentPointer = cast<Constant>(visit(GEP->getPointerOperand()));
-      }
       SmallVector<Value *, 4> Indices(GEP->idx_begin(), GEP->idx_end());
 
       auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
@@ -1106,16 +1093,7 @@ Value *
 clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   auto *EquivalentPointer = I.getPointerOperand();
   auto *Type = getEquivalentType(I.getSourceElementType());
-  // TODO(#816): remove after final transition.
-  if (!I.getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    if (!EquivalentPointer)
-      return nullptr;
-
-    Type = EquivalentPointer->getType()
-               ->getScalarType()
-               ->getNonOpaquePointerElementType();
-  } else if (!Type) {
+  if (!Type) {
     return nullptr;
   } else {
     // For an opaque pointer check if the pass rewrote the pointer already and
@@ -1201,17 +1179,11 @@ Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   Type *EquivalentTy = getEquivalentType(I.getType());
   assert(EquivalentTy && "type not lowered");
   auto *EquivalentPointer = I.getPointerOperand();
-  // TODO(#816): remove after final transition.
-  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    assert(EquivalentPointer && "pointer not lowered");
-  } else {
-    // For an opaque pointer check if the pass rewrote the pointer already and
-    // use the value if it did. This occurs with global variables
-    auto *tmp = visit(I.getPointerOperand());
-    if (tmp) {
-      EquivalentPointer = tmp;
-    }
+  // For an opaque pointer check if the pass rewrote the pointer already and
+  // use the value if it did. This occurs with global variables
+  auto *tmp = visit(I.getPointerOperand());
+  if (tmp) {
+    EquivalentPointer = tmp;
   }
 
   IRBuilder<> B(&I);
@@ -1377,17 +1349,11 @@ Value *clspv::LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   Value *EquivalentValue = visit(I.getValueOperand());
   assert(EquivalentValue && "value not lowered");
   Value *EquivalentPointer = I.getPointerOperand();
-  // TODO(#816): remove after final transition.
-  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    assert(EquivalentPointer && "pointer not lowered");
-  } else {
-    // For an opaque pointer check if the pass rewrote the pointer already and
-    // use the value if it did. This occurs with global variables
-    auto *tmp = visit(I.getPointerOperand());
-    if (tmp) {
-      EquivalentPointer = tmp;
-    }
+  // For an opaque pointer check if the pass rewrote the pointer already and
+  // use the value if it did. This occurs with global variables
+  auto *tmp = visit(I.getPointerOperand());
+  if (tmp) {
+    EquivalentPointer = tmp;
   }
 
   IRBuilder<> B(&I);
@@ -1469,7 +1435,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy() ||
+      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isPointerTy() ||
       Ty->isTargetExtTy()) {
     // No lowering required.
     return nullptr;
@@ -1492,16 +1458,6 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
              "Unsupported scalar type");
 
       return ArrayType::get(ScalarTy, VecWidth);
-    }
-
-    return nullptr;
-  }
-
-  // TODO(#816): remove after final transition.
-  if (Ty->isPointerTy()) {
-    if (auto *ElementTy =
-            getEquivalentType(Ty->getNonOpaquePointerElementType())) {
-      return ElementTy->getPointerTo(Ty->getPointerAddressSpace());
     }
 
     return nullptr;

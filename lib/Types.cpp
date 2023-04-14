@@ -36,11 +36,6 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   if (!isa<PointerType>(v->getType()))
     return v->getType();
 
-  // TODO: #816 remove this after final transition
-  // Non-opaque pointer use the element type.
-  if (!v->getType()->isOpaquePointerTy())
-    return v->getType()->getNonOpaquePointerElementType();
-
   auto iter = cache->find(v);
   if (iter != cache->end()) {
     return iter->second;

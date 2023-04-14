@@ -35,7 +35,6 @@ using namespace llvm;
 
 namespace {
 
-// TODO(#816): the second argument is no longer needed.
 // Maps an LLVM type for a kernel argument to an argument kind.
 clspv::ArgKind GetArgKindForType(Type *type) {
   if (isa<PointerType>(type)) {

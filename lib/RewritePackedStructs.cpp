@@ -62,72 +62,6 @@ unsigned getStructAlignment(Type *Ty, const DataLayout *DL) {
   return structAlignment;
 }
 
-/// Map the arguments of the wrapper function to the original arguments of the
-/// user-defined function (before transforming types to i8 array).
-SmallVector<Value *, 16> mapWrapperArgsToWrappeeArgs(IRBuilder<> &B,
-                                                     Function &Wrappee,
-                                                     Function &Wrapper,
-                                                     const DataLayout *DL) {
-  SmallVector<Value *, 16> Args;
-
-  std::size_t ArgumentCount = Wrapper.arg_size();
-  Args.reserve(ArgumentCount);
-
-  for (std::size_t i = 0; i < ArgumentCount; ++i) {
-    auto *Arg = Wrappee.getArg(i);
-    auto *NewArg = Wrapper.getArg(i);
-    NewArg->takeName(Arg);
-    auto *OldArgTy = Wrappee.getFunctionType()->getParamType(i);
-
-    assert(NewArg->getType()->isPointerTy());
-    auto *EquivalentArg = B.CreateBitCast(NewArg, OldArgTy);
-    Args.push_back(EquivalentArg);
-  }
-
-  return Args;
-}
-
-/// Create a new, equivalent function with new packed struct type.
-///
-/// This is achieved by creating a new function (the "wrapper") which inlines
-/// the given function (the "wrappee"). Only the parameters are mapped.
-Function *createFunctionWithMappedTypes(Function &F,
-                                        FunctionType *EquivalentFunctionTy,
-                                        const DataLayout *DL) {
-  auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
-  Wrapper->takeName(&F);
-  Wrapper->setCallingConv(F.getCallingConv());
-  Wrapper->copyAttributesFrom(&F);
-  Wrapper->copyMetadata(&F, /* offset */ 0);
-
-  BasicBlock::Create(F.getContext(), "", Wrapper);
-  IRBuilder<> B(&Wrapper->getEntryBlock());
-
-  // Fill in the body of the wrapper function.
-  auto WrappeeArgs = mapWrapperArgsToWrappeeArgs(B, F, *Wrapper, DL);
-  CallInst *Call = B.CreateCall(&F, WrappeeArgs);
-
-  B.CreateRetVoid();
-
-  // Ensure wrapper has a parent or InlineFunction will crash.
-  F.getParent()->getFunctionList().push_front(Wrapper);
-
-  // Inline the original function.
-  InlineFunctionInfo Info;
-  auto Result = InlineFunction(*Call, Info);
-  if (!Result.isSuccess()) {
-    LLVM_DEBUG(dbgs() << "Failed to inline " << F.getName() << '\n');
-    LLVM_DEBUG(dbgs() << "Reason: " << Result.getFailureReason() << '\n');
-    llvm_unreachable("Unexpected failure when inlining function.");
-  }
-
-  // Inlining a function can introduce constant expression that we could not
-  // handle afterwards.
-  BitcastUtils::RemoveCstExprFromFunction(Wrapper);
-
-  return Wrapper;
-}
-
 } // namespace
 
 PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
@@ -135,44 +69,10 @@ PreservedAnalyses clspv::RewritePackedStructs::run(Module &M,
   PreservedAnalyses PA;
   DL = &M.getDataLayout();
 
-  SmallVector<Function *, 16> OldKernels;
   for (auto &F : M.functions()) {
-    bool needRewriting = false;
-    if (F.getCallingConv() == CallingConv::SPIR_KERNEL) {
-      for (auto &Arg : F.args()) {
-        if (Arg.getType()->isOpaquePointerTy()) {
-          continue;
-        }
-
-        // process the function if it has an input buffer with a packed struct
-        // type.
-        Type *ArgType =
-            clspv::InferType(&Arg, F.getParent()->getContext(), &type_cache_);
-        auto StructTy = dyn_cast<StructType>(ArgType);
-        if (StructTy && StructTy->isPacked()) {
-          const auto ArgKind = clspv::GetArgKind(Arg);
-          if (ArgKind == clspv::ArgKind::Buffer ||
-              ArgKind == clspv::ArgKind::BufferUBO) {
-            needRewriting = true;
-          }
-        }
-      }
+    if (structsShouldBeLowered(F)) {
+      runOnFunction(F);
     }
-
-    if (needRewriting) {
-      if (runOnFunction(F)) {
-        OldKernels.push_back(&F);
-      }
-    } else {
-      if (structsShouldBeLowered(F)) {
-        runOnOpaqueFunction(F);
-      }
-    }
-  }
-
-  // Delete the old kernels if we have rewritten them.
-  for (auto OldKernel : OldKernels) {
-    OldKernel->eraseFromParent();
   }
 
   return PA;
@@ -222,13 +122,7 @@ Type *clspv::RewritePackedStructs::getEquivalentTypeImpl(Type *Ty) {
     return nullptr;
   }
 
-  // TODO(#816): remove after final transition.
   if (Ty->isPointerTy()) {
-    if (auto *ElementTy =
-            getEquivalentType(Ty->getNonOpaquePointerElementType())) {
-      return ElementTy->getPointerTo(Ty->getPointerAddressSpace());
-    }
-
     return nullptr;
   }
 
@@ -287,31 +181,6 @@ bool clspv::RewritePackedStructs::runOnFunction(Function &F) {
     return false;
   }
 
-  // Rewrite the function if needed.
-  Function *RewrittenFunction = convertUserDefinedFunction(F);
-
-  if (RewrittenFunction == nullptr) {
-    LLVM_DEBUG(dbgs() << "Function " << F.getName()
-                      << " doesn't need rewriting\n");
-    return false;
-  }
-
-  bool Modified = (RewrittenFunction != &F);
-
-  LLVM_DEBUG(dbgs() << "Final version for " << F.getName() << '\n');
-  LLVM_DEBUG(dbgs() << *RewrittenFunction << '\n');
-
-  return Modified;
-}
-
-bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
-  LLVM_DEBUG(dbgs() << "Processing " << F.getName() << '\n');
-
-  // Skip declarations.
-  if (F.isDeclaration()) {
-    return false;
-  }
-
   SmallVector<GetElementPtrInst *, 16> WorkList;
   for (BasicBlock &BB : F) {
     for (Instruction &I : BB) {
@@ -350,26 +219,4 @@ bool clspv::RewritePackedStructs::runOnOpaqueFunction(Function &F) {
   LLVM_DEBUG(dbgs() << F << '\n');
 
   return changed;
-}
-
-Function *clspv::RewritePackedStructs::convertUserDefinedFunction(Function &F) {
-  LLVM_DEBUG(dbgs() << "Handling of user defined function:\n");
-  LLVM_DEBUG(dbgs() << F << '\n');
-
-  auto *FunctionTy = F.getFunctionType();
-  auto *EquivalentFunctionTy =
-      cast_or_null<FunctionType>(getEquivalentType(FunctionTy));
-
-  // If no work is needed, mark it as so for future reference and bail out.
-  if (EquivalentFunctionTy == nullptr) {
-    LLVM_DEBUG(dbgs() << "No need of wrapper function\n");
-    return nullptr;
-  }
-
-  Function *EquivalentFunction =
-      createFunctionWithMappedTypes(F, EquivalentFunctionTy, DL);
-
-  LLVM_DEBUG(dbgs() << "Wrapper function:\n" << *EquivalentFunction << "\n");
-
-  return EquivalentFunction;
 }

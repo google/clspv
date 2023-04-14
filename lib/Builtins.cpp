@@ -514,9 +514,6 @@ std::string Builtins::GetMangledTypeName(Type *Ty) {
       std::string AS_name = "AS" + std::to_string(AS);
       mangled_type_str += "U" + std::to_string(AS_name.size()) + AS_name;
     }
-    if (!Ty->isOpaquePointerTy()) {
-      mangled_type_str += GetMangledTypeName(Ty->getNonOpaquePointerElementType());
-    }
     break;
   }
   case Type::FixedVectorTyID: {
