@@ -20,7 +20,7 @@ entry:
 ; CHECK:  bar
 ; CHECK:  [[load:%[^ ]+]] = load i32, ptr addrspace(1) %a, align 32
 ; CHECK:  [[shl:%[^ ]+]] = shl i32 %i, 2
-; CHECK:  [[add:%[^ ]+]] = add i32 %j, [[shl]]
+; CHECK:  [[add:%[^ ]+]] = add i32 [[shl]], %j
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %a, i32 [[add]]
 ; CHECK:  store i32 [[load]], ptr addrspace(1) [[gep]], align 32
 
