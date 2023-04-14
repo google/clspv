@@ -444,33 +444,18 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
   }
 
   for (auto *GEP : UnneededCasts) {
-    Type *source = GEP->getSourceElementType();
-    Type *result = GEP->getResultElementType();
-    auto TyBitWidths = getEleTypesBitWidths(source, DL, result);
-
     IRBuilder<> Builder(GEP);
-    Value *GEPIdx = nullptr;
-    assert(TyBitWidths.size() == (GEP->getNumOperands() - 1));
-    auto smallerTySize = TyBitWidths[TyBitWidths.size() - 1];
-    for (unsigned int i = 0; i < TyBitWidths.size(); i++) {
-      Value *Id = GEP->getOperand(i + 1);
-      if (auto cst = dyn_cast<ConstantInt>(Id)) {
-        if (cst->getZExtValue() == 0) {
-          continue;
-        }
-      }
-      Value *Mul = CreateMul(Builder, TyBitWidths[i] / smallerTySize, Id);
-      if (GEPIdx == nullptr) {
-        GEPIdx = Mul;
-      } else {
-        GEPIdx = Builder.CreateAdd(Mul, GEPIdx);
-      }
-    }
-    if (GEPIdx == nullptr) {
-      GEPIdx = Builder.getInt32(0);
-    }
-    SmallVector<Value *, 1> Indices{GEPIdx};
-    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(),
+    Type *Ty = GEP->getResultElementType();
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+    auto Indices = GetIdxsForTyFromOffset(
+        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+        cast<PointerType>(GEP->getPointerOperand()->getType())
+                ->getAddressSpace() == clspv::AddressSpace::Private);
+
+    auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
                                              Indices, "", GEP);
     GEP->replaceAllUsesWith(NewGEP);
     GEP->eraseFromParent();
