@@ -1,4 +1,4 @@
-// RUN: clspv %s --cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_scope_all_devices -o %t.spv -verify
+// RUN: clspv %s --cl-std=CL3.0 --inline-entry-points --enable-feature-macros=__opencl_c_atomic_scope_all_devices -o %t.spv -verify
 
 kernel void not_constant(global int* out, global atomic_flag *flag, global int *test) {
   // "All <id> used for Scope <id> and Memory Semantics <id> must be of an OpConstant."

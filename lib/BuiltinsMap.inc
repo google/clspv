@@ -832,6 +832,9 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"mem_fence", Builtins::kMemFence},
         {"read_mem_fence", Builtins::kReadMemFence},
         {"write_mem_fence", Builtins::kWriteMemFence},
+        {"__to_global", Builtins::kToGlobal},
+        {"__to_local", Builtins::kToLocal},
+        {"__to_private", Builtins::kToPrivate},
 
         // Geometric
         {"cross", Builtins::kCross},

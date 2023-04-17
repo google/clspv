@@ -172,7 +172,8 @@ SourceLanguage Language();
 // Returns true when the source language makes use of the generic address space.
 inline bool LanguageUsesGenericAddressSpace() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
-         ((Language() == SourceLanguage::OpenCL_C_20));
+         (Language() == SourceLanguage::OpenCL_C_20) ||
+         (Language() == SourceLanguage::OpenCL_C_30);
 }
 
 // Return the SPIR-V binary version

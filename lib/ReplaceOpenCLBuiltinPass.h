@@ -91,6 +91,8 @@ private:
   bool replaceAtomics(llvm::Function &F, llvm::AtomicRMWInst::BinOp Op);
   bool replaceAtomicLoad(llvm::Function &F);
   bool replaceGetFence(llvm::Function &F);
+  bool replaceAddressSpaceQualifiers(llvm::Function &F,
+                                     clspv::AddressSpace::Type addrspace);
   bool replaceExplicitAtomics(llvm::Function &F, spv::Op Op,
                               spv::MemorySemanticsMask semantics =
                                   spv::MemorySemanticsAcquireReleaseMask);

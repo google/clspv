@@ -1,4 +1,4 @@
-// RUN: clspv -cl-std=CL3.0 --enable-feature-macros=__opencl_c_3d_image_writes,__opencl_c_atomic_order_acq_rel,__opencl_c_fp64,__opencl_c_images,__opencl_c_subgroups,__opencl_c_int64,__opencl_c_atomic_order_seq_cst,__opencl_c_read_write_images,__opencl_c_atomic_scope_device,__opencl_c_atomic_scope_all_devices,__opencl_c_work_group_collective_functions %s -verify
+// RUN: clspv -cl-std=CL3.0 --inline-entry-points --enable-feature-macros=__opencl_c_3d_image_writes,__opencl_c_atomic_order_acq_rel,__opencl_c_fp64,__opencl_c_images,__opencl_c_subgroups,__opencl_c_int64,__opencl_c_atomic_order_seq_cst,__opencl_c_read_write_images,__opencl_c_atomic_scope_device,__opencl_c_atomic_scope_all_devices,__opencl_c_work_group_collective_functions %s -verify
 
 #ifndef __opencl_c_3d_image_writes
 #error __opencl_c_3d_image_writes should be defined
