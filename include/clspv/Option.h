@@ -264,6 +264,9 @@ Vec3ToVec4SupportClass Vec3ToVec4();
 // Returns true if opaque pointers are enabled
 bool OpaquePointers();
 
+// Returns true if vulkan memory model is enabled
+bool VulkanMemoryModel();
+
 // Returns true if the debug information should be generated
 bool DebugInfo();
 
