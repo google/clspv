@@ -585,6 +585,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
     pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
 
+    // This pass needs to be after every inlining to make sure we are capable of
+    // removing every addrspacecast. It only needs to run if generic addrspace
+    // is used.
+    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
+      pm.addPass(clspv::LowerAddrSpaceCastPass());
+    }
+
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
     // clspv needs to remove them ahead of transformation.

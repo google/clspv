@@ -169,10 +169,15 @@ enum class SourceLanguage {
 
 SourceLanguage Language();
 
+std::set<FeatureMacro> EnabledFeatureMacros();
+
 // Returns true when the source language makes use of the generic address space.
 inline bool LanguageUsesGenericAddressSpace() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
-         ((Language() == SourceLanguage::OpenCL_C_20));
+         (Language() == SourceLanguage::OpenCL_C_20) ||
+         (Language() == SourceLanguage::OpenCL_C_30 &&
+          EnabledFeatureMacros().count(
+              clspv::FeatureMacro::__opencl_c_generic_address_space) > 0);
 }
 
 // Return the SPIR-V binary version
@@ -266,8 +271,6 @@ bool OpaquePointers();
 
 // Returns true if the debug information should be generated
 bool DebugInfo();
-
-std::set<FeatureMacro> EnabledFeatureMacros();
 
 // Returns true if the NonUniform pointers need to be decorated with the
 // NonUniform decoration.

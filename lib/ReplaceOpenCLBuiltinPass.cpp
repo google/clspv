@@ -79,6 +79,9 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kMemFence,
      Builtins::kReadMemFence,
      Builtins::kWriteMemFence,
+     Builtins::kToGlobal,
+     Builtins::kToLocal,
+     Builtins::kToPrivate,
      Builtins::kIsequal,
      Builtins::kIsgreater,
      Builtins::kIsgreaterequal,
@@ -528,6 +531,12 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceAtomicLoad(F);
   case Builtins::kGetFence:
     return replaceGetFence(F);
+  case Builtins::kToGlobal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Global);
+  case Builtins::kToLocal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Local);
+  case Builtins::kToPrivate:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Private);
   case Builtins::kAtomicInit:
   case Builtins::kAtomicStore:
   case Builtins::kAtomicStoreExplicit:
@@ -3569,6 +3578,16 @@ bool ReplaceOpenCLBuiltinPass::replaceGetFence(Function &F) {
     default:
       return builder.getInt32(MemFence::CLK_NO_MEM_FENCE);
     }
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAddressSpaceQualifiers(
+    Function &F, AddressSpace::Type addrspace) {
+  return replaceCallsWithValue(F, [&F, addrspace](CallInst *Call) {
+    auto ptr = Call->getArgOperand(0);
+    IRBuilder<> builder(Call);
+    return builder.CreateAddrSpaceCast(
+        ptr, PointerType::get(F.getContext(), addrspace));
   });
 }
 
