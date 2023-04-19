@@ -3,11 +3,12 @@
 // RUN: FileCheck %s < %t.ll
 
 // CHECK-NOT: addrspacecast
+// CHECK-NOT: ptr addrspace({{.*}}) null
 
 float loop(const float *data, unsigned num) {
     float res = 0;
     for (unsigned j = 0; j < num; ++j) {
-        res += to_local(data)[j];
+        res += to_global(data)[j];
     }
     return res;
 }
