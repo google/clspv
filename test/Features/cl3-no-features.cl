@@ -1,4 +1,4 @@
-// RUN: clspv -fp64=0 -images=0 -cl-std=CL3.0 --inline-entry-points %s -verify
+// RUN: clspv -fp64=0 -images=0 -cl-std=CL3.0 %s -verify
 
 #ifdef __opencl_c_3d_image_writes
 #error __opencl_c_3d_image_writes should not be defined

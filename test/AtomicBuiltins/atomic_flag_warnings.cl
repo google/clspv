@@ -1,4 +1,4 @@
-// RUN: clspv %s --cl-std=CL3.0 --inline-entry-points --enable-feature-macros=__opencl_c_atomic_order_seq_cst,__opencl_c_atomic_scope_device -o %t.spv -verify
+// RUN: clspv %s --cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_order_seq_cst,__opencl_c_atomic_scope_device -o %t.spv -verify
 
 kernel void flag_global(global int *out, global atomic_flag *flag) {
 //expected-warning@+1{{memory_order_seq_cst is treated as memory_order_acq_rel}}
