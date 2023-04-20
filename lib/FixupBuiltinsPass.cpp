@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 
 #include "Builtins.h"
 #include "FixupBuiltinsPass.h"
 
+#include <cmath>
+
 using namespace clspv;
 using namespace llvm;
+
+namespace {
+double rsqrt(double input) { return 1.0 / sqrt(input); }
+} // namespace
 
 PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
@@ -33,16 +40,17 @@ bool FixupBuiltinsPass::runOnFunction(Function &F) {
   auto &FI = Builtins::Lookup(&F);
   switch (FI.getType()) {
   case Builtins::kSqrt:
+    return fixupSqrt(F, sqrt);
   case Builtins::kRsqrt:
-    return fixupSqrt(F);
+    return fixupSqrt(F, rsqrt);
   default:
     return false;
   }
 }
 
-bool FixupBuiltinsPass::fixupSqrt(Function &F) {
-  // We only want to perform this transformation if no sqrt/rsqrt
-  // implementation has been linked.
+bool FixupBuiltinsPass::fixupSqrt(Function &F, double (*fct)(double)) {
+  // We only want to perform this transformation on the native sqrt/rsqrt
+  // implementation.
   if (!F.isDeclaration()) {
     return false;
   }
@@ -52,12 +60,29 @@ bool FixupBuiltinsPass::fixupSqrt(Function &F) {
       IRBuilder<> builder(CI);
       auto nan = ConstantFP::getNaN(CI->getType());
       auto zero = ConstantFP::getZero(CI->getType());
-      auto op_is_positive = builder.CreateFCmpOGE(CI->getOperand(0), zero);
-      builder.SetInsertPoint(CI->getNextNode());
-      SelectInst *select =
-          cast<SelectInst>(builder.CreateSelect(op_is_positive, zero, nan));
-      CI->replaceAllUsesWith(select);
-      select->setTrueValue(CI);
+      if (auto cst = dyn_cast<ConstantFP>(CI->getOperand(0))) {
+        CI->replaceAllUsesWith(ConstantFP::get(
+            CI->getType(), fct(cst->getValue().convertToDouble())));
+        CI->eraseFromParent();
+      } else if (auto vec_cst =
+                     dyn_cast<ConstantDataVector>(CI->getOperand(0))) {
+        Value *Res = UndefValue::get(vec_cst->getType());
+        for (unsigned int i = 0; i < vec_cst->getNumElements(); i++) {
+          auto fp = cast<ConstantFP>(vec_cst->getElementAsConstant(i))
+                        ->getValue()
+                        .convertToDouble();
+          Res = builder.CreateInsertElement(
+              Res, ConstantFP::get(CI->getType()->getScalarType(), fct(fp)), i);
+        }
+        CI->replaceAllUsesWith(Res);
+      } else {
+        auto op_is_positive = builder.CreateFCmpOGE(CI->getOperand(0), zero);
+        builder.SetInsertPoint(CI->getNextNode());
+        SelectInst *select =
+            cast<SelectInst>(builder.CreateSelect(op_is_positive, zero, nan));
+        CI->replaceAllUsesWith(select);
+        select->setTrueValue(CI);
+      }
       modified = true;
     }
   }
