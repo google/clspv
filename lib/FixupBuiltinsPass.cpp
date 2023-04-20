@@ -24,6 +24,10 @@
 using namespace clspv;
 using namespace llvm;
 
+namespace {
+double rsqrt(double input) { return 1.0 / sqrt(input); }
+} // namespace
+
 PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
   for (auto &F : M) {
@@ -36,14 +40,15 @@ bool FixupBuiltinsPass::runOnFunction(Function &F) {
   auto &FI = Builtins::Lookup(&F);
   switch (FI.getType()) {
   case Builtins::kSqrt:
+    return fixupSqrt(F, sqrt);
   case Builtins::kRsqrt:
-    return fixupSqrt(F);
+    return fixupSqrt(F, rsqrt);
   default:
     return false;
   }
 }
 
-bool FixupBuiltinsPass::fixupSqrt(Function &F) {
+bool FixupBuiltinsPass::fixupSqrt(Function &F, double (*fct)(double)) {
   // We only want to perform this transformation on the native sqrt/rsqrt
   // implementation.
   if (!F.isDeclaration()) {
@@ -57,7 +62,7 @@ bool FixupBuiltinsPass::fixupSqrt(Function &F) {
       auto zero = ConstantFP::getZero(CI->getType());
       if (auto cst = dyn_cast<ConstantFP>(CI->getOperand(0))) {
         CI->replaceAllUsesWith(ConstantFP::get(
-            CI->getType(), sqrt(cst->getValue().convertToDouble())));
+            CI->getType(), fct(cst->getValue().convertToDouble())));
         CI->eraseFromParent();
       } else if (auto vec_cst =
                      dyn_cast<ConstantDataVector>(CI->getOperand(0))) {
@@ -67,8 +72,7 @@ bool FixupBuiltinsPass::fixupSqrt(Function &F) {
                         ->getValue()
                         .convertToDouble();
           Res = builder.CreateInsertElement(
-              Res, ConstantFP::get(CI->getType()->getScalarType(), sqrt(fp)),
-              i);
+              Res, ConstantFP::get(CI->getType()->getScalarType(), fct(fp)), i);
         }
         CI->replaceAllUsesWith(Res);
       } else {
