@@ -55,36 +55,39 @@ bool FixupBuiltinsPass::fixupSqrt(Function &F, double (*fct)(double)) {
     return false;
   }
   bool modified = false;
+  SmallVector<CallInst *> worklist;
   for (auto &U : F.uses()) {
     if (auto CI = dyn_cast<CallInst>(U.getUser())) {
-      IRBuilder<> builder(CI);
-      auto nan = ConstantFP::getNaN(CI->getType());
-      auto zero = ConstantFP::getZero(CI->getType());
-      if (auto cst = dyn_cast<ConstantFP>(CI->getOperand(0))) {
-        CI->replaceAllUsesWith(ConstantFP::get(
-            CI->getType(), fct(cst->getValue().convertToDouble())));
-        CI->eraseFromParent();
-      } else if (auto vec_cst =
-                     dyn_cast<ConstantDataVector>(CI->getOperand(0))) {
-        Value *Res = UndefValue::get(vec_cst->getType());
-        for (unsigned int i = 0; i < vec_cst->getNumElements(); i++) {
-          auto fp = cast<ConstantFP>(vec_cst->getElementAsConstant(i))
-                        ->getValue()
-                        .convertToDouble();
-          Res = builder.CreateInsertElement(
-              Res, ConstantFP::get(CI->getType()->getScalarType(), fct(fp)), i);
-        }
-        CI->replaceAllUsesWith(Res);
-      } else {
-        auto op_is_positive = builder.CreateFCmpOGE(CI->getOperand(0), zero);
-        builder.SetInsertPoint(CI->getNextNode());
-        SelectInst *select =
-            cast<SelectInst>(builder.CreateSelect(op_is_positive, zero, nan));
-        CI->replaceAllUsesWith(select);
-        select->setTrueValue(CI);
-      }
-      modified = true;
+      worklist.push_back(CI);
     }
+  }
+  for (auto CI : worklist) {
+    IRBuilder<> builder(CI);
+    auto nan = ConstantFP::getNaN(CI->getType());
+    auto zero = ConstantFP::getZero(CI->getType());
+    if (auto cst = dyn_cast<ConstantFP>(CI->getOperand(0))) {
+      CI->replaceAllUsesWith(ConstantFP::get(
+          CI->getType(), fct(cst->getValue().convertToDouble())));
+      CI->eraseFromParent();
+    } else if (auto vec_cst = dyn_cast<ConstantDataVector>(CI->getOperand(0))) {
+      Value *Res = UndefValue::get(vec_cst->getType());
+      for (unsigned int i = 0; i < vec_cst->getNumElements(); i++) {
+        auto fp = cast<ConstantFP>(vec_cst->getElementAsConstant(i))
+                      ->getValue()
+                      .convertToDouble();
+        Res = builder.CreateInsertElement(
+            Res, ConstantFP::get(CI->getType()->getScalarType(), fct(fp)), i);
+      }
+      CI->replaceAllUsesWith(Res);
+    } else {
+      auto op_is_positive = builder.CreateFCmpOGE(CI->getOperand(0), zero);
+      builder.SetInsertPoint(CI->getNextNode());
+      SelectInst *select =
+          cast<SelectInst>(builder.CreateSelect(op_is_positive, zero, nan));
+      CI->replaceAllUsesWith(select);
+      select->setTrueValue(CI);
+    }
+    modified = true;
   }
   return modified;
 }
