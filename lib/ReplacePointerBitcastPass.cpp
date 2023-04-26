@@ -661,15 +661,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
     SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
-    SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
-
-    // If we detect a private memory, the first index of the GEP will need to be
-    // zero (meaning that we are not explicitly trying to access private memory
-    // out-of-bounds).
-    // spirv-val is not yet capable of detecting it, but such access would fail
-    // at runtime (see https://github.com/KhronosGroup/SPIRV-Tools/issues/1585).
-    bool isPrivateMemory = isa<AllocaInst>(Src);
-
     SmallVector<Value *, 4> NewAddrIdxs;
 
     // It consist of User* and bool whether user is gep or not.
@@ -678,36 +669,26 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     Value *OrgGEPIdx = nullptr;
     if (auto GEP = dyn_cast<GetElementPtrInst>(Inst)) {
       IRBuilder<> Builder(GEP);
-      unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
 
-      // TODO: handle GEPs with multiple indexes
-      if (GEP->getNumOperands() > 2) {
-        continue;
+      uint64_t CstVal;
+      Value *DynVal;
+      size_t SmallerBitWidths;
+      ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+
+      OrgGEPIdx = DynVal;
+      if (DynVal == nullptr) {
+        OrgGEPIdx = Builder.getInt32(CstVal);
+      } else if (CstVal != 0) {
+        OrgGEPIdx = Builder.CreateAdd(Builder.getInt32(CstVal), DynVal);
       }
 
-      // Build new src/dst address.
-      Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);
-      unsigned SmallerSrcBitWidth = SrcTyBitWidths[SrcTyBitWidths.size() - 1];
-      if (SmallerSrcBitWidth > DstTyBitWidth) {
-        GEPIdx = CreateDiv(Builder, SmallerSrcBitWidth / DstTyBitWidth, GEPIdx);
-      } else if (SmallerSrcBitWidth < DstTyBitWidth) {
-        GEPIdx = CreateMul(Builder, DstTyBitWidth / SmallerSrcBitWidth, GEPIdx);
-      }
-      for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
-        if (isPrivateMemory && i == 0) {
-          NewAddrIdxs.push_back(Builder.getInt32(0));
-          continue;
-        }
-        Value *Idx;
-        unsigned div = SrcTyBitWidths[i] / SmallerSrcBitWidth;
-        if (div <= 1) {
-          Idx = GEPIdx;
-        } else {
-          Idx = CreateDiv(Builder, div, GEPIdx);
-          GEPIdx = CreateRem(Builder, div, GEPIdx);
-        }
-        NewAddrIdxs.push_back(Idx);
-      }
+      DstTy = GEP->getResultElementType();
+      auto Idx = GetIdxsForTyFromOffset(
+          DL, Builder, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
+          (clspv::AddressSpace::Type)GEP->getPointerOperand()
+              ->getType()
+              ->getPointerAddressSpace());
+      NewAddrIdxs.append(Idx);
 
       // If bitcast's user is gep, investigate gep's users too.
       for (User *GEPUser : GEP->users()) {

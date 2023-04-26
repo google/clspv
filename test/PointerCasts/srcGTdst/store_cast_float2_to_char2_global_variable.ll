@@ -7,11 +7,9 @@ target triple = "spir-unknown-unknown"
 ; CHECK:  [[gv:@[^ ]+]] = addrspace(1) global [4 x <2 x i8>] zeroinitializer
 ; CHECK:  [[load:%[^ ]+]] = load <2 x i8>, ptr addrspace(1) %b, align 2
 ; CHECK:  [[shl:%[^ ]+]] = shl i32 %i, 2
-; CHECK:  [[shl2:%[^ ]+]] = shl i32 %1, 1
-; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[shl2]], 3
-; CHECK:  [[and:%[^ ]+]] = and i32 [[shl2]], 7
-; CHECK:  [[lshr2:%[^ ]+]] = lshr i32 [[and]], 1
-; CHECK:  getelementptr [4 x <2 x i8>], ptr addrspace(1) [[gv]], i32 [[lshr]], i32 [[lshr2]]
+; CHECK:  [[lshr:%[^ ]+]] = lshr i32 [[shl]], 2
+; CHECK:  [[and:%[^ ]+]] = and i32 [[shl]], 3
+; CHECK:  getelementptr [4 x <2 x i8>], ptr addrspace(1) [[gv]], i32 [[lshr]], i32 [[and]]
 ; CHECK:  store <2 x i8> [[load]], ptr addrspace(1) [[gv]], align 2
 
 @my_var = addrspace(1) global <2 x float> zeroinitializer
