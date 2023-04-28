@@ -28,6 +28,7 @@
 
 #include "ArgKind.h"
 #include "ShareModuleScopeVariables.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -88,6 +89,7 @@ bool clspv::ShareModuleScopeVariablesPass::ShareModuleScopeVariables(
     CollectUserEntryPoints(&G, &entry_points);
   }
 
+  DenseMap<Value *, Type *> cache;
   SmallVector<GlobalVariable *, 8> dead_globals;
   for (auto global = M.global_begin(); global != M.global_end(); ++global) {
     if (!clspv::IsLocalPtr(global->getType()))
@@ -105,7 +107,8 @@ bool clspv::ShareModuleScopeVariablesPass::ShareModuleScopeVariables(
     auto next = global;
     ++next;
     for (; next != M.global_end(); ++next) {
-      if (global->getType() != next->getType())
+      if (clspv::InferType(cast<Value>(global), M.getContext(), &cache) !=
+          clspv::InferType(cast<Value>(next), M.getContext(), &cache))
         continue;
       if (next->user_empty())
         continue;
