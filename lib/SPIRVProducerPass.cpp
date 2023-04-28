@@ -5225,7 +5225,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       SmallVector<int, 4> mask;
       shuffle->getShuffleMask(mask);
       for (auto i : mask) {
-        if (i == UndefMaskElem) {
+        if (i == PoisonMaskElem) {
           if (clspv::Option::HackUndef())
             // Use 0 instead of undef.
             Ops << 0;
