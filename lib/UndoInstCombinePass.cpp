@@ -216,7 +216,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   for (auto i : mask) {
     // Instcombine should not have generated odd indices, so don't handle them
     // for now.
-    if ((i != UndefMaskElem) && (i & 0x1))
+    if ((i != PoisonMaskElem) && (i & 0x1))
       return false;
   }
 
@@ -232,7 +232,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   // TODO could replace with a shuffle and vectorized trunc
   int i = 0;
   for (auto idx : mask) {
-    if (idx == UndefMaskElem)
+    if (idx == PoisonMaskElem)
       continue;
 
     uint64_t new_idx = idx / ratio;
