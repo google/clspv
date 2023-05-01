@@ -70,9 +70,8 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
     // restricted to the original bit width.
     result = BinaryOperator::Create(
         Instruction::And, tmp,
-        ConstantInt::get(
-            desired_int_ty,
-            (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+        ConstantInt::get(desired_int_ty,
+                         (uint32_t)APInt::getAllOnes(bit_width).getZExtValue()),
         "", trunc);
   } else if (auto *zext = dyn_cast<ZExtInst>(v)) {
     auto tmp = ZeroExtend(zext->getOperand(0), desired_bit_width);
@@ -119,7 +118,7 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
             Instruction::And, result,
             ConstantInt::get(
                 desired_int_ty,
-                (uint32_t)APInt::getAllOnesValue(bit_width).getZExtValue()),
+                (uint32_t)APInt::getAllOnes(bit_width).getZExtValue()),
             "", binop);
       }
     } else {

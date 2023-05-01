@@ -329,7 +329,7 @@ Value *ConvertToType(Module &M, StructType *pod_struct, unsigned index,
   const auto &DL = M.getDataLayout();
   const auto struct_layout = DL.getStructLayout(pod_struct);
   auto ele_ty = pod_struct->getElementType(index);
-  const auto ele_size = DL.getTypeStoreSize(ele_ty).getKnownMinSize();
+  const auto ele_size = DL.getTypeStoreSize(ele_ty).getKnownMinValue();
   auto ele_offset = struct_layout->getElementOffset(index);
   const auto ele_start_index = ele_offset / kIntBytes; // round down
   const auto ele_end_index =
@@ -357,7 +357,7 @@ Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
                          const std::vector<Value *> &elements) {
   auto int32_ty = IntegerType::get(M.getContext(), 32);
   const auto &DL = M.getDataLayout();
-  const auto dst_size = DL.getTypeStoreSize(dst_type).getKnownMinSize();
+  const auto dst_size = DL.getTypeStoreSize(dst_type).getKnownMinValue();
   auto dst_array_ty = dyn_cast<ArrayType>(dst_type);
   auto dst_vec_ty = dyn_cast<VectorType>(dst_type);
 
@@ -449,7 +449,7 @@ Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
       // General case, break into elements and construct the composite type.
       auto ele_ty = dst_vec_ty ? dst_vec_ty->getElementType()
                                : dst_array_ty->getElementType();
-      assert((DL.getTypeStoreSize(ele_ty).getKnownMinSize() < kIntBytes ||
+      assert((DL.getTypeStoreSize(ele_ty).getKnownMinValue() < kIntBytes ||
               base_offset == 0) &&
              "Unexpected packed data format");
       uint64_t ele_size = DL.getTypeStoreSize(ele_ty);

@@ -87,7 +87,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
 #ifndef NDEBUG
   const auto &DL = M.getDataLayout();
   const uint64_t global_push_constant_size =
-      DL.getTypeStoreSize(global_push_constant_ty).getKnownMinSize();
+      DL.getTypeStoreSize(global_push_constant_ty).getKnownMinValue();
   assert(global_push_constant_size % 8 == 0 &&
          "Global push constants size changed");
 #endif
