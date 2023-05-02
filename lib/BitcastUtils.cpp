@@ -962,6 +962,8 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
 }
 
 bool IsArrayLike(StructType *Ty) {
+  if (Ty->getNumElements() == 0)
+    return false;
   Type *ElemTy = Ty->getStructElementType(0);
   for (unsigned i = 0; i < Ty->getNumElements(); i++) {
     if (ElemTy != Ty->getStructElementType(i)) {
