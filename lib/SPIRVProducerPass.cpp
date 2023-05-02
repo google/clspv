@@ -5812,7 +5812,6 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
 }
 
 void SPIRVProducerPassImpl::HandleDeferredDecorations() {
-  const auto &DL = module->getDataLayout();
   if (getTypesNeedingArrayStride().empty()) {
     return;
   }
