@@ -211,11 +211,6 @@ llvm::cl::opt<bool> std430_ubo_layout(
                    "requirements. This does not generate valid SPIR-V for the "
                    "Vulkan environment; however, some drivers may accept it."));
 
-// TODO(#816): dead option
-llvm::cl::opt<bool> keep_unused_arguments(
-    "keep-unused-arguments", llvm::cl::init(false),
-    llvm::cl::desc("Do not remove unused non-kernel function arguments."));
-
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
@@ -433,7 +428,6 @@ uint32_t MaxUniformBufferSize() { return maximum_ubo_size; }
 uint32_t MaxPushConstantsSize() { return maximum_pushconstant_size; }
 bool RelaxedUniformBufferLayout() { return relaxed_ubo_layout; }
 bool Std430UniformBufferLayout() { return std430_ubo_layout; }
-bool KeepUnusedArguments() { return keep_unused_arguments; }
 bool Int8Support() { return int8_support; }
 bool RewritePackedStructs() { return rewrite_packed_structs; }
 bool LongVectorSupport() { return long_vector_support; }

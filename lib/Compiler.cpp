@@ -776,9 +776,6 @@ int ParseOptions(const int argc, const char *const argv[]) {
     llvm::errs() << "transparent pointer is not supported anymore\n";
     return -1;
   }
-  if (clspv::Option::KeepUnusedArguments()) {
-    llvm::errs() << "warning: -keep-unused-arguments has been removed\n";
-  }
 
   if (clspv::Option::LanguageUsesGenericAddressSpace() &&
       !clspv::Option::InlineEntryPoints()) {
