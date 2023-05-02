@@ -329,8 +329,10 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
 
         auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto DstAlignment = cast<MemCpyInst>(CI)->getDestAlignment();
-        auto SrcAlignment = cast<MemCpyInst>(CI)->getSourceAlignment();
+        auto DstAlign = cast<MemCpyInst>(CI)->getDestAlign();
+        auto DstAlignment = DstAlign ? DstAlign->value() : 0;
+        auto SrcAlign = cast<MemCpyInst>(CI)->getSourceAlign();
+        auto SrcAlignment = SrcAlign ? SrcAlign->value() : 0;
         auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
 
         auto Dst = CI->getArgOperand(0);
