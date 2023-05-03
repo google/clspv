@@ -904,7 +904,8 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
       new OpenCLBuiltinMemoryBuffer(library_data, library_size - 1));
 
   llvm::SMDiagnostic Err;
-  auto library = llvm::getLazyIRModule(std::move(buffer), Err, module->getContext());
+  auto library =
+      llvm::getLazyIRModule(std::move(buffer), Err, module->getContext());
   if (!library) {
     llvm::errs() << "Failed to parse builtins library\n";
     return false;
@@ -996,7 +997,7 @@ int CompileModule(const llvm::StringRef &input_filename,
   }
 
   if (!LinkBuiltinLibrary(module.get())) {
-      return -1;
+    return -1;
   }
 
   // Run the passes to produce SPIR-V.
