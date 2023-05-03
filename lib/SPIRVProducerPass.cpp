@@ -266,24 +266,13 @@ private:
 struct SPIRVProducerPassImpl {
 
   // Struct to handle generation of ArrayStride decorations.
-  // It supports two styles of stride generation to avoid unnecessarily
-  // perturbing the instruction order generated during the transition to opaque
-  // pointers (see #816).
-  // TODO(#816): remove the type in this struct and update tests as necessary.
   struct StrideType {
-    Type *type;
     uint32_t stride;
     SPIRVID id;
 
-    StrideType(Type *type, uint32_t stride, SPIRVID id)
-        : type(type), stride(stride), id(id) {}
-    StrideType(Type *type) : type(type), stride(0), id(0) {}
+    StrideType(uint32_t stride, SPIRVID id) : stride(stride), id(id) {}
 
     bool operator<(const StrideType &x) const {
-      if (type < x.type)
-        return true;
-      if (x.type < type)
-        return false;
       if (stride < x.stride)
         return true;
       if (x.stride < stride)
@@ -1207,14 +1196,8 @@ void SPIRVProducerPassImpl::FindTypesForSamplerMap() {
   // If we are using a sampler map, find the type of the sampler.
   if (auto *F = module->getFunction(clspv::LiteralSamplerFunction())) {
     SamplerDataTy = F->getArg(ClspvOperand::kSamplerDataType)->getType();
-    // TODO(#816): remove after final transition
-    if (F->getType()->isOpaquePointerTy()) {
-      SamplerPointerTy =
-          PointerType::get(module->getContext(), AddressSpace::UniformConstant);
-    } else {
-      SamplerPointerTy =
-          PointerType::get(SamplerDataTy, AddressSpace::UniformConstant);
-    }
+    SamplerPointerTy =
+        PointerType::get(module->getContext(), AddressSpace::UniformConstant);
   }
 }
 
@@ -1290,13 +1273,18 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     work_list.pop_back();
     TypesNeedingLayout.insert(type);
     switch (type->getTypeID()) {
-    case Type::ArrayTyID:
-      work_list.push_back(type->getArrayElementType());
+    case Type::ArrayTyID: {
+      auto ele_ty = type->getArrayElementType();
+      work_list.push_back(ele_ty);
       if (!Hack_generate_runtime_array_stride_early) {
         // Remember this array type for deferred decoration.
-        TypesNeedingArrayStride.insert(type);
+        auto needs_layout = SpvVersion() >= SPIRVVersion::SPIRV_1_4;
+        getTypesNeedingArrayStride().insert(
+            StrideType(GetTypeAllocSize(ele_ty, module->getDataLayout()),
+                       getSPIRVType(type, needs_layout)));
       }
       break;
+    }
     case Type::StructTyID:
       for (auto *elem_ty : cast<StructType>(type)->elements()) {
         work_list.push_back(elem_ty);
@@ -1595,8 +1583,7 @@ bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
-  // TODO(#816): change after final transition.
-  if (!PtrTy->isOpaquePointerTy()) {
+  if (!PtrTy->isPointerTy()) {
     return getSPIRVType(PtrTy);
   }
   if (!DataTy) {
@@ -1647,16 +1634,15 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
   return ptr_id;
 }
 
-// TODO(#816): much of this can be reworked after final transition.
 SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
                                                     Type *RetTy,
                                                     ArrayRef<Type *> ParamTys) {
   bool has_pointers = false;
-  if (FTy->getReturnType()->isOpaquePointerTy()) {
+  if (FTy->getReturnType()->isPointerTy()) {
     has_pointers = true;
   }
   for (auto *param_ty : FTy->params()) {
-    if (param_ty->isOpaquePointerTy()) {
+    if (param_ty->isPointerTy()) {
       has_pointers = true;
       break;
     }
@@ -1787,37 +1773,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     break;
   }
   case Type::PointerTyID: {
-    PointerType *PTy = cast<PointerType>(Canonical);
-    unsigned AddrSpace = PTy->getAddressSpace();
-
-    auto PointeeTy = PTy->getNonOpaquePointerElementType();
-    if (AddrSpace != AddressSpace::UniformConstant) {
-      if (PointeeTy->isStructTy() &&
-          dyn_cast<StructType>(PointeeTy)->isOpaque()) {
-        RID = getSPIRVType(PointeeTy, needs_layout);
-        break;
-      }
-    }
-
-    //
-    // Generate OpTypePointer.
-    //
-
-    // OpTypePointer
-    // Ops[0] = Storage Class
-    // Ops[1] = Element Type ID
-    SPIRVOperandVec Ops;
-
-    SPIRVID pointee_id;
-    // TODO(#816): no way to infer the data type here.
-    if (PointeeTy->isPointerTy()) {
-      pointee_id = getSPIRVType(PointeeTy);
-    } else {
-      pointee_id = getSPIRVType(PointeeTy, needs_layout);
-    }
-    Ops << GetStorageClass(AddrSpace) << getSPIRVType(PointeeTy, needs_layout);
-
-    RID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
+    llvm_unreachable("getSPIRVType called directly on a pointer type");
     break;
   }
   case Type::TargetExtTyID: {
@@ -2077,9 +2033,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       Constant *CstLength =
           ConstantInt::get(Type::getInt32Ty(module->getContext()), Length);
 
-      // Remember to generate ArrayStride later
-      getTypesNeedingArrayStride().insert(Canonical);
-
       //
       // Generate OpTypeArray.
       //
@@ -2090,6 +2043,13 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       Ops << getSPIRVType(ArrTy->getElementType(), needs_layout) << CstLength;
 
       RID = addSPIRVInst<kTypes>(spv::OpTypeArray, Ops);
+
+      // Remember to generate ArrayStride later
+      if (needs_layout || SpvVersion() < SPIRVVersion::SPIRV_1_4) {
+        getTypesNeedingArrayStride().insert(StrideType(
+            GetTypeAllocSize(ArrTy->getElementType(), module->getDataLayout()),
+            RID));
+      }
     }
     break;
   }
@@ -2135,15 +2095,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     for (unsigned k = 0; k < FTy->getNumParams(); k++) {
       // Find SPIRV instruction for parameter type.
       auto ParamTy = FTy->getParamType(k);
-      // TODO(#816): remove after transition.
-      if (ParamTy->isPointerTy()) {
-        auto PointeeTy = ParamTy->getNonOpaquePointerElementType();
-        if (PointeeTy->isStructTy() &&
-            dyn_cast<StructType>(PointeeTy)->isOpaque()) {
-          ParamTy = PointeeTy;
-        }
-      }
-
       Ops << getSPIRVType(ParamTy);
     }
 
@@ -4920,12 +4871,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         // Save the type to generate an ArrayStride decoration later, but
         // assume opaque pointers may be present so also cache the SPIRVID for
         // the type and the stride value.
-        getTypesNeedingArrayStride().insert(
-            {GEP->getPointerOperandType(),
-             static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
-                                                    module->getDataLayout())),
-             getSPIRVPointerType(GEP->getPointerOperand()->getType(),
-                                 GEP->getSourceElementType())});
+        getTypesNeedingArrayStride().insert(StrideType(
+            static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
+                                                   module->getDataLayout())),
+            getSPIRVPointerType(GEP->getPointerOperand()->getType(),
+                                GEP->getSourceElementType())));
         break;
       case spv::StorageClassWorkgroup:
         break;
@@ -5255,7 +5205,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         auto *lhs_ty = clspv::InferType(lhs, Context, &InferredTypeCache);
         auto *rhs_ty = clspv::InferType(rhs, Context, &InferredTypeCache);
         SPIRVID cmp_lhs, cmp_rhs;
-        // TODO(#816): need a better way to handle pointer constants
+        // Need a better way to handle pointer constants
         if (!lhs_ty && !rhs_ty) {
           llvm_unreachable("neither pointer type can be inferred");
         }
@@ -5862,7 +5812,6 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
 }
 
 void SPIRVProducerPassImpl::HandleDeferredDecorations() {
-  const auto &DL = module->getDataLayout();
   if (getTypesNeedingArrayStride().empty()) {
     return;
   }
@@ -5871,50 +5820,16 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
   // instructions we generated earlier.
   DenseSet<uint32_t> seen;
   for (auto stride_type : getTypesNeedingArrayStride()) {
-    // Two cases:
-    // 1. We only stored the type and need to get the result id and stride
-    //    size.
-    // 2. We stored the array stride and result id because they are not
-    //    recoverable at this point.
-    auto *type = stride_type.type;
     auto stride = stride_type.stride;
     auto id = stride_type.id;
-    if (!id.isValid()) {
-      auto TI = TypeMap.find(type);
-      unsigned index = SpvVersion() < SPIRVVersion::SPIRV_1_4 ? 0 : 1;
-      assert(TI != TypeMap.end());
-      assert(index < TI->second.size());
-      if (!TI->second[index].isValid())
-        continue;
-
-      id = TI->second[index];
-    }
+    assert(id.isValid() && stride != 0);
     if (!seen.insert(id.get()).second)
       continue;
-
-    Type *elemTy = nullptr;
-    if (isa<PointerType>(type)) {
-      if (stride == 0) {
-        llvm_unreachable("missing stride for pointer");
-      }
-    } else if (auto *arrayTy = dyn_cast<ArrayType>(type)) {
-      elemTy = arrayTy->getElementType();
-    } else if (auto *vecTy = dyn_cast<VectorType>(type)) {
-      elemTy = vecTy->getElementType();
-    } else {
-      errs() << "Unhandled strided type " << *type << "\n";
-      llvm_unreachable("Unhandled strided type");
-    }
 
     // Ops[0] = Target ID
     // Ops[1] = Decoration (ArrayStride)
     // Ops[2] = Stride number (Literal Number)
     SPIRVOperandVec Ops;
-
-    // Same as DL.getIndexedOffsetInType( elemTy, { 1 } );
-    if (elemTy) {
-      stride = static_cast<uint32_t>(GetTypeAllocSize(elemTy, DL));
-    }
 
     Ops << id << spv::DecorationArrayStride << stride;
 
@@ -6206,20 +6121,9 @@ bool SPIRVProducerPassImpl::IsTypeNullable(const Type *type) const {
   case Type::FixedVectorTyID:
     return true;
   case Type::PointerTyID: {
-    // TODO(#816): samplers and images should not be nulled, but we lack that
-    // information here. That said, an undef image/sampler is likely already
-    // problematic (e.g. due to a phi).
-    const PointerType *pointer_type = cast<PointerType>(type);
-    if (!pointer_type->isOpaquePointerTy() &&
-        pointer_type->getPointerAddressSpace() !=
-            AddressSpace::UniformConstant) {
-      auto pointee_type = pointer_type->getPointerElementType();
-      if (pointee_type->isStructTy() &&
-          cast<StructType>(pointee_type)->isOpaque()) {
-        // Images and samplers are not nullable.
-        return false;
-      }
-    }
+    // Samplers and images should not be nulled, but we lack that information
+    // here. That said, an undef image/sampler is likely already problematic
+    // (e.g. due to a phi).
     return true;
   }
   case Type::ArrayTyID:
