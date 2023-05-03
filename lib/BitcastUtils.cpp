@@ -305,7 +305,7 @@ void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
   DEBUG_FCT_VALUES(Values);
   SmallVector<Value *, 8> ScalarValues;
   Type *ValueTy = Values[0]->getType();
-  unsigned CharSize = 8;
+  unsigned CharSize = CHAR_BIT;
   unsigned NumElements =
       isPackedStructSrc ? DstTySize / CharSize : GetNumEle(ValueTy);
   assert(NumElements != 0);
@@ -1041,11 +1041,11 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
       auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
           Cst->getZExtValue());
       if (offset % SmallerBitWidths != 0) {
-        CstVal = (CstVal * SmallerBitWidths + offset) / 8;
+        CstVal = (CstVal * SmallerBitWidths + offset) / CHAR_BIT;
         if (DynVal) {
-          DynVal = CreateMul(Builder, SmallerBitWidths / 8, DynVal);
+          DynVal = CreateMul(Builder, SmallerBitWidths / CHAR_BIT, DynVal);
         }
-        SmallerBitWidths = 8;
+        SmallerBitWidths = CHAR_BIT;
       } else {
         CstVal += offset / SmallerBitWidths;
       }
