@@ -13,11 +13,10 @@ define spir_kernel void @test(ptr addrspace(1) nocapture %in) {
 
 declare spir_func i32 @_Z13get_global_idj(i32)
 
-; CHECK:  [[load:%[^ ]+]] = load %struct, ptr addrspace(1) %in, align 1
 ; CHECK:  [[gid:%[^ ]+]] = call spir_func i32 @_Z13get_global_idj(i32 0)
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr <{ [6 x i8] }>, ptr addrspace(1) %in, i32 [[gid]]
-; CHECK:  [[load0:%[^ ]+]] = extractvalue %struct [[load]], 0
-; CHECK:  [[load1:%[^ ]+]] = extractvalue %struct [[load]], 1
+; CHECK:  [[load0:%[^ ]+]] = extractvalue %struct {{.*}}, 0
+; CHECK:  [[load1:%[^ ]+]] = extractvalue %struct {{.*}}, 1
 
 ; CHECK:  [[trunc:%[^ ]+]] = trunc i32 [[load0]] to i8
 ; CHECK:  [[arr0:%[^ ]+]] = insertvalue [6 x i8] poison, i8 [[trunc]], 0

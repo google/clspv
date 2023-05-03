@@ -254,7 +254,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
           OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          true);
+          clspv::AddressSpace::Private);
       Idxs.append(NewGEPIdxs);
     } else {
       if (!CstSrcLastIdxOp || !CstSrcLastIdxOp->isZero()) {
@@ -434,8 +434,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     auto Idxs = GetIdxsForTyFromOffset(
         DL, Builder, src_gep->getResultElementType(),
         inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
-        cast<PointerType>(inst_gep->getPointerOperand()->getType())
-                ->getAddressSpace() == clspv::AddressSpace::Private);
+        (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
     auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
                                              src_gep, Idxs, "", inst_gep);
     inst_gep->replaceAllUsesWith(new_gep);
@@ -452,8 +453,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
     auto Indices = GetIdxsForTyFromOffset(
         DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
-        cast<PointerType>(GEP->getPointerOperand()->getType())
-                ->getAddressSpace() == clspv::AddressSpace::Private);
+        (clspv::AddressSpace::Type)GEP->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
 
     auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
                                              Indices, "", GEP);

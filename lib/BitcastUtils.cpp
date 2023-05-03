@@ -37,6 +37,9 @@
 
 namespace BitcastUtils {
 
+void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
+                                 SmallVector<Value *, 8> &Values,
+                                 unsigned NumElePerVec);
 // Returns the size in bits of 'Ty'
 size_t SizeInBits(const DataLayout &DL, Type *Ty) {
   return DL.getTypeAllocSizeInBits(Ty);
@@ -302,7 +305,7 @@ void ExtractFromArray(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
   DEBUG_FCT_VALUES(Values);
   SmallVector<Value *, 8> ScalarValues;
   Type *ValueTy = Values[0]->getType();
-  unsigned CharSize = 8;
+  unsigned CharSize = CHAR_BIT;
   unsigned NumElements =
       isPackedStructSrc ? DstTySize / CharSize : GetNumEle(ValueTy);
   assert(NumElements != 0);
@@ -359,7 +362,18 @@ void BitcastIntoVector(IRBuilder<> &Builder, SmallVector<Value *, 8> &Values,
   unsigned SrcEleSize = SrcSize / NumElePerVec;
   VectorType *DstTy =
       FixedVectorType::get(getNTy(Builder, SrcEleSize, Ty), NumElePerVec);
-  BitcastValues(Builder, DstTy, Values);
+
+  // As vec3 has the size of a vec4, size of SrcTy can be different than DstTy.
+  // Deal with this case by going through an intermediate array type.
+  if (SizeInBits(Builder, SrcTy) != SizeInBits(Builder, DstTy)) {
+    ArrayType *ArrTy = ArrayType::get(Ty, SizeInBits(Builder, SrcTy) /
+                                              SizeInBits(Builder, Ty));
+    BitcastValues(Builder, ArrTy, Values);
+    ExtractFromArray(Builder, Values);
+    GroupScalarValuesIntoVector(Builder, Values, NumElePerVec);
+  } else {
+    BitcastValues(Builder, DstTy, Values);
+  }
 }
 
 // 'Values' is expected to contain scalar values.
@@ -372,8 +386,10 @@ void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
   Type *SrcTy = Values[0]->getType();
   assert(!SrcTy->isVectorTy() && !SrcTy->isArrayTy());
   VectorType *DstTy = FixedVectorType::get(SrcTy, NumElePerVec);
-  assert(Values.size() % NumElePerVec == 0);
   unsigned int NumVector = Values.size() / NumElePerVec;
+  if (Values.size() > NumElePerVec && Values.size() % NumElePerVec != 0) {
+    Values.resize(NumVector * NumElePerVec);
+  }
   for (unsigned i = 0; i < NumVector; i++) {
     unsigned idx = i * NumElePerVec;
     Value *Vec = PoisonValue::get(DstTy);
@@ -945,13 +961,26 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
   }
 }
 
+bool IsArrayLike(StructType *Ty) {
+  if (Ty->getNumElements() == 0)
+    return false;
+  Type *ElemTy = Ty->getStructElementType(0);
+  for (unsigned i = 0; i < Ty->getNumElements(); i++) {
+    if (ElemTy != Ty->getStructElementType(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Check whether a pointer to the type `ContainingTy` is also usable as a
 // pointer to the type `TargetTy` due to the layout of the vector or aggregrate
 // type. Descends through the first element of the `ContainingTy` until it is
 // found or it cannot descend any further. Writes out levels of indirection to
 // `Steps`.
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
-                               bool &PerfectMatch, const DataLayout &DL) {
+                               bool &PerfectMatch, const DataLayout &DL,
+                               bool strictAliasing) {
   int StepCount = 0;
 
   auto IsIntegerOrFloatTy = [](Type *Ty) {
@@ -976,6 +1005,8 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
       ContainingTy = ArrayTy->getArrayElementType();
     } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
       if (StructTy->isOpaque())
+        break;
+      if (!IsArrayLike(StructTy) && strictAliasing)
         break;
       ContainingTy = StructTy->getStructElementType(0);
     } else {
@@ -1003,17 +1034,18 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
     Idxs.push_back(Op);
     Type *NextTy =
         GetElementPtrInst::getIndexedType(GEP->getSourceElementType(), Idxs);
-    if (auto STy = dyn_cast<StructType>(PrevTy)) {
+    auto STy = dyn_cast<StructType>(PrevTy);
+    if (STy && i != 0) {
       auto Cst = dyn_cast<ConstantInt>(Op);
       assert(Cst);
       auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
           Cst->getZExtValue());
-      if (offset < SmallerBitWidths) {
-        CstVal = CstVal * SmallerBitWidths + offset;
+      if (offset % SmallerBitWidths != 0) {
+        CstVal = (CstVal * SmallerBitWidths + offset) / CHAR_BIT;
         if (DynVal) {
-          DynVal = CreateMul(Builder, SmallerBitWidths, DynVal);
+          DynVal = CreateMul(Builder, SmallerBitWidths / CHAR_BIT, DynVal);
         }
-        SmallerBitWidths = 8;
+        SmallerBitWidths = CHAR_BIT;
       } else {
         CstVal += offset / SmallerBitWidths;
       }
@@ -1037,7 +1069,8 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
-                       size_t SmallerBitWidths, bool IsPrivate) {
+                       size_t SmallerBitWidths,
+                       clspv::AddressSpace::Type AddrSpace) {
   SmallVector<Value *, 2> Idxs;
   auto TyBitWidths =
       BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
@@ -1050,7 +1083,10 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
-  if (IsPrivate) {
+  if (AddrSpace == clspv::AddressSpace::Private ||
+      AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
+      AddrSpace == clspv::AddressSpace::PushConstant ||
+      AddrSpace == clspv::AddressSpace::Input) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
     startIdx = 1;
   }

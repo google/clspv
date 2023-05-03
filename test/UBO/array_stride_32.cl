@@ -13,8 +13,9 @@ typedef struct {
 } s;
 
 __kernel void foo(__global s* data, __constant s* c) {
-  data->x = c->x;
-  data->y = c->y;
+  unsigned gid = get_global_id(0);
+  data[gid].x = c[gid].x;
+  data[gid].y = c[gid].y;
 }
 
 //      MAP: kernel,foo,arg,data,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer

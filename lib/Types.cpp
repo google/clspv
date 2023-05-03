@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Types.h"
+#include "BitcastUtils.h"
 #include "Builtins.h"
 #include "Constants.h"
-#include "Types.h"
 #include "spirv/unified1/spirv.hpp"
 
 #include "clspv/Option.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Metadata.h"
@@ -29,6 +31,216 @@
 
 using namespace clspv;
 using namespace llvm;
+
+namespace {
+
+Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
+                    Type *&backup_ty, LLVMContext &context,
+                    DenseMap<Value *, Type *> *cache, Value *v) {
+  auto CacheType = [cache, v](Type *ty) {
+    (*cache)[v] = ty;
+    return ty;
+  };
+  if (auto *GEP = dyn_cast<GEPOperator>(user)) {
+    return GEP->getSourceElementType();
+  } else if (auto *load = dyn_cast<LoadInst>(user)) {
+    if (!load->getType()->isPointerTy()) {
+      return load->getType();
+    }
+    isPointerTy = true;
+  } else if (auto *store = dyn_cast<StoreInst>(user)) {
+    if (!store->getValueOperand()->getType()->isPointerTy()) {
+      return store->getValueOperand()->getType();
+    } else if (!isa<ConstantPointerNull>(store->getValueOperand())) {
+      isPointerTy = true;
+    }
+  } else if (auto *rmw = dyn_cast<AtomicRMWInst>(user)) {
+    return rmw->getValOperand()->getType();
+  } else if (auto *memcpy = dyn_cast<MemCpyInst>(user)) {
+    auto other_op = operand == 0 ? 1 : 0;
+    // See if the type can be inferred from the other pointer operand as a
+    // last resort.
+    // Cache a nullptr to avoid infinite recursion.
+    CacheType(nullptr);
+    if (auto other_ty =
+            InferType(memcpy->getArgOperand(other_op), context, cache)) {
+      backup_ty = other_ty;
+    }
+  } else if (auto *select = dyn_cast<SelectInst>(user)) {
+    isPointerTy = true;
+
+    // See if the type can be inferred from the other pointer operand as a
+    // last resort.
+    // Cache a nullptr to avoid infinite recursion.
+    auto other_op = operand == 1 ? 2 : 1;
+    CacheType(nullptr);
+    if (auto other_ty =
+            InferType(select->getOperand(other_op), context, cache)) {
+      backup_ty = other_ty;
+    }
+  } else if (auto *call = dyn_cast<CallInst>(user)) {
+    auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
+    // TODO: remaining builtins
+    // TODO: kSpirvCopyMemory
+    switch (info.getType()) {
+    case clspv::Builtins::kAtomicInit:
+    case clspv::Builtins::kAtomicStore:
+    case clspv::Builtins::kAtomicStoreExplicit: {
+      // Data type is inferred from the "value" or "desired" operand.
+      auto *data_param = call->getArgOperand(1);
+      return data_param->getType();
+    }
+    case clspv::Builtins::kAtomicCompareExchangeStrong:
+    case clspv::Builtins::kAtomicCompareExchangeStrongExplicit:
+    case clspv::Builtins::kAtomicCompareExchangeWeak:
+    case clspv::Builtins::kAtomicCompareExchangeWeakExplicit: {
+      // Data type inferred from "desired" operand.
+      auto *data_param = call->getArgOperand(2);
+      return data_param->getType();
+    }
+    case clspv::Builtins::kVload:
+      // Data type is the scalar return type.
+      return call->getType()->getScalarType();
+    case clspv::Builtins::kVloadHalf:
+    case clspv::Builtins::kVloadaHalf:
+      return Type::getHalfTy(context);
+    case clspv::Builtins::kVstore: {
+      // Data type is the scalar version of the "data" operand.
+      auto *data_param = call->getArgOperand(0);
+      return data_param->getType()->getScalarType();
+    }
+    case clspv::Builtins::kVstoreHalf:
+    case clspv::Builtins::kVstoreaHalf:
+      return Type::getHalfTy(context);
+    case clspv::Builtins::kSincos:
+    case clspv::Builtins::kModf:
+    case clspv::Builtins::kFract:
+      // Data type is the same as the return type.
+      return call->getType();
+    case clspv::Builtins::kFrexp:
+    case clspv::Builtins::kRemquo:
+    case clspv::Builtins::kLgammaR: {
+      // Data type is an i32 equivalent of the return type.
+      // That is, same number of components.
+      auto *int32Ty = Type::getIntNTy(context, 32);
+      auto *data_ty = call->getType();
+      if (auto vec_ty = dyn_cast<VectorType>(data_ty))
+        return VectorType::get(int32Ty, vec_ty);
+      else
+        return int32Ty;
+    }
+    case clspv::Builtins::kSpirvOp: {
+      auto *op_param = call->getArgOperand(0);
+      auto op =
+          static_cast<spv::Op>(cast<ConstantInt>(op_param)->getZExtValue());
+      switch (op) {
+      case spv::Op::OpAtomicIAdd:
+      case spv::Op::OpAtomicISub:
+      case spv::Op::OpAtomicSMin:
+      case spv::Op::OpAtomicUMin:
+      case spv::Op::OpAtomicSMax:
+      case spv::Op::OpAtomicUMax:
+      case spv::Op::OpAtomicAnd:
+      case spv::Op::OpAtomicOr:
+      case spv::Op::OpAtomicXor:
+      case spv::Op::OpAtomicIIncrement:
+      case spv::Op::OpAtomicIDecrement:
+      case spv::Op::OpAtomicCompareExchange:
+      case spv::Op::OpAtomicLoad:
+      case spv::Op::OpAtomicExchange:
+        // Data type is return type.
+        return call->getType();
+      case spv::Op::OpAtomicStore:
+        // Data type is operand 4.
+        return call->getArgOperand(4)->getType();
+      default:
+        // No other current uses of SPIRVOp deal with pointers, but this
+        // code should be expanded if any are added.
+        break;
+      }
+      break;
+    }
+    case clspv::Builtins::kBuiltinNone:
+      if (!call->getCalledFunction()->isDeclaration()) {
+        // See if the type can be inferred from the use in the called
+        // function.
+        auto *ty = InferType(call->getCalledFunction()->getArg(operand),
+                             context, cache);
+        if (ty)
+          return ty;
+      }
+      break;
+    default:
+      // Handle entire ranges of builtins here.
+      if (BUILTIN_IN_GROUP(info.getType(), Image)) {
+        // Data type is inferred through the mangling of the operand.
+        auto param = info.getParameter(operand);
+        assert(param.type_id == Type::StructTyID);
+        auto struct_ty = StructType::getTypeByName(context, param.name);
+        if (!struct_ty) {
+          struct_ty = StructType::create(context, param.name);
+        }
+        return struct_ty;
+      } else if (BUILTIN_IN_GROUP(info.getType(), Atomic) ||
+                 info.getType() == clspv::Builtins::kSpirvAtomicXor) {
+        // TODO: handle atomic flag functions properly.
+        // Data type is the same as the return type.
+        return call->getType();
+      } else if (BUILTIN_IN_GROUP(info.getType(), Async)) {
+        // Data type is inferred through the mangling of the operand.
+        auto param = info.getParameter(operand);
+        return param.DataType(context);
+      }
+      break;
+    }
+  }
+  return nullptr;
+}
+
+Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
+  if (TyA == nullptr) {
+    return TyB;
+  } else if (TyB == nullptr) {
+    return TyA;
+  }
+
+  int Steps;
+  bool PerfectMatch;
+  if (BitcastUtils::FindAliasingContainedType(TyA, TyB, Steps, PerfectMatch, DL,
+                                              true)) {
+    return TyA;
+  }
+  if (BitcastUtils::FindAliasingContainedType(TyB, TyA, Steps, PerfectMatch, DL,
+                                              true)) {
+    return TyB;
+  }
+
+  if (BitcastUtils::SizeInBits(DL, TyA) > BitcastUtils::SizeInBits(DL, TyB)) {
+    return TyB;
+  } else if (BitcastUtils::SizeInBits(DL, TyA) <
+             BitcastUtils::SizeInBits(DL, TyB)) {
+    return TyA;
+  }
+  // TyA size == TyB size
+  if (auto STy = dyn_cast<StructType>(TyB)) {
+    // If we need to make the choice between 2 packed struct, we need to choose
+    // the one created by the RewritePackedStructPass.
+    // Just look if TyB is a typical RewritePackedStruct type, if not let's take
+    // TyA, which might be the one, or something else.
+    if (STy->isPacked() && STy->getNumElements() == 1) {
+      if (auto ArrTy = dyn_cast<ArrayType>(STy->getStructElementType(0))) {
+        if (ArrTy->getArrayElementType() ==
+            Type::getInt8Ty(TyB->getContext())) {
+          return TyB;
+        }
+      }
+    }
+  }
+
+  return TyA;
+}
+
+} // namespace
 
 Type *clspv::InferType(Value *v, LLVMContext &context,
                        DenseMap<Value *, Type *> *cache) {
@@ -85,6 +297,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   }
 
   Type *backup_ty = nullptr;
+  Type *user_ty = nullptr;
   DenseSet<Value *> seen;
   while (!worklist.empty()) {
     User *user = worklist.back().first;
@@ -95,162 +308,23 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
       continue;
     }
 
-    if (auto *GEP = dyn_cast<GEPOperator>(user)) {
-      return CacheType(GEP->getSourceElementType());
-    } else if (auto *load = dyn_cast<LoadInst>(user)) {
-      if (!load->getType()->isPointerTy()) {
-        return CacheType(load->getType());
-      }
-      isPointerTy = true;
-    } else if (auto *store = dyn_cast<StoreInst>(user)) {
-      if (!store->getValueOperand()->getType()->isPointerTy()) {
-        return CacheType(store->getValueOperand()->getType());
-      } else if (!isa<ConstantPointerNull>(store->getValueOperand())) {
-        isPointerTy = true;
-      }
-    } else if (auto *rmw = dyn_cast<AtomicRMWInst>(user)) {
-      return CacheType(rmw->getValOperand()->getType());
-    } else if (auto *memcpy = dyn_cast<MemCpyInst>(user)) {
-      auto other_op = operand == 0 ? 1 : 0;
-      // See if the type can be inferred from the other pointer operand as a
-      // last resort.
-      // Cache a nullptr to avoid infinite recursion.
-      CacheType(nullptr);
-      if (auto other_ty =
-              InferType(memcpy->getArgOperand(other_op), context, cache)) {
-        backup_ty = other_ty;
-      }
-    } else if (auto *select = dyn_cast<SelectInst>(user)) {
-      isPointerTy = true;
+    Instruction *userI = dyn_cast<Instruction>(user);
+    if (!userI) {
+      continue;
+    }
+    const DataLayout &DL =
+        userI->getParent()->getParent()->getParent()->getDataLayout();
 
-      // See if the type can be inferred from the other pointer operand as a
-      // last resort.
-      // Cache a nullptr to avoid infinite recursion.
-      auto other_op = operand == 1 ? 2 : 1;
-      CacheType(nullptr);
-      if (auto other_ty =
-              InferType(select->getOperand(other_op), context, cache)) {
-        backup_ty = other_ty;
-      }
-    } else if (auto *call = dyn_cast<CallInst>(user)) {
-      auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
-      // TODO: remaining builtins
-      // TODO: kSpirvCopyMemory
-      switch (info.getType()) {
-      case clspv::Builtins::kAtomicInit:
-      case clspv::Builtins::kAtomicStore:
-      case clspv::Builtins::kAtomicStoreExplicit: {
-        // Data type is inferred from the "value" or "desired" operand.
-        auto *data_param = call->getArgOperand(1);
-        return CacheType(data_param->getType());
-      }
-      case clspv::Builtins::kAtomicCompareExchangeStrong:
-      case clspv::Builtins::kAtomicCompareExchangeStrongExplicit:
-      case clspv::Builtins::kAtomicCompareExchangeWeak:
-      case clspv::Builtins::kAtomicCompareExchangeWeakExplicit: {
-        // Data type inferred from "desired" operand.
-        auto *data_param = call->getArgOperand(2);
-        return CacheType(data_param->getType());
-      }
-      case clspv::Builtins::kVload:
-        // Data type is the scalar return type.
-        return CacheType(call->getType()->getScalarType());
-      case clspv::Builtins::kVloadHalf:
-      case clspv::Builtins::kVloadaHalf:
-        return CacheType(Type::getHalfTy(context));
-      case clspv::Builtins::kVstore: {
-        // Data type is the scalar version of the "data" operand.
-        auto *data_param = call->getArgOperand(0);
-        return CacheType(data_param->getType()->getScalarType());
-      }
-      case clspv::Builtins::kVstoreHalf:
-      case clspv::Builtins::kVstoreaHalf:
-        return CacheType(Type::getHalfTy(context));
-      case clspv::Builtins::kSincos:
-      case clspv::Builtins::kModf:
-      case clspv::Builtins::kFract:
-        // Data type is the same as the return type.
-        return CacheType(call->getType());
-      case clspv::Builtins::kFrexp:
-      case clspv::Builtins::kRemquo:
-      case clspv::Builtins::kLgammaR: {
-        // Data type is an i32 equivalent of the return type.
-        // That is, same number of components.
-        auto *int32Ty = Type::getIntNTy(context, 32);
-        auto *data_ty = call->getType();
-        if (auto vec_ty = dyn_cast<VectorType>(data_ty))
-          return CacheType(VectorType::get(int32Ty, vec_ty));
-        else
-          return CacheType(int32Ty);
-      }
-      case clspv::Builtins::kSpirvOp: {
-        auto *op_param = call->getArgOperand(0);
-        auto op =
-            static_cast<spv::Op>(cast<ConstantInt>(op_param)->getZExtValue());
-        switch (op) {
-        case spv::Op::OpAtomicIAdd:
-        case spv::Op::OpAtomicISub:
-        case spv::Op::OpAtomicSMin:
-        case spv::Op::OpAtomicUMin:
-        case spv::Op::OpAtomicSMax:
-        case spv::Op::OpAtomicUMax:
-        case spv::Op::OpAtomicAnd:
-        case spv::Op::OpAtomicOr:
-        case spv::Op::OpAtomicXor:
-        case spv::Op::OpAtomicIIncrement:
-        case spv::Op::OpAtomicIDecrement:
-        case spv::Op::OpAtomicCompareExchange:
-        case spv::Op::OpAtomicLoad:
-        case spv::Op::OpAtomicExchange:
-          // Data type is return type.
-          return CacheType(call->getType());
-        case spv::Op::OpAtomicStore:
-          // Data type is operand 4.
-          return CacheType(call->getArgOperand(4)->getType());
-        default:
-          // No other current uses of SPIRVOp deal with pointers, but this
-          // code should be expanded if any are added.
-          break;
-        }
-        break;
-      }
-      case clspv::Builtins::kBuiltinNone:
-        if (!call->getCalledFunction()->isDeclaration()) {
-          // See if the type can be inferred from the use in the called
-          // function.
-          auto *ty = InferType(call->getCalledFunction()->getArg(operand),
-                               context, cache);
-          if (ty)
-            return CacheType(ty);
-        }
-        break;
-      default:
-        // Handle entire ranges of builtins here.
-        if (BUILTIN_IN_GROUP(info.getType(), Image)) {
-          // Data type is inferred through the mangling of the operand.
-          auto param = info.getParameter(operand);
-          assert(param.type_id == Type::StructTyID);
-          auto struct_ty = StructType::getTypeByName(context, param.name);
-          if (!struct_ty) {
-            struct_ty = StructType::create(context, param.name);
-          }
-          return CacheType(struct_ty);
-        } else if (BUILTIN_IN_GROUP(info.getType(), Atomic) ||
-                   info.getType() == clspv::Builtins::kSpirvAtomicXor) {
-          // TODO: handle atomic flag functions properly.
-          // Data type is the same as the return type.
-          return CacheType(call->getType());
-        } else if (BUILTIN_IN_GROUP(info.getType(), Async)) {
-          // Data type is inferred through the mangling of the operand.
-          auto param = info.getParameter(operand);
-          return CacheType(param.DataType(context));
-        }
-        break;
-      }
+    Type *user_backup_ty = nullptr;
+    Type *ty = InferUserType(user, isPointerTy, operand, user_backup_ty,
+                             context, cache, v);
+    user_ty = SmallerTypeNotAliasing(DL, user_ty, ty);
+    if (user_ty == nullptr) {
+      backup_ty = SmallerTypeNotAliasing(DL, backup_ty, user_backup_ty);
     }
 
     // If the result is also a pointer, try to infer from further uses.
-    if (user->getType()->isPointerTy() || isPointerTy) {
+    if (user_ty == nullptr && (user->getType()->isPointerTy() || isPointerTy)) {
       // Handle stores with only pointer operands.
       if (auto *store = dyn_cast<StoreInst>(user)) {
         if (store->getPointerOperand() != v) {
@@ -264,7 +338,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
       }
     }
   }
-  if (backup_ty) {
+  if (user_ty) {
+    return CacheType(user_ty);
+  } else if (backup_ty) {
     return CacheType(backup_ty);
   }
 

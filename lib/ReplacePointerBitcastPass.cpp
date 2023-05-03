@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -49,6 +50,14 @@ cl::opt<bool> ReplacePhysicalPointerBitcasts(
 using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
 
 namespace {
+
+bool IsComplexStruct(const DataLayout &DL, Type *Ty) {
+  if (auto STy = dyn_cast<StructType>(Ty)) {
+    auto vec4u64 = FixedVectorType::get(Type::getInt64Ty(Ty->getContext()), 4);
+    return !IsArrayLike(STy) && SizeInBits(DL, Ty) > SizeInBits(DL, vec4u64);
+  }
+  return false;
+}
 
 // 'Val' is expected to be a vector.
 // 'Idx' is the index where to extract the subvector, but in the casted type
@@ -203,8 +212,8 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
   if (!IsGEPUser) {
     while (true) {
       OutAddrIdxs.push_back(Builder.getInt32(0));
-      if ((SrcTy->isArrayTy() || SrcTy->isVectorTy() || SrcTy->isStructTy()) &&
-          SrcTyBitWidth > DstTyBitWidth && SrcEleTyBitWidth >= DstTyBitWidth) {
+      if ((SrcTy != GetEleType(SrcTy)) && SrcTyBitWidth > DstTyBitWidth &&
+          SrcEleTyBitWidth >= DstTyBitWidth) {
         SrcTy = GetEleType(SrcTy);
         SrcTyBitWidth = SrcEleTyBitWidth;
         SrcEleTy = GetEleType(SrcTy);
@@ -218,9 +227,8 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
       OutAddrIdxs.push_back(OrgGEPIdx);
     } else {
       OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
-      while (
-          (SrcTy->isVectorTy() || SrcTy->isArrayTy() || SrcTy->isStructTy()) &&
-          SrcTyBitWidth > DstTyBitWidth && InAddrIdxs.size() > InIdx) {
+      while ((SrcTy != GetEleType(SrcTy)) && SrcTyBitWidth > DstTyBitWidth &&
+             InAddrIdxs.size() > InIdx) {
         SrcTy = GetEleType(SrcTy);
         SrcTyBitWidth = SrcEleTyBitWidth;
         SrcEleTy = GetEleType(SrcTy);
@@ -472,6 +480,72 @@ void CleanModule(WeakInstructions &ToBeDeleted) {
   }
 }
 
+void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
+  while (auto gep = dyn_cast<GetElementPtrInst>(Src)) {
+    IRBuilder<> B(gep);
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, B, gep, CstVal, DynVal, SmallerBitWidths);
+    auto Idxs = GetIdxsForTyFromOffset(
+        DL, B, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+        (clspv::AddressSpace::Type)gep->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
+    auto *new_gep =
+        GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
+    gep->replaceAllUsesWith(new_gep);
+    gep->eraseFromParent();
+    Src = new_gep->getPointerOperand();
+  }
+  if (auto alloca = dyn_cast<AllocaInst>(Src)) {
+    IRBuilder<> B(alloca);
+    auto nb_elem =
+        alloca->getAllocationSizeInBits(DL).value() / SizeInBits(DL, Ty);
+    if (nb_elem > 1) {
+      Ty = ArrayType::get(Ty, nb_elem);
+    }
+    auto new_alloca = B.CreateAlloca(Ty, alloca->getAddressSpace());
+    alloca->replaceAllUsesWith(new_alloca);
+    alloca->eraseFromParent();
+  } else if (auto GV = dyn_cast<GlobalVariable>(Src)) {
+    auto nb_elem = SizeInBits(DL, GV->getValueType()) / SizeInBits(DL, Ty);
+    if (nb_elem > 1) {
+      Ty = ArrayType::get(Ty, nb_elem);
+    }
+    if (!isa<StructType>(Ty) &&
+        GV->getAddressSpace() == clspv::AddressSpace::PushConstant) {
+      Ty = StructType::get(Ty);
+    }
+
+    auto initializer = GV->getInitializer();
+    if (initializer && !initializer->isOneValue() &&
+        !initializer->isNullValue() && !initializer->isZeroValue() &&
+        !isa<UndefValue>(initializer)) {
+      // unsupported do nothing...
+      return;
+    } else if (initializer && initializer->isOneValue()) {
+      initializer = Constant::getAllOnesValue(Ty);
+    } else if (initializer &&
+               (initializer->isNullValue() || initializer->isZeroValue())) {
+      initializer = Constant::getNullValue(Ty);
+    } else if (initializer && isa<UndefValue>(initializer)) {
+      initializer = UndefValue::get(Ty);
+    }
+    auto new_GV = new GlobalVariable(
+        *GV->getParent(), Ty, GV->isConstant(), GV->getLinkage(), initializer,
+        "", GV, GV->getThreadLocalMode(), GV->getAddressSpace(),
+        GV->isExternallyInitialized());
+    new_GV->takeName(GV);
+    new_GV->setAlignment(GV->getAlign());
+    new_GV->copyMetadata(GV, /* offset: */ 0);
+    new_GV->copyAttributesFrom(GV);
+
+    GV->replaceAllUsesWith(new_GV);
+    GV->eraseFromParent();
+  }
+}
+
 } // namespace
 
 PreservedAnalyses
@@ -480,9 +554,54 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
   DenseMap<Value *, Type *> type_cache;
   WeakInstructions ToBeDeleted;
-  SmallVector<Instruction *, 16> WorkList;
-  DenseSet<Value *> ImplicitCasts;
   const DataLayout &DL = M.getDataLayout();
+
+  // Downgrade object type when detecting implicit cast with inner source type
+  // bigger than destination type in 2 cases:
+  // - storing => avoid trying to store an element smaller that the object type
+  // (not supported later on).
+  // - complex structures (whatever is done with the ptr casted afterwards) =>
+  // avoid complex load/store with structures casted into other types where it
+  // can be hard to reassemble everything to get the proper type/value from the
+  // structure.
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             ReplacePhysicalPointerBitcasts)) {
+          continue;
+        }
+        bool isStore = isa<StoreInst>(I);
+        if (!isStore) {
+          for (User *U : I.users()) {
+            if (isa<StoreInst>(U)) {
+              isStore = true;
+            }
+          }
+        }
+        if (!isStore && !IsComplexStruct(DL, source_ty)) {
+          continue;
+        }
+
+        Type *EleTy = GetEleType(source_ty);
+        while (source_ty != EleTy) {
+          source_ty = EleTy;
+          EleTy = GetEleType(source_ty);
+        }
+        size_t source_size = SizeInBits(DL, source_ty);
+        size_t dest_size = SizeInBits(DL, dest_ty);
+        if (source_size > dest_size) {
+          DowngradeSourceToTy(DL, source, dest_ty);
+        }
+      }
+    }
+  }
+  type_cache.clear();
+
+  DenseSet<Instruction *> WorkList;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -492,6 +611,14 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
                              ReplacePhysicalPointerBitcasts))
           continue;
+
+        if (isa<Instruction>(source) &&
+            WorkList.count(cast<Instruction>(source)) > 0)
+          continue;
+
+        if (IsComplexStruct(DL, source_ty))
+          continue;
+
         bool ok = true;
         SmallVector<User *, 16> UserWorkList;
         UserWorkList.push_back(&I);
@@ -510,8 +637,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         if (!ok)
           continue;
 
-        ImplicitCasts.insert(source);
-        WorkList.push_back(&I);
+        WorkList.insert(&I);
       }
     }
   }
@@ -535,21 +661,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
     SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
-    SmallVector<size_t, 4> SrcTyBitWidths = getEleTypesBitWidths(SrcTy, DL);
-
-    // If we detect a private memory, the first index of the GEP will need to be
-    // zero (meaning that we are not explicitly trying to access private memory
-    // out-of-bounds).
-    // spirv-val is not yet capable of detecting it, but such access would fail
-    // at runtime (see https://github.com/KhronosGroup/SPIRV-Tools/issues/1585).
-    bool isPrivateMemory = isa<AllocaInst>(Src);
-
-    if (ImplicitCasts.count(Inst)) {
-      // If this user was queued on the worklist as an implicit cast
-      // separately, don't handle it now.
-      continue;
-    }
-
     SmallVector<Value *, 4> NewAddrIdxs;
 
     // It consist of User* and bool whether user is gep or not.
@@ -558,36 +669,26 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     Value *OrgGEPIdx = nullptr;
     if (auto GEP = dyn_cast<GetElementPtrInst>(Inst)) {
       IRBuilder<> Builder(GEP);
-      unsigned DstTyBitWidth = SizeInBits(DL, DstTy);
 
-      // TODO: handle GEPs with multiple indexes
-      if (GEP->getNumOperands() > 2) {
-        continue;
+      uint64_t CstVal;
+      Value *DynVal;
+      size_t SmallerBitWidths;
+      ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+
+      OrgGEPIdx = DynVal;
+      if (DynVal == nullptr) {
+        OrgGEPIdx = Builder.getInt32(CstVal);
+      } else if (CstVal != 0) {
+        OrgGEPIdx = Builder.CreateAdd(Builder.getInt32(CstVal), DynVal);
       }
 
-      // Build new src/dst address.
-      Value *GEPIdx = OrgGEPIdx = GEP->getOperand(1);
-      unsigned SmallerSrcBitWidth = SrcTyBitWidths[SrcTyBitWidths.size() - 1];
-      if (SmallerSrcBitWidth > DstTyBitWidth) {
-        GEPIdx = CreateDiv(Builder, SmallerSrcBitWidth / DstTyBitWidth, GEPIdx);
-      } else if (SmallerSrcBitWidth < DstTyBitWidth) {
-        GEPIdx = CreateMul(Builder, DstTyBitWidth / SmallerSrcBitWidth, GEPIdx);
-      }
-      for (unsigned i = 0; i < SrcTyBitWidths.size(); i++) {
-        if (isPrivateMemory && i == 0) {
-          NewAddrIdxs.push_back(Builder.getInt32(0));
-          continue;
-        }
-        Value *Idx;
-        unsigned div = SrcTyBitWidths[i] / SmallerSrcBitWidth;
-        if (div <= 1) {
-          Idx = GEPIdx;
-        } else {
-          Idx = CreateDiv(Builder, div, GEPIdx);
-          GEPIdx = CreateRem(Builder, div, GEPIdx);
-        }
-        NewAddrIdxs.push_back(Idx);
-      }
+      DstTy = GEP->getResultElementType();
+      auto Idx = GetIdxsForTyFromOffset(
+          DL, Builder, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
+          (clspv::AddressSpace::Type)GEP->getPointerOperand()
+              ->getType()
+              ->getPointerAddressSpace());
+      NewAddrIdxs.append(Idx);
 
       // If bitcast's user is gep, investigate gep's users too.
       for (User *GEPUser : GEP->users()) {
@@ -615,11 +716,12 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       IRBuilder<> Builder(cast<Instruction>(U));
 
       if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-        ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy, DstTy,
-                     NewAddrIdxs, ToBeDeleted);
+        ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy,
+                     ST->getValueOperand()->getType(), NewAddrIdxs,
+                     ToBeDeleted);
       } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
         Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
-                                    DstTy, NewAddrIdxs, ToBeDeleted);
+                                    LD->getType(), NewAddrIdxs, ToBeDeleted);
         // Update LD's users with DstVal.
         LD->replaceAllUsesWith(DstVal);
       } else {
