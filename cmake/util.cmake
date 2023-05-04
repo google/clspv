@@ -4,27 +4,30 @@
 # built by CMake, for example -lpthread.
 macro(clspv_get_transitive_libs target out_list)
   if (TARGET ${target})
-    get_target_property(libtype ${target} TYPE)
-    # If this target is a static library, get anything it depends on.
-    if ("${libtype}" STREQUAL "STATIC_LIBRARY")
-      # Get the original library if this is an alias library. This is
-      # to avoid putting both the original library and the alias library
-      # in the list (given we are deduplicating according to target names).
-      # Otherwise, we may pack the same library twice, resulting in
-      # duplicated symbols.
-      get_target_property(aliased_target ${target} ALIASED_TARGET)
-      if (aliased_target)
-        list(INSERT ${out_list} 0 "${aliased_target}")
-      else()
-        list(INSERT ${out_list} 0 "${target}")
-      endif()
+    if (NOT DEFINED clspv_get_transitive_libs_${target})
+      get_target_property(libtype ${target} TYPE)
+      # If this target is a static library, get anything it depends on.
+      if ("${libtype}" STREQUAL "STATIC_LIBRARY")
+        # Get the original library if this is an alias library. This is
+        # to avoid putting both the original library and the alias library
+        # in the list (given we are deduplicating according to target names).
+        # Otherwise, we may pack the same library twice, resulting in
+        # duplicated symbols.
+        get_target_property(aliased_target ${target} ALIASED_TARGET)
+        if (aliased_target)
+          list(INSERT ${out_list} 0 "${aliased_target}")
+        else()
+          list(INSERT ${out_list} 0 "${target}")
+        endif()
 
-      get_target_property(libs ${target} LINK_LIBRARIES)
-      if (libs)
-        foreach(lib ${libs})
-          clspv_get_transitive_libs(${lib} ${out_list})
-        endforeach()
+        get_target_property(libs ${target} LINK_LIBRARIES)
+        if (libs)
+          foreach(lib ${libs})
+            clspv_get_transitive_libs(${lib} ${out_list})
+          endforeach()
+        endif()
       endif()
+      set(clspv_get_transitive_libs_${target} "")
     endif()
   endif()
   # If we know the location (i.e. if it was made with CMake) then we
@@ -81,4 +84,4 @@ function(clspv_combine_static_lib new_target target)
   set_target_properties(${new_target}
     PROPERTIES IMPORTED_LOCATION ${libname})
   add_dependencies(${new_target} ${new_target}_genfile)
-endfunction() 
+endfunction()
