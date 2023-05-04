@@ -915,7 +915,8 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
       new OpenCLBuiltinMemoryBuffer(library_data, library_size - 1));
 
   llvm::SMDiagnostic Err;
-  auto library = llvm::parseIR(*buffer, Err, module->getContext());
+  auto library =
+      llvm::getLazyIRModule(std::move(buffer), Err, module->getContext());
   if (!library) {
     llvm::errs() << "Failed to parse builtins library\n";
     return false;
