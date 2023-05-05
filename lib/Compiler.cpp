@@ -696,6 +696,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
     }
 
+    // This pass needs to run before an interation of
+    // SimplifyPointerBitcastPass/ReplacePointerBitcastPass.
+    pm.addPass(clspv::LowerPrivatePointerPHIPass());
+
     // Last minute pointer simplification. With opaque pointers, we can often
     // end up in a situation where LLVM has simplified GEPs by removing zero
     // indices where an equivalent address would be computed. These lead to

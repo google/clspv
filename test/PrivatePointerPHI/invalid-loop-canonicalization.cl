@@ -1,7 +1,6 @@
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val --target-env spv1.0 %t.spv
-// XFAIL: *
 
 int foo(private unsigned char *tab, unsigned int stride) {
   int res = 0;

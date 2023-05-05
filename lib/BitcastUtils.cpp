@@ -893,10 +893,10 @@ SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
                                             Type *BaseTy) {
   SmallVector<size_t, 4> TyBitWidths;
   TyBitWidths.push_back(SizeInBits(DL, Ty));
-  while ((Ty->isArrayTy() || Ty->isVectorTy() ||
-          (Ty->isStructTy() && cast<StructType>(Ty)->getNumElements() <= 1)) &&
-         Ty != BaseTy) {
-    Ty = GetEleType(Ty);
+  Type *EleTy = GetEleType(Ty);
+  while (EleTy != Ty && Ty != BaseTy) {
+    Ty = EleTy;
+    EleTy = GetEleType(Ty);
     TyBitWidths.push_back(SizeInBits(DL, Ty));
   }
   return TyBitWidths;
