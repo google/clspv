@@ -14,6 +14,7 @@
 
 #include "LowerAddrSpaceCastPass.h"
 #include "BitcastUtils.h"
+#include "Builtins.h"
 #include "Types.h"
 #include "clspv/AddressSpace.h"
 
@@ -21,6 +22,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Utils/Local.h"
 
@@ -182,6 +184,73 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitICmpInst(llvm::ICmpInst &I) {
   registerReplacement(&I, icmp);
   I.replaceAllUsesWith(icmp);
   return icmp;
+}
+
+llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
+  SmallVector<Value *, 16> EquivalentArgs;
+  SmallVector<Type *, 8> EquivalentTypes;
+  for (auto &ArgUse : I.args()) {
+    Value *Arg = ArgUse.get();
+    Value *EquivalentArg = visit(Arg);
+    EquivalentArgs.push_back(EquivalentArg);
+    EquivalentTypes.push_back(EquivalentArg->getType());
+  }
+  Function *F = I.getCalledFunction();
+  assert(F && "Only function calls are supported.");
+
+  auto FunctionTy =
+      FunctionType::get(F->getReturnType(), EquivalentTypes, F->isVarArg());
+
+  const auto &Info = clspv::Builtins::Lookup(F);
+  auto fixNameSuffix = [&F](std::string Name) {
+    const auto pattern_size = strlen("PU3AS");
+
+    auto Name_start = Name.find("PU3AS") + pattern_size + 1;
+    auto Name_end = Name.size() - Name_start;
+    auto subName = Name.substr(Name_start, Name_end);
+
+    auto FName = F->getName();
+    auto FName_start = FName.find("PU3AS") + pattern_size + 1;
+    auto FName_end = FName.size() - FName_start;
+    auto subFName = FName.substr(FName_start, FName_end);
+
+    if (subName != subFName) {
+      Name = Name.replace(Name_start, Name_end, subFName);
+    }
+    return Name;
+  };
+  std::string Name = fixNameSuffix(clspv::Builtins::GetMangledFunctionName(
+      Info.getName().c_str(), FunctionTy));
+
+  Module *M = I.getParent()->getParent()->getParent();
+  auto getEquivalentFunction = [&Name, &M, &FunctionTy, this, &F]() {
+    Function *eqF = M->getFunction(Name);
+    if (eqF != nullptr)
+      return eqF;
+
+    eqF = FunctionMap[F];
+    if (eqF != nullptr)
+      return eqF;
+
+    eqF = Function::Create(FunctionTy, F->getLinkage(), Name);
+    FunctionMap[F] = eqF;
+    M->getFunctionList().push_front(eqF);
+
+    return eqF;
+  };
+  Function *EquivalentFunction = getEquivalentFunction();
+  EquivalentFunction->copyAttributesFrom(F);
+  EquivalentFunction->setCallingConv(F->getCallingConv());
+
+  IRBuilder<> B(&I);
+  auto call = B.CreateCall(EquivalentFunction, EquivalentArgs);
+  call->copyIRFlags(&I);
+  call->copyMetadata(I);
+  call->setCallingConv(I.getCallingConv());
+
+  registerReplacement(&I, call);
+  I.replaceAllUsesWith(call);
+  return call;
 }
 
 Value *clspv::LowerAddrSpaceCastPass::visitInstruction(Instruction &I) {
