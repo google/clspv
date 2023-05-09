@@ -22,6 +22,14 @@ namespace clspv {
 struct NativeMathPass : llvm::PassInfoMixin<NativeMathPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
+
+inline bool BuiltinWithGenericPointer(llvm::StringRef name) {
+  if (name.contains("fract") || name.contains("frexp") ||
+      name.contains("modf") || name.contains("remquo") ||
+      name.contains("lgamma_r"))
+    return true;
+  return false;
+}
 } // namespace clspv
 
 #endif // _CLSPV_LIB_NATIVE_MATH_PASS_H

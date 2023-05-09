@@ -55,7 +55,9 @@
 #include "clspv/opencl_builtins_header.h"
 
 #include "Builtins.h"
+#include "Constants.h"
 #include "FrontendPlugin.h"
+#include "NativeMathPass.h"
 #include "Passes.h"
 #include "Types.h"
 
@@ -63,6 +65,7 @@
 #include <fstream>
 #include <iostream>
 #include <numeric>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -906,6 +909,66 @@ int GenerateIRFile(std::unique_ptr<llvm::Module> &module,
   return WriteOutput(module_string, output_binary);
 }
 
+bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
+                                                std::string &lib_str) {
+  std::string fct_list;
+  llvm::raw_string_ostream stream_fct_list(fct_list);
+  llvm::raw_string_ostream stream_fct_decl(lib_str);
+  bool found = false;
+  for (auto &F : module->functions()) {
+    auto name = F.getName();
+    if (!name.contains("PU3AS4") || !clspv::BuiltinWithGenericPointer(name)) {
+      continue;
+    }
+
+    auto get_fct_decl = [](llvm::Function &F) {
+      std::string str;
+      llvm::raw_string_ostream stream(str);
+      F.print(stream);
+      stream.flush();
+      return str;
+    };
+    std::string str = get_fct_decl(F);
+
+    auto add_impl = [&found, &str, &stream_fct_decl,
+                     &stream_fct_list](std::string mangling, std::string AS) {
+      auto substr = [&str](size_t start, size_t end) {
+        return str.substr(start, end - start);
+      };
+      std::string mangling_pattern = "PU3AS4";
+      auto mangling_start = str.find(mangling_pattern);
+      auto mangling_end = mangling_start + mangling_pattern.size();
+      std::string AS_pattern = " addrspace(4)";
+      auto AS_start = str.find(AS_pattern);
+      auto AS_end = AS_start + AS_pattern.size();
+      stream_fct_decl << substr(0, mangling_start) << mangling
+                      << substr(mangling_end, AS_start) << AS
+                      << substr(AS_end, str.find('#') - 1) << "\n";
+
+      if (found) {
+        stream_fct_list << ", ptr ";
+      }
+      stream_fct_list << substr(str.find('@'), mangling_start) << mangling
+                      << substr(mangling_end, str.find('('));
+    };
+
+    add_impl("P", ""); // private
+    found = true;
+    add_impl("PU3AS1", " addrspace(1)"); // local
+    add_impl("PU3AS3", " addrspace(3)"); // global
+  }
+  if (found) {
+    stream_fct_list.flush();
+    stream_fct_decl << "@" << clspv::CLSPVBuiltinsUsed()
+                    << " = appending global ["
+                    << std::count(fct_list.begin(), fct_list.end(), '@')
+                    << " x ptr] [ptr " << fct_list
+                    << "], section \"llvm.metadata\"";
+    stream_fct_decl.flush();
+  }
+  return found;
+}
+
 bool LinkBuiltinLibrary(llvm::Module *module) {
   auto library_data = clspv::PointersAre64Bit(*module)
                           ? clspv64_builtin_library_data
@@ -926,12 +989,24 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
     return false;
   }
 
-  // TODO: when clang generates builtins using the generic address space,
-  // different builtins are used for pointer-based builtins. Need to do some
-  // work to ensure they are kept around.
-  // Affects: modf, remquo, lgamma_r, frexp
-
   llvm::Linker L(*module);
+
+  // When clang generates builtins using the generic address space, different
+  // builtins are used for pointer-based builtins. Need to do some work to
+  // ensure they are kept around.
+  // Affects: modf, remquo, lgamma_r, frexp, fract
+  std::string additional_library;
+  if (GetEquivalentBuiltinsWithoutGenericPointer(module, additional_library)) {
+    auto add_buffer = llvm::MemoryBuffer::getMemBuffer(additional_library);
+    auto add_library = llvm::parseIR(*add_buffer, Err, module->getContext());
+    if (add_library == nullptr) {
+      fprintf(stderr, "%s\n", additional_library.c_str());
+      Err.print("internal_additional_library:", llvm::errs());
+      return false;
+    }
+    L.linkInModule(std::move(add_library), 0);
+  }
+
   L.linkInModule(std::move(library), 0);
 
   return true;

@@ -154,6 +154,8 @@ inline std::string PointerPodArgMetadataName() {
   return "clspv.pointer_from_pod";
 }
 
+inline std::string CLSPVBuiltinsUsed() { return "clspv.builtins.used"; }
+
 } // namespace clspv
 
 #endif

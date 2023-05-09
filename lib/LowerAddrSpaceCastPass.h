@@ -52,6 +52,8 @@ private:
   /// by their removal.
   void cleanDeadInstructions();
 
+  void cleanModule(llvm::Module &M);
+
   /// A map between original values and their replacement.
   ///
   /// The content of this mapping is valid only for the function being visited
