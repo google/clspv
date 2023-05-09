@@ -38,10 +38,10 @@
 #include "Builtins.h"
 #include "Constants.h"
 #include "MemFence.h"
+#include "NativeMathPass.h"
 #include "ReplaceOpenCLBuiltinPass.h"
 #include "SPIRVOp.h"
 #include "Types.h"
-#include "NativeMathPass.h"
 
 using namespace clspv;
 using namespace llvm;
