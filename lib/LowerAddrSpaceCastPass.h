@@ -41,6 +41,7 @@ private:
   llvm::Value *visitGetElementPtrInst(llvm::GetElementPtrInst &I);
   llvm::Value *visitAddrSpaceCastInst(llvm::AddrSpaceCastInst &I);
   llvm::Value *visitICmpInst(llvm::ICmpInst &I);
+  llvm::Value *visitCallInst(llvm::CallInst &I);
   llvm::Value *visitInstruction(llvm::Instruction &I);
 
   void runOnFunction(llvm::Function &F);
@@ -61,6 +62,8 @@ private:
   llvm::DenseMap<llvm::Value *, llvm::Value *> ValueMap;
 
   llvm::DenseMap<llvm::Value *, llvm::Type *> TypeCache;
+
+  llvm::DenseMap<llvm::Function *, llvm::Function *> FunctionMap;
 };
 } // namespace clspv
 
