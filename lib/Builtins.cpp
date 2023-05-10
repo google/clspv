@@ -774,3 +774,11 @@ glsl::ExtInst Builtins::getDirectOrIndirectExtInstEnum(
     return direct;
   return getIndirectExtInstEnum(func_info);
 }
+
+bool Builtins::BuiltinWithGenericPointer(StringRef name) {
+  if (name.contains("fract") || name.contains("frexp") ||
+      name.contains("modf") || name.contains("remquo") ||
+      name.contains("lgamma_r"))
+    return true;
+  return false;
+}

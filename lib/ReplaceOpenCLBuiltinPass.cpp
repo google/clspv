@@ -38,7 +38,6 @@
 #include "Builtins.h"
 #include "Constants.h"
 #include "MemFence.h"
-#include "NativeMathPass.h"
 #include "ReplaceOpenCLBuiltinPass.h"
 #include "SPIRVOp.h"
 #include "Types.h"
@@ -362,7 +361,7 @@ bool replaceCallsWithValue(Function &F,
 bool skipBuiltinsWithGenericPointer(Function &F,
                                     Builtins::BuiltinType builtin) {
   auto name = F.getName();
-  if (!clspv::BuiltinWithGenericPointer(name))
+  if (!Builtins::BuiltinWithGenericPointer(name))
     return false;
   if (clspv::Option::UseNativeBuiltins().count(builtin) > 0)
     return false;

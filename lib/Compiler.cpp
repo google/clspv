@@ -57,7 +57,6 @@
 #include "Builtins.h"
 #include "Constants.h"
 #include "FrontendPlugin.h"
-#include "NativeMathPass.h"
 #include "Passes.h"
 #include "Types.h"
 
@@ -917,7 +916,8 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
   bool found = false;
   for (auto &F : module->functions()) {
     auto name = F.getName();
-    if (!name.contains("PU3AS4") || !clspv::BuiltinWithGenericPointer(name)) {
+    if (!name.contains("PU3AS4") ||
+        !clspv::Builtins::BuiltinWithGenericPointer(name)) {
       continue;
     }
 
