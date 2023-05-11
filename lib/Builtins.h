@@ -108,6 +108,10 @@ glsl::ExtInst getIndirectExtInstEnum(const FunctionInfo &func_info);
 // Returns the single GLSL extended instruction used directly or
 // indirectly by the given function call.
 glsl::ExtInst getDirectOrIndirectExtInstEnum(const FunctionInfo &func_info);
+
+// Builtin that might need particular management with libclc to ensure the
+// correct implementation (libclc or native) is used.
+bool BuiltinWithGenericPointer(llvm::StringRef name);
 } // namespace Builtins
 
 } // namespace clspv

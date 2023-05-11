@@ -29,6 +29,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "BuiltinsEnum.h"
 #include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
@@ -357,6 +358,23 @@ bool replaceCallsWithValue(Function &F,
   return Changed;
 }
 
+bool skipBuiltinsWithGenericPointer(Function &F,
+                                    Builtins::BuiltinType builtin) {
+  auto name = F.getName();
+  if (!Builtins::BuiltinWithGenericPointer(name))
+    return false;
+  if (clspv::Option::UseNativeBuiltins().count(builtin) > 0)
+    return false;
+  for (auto &Arg : F.args()) {
+    Type *Ty = Arg.getType();
+    if (Ty->isPointerTy() &&
+        Ty->getPointerAddressSpace() == clspv::AddressSpace::Generic) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
 PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
@@ -384,7 +402,11 @@ PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
 
 bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   auto &FI = Builtins::Lookup(&F);
-  switch (FI.getType()) {
+  auto builtin = FI.getType();
+  if (skipBuiltinsWithGenericPointer(F, builtin)) {
+    return false;
+  }
+  switch (builtin) {
   case Builtins::kAbs:
     if (!FI.getParameter(0).is_signed) {
       return replaceAbs(F);

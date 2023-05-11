@@ -15,6 +15,7 @@
 #include "LowerAddrSpaceCastPass.h"
 #include "BitcastUtils.h"
 #include "Builtins.h"
+#include "Constants.h"
 #include "Types.h"
 #include "clspv/AddressSpace.h"
 
@@ -68,6 +69,7 @@ PreservedAnalyses clspv::LowerAddrSpaceCastPass::run(Module &M,
     BitcastUtils::RemoveCstExprFromFunction(&F);
     runOnFunction(F);
   }
+  cleanModule(M);
 
   return PA;
 }
@@ -282,6 +284,21 @@ void clspv::LowerAddrSpaceCastPass::runOnFunction(Function &F) {
 
   LLVM_DEBUG(dbgs() << "Final version for " << F.getName() << '\n');
   LLVM_DEBUG(dbgs() << F << '\n');
+}
+
+void clspv::LowerAddrSpaceCastPass::cleanModule(Module &M) {
+  for (auto &GV : M.globals()) {
+    if (GV.getName() == CLSPVBuiltinsUsed()) {
+      assert(GV.use_empty());
+      GV.eraseFromParent();
+      break;
+    }
+  }
+  for (auto &F : M) {
+    if (F.use_empty() && F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+      F.deleteBody();
+    }
+  }
 }
 
 void clspv::LowerAddrSpaceCastPass::cleanDeadInstructions() {
