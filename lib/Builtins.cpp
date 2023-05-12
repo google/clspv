@@ -778,7 +778,8 @@ glsl::ExtInst Builtins::getDirectOrIndirectExtInstEnum(
 bool Builtins::BuiltinWithGenericPointer(StringRef name) {
   if (name.contains("fract") || name.contains("frexp") ||
       name.contains("modf") || name.contains("remquo") ||
-      name.contains("lgamma_r"))
+      name.contains("lgamma_r") || name.contains("vstore_half") ||
+      name.contains("sincos"))
     return true;
   return false;
 }

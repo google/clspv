@@ -162,6 +162,8 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitAddrSpaceCastInst(
   // NULL.
   if (ptr->getType() != I.getSrcTy() && ptr->getType() != I.getDestTy()) {
     ptr = ConstantPointerNull::get(cast<PointerType>(I.getType()));
+  }
+  if (ptr->getType() == I.getDestTy()) {
     I.replaceAllUsesWith(ptr);
   }
   registerReplacement(&I, ptr);
@@ -294,10 +296,20 @@ void clspv::LowerAddrSpaceCastPass::cleanModule(Module &M) {
       break;
     }
   }
+  SmallVector<Function *> ToBeRemoved;
   for (auto &F : M) {
-    if (F.use_empty() && F.getCallingConv() != CallingConv::SPIR_KERNEL) {
-      F.deleteBody();
+    bool useCLSPVBuiltinsUsed = false;
+    if (F.getNumUses() == 1) {
+      auto C = dyn_cast<Constant>(F.user_back());
+      useCLSPVBuiltinsUsed = C != nullptr && C->getNumUses() == 0;
     }
+    if ((F.use_empty() || useCLSPVBuiltinsUsed) &&
+        F.getCallingConv() != CallingConv::SPIR_KERNEL) {
+      ToBeRemoved.push_back(&F);
+    }
+  }
+  for (auto F : ToBeRemoved) {
+    F->eraseFromParent();
   }
 }
 
