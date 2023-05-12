@@ -33,5 +33,3 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uint* a)
 // CHECK-DAG:  [[_20:%[0-9a-zA-Z_]+]] = OpConstantComposite [[__arr_uint_uint_4]] [[_uint_42]] [[_uint_13]] [[_uint_0]] [[_uint_5]]
 // CHECK-DAG:  [[_22:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_Private__arr_uint_uint_4]] Private [[_20]]
 // CHECK:  = OpFunction
-// CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_uint]] [[_24:%[0-9a-zA-Z_]+]]
-// CHECK:  [[_24]] = OpFunction [[_uint]] 

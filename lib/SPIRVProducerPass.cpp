@@ -94,6 +94,10 @@ cl::opt<bool>
     ShowProducerIR("show-producer-ir", cl::init(false), cl::ReallyHidden,
                    cl::desc("Dump the IR at the start of SPIRVProducer"));
 
+cl::opt<bool>
+    NameBasicBlocks("name-basic-blocks", cl::init(false), cl::ReallyHidden,
+                    cl::desc("Name SPIR-V basic blocks based on LLVM names"));
+
 // These hacks exist to help transition code generation algorithms
 // without making huge noise in detailed test output.
 const bool Hack_generate_runtime_array_stride_early = true;
@@ -113,6 +117,7 @@ enum SPIRVSection {
   kExecutionModes,
 
   kDebug,
+  kNames,
   kAnnotations,
 
   kTypes,
@@ -3288,6 +3293,11 @@ void SPIRVProducerPassImpl::GenerateFuncBody(Function &F) {
     // Generate OpLabel for Basic Block.
     //
     VMap[&BB] = addSPIRVInst(spv::OpLabel);
+    if (NameBasicBlocks) {
+      SPIRVOperandVec Ops;
+      Ops << VMap[&BB] << BB.getName();
+      addSPIRVInst<kNames>(spv::OpName, Ops);
+    }
 
     // OpVariable instructions must come first.
     for (Instruction &I : BB) {
@@ -5919,6 +5929,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
       llvm_unreachable("Unsupported SPIRV instruction");
       break;
     }
+    case spv::OpName:
     case spv::OpLine:
     case spv::OpNoLine:
     case spv::OpUnreachable:

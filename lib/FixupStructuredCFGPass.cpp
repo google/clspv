@@ -24,8 +24,9 @@ using namespace llvm;
 PreservedAnalyses
 clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
   // Assumes CFG has been structurized.
-  breakConditionalHeader(F, FAM);
   isolateContinue(F, FAM);
+  // Run after isolateContinue since this can invalidate loop info.
+  breakConditionalHeader(F, FAM);
 
   PreservedAnalyses PA;
   return PA;
