@@ -547,6 +547,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
 
     pm.addPass(clspv::InlineEntryPointsPass());
+    pm.addPass(clspv::FunctionInternalizerPass());
     // This pass needs to be after every inlining to make sure we are capable of
     // removing every addrspacecast. It only needs to run if generic addrspace
     // is used.
@@ -932,15 +933,14 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
     };
     std::string str = get_fct_decl(F);
 
-    auto add_impl = [&found, &str, &stream_fct_decl,
-                     &stream_fct_list](std::string mangling, std::string AS) {
+    auto add_impl = [&found, &str, &stream_fct_decl, &stream_fct_list,
+                     &module](std::string mangling, std::string AS) {
       auto substr = [&str](size_t start, size_t end) {
         return str.substr(start, end - start);
       };
       if (!found) {
-        stream_fct_decl << "target datalayout = "
-                           "\"e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:"
-                           "128-v192:256-v256:256-v512:512-v1024:1024\"";
+        stream_fct_decl << "target datalayout = \""
+                        << module->getDataLayoutStr() << "\"";
       }
       std::string mangling_pattern = "PU3AS4";
       auto mangling_start = str.find(mangling_pattern);

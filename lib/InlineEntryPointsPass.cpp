@@ -40,16 +40,6 @@ PreservedAnalyses clspv::InlineEntryPointsPass::run(Module &M,
     changed &= InlineFunctions(M);
   }
 
-  SmallVector<Function *> ToBeRemoved;
-  for (auto &F : M) {
-    if (F.getNumUses() == 0 && F.getCallingConv() != CallingConv::SPIR_KERNEL) {
-      ToBeRemoved.push_back(&F);
-    }
-  }
-  for (auto F : ToBeRemoved) {
-    F->eraseFromParent();
-  }
-
   return PA;
 }
 
