@@ -545,6 +545,17 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     //   %3 = load float %2
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
+
+    pm.addPass(clspv::InlineEntryPointsPass());
+    pm.addPass(clspv::FunctionInternalizerPass());
+    // This pass needs to be after every inlining to make sure we are capable of
+    // removing every addrspacecast. It only needs to run if generic addrspace
+    // is used.
+    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
+      pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
+      pm.addPass(clspv::LowerAddrSpaceCastPass());
+    }
+
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
     pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
@@ -581,18 +592,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    pm.addPass(clspv::InlineEntryPointsPass());
     pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
     pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
     pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
-
-    // This pass needs to be after every inlining to make sure we are capable of
-    // removing every addrspacecast. It only needs to run if generic addrspace
-    // is used.
-    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
-      pm.addPass(clspv::LowerAddrSpaceCastPass());
-    }
 
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
@@ -930,11 +933,15 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
     };
     std::string str = get_fct_decl(F);
 
-    auto add_impl = [&found, &str, &stream_fct_decl,
-                     &stream_fct_list](std::string mangling, std::string AS) {
+    auto add_impl = [&found, &str, &stream_fct_decl, &stream_fct_list,
+                     &module](std::string mangling, std::string AS) {
       auto substr = [&str](size_t start, size_t end) {
         return str.substr(start, end - start);
       };
+      if (!found) {
+        stream_fct_decl << "target datalayout = \""
+                        << module->getDataLayoutStr() << "\"";
+      }
       std::string mangling_pattern = "PU3AS4";
       auto mangling_start = str.find(mangling_pattern);
       auto mangling_end = mangling_start + mangling_pattern.size();
@@ -943,13 +950,13 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
       auto AS_end = AS_start + AS_pattern.size();
       stream_fct_decl << substr(0, mangling_start) << mangling
                       << substr(mangling_end, AS_start) << AS
-                      << substr(AS_end, str.find('#') - 1) << "\n";
+                      << substr(AS_end, str.find('#', AS_end) - 1) << "\n";
 
       if (found) {
         stream_fct_list << ", ptr ";
       }
       stream_fct_list << substr(str.find('@'), mangling_start) << mangling
-                      << substr(mangling_end, str.find('('));
+                      << substr(mangling_end, str.find('(', mangling_end));
     };
 
     add_impl("P", ""); // private
