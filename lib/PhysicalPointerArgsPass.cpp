@@ -151,12 +151,14 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
 
     // Inline the function into the wrapper
     InlineFunctionInfo info;
-    if (InlineFunction(*CallInst, info).isSuccess())
-      FuncsToDelete.push_back(&F);
+    InlineFunction(*CallInst, info);
+    FuncsToDelete.push_back(&F);
   }
 
   for (auto *F : FuncsToDelete) {
-    F->eraseFromParent();
+    if (F->getNumUses() == 0) {
+      F->eraseFromParent();
+    }
   }
 
   return PA;
