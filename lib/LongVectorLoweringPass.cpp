@@ -233,6 +233,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kLog2:
   case clspv::Builtins::kMax:
   case clspv::Builtins::kMin:
+  case clspv::Builtins::kMix:
   case clspv::Builtins::kPopcount:
   case clspv::Builtins::kPow:
   case clspv::Builtins::kPowr:
