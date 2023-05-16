@@ -257,6 +257,60 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
   return call;
 }
 
+Value *clspv::LowerAddrSpaceCastPass::visitIntToPtrInst(IntToPtrInst &I) {
+  SmallVector<Instruction *> Uses;
+  for (auto &use : I.uses()) {
+    if (auto Iuse = dyn_cast<Instruction>(&use)) {
+      Uses.push_back(Iuse);
+    }
+  }
+  clspv::AddressSpace::Type AS = clspv::AddressSpace::Global;
+  bool found = false;
+  DenseSet<Value *> seen;
+  while (!Uses.empty()) {
+    auto *U = Uses.pop_back_val();
+    if (seen.contains(U)) {
+      continue;
+    }
+    seen.insert(U);
+    if (auto ASCast = dyn_cast<AddrSpaceCastInst>(U)) {
+      clspv::AddressSpace::Type ASCastAS =
+          (clspv::AddressSpace::Type)ASCast->getDestAddressSpace();
+      if (!found) {
+        AS = ASCastAS;
+        found = true;
+      } else if (AS != ASCastAS) {
+        llvm_unreachable(
+            "Result of IntToPtr is casted into 2 different address space");
+      }
+    } else {
+      for (auto &use : U->uses()) {
+        if (auto Iuse = dyn_cast<Instruction>(&use)) {
+          Uses.push_back(Iuse);
+        }
+      }
+    }
+  }
+  IRBuilder<> B(&I);
+  Value *V =
+      B.CreateIntToPtr(I.getOperand(0), PointerType::get(I.getContext(), AS));
+  registerReplacement(&I, V);
+
+  return V;
+}
+
+Value *clspv::LowerAddrSpaceCastPass::visitPtrToIntInst(PtrToIntInst &I) {
+  auto ptr = visit(I.getPointerOperand());
+
+  IRBuilder<> B(&I);
+  auto ptrToInt = B.CreatePtrToInt(ptr, I.getDestTy());
+
+  registerReplacement(&I, ptrToInt);
+  I.replaceAllUsesWith(ptrToInt);
+
+  return ptrToInt;
+}
+
 Value *clspv::LowerAddrSpaceCastPass::visitInstruction(Instruction &I) {
 #ifndef NDEBUG
   dbgs() << "Instruction not handled: " << I << '\n';
