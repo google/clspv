@@ -8,7 +8,7 @@ define spir_kernel void @test(ptr addrspace(1) %dst, ptr addrspace(1) %srcA, ptr
 entry:
   %0 = load <8 x float>, <8 x float> addrspace(1)* %srcA, align 32
   %1 = load <8 x float>, <8 x float> addrspace(1)* %srcB, align 32
-  %2 = load <8 x float>, <8 x float> addrspace(1)* %srcB, align 32
+  %2 = load <8 x float>, <8 x float> addrspace(1)* %srcC, align 32
   %call = call spir_func <8 x float> @_Z3mixDv8_fS_S_(<8 x float> %0, <8 x float> %1, <8 x float> %2)
   store <8 x float> %call, <8 x float> addrspace(1)* %dst, align 32
   ret void
