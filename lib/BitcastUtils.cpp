@@ -1103,7 +1103,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
         // Determine which struct element
         uint32_t index = 0;
         for (unsigned i = 0; CstVal > 0; i++) {
-          auto ele_size = SizeInBits(DataLayout, ty->getContainedType(i));
+          auto ele_size = SizeInBits(DataLayout, struct_ty->getElementType(i));
           auto size = ele_size / SmallerBitWidths;
           if (size > CstVal)
             break;
