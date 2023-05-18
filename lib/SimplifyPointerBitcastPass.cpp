@@ -480,7 +480,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
           continue;
         }
 
-        if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
+        if (isa<GetElementPtrInst>(source)) {
           if (auto *inst_gep = dyn_cast<GetElementPtrInst>(&I)) {
             auto VecSrcTy = dyn_cast<FixedVectorType>(source_ty);
             auto VecDstTy = dyn_cast<FixedVectorType>(dest_ty);
