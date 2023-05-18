@@ -344,7 +344,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededCasts(Module &M) const {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
           continue;
         }
 
@@ -385,7 +386,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
   const DataLayout &DL = M.getDataLayout();
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
-  
+
   struct ImplicitGEP {
     Instruction *inst;
     int steps;
@@ -399,7 +400,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
           continue;
         }
 
@@ -464,7 +466,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
   const DataLayout &DL = M.getDataLayout();
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
-  
+
   SmallVector<GetElementPtrInst *, 8> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -473,7 +475,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
 
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
           continue;
         }
 
@@ -522,11 +525,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
   return changed;
 }
 
-bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
+    Module &M) const {
   const DataLayout &DL = M.getDataLayout();
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
-  
+
   DenseSet<GetElementPtrInst *> seen;
   struct UpgradeInfo {
     GetElementPtrInst *gep;
@@ -542,7 +546,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(Module &M)
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
           continue;
         }
 

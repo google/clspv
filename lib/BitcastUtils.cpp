@@ -1088,8 +1088,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   // TODO: Is there a better way to adjust for this?
   if (DynVal == nullptr) {
     if (TyBitWidths.size() == 1 &&
-        (TyBitWidths[0] > CstVal * SmallerBitWidths) &&
-        SrcTy->isStructTy()) {
+        (TyBitWidths[0] > CstVal * SmallerBitWidths) && SrcTy->isStructTy()) {
       // Descending into the aggregate so 0 the first GEP index.
       if (startIdx == 0)
         Idxs.push_back(Builder.getInt32(0));
