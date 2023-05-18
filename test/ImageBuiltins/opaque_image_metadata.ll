@@ -6,23 +6,22 @@ target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:2
 target triple = "spir-unknown-unknown"
 
 %0 = type { { i32, i32 } }
-%ocl_image1d_ro.float.sampled = type opaque
 %struct.image_kernel_data = type { i32, i32, i32, i32, i32 }
 
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 @__push_constants = addrspace(9) global %0 zeroinitializer, !push_constants !0
 
-define dso_local spir_kernel void @sample_kernel(ptr addrspace(1) %input, ptr addrspace(1) nocapture writeonly align 4 %outData) !kernel_arg_addr_space !7 !kernel_arg_access_qual !8 !kernel_arg_type !9 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 !push_constants_image_channel !12 {
+define dso_local spir_kernel void @sample_kernel(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %input, ptr addrspace(1) nocapture writeonly align 4 %outData) !kernel_arg_addr_space !7 !kernel_arg_access_qual !8 !kernel_arg_type !9 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 !push_constants_image_channel !12 {
 entry:
-  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, %ocl_image1d_ro.float.sampled zeroinitializer)
+  %0 = call target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
   %1 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x %struct.image_kernel_data] } zeroinitializer)
-  %call = tail call spir_func i32 @_Z15get_image_width28ocl_image1d_ro.float.sampled(ptr addrspace(1) %0) #2
+  %call = tail call spir_func i32 @_Z15get_image_width28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %0) #2
   %2 = getelementptr { [0 x %struct.image_kernel_data] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0, i32 0
   store i32 %call, ptr addrspace(1) %2, align 4
-  %call1 = tail call spir_func i32 @_Z27get_image_channel_data_type28ocl_image1d_ro.float.sampled(ptr addrspace(1) %0) #2, !image_getter_push_constant_offset !6
+  %call1 = tail call spir_func i32 @_Z27get_image_channel_data_type28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %0) #2, !image_getter_push_constant_offset !6
   %3 = getelementptr { [0 x %struct.image_kernel_data] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0, i32 1
   store i32 %call1, ptr addrspace(1) %3, align 4
-  %call2 = tail call spir_func i32 @_Z23get_image_channel_order28ocl_image1d_ro.float.sampled(ptr addrspace(1) %0) #2, !image_getter_push_constant_offset !13
+  %call2 = tail call spir_func i32 @_Z23get_image_channel_order28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %0) #2, !image_getter_push_constant_offset !13
   %4 = getelementptr { [0 x %struct.image_kernel_data] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0, i32 2
   store i32 %call2, ptr addrspace(1) %4, align 4
   %5 = getelementptr { [0 x %struct.image_kernel_data] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0, i32 3
@@ -32,10 +31,10 @@ entry:
   ret void
 }
 
-declare spir_func i32 @_Z15get_image_width28ocl_image1d_ro.float.sampled(ptr addrspace(1))
-declare spir_func i32 @_Z27get_image_channel_data_type28ocl_image1d_ro.float.sampled(ptr addrspace(1))
-declare spir_func i32 @_Z23get_image_channel_order28ocl_image1d_ro.float.sampled(ptr addrspace(1))
-declare ptr addrspace(1) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, %ocl_image1d_ro.float.sampled)
+declare spir_func i32 @_Z15get_image_width28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
+declare spir_func i32 @_Z27get_image_channel_data_type28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
+declare spir_func i32 @_Z23get_image_channel_order28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
+declare target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
 declare ptr addrspace(1) @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, { [0 x %struct.image_kernel_data] })
 
 !llvm.module.flags = !{!1}

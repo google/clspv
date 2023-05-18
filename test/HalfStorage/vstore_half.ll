@@ -6,11 +6,11 @@ target triple = "spir-unknown-unknown"
 
 define void @foo(ptr addrspace(1) %a, float %b, i32 %c) {
 entry:
-  call spir_func void @_Z11vstore_halffjPU3AS1Dh(float %b, i32 %c, ptr addrspace(1) %a)
+  call spir_func void @_Z13vstore_half_1fjPU3AS1Dh(float %b, i32 %c, ptr addrspace(1) %a)
   ret void
 }
 
-declare spir_func void @_Z11vstore_halffjPU3AS1Dh(float, i32, ptr addrspace(1))
+declare spir_func void @_Z13vstore_half_1fjPU3AS1Dh(float, i32, ptr addrspace(1))
 
 ; CHECK: [[float2:%[^ ]+]] = insertelement <2 x float> poison, float %b, i32 0
 ; CHECK: [[half2:%[^ ]+]] = call i32 @_Z16spirv.pack.v2f16(<2 x float> [[float2]])

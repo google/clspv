@@ -19,6 +19,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 
+#include "clspv/AddressSpace.h"
+
 using namespace llvm;
 
 namespace BitcastUtils {
@@ -44,6 +46,8 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts);
 
+unsigned PointerOperandNum(Instruction *inst);
+
 SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
                                             Type *BaseTy = nullptr);
 
@@ -54,8 +58,11 @@ Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val);
 Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val);
 Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
 
+bool IsArrayLike(StructType *Ty);
+
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
-                               bool &PerfectMatch, const DataLayout &DL);
+                               bool &PerfectMatch, const DataLayout &DL,
+                               bool structAliasing = false);
 
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, uint64_t &CstVal,
@@ -64,7 +71,8 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
-                       size_t SmallerBitWidths, bool IsPrivate);
+                       size_t SmallerBitWidths,
+                       clspv::AddressSpace::Type AddrSpace);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H

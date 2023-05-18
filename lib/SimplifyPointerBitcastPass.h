@@ -26,7 +26,6 @@ struct SimplifyPointerBitcastPass
   void runOnInstFromCstExpr(llvm::Module &M) const;
   bool runOnTrivialBitcast(llvm::Module &M) const;
   bool runOnBitcastFromBitcast(llvm::Module &M) const;
-  bool runOnBitcastFromGEP(llvm::Module &M) const;
   bool runOnGEPFromGEP(llvm::Module &M) const;
   bool runOnGEPImplicitCasts(llvm::Module &M) const;
 };

@@ -1,11 +1,11 @@
 ; RUN: clspv-opt --passes=specialize-image-types %s -o %t
 ; RUN: FileCheck %s < %t
 
+; CHECK-DAG: declare spir_func void @_Z12write_imagef{{.*}}([[image:target\(\"spirv.Image\", float, 1, 0, 0, 0, 2, 0, 1, 0\)]], <2 x i32>, <4 x float>) [[ATTRS1:#[0-9]+]]
+; CHECK-DAG: declare spir_func i32 @_Z15get_image_width{{.*}}([[image]]) [[ATTRS2:#[0-9]+]]
 ; CHECK: define spir_kernel void @write_float
-; CHECK: call spir_func void @_Z12write_imagef20[[IMAGE:ocl_image2d_wo.float]]Dv2_iDv4_f(ptr addrspace(1) %image
-; CHECK: call spir_func i32 @_Z15get_image_width20[[IMAGE]](ptr addrspace(1) %image)
-; CHECK-DAG: declare spir_func void @_Z12write_imagef20[[IMAGE]]Dv2_iDv4_f(ptr addrspace(1), <2 x i32>, <4 x float>) [[ATTRS1:#[0-9]+]]
-; CHECK-DAG: declare spir_func i32 @_Z15get_image_width20[[IMAGE]](ptr addrspace(1)) [[ATTRS2:#[0-9]+]]
+; CHECK: call spir_func void @_Z12write_imagef{{.*}}([[image]] %image
+; CHECK: call spir_func i32 @_Z15get_image_width{{.*}}([[image]] %image)
 ; CHECK-DAG: attributes [[ATTRS1]] = { convergent nounwind }
 ; CHECK-DAG: attributes [[ATTRS2]] = { convergent nobuiltin nounwind memory(read) }
 
@@ -14,17 +14,17 @@ target triple = "spir-unknown-unknown"
 
 %opencl.image2d_wo_t = type opaque
 
-define spir_kernel void @write_float(ptr addrspace(1) %image, <2 x i32> %coord, ptr addrspace(1) nocapture %data) local_unnamed_addr #0 {
+define spir_kernel void @write_float(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) %image, <2 x i32> %coord, ptr addrspace(1) nocapture %data) local_unnamed_addr #0 {
 entry:
   %ld = load <4 x float>, ptr addrspace(1) %data, align 16
-  call spir_func void @_Z12write_imagef14ocl_image2d_woDv2_iDv4_f(ptr addrspace(1) %image, <2 x i32> %coord, <4 x float> %ld) #2
-  %h = tail call spir_func i32 @_Z15get_image_width14ocl_image2d_wo(ptr addrspace(1) %image)
+  call spir_func void @_Z12write_imagef14ocl_image2d_woDv2_iDv4_f(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) %image, <2 x i32> %coord, <4 x float> %ld) #2
+  %h = tail call spir_func i32 @_Z15get_image_width14ocl_image2d_wo(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) %image)
   ret void
 }
 
-declare spir_func void @_Z12write_imagef14ocl_image2d_woDv2_iDv4_f(ptr addrspace(1), <2 x i32>, <4 x float>) local_unnamed_addr #1
+declare spir_func void @_Z12write_imagef14ocl_image2d_woDv2_iDv4_f(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1), <2 x i32>, <4 x float>) local_unnamed_addr #1
 
-declare spir_func i32 @_Z15get_image_width14ocl_image2d_wo(ptr addrspace(1)) #2
+declare spir_func i32 @_Z15get_image_width14ocl_image2d_wo(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1)) #2
 
 attributes #0 = { convergent }
 attributes #1 = { convergent nounwind }

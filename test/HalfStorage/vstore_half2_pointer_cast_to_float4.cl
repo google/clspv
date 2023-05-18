@@ -12,6 +12,5 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float4* a,
 // CHECK-DAG:  [[_v2float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 2
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK:  [[_22:%[0-9a-zA-Z_]+]] = OpLoad [[_v2float]]
-// CHECK-NEXT:  [[_23:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_22]]
-// CHECK-NEXT:  OpStore {{.*}} [[_23]]
+// CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16
+// CHECK:  OpStore {{.*}} [[_23]]

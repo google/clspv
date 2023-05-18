@@ -78,6 +78,34 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
 
     NewFunc->setCallingConv(F.getCallingConv());
     NewFunc->copyAttributesFrom(&F);
+
+    // Remove all the pointer related parameter attributes for any parameter
+    // converted to an integer.
+    AttributeMask mask;
+    mask.addAttribute(Attribute::AttrKind::Alignment);
+    mask.addAttribute(Attribute::AttrKind::NoAlias);
+    mask.addAttribute(Attribute::AttrKind::ByVal);
+    mask.addAttribute(Attribute::AttrKind::ByRef);
+    mask.addAttribute(Attribute::AttrKind::StructRet);
+    mask.addAttribute(Attribute::AttrKind::ElementType);
+    mask.addAttribute(Attribute::AttrKind::InAlloca);
+    mask.addAttribute(Attribute::AttrKind::Preallocated);
+    mask.addAttribute(Attribute::AttrKind::NoCapture);
+    mask.addAttribute(Attribute::AttrKind::NoFree);
+    mask.addAttribute(Attribute::AttrKind::Nest);
+    mask.addAttribute(Attribute::AttrKind::NonNull);
+    mask.addAttribute(Attribute::AttrKind::Dereferenceable);
+    mask.addAttribute(Attribute::AttrKind::DereferenceableOrNull);
+    mask.addAttribute(Attribute::AttrKind::ReadOnly);
+    mask.addAttribute(Attribute::AttrKind::ReadNone);
+    mask.addAttribute(Attribute::AttrKind::WriteOnly);
+    for (unsigned i = 0; i < NewParamTypes.size(); i++) {
+      if (F.getArg(i)->getType()->isPointerTy() &&
+          !NewParamTypes[i]->isPointerTy()) {
+        NewFunc->removeParamAttrs(i, mask);
+      }
+    }
+
     F.setCallingConv(CallingConv::SPIR_FUNC);
     NewFunc->copyMetadata(&F, 0);
 
@@ -123,12 +151,14 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
 
     // Inline the function into the wrapper
     InlineFunctionInfo info;
-    if (InlineFunction(*CallInst, info).isSuccess())
-      FuncsToDelete.push_back(&F);
+    InlineFunction(*CallInst, info);
+    FuncsToDelete.push_back(&F);
   }
 
   for (auto *F : FuncsToDelete) {
-    F->eraseFromParent();
+    if (F->getNumUses() == 0) {
+      F->eraseFromParent();
+    }
   }
 
   return PA;

@@ -18,8 +18,8 @@ entry:
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertelement <2 x i32> [[in0]], i32 [[pack1]], i32 1
   ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr <2 x i32>, ptr addrspace(1) [[cast]], i32 0
   ; CHECK: store <2 x i32> [[in1]], ptr addrspace(1) [[gep]]
-  call spir_func void @_Z12vstore_half4Dv4_fjPU3AS1Dh(<4 x float> %ld_b, i32 0, ptr addrspace(1) %cast)
+  call spir_func void @_Z13vstore_half_4Dv4_fjPU3AS1Dh(<4 x float> %ld_b, i32 0, ptr addrspace(1) %cast)
   ret void
 }
 
-declare spir_func void @_Z12vstore_half4Dv4_fjPU3AS1Dh(<4 x float>, i32, ptr addrspace(1))
+declare spir_func void @_Z13vstore_half_4Dv4_fjPU3AS1Dh(<4 x float>, i32, ptr addrspace(1))

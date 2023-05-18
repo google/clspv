@@ -60,6 +60,8 @@ private:
   bool replaceStep(llvm::Function &F, bool is_smooth);
   bool replaceSignbit(llvm::Function &F, bool is_vec);
   bool replaceMul(llvm::Function &F, bool is_float, bool is_mad);
+  llvm::Value *createVloadHalf(llvm::Module &M, llvm::CallInst *CI,
+                               llvm::Value *index, llvm::Value *ptr);
   bool replaceVloadHalf(llvm::Function &F, const std::string &name,
                         int vec_size, bool aligned);
   bool replaceVloadHalf(llvm::Function &F);
@@ -71,6 +73,9 @@ private:
   bool replaceVloadHalf16(llvm::Function &F);
   bool replaceClspvVloadaHalf2(llvm::Function &F);
   bool replaceClspvVloadaHalf4(llvm::Function &F);
+  llvm::Value *createVstoreHalf(llvm::Module &M, llvm::CallInst *CI,
+                                llvm::Value *value, llvm::Value *index,
+                                llvm::Value *ptr);
   bool replaceVstoreHalf(llvm::Function &F, int vec_size, bool aligned);
   bool replaceVstoreHalf(llvm::Function &F);
   bool replaceVstoreHalf2(llvm::Function &F);
@@ -86,6 +91,8 @@ private:
   bool replaceAtomics(llvm::Function &F, llvm::AtomicRMWInst::BinOp Op);
   bool replaceAtomicLoad(llvm::Function &F);
   bool replaceGetFence(llvm::Function &F);
+  bool replaceAddressSpaceQualifiers(llvm::Function &F,
+                                     clspv::AddressSpace::Type addrspace);
   bool replaceExplicitAtomics(llvm::Function &F, spv::Op Op,
                               spv::MemorySemanticsMask semantics =
                                   spv::MemorySemanticsAcquireReleaseMask);

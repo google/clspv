@@ -1,5 +1,4 @@
-; TODO(#816): remove opaque pointers disable
-; RUN: clspv-opt %s -o %t.ll --passes=cluster-pod-kernel-args-pass -opaque-pointers=0
+; RUN: clspv-opt %s -o %t.ll --passes=cluster-pod-kernel-args-pass
 ; RUN: FileCheck %s < %t.ll
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
@@ -14,10 +13,10 @@ define spir_kernel void @i8x16([16 x i8] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @i8x16() !clspv.pod_args_impl [[pod_args_md:![0-9]+]] !kernel_arg_map [[map_md:![0-9]+]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [16 x i8] poison, i8 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <4 x i8>
@@ -69,10 +68,10 @@ define spir_kernel void @i16x8([8 x i16] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @i16x8() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i16
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i16] poison, i16 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x i16>
@@ -100,10 +99,10 @@ define spir_kernel void @i32x4([4 x i32] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @i32x4() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] poison, i32 [[ld0]], 0
   ; CHECK: [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] [[in0]], i32 [[ld1]], 1
   ; CHECK: [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [4 x i32] [[in1]], i32 [[ld2]], 2
@@ -115,10 +114,10 @@ define spir_kernel void @i64x2([2 x i64] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @i64x2() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld0]] to i64
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld1]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32
@@ -136,10 +135,10 @@ define spir_kernel void @halfx8([8 x half] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @halfx8() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to <2 x half>
   ; CHECK: [[ex:%[a-zA-Z0-9_.]+]] = extractelement <2 x half> [[cast]], i64 0
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x half] poison, half [[ex]], 0
@@ -171,10 +170,10 @@ define spir_kernel void @floatx4([4 x float] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @floatx4() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld0]] to float
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [4 x float] poison, float [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast i32 [[ld1]] to float
@@ -190,10 +189,10 @@ define spir_kernel void @doublex2([2 x double] %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @doublex2() !clspv.pod_args_impl [[pod_args_md]] !kernel_arg_map [[map_md]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 0), align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, i32 addrspace(9)* getelementptr inbounds (%0, %0 addrspace(9)* @__push_constants, i32 0, i32 0, i32 3), align 4
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
   ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = zext i32 [[ld0]] to i64
   ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = zext i32 [[ld1]] to i64
   ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[ex1]], 32

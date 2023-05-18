@@ -233,6 +233,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kLog2:
   case clspv::Builtins::kMax:
   case clspv::Builtins::kMin:
+  case clspv::Builtins::kMix:
   case clspv::Builtins::kPopcount:
   case clspv::Builtins::kPow:
   case clspv::Builtins::kPowr:
@@ -257,14 +258,6 @@ Function *getBIFScalarVersion(Function &Builtin) {
       Type *ScalarParamTy = nullptr;
       if (ParamTy->isPointerTy()) {
         ScalarParamTy = ParamTy;
-        // TODO(#816): remove after final transition.
-        if (!ParamTy->isOpaquePointerTy()) {
-          auto *PointeeTy = ParamTy->getNonOpaquePointerElementType();
-          assert(PointeeTy->isVectorTy() &&
-                 "Unsupported kind of pointer type.");
-          ScalarParamTy = PointerType::get(PointeeTy->getScalarType(),
-                                           ParamTy->getPointerAddressSpace());
-        }
       } else {
         assert((ParamTy->isVectorTy() || ParamTy->isFloatingPointTy() ||
                 ParamTy->isIntegerTy()) &&
@@ -549,33 +542,6 @@ FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
   return VectorTy;
 }
 
-Value *convertOpCopyMemoryOperation(CallInst &VectorCall,
-                                    ArrayRef<Value *> EquivalentArgs) {
-  auto *DstOperand = EquivalentArgs[1];
-  auto *SrcOperand = EquivalentArgs[2];
-  auto *DstTy = DstOperand->getType()->getPointerElementType();
-  assert(DstTy->isArrayTy());
-  ArrayType *Ty = dyn_cast<ArrayType>(DstTy);
-
-  IRBuilder<> B(&VectorCall);
-  Value *ReturnValue = nullptr;
-  unsigned int InitNumElements = Ty->getNumElements();
-  // for each element
-  for (unsigned eachElem = 0; eachElem < InitNumElements; eachElem++) {
-    auto *SrcGEP = B.CreateGEP(
-        SrcOperand->getType()->getScalarType()->getPointerElementType(),
-        SrcOperand, {B.getInt32(0), B.getInt32(eachElem)});
-    auto *Val =
-        B.CreateLoad(SrcGEP->getType()->getPointerElementType(), SrcGEP);
-    auto *DstGEP = B.CreateGEP(
-        DstOperand->getType()->getScalarType()->getPointerElementType(),
-        DstOperand, {B.getInt32(0), B.getInt32(eachElem)});
-    ReturnValue = B.CreateStore(Val, DstGEP);
-  }
-
-  return ReturnValue;
-}
-
 using ReduceOperationFactory =
     std::function<Value *(IRBuilder<> &, Value *, Value *)>;
 
@@ -685,8 +651,7 @@ Value *clspv::LongVectorLoweringPass::visit(Value *V) {
     return it->second;
   }
 
-  // TODO(#816): change to isPointerTy().
-  if (V->getType()->isOpaquePointerTy()) {
+  if (V->getType()->isPointerTy()) {
     auto where = GlobalVariableMap.find(dyn_cast_or_null<GlobalVariable>(V));
     if (where != GlobalVariableMap.end()) {
       return where->second;
@@ -770,10 +735,6 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
       auto *GEP = cast<GEPOperator>(CE);
       auto *EquivalentSourceTy = getEquivalentType(GEP->getSourceElementType());
       Constant *EquivalentPointer = cast<Constant>(GEP->getPointerOperand());
-      // TODO(#816): remove after final transition, but see also #874.
-      if (!GEP->getType()->isOpaquePointerTy()) {
-        EquivalentPointer = cast<Constant>(visit(GEP->getPointerOperand()));
-      }
       SmallVector<Value *, 4> Indices(GEP->idx_begin(), GEP->idx_end());
 
       auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
@@ -1106,16 +1067,7 @@ Value *
 clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
   auto *EquivalentPointer = I.getPointerOperand();
   auto *Type = getEquivalentType(I.getSourceElementType());
-  // TODO(#816): remove after final transition.
-  if (!I.getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    if (!EquivalentPointer)
-      return nullptr;
-
-    Type = EquivalentPointer->getType()
-               ->getScalarType()
-               ->getNonOpaquePointerElementType();
-  } else if (!Type) {
+  if (!Type) {
     return nullptr;
   } else {
     // For an opaque pointer check if the pass rewrote the pointer already and
@@ -1201,17 +1153,11 @@ Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
   Type *EquivalentTy = getEquivalentType(I.getType());
   assert(EquivalentTy && "type not lowered");
   auto *EquivalentPointer = I.getPointerOperand();
-  // TODO(#816): remove after final transition.
-  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    assert(EquivalentPointer && "pointer not lowered");
-  } else {
-    // For an opaque pointer check if the pass rewrote the pointer already and
-    // use the value if it did. This occurs with global variables
-    auto *tmp = visit(I.getPointerOperand());
-    if (tmp) {
-      EquivalentPointer = tmp;
-    }
+  // For an opaque pointer check if the pass rewrote the pointer already and
+  // use the value if it did. This occurs with global variables
+  auto *tmp = visit(I.getPointerOperand());
+  if (tmp) {
+    EquivalentPointer = tmp;
   }
 
   IRBuilder<> B(&I);
@@ -1222,28 +1168,7 @@ Value *clspv::LongVectorLoweringPass::visitLoadInst(LoadInst &I) {
 }
 
 Value *clspv::LongVectorLoweringPass::visitPHINode(PHINode &I) {
-  static std::map<PHINode *, Value *> PHIMap;
-  if (PHIMap.count(&I) > 0) {
-    return PHIMap[&I];
-  }
-
-  Type *EquivalentTy = getEquivalentType(I.getType());
-  assert(EquivalentTy && "type not lowered");
-  IRBuilder<> B(&I);
-  auto NbVal = I.getNumIncomingValues();
-  auto *V = B.CreatePHI(EquivalentTy, NbVal);
-  PHIMap[&I] = V;
-
-  for (unsigned EachVal = 0; EachVal < NbVal; EachVal++) {
-    auto BB = I.getIncomingBlock(0);
-    auto *NewVal = visitOrSelf(I.getIncomingValue(0));
-    V->addIncoming(NewVal, BB);
-    I.removeIncomingValue(BB, false);
-  }
-
-  registerReplacement(I, *V);
-  PHIMap.erase(&I);
-  return V;
+  llvm_unreachable("PHI should be handled elsewhere");
 }
 
 Value *clspv::LongVectorLoweringPass::visitSelectInst(SelectInst &I) {
@@ -1377,17 +1302,11 @@ Value *clspv::LongVectorLoweringPass::visitStoreInst(StoreInst &I) {
   Value *EquivalentValue = visit(I.getValueOperand());
   assert(EquivalentValue && "value not lowered");
   Value *EquivalentPointer = I.getPointerOperand();
-  // TODO(#816): remove after final transition.
-  if (!I.getPointerOperand()->getType()->isOpaquePointerTy()) {
-    EquivalentPointer = visit(I.getPointerOperand());
-    assert(EquivalentPointer && "pointer not lowered");
-  } else {
-    // For an opaque pointer check if the pass rewrote the pointer already and
-    // use the value if it did. This occurs with global variables
-    auto *tmp = visit(I.getPointerOperand());
-    if (tmp) {
-      EquivalentPointer = tmp;
-    }
+  // For an opaque pointer check if the pass rewrote the pointer already and
+  // use the value if it did. This occurs with global variables
+  auto *tmp = visit(I.getPointerOperand());
+  if (tmp) {
+    EquivalentPointer = tmp;
   }
 
   IRBuilder<> B(&I);
@@ -1469,7 +1388,7 @@ Type *clspv::LongVectorLoweringPass::getEquivalentType(Type *Ty) {
 
 Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
   if (Ty->isIntegerTy() || Ty->isFloatingPointTy() || Ty->isVoidTy() ||
-      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isOpaquePointerTy() ||
+      Ty->isLabelTy() || Ty->isMetadataTy() || Ty->isPointerTy() ||
       Ty->isTargetExtTy()) {
     // No lowering required.
     return nullptr;
@@ -1492,16 +1411,6 @@ Type *clspv::LongVectorLoweringPass::getEquivalentTypeImpl(Type *Ty) {
              "Unsupported scalar type");
 
       return ArrayType::get(ScalarTy, VecWidth);
-    }
-
-    return nullptr;
-  }
-
-  // TODO(#816): remove after final transition.
-  if (Ty->isPointerTy()) {
-    if (auto *ElementTy =
-            getEquivalentType(Ty->getNonOpaquePointerElementType())) {
-      return ElementTy->getPointerTo(Ty->getPointerAddressSpace());
     }
 
     return nullptr;
@@ -1645,9 +1554,37 @@ bool clspv::LongVectorLoweringPass::runOnFunction(Function &F) {
   }
 
   bool Modified = (FunctionToVisit != &F);
+  // First, replace PHINodes that need modified with placeholders.
+  for (Instruction &I : instructions(FunctionToVisit)) {
+    if (auto *phi = dyn_cast<PHINode>(&I)) {
+      auto *equivalent_ty = getEquivalentType(phi->getType());
+      if (equivalent_ty && equivalent_ty != phi->getType()) {
+        IRBuilder<> b(phi);
+        auto *new_phi = b.CreatePHI(equivalent_ty, phi->getNumIncomingValues());
+        registerReplacement(*phi, *new_phi);
+        Modified = true;
+      }
+    }
+  }
   for (Instruction &I : instructions(FunctionToVisit)) {
     // Use the Value overload of visit to ensure cache is used.
     Modified |= (visit(static_cast<Value *>(&I)) != nullptr);
+  }
+  // Finally, update placeholder PHINodes with correct incoming values.
+  for (Instruction &I : instructions(FunctionToVisit)) {
+    if (auto *phi = dyn_cast<PHINode>(&I)) {
+      auto *equivalent_ty = getEquivalentType(phi->getType());
+      if (equivalent_ty && equivalent_ty != phi->getType()) {
+        auto *replacement = cast<PHINode>(ValueMap[phi]);
+        const auto num_incoming = phi->getNumIncomingValues();
+        for (unsigned i = 0; i < num_incoming; ++i) {
+          auto *block = phi->getIncomingBlock(0);
+          auto *val = visitOrSelf(phi->getIncomingValue(0));
+          replacement->addIncoming(val, block);
+          phi->removeIncomingValue(block, false);
+        }
+      }
+    }
   }
 
   cleanDeadInstructions();
@@ -1850,8 +1787,8 @@ Value *clspv::LongVectorLoweringPass::convertSpirvOpBuiltinCall(
       return convertOpAnyOrAllOperation(VectorCall, EquivalentArgs,
                                         ReduceFactory);
     }
-    case 63: // OpCopyMemory
-      return convertOpCopyMemoryOperation(VectorCall, EquivalentArgs);
+    default:
+      break;
     }
   }
   return convertBuiltinCall(VectorCall, EquivalentReturnTy, EquivalentArgs);

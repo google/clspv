@@ -13,8 +13,7 @@ void read_local(__global int* out, __local int* tmp, unsigned int id) {
   out[id] = tmp[id];
 }
 
-__kernel void local_memory(__global int* in, __global int* out) {
-  __local int temp[32];
+__kernel void local_memory(__global int* in, __global int* out, __local int *temp) {
   unsigned int gid = get_global_id(0);
   write_local(in, temp, gid);
   barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);

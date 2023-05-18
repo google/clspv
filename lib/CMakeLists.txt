@@ -55,6 +55,8 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/LongVectorLoweringPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SetImageChannelMetadataPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/ThreeElementVectorLoweringPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/LowerAddrSpaceCastPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/LowerPrivatePointerPHIPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/MultiVersionUBOFunctionsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NativeMathPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/NormalizeGlobalVariable.cpp

@@ -22,12 +22,8 @@ The following subjects are covered:
 
 Jan 2023:
 
-Transparent pointers are deprecated. Usage of opaque pointers in LLVM are
-enabled by default. Soon the option will be removed. If you encounter
-regressions in behaviour, please open an issue.
-
-You may use -enable-opaque-pointers=0 for now, but that option will be removed
-when LLVM removes support for transparent pointers.
+Transparent pointers are not supported anymore. clspv only supports opaque
+pointers. If you encounter regressions in behaviour, please open an issue.
 
 Older:
 
@@ -752,10 +748,7 @@ The OpenCL 2.0 atomic functions are supported with the following exceptions:
 
 #### Conversions
 
-The `convert_<type>_rte()`, `convert_<type>_rtz()`, `convert_<type>_rtp()`,
-`convert_<type>_rtn()`, `convert_<type>_sat()`, `convert_<type>_sat_rte()`,
-`convert_<type>_sat_rtz()`, `convert_<type>_sat_rtp()`, and
-`convert_<type>_sat_rtn()` built-in functions **must not** be used.
+All supported.
 
 #### Math Functions
 
@@ -771,41 +764,15 @@ All supported.
 
 #### Vector Data Load and Store Functions
 
-The `vload<size>()`, `vstore<size>()`, `vstore_half_rtp()`, `vstore_half_rtn()`,
-`vstore_half<size>_rtp()`, `vstore_half<size>_rtn()`, `vstorea_half<size>_rtp()`
-, and `vstorea_half<size>_rtn()` built-in functions **must not** be used.
-
-The `vload_half()`, `vload_half<size>()`, `vstore_half()`, `vstore_half_rte()`,
-`vstore_half_rtz()`, `vstore_half<size>()`, `vstore_half<size>_rte()`,
-`vstore_half<size>_rtz()`, and `vloada_half<size>()`
-built-in functions
-are only allowed to use the `global` and `constant` address spaces.
+All supported.
 
 **Note**: When 16-bit storage support is not assumed, both `vload_half` and
 `vstore_half` assume the pointers are aligned to 4 bytes, not 2 bytes.
 See [issue 6](https://github.com/google/clspv/issues/6).
 
-Builtin functions
-`vstorea_half2()`,
-`vstorea_half4()`,
-`vstorea_half2_rtz()`,
-`vstorea_half4_rtz()`,
-`vstorea_half2_rte()`,
- and
-`vstorea_half4_rte()` built-in functions
-have implementations for global, local, and private
-address spaces.
-
-The `vstore_half_rte()`, `vstore_half_rtz()`, `vstore_half<size>_rte()`,
-`vstore_half<size>_rtz()`, `vstorea_half<size>_rte()`, and
-`vstorea_half<size>_rtz()` built-in functions are not guaranteed to round the
-result correctly if the destination address was not declared as a `half*` on the
-kernel entry point.
-
 #### Miscellaneous Vector Functions
 
-The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions **must not**
-be used.
+The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions are supported.
 
 #### Printf
 

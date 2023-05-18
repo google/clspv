@@ -36,31 +36,8 @@ using namespace llvm;
 namespace {
 
 // Maps an LLVM type for a kernel argument to an argument kind.
-clspv::ArgKind GetArgKindForType(Type *type, Type *data_type) {
-  if (auto ptrTy = dyn_cast<PointerType>(type)) {
-    // TODO: #816 remove after final transition
-    Type *inner_type = ptrTy->isOpaquePointerTy()
-                           ? data_type
-                           : ptrTy->getNonOpaquePointerElementType();
-    // TODO(#1036): remove opaque struct support
-    if (clspv::IsSamplerType(inner_type)) {
-      return clspv::ArgKind::Sampler;
-    }
-    if (clspv::IsImageType(inner_type)) {
-      assert(isa<StructType>(inner_type));
-      // OpenCL 1.2 only has read-only and write-only images.
-      // OpenCL 2.0 (and later) also has read-write images.
-      // Read-only images are translated to sampled images, while write-only
-      // and read-write images are translated as storage images.
-      //
-      // Can't rely on IsSampledImageType here because it requires specialization.
-      auto name = cast<StructType>(inner_type)->getName();
-      if (name.contains("_ro")) {
-        return clspv::ArgKind::SampledImage;
-      } else {
-        return clspv::ArgKind::StorageImage;
-      }
-    }
+clspv::ArgKind GetArgKindForType(Type *type) {
+  if (isa<PointerType>(type)) {
     switch (type->getPointerAddressSpace()) {
     // Pointer to constant and pointer to global are both in
     // storage buffers.
@@ -142,9 +119,9 @@ ArgKind GetArgKindForPointerPodArgs(Function &F) {
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }
 
-ArgKind GetArgKind(Argument &Arg, Type *data_type) {
+ArgKind GetArgKind(Argument &Arg) {
   if (isa<TargetExtType>(Arg.getType())) {
-    return GetArgKindForType(Arg.getType(), data_type);
+    return GetArgKindForType(Arg.getType());
   } else if (!isa<PointerType>(Arg.getType()) &&
       Arg.getParent()->getCallingConv() == CallingConv::SPIR_KERNEL) {
 
@@ -159,7 +136,7 @@ ArgKind GetArgKind(Argument &Arg, Type *data_type) {
     return GetArgKindForPodArgs(*Arg.getParent());
   }
 
-  return GetArgKindForType(Arg.getType(), data_type);
+  return GetArgKindForType(Arg.getType());
 }
 
 const char *GetArgKindName(ArgKind kind) {

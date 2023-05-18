@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv --use-native-builtins=half_log10
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

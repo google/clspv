@@ -15,7 +15,7 @@ target triple = "spir-unknown-unknown"
 
 define dso_local spir_kernel void @main_function(ptr addrspace(1) align 8 %dst_tensor_buffer, ptr addrspace(1) align 8 %src_tensor_buffer, <4 x i32> %shared_int4_0, <4 x i32> %shared_int4_1, <4 x float> %shared_float4_0) !kernel_arg_addr_space !6 !kernel_arg_access_qual !7 !kernel_arg_type !8 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 {
 entry:
-  %0 = load i32, ptr addrspace(9) getelementptr inbounds (<3 x i32>, ptr addrspace(9) @__push_constants, i32 0, i32 2), align 4
+  %0 = load i32, ptr addrspace(9) getelementptr inbounds ({ <3 x i32> }, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
   ret void
 }
 

@@ -55,6 +55,7 @@
 #include "clspv/opencl_builtins_header.h"
 
 #include "Builtins.h"
+#include "Constants.h"
 #include "FrontendPlugin.h"
 #include "Passes.h"
 #include "Types.h"
@@ -63,6 +64,7 @@
 #include <fstream>
 #include <iostream>
 #include <numeric>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -349,8 +351,7 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().OptimizationLevel = 0;
 
   if (clspv::Option::DebugInfo()) {
-    instance.getCodeGenOpts().setDebugInfo(
-        clang::codegenoptions::FullDebugInfo);
+    instance.getCodeGenOpts().setDebugInfo(llvm::codegenoptions::FullDebugInfo);
   }
 
   // Select the correct SPIR triple
@@ -544,6 +545,17 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     //   %3 = load float %2
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
+
+    pm.addPass(clspv::InlineEntryPointsPass());
+    pm.addPass(clspv::FunctionInternalizerPass());
+    // This pass needs to be after every inlining to make sure we are capable of
+    // removing every addrspacecast. It only needs to run if generic addrspace
+    // is used.
+    if (clspv::Option::LanguageUsesGenericAddressSpace()) {
+      pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
+      pm.addPass(clspv::LowerAddrSpaceCastPass());
+    }
+
     // ReplaceOpenCLBuiltinPass can generate vec8 and vec16 elements. It needs
     // to be before the potential LongVectorLoweringPass pass.
     pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
@@ -580,7 +592,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
-    pm.addPass(clspv::InlineEntryPointsPass());
     pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
     pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
@@ -690,6 +701,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
     }
 
+    // This pass needs to run before an interation of
+    // SimplifyPointerBitcastPass/ReplacePointerBitcastPass.
+    pm.addPass(clspv::LowerPrivatePointerPHIPass());
+
     // Last minute pointer simplification. With opaque pointers, we can often
     // end up in a situation where LLVM has simplified GEPs by removing zero
     // indices where an equivalent address would be computed. These lead to
@@ -707,6 +722,13 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass depends on the inlining of the image metadata getter from
     // InlineFuncWithImageMetadataGetterPass
     pm.addPass(clspv::SetImageChannelMetadataPass());
+
+    // This is needed to remove long vectors created by SROA passes. Especially
+    // with vstore_half, which tends to always recreate long vectors after the
+    // first iteration of the longvectorlowering pass
+    if (clspv::Option::LongVectorSupport()) {
+      pm.addPass(clspv::LongVectorLoweringPass());
+    }
 
     pm.addPass(
         clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
@@ -760,10 +782,8 @@ int ParseOptions(const int argc, const char *const argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   if (!clspv::Option::OpaquePointers()) {
-    llvm::errs() << "warning: transparent pointer support is deprecated\n";
-  }
-  if (clspv::Option::KeepUnusedArguments()) {
-    llvm::errs() << "warning: -keep-unused-arguments has been removed\n";
+    llvm::errs() << "transparent pointer is not supported anymore\n";
+    return -1;
   }
 
   if (clspv::Option::LanguageUsesGenericAddressSpace() &&
@@ -891,6 +911,71 @@ int GenerateIRFile(std::unique_ptr<llvm::Module> &module,
   return WriteOutput(module_string, output_binary);
 }
 
+bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
+                                                std::string &lib_str) {
+  std::string fct_list;
+  llvm::raw_string_ostream stream_fct_list(fct_list);
+  llvm::raw_string_ostream stream_fct_decl(lib_str);
+  bool found = false;
+  for (auto &F : module->functions()) {
+    auto name = F.getName();
+    if (!name.contains("PU3AS4") ||
+        !clspv::Builtins::BuiltinWithGenericPointer(name)) {
+      continue;
+    }
+
+    auto get_fct_decl = [](llvm::Function &F) {
+      std::string str;
+      llvm::raw_string_ostream stream(str);
+      F.print(stream);
+      stream.flush();
+      return str;
+    };
+    std::string str = get_fct_decl(F);
+
+    auto add_impl = [&found, &str, &stream_fct_decl, &stream_fct_list,
+                     &module](std::string mangling, std::string AS) {
+      auto substr = [&str](size_t start, size_t end) {
+        return str.substr(start, end - start);
+      };
+      if (!found) {
+        stream_fct_decl << "target datalayout = \""
+                        << module->getDataLayoutStr() << "\"";
+      }
+      std::string mangling_pattern = "PU3AS4";
+      auto mangling_start = str.find(mangling_pattern);
+      auto mangling_end = mangling_start + mangling_pattern.size();
+      std::string AS_pattern = " addrspace(4)";
+      auto AS_start = str.find(AS_pattern);
+      auto AS_end = AS_start + AS_pattern.size();
+      stream_fct_decl << substr(0, mangling_start) << mangling
+                      << substr(mangling_end, AS_start) << AS
+                      << substr(AS_end, str.find('#', AS_end) - 1) << "\n";
+
+      if (found) {
+        stream_fct_list << ", ptr ";
+      }
+      stream_fct_list << substr(str.find('@'), mangling_start) << mangling
+                      << substr(mangling_end, str.find('(', mangling_end));
+    };
+
+    add_impl("P", ""); // private
+    found = true;
+    add_impl("PU3AS1", " addrspace(1)"); // local
+    add_impl("PU3AS3", " addrspace(3)"); // global
+  }
+  if (found) {
+    stream_fct_list.flush();
+    stream_fct_decl << "@" << clspv::CLSPVBuiltinsUsed()
+                    << " = appending global ["
+                    << std::count(fct_list.begin(), fct_list.end(), '@')
+                    << " x ptr] [ptr " << fct_list
+                    << "], section \"llvm.metadata\"";
+    stream_fct_decl.flush();
+  }
+  return found;
+}
+
 bool LinkBuiltinLibrary(llvm::Module *module) {
   auto library_data = clspv::PointersAre64Bit(*module)
                           ? clspv64_builtin_library_data
@@ -911,12 +996,24 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
     return false;
   }
 
-  // TODO: when clang generates builtins using the generic address space,
-  // different builtins are used for pointer-based builtins. Need to do some
-  // work to ensure they are kept around.
-  // Affects: modf, remquo, lgamma_r, frexp
-
   llvm::Linker L(*module);
+
+  // When clang generates builtins using the generic address space, different
+  // builtins are used for pointer-based builtins. Need to do some work to
+  // ensure they are kept around.
+  // Affects: modf, remquo, lgamma_r, frexp, fract
+  std::string additional_library;
+  if (GetEquivalentBuiltinsWithoutGenericPointer(module, additional_library)) {
+    auto add_buffer = llvm::MemoryBuffer::getMemBuffer(additional_library);
+    auto add_library = llvm::parseIR(*add_buffer, Err, module->getContext());
+    if (add_library == nullptr) {
+      fprintf(stderr, "%s\n", additional_library.c_str());
+      Err.print("internal_additional_library:", llvm::errs());
+      return false;
+    }
+    L.linkInModule(std::move(add_library), 0);
+  }
+
   L.linkInModule(std::move(library), 0);
 
   return true;

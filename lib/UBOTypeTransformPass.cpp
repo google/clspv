@@ -100,16 +100,6 @@ Type *clspv::UBOTypeTransformPass::MapType(Type *type, Module &M,
   // Rebuild the types. Most types do not need handled here.
   Type *remapped = type;
   switch (type->getTypeID()) {
-  case Type::PointerTyID: {
-    PointerType *pointer = cast<PointerType>(type);
-    // TODO: #816 remove after final switch.
-    if (!pointer->isOpaquePointerTy()) {
-      Type *pointee =
-          MapType(pointer->getNonOpaquePointerElementType(), M, rewrite);
-      remapped = PointerType::get(pointee, pointer->getAddressSpace());
-    }
-    break;
-  }
   case Type::StructTyID:
     remapped = MapStructType(cast<StructType>(type), M, rewrite);
     break;

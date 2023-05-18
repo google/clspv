@@ -120,11 +120,8 @@ bool clspv::UndoInstCombinePass::UndoWideVectorExtractCast(Instruction *inst) {
 
   auto src_ty = src->getType();
   VectorType *src_vec_ty = [src_ty, vec_ty] {
-    if (src_ty->isOpaquePointerTy()) {
+    if (src_ty->isPointerTy()) {
       return InferTypeForOpaqueLoad(vec_ty);
-      // TODO: #816 remove after final switch.
-    } else if (src_ty->isPointerTy()) {
-      return dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
     } else {
       return dyn_cast<VectorType>(src_ty);
     }
@@ -196,11 +193,8 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
 
   auto src_ty = src->getType();
   VectorType *src_vec_ty = [src_ty, in1_vec_ty] {
-    if (src_ty->isOpaquePointerTy()) {
+    if (src_ty->isPointerTy()) {
       return InferTypeForOpaqueLoad(in1_vec_ty);
-      // TODO: #816 remove after final switch.
-    } else if (src_ty->isPointerTy()) {
-      return dyn_cast<VectorType>(src_ty->getNonOpaquePointerElementType());
     } else {
       return dyn_cast<VectorType>(src_ty);
     }
@@ -222,7 +216,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   for (auto i : mask) {
     // Instcombine should not have generated odd indices, so don't handle them
     // for now.
-    if ((i != UndefMaskElem) && (i & 0x1))
+    if ((i != PoisonMaskElem) && (i & 0x1))
       return false;
   }
 
@@ -238,7 +232,7 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   // TODO could replace with a shuffle and vectorized trunc
   int i = 0;
   for (auto idx : mask) {
-    if (idx == UndefMaskElem)
+    if (idx == PoisonMaskElem)
       continue;
 
     uint64_t new_idx = idx / ratio;

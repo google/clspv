@@ -34,6 +34,8 @@
 #include "InlineFuncWithSingleCallSitePass.h"
 #include "LogicalPointerToIntPass.h"
 #include "LongVectorLoweringPass.h"
+#include "LowerAddrSpaceCastPass.h"
+#include "LowerPrivatePointerPHIPass.h"
 #include "MultiVersionUBOFunctionsPass.h"
 #include "NativeMathPass.h"
 #include "OpenCLInlinerPass.h"

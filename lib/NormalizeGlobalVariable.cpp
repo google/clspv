@@ -175,11 +175,7 @@ GlobalVariable *NormalizeVariable(GlobalVariable *GV, User *user, Type *to_type)
       new_initializer, "", nullptr, GV->getThreadLocalMode(),
       GV->getType()->getPointerAddressSpace(), GV->isExternallyInitialized());
   new_gv->takeName(GV);
-  if (user->getType()->isOpaquePointerTy()) {
-    user->replaceUsesOfWith(GV, new_gv);
-  } else {
-    user->replaceAllUsesWith(new_gv);
-  }
+  user->replaceUsesOfWith(GV, new_gv);
 
   return new_gv;
 }
@@ -187,32 +183,17 @@ GlobalVariable *NormalizeVariable(GlobalVariable *GV, User *user, Type *to_type)
 // Normalize the users of |GV|.
 void NormalizeVariableUsers(GlobalVariable *GV) {
   for (auto *user : GV->users()) {
-    Type *to_type = nullptr;
-    if (user->getType()->isOpaquePointerTy()) {
-      auto *gep = dyn_cast<GEPOperator>(user);
-      if (!gep)
-        continue;
+    auto *gep = dyn_cast<GEPOperator>(user);
+    if (!gep)
+      continue;
 
-      Type *gv_contained_ty = SoleContainedType(GV->getValueType());
-      if (!gv_contained_ty)
-        continue;
+    Type *gv_contained_ty = SoleContainedType(GV->getValueType());
+    if (!gv_contained_ty)
+      continue;
 
-      to_type = gep->getSourceElementType();
-      if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
-        continue;
-    } else {
-      auto *bitcast = dyn_cast<ConstantExpr>(user);
-      if (!bitcast || bitcast->getOpcode() != Instruction::BitCast)
-        continue;
-
-      Type *gv_contained_ty = SoleContainedType(GV->getValueType());
-      if (!gv_contained_ty)
-        continue;
-
-      to_type = bitcast->getType()->getNonOpaquePointerElementType();
-      if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
-        continue;
-    }
+    Type *to_type = gep->getSourceElementType();
+    if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
+      continue;
 
     if (to_type)
       NormalizeVariable(GV, user, to_type);

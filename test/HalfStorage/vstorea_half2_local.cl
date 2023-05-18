@@ -22,22 +22,21 @@ kernel void foo(local uint* A, float2 val, uint n) {
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
 // CHECK-DAG: [[_uint_2:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 2
-// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2float]]
-// CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
-// CHECK-64: [[_36_ulong:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]] [[_36]]
+
+// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_34]]
-// CHECK-64: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_36_ulong]]
-// CHECK-32: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_36]]
+// CHECK-64: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] {{.*}}
+// CHECK-32: [[_38:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] {{.*}}
 // CHECK: OpStore [[_38]] [[_37]]
-// CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_36]] [[_uint_1]]
-// CHECK-64: [[_39_ulong:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]] [[_39]]
+
+// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_34]]
-// CHECK-64: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_39_ulong]]
-// CHECK-32: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_39]]
+// CHECK-64: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]]
+// CHECK-32: [[_41:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]]
 // CHECK: OpStore [[_41]] [[_40]]
-// CHECK: [[_42:%[0-9a-zA-Z_]+]] = OpIAdd [[_uint]] [[_36]] [[_uint_2]]
-// CHECK-64: [[_42_ulong:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]] [[_42]]
+
+// CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpCompositeConstruct [[_v2float]]
 // CHECK: [[_43:%[0-9a-zA-Z_]+]] = OpExtInst [[_uint]] {{.*}} PackHalf2x16 [[_34]]
-// CHECK-64: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_42_ulong]]
-// CHECK-32: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_42]]
+// CHECK-64: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]]
+// CHECK-32: [[_44:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]]
 // CHECK: OpStore [[_44]] [[_43]]

@@ -137,7 +137,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
                                    clspv::Option::StorageClass::kPushConstant);
   // Align to 4 to use i32s.
   const uint64_t pod_struct_size =
-      alignTo(DL.getTypeStoreSize(pod_struct_ty).getKnownMinSize(), 4);
+      alignTo(DL.getTypeStoreSize(pod_struct_ty).getKnownMinValue(), 4);
   const bool fits_push_constant =
       pod_struct_size <= clspv::Option::MaxPushConstantsSize();
   const bool satisfies_push_constant =
@@ -166,7 +166,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   // fallback to fit arguments depending on the performance cost.
   const auto global_pc_type = clspv::GlobalPushConstantsType(M);
   const auto global_pc_size =
-      DL.getTypeStoreSize(global_pc_type).getKnownMinSize();
+      DL.getTypeStoreSize(global_pc_type).getKnownMinValue();
   const auto global_size = global_pc_size + pod_struct_size;
   const auto fits_global_size =
       global_size <= clspv::Option::MaxPushConstantsSize();

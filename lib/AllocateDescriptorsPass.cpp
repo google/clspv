@@ -96,26 +96,10 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
   // Generate the function type for clspv::LiteralSamplerFunction()
   IRBuilder<> Builder(M.getContext());
   Type *sampler_ty = nullptr;
-  Type *sampler_data_ty = nullptr;;
-  // TODO(#1036): remove opaque struct support
-  if (init_fn->getReturnType()->isTargetExtTy()) {
-    sampler_ty = init_fn->getReturnType();
-    sampler_data_ty = init_fn->getReturnType();
-  } else {
-    sampler_data_ty =
-        StructType::getTypeByName(M.getContext(), "opencl.sampler_t");
-    if (!sampler_data_ty) {
-      sampler_data_ty = StructType::create(M.getContext(), "opencl.sampler_t");
-    }
-    // TODO: #816 remove after final switch.
-    if (init_fn->getType()->isOpaquePointerTy()) {
-      sampler_ty = PointerType::get(M.getContext(), clspv::AddressSpace::Constant);
-    } else {
-      sampler_ty = sampler_data_ty->getPointerTo(clspv::AddressSpace::Constant);
-    }
-  }
+  sampler_ty = init_fn->getReturnType();
   Type *i32 = Builder.getInt32Ty();
-  FunctionType *fn_ty = FunctionType::get(sampler_ty, {i32, i32, i32, sampler_data_ty}, false);
+  FunctionType *fn_ty =
+      FunctionType::get(sampler_ty, {i32, i32, i32, sampler_ty}, false);
 
   auto var_fn = M.getOrInsertFunction(clspv::LiteralSamplerFunction(), fn_ty);
 
@@ -154,16 +138,13 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
 
         SmallVector<Value *, 3> args = {
             Builder.getInt32(descriptor_set), Builder.getInt32(binding),
-            Builder.getInt32(third_param),
-            Constant::getNullValue(sampler_data_ty)};
+            Builder.getInt32(third_param), Constant::getNullValue(sampler_ty)};
         if (ShowDescriptors) {
           outs() << "  translate literal sampler " << *const_val << " to ("
                  << descriptor_set << "," << binding << ")\n";
         }
         auto *new_call =
             CallInst::Create(var_fn, args, "", dyn_cast<Instruction>(call));
-        assert(clspv::InferType(new_call, M.getContext(), &type_cache_) ==
-               sampler_data_ty);
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();
       }
@@ -272,14 +253,14 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       assert(inferred_ty && "failed to infer argument type");
       Type *argTy = Arg.getType();
-      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+      const auto arg_kind = clspv::GetArgKind(Arg);
 
       int separation_token = 0;
       switch (arg_kind) {
@@ -377,14 +358,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         if (Arg.use_empty()) {
           continue;
         }
-        auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
-        assert(inferred_ty && "failed to infer argument type");
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[arg_index].index >= 0) {
-          if (clspv::GetArgKind(Arg, inferred_ty) !=
-                  clspv::ArgKind::PodPushConstant &&
-              clspv::GetArgKind(Arg, inferred_ty) !=
-                  clspv::ArgKind::PointerPushConstant) {
+          if (clspv::GetArgKind(Arg) != clspv::ArgKind::PodPushConstant &&
+              clspv::GetArgKind(Arg) != clspv::ArgKind::PointerPushConstant) {
             // Don't assign a descriptor set to push constants.
             set_and_binding_list.back().first = set;
           }
@@ -406,20 +383,20 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
       auto &set_and_binding_list = set_and_binding_pairs_for_function[f_ptr];
       for (auto &info : discriminants_used_by_function[f_ptr]) {
-        while (f_ptr->getArg(arg_index)->use_empty()) {
-          arg_index++;
+        if (!clspv::Option::KernelArgInfo()) {
+          while (f_ptr->getArg(arg_index)->use_empty()) {
+            arg_index++;
+          }
         }
         set_and_binding_list.emplace_back(kUnallocated, kUnallocated);
         if (discriminants_list[discriminant_index].index >= 0) {
           // This argument will map to a resource.
           unsigned set = kUnallocated;
           unsigned binding = kUnallocated;
-          auto *inferred_ty = clspv::InferType(&*f_ptr->getArg(arg_index), M.getContext(), &type_cache_);
-          assert(inferred_ty && "failed to infer argument type");
           const bool is_push_constant_arg =
-              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
                   clspv::ArgKind::PodPushConstant ||
-              clspv::GetArgKind(*f_ptr->getArg(arg_index), inferred_ty) ==
+              clspv::GetArgKind(*f_ptr->getArg(arg_index)) ==
                   clspv::ArgKind::PointerPushConstant;
           if (always_single_kernel_descriptor ||
               functions_used_by_discriminant[info.index].size() ==
@@ -483,7 +460,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     int discriminant_index = 0;
     int arg_index = 0;
     for (Argument &Arg : f_ptr->args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
@@ -513,7 +490,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
                  << " type " << *argTy << "\n";
         }
 
-        const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+        const auto arg_kind = clspv::GetArgKind(Arg);
 
         Type *resource_type = nullptr;
         unsigned addr_space = kUnallocated;
@@ -626,14 +603,11 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
         if (!var_fn) {
           // Make the function
-          // TODO: #816 remove after final transition.
           Type *ret_ty = nullptr;
           if (Arg.getType()->isTargetExtTy()) {
             ret_ty = Arg.getType();
-          } else if (Arg.getType()->isOpaquePointerTy()) {
-            ret_ty = PointerType::get(M.getContext(), addr_space);
           } else {
-            ret_ty = resource_type->getPointerTo(addr_space);
+            ret_ty = PointerType::get(M.getContext(), addr_space);
           }
           // The parameters are:
           //  descriptor set
@@ -644,8 +618,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           //  coherent
           //  data_type
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fnTy =
-              FunctionType::get(ret_ty, {i32, i32, i32, i32, i32, i32, resource_type}, false);
+          FunctionType *fnTy = FunctionType::get(
+              ret_ty, {i32, i32, i32, i32, i32, i32, resource_type}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fnTy).getCallee());
         }
@@ -781,14 +755,14 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
     function_spec_ids.clear();
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
-      if (Arg.use_empty()) {
+      if (Arg.use_empty() && !clspv::Option::KernelArgInfo()) {
         arg_index++;
         continue;
       }
       Type *argTy = Arg.getType();
       auto *inferred_ty = clspv::InferType(&Arg, M.getContext(), &type_cache_);
       assert(inferred_ty && "failed to infer argument type");
-      const auto arg_kind = clspv::GetArgKind(Arg, inferred_ty);
+      const auto arg_kind = clspv::GetArgKind(Arg);
       if (arg_kind == clspv::ArgKind::Local) {
         // Assign a SpecId to this argument.
         int spec_id = GetSpecId(inferred_ty);
@@ -807,12 +781,8 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
         auto *array_ty = ArrayType::get(inferred_ty, 0);
-        PointerType *ptr_ty = nullptr;
-        if (argTy->isOpaquePointerTy()) {
-          ptr_ty = PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
-        } else {
-          ptr_ty = PointerType::get(array_ty, argTy->getPointerAddressSpace());
-        }
+        PointerType *ptr_ty =
+            PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();

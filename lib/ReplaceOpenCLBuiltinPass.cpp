@@ -29,6 +29,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "BuiltinsEnum.h"
 #include "spirv/unified1/spirv.hpp"
 
 #include "clspv/AddressSpace.h"
@@ -79,6 +80,9 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kMemFence,
      Builtins::kReadMemFence,
      Builtins::kWriteMemFence,
+     Builtins::kToGlobal,
+     Builtins::kToLocal,
+     Builtins::kToPrivate,
      Builtins::kIsequal,
      Builtins::kIsgreater,
      Builtins::kIsgreaterequal,
@@ -354,6 +358,23 @@ bool replaceCallsWithValue(Function &F,
   return Changed;
 }
 
+bool skipBuiltinsWithGenericPointer(Function &F,
+                                    Builtins::BuiltinType builtin) {
+  auto name = F.getName();
+  if (!Builtins::BuiltinWithGenericPointer(name))
+    return false;
+  if (clspv::Option::UseNativeBuiltins().count(builtin) > 0)
+    return false;
+  for (auto &Arg : F.args()) {
+    Type *Ty = Arg.getType();
+    if (Ty->isPointerTy() &&
+        Ty->getPointerAddressSpace() == clspv::AddressSpace::Generic) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
 PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
@@ -381,7 +402,11 @@ PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
 
 bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   auto &FI = Builtins::Lookup(&F);
-  switch (FI.getType()) {
+  auto builtin = FI.getType();
+  if (skipBuiltinsWithGenericPointer(F, builtin)) {
+    return false;
+  }
+  switch (builtin) {
   case Builtins::kAbs:
     if (!FI.getParameter(0).is_signed) {
       return replaceAbs(F);
@@ -528,6 +553,12 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     return replaceAtomicLoad(F);
   case Builtins::kGetFence:
     return replaceGetFence(F);
+  case Builtins::kToGlobal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Global);
+  case Builtins::kToLocal:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Local);
+  case Builtins::kToPrivate:
+    return replaceAddressSpaceQualifiers(F, AddressSpace::Private);
   case Builtins::kAtomicInit:
   case Builtins::kAtomicStore:
   case Builtins::kAtomicStoreExplicit:
@@ -2143,6 +2174,94 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F,
   llvm_unreachable("Unsupported vload_half vector size");
 }
 
+llvm::Value *ReplaceOpenCLBuiltinPass::createVloadHalf(llvm::Module &M,
+                                                       llvm::CallInst *CI,
+                                                       llvm::Value *index,
+                                                       llvm::Value *ptr) {
+  auto IntTy = Type::getInt32Ty(M.getContext());
+  auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+  auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
+
+  // Our intrinsic to unpack a float2 from an int.
+  auto SPIRVIntrinsic = clspv::UnpackFunction();
+
+  auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+  Value *V = nullptr;
+
+  bool supports_16bit_storage = true;
+  switch (ptr->getType()->getPointerAddressSpace()) {
+  case clspv::AddressSpace::Global:
+    supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+        clspv::Option::StorageClass::kSSBO);
+    break;
+  case clspv::AddressSpace::Constant:
+    if (clspv::Option::ConstantArgsInUniformBuffer())
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kUBO);
+    else
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kSSBO);
+    break;
+  default:
+    // Clspv will emit the Float16 capability if the half type is
+    // encountered. That capability covers private and local addressspaces.
+    break;
+  }
+
+  if (supports_16bit_storage) {
+    auto ShortTy = Type::getInt16Ty(M.getContext());
+
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(ShortTy, ptr, index, "", CI);
+
+    // Load from the short* we casted to.
+    auto Load = new LoadInst(ShortTy, Index, "", CI);
+
+    // ZExt the short -> int.
+    auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
+
+    // Get our float2.
+    auto Call = CallInst::Create(NewF, ZExt, "", CI);
+
+    // Extract out the bottom element which is our float result.
+    V = ExtractElementInst::Create(Call, ConstantInt::get(IntTy, 0), "", CI);
+  } else {
+    // Assume the pointer argument points to storage aligned to 32bits
+    // or more.
+    // TODO(dneto): Do more analysis to make sure this is true?
+    //
+    // Replace call vstore_half(i32 %index, half addrspace(1) %base)
+    // with:
+    //
+    //   %base_i32_ptr = bitcast half addrspace(1)* %base to i32
+    //   addrspace(1)* %index_is_odd32 = and i32 %index, 1 %index_i32 =
+    //   lshr i32 %index, 1 %in_ptr = getlementptr i32, i32
+    //   addrspace(1)* %base_i32_ptr, %index_i32 %value_i32 = load i32,
+    //   i32 addrspace(1)* %in_ptr %converted = call <2 x float>
+    //   @spirv.unpack.v2f16(i32 %value_i32) %value = extractelement <2
+    //   x float> %converted, %index_is_odd32
+
+    auto One = ConstantInt::get(IntTy, 1);
+    auto IndexIsOdd = BinaryOperator::CreateAnd(index, One, "", CI);
+    auto IndexIntoI32 = BinaryOperator::CreateLShr(index, One, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Ptr = GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32, "", CI);
+
+    // Load from the int* we casted to.
+    auto Load = new LoadInst(IntTy, Ptr, "", CI);
+
+    // Get our float2.
+    auto Call = CallInst::Create(NewF, Load, "", CI);
+
+    // Extract out the float result, where the element number is
+    // determined by whether the original index was even or odd.
+    V = ExtractElementInst::Create(Call, IndexIsOdd, "", CI);
+  }
+  return V;
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -2152,109 +2271,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf(Function &F) {
     // The pointer argument from vload_half.
     auto Arg1 = CI->getOperand(1);
 
-    auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
-
-    // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = clspv::UnpackFunction();
-
-    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-    Value *V = nullptr;
-
-    bool supports_16bit_storage = true;
-    switch (Arg1->getType()->getPointerAddressSpace()) {
-    case clspv::AddressSpace::Global:
-      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-          clspv::Option::StorageClass::kSSBO);
-      break;
-    case clspv::AddressSpace::Constant:
-      if (clspv::Option::ConstantArgsInUniformBuffer())
-        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-            clspv::Option::StorageClass::kUBO);
-      else
-        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-            clspv::Option::StorageClass::kSSBO);
-      break;
-    default:
-      // Clspv will emit the Float16 capability if the half type is
-      // encountered. That capability covers private and local addressspaces.
-      break;
-    }
-
-    if (supports_16bit_storage) {
-      auto ShortTy = Type::getInt16Ty(M.getContext());
-      auto ShortPointerTy =
-          PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
-
-      // Cast the half* pointer to short*.
-      // TODO(#816): remove after final transition.
-      Value *Cast = Arg1;
-      if (Arg1->getType() != ShortPointerTy) {
-        Cast = CastInst::CreatePointerCast(Arg1, ShortPointerTy, "", CI);
-      }
-
-      // Index into the correct address of the casted pointer.
-      auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg0, "", CI);
-
-      // Load from the short* we casted to.
-      auto Load = new LoadInst(ShortTy, Index, "", CI);
-
-      // ZExt the short -> int.
-      auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
-
-      // Get our float2.
-      auto Call = CallInst::Create(NewF, ZExt, "", CI);
-
-      // Extract out the bottom element which is our float result.
-      V = ExtractElementInst::Create(Call, ConstantInt::get(IntTy, 0), "", CI);
-    } else {
-      // Assume the pointer argument points to storage aligned to 32bits
-      // or more.
-      // TODO(dneto): Do more analysis to make sure this is true?
-      //
-      // Replace call vstore_half(i32 %index, half addrspace(1) %base)
-      // with:
-      //
-      //   %base_i32_ptr = bitcast half addrspace(1)* %base to i32
-      //   addrspace(1)* %index_is_odd32 = and i32 %index, 1 %index_i32 =
-      //   lshr i32 %index, 1 %in_ptr = getlementptr i32, i32
-      //   addrspace(1)* %base_i32_ptr, %index_i32 %value_i32 = load i32,
-      //   i32 addrspace(1)* %in_ptr %converted = call <2 x float>
-      //   @spirv.unpack.v2f16(i32 %value_i32) %value = extractelement <2
-      //   x float> %converted, %index_is_odd32
-
-      auto IntPointerTy =
-          PointerType::get(IntTy, Arg1->getType()->getPointerAddressSpace());
-
-      // Cast the base pointer to int*.
-      // In a valid call (according to assumptions), this should get
-      // optimized away in the simplify GEP pass.
-      // TODO(#816): remove after final transition.
-      Value *Cast = Arg1;
-      if (Arg1->getType() != IntPointerTy) {
-        Cast = CastInst::CreatePointerCast(Arg1, IntPointerTy, "", CI);
-      }
-
-      auto One = ConstantInt::get(IntTy, 1);
-      auto IndexIsOdd = BinaryOperator::CreateAnd(Arg0, One, "", CI);
-      auto IndexIntoI32 = BinaryOperator::CreateLShr(Arg0, One, "", CI);
-
-      // Index into the correct address of the casted pointer.
-      auto Ptr = GetElementPtrInst::Create(IntTy, Cast, IndexIntoI32, "", CI);
-
-      // Load from the int* we casted to.
-      auto Load = new LoadInst(IntTy, Ptr, "", CI);
-
-      // Get our float2.
-      auto Call = CallInst::Create(NewF, Load, "", CI);
-
-      // Extract out the float result, where the element number is
-      // determined by whether the original index was even or odd.
-      V = ExtractElementInst::Create(Call, IndexIsOdd, "", CI);
-    }
-    return V;
+    return createVloadHalf(M, CI, Arg0, Arg1);
   });
 }
 
@@ -2269,19 +2286,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
 
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(IntTy, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    // Cast the half* pointer to int*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg0, "", CI);
+    auto Index = GetElementPtrInst::Create(IntTy, Arg1, Arg0, "", CI);
 
     // Load from the int* we casted to.
     auto Load = new LoadInst(IntTy, Index, "", CI);
@@ -2308,62 +2316,29 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto IndexTy =
         clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
-    auto ShortTy = Type::getInt16Ty(M.getContext());
     auto FloatTy = Type::getFloatTy(M.getContext());
-    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
     auto Float3Ty = FixedVectorType::get(FloatTy, 3);
-    auto NewPointerTy =
-        PointerType::get(ShortTy, Arg1->getType()->getPointerAddressSpace());
-    auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     auto Int0 = ConstantInt::get(IndexTy, 0);
     auto Int1 = ConstantInt::get(IndexTy, 1);
     auto Int2 = ConstantInt::get(IndexTy, 2);
-
-    // Cast the half* pointer to short*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
 
     // Load the first element
     auto Index0 = BinaryOperator::Create(
         Instruction::Add,
         BinaryOperator::Create(Instruction::Shl, Arg0, Int1, "", CI), Arg0, "",
         CI);
-    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
-    auto Load0 = new LoadInst(ShortTy, GEP0, "", CI);
+    auto Y0 = createVloadHalf(M, CI, Index0, Arg1);
 
     // Load the second element
     auto Index1 =
         BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
-    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
-    auto Load1 = new LoadInst(ShortTy, GEP1, "", CI);
+    auto Y1 = createVloadHalf(M, CI, Index1, Arg1);
 
     // Load the third element
     auto Index2 =
         BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
-    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
-    auto Load2 = new LoadInst(ShortTy, GEP2, "", CI);
-
-    // Extend each short to int.
-    auto X0 = CastInst::Create(Instruction::ZExt, Load0, IntTy, "", CI);
-    auto X1 = CastInst::Create(Instruction::ZExt, Load1, IntTy, "", CI);
-    auto X2 = CastInst::Create(Instruction::ZExt, Load2, IntTy, "", CI);
-
-    // Our intrinsic to unpack a float2 from an int.
-    auto SPIRVIntrinsic = clspv::UnpackFunction();
-
-    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-    // Convert int to float2 and extract the uniq meaningful float
-    auto Y0 = ExtractElementInst::Create(CallInst::Create(NewF, X0, "", CI),
-                                         Int0, "", CI);
-    auto Y1 = ExtractElementInst::Create(CallInst::Create(NewF, X1, "", CI),
-                                         Int0, "", CI);
-    auto Y2 = ExtractElementInst::Create(CallInst::Create(NewF, X2, "", CI),
-                                         Int0, "", CI);
+    auto Y2 = createVloadHalf(M, CI, Index2, Arg1);
 
     // Create the final float3 to be returned
     auto Combine =
@@ -2387,19 +2362,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Int2Ty = FixedVectorType::get(IntTy, 2);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int2Ty, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    // Cast the half* pointer to int2*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
+    auto Index = GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI);
 
     // Load from the int2* we casted to.
     auto Load = new LoadInst(Int2Ty, Index, "", CI);
@@ -2443,19 +2409,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Int2Ty = FixedVectorType::get(IntTy, 2);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int2Ty, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    // Cast the half* pointer to int2*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg0, "", CI);
+    auto Index = GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI);
 
     // Load from the int2* we casted to.
     auto Load = new LoadInst(Int2Ty, Index, "", CI);
@@ -2499,19 +2456,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int4Ty, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    // Cast the half* pointer to int4*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg0, "", CI);
+    auto Index = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0, "", CI);
 
     // Load from the int4* we casted to.
     auto Load = new LoadInst(Int4Ty, Index, "", CI);
@@ -2573,24 +2521,15 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
         clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int4Ty, Arg1->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
-
-    // Cast the half* pointer to int4*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg1;
-    if (Arg1->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg1, NewPointerTy, "", CI);
-    }
 
     // Index into the correct address of the casted pointer.
     auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0,
                                          ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2, "", CI);
+    auto Index1 = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2, "", CI);
     auto Arg0x2p1 = BinaryOperator::Create(
         Instruction::Add, Arg0x2, ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg0x2p1, "", CI);
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2p1, "", CI);
 
     // Load from the int4* we casted to.
     auto Load1 = new LoadInst(Int4Ty, Index1, "", CI);
@@ -2769,6 +2708,150 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F, int vec_size,
   return false;
 }
 
+llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
+                                                        llvm::CallInst *CI,
+                                                        llvm::Value *value,
+                                                        llvm::Value *index,
+                                                        llvm::Value *ptr) {
+  auto IntTy = Type::getInt32Ty(M.getContext());
+  auto Int64Ty = Type::getInt64Ty(M.getContext());
+  auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
+  auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
+
+  // Our intrinsic to pack a float2 to an int.
+  auto SPIRVIntrinsic = clspv::PackFunction();
+
+  auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
+
+  // Insert our value into a float2 so that we can pack it.
+  auto TempVec = InsertElementInst::Create(PoisonValue::get(Float2Ty), value,
+                                           ConstantInt::get(IntTy, 0), "", CI);
+
+  // Pack the float2 -> half2 (in an int).
+  auto X = CallInst::Create(NewF, TempVec, "", CI);
+
+  bool supports_16bit_storage = true;
+  switch (ptr->getType()->getPointerAddressSpace()) {
+  case clspv::AddressSpace::Global:
+    supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+        clspv::Option::StorageClass::kSSBO);
+    break;
+  case clspv::AddressSpace::Constant:
+    if (clspv::Option::ConstantArgsInUniformBuffer())
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kUBO);
+    else
+      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
+          clspv::Option::StorageClass::kSSBO);
+    break;
+  default:
+    // Clspv will emit the Float16 capability if the half type is
+    // encountered. That capability covers private and local addressspaces.
+    break;
+  }
+
+  Value *V = nullptr;
+  if (supports_16bit_storage) {
+    auto ShortTy = Type::getInt16Ty(M.getContext());
+
+    // Truncate our i32 to an i16.
+    auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
+
+    // Index into the correct address of the casted pointer.
+    auto Index = GetElementPtrInst::Create(ShortTy, ptr, index, "", CI);
+
+    // Store to the int* we casted to.
+    V = new StoreInst(Trunc, Index, CI);
+  } else {
+    // We can only write to 32-bit aligned words.
+    //
+    // Assuming base is aligned to 32-bits, replace the equivalent of
+    //   vstore_half(value, index, base)
+    // with:
+    //   uint32_t* target_ptr = (uint32_t*)(base) + index / 2;
+    //   uint32_t write_to_upper_half = index & 1u;
+    //   uint32_t shift = write_to_upper_half << 4;
+    //
+    //   // Pack the float value as a half number in bottom 16 bits
+    //   // of an i32.
+    //   uint32_t packed = spirv.pack.v2f16((float2)(value, undef));
+    //
+    //   uint32_t xor_value =   (*target_ptr & (0xffff << shift))
+    //                        ^ ((packed & 0xffff) << shift)
+    //   // We only need relaxed consistency, but OpenCL 1.2 only has
+    //   // sequentially consistent atomics.
+    //   // TODO(dneto): Use relaxed consistency.
+    //   atomic_xor(target_ptr, xor_value)
+    auto IntPointerTy =
+        PointerType::get(IntTy, ptr->getType()->getPointerAddressSpace());
+
+    auto One =
+        ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 1);
+    auto Four =
+        ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 4);
+    auto FFFF = ConstantInt::get(IntTy, 0xffff);
+    auto IndexIsOdd =
+        BinaryOperator::CreateAnd(index, One, "index_is_odd_i32", CI);
+    // Compute index / 2
+    auto IndexIntoI32 =
+        BinaryOperator::CreateLShr(index, One, "index_into_i32", CI);
+
+    auto OutPtr =
+        GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32, "base_i32_ptr", CI);
+    auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
+    Value *Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+    // The shift is safe to truncate as it will definitely fit in a 32-bit int
+    if (Shift->getType() != IntTy) {
+      Shift = CastInst::Create(Instruction::CastOps::Trunc, Shift, IntTy,
+                               "shift_trunc", CI);
+    }
+    auto MaskBitsToWrite =
+        BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
+    auto MaskedCurrent = BinaryOperator::CreateAnd(
+        MaskBitsToWrite, CurrentValue, "masked_current", CI);
+
+    auto XLowerBits =
+        BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
+    auto NewBitsToWrite =
+        BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
+    auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite,
+                                                "value_to_xor", CI);
+
+    // Generate the call to atomi_xor.
+    SmallVector<Type *, 5> ParamTypes;
+    // The pointer type.
+    ParamTypes.push_back(IntPointerTy);
+    // The Types for memory scope, semantics, and value.
+    ParamTypes.push_back(IntTy);
+    ParamTypes.push_back(IntTy);
+    ParamTypes.push_back(IntTy);
+    auto NewFType = FunctionType::get(IntTy, ParamTypes, false);
+    auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
+
+    const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
+    // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
+    // (SPIR-V Workgroup).
+    const auto AddrSpaceSemanticsBits =
+        IntPointerTy->getPointerAddressSpace() == 1
+            ? spv::MemorySemanticsUniformMemoryMask
+            : spv::MemorySemanticsWorkgroupMemoryMask;
+
+    // We're using relaxed consistency here.
+    const auto ConstantMemorySemantics = ConstantInt::get(
+        IntTy, spv::MemorySemanticsUniformMemoryMask | AddrSpaceSemanticsBits);
+
+    SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
+                                   ConstantMemorySemantics, ValueToXor};
+    CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
+
+    // Return a Nop so the old Call is removed
+    Function *donothing = Intrinsic::getDeclaration(&M, Intrinsic::donothing);
+    V = CallInst::Create(donothing, {}, "", CI);
+  }
+
+  return V;
+}
+
 bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
@@ -2781,159 +2864,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf(Function &F) {
     // The pointer argument from vstore_half.
     auto Arg2 = CI->getOperand(2);
 
-    auto IntTy = Type::getInt32Ty(M.getContext());
-    auto Int64Ty = Type::getInt64Ty(M.getContext());
-    auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
-
-    // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = clspv::PackFunction();
-
-    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-    // Insert our value into a float2 so that we can pack it.
-    auto TempVec = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty), Arg0, ConstantInt::get(IntTy, 0), "", CI);
-
-    // Pack the float2 -> half2 (in an int).
-    auto X = CallInst::Create(NewF, TempVec, "", CI);
-
-    bool supports_16bit_storage = true;
-    switch (Arg2->getType()->getPointerAddressSpace()) {
-    case clspv::AddressSpace::Global:
-      supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-          clspv::Option::StorageClass::kSSBO);
-      break;
-    case clspv::AddressSpace::Constant:
-      if (clspv::Option::ConstantArgsInUniformBuffer())
-        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-            clspv::Option::StorageClass::kUBO);
-      else
-        supports_16bit_storage = clspv::Option::Supports16BitStorageClass(
-            clspv::Option::StorageClass::kSSBO);
-      break;
-    default:
-      // Clspv will emit the Float16 capability if the half type is
-      // encountered. That capability covers private and local addressspaces.
-      break;
-    }
-
-    Value *V = nullptr;
-    if (supports_16bit_storage) {
-      auto ShortTy = Type::getInt16Ty(M.getContext());
-      auto ShortPointerTy =
-          PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
-
-      // Truncate our i32 to an i16.
-      auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
-
-      // Cast the half* pointer to short*.
-      // TODO(#816): remove after final transition.
-      Value *Cast = Arg2;
-      if (Arg2->getType() != ShortPointerTy) {
-        Cast = CastInst::CreatePointerCast(Arg2, ShortPointerTy, "", CI);
-      }
-
-      // Index into the correct address of the casted pointer.
-      auto Index = GetElementPtrInst::Create(ShortTy, Cast, Arg1, "", CI);
-
-      // Store to the int* we casted to.
-      V = new StoreInst(Trunc, Index, CI);
-    } else {
-      // We can only write to 32-bit aligned words.
-      //
-      // Assuming base is aligned to 32-bits, replace the equivalent of
-      //   vstore_half(value, index, base)
-      // with:
-      //   uint32_t* target_ptr = (uint32_t*)(base) + index / 2;
-      //   uint32_t write_to_upper_half = index & 1u;
-      //   uint32_t shift = write_to_upper_half << 4;
-      //
-      //   // Pack the float value as a half number in bottom 16 bits
-      //   // of an i32.
-      //   uint32_t packed = spirv.pack.v2f16((float2)(value, undef));
-      //
-      //   uint32_t xor_value =   (*target_ptr & (0xffff << shift))
-      //                        ^ ((packed & 0xffff) << shift)
-      //   // We only need relaxed consistency, but OpenCL 1.2 only has
-      //   // sequentially consistent atomics.
-      //   // TODO(dneto): Use relaxed consistency.
-      //   atomic_xor(target_ptr, xor_value)
-      auto IntPointerTy =
-          PointerType::get(IntTy, Arg2->getType()->getPointerAddressSpace());
-
-      auto One =
-          ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 1);
-      auto Four =
-          ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 4);
-      auto FFFF = ConstantInt::get(IntTy, 0xffff);
-      auto IndexIsOdd =
-          BinaryOperator::CreateAnd(Arg1, One, "index_is_odd_i32", CI);
-      // Compute index / 2
-      auto IndexIntoI32 =
-          BinaryOperator::CreateLShr(Arg1, One, "index_into_i32", CI);
-      // TODO(#816): remove after final transition.
-      Value *BaseI32Ptr = Arg2;
-      if (Arg2->getType() != IntPointerTy) {
-        BaseI32Ptr =
-            CastInst::CreatePointerCast(Arg2, IntPointerTy, "base_i32_ptr", CI);
-      }
-      auto OutPtr = GetElementPtrInst::Create(IntTy, BaseI32Ptr, IndexIntoI32,
-                                              "base_i32_ptr", CI);
-      auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
-      Value *Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
-      // The shift is safe to truncate as it will definitely fit in a 32-bit int
-      if (Shift->getType() != IntTy) {
-        Shift = CastInst::Create(Instruction::CastOps::Trunc, Shift, IntTy,
-                                 "shift_trunc", CI);
-      }
-      auto MaskBitsToWrite =
-          BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
-      auto MaskedCurrent = BinaryOperator::CreateAnd(
-          MaskBitsToWrite, CurrentValue, "masked_current", CI);
-
-      auto XLowerBits =
-          BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
-      auto NewBitsToWrite =
-          BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
-      auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite,
-                                                  "value_to_xor", CI);
-
-      // Generate the call to atomi_xor.
-      SmallVector<Type *, 5> ParamTypes;
-      // The pointer type.
-      ParamTypes.push_back(IntPointerTy);
-      // The Types for memory scope, semantics, and value.
-      ParamTypes.push_back(IntTy);
-      ParamTypes.push_back(IntTy);
-      ParamTypes.push_back(IntTy);
-      auto NewFType = FunctionType::get(IntTy, ParamTypes, false);
-      auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
-
-      const auto ConstantScopeDevice =
-          ConstantInt::get(IntTy, spv::ScopeDevice);
-      // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
-      // (SPIR-V Workgroup).
-      const auto AddrSpaceSemanticsBits =
-          IntPointerTy->getPointerAddressSpace() == 1
-              ? spv::MemorySemanticsUniformMemoryMask
-              : spv::MemorySemanticsWorkgroupMemoryMask;
-
-      // We're using relaxed consistency here.
-      const auto ConstantMemorySemantics =
-          ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
-                                      AddrSpaceSemanticsBits);
-
-      SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
-                                     ConstantMemorySemantics, ValueToXor};
-      CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
-
-      // Return a Nop so the old Call is removed
-      Function *donothing = Intrinsic::getDeclaration(&M, Intrinsic::donothing);
-      V = CallInst::Create(donothing, {}, "", CI);
-    }
-
-    return V;
+    return createVstoreHalf(M, CI, Arg0, Arg1, Arg2);
   });
 }
 
@@ -2951,8 +2882,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
 
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(IntTy, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     // Our intrinsic to pack a float2 to an int.
@@ -2963,15 +2892,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
     // Turn the packed x & y into the final packing.
     auto X = CallInst::Create(NewF, Arg0, "", CI);
 
-    // Cast the half* pointer to int*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(IntTy, Cast, Arg1, "", CI);
+    auto Index = GetElementPtrInst::Create(IntTy, Arg2, Arg1, "", CI);
 
     // Store to the int* we casted to.
     return new StoreInst(X, Index, CI);
@@ -2993,67 +2915,28 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto IndexTy =
         clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
-    auto ShortTy = Type::getInt16Ty(M.getContext());
-    auto FloatTy = Type::getFloatTy(M.getContext());
-    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
-    auto NewPointerTy =
-        PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
-    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     auto Int0 = ConstantInt::get(IndexTy, 0);
     auto Int1 = ConstantInt::get(IndexTy, 1);
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
-    auto X0 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
-    auto X1 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
-    auto X2 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
-
-    // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = clspv::PackFunction();
-
-    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-    // Convert float2 into int and trunc to short to keep only the meaningful
-    // part of it
-    auto Y0 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X0, "", CI),
-                         ShortTy, "", CI);
-    auto Y1 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X1, "", CI),
-                         ShortTy, "", CI);
-    auto Y2 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X2, "", CI),
-                         ShortTy, "", CI);
-
-    // Cast the half* pointer to short*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
+    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI);
+    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI);
+    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI);
 
     auto Index0 = BinaryOperator::Create(
         Instruction::Add,
         BinaryOperator::Create(Instruction::Shl, Arg1, Int1, "", CI), Arg1, "",
         CI);
-    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
-    new StoreInst(Y0, GEP0, CI);
+    createVstoreHalf(M, CI, X0, Index0, Arg2);
 
     auto Index1 =
         BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
-    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
-    new StoreInst(Y1, GEP1, CI);
+    createVstoreHalf(M, CI, X1, Index1, Arg2);
 
     auto Index2 =
         BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
-    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
-    return new StoreInst(Y2, GEP2, CI);
+    return createVstoreHalf(M, CI, X2, Index2, Arg2);
   });
 }
 
@@ -3072,64 +2955,25 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto IndexTy =
         clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
-    auto ShortTy = Type::getInt16Ty(M.getContext());
-    auto FloatTy = Type::getFloatTy(M.getContext());
-    auto Float2Ty = FixedVectorType::get(FloatTy, 2);
-    auto NewPointerTy =
-        PointerType::get(ShortTy, Arg2->getType()->getPointerAddressSpace());
-    auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     auto Int0 = ConstantInt::get(IndexTy, 0);
     auto Int1 = ConstantInt::get(IndexTy, 1);
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
-    auto X0 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int0, "", CI), Int0, "", CI);
-    auto X1 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int1, "", CI), Int0, "", CI);
-    auto X2 = InsertElementInst::Create(
-        PoisonValue::get(Float2Ty),
-        ExtractElementInst::Create(Arg0, Int2, "", CI), Int0, "", CI);
-
-    // Our intrinsic to pack a float2 to an int.
-    auto SPIRVIntrinsic = clspv::PackFunction();
-
-    auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
-
-    // Convert float2 into int and trunc to short to keep only the meaningful
-    // part of it
-    auto Y0 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X0, "", CI),
-                         ShortTy, "", CI);
-    auto Y1 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X1, "", CI),
-                         ShortTy, "", CI);
-    auto Y2 =
-        CastInst::Create(Instruction::Trunc, CallInst::Create(NewF, X2, "", CI),
-                         ShortTy, "", CI);
-
-    // Cast the half* pointer to short*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
+    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI);
+    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI);
+    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI);
 
     auto Index0 = BinaryOperator::Create(Instruction::Shl, Arg1, Int2, "", CI);
-    auto GEP0 = GetElementPtrInst::Create(ShortTy, Cast, Index0, "", CI);
-    new StoreInst(Y0, GEP0, CI);
+    createVstoreHalf(M, CI, X0, Index0, Arg2);
 
     auto Index1 =
         BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
-    auto GEP1 = GetElementPtrInst::Create(ShortTy, Cast, Index1, "", CI);
-    new StoreInst(Y1, GEP1, CI);
+    createVstoreHalf(M, CI, X1, Index1, Arg2);
 
     auto Index2 =
         BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
-    auto GEP2 = GetElementPtrInst::Create(ShortTy, Cast, Index2, "", CI);
-    return new StoreInst(Y2, GEP2, CI);
+    return createVstoreHalf(M, CI, X2, Index2, Arg2);
   });
 }
 
@@ -3148,8 +2992,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Int2Ty = FixedVectorType::get(IntTy, 2);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int2Ty, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     Constant *LoShuffleMask[2] = {ConstantInt::get(IntTy, 0),
@@ -3182,15 +3024,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
     Combine = InsertElementInst::Create(Combine, Y, ConstantInt::get(IntTy, 1),
                                         "", CI);
 
-    // Cast the half* pointer to int2*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Cast, Arg1, "", CI);
+    auto Index = GetElementPtrInst::Create(Int2Ty, Arg2, Arg1, "", CI);
 
     // Store to the int2* we casted to.
     return new StoreInst(Combine, Index, CI);
@@ -3212,8 +3047,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
     auto IntTy = Type::getInt32Ty(M.getContext());
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int4Ty, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     Constant *ShuffleMask01[2] = {ConstantInt::get(IntTy, 0),
@@ -3256,15 +3089,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
     Combine = InsertElementInst::Create(Combine, Y67,
                                         ConstantInt::get(IntTy, 3), "", CI);
 
-    // Cast the half* pointer to int4*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int4Ty, Cast, Arg1, "", CI);
+    auto Index = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1, "", CI);
 
     // Store to the int4* we casted to.
     return new StoreInst(Combine, Index, CI);
@@ -3288,8 +3114,6 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
         clspv::PointersAre64Bit(M) ? Type::getInt64Ty(M.getContext()) : IntTy;
     auto Int4Ty = FixedVectorType::get(IntTy, 4);
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
-    auto NewPointerTy =
-        PointerType::get(Int4Ty, Arg2->getType()->getPointerAddressSpace());
     auto NewFType = FunctionType::get(IntTy, Float2Ty, false);
 
     Constant *ShuffleMask0[2] = {ConstantInt::get(IntTy, 0),
@@ -3357,17 +3181,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     Combine2 = InsertElementInst::Create(Combine2, Y7,
                                          ConstantInt::get(IntTy, 3), "", CI);
 
-    // Cast the half* pointer to int4*.
-    // TODO(#816): remove after final transition.
-    Value *Cast = Arg2;
-    if (Arg2->getType() != NewPointerTy) {
-      Cast = CastInst::CreatePointerCast(Arg2, NewPointerTy, "", CI);
-    }
-
     // Index into the correct address of the casted pointer.
     auto Arg1x2 = BinaryOperator::Create(Instruction::Shl, Arg1,
                                          ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index1 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1x2, "", CI);
+    auto Index1 = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1x2, "", CI);
 
     // Store to the int4* we casted to.
     new StoreInst(Combine1, Index1, CI);
@@ -3375,7 +3192,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     // Index into the correct address of the casted pointer.
     auto Arg1Plus1 = BinaryOperator::Create(
         Instruction::Add, Arg1x2, ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index2 = GetElementPtrInst::Create(Int4Ty, Cast, Arg1Plus1, "", CI);
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1Plus1, "", CI);
 
     // Store to the int4* we casted to.
     return new StoreInst(Combine2, Index2, CI);
@@ -3783,6 +3600,16 @@ bool ReplaceOpenCLBuiltinPass::replaceGetFence(Function &F) {
     default:
       return builder.getInt32(MemFence::CLK_NO_MEM_FENCE);
     }
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceAddressSpaceQualifiers(
+    Function &F, AddressSpace::Type addrspace) {
+  return replaceCallsWithValue(F, [&F, addrspace](CallInst *Call) {
+    auto ptr = Call->getArgOperand(0);
+    IRBuilder<> builder(Call);
+    return builder.CreateAddrSpaceCast(
+        ptr, PointerType::get(F.getContext(), addrspace));
   });
 }
 

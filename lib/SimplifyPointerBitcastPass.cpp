@@ -47,7 +47,6 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed = false;
 
     changed |= runOnTrivialBitcast(M);
-    changed |= runOnBitcastFromGEP(M);
     changed |= runOnBitcastFromBitcast(M);
     changed |= runOnGEPFromGEP(M);
     changed |= runOnGEPImplicitCasts(M);
@@ -56,7 +55,6 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   return PA;
 }
 
-// TODO(#816): remove function after final transition.
 void clspv::SimplifyPointerBitcastPass::runOnInstFromCstExpr(Module &M) const {
   for (Function &F : M) {
     BitcastUtils::RemoveCstExprFromFunction(&F);
@@ -99,93 +97,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
         // ... and remove it if we were its only user.
         SourceInst->eraseFromParent();
       }
-    }
-  }
-
-  return Changed;
-}
-
-// TODO(#816): remove function after final transition.
-bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromGEP(Module &M) const {
-  SmallVector<BitCastInst *, 16> WorkList;
-  for (Function &F : M) {
-    for (BasicBlock &BB : F) {
-      for (Instruction &I : BB) {
-        // If we have a bitcast instruction...
-        if (auto Bitcast = dyn_cast<BitCastInst>(&I)) {
-          // ... whose source is a GEP instruction...
-          if (auto GEP = dyn_cast<GetElementPtrInst>(Bitcast->getOperand(0))) {
-            // ... where the GEP is retrieving an element of the same type...
-            auto BitcastTy = Bitcast->getType();
-            if (!BitcastTy->isOpaquePointerTy() &&
-                GEP->getSourceElementType() == GEP->getResultElementType()) {
-              auto GEPTy = GEP->getResultElementType();
-              auto BitcastElementTy =
-                  BitcastTy->getNonOpaquePointerElementType();
-              // ... and the types have a known compile time size...
-              if ((0 != GEPTy->getPrimitiveSizeInBits()) &&
-                  (0 != BitcastElementTy->getPrimitiveSizeInBits())) {
-                // ... record the bitcast as something we need to process.
-                WorkList.push_back(Bitcast);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const bool Changed = !WorkList.empty();
-
-  for (auto Bitcast : WorkList) {
-    auto BitcastTy = Bitcast->getType();
-    auto BitcastElementTy = BitcastTy->getNonOpaquePointerElementType();
-
-    auto GEP = cast<GetElementPtrInst>(Bitcast->getOperand(0));
-
-    auto SrcTySize = GEP->getResultElementType()->getPrimitiveSizeInBits();
-    auto DstTySize = BitcastElementTy->getPrimitiveSizeInBits();
-
-    SmallVector<Value *, 4> GEPArgs(GEP->idx_begin(), GEP->idx_end());
-
-    // If the source type is smaller than the destination type...
-    if (SrcTySize < DstTySize) {
-      // ... we need to divide the last index of the GEP by the size difference.
-      auto LastIndex = GEPArgs.back();
-      GEPArgs.back() = BinaryOperator::Create(
-          Instruction::SDiv, LastIndex,
-          ConstantInt::get(LastIndex->getType(), DstTySize / SrcTySize), "",
-          Bitcast);
-    } else if (SrcTySize > DstTySize) {
-      // ... we need to multiply the last index of the GEP by the size
-      // difference.
-      auto LastIndex = GEPArgs.back();
-      GEPArgs.back() = BinaryOperator::Create(
-          Instruction::Mul, LastIndex,
-          ConstantInt::get(LastIndex->getType(), SrcTySize / DstTySize), "",
-          Bitcast);
-    } else {
-      // ... the arguments are the same size, nothing to do!
-    }
-
-    // Create a new bitcast from the GEP argument to the bitcast type.
-    auto NewBitcast = CastInst::CreatePointerCast(GEP->getPointerOperand(),
-                                                  BitcastTy, "", Bitcast);
-
-    // Create a new GEP from the (maybe modified) GEPArgs.
-    auto NewGEP = GetElementPtrInst::Create(BitcastElementTy, NewBitcast,
-                                            GEPArgs, "", Bitcast);
-
-    // And replace the original bitcast with our replacement GEP.
-    Bitcast->replaceAllUsesWith(NewGEP);
-
-    // Remove the bitcast as it has no users now.
-    Bitcast->eraseFromParent();
-
-    // Check if the old GEP had no other users...
-    if (0 == GEP->getNumUses()) {
-      // ... and remove it if we were its only user.
-      GEP->eraseFromParent();
     }
   }
 
@@ -343,7 +254,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
           OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          true);
+          clspv::AddressSpace::Private);
       Idxs.append(NewGEPIdxs);
     } else {
       if (!CstSrcLastIdxOp || !CstSrcLastIdxOp->isZero()) {
@@ -457,9 +368,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
           // that the address math must be divided among other
           // entries.
           auto *gep = dyn_cast<GetElementPtrInst>(&I);
+          auto *call = dyn_cast_or_null<CallInst>(&I);
+          bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if ((Steps > 0 && !gep) || (Steps == 1)) {
-            if ((isa<LoadInst>(I) || isa<StoreInst>(I) || gep) &&
-                (gep || PerfectMatch)) {
+            if (!userCall && (gep || PerfectMatch)) {
               ImplicitGEPs.insert(
                   {&I, std::make_pair(Steps, PerfectMatch ? nullptr : gep)});
               continue;
@@ -522,8 +434,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     auto Idxs = GetIdxsForTyFromOffset(
         DL, Builder, src_gep->getResultElementType(),
         inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
-        cast<PointerType>(inst_gep->getPointerOperand()->getType())
-                ->getAddressSpace() == clspv::AddressSpace::Private);
+        (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
     auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
                                              src_gep, Idxs, "", inst_gep);
     inst_gep->replaceAllUsesWith(new_gep);
@@ -532,33 +445,19 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
   }
 
   for (auto *GEP : UnneededCasts) {
-    Type *source = GEP->getSourceElementType();
-    Type *result = GEP->getResultElementType();
-    auto TyBitWidths = getEleTypesBitWidths(source, DL, result);
-
     IRBuilder<> Builder(GEP);
-    Value *GEPIdx = nullptr;
-    assert(TyBitWidths.size() == (GEP->getNumOperands() - 1));
-    auto smallerTySize = TyBitWidths[TyBitWidths.size() - 1];
-    for (unsigned int i = 0; i < TyBitWidths.size(); i++) {
-      Value *Id = GEP->getOperand(i + 1);
-      if (auto cst = dyn_cast<ConstantInt>(Id)) {
-        if (cst->getZExtValue() == 0) {
-          continue;
-        }
-      }
-      Value *Mul = CreateMul(Builder, TyBitWidths[i] / smallerTySize, Id);
-      if (GEPIdx == nullptr) {
-        GEPIdx = Mul;
-      } else {
-        GEPIdx = Builder.CreateAdd(Mul, GEPIdx);
-      }
-    }
-    if (GEPIdx == nullptr) {
-      GEPIdx = Builder.getInt32(0);
-    }
-    SmallVector<Value *, 1> Indices{GEPIdx};
-    auto *NewGEP = GetElementPtrInst::Create(result, GEP->getPointerOperand(),
+    Type *Ty = GEP->getResultElementType();
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+    auto Indices = GetIdxsForTyFromOffset(
+        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+        (clspv::AddressSpace::Type)GEP->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
+
+    auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
                                              Indices, "", GEP);
     GEP->replaceAllUsesWith(NewGEP);
     GEP->eraseFromParent();
@@ -591,7 +490,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
       auto new_gep = GetElementPtrInst::Create(
           new_type, GEP->getPointerOperand(), Indices, "", I);
 
-      unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+      unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
       I->setOperand(PointerOperandNum, new_gep);
 
       if (GEP->getNumUses() == 0) {
@@ -610,7 +509,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     auto *gep = GEPInfo.second.second;
     IRBuilder<> Builder{I};
     SmallVector<Value *, 8> GEPIndices{};
-    unsigned PointerOperandNum = isa<StoreInst>(I) ? 1 : 0;
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
 
     for (int i = 0; i < Steps + 1; i++) {
       GEPIndices.push_back(Builder.getInt32(0));

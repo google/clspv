@@ -5,12 +5,15 @@
 // Check that conversions from short8 to int8 is supported.
 
 // CHECK: [[INT:%[0-9a-zA-Z_]+]] = OpTypeInt 32
-// CHECK: [[VECTOR_INT:%[0-9a-zA-Z_]+]] = OpTypeVector [[INT]] 2
 //
-// CHECK: OpSConvert [[VECTOR_INT]]
-// CHECK: OpSConvert [[VECTOR_INT]]
-// CHECK: OpSConvert [[VECTOR_INT]]
-// CHECK: OpSConvert [[VECTOR_INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
+// CHECK: OpSConvert [[INT]]
 
 void kernel test(global short8 *in, global int8 *out) {
   *out = convert_int8(*in);

@@ -22,7 +22,7 @@ set -e
 set -x
 
 # Common tools.
-using cmake-3.17.2
+using cmake-3.26.3
 using gcc-9
 using ninja-1.10.0
 

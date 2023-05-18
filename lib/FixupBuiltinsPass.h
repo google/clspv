@@ -30,7 +30,7 @@ private:
   // If this detects builtin calls that will generate calls to the Sqrt or
   // InverseSqrt glsl instructions it adds checks to guarantee the result is a
   // NaN if the input is negative.
-  bool fixupSqrt(llvm::Function &F);
+  bool fixupSqrt(llvm::Function &F, double (*fct)(double));
 };
 } // namespace clspv
 

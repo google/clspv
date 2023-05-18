@@ -87,7 +87,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
 #ifndef NDEBUG
   const auto &DL = M.getDataLayout();
   const uint64_t global_push_constant_size =
-      DL.getTypeStoreSize(global_push_constant_ty).getKnownMinSize();
+      DL.getTypeStoreSize(global_push_constant_ty).getKnownMinValue();
   assert(global_push_constant_size % 8 == 0 &&
          "Global push constants size changed");
 #endif
@@ -135,10 +135,8 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
         // The kind only matter if the argument is used, otherwise we just need
         // to track that there was an argument.
         auto kind = clspv::ArgKind::Buffer;
-        if (!Arg.use_empty()) {
-          auto *inferred_ty =
-              clspv::InferType(&Arg, M.getContext(), &type_cache);
-          kind = clspv::GetArgKind(Arg, inferred_ty);
+        if (!Arg.use_empty() || clspv::Option::KernelArgInfo()) {
+          kind = clspv::GetArgKind(Arg);
         }
         RemapInfo.push_back(
             {std::string(Arg.getName()), arg_index, new_index++, 0u, 0u, kind});
@@ -220,7 +218,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       for (Argument &Arg : F->args()) {
         Type *ArgTy = Arg.getType();
         if (!clspv::IsResourceType(ArgTy)) {
-          auto pod_arg_kind = clspv::GetArgKind(Arg, ArgTy);
+          auto pod_arg_kind = clspv::GetArgKind(Arg);
           unsigned arg_size = DL.getTypeStoreSize(ArgTy);
           unsigned offset = StructLayout->getElementOffset(PodIndexMap[&Arg]);
           int remapped_index = new_index;
@@ -289,8 +287,10 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     NewFunc->setAttributes(newAttributes);
 
     // Move OpenCL kernel named attributes.
-    // TODO(dneto): Attributes starting with kernel_arg_* should be rewritten
-    // to reflect change in the argument shape.
+    // Do not rewrite the kernel_arg_* metadata as all of it needs to be
+    // preserved intact so it can be reported via clGetKernelArgInfo.
+    // Users of this metadata need to be aware that it may not map directly
+    // to kernel arguments after this pass.
     auto pod_md_name = clspv::PodArgsImplMetadataName();
     std::vector<const char *> Metadatas{
         "reqd_work_group_size",   "kernel_arg_addr_space",

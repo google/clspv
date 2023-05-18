@@ -27,7 +27,7 @@ using namespace llvm;
 namespace clspv {
 
 void ConstantEmitter::Emit(Constant *c) {
-  AlignTo(Layout.getABITypeAlignment(c->getType()));
+  AlignTo(Layout.getABITypeAlign(c->getType()).value());
   if (auto i = dyn_cast<ConstantInt>(c)) {
     EmitInt(i);
   } else if (auto f = dyn_cast<ConstantFP>(c)) {

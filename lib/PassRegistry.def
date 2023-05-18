@@ -36,6 +36,8 @@ MODULE_PASS("inline-func-with-single-call-site", clspv::InlineFuncWithSingleCall
 MODULE_PASS("logical-pointer-to-int", clspv::LogicalPointerToIntPass)
 MODULE_PASS("long-vector-lowering", clspv::LongVectorLoweringPass)
 MODULE_PASS("set-image-channel-metadata", clspv::SetImageChannelMetadataPass)
+MODULE_PASS("lower-addrspacecast", clspv::LowerAddrSpaceCastPass)
+MODULE_PASS("lower-private-pointer-phi", clspv::LowerPrivatePointerPHIPass)
 MODULE_PASS("multi-version-ubo-functions", clspv::MultiVersionUBOFunctionsPass)
 MODULE_PASS("native-math", clspv::NativeMathPass)
 MODULE_PASS("opencl-inliner", clspv::OpenCLInlinerPass)

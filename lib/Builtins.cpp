@@ -514,9 +514,6 @@ std::string Builtins::GetMangledTypeName(Type *Ty) {
       std::string AS_name = "AS" + std::to_string(AS);
       mangled_type_str += "U" + std::to_string(AS_name.size()) + AS_name;
     }
-    if (!Ty->isOpaquePointerTy()) {
-      mangled_type_str += GetMangledTypeName(Ty->getNonOpaquePointerElementType());
-    }
     break;
   }
   case Type::FixedVectorTyID: {
@@ -776,4 +773,13 @@ glsl::ExtInst Builtins::getDirectOrIndirectExtInstEnum(
   if (direct != kGlslExtInstBad)
     return direct;
   return getIndirectExtInstEnum(func_info);
+}
+
+bool Builtins::BuiltinWithGenericPointer(StringRef name) {
+  if (name.contains("fract") || name.contains("frexp") ||
+      name.contains("modf") || name.contains("remquo") ||
+      name.contains("lgamma_r") || name.contains("vstore_half") ||
+      name.contains("sincos"))
+    return true;
+  return false;
 }
