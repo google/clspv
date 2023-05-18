@@ -27,7 +27,10 @@ struct SimplifyPointerBitcastPass
   bool runOnTrivialBitcast(llvm::Module &M) const;
   bool runOnBitcastFromBitcast(llvm::Module &M) const;
   bool runOnGEPFromGEP(llvm::Module &M) const;
-  bool runOnGEPImplicitCasts(llvm::Module &M) const;
+  bool runOnUnneededCasts(llvm::Module &M) const;
+  bool runOnImplicitCasts(llvm::Module &M) const;
+  bool runOnUpgradeableConstantCasts(llvm::Module &M) const;
+  bool runOnImplicitGEP(llvm::Module &M) const;
 };
 } // namespace clspv
 

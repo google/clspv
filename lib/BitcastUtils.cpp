@@ -1074,12 +1074,6 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   SmallVector<Value *, 2> Idxs;
   auto TyBitWidths =
       BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
-  size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
-  if (NewSmallerBitWidths <= SmallerBitWidths) {
-    CstVal *= SmallerBitWidths / NewSmallerBitWidths;
-  } else {
-    CstVal /= NewSmallerBitWidths / SmallerBitWidths;
-  }
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
@@ -1091,10 +1085,48 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     startIdx = 1;
   }
 
+  // TODO: Is there a better way to adjust for this?
+  if (DynVal == nullptr) {
+    if (TyBitWidths.size() == 1 &&
+        (TyBitWidths[0] > CstVal * SmallerBitWidths) &&
+        SrcTy->isStructTy()) {
+      // Descending into the aggregate so 0 the first GEP index.
+      if (startIdx == 0)
+        Idxs.push_back(Builder.getInt32(0));
+
+      auto *ty = SrcTy;
+      while (ty->isStructTy() &&
+             SizeInBits(DataLayout, ty->getContainedType(0)) >
+                 CstVal * SmallerBitWidths) {
+        ty = ty->getContainedType(0);
+      }
+      if (auto *struct_ty = dyn_cast<StructType>(ty)) {
+        // Determine which struct element
+        uint32_t index = 0;
+        for (unsigned i = 0; CstVal > 0; i++) {
+          auto ele_size = SizeInBits(DataLayout, ty->getContainedType(i));
+          auto size = ele_size / SmallerBitWidths;
+          if (size > CstVal)
+            break;
+          CstVal -= size;
+          index++;
+        }
+        Idxs.push_back(Builder.getInt32(index));
+        return Idxs;
+      }
+    }
+  }
+
+  size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
+  if (NewSmallerBitWidths <= SmallerBitWidths) {
+    CstVal *= SmallerBitWidths / NewSmallerBitWidths;
+  } else {
+    CstVal /= NewSmallerBitWidths / SmallerBitWidths;
+  }
   if (DynVal == nullptr) {
     for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
       size_t size = TyBitWidths[i] / NewSmallerBitWidths;
-      Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), CstVal / size));
+      Idxs.push_back(Builder.getInt32(CstVal / size));
       CstVal %= size;
     }
   } else {
