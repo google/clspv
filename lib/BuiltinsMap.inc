@@ -1114,7 +1114,6 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"clspv.resource", Builtins::kClspvResource},
         {"clspv.local", Builtins::kClspvLocal},
         {"spirv.op", Builtins::kSpirvOp},
-        {"spirv.copy_memory", Builtins::kSpirvCopyMemory},
         {"clspv.sampler_var_literal", Builtins::kClspvSamplerVarLiteral},
         {"clspv.composite_construct", Builtins::kClspvCompositeConstruct},
 

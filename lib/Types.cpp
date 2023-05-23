@@ -81,7 +81,6 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
   } else if (auto *call = dyn_cast<CallInst>(user)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     // TODO: remaining builtins
-    // TODO: kSpirvCopyMemory
     switch (info.getType()) {
     case clspv::Builtins::kAtomicInit:
     case clspv::Builtins::kAtomicStore:

@@ -629,6 +629,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
     pm.addPass(clspv::UndoInstCombinePass());
     pm.addPass(clspv::FunctionInternalizerPass());
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
     // Replace LLVM intrinsics can leave dead code around.
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));

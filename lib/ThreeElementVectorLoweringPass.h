@@ -120,12 +120,6 @@ private:
   /// Lower the given function.
   bool runOnFunction(llvm::Function &F);
 
-  /// In order not to overflow, we need to copy elements one by one when
-  /// CopyMemory arguments are transformed from vec3 to vec4.
-  llvm::Value *
-  convertOpCopyMemoryOperation(llvm::CallInst &VectorCall,
-                               llvm::ArrayRef<llvm::Value *> EquivalentArgs);
-
   /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
   /// the same calls but reworking the args and the return value.
   llvm::Value *convertBuiltinCall(llvm::CallInst &CI,

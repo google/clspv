@@ -873,6 +873,28 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           dest_ty = call->getType();
         }
       }
+    } else if (call->getCalledFunction()->getName().startswith("llvm.memcpy")) {
+      auto Dst = call->getArgOperand(0);
+      auto Src = call->getArgOperand(1);
+      auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+      auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+      if (DstTy != SrcTy) {
+        if (SizeInBits(M.getDataLayout(), DstTy) >
+            SizeInBits(M.getDataLayout(), SrcTy)) {
+          source = Src;
+          source_ty = SrcTy;
+          dest_ty = DstTy;
+        } else if (SizeInBits(M.getDataLayout(), DstTy) >
+                   SizeInBits(M.getDataLayout(), SrcTy)) {
+          source = Dst;
+          source_ty = DstTy;
+          dest_ty = SrcTy;
+        } else {
+          source = Src;
+          source_ty = SrcTy;
+          dest_ty = DstTy;
+        }
+      }
     }
   }
 

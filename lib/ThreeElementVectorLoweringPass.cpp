@@ -1047,40 +1047,6 @@ bool clspv::ThreeElementVectorLoweringPass::runOnFunction(Function &F) {
   return Modified;
 }
 
-Value *clspv::ThreeElementVectorLoweringPass::convertOpCopyMemoryOperation(
-    CallInst &VectorCall, ArrayRef<Value *> EquivalentArgs) {
-  auto *DstOperand = EquivalentArgs[1];
-  auto *SrcOperand = EquivalentArgs[2];
-
-#ifdef DEBUG
-  auto ptrTy =
-      clspv::InferType(DstOperand, VectorCall.getContext(), &type_cache_);
-  assert(ptrTy->isVectorTy());
-  auto *VectorType = cast<FixedVectorType>(ptrTy);
-  assert(VectorType->getElementCount().getKnownMinValue() == 4);
-#endif
-  IRBuilder<> B(&VectorCall);
-  Value *ReturnValue = nullptr;
-
-  // for each element
-  for (unsigned eachElem = 0; eachElem < 3; eachElem++) {
-    auto SrcOperandTy = SrcOperand->getType();
-    auto DstOperandTy = DstOperand->getType();
-    SrcOperandTy =
-        clspv::InferType(SrcOperand, VectorCall.getContext(), &type_cache_);
-    DstOperandTy =
-        clspv::InferType(DstOperand, VectorCall.getContext(), &type_cache_);
-    auto *SrcGEP = B.CreateGEP(SrcOperandTy, SrcOperand,
-                               {B.getInt32(0), B.getInt32(eachElem)});
-    auto *Val = B.CreateLoad(SrcOperandTy->getScalarType(), SrcGEP);
-    auto *DstGEP = B.CreateGEP(DstOperandTy, DstOperand,
-                               {B.getInt32(0), B.getInt32(eachElem)});
-    ReturnValue = B.CreateStore(Val, DstGEP);
-  }
-
-  return ReturnValue;
-}
-
 Value *clspv::ThreeElementVectorLoweringPass::convertBuiltinCall(
     CallInst &VectorCall, Type *EquivalentReturnTy,
     ArrayRef<Value *> EquivalentArgs) {
@@ -1153,8 +1119,6 @@ Value *clspv::ThreeElementVectorLoweringPass::convertSpirvOpBuiltinCall(
     ArrayRef<Value *> EquivalentArgs) {
   if (auto *SpirvIdValue = dyn_cast<ConstantInt>(VectorCall.getOperand(0))) {
     switch (SpirvIdValue->getZExtValue()) {
-    case 63: // OpCopyMemory
-      return convertOpCopyMemoryOperation(VectorCall, EquivalentArgs);
     case 149: // OpIAddCarry
     case 151: // OpUMulExtended
     case 152: // OpSMulExtended
