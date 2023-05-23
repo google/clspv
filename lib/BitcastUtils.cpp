@@ -1098,6 +1098,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
              SizeInBits(DataLayout, ty->getContainedType(0)) >
                  CstVal * SmallerBitWidths) {
         ty = ty->getContainedType(0);
+        Idxs.push_back(Builder.getInt32(0));
       }
       if (auto *struct_ty = dyn_cast<StructType>(ty)) {
         // Determine which struct element
