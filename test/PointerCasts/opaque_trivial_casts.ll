@@ -78,20 +78,6 @@ entry:
   ret void
 }
 
-; TODO(#1115): bad assumption based on address space
-; CHECK-LABEL: define void @test6(ptr %in) {
-; CHECK: entry:
-; CHECK:   getelementptr float, ptr %in, i32 1
-; CHECK-NEXT: ret void
-; CHECK: }
-
-define void @test6(ptr %in) {
-entry:
-  %gep1 = getelementptr float, ptr %in, i32 1
-  %gep2 = getelementptr i32, ptr %gep1, i32 1
-  ret void
-}
-
 ; CHECK-LABEL: define void @test7(ptr addrspace(1) %in) {
 ; CHECK: entry:
 ; CHECK:   getelementptr float, ptr addrspace(1) %in, i32 2

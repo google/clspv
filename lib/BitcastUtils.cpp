@@ -1072,8 +1072,6 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        size_t SmallerBitWidths,
                        clspv::AddressSpace::Type AddrSpace) {
   SmallVector<Value *, 2> Idxs;
-  auto TyBitWidths =
-      BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
@@ -1085,55 +1083,66 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     startIdx = 1;
   }
 
-  // TODO: Is there a better way to adjust for this?
-  if (DynVal == nullptr) {
-    if (TyBitWidths.size() == 1 &&
-        (TyBitWidths[0] > CstVal * SmallerBitWidths) && SrcTy->isStructTy()) {
-      // Descending into the aggregate so 0 the first GEP index.
-      if (startIdx == 0)
-        Idxs.push_back(Builder.getInt32(0));
-
-      auto *ty = SrcTy;
-      while (ty->isStructTy() &&
-             SizeInBits(DataLayout, ty->getContainedType(0)) >
-                 CstVal * SmallerBitWidths) {
-        ty = ty->getContainedType(0);
-        Idxs.push_back(Builder.getInt32(0));
-      }
-      if (auto *struct_ty = dyn_cast<StructType>(ty)) {
-        // Determine which struct element
-        uint32_t index = 0;
-        for (unsigned i = 0; CstVal > 0; i++) {
-          auto ele_size = SizeInBits(DataLayout, struct_ty->getElementType(i));
-          auto size = ele_size / SmallerBitWidths;
-          if (size > CstVal)
-            break;
-          CstVal -= size;
-          index++;
-        }
-        Idxs.push_back(Builder.getInt32(index));
-        return Idxs;
-      }
+  if (DstTy->isVoidTy()) {
+    DstTy = Builder.getInt8Ty();
+  }
+  if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
+      DstTy != SrcTy) {
+    DstTy = SrcTy;
+    auto ElDstTy = GetEleType(DstTy);
+    while (DstTy != ElDstTy) {
+      DstTy = ElDstTy;
+      ElDstTy = GetEleType(DstTy);
     }
   }
 
-  size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
-  if (NewSmallerBitWidths <= SmallerBitWidths) {
-    CstVal *= SmallerBitWidths / NewSmallerBitWidths;
-  } else {
-    CstVal /= NewSmallerBitWidths / SmallerBitWidths;
-  }
   if (DynVal == nullptr) {
-    for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
-      size_t size = TyBitWidths[i] / NewSmallerBitWidths;
+    Type *Ty = SrcTy;
+    CstVal *= SmallerBitWidths;
+    if (startIdx == 0) {
+      auto size = SizeInBits(DataLayout, Ty);
       Idxs.push_back(Builder.getInt32(CstVal / size));
       CstVal %= size;
     }
+    while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
+           SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, DstTy)) {
+      if (auto STy = dyn_cast<StructType>(Ty)) {
+        auto SLayout = DataLayout.getStructLayout(STy);
+        auto SId = SLayout->getElementContainingOffset(CstVal / CHAR_BIT);
+        auto offset = SLayout->getElementOffsetInBits(SId);
+        Ty = STy->getElementType(SId);
+        Idxs.push_back(Builder.getInt32(SId));
+        CstVal -= offset;
+      } else {
+        auto NextTy = GetEleType(Ty);
+        assert(NextTy != Ty);
+        Ty = NextTy;
+        auto size = SizeInBits(DataLayout, Ty);
+        Idxs.push_back(Builder.getInt32(CstVal / size));
+        CstVal %= size;
+      }
+      assert(GetElementPtrInst::getIndexedType(SrcTy, Idxs) == Ty);
+    }
+    if (CstVal != 0) {
+      errs() << "Err: SrcTy = ";
+      SrcTy->print(errs());
+      errs() << " - DstTy = ";
+      DstTy->print(errs());
+      errs() << " - Ty = ";
+      Ty->print(errs());
+      errs() << " - CstVal = " << CstVal << "\n";
+      llvm_unreachable("Unexpected offset for type in GetIdxsForTyFromOffset");
+    }
   } else {
+    auto TyBitWidths =
+        BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
+    size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
     if (NewSmallerBitWidths <= SmallerBitWidths) {
+      CstVal *= SmallerBitWidths / NewSmallerBitWidths;
       DynVal =
           CreateMul(Builder, SmallerBitWidths / NewSmallerBitWidths, DynVal);
     } else {
+      CstVal /= NewSmallerBitWidths / SmallerBitWidths;
       DynVal =
           CreateDiv(Builder, NewSmallerBitWidths / SmallerBitWidths, DynVal);
     }
