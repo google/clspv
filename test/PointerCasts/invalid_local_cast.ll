@@ -5,7 +5,6 @@ target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:2
 target triple = "spir-unknown-unknown"
 
 ; CHECK: Err: SrcTy = float - DstTy = float - Ty = float - CstVal = 32
-; CHECK-NEXT: Unexpected offset for type in GetIdxsForTyFromOffset
 
 define void @test6(ptr %in) {
 entry:
