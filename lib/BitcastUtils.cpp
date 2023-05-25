@@ -1124,9 +1124,12 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
       assert(GetElementPtrInst::getIndexedType(SrcTy, Idxs) == Ty);
     }
     if (CstVal != 0) {
-      errs() << "Err: SrcTy = "; SrcTy->print(errs());
-      errs() << " - DstTy = "; DstTy->print(errs());
-      errs() << " - Ty = "; Ty->print(errs());
+      errs() << "Err: SrcTy = ";
+      SrcTy->print(errs());
+      errs() << " - DstTy = ";
+      DstTy->print(errs());
+      errs() << " - Ty = ";
+      Ty->print(errs());
       errs() << " - CstVal = " << CstVal << "\n";
       llvm_unreachable("Unexpected offset for type in GetIdxsForTyFromOffset");
     }
