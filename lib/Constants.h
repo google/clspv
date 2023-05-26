@@ -82,9 +82,6 @@ const std::string &PackFunction();
 // Name of the clspv builtin used for register unpacking (specifically v2f16)
 const std::string &UnpackFunction();
 
-// Name of the clspv builtin for copy_memory
-const std::string &CopyMemoryFunction();
-
 // Base name for SPIR-V intrinsic functions
 const std::string &SPIRVOpIntrinsicFunction();
 

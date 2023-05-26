@@ -15,5 +15,6 @@ declare void @llvm.memcpy.p0i8.p1i8.i64(i8*, ptr addrspace(1), i64, i1)
 
 ; CHECK-NOT: bitcast
 ; CHECK: [[src_gep:%[a-zA-Z0-9_.]+]] = getelementptr inbounds [7 x float], ptr addrspace(1)
+; CHECK: [[load:%[a-zA-Z0-9_.]+]] = load [7 x float], ptr addrspace(1) [[src_gep]]
 ; CHECK: [[dst_gep:%[a-zA-Z0-9_.]+]] = getelementptr [7 x float], ptr %dst,
-; CHECK: call void @_Z17spirv.copy_memory(ptr [[dst_gep]], ptr addrspace(1) [[src_gep]], i32 4, i32 0)
+; CHECK: store [7 x float] [[load]], ptr [[dst_gep]]

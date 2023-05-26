@@ -873,6 +873,26 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           dest_ty = call->getType();
         }
       }
+    } else if (call->getCalledFunction()->getName().startswith("llvm.memcpy")) {
+      // To help lower memcpy, try to rework memcpy inputs to have the same type
+      // with the samer of them. It avoids upgrading a type which can lead to
+      // complicated issues.
+      auto Dst = call->getArgOperand(0);
+      auto Src = call->getArgOperand(1);
+      auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+      auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+      if (DstTy != SrcTy) {
+        if (SizeInBits(M.getDataLayout(), DstTy) >=
+            SizeInBits(M.getDataLayout(), SrcTy)) {
+          source = Src;
+          source_ty = SrcTy;
+          dest_ty = DstTy;
+        } else {
+          source = Dst;
+          source_ty = DstTy;
+          dest_ty = SrcTy;
+        }
+      }
     }
   }
 

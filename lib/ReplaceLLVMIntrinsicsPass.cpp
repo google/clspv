@@ -21,6 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "BitcastUtils.h"
 #include "clspv/Option.h"
 #include "spirv/unified1/spirv.hpp"
 
@@ -35,12 +36,6 @@ using namespace llvm;
 #define DEBUG_TYPE "ReplaceLLVMIntrinsics"
 
 namespace {
-uint32_t NewAlignment(uint32_t Alignment, uint32_t ElemSize) {
-  if (Alignment == 0) {
-    return 0;
-  }
-  return ((Alignment + ElemSize - 1) % Alignment) + 1;
-}
 Type *UpdateTy(LLVMContext &Ctx, uint64_t Size) {
   if (Size % (4 * sizeof(uint32_t)) == 0) {
     return FixedVectorType::get(Type::getInt32Ty(Ctx), 4);
@@ -53,20 +48,6 @@ Type *UpdateTy(LLVMContext &Ctx, uint64_t Size) {
   } else {
     return Type::getInt8Ty(Ctx);
   }
-}
-Type *descend_type(Type *InType) {
-  Type *OutType = InType;
-  if (OutType->isStructTy()) {
-    OutType = OutType->getStructElementType(0);
-  } else if (OutType->isArrayTy()) {
-    OutType = OutType->getArrayElementType();
-  } else if (auto vec_type = dyn_cast<VectorType>(OutType)) {
-    OutType = vec_type->getElementType();
-  } else {
-    assert(false && "Don't know how to descend into type");
-  }
-
-  return OutType;
 }
 } // namespace
 
@@ -197,7 +178,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
                           unsigned *NumUnpackings) {
     auto ElemSize = Layout.getTypeSizeInBits(*Ty) / 8;
     while (Size < ElemSize) {
-      *Ty = descend_type(*Ty);
+      auto EleTy = BitcastUtils::GetEleType(*Ty);
+      assert(EleTy != *Ty);
+      *Ty = EleTy;
       (*NumUnpackings)++;
       ElemSize = Layout.getTypeSizeInBits(*Ty) / 8;
     }
@@ -281,40 +264,6 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
   DenseMap<Value *, Type *> type_cache;
 
-  // Unpack source and destination types until we find a matching
-  // element type.  Count the number of levels we unpack for the
-  // source and destination types.  So far this only works for
-  // array types, but could be generalized to other regular types
-  // like vectors.
-  auto match_types = [&Layout](CallInst &CI, uint64_t Size, Type **DstElemTy,
-                               Type **SrcElemTy, unsigned *NumDstUnpackings,
-                               unsigned *NumSrcUnpackings) {
-    while (*SrcElemTy != *DstElemTy) {
-      auto SrcElemSize = Layout.getTypeSizeInBits(*SrcElemTy);
-      auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy);
-      if (SrcElemSize >= DstElemSize) {
-        *SrcElemTy = descend_type(*SrcElemTy);
-        (*NumSrcUnpackings)++;
-      } else if (DstElemSize >= SrcElemSize) {
-        *DstElemTy = descend_type(*DstElemTy);
-        (*NumDstUnpackings)++;
-      } else {
-        errs() << "Don't know how to unpack types for memcpy: " << CI
-               << "\ngot to: " << **DstElemTy << " vs " << **SrcElemTy << "\n";
-        assert(false && "Don't know how to unpack these types");
-      }
-    }
-
-    auto DstElemSize = Layout.getTypeSizeInBits(*DstElemTy) / 8;
-    while (Size < DstElemSize) {
-      *DstElemTy = descend_type(*DstElemTy);
-      *SrcElemTy = descend_type(*SrcElemTy);
-      (*NumDstUnpackings)++;
-      (*NumSrcUnpackings)++;
-      DstElemSize = Layout.getTypeSizeInBits(*DstElemTy) / 8;
-    }
-  };
-
   for (auto &F : M) {
     if (F.getName().startswith("llvm.memcpy")) {
       SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
@@ -326,97 +275,39 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
       }
 
       for (auto CI : CallsToReplaceWithSpirvCopyMemory) {
-        auto Arg3 = dyn_cast<ConstantInt>(CI->getArgOperand(3));
-
         auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto DstAlign = cast<MemCpyInst>(CI)->getDestAlign();
-        auto DstAlignment = DstAlign ? DstAlign->value() : 0;
-        auto SrcAlign = cast<MemCpyInst>(CI)->getSourceAlign();
-        auto SrcAlignment = SrcAlign ? SrcAlign->value() : 0;
-        auto Volatile = ConstantInt::get(I32Ty, Arg3->getZExtValue());
+        bool Volatile =
+            dyn_cast<ConstantInt>(CI->getArgOperand(3))->getZExtValue();
 
         auto Dst = CI->getArgOperand(0);
         auto Src = CI->getArgOperand(1);
+        auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+        auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
         auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
-        Type *DstElemTy = clspv::InferType(Dst, M.getContext(), &type_cache);
-        Type *SrcElemTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
         IRBuilder<> Builder(CI);
-        if (DstElemTy == nullptr && SrcElemTy == nullptr) {
-          DstElemTy = SrcElemTy = UpdateTy(M.getContext(), Size);
-          Dst = Builder.CreateGEP(DstElemTy, Dst, {ConstantInt::get(I32Ty, 0)});
-          Src = Builder.CreateGEP(SrcElemTy, Src, {ConstantInt::get(I32Ty, 0)});
-        } else if (DstElemTy == nullptr) {
-          DstElemTy = SrcElemTy;
-          Dst = Builder.CreateGEP(DstElemTy, Dst, {ConstantInt::get(I32Ty, 0)});
-        } else if (SrcElemTy == nullptr) {
-          SrcElemTy = DstElemTy;
-          Src = Builder.CreateGEP(SrcElemTy, Src, {ConstantInt::get(I32Ty, 0)});
+        Type *ElemTy;
+        if (DstTy == SrcTy && SrcTy != nullptr &&
+            ((Size % (BitcastUtils::SizeInBits(Layout, SrcTy) / CHAR_BIT)) ==
+             0)) {
+          ElemTy = SrcTy;
+        } else {
+          ElemTy = UpdateTy(M.getContext(), Size);
         }
+        auto ElemSize = Layout.getTypeSizeInBits(ElemTy) / CHAR_BIT;
 
-        unsigned NumDstUnpackings = 0;
-        unsigned NumSrcUnpackings = 0;
-        match_types(*CI, Size, &DstElemTy, &SrcElemTy, &NumDstUnpackings,
-                    &NumSrcUnpackings);
-        auto SPIRVIntrinsic = clspv::CopyMemoryFunction();
-
-        auto DstElemSize = Layout.getTypeSizeInBits(DstElemTy) / 8;
-        auto SrcElemSize = Layout.getTypeSizeInBits(SrcElemTy) / 8;
-
-        auto Zero = ConstantInt::get(I32Ty, 0);
-        SmallVector<Value *, 3> SrcIndices;
-        SmallVector<Value *, 3> DstIndices;
-        // Make unpacking indices.
-        for (unsigned unpacking = 0; unpacking < NumSrcUnpackings;
-             ++unpacking) {
-          SrcIndices.push_back(Zero);
-        }
-        for (unsigned unpacking = 0; unpacking < NumDstUnpackings;
-             ++unpacking) {
-          DstIndices.push_back(Zero);
-        }
-        // Add a placeholder for the final index.
-        SrcIndices.push_back(Zero);
-        DstIndices.push_back(Zero);
-
-        // Build the function and function type only once.
-        FunctionType *NewFType = nullptr;
-        Function *NewF = nullptr;
-
-        for (unsigned i = 0; i < Size / DstElemSize; ++i) {
+        for (unsigned i = 0; i < Size / ElemSize; ++i) {
           auto Index = ConstantInt::get(I32Ty, i);
-          SrcIndices.back() = Index;
-          DstIndices.back() = Index;
+          SmallVector<Value *, 3> Indices = {Index};
 
           // Avoid the builder for Src in order to prevent the folder from
           // creating constant expressions for constant memcpys.
-          auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
-              clspv::InferType(Src, M.getContext(), &type_cache), Src,
-              SrcIndices, "", CI);
-          auto DstElemPtr = Builder.CreateGEP(
-              clspv::InferType(Dst, M.getContext(), &type_cache), Dst,
-              DstIndices);
-          SmallVector<Type *, 5> param_tys = {
-              DstElemPtr->getType(), SrcElemPtr->getType(), I32Ty, I32Ty};
-          SmallVector<Value *, 5> param_values = {
-              DstElemPtr, SrcElemPtr,
-              ConstantInt::get(I32Ty,
-                               NewAlignment(DstAlignment, i * DstElemSize))};
-          if (clspv::Option::SpvVersion() >=
-              clspv::Option::SPIRVVersion::SPIRV_1_4) {
-            param_tys.push_back(I32Ty);
-            param_values.push_back(ConstantInt::get(
-                I32Ty, NewAlignment(SrcAlignment, i * SrcElemSize)));
-          }
-          param_values.push_back(Volatile);
-          NewFType = NewFType != nullptr ? NewFType
-                                         : FunctionType::get(F.getReturnType(),
-                                                             param_tys, false);
-          NewF = NewF != nullptr ? NewF
-                                 : Function::Create(NewFType, F.getLinkage(),
-                                                    SPIRVIntrinsic, &M);
-          Builder.CreateCall(NewF, param_values, "");
+          auto SrcElemPtr =
+              GetElementPtrInst::CreateInBounds(ElemTy, Src, Indices, "", CI);
+          auto Srci = Builder.CreateLoad(ElemTy, SrcElemPtr, Volatile);
+          auto DstElemPtr = Builder.CreateGEP(ElemTy, Dst, Indices);
+          Builder.CreateStore(Srci, DstElemPtr, Volatile);
         }
 
         // Erase the call.
