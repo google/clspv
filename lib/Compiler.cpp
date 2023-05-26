@@ -313,6 +313,8 @@ int SetCompilerInstanceOptions(
   instance.getCodeGenOpts().DisableO0ImplyOptNone = true;
   instance.getCodeGenOpts().OpaquePointers = clspv::Option::OpaquePointers();
   instance.getDiagnosticOpts().IgnoreWarnings = IgnoreWarnings;
+  // We always undef __SPIR__ and __SPIRV__ (see below) so don't warn about it.
+  instance.getDiagnosticOpts().Warnings.push_back("no-builtin-macro-redefined");
   // TODO(#995): Re-enable this warning.
   instance.getDiagnosticOpts().Warnings.push_back("no-unsafe-buffer-usage");
 
