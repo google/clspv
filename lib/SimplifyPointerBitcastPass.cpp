@@ -675,6 +675,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
           continue;
         }
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
+          if (gep->getNumIndices() <= 1)
+            continue;
           if (SizeInBits(DL, source_ty) < SizeInBits(DL, dest_ty)) {
             if (auto cst = dyn_cast<ConstantInt>(
                     gep->getOperand(gep->getNumOperands() - 1))) {
