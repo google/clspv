@@ -1280,7 +1280,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
     for (auto &F : *module) {
       for (auto &BB : F) {
         for (auto &I : BB) {
-          if (I.getType()->isPointerTy() &&
+          if (isa<IntToPtrInst>(&I) &&
               GetStorageClass(I.getType()->getPointerAddressSpace()) ==
                   spv::StorageClassPhysicalStorageBuffer) {
             auto *inferred_ty =
