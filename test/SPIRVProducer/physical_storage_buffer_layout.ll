@@ -1,0 +1,44 @@
+; RUN: clspv-opt %s -o %t.ll -producer-out-file=%t.spv --passes=spirv-producer -physical-storage-buffers
+; RUN: spirv-dis %t.spv -o %t.spvasm
+; RUN: spirv-val --target-env vulkan1.0 %t.spv
+; RUN: FileCheck %s < %t.spvasm
+
+; CHECK-DAG: OpDecorate [[ptr:%[a-zA-Z0-9_]+]] ArrayStride 8
+; CHECK-DAG: OpMemberDecorate [[struct:%[a-zA-Z0-9_]+]] 1 Offset 4
+; CHECK-DAG: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
+; CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+; CHECK-DAG: [[struct]] = OpTypeStruct [[int]] [[float]]
+; CHECK-DAG: [[ptr]] = OpTypePointer PhysicalStorageBuffer [[struct]]
+
+target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
+target triple = "spir64-unknown-unknown"
+
+%struct.TestStruct = type { i32, float }
+
+@__spirv_GlobalInvocationId = local_unnamed_addr addrspace(5) global <3 x i32> zeroinitializer
+@__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
+
+define spir_kernel void @test_buffer_read_struct({ i64 } %podargs) !clspv.pod_args_impl !10 !kernel_arg_map !11 {
+entry:
+  %0 = call ptr addrspace(9) @_Z14clspv.resource.0(i32 -1, i32 0, i32 5, i32 0, i32 0, i32 0, { { i64 } } zeroinitializer)
+  %1 = getelementptr { { i64 } }, ptr addrspace(9) %0, i32 0, i32 0
+  %2 = load { i64 }, ptr addrspace(9) %1, align 8
+  %3 = extractvalue { i64 } %2, 0
+  %4 = inttoptr i64 %3 to ptr addrspace(1), !clspv.pointer_from_pod !13
+  %5 = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_GlobalInvocationId, i32 0, i32 0
+  %6 = load i32, ptr addrspace(5) %5, align 16
+  %idxprom.i.i = sext i32 %6 to i64
+  %7 = getelementptr %struct.TestStruct, ptr addrspace(1) %4, i64 %idxprom.i.i, i32 0
+  store i32 65537, ptr addrspace(1) %7, align 4
+  %8 = getelementptr inbounds %struct.TestStruct, ptr addrspace(1) %4, i64 %idxprom.i.i, i32 1
+  store float 0x47EFFFFFE0000000, ptr addrspace(1) %8, align 4
+  ret void
+}
+
+declare ptr addrspace(9) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { { i64 } })
+
+!10 = !{i32 2}
+!11 = !{!12}
+!12 = !{!"", i32 0, i32 0, i32 0, i32 8, !"pointer_pushconstant"}
+!13 = !{}
+
