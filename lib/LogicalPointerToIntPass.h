@@ -21,23 +21,22 @@
 #define _CLSPV_LIB_LOGICAL_POINTER_TO_INT_PASS_H
 
 namespace clspv {
-struct LogicalPointerToIntPass
-    : llvm::PassInfoMixin<LogicalPointerToIntPass> {
+struct LogicalPointerToIntPass : llvm::PassInfoMixin<LogicalPointerToIntPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:
-  bool isMemBase(llvm::Value* Val);
+  bool isMemBase(llvm::Value *Val);
   bool processValue(const llvm::DataLayout &DL, llvm::Value *Value,
-                  llvm::APInt &Offset, llvm::Value *&MemBase);
+                    uint64_t &CstOffset, llvm::Value *&DynOffset,
+                    llvm::Value *&MemBase);
   uint64_t getMemBaseAddr(llvm::Value *MemBase);
+  bool InlineFunctions(llvm::Module &M);
 
-
-// Arbitrary initial base address for allocations. Don't use 0x0 in case of
-// problems with NULL.
+  // Arbitrary initial base address for allocations. Don't use 0x0 in case of
+  // problems with NULL.
   uint64_t nextBaseAddress = 0X1000000000000000;
 
-  std::unordered_map<llvm::Value*, uint64_t> baseAddressMap;
-  llvm::SmallPtrSet<llvm::Function*, 8> calledFuncs;
+  std::unordered_map<llvm::Value *, uint64_t> baseAddressMap;
 };
 } // namespace clspv
 

@@ -15,8 +15,10 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
 
 #include "BitcastUtils.h"
 
@@ -41,28 +43,53 @@ using namespace llvm;
 // the amount of private and local memory will be quite small.
 constexpr uint64_t MaxAllocSize = 0x0000100000000000;
 
-bool IsTargetAddrSpace(unsigned AS) {
-  return AS == clspv::AddressSpace::Private || AS == clspv::AddressSpace::Local;
+static bool IsTargetAddrSpace(unsigned AS) {
+  return AS == clspv::AddressSpace::Private ||
+         AS == clspv::AddressSpace::Local ||
+         !clspv::Option::PhysicalStorageBuffers();
+}
+
+static bool FunctionShouldBeInlined(Function &F) {
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : BB) {
+      if (isa<IntToPtrInst>(I) || isa<PtrToIntInst>(I)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool clspv::LogicalPointerToIntPass::InlineFunctions(Module &M) {
+  bool Changed = false;
+  std::vector<CallInst *> to_inline;
+  for (auto &F : M) {
+    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
+      continue;
+
+    if (!FunctionShouldBeInlined(F)) {
+      continue;
+    }
+
+    for (auto user : F.users()) {
+      if (auto call = dyn_cast<CallInst>(user))
+        to_inline.push_back(call);
+    }
+  }
+
+  for (auto call : to_inline) {
+    InlineFunctionInfo IFI;
+    Changed |= InlineFunction(*call, IFI, false, nullptr, false).isSuccess();
+  }
+  return Changed;
 }
 
 PreservedAnalyses
 clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
   PreservedAnalyses PA;
 
-  // If a kernel is called from another function, local pointer arguments
-  // cannot be guaranteed to the 'base' address of the allocation, track these
-  // kernels so we can skip them if needed
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        if (auto *Call = dyn_cast<CallInst>(&I)) {
-          if (auto *CalledFunc = Call->getCalledFunction()) {
-            calledFuncs.insert(CalledFunc);
-          }
-        }
-      }
-    }
-  }
+  while (InlineFunctions(M))
+    ;
 
   SmallVector<Instruction *, 8> InstrsToProcess;
   for (auto &F : M) {
@@ -96,15 +123,18 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
     auto *IntTy = cast<IntegerType>(Instr->getType());
 
     auto *PtrOp = Instr->getOperand(0);
-    APInt Offset(M.getDataLayout().getPointerSizeInBits(
-                     PtrOp->getType()->getPointerAddressSpace()),
-                 0);
     Value *MemBase = nullptr;
+    uint64_t CstOffset = 0;
+    Value *DynOffset = nullptr;
 
-    if (processValue(M.getDataLayout(), PtrOp, Offset, MemBase)) {
+    if (processValue(M.getDataLayout(), PtrOp, CstOffset, DynOffset, MemBase)) {
       auto BaseAddr = getMemBaseAddr(MemBase);
-      auto *Replacement =
-          ConstantInt::get(IntTy, BaseAddr + Offset.getZExtValue());
+      Value *Replacement;
+      Replacement = ConstantInt::get(IntTy, BaseAddr + CstOffset);
+      if (DynOffset != nullptr) {
+        IRBuilder<> B(Instr);
+        Replacement = B.CreateAdd(Replacement, DynOffset);
+      }
       Instr->replaceAllUsesWith(Replacement);
     }
   }
@@ -113,18 +143,32 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
 }
 
 bool clspv::LogicalPointerToIntPass::processValue(const DataLayout &DL,
-                                                  Value *Val, APInt &Offset,
+                                                  Value *Val,
+                                                  uint64_t &CstOffset,
+                                                  llvm::Value *&DynOffset,
                                                   Value *&MemBase) {
   if (auto *GEP = dyn_cast<GetElementPtrInst>(Val)) {
     // Convert GEP indices to byte offset
-    if (GEP->hasAllConstantIndices() && isMemBase(GEP->getPointerOperand())) {
-      if (GEP->accumulateConstantOffset(DL, Offset)) {
-        MemBase = GEP->getPointerOperand();
-        return true;
-      }
+    IRBuilder<> B(GEP);
+    size_t SmallerBitWidths;
+    uint64_t CstVal = 0;
+    Value *DynVal = nullptr;
+    BitcastUtils::ExtractOffsetFromGEP(DL, B, GEP, CstVal, DynVal,
+                                       SmallerBitWidths);
+    CstOffset += CstVal * SmallerBitWidths / CHAR_BIT;
+    if (DynVal) {
+      DynVal = BitcastUtils::CreateMul(B, SmallerBitWidths / CHAR_BIT, DynVal);
     }
+    if (DynOffset && DynVal) {
+      DynOffset = B.CreateAdd(DynOffset, DynVal);
+    } else if (DynVal) {
+      DynOffset = DynVal;
+    }
+    return processValue(DL, GEP->getPointerOperand(), CstOffset, DynOffset,
+                        MemBase);
   } else if (auto *Bitcast = dyn_cast<BitCastInst>(Val)) {
-    return processValue(DL, Bitcast->getOperand(0), Offset, MemBase);
+    return processValue(DL, Bitcast->getOperand(0), CstOffset, DynOffset,
+                        MemBase);
   } else if (isMemBase(Val)) {
     MemBase = Val;
     return true;
@@ -141,7 +185,7 @@ bool clspv::LogicalPointerToIntPass::isMemBase(Value *Val) {
     // Local memory args are only allowed in actual kernels, pointers passed
     // to regular functions might not be the base of the actual allocation
     if (F->getCallingConv() == llvm::CallingConv::SPIR_KERNEL &&
-        !calledFuncs.contains(F) && Arg->getType()->isPointerTy() &&
+        Arg->getType()->isPointerTy() &&
         IsTargetAddrSpace(Arg->getType()->getPointerAddressSpace())) {
       return true;
     }
