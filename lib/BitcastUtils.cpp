@@ -1172,9 +1172,19 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     }
     for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
       size_t size = TyBitWidths[i] / NewSmallerBitWidths;
-      Idxs.push_back(CreateDiv(Builder, size, DynVal));
-      if (i != TyBitWidths.size() - 1)
-        DynVal = CreateRem(Builder, size, DynVal);
+      auto STy =
+          dyn_cast<StructType>(GetElementPtrInst::getIndexedType(SrcTy, Idxs));
+      if (i != 0 && STy) {
+        if (STy->getNumElements() > 1) {
+          llvm_unreachable("Cannot create gep with dynamic indices for this "
+                           "multi-element struct");
+        }
+        Idxs.push_back(Builder.getInt32(0));
+      } else {
+        Idxs.push_back(CreateDiv(Builder, size, DynVal));
+        if (i != TyBitWidths.size() - 1)
+          DynVal = CreateRem(Builder, size, DynVal);
+      }
     }
   }
   return Idxs;
