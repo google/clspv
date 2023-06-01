@@ -1273,6 +1273,25 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
   // mark them as needing layout.
   std::vector<Type *> work_list(StructTypesNeedingBlock.begin(),
                                 StructTypesNeedingBlock.end());
+
+  // Physical storage buffer types need layout, but the types can't be found via
+  // resource variables. Traverse the module to find the necessary types.
+  if (clspv::Option::PhysicalStorageBuffers()) {
+    for (auto &F : *module) {
+      for (auto &BB : F) {
+        for (auto &I : BB) {
+          if (isa<IntToPtrInst>(&I) &&
+              GetStorageClass(I.getType()->getPointerAddressSpace()) ==
+                  spv::StorageClassPhysicalStorageBuffer) {
+            auto *inferred_ty =
+                clspv::InferType(&I, module->getContext(), &InferredTypeCache);
+            if (inferred_ty)
+              work_list.push_back(inferred_ty);
+          }
+        }
+      }
+    }
+  }
   while (!work_list.empty()) {
     Type *type = work_list.back();
     work_list.pop_back();
