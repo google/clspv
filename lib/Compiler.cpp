@@ -564,11 +564,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::FixupBuiltinsPass());
     pm.addPass(clspv::ThreeElementVectorLoweringPass());
 
-    if (clspv::Option::HackLogicalPtrtoint()) {
-      pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
-      pm.addPass(clspv::LogicalPointerToIntPass());
-    }
-
     // Lower longer vectors when requested. Note that this pass depends on
     // ReplaceOpenCLBuiltinPass and expects DeadCodeEliminationPass to be run
     // afterwards.
@@ -598,6 +593,11 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
     pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
+
+    if (clspv::Option::HackLogicalPtrtoint()) {
+      pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+      pm.addPass(clspv::LogicalPointerToIntPass());
+    }
 
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
