@@ -657,10 +657,10 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
 
   case Builtins::kMad:
   case Builtins::kMad24:
-    return replaceMul(F, FI.getParameter(0).type_id == llvm::Type::FloatTyID,
+    return replaceMul(F, Builtins::IsFloatTypeID(FI.getParameter(0).type_id),
                       true);
   case Builtins::kMul24:
-    return replaceMul(F, FI.getParameter(0).type_id == llvm::Type::FloatTyID,
+    return replaceMul(F, Builtins::IsFloatTypeID(FI.getParameter(0).type_id),
                       false);
 
   case Builtins::kSelect:
