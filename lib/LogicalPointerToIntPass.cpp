@@ -88,8 +88,8 @@ PreservedAnalyses
 clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
   PreservedAnalyses PA;
 
-  while (InlineFunctions(M))
-    { }
+  while (InlineFunctions(M)) {
+  }
 
   SmallVector<Instruction *, 8> InstrsToProcess;
   for (auto &F : M) {
