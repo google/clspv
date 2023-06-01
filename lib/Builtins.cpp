@@ -124,7 +124,7 @@ size_t GetParameterType(const std::string &mangled_name,
       }
       return GetParameterType(mangled_name, type_info, pos);
     } else if (type_code == 'h') { // OCL half
-      type_info->type_id = Type::FloatTyID;
+      type_info->type_id = Type::HalfTyID;
       type_info->is_signed = true;
       type_info->byte_len = 2;
       return pos;
@@ -388,6 +388,7 @@ Builtins::GetMangledFunctionName(const Builtins::FunctionInfo &info) {
 
     switch (param.type_id) {
     case Type::FloatTyID:
+    case Type::HalfTyID:
       switch (param.byte_len) {
       case 2:
         out << "Dh";
@@ -544,7 +545,7 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   switch (func_info.getType()) {
   case Builtins::kClamp: {
     auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
+    if (IsFloatTypeID(param_type.type_id)) {
       return glsl::ExtInst::ExtInstNClamp;
     }
     return param_type.is_signed ? glsl::ExtInst::ExtInstSClamp
@@ -552,7 +553,7 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   }
   case Builtins::kMax: {
     auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
+    if (IsFloatTypeID(param_type.type_id)) {
       return glsl::ExtInst::ExtInstFMax;
     }
     return param_type.is_signed ? glsl::ExtInst::ExtInstSMax
@@ -560,7 +561,7 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   }
   case Builtins::kMin: {
     auto param_type = func_info.getParameter(0);
-    if (param_type.type_id == Type::FloatTyID) {
+    if (IsFloatTypeID(param_type.type_id)) {
       return glsl::ExtInst::ExtInstFMin;
     }
     return param_type.is_signed ? glsl::ExtInst::ExtInstSMin
@@ -782,4 +783,8 @@ bool Builtins::BuiltinWithGenericPointer(StringRef name) {
       name.contains("sincos"))
     return true;
   return false;
+}
+
+bool Builtins::IsFloatTypeID(llvm::Type::TypeID type_id) {
+  return type_id == llvm::Type::FloatTyID || type_id == llvm::Type::HalfTyID;
 }
