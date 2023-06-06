@@ -21,6 +21,7 @@
 namespace clspv {
 struct PrintfPass : llvm::PassInfoMixin<PrintfPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
+
 private:
   // Find the underlying compile-time string literal, if any, for the given
   // value
