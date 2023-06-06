@@ -59,7 +59,7 @@ std::string clspv::PrintfPass::GetStringLiteral(Value *Val) {
 }
 
 unsigned clspv::PrintfPass::GetPrintfStoreSize(const DataLayout &DL, Type *Ty) {
-  return std::max(4ul, DL.getTypeStoreSize(Ty).getFixedValue());
+  return std::max(4ul, (unsigned long)DL.getTypeStoreSize(Ty).getFixedValue());
 }
 
 void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
