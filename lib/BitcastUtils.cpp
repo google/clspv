@@ -874,6 +874,26 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           dest_ty = call->getType();
         }
       }
+    } else if (call->getCalledFunction()->getName().startswith("llvm.memcpy")) {
+      // To help lower memcpy, try to rework memcpy inputs to have the same type
+      // with the samer of them. It avoids upgrading a type which can lead to
+      // complicated issues.
+      auto Dst = call->getArgOperand(0);
+      auto Src = call->getArgOperand(1);
+      auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+      auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+      if (DstTy != SrcTy) {
+        if (SizeInBits(M.getDataLayout(), DstTy) >=
+            SizeInBits(M.getDataLayout(), SrcTy)) {
+          source = Src;
+          source_ty = SrcTy;
+          dest_ty = DstTy;
+        } else {
+          source = Dst;
+          source_ty = DstTy;
+          dest_ty = SrcTy;
+        }
+      }
     }
   }
 
@@ -1073,14 +1093,6 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        size_t SmallerBitWidths,
                        clspv::AddressSpace::Type AddrSpace) {
   SmallVector<Value *, 2> Idxs;
-  auto TyBitWidths =
-      BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
-  size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
-  if (NewSmallerBitWidths <= SmallerBitWidths) {
-    CstVal *= SmallerBitWidths / NewSmallerBitWidths;
-  } else {
-    CstVal /= NewSmallerBitWidths / SmallerBitWidths;
-  }
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
@@ -1092,17 +1104,66 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     startIdx = 1;
   }
 
+  if (DstTy->isVoidTy()) {
+    DstTy = Builder.getInt8Ty();
+  }
+  if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
+      DstTy != SrcTy) {
+    DstTy = SrcTy;
+    auto ElDstTy = GetEleType(DstTy);
+    while (DstTy != ElDstTy) {
+      DstTy = ElDstTy;
+      ElDstTy = GetEleType(DstTy);
+    }
+  }
+
   if (DynVal == nullptr) {
-    for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
-      size_t size = TyBitWidths[i] / NewSmallerBitWidths;
-      Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), CstVal / size));
+    Type *Ty = SrcTy;
+    CstVal *= SmallerBitWidths;
+    if (startIdx == 0) {
+      auto size = SizeInBits(DataLayout, Ty);
+      Idxs.push_back(Builder.getInt32(CstVal / size));
       CstVal %= size;
     }
+    while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
+           SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, DstTy)) {
+      if (auto STy = dyn_cast<StructType>(Ty)) {
+        auto SLayout = DataLayout.getStructLayout(STy);
+        auto SId = SLayout->getElementContainingOffset(CstVal / CHAR_BIT);
+        auto offset = SLayout->getElementOffsetInBits(SId);
+        Ty = STy->getElementType(SId);
+        Idxs.push_back(Builder.getInt32(SId));
+        CstVal -= offset;
+      } else {
+        auto NextTy = GetEleType(Ty);
+        assert(NextTy != Ty);
+        Ty = NextTy;
+        auto size = SizeInBits(DataLayout, Ty);
+        Idxs.push_back(Builder.getInt32(CstVal / size));
+        CstVal %= size;
+      }
+      assert(GetElementPtrInst::getIndexedType(SrcTy, Idxs) == Ty);
+    }
+    if (CstVal != 0) {
+      errs() << "Err: SrcTy = ";
+      SrcTy->print(errs());
+      errs() << " - DstTy = ";
+      DstTy->print(errs());
+      errs() << " - Ty = ";
+      Ty->print(errs());
+      errs() << " - CstVal = " << CstVal << "\n";
+      llvm_unreachable("Unexpected offset for type in GetIdxsForTyFromOffset");
+    }
   } else {
+    auto TyBitWidths =
+        BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
+    size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
     if (NewSmallerBitWidths <= SmallerBitWidths) {
+      CstVal *= SmallerBitWidths / NewSmallerBitWidths;
       DynVal =
           CreateMul(Builder, SmallerBitWidths / NewSmallerBitWidths, DynVal);
     } else {
+      CstVal /= NewSmallerBitWidths / SmallerBitWidths;
       DynVal =
           CreateDiv(Builder, NewSmallerBitWidths / SmallerBitWidths, DynVal);
     }
@@ -1112,9 +1173,19 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     }
     for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
       size_t size = TyBitWidths[i] / NewSmallerBitWidths;
-      Idxs.push_back(CreateDiv(Builder, size, DynVal));
-      if (i != TyBitWidths.size() - 1)
-        DynVal = CreateRem(Builder, size, DynVal);
+      auto STy =
+          dyn_cast<StructType>(GetElementPtrInst::getIndexedType(SrcTy, Idxs));
+      if (i != 0 && STy) {
+        if (STy->getNumElements() > 1) {
+          llvm_unreachable("Cannot create gep with dynamic indices for this "
+                           "multi-element struct");
+        }
+        Idxs.push_back(Builder.getInt32(0));
+      } else {
+        Idxs.push_back(CreateDiv(Builder, size, DynVal));
+        if (i != TyBitWidths.size() - 1)
+          DynVal = CreateRem(Builder, size, DynVal);
+      }
     }
   }
   return Idxs;

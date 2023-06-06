@@ -49,7 +49,11 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed |= runOnTrivialBitcast(M);
     changed |= runOnBitcastFromBitcast(M);
     changed |= runOnGEPFromGEP(M);
-    changed |= runOnGEPImplicitCasts(M);
+    changed |= runOnUnneededCasts(M);
+    changed |= runOnImplicitGEP(M);
+    changed |= runOnUpgradeableConstantCasts(M);
+    changed |= runOnUnneededIndices(M);
+    changed |= runOnImplicitCasts(M);
   }
 
   return PA;
@@ -86,6 +90,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnTrivialBitcast(Module &M) const {
 
   for (auto Bitcast : WorkList) {
     auto Source = Bitcast->getOperand(0);
+    LLVM_DEBUG(dbgs() << "\n##runOnTrivialBitcast:\nreplaceAllUses of :";
+               Bitcast->dump(); dbgs() << "by: "; Source->dump());
     Bitcast->replaceAllUsesWith(Source);
 
     // Remove the bitcast as it has no users now.
@@ -137,9 +143,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
       assert(CE && CE->getOpcode() == Instruction::BitCast);
       OtherBitcast = CE->getAsInstruction(Bitcast);
     }
+    LLVM_DEBUG(dbgs() << "\n##runOnBitcastFromBitcast:\nremove:";
+               Bitcast->dump());
 
     if (OtherBitcast->getType() == Bitcast->getType()) {
       Bitcast->replaceAllUsesWith(OtherBitcast);
+      LLVM_DEBUG(dbgs() << "in favor of: "; OtherBitcast->dump());
     } else {
       // Create a new bitcast from the other bitcasts argument to our type.
       auto NewBitcast =
@@ -148,6 +157,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
 
       // And replace the original bitcast with our replacement bitcast.
       Bitcast->replaceAllUsesWith(NewBitcast);
+      LLVM_DEBUG(dbgs() << "in favor of: "; NewBitcast->dump());
     }
 
     // Remove the bitcast as it has no users now.
@@ -171,11 +181,32 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
         // If we have a GEP instruction...
         if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) {
           // ... whose operand is also a GEP instruction...
-          if (isa<GetElementPtrInst>(GEP->getPointerOperand())) {
+          if (auto OtherGEP =
+                  dyn_cast<GetElementPtrInst>(GEP->getPointerOperand())) {
             // ... with no implicit cast between them...
-            auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
             if (OtherGEP->getResultElementType() ==
                 GEP->getSourceElementType()) {
+
+              auto LastTypeIsStruct = [](Type *Ty, SmallVector<Value *> Idxs) {
+                Idxs.pop_back();
+                return isa<StructType>(
+                    GetElementPtrInst::getIndexedType(Ty, Idxs));
+              };
+              auto NotZero = [](Value *V) {
+                if (auto CstVal = dyn_cast<ConstantInt>(V)) {
+                  if (CstVal->getZExtValue() == 0)
+                    return false;
+                }
+                return true;
+              };
+              if (GEP->getNumOperands() > 1 && NotZero(GEP->getOperand(1)) &&
+                  LastTypeIsStruct(OtherGEP->getSourceElementType(),
+                                   SmallVector<Value *>(OtherGEP->indices()))) {
+                LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (struct "
+                                     "follow by not zero): ";
+                           OtherGEP->dump(); GEP->dump());
+                continue;
+              }
               // ... record the GEP as something we need to process.
               WorkList.push_back(GEP);
             }
@@ -191,6 +222,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     IRBuilder<> Builder(GEP);
 
     auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
+    LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nreplace: "; OtherGEP->dump();
+               GEP->dump());
 
     Value *SrcLastIdxOp = OtherGEP->getOperand(OtherGEP->getNumOperands() - 1);
     Value *GEPIdxOp = GEP->getOperand(1);
@@ -313,6 +346,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                                          OtherGEP->getPointerOperand(), Idxs,
                                          "", GEP);
     }
+    LLVM_DEBUG(dbgs() << "by: "; NewGEP->dump());
 
     // And replace the original GEP with our replacement GEP.
     GEP->replaceAllUsesWith(NewGEP);
@@ -330,19 +364,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
   return Changed;
 }
 
-bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
+bool clspv::SimplifyPointerBitcastPass::runOnUnneededCasts(Module &M) const {
   const DataLayout &DL = M.getDataLayout();
-
-  DenseSet<GetElementPtrInst *> UnneededCasts;
-  DenseMap<GetElementPtrInst *,
-           std::tuple<Instruction *, ConstantInt *, Type *, Type *>>
-      UpgradeCstCasts;
-  DenseMap<Instruction *, std::pair<int, GetElementPtrInst *>> ImplicitGEPs;
-  DenseMap<Value *, Type *> type_cache;
-  DenseMap<GetElementPtrInst *, GetElementPtrInst *> ImplicitCasts;
-
   bool changed = false;
-
+  DenseMap<Value *, Type *> type_cache;
+  SmallVector<GetElementPtrInst *, 8> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -350,14 +376,66 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
         if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
-                             true))
+                             true)) {
           continue;
+        }
 
         if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
           if (source_ty == gep->getResultElementType()) {
-            UnneededCasts.insert(gep);
-            continue;
+            Worklist.push_back(gep);
           }
+        }
+      }
+    }
+  }
+
+  for (auto *GEP : Worklist) {
+    IRBuilder<> Builder(GEP);
+    LLVM_DEBUG(dbgs() << "\n##runOnUnneededCasts:\nreplace: "; GEP->dump());
+    Type *Ty = GEP->getResultElementType();
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+    auto Indices = GetIdxsForTyFromOffset(
+        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+        (clspv::AddressSpace::Type)GEP->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
+
+    auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
+                                             Indices, "", GEP);
+    LLVM_DEBUG(dbgs() << "by: "; NewGEP->dump());
+    GEP->replaceAllUsesWith(NewGEP);
+    GEP->eraseFromParent();
+
+    changed = true;
+  }
+
+  return changed;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  bool changed = false;
+  DenseMap<Value *, Type *> type_cache;
+
+  struct ImplicitGEP {
+    Instruction *inst;
+    int steps;
+    GetElementPtrInst *gep;
+  };
+
+  SmallVector<ImplicitGEP, 8> Worklist;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
         }
 
         int Steps = 0;
@@ -372,20 +450,75 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
           bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if ((Steps > 0 && !gep) || (Steps == 1)) {
             if (!userCall && (gep || PerfectMatch)) {
-              ImplicitGEPs.insert(
-                  {&I, std::make_pair(Steps, PerfectMatch ? nullptr : gep)});
-              continue;
+              Worklist.push_back({&I, Steps, PerfectMatch ? nullptr : gep});
             }
           }
         }
+      }
+    }
+  }
 
-        if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
+  // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
+  // handled by explcitly inserting the GEP.
+  for (auto GEPInfo : Worklist) {
+    auto *I = GEPInfo.inst;
+    auto Steps = GEPInfo.steps;
+    auto *gep = GEPInfo.gep;
+    IRBuilder<> Builder{I};
+    SmallVector<Value *, 8> GEPIndices{};
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
 
-          if (UnneededCasts.count(gep) != 0 ||
-              UpgradeCstCasts.count(gep) != 0 || ImplicitGEPs.count(gep) != 0) {
-            continue;
-          }
+    for (int i = 0; i < Steps + 1; i++) {
+      GEPIndices.push_back(Builder.getInt32(0));
+    }
 
+    Value *PointerOp = I->getOperand(PointerOperandNum);
+    auto *PointerOpType =
+        clspv::InferType(PointerOp, M.getContext(), &type_cache);
+    auto *NewGEP =
+        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP:\nadding: "; NewGEP->dump());
+
+    if (gep) {
+      // Typical usecase here is a GEP on a struct of float, followed by a GEP
+      // on a int. Replace the last GEP by a GEP on a float.
+      auto *NewCastGEP = GetElementPtrInst::Create(
+          NewGEP->getResultElementType(), NewGEP,
+          SmallVector<Value *, 1>(gep->indices()), "", I);
+      LLVM_DEBUG(dbgs() << "instead of: "; I->dump());
+      I->replaceAllUsesWith(NewCastGEP);
+      I->eraseFromParent();
+    } else {
+      LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum
+                        << " of: ";
+                 I->dump());
+      I->setOperand(PointerOperandNum, NewGEP);
+    }
+    changed = true;
+  }
+
+  return changed;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  bool changed = false;
+  DenseMap<Value *, Type *> type_cache;
+
+  SmallVector<GetElementPtrInst *, 8> Worklist;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
+        }
+
+        if (isa<GetElementPtrInst>(source)) {
           if (auto *inst_gep = dyn_cast<GetElementPtrInst>(&I)) {
             auto VecSrcTy = dyn_cast<FixedVectorType>(source_ty);
             auto VecDstTy = dyn_cast<FixedVectorType>(dest_ty);
@@ -396,24 +529,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
             if (!(VecSrcTy && VecDstTy &&
                   (VecSrcTy->getNumElements() == 3 ||
                    VecDstTy->getNumElements() == 3))) {
-              ImplicitCasts.insert({gep, inst_gep});
-              continue;
-            }
-          }
-
-          // For some reason, with opaque pointer, LLVM tends to transform
-          // memcpy/memset into a series of gep and load/store. But while the
-          // load/store are on i32 for example, it keeps the gep on i8 but
-          // with index multiples of sizeof(i32). To avoid such bitcast which
-          // leads to trying to store an i8 into a i32 element (which is not
-          // supported), upgrade those gep into gep on i32 with the
-          // appropriate indexes.
-          SmallVector<Value *, 2> Indices(gep->indices());
-          if (Indices.size() == 1) {
-            if (auto cst = dyn_cast<ConstantInt>(Indices[0])) {
-              UpgradeCstCasts.insert(
-                  {gep, std::make_tuple(&I, cst, source_ty, dest_ty)});
-              continue;
+              Worklist.emplace_back(inst_gep);
             }
           }
         }
@@ -421,9 +537,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     }
   }
 
-  for (auto GEPs : ImplicitCasts) {
-    GetElementPtrInst *src_gep = GEPs.first;
-    GetElementPtrInst *inst_gep = GEPs.second;
+  for (auto inst_gep : Worklist) {
+    GetElementPtrInst *src_gep =
+        cast<GetElementPtrInst>(inst_gep->getPointerOperand());
 
     IRBuilder<> Builder{inst_gep};
     uint64_t CstVal;
@@ -439,38 +555,71 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
             ->getPointerAddressSpace());
     auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
                                              src_gep, Idxs, "", inst_gep);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitCasts:\nreplace: "; inst_gep->dump();
+               dbgs() << "by: "; new_gep->dump());
     inst_gep->replaceAllUsesWith(new_gep);
     inst_gep->eraseFromParent();
     changed = true;
   }
 
-  for (auto *GEP : UnneededCasts) {
-    IRBuilder<> Builder(GEP);
-    Type *Ty = GEP->getResultElementType();
-    uint64_t CstVal;
-    Value *DynVal;
-    size_t SmallerBitWidths;
-    ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
-    auto Indices = GetIdxsForTyFromOffset(
-        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)GEP->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
+  return changed;
+}
 
-    auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
-                                             Indices, "", GEP);
-    GEP->replaceAllUsesWith(NewGEP);
-    GEP->eraseFromParent();
+bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
+    Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  bool changed = false;
+  DenseMap<Value *, Type *> type_cache;
 
-    changed = true;
+  DenseSet<GetElementPtrInst *> seen;
+  struct UpgradeInfo {
+    GetElementPtrInst *gep;
+    Instruction *inst;
+    ConstantInt *constant;
+    Type *source_ty;
+    Type *dest_ty;
+  };
+  SmallVector<UpgradeInfo, 8> Worklist;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
+        }
+
+        if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
+          if (!seen.insert(gep).second) {
+            continue;
+          }
+
+          // For some reason, with opaque pointer, LLVM tends to transform
+          // memcpy/memset into a series of gep and load/store. But while the
+          // load/store are on i32 for example, it keeps the gep on i8 but
+          // with index multiples of sizeof(i32). To avoid such bitcast which
+          // leads to trying to store an i8 into a i32 element (which is not
+          // supported), upgrade those gep into gep on i32 with the
+          // appropriate indexes.
+          SmallVector<Value *, 2> Indices(gep->indices());
+          if (Indices.size() == 1) {
+            if (auto cst = dyn_cast<ConstantInt>(Indices[0])) {
+              Worklist.push_back({gep, &I, cst, source_ty, dest_ty});
+            }
+          }
+        }
+      }
+    }
   }
 
-  for (auto GEPInfo : UpgradeCstCasts) {
-    auto *GEP = GEPInfo.first;
-    Instruction *I = std::get<0>(GEPInfo.second);
-    ConstantInt *cst = std::get<1>(GEPInfo.second);
-    Type *source_ty = std::get<2>(GEPInfo.second);
-    Type *dest_ty = std::get<3>(GEPInfo.second);
+  for (auto GEPInfo : Worklist) {
+    auto *GEP = GEPInfo.gep;
+    Instruction *I = GEPInfo.inst;
+    ConstantInt *cst = GEPInfo.constant;
+    Type *source_ty = GEPInfo.source_ty;
+    Type *dest_ty = GEPInfo.dest_ty;
     auto source_ty_size = SizeInBits(DL, source_ty);
     auto dest_ty_size = SizeInBits(DL, dest_ty);
     auto value = cst->getZExtValue();
@@ -491,6 +640,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
           new_type, GEP->getPointerOperand(), Indices, "", I);
 
       unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+
+      LLVM_DEBUG(
+          dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace operand "
+                 << PointerOperandNum << " of: ";
+          I->dump(); dbgs() << "by: "; new_gep->dump());
       I->setOperand(PointerOperandNum, new_gep);
 
       if (GEP->getNumUses() == 0) {
@@ -501,36 +655,66 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPImplicitCasts(Module &M) const {
     }
   }
 
-  // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
-  // handled by explcitly inserting the GEP.
-  for (auto GEPInfo : ImplicitGEPs) {
-    auto *I = GEPInfo.first;
-    auto Steps = GEPInfo.second.first;
-    auto *gep = GEPInfo.second.second;
-    IRBuilder<> Builder{I};
-    SmallVector<Value *, 8> GEPIndices{};
-    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+  return changed;
+}
 
-    for (int i = 0; i < Steps + 1; i++) {
-      GEPIndices.push_back(Builder.getInt32(0));
+bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  bool changed = false;
+  DenseMap<Value *, Type *> type_cache;
+
+  SmallVector<std::pair<GetElementPtrInst *, Instruction *>> Worklist;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
+        }
+        if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
+          if (gep->getNumIndices() <= 1)
+            continue;
+          if (SizeInBits(DL, source_ty) < SizeInBits(DL, dest_ty)) {
+            if (auto cst = dyn_cast<ConstantInt>(
+                    gep->getOperand(gep->getNumOperands() - 1))) {
+              if (cst->getZExtValue() == 0) {
+                Worklist.push_back(std::make_pair(gep, &I));
+              }
+            }
+          }
+        }
+      }
     }
+  }
 
-    Value *PointerOp = I->getOperand(PointerOperandNum);
-    auto *PointerOpType =
-        clspv::InferType(PointerOp, M.getContext(), &type_cache);
-    auto *NewGEP =
-        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
-
-    if (gep) {
-      // Typical usecase here is a GEP on a struct of float, followed by a GEP
-      // on a int. Replace the last GEP by a GEP on a float.
-      auto *NewCastGEP = GetElementPtrInst::Create(
-          NewGEP->getResultElementType(), NewGEP,
-          SmallVector<Value *, 1>(gep->indices()), "", I);
-      I->replaceAllUsesWith(NewCastGEP);
-      I->eraseFromParent();
-    } else {
-      I->setOperand(PointerOperandNum, NewGEP);
+  for (auto pair : Worklist) {
+    GetElementPtrInst *gep = pair.first;
+    Instruction *I = pair.second;
+    SmallVector<Value *> Indices(gep->indices());
+    while (Indices.size() > 1) {
+      auto lastIndice = Indices.back();
+      if (auto cst = dyn_cast<ConstantInt>(lastIndice)) {
+        if (cst->getZExtValue() == 0) {
+          Indices.pop_back();
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    IRBuilder<> Builder{gep};
+    auto new_gep =
+        GetElementPtrInst::Create(gep->getSourceElementType(),
+                                  gep->getPointerOperand(), Indices, "", gep);
+    LLVM_DEBUG(dbgs() << "\nrunOnUnneededIndices:\nreplace: "; gep->dump();
+               dbgs() << "by: "; new_gep->dump(); dbgs() << "in: "; I->dump());
+    I->replaceUsesOfWith(gep, new_gep);
+    if (gep->getNumUses() == 0) {
+      gep->eraseFromParent();
     }
     changed = true;
   }

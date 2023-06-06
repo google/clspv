@@ -391,7 +391,7 @@ static llvm::cl::opt<bool> physical_storage_buffers(
     llvm::cl::desc("Use physical storage buffers instead of storage buffers"));
 
 static llvm::cl::opt<bool> hack_logical_ptrtoint(
-    "hack-logical-ptrtoint", llvm::cl::init(false),
+    "hack-logical-ptrtoint", llvm::cl::init(true),
     llvm::cl::desc(
         "Allow ptrtoint on logical address spaces when it can be "
         "guaranteed that they won't be converted back to pointers."));

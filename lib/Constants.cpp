@@ -71,12 +71,6 @@ const std::string &UnpackFunction() {
   return func_name;
 }
 
-const std::string &CopyMemoryFunction() {
-  static std::string func_name =
-      Builtins::GetMangledFunctionName("spirv.copy_memory");
-  return func_name;
-}
-
 const std::string &SPIRVOpIntrinsicFunction() {
   static std::string func_name = Builtins::GetMangledFunctionName("spirv.op");
   return func_name;

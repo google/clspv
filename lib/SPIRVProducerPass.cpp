@@ -1278,6 +1278,25 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
   // mark them as needing layout.
   std::vector<Type *> work_list(StructTypesNeedingBlock.begin(),
                                 StructTypesNeedingBlock.end());
+
+  // Physical storage buffer types need layout, but the types can't be found via
+  // resource variables. Traverse the module to find the necessary types.
+  if (clspv::Option::PhysicalStorageBuffers()) {
+    for (auto &F : *module) {
+      for (auto &BB : F) {
+        for (auto &I : BB) {
+          if (isa<IntToPtrInst>(&I) &&
+              GetStorageClass(I.getType()->getPointerAddressSpace()) ==
+                  spv::StorageClassPhysicalStorageBuffer) {
+            auto *inferred_ty =
+                clspv::InferType(&I, module->getContext(), &InferredTypeCache);
+            if (inferred_ty)
+              work_list.push_back(inferred_ty);
+          }
+        }
+      }
+    }
+  }
   while (!work_list.empty()) {
     Type *type = work_list.back();
     work_list.pop_back();
@@ -3568,75 +3587,6 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
       }
 
       RID = addSPIRVInst(opcode, Ops);
-    }
-    break;
-  }
-  case Builtins::kSpirvCopyMemory: {
-    //
-    // Generate OpCopyMemory.
-    //
-
-    // Ops[0] = Dst ID
-    // Ops[1] = Src ID
-    // Ops[2] = Memory Access
-    // Ops[3] = Alignment
-
-    const auto volatile_arg = SpvVersion() >= SPIRVVersion::SPIRV_1_4 ? 4 : 3;
-    auto IsVolatile = dyn_cast<ConstantInt>(Call->getArgOperand(volatile_arg))
-                          ->getZExtValue() != 0;
-
-    auto VolatileMemoryAccess = (IsVolatile) ? spv::MemoryAccessVolatileMask
-                                             : spv::MemoryAccessMaskNone;
-
-    auto MemoryAccess = VolatileMemoryAccess | spv::MemoryAccessAlignedMask;
-
-    auto DstAlignment =
-        dyn_cast<ConstantInt>(Call->getArgOperand(2))->getZExtValue();
-    auto SrcAlignment = DstAlignment;
-    if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
-      SrcAlignment =
-          dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue();
-    }
-
-    // OpCopyMemory only works if the pointer element type are the same id. If
-    // we are generating code for SPIR-V 1.4 or later, this may not be the
-    // case.
-    auto dst = Call->getArgOperand(0);
-    auto src = Call->getArgOperand(1);
-    auto dst_layout =
-        PointerRequiresLayout(dst->getType()->getPointerAddressSpace());
-    auto src_layout =
-        PointerRequiresLayout(src->getType()->getPointerAddressSpace());
-    auto dst_id = getSPIRVType(
-        InferType(dst, module->getContext(), &InferredTypeCache), dst_layout);
-    auto src_id = getSPIRVType(
-        InferType(src, module->getContext(), &InferredTypeCache), src_layout);
-    SPIRVOperandVec Ops;
-    if (dst_id.get() != src_id.get()) {
-      assert(Option::SpvVersion() >= SPIRVVersion::SPIRV_1_4);
-      // Types differ so generate:
-      // OpLoad
-      // OpCopyLogical
-      // OpStore
-
-      Ops << src_id << src << MemoryAccess
-          << static_cast<uint32_t>(SrcAlignment);
-      auto load = addSPIRVInst(spv::OpLoad, Ops);
-
-      Ops.clear();
-      Ops << dst_id << load;
-      auto copy = addSPIRVInst(spv::OpCopyLogical, Ops);
-
-      Ops.clear();
-      Ops << dst << copy << MemoryAccess << static_cast<uint32_t>(DstAlignment);
-      RID = addSPIRVInst(spv::OpStore, Ops);
-    } else {
-      Ops << dst << src << MemoryAccess << static_cast<uint32_t>(DstAlignment);
-      if (SpvVersion() >= SPIRVVersion::SPIRV_1_4) {
-        Ops << MemoryAccess << static_cast<uint32_t>(SrcAlignment);
-      }
-
-      RID = addSPIRVInst(spv::OpCopyMemory, Ops);
     }
     break;
   }

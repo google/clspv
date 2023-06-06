@@ -112,6 +112,9 @@ glsl::ExtInst getDirectOrIndirectExtInstEnum(const FunctionInfo &func_info);
 // Builtin that might need particular management with libclc to ensure the
 // correct implementation (libclc or native) is used.
 bool BuiltinWithGenericPointer(llvm::StringRef name);
+
+bool IsFloatTypeID(llvm::Type::TypeID type_id);
+
 } // namespace Builtins
 
 } // namespace clspv

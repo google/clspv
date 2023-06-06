@@ -44,6 +44,7 @@ clspv::SplatArgPass::getSplatName(const Builtins::FunctionInfo &func_info,
     type_code = param_info.is_signed ? signed_int_type_tbl[index]
                                      : unsigned_int_type_tbl[index];
     break;
+  case Type::HalfTyID:
   case Type::FloatTyID:
     if (index == 0)
       llvm_unreachable("Unsupported float type");
