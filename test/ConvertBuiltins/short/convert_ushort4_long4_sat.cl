@@ -13,6 +13,6 @@
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global ushort4* dst, global long4* src)
 {
-    *dst = convert_ushort4(*src);
+    *dst = convert_ushort4_sat(*src);
 }
 

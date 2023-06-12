@@ -1748,12 +1748,42 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
     bool SrcIsInt = SrcType->isIntOrIntVectorTy();
     bool DstIsInt = DstType->isIntOrIntVectorTy();
 
+    const bool isSaturate = F.getName() .find("_sat") != std::string::npos;
+
     if (SrcType == DstType && DstIsSigned == SrcIsSigned) {
       // Unnecessary cast operation.
       V = SrcValue;
     } else if (SrcIsFloat && DstIsFloat) {
       V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
     } else if (SrcIsFloat && DstIsInt) {
+      if (isSaturate) {
+        auto dstWidth = DstType->getScalarSizeInBits();
+
+        // Don't use function type because we need signed parameters.
+        std::string clamp_name = Builtins::GetMangledFunctionName("clamp");
+        // The clamp values are the signed min and max of the original bitwidth
+        // sign extended to the extended bitwidth.
+        Constant *min = nullptr, *max = nullptr;
+        if (DstIsSigned)  {
+          int64_t maxValue = uint64_t(1 << (dstWidth - 1)) - 1;
+          min = ConstantFP::get(SrcType, double(-maxValue - 1));
+          max = ConstantFP::get(SrcType, double(maxValue));
+        } else {
+          min = ConstantFP::getZero(SrcType);
+          max = ConstantFP::get(SrcType, double(((1 << dstWidth) - 1)));
+        }
+        if (auto vec_ty = dyn_cast<VectorType>(DstType)) {
+          auto elemCount = vec_ty->getElementCount();
+          auto vec_width = elemCount.getKnownMinValue();
+          clamp_name += "Dv" + std::to_string(vec_width);
+          clamp_name += (dstWidth == 32) ? "_fS_S_" :  "_dS_S_";
+        } else {
+          clamp_name += (dstWidth == 32) ? "fff" : "ddd";
+        }
+        auto func_ty = FunctionType::get(SrcType, {SrcType, SrcType, SrcType}, false);
+        auto callee = F.getParent()->getOrInsertFunction(clamp_name, func_ty);
+        SrcValue = CallInst::Create(callee, {SrcValue, min, max}, "", CI);
+      }
       if (DstIsSigned) {
         V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "", CI);
       } else {
@@ -1766,6 +1796,63 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
         V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "", CI);
       }
     } else if (SrcIsInt && DstIsInt) {
+      if (isSaturate) {
+        auto srcWidth = SrcType->getScalarSizeInBits();
+        auto dstWidth = DstType->getScalarSizeInBits();
+
+        // The clamp values are the signed min and max of the original bitwidth
+        // sign extended to the extended bitwidth.
+        Constant *min = nullptr, *max = nullptr;
+        if (DstIsSigned)  {
+          if(SrcIsSigned) {
+            if (srcWidth > dstWidth) {
+              min = ConstantInt::get(CI->getContext(), APInt::getSignedMinValue(dstWidth).sext(srcWidth));
+              max = ConstantInt::get(CI->getContext(), APInt::getSignedMaxValue(dstWidth).sext(srcWidth));
+            }
+          } else {
+            if (srcWidth >= dstWidth) {
+              max = ConstantInt::get(CI->getContext(), APInt::getSignedMaxValue(dstWidth).sext(srcWidth));
+            }
+          }
+        } else {
+          if (SrcIsSigned) {
+            min = ConstantInt::get(CI->getContext(), APInt::getMinValue(dstWidth).zext(srcWidth));
+          }
+          if (srcWidth > dstWidth) {
+            max = ConstantInt::get(CI->getContext(), APInt::getMaxValue(dstWidth).zext(srcWidth));
+          }
+        }
+        if (auto vec_ty = dyn_cast<VectorType>(DstType)) {
+          auto elemCount = vec_ty->getElementCount();
+          min = min ? ConstantVector::getSplat(elemCount, min) : min;
+          max = max ? ConstantVector::getSplat(elemCount, max) : max;
+        }
+
+        if (min && max) {
+          // Don't use function type because we need signed parameters.
+          std::string clamp_name = Builtins::GetMangledFunctionName("clamp");
+          if (auto vec_ty = dyn_cast<VectorType>(DstType)) {
+            auto vec_width = vec_ty->getElementCount().getKnownMinValue();
+            clamp_name += "Dv" + std::to_string(vec_width);
+            clamp_name += (dstWidth == 32) ? "_iS_S_" :  "_sS_S_";
+          } else {
+            clamp_name += (dstWidth == 32) ? "iii" : "sss";
+          }
+          auto func_ty = FunctionType::get(SrcType, {SrcType, SrcType, SrcType}, false);
+          auto callee = F.getParent()->getOrInsertFunction(clamp_name, func_ty);
+          SrcValue = CallInst::Create(callee, {SrcValue, min, max}, "", CI);
+        } else if (max) {
+          auto cmp = CmpInst::Create(Instruction::ICmp,
+                        SrcIsSigned ? ICmpInst::ICMP_SLT : ICmpInst::ICMP_ULT,
+                        SrcValue, max, "", CI);
+          SrcValue  = SelectInst::Create(cmp, SrcValue, max, "", CI);
+        } else if (min) {
+          auto cmp = CmpInst::Create(Instruction::ICmp,
+                        SrcIsSigned ? ICmpInst::ICMP_SLT : ICmpInst::ICMP_ULT,
+                        min, SrcValue, "", CI);
+          SrcValue  = SelectInst::Create(cmp, SrcValue, min, "", CI);
+        }
+      }
       V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "", CI);
     } else {
       // Not something we're supposed to handle, just move on

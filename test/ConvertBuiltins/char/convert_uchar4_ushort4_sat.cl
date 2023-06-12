@@ -14,6 +14,6 @@
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uchar4* dst, global ushort4* src)
 {
-    *dst = convert_uchar4(*src);
+    *dst = convert_uchar4_sat(*src);
 }
 
