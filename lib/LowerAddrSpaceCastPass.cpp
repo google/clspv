@@ -223,10 +223,22 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
     }
     return Name;
   };
-  std::string Name = fixNameSuffix(clspv::Builtins::GetMangledFunctionName(
-      Info.getName().c_str(), FunctionTy));
 
-  Module *M = I.getParent()->getParent()->getParent();
+  std::string Name = Info.getName();
+  if (Info.getType() == clspv::Builtins::kSpirvOp) {
+    auto *opcode = dyn_cast<ConstantInt>(EquivalentArgs[0]);
+    Name = Builtins::GetMangledFunctionName(Name.c_str());
+    Name += ".";
+    Name += std::to_string(opcode->getZExtValue());
+    Name += ".";
+    for (auto i = 1; i < EquivalentTypes.size(); i++) {
+       Name += Builtins::GetMangledTypeName(EquivalentTypes[i]);
+    }
+  } else {
+    Name = fixNameSuffix(clspv::Builtins::GetMangledFunctionName(Name.c_str(), FunctionTy));
+  }
+
+  Module *M = I.getModule();
   auto getEquivalentFunction = [&Name, &M, &FunctionTy, this, &F]() {
     Function *eqF = M->getFunction(Name);
     if (eqF != nullptr)
