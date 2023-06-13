@@ -997,7 +997,8 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
   auto library =
       llvm::getLazyIRModule(std::move(buffer), Err, module->getContext());
   if (!library) {
-    llvm::errs() << "Failed to parse builtins library\n";
+    llvm::errs() << "Failed to parse builtins library:\n";
+    llvm::errs() << Err.getMessage();
     return false;
   }
 
