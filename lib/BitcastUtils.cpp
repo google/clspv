@@ -18,6 +18,7 @@
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 #include <cmath>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/Debug.h>
 
 #define DEBUG_TYPE "bitcastutils"
@@ -847,6 +848,30 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     source_ty =
         clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
     dest_ty = st->getValueOperand()->getType();
+  } else if (auto *phi = dyn_cast<PHINode>(&I)) {
+    if (phi->getNumIncomingValues() > 0) {
+      auto RefOp = phi->getIncomingValue(0);
+      auto RefOpTy = clspv::InferType(RefOp, M.getContext(), &type_cache);
+      for (unsigned i = 1; i < phi->getNumIncomingValues(); i++) {
+        auto Op = phi->getIncomingValue(i);
+        auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
+        if (SizeInBits(M.getDataLayout(), OpTy) >
+            SizeInBits(M.getDataLayout(), RefOpTy)) {
+          source = Op;
+          source_ty = OpTy;
+          dest_ty = RefOpTy;
+        } else if (SizeInBits(M.getDataLayout(), OpTy) <
+                   SizeInBits(M.getDataLayout(), RefOpTy)) {
+          source = RefOp;
+          source_ty = RefOpTy;
+          dest_ty = OpTy;
+        } else if (OpTy != RefOpTy) {
+          source = Op;
+          source_ty = OpTy;
+          dest_ty = RefOpTy;
+        }
+      }
+    }
   } else if (auto *call = dyn_cast<CallInst>(&I)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {

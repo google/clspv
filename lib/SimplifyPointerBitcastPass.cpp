@@ -54,6 +54,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed |= runOnUpgradeableConstantCasts(M);
     changed |= runOnUnneededIndices(M);
     changed |= runOnImplicitCasts(M);
+    changed |= runOnPHIFromGEP(M);
   }
 
   return PA;
@@ -442,6 +443,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         bool PerfectMatch;
         if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
                                       DL)) {
+          // PHI Node are handle in runOnPHIFromGEP if it is really needed
+          if (isa<PHINode>(&I)) {
+            continue;
+          }
+
           // Single level GEP is ok to transform, but beyond
           // that the address math must be divided among other
           // entries.
@@ -716,6 +722,59 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
     if (gep->getNumUses() == 0) {
       gep->eraseFromParent();
     }
+    changed = true;
+  }
+
+  return changed;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  bool changed = false;
+  DenseMap<Value *, Type *> type_cache;
+
+  SmallVector<std::pair<GetElementPtrInst *, Type *>> Worklist;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
+        }
+
+        if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
+          if (isa<PHINode>(&I)) {
+            Worklist.emplace_back(std::make_pair(gep, dest_ty));
+          }
+        }
+      }
+    }
+  }
+
+  for (auto pair : Worklist) {
+    GetElementPtrInst *gep = pair.first;
+    Type *Ty = pair.second;
+
+    IRBuilder<> Builder{gep};
+    uint64_t CstVal;
+    Value *DynVal;
+    size_t SmallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, gep, CstVal, DynVal, SmallerBitWidths);
+    auto Idxs = GetIdxsForTyFromOffset(
+        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+        (clspv::AddressSpace::Type)gep->getPointerOperand()
+            ->getType()
+            ->getPointerAddressSpace());
+    auto new_gep =
+        GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
+    LLVM_DEBUG(dbgs() << "\n##runOnPHIFromGEP:\nreplace: "; gep->dump();
+               dbgs() << "by: "; new_gep->dump());
+    gep->replaceAllUsesWith(new_gep);
+    gep->eraseFromParent();
     changed = true;
   }
 
