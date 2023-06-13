@@ -83,7 +83,7 @@ mkdir "$CLVK_BUILD" && cd "$CLVK_BUILD"
 cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DCLVK_CLSPV_ONLINE_COMPILER=ON -DCLSPV_SOURCE_DIR="$SRC" \
   -DCLVK_ENABLE_ASSERTIONS=ON \
-  -DCLVK_VULKAN_IMPLEMENTATION=custom -DVulkan_INCLUDE_DIRS=$CLVK_SRC/external/Vulkan-Headers/include -DVulkan_LIBRARIES="$VULKAN_LOADER_BUILD/loader/libvulkan.so" \
+  -DCLVK_VULKAN_IMPLEMENTATION=custom -DVulkan_INCLUDE_DIRS=${VULKAN_HEADERS_SRC}/include -DVulkan_LIBRARIES="$VULKAN_LOADER_BUILD/loader/libvulkan.so" \
   "$CLVK_SRC"
 ninja
 echo $(date): Clvk build completed.
