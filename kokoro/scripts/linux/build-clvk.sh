@@ -37,27 +37,32 @@ fi
 cd $SRC
 /usr/bin/python3 utils/fetch_sources.py
 
+VULKAN_VERSION=v1.3.243
+
 # Get and build Vulkan-Headers
 echo $(date): Starting Vulkan-Headers build...
-VULKAN_HEADERS_SRC="$BUILD_ROOT/github/vulkan-headers"
-VULKAN_HEADERS_BUILD="$VULKAN_HEADERS_SRC/build"
-git clone https://github.com/KhronosGroup/Vulkan-Headers "$VULKAN_HEADERS_SRC"
-cd "$VULKAN_HEADERS_SRC" && git checkout tags/v1.1.129
-mkdir "$VULKAN_HEADERS_BUILD" && cd "$VULKAN_HEADERS_BUILD"
-cmake -G Ninja -DCMAKE_INSTALL_PREFIX=$PWD "$VULKAN_HEADERS_SRC"
-ninja install
+VULKAN_HEADERS_SRC="${BUILD_ROOT}/github/vulkan-headers"
+VULKAN_HEADERS_BUILD="${VULKAN_HEADERS_SRC}/build"
+VULKAN_HEADERS_INSTALL="${VULKAN_HEADERS_SRC}/install"
+git clone https://github.com/KhronosGroup/Vulkan-Headers "${VULKAN_HEADERS_SRC}"
+git -C "${VULKAN_HEADERS_SRC}" checkout tags/${VULKAN_VERSION}
+mkdir "${VULKAN_HEADERS_INSTALL}"
+mkdir "${VULKAN_HEADERS_BUILD}"
+cmake -G Ninja -DCMAKE_INSTALL_PREFIX="${VULKAN_HEADERS_INSTALL}" -S "${VULKAN_HEADERS_SRC}" -B "${VULKAN_HEADERS_BUILD}"
+cmake --build "${VULKAN_HEADERS_BUILD}" --target install
 echo $(date): Vulkan-Headers build completed.
 
 # Get and build Vulkan-Loader
 echo $(date): Starting Vulkan-Loader build...
-VULKAN_LOADER_SRC="$BUILD_ROOT/github/vulkan-loader"
-VULKAN_LOADER_BUILD="$VULKAN_LOADER_SRC/build"
-git clone https://github.com/KhronosGroup/Vulkan-Loader "$VULKAN_LOADER_SRC"
-cd "$VULKAN_LOADER_SRC" && git checkout tags/v1.1.129
-mkdir "$VULKAN_LOADER_BUILD" && cd "$VULKAN_LOADER_BUILD"
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-  -DVULKAN_HEADERS_INSTALL_DIR="$VULKAN_HEADERS_BUILD" -DBUILD_WSI_WAYLAND_SUPPORT=OFF -DBUILD_WSI_XLIB_SUPPORT=OFF "$VULKAN_LOADER_SRC" -DBUILD_WSI_XCB_SUPPORT=OFF
-ninja
+VULKAN_LOADER_SRC="${BUILD_ROOT}/github/vulkan-loader"
+VULKAN_LOADER_BUILD="${VULKAN_LOADER_SRC}/build"
+git clone https://github.com/KhronosGroup/Vulkan-Loader "${VULKAN_LOADER_SRC}"
+git -C "${VULKAN_LOADER_SRC}" checkout tags/${VULKAN_VERSION}
+mkdir "${VULKAN_LOADER_BUILD}"
+cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+      -DVULKAN_HEADERS_INSTALL_DIR="${VULKAN_HEADERS_INSTALL}" -DBUILD_WSI_WAYLAND_SUPPORT=OFF -DBUILD_WSI_XLIB_SUPPORT=OFF \
+      -DBUILD_WSI_XCB_SUPPORT=OFF -S "${VULKAN_LOADER_SRC}" -B "${VULKAN_LOADER_BUILD}"
+cmake --build "${VULKAN_LOADER_BUILD}"
 echo $(date): Vulkan-Loader build completed.
 
 # Get and build SwiftShader
@@ -83,7 +88,7 @@ mkdir "$CLVK_BUILD" && cd "$CLVK_BUILD"
 cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DCLVK_CLSPV_ONLINE_COMPILER=ON -DCLSPV_SOURCE_DIR="$SRC" \
   -DCLVK_ENABLE_ASSERTIONS=ON \
-  -DCLVK_VULKAN_IMPLEMENTATION=custom -DVulkan_INCLUDE_DIRS=$CLVK_SRC/external/Vulkan-Headers/include -DVulkan_LIBRARIES="$VULKAN_LOADER_BUILD/loader/libvulkan.so" \
+  -DCLVK_VULKAN_IMPLEMENTATION=custom -DVulkan_INCLUDE_DIRS=${VULKAN_HEADERS_SRC}/include -DVulkan_LIBRARIES="$VULKAN_LOADER_BUILD/loader/libvulkan.so" \
   "$CLVK_SRC"
 ninja
 echo $(date): Clvk build completed.
