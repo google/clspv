@@ -4527,7 +4527,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         }
         Ops << I.getOperand(0);
 
-        RID = addSPIRVInst(GetSPIRVCastOpcode(I), Ops);
+        auto Op = GetSPIRVCastOpcode(I);
+        RID = addSPIRVInst(Op, Ops);
+
+        if (clspv::Option::HackConvertToFloat() &&
+            (Op == spv::OpConvertSToF || Op == spv::OpConvertUToF)) {
+          Ops.clear();
+          Ops << I.getType() << RID
+              << getSPIRVConstant(Constant::getNullValue(I.getType()));
+          RID = addSPIRVInst(spv::OpFAdd, Ops);
+        }
       }
     } else if (isa<BinaryOperator>(I)) {
       //
