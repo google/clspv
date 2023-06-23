@@ -86,6 +86,10 @@ bool HackMulExtended();
 // compile-time constants when it is safe to do so.
 bool HackLogicalPtrtoint();
 
+// Returns true if a dummy instruction should be inserted after conversion to
+// float to prevent driver optimisation getting rid of the conversion.
+bool HackConvertToFloat();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.

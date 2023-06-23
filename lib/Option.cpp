@@ -165,6 +165,11 @@ llvm::cl::opt<bool> hack_mul_extended(
     "hack-mul-extended", llvm::cl::init(false),
     llvm::cl::desc("Avoid usage of OpSMulExtended and OpUMulExtended"));
 
+llvm::cl::opt<bool> hack_convert_to_float(
+    "hack-convert-to-float", llvm::cl::init(false),
+    llvm::cl::desc("Insert a dummy instruction after conversions to float to "
+                   "avoid driver optimization getting rid of the conversion"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -417,6 +422,7 @@ bool HackBlockOrder() { return hack_block_order; }
 bool HackClampWidth() { return hack_clamp_width; }
 bool HackMulExtended() { return hack_mul_extended; }
 bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
+bool HackConvertToFloat() { return hack_convert_to_float; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }
