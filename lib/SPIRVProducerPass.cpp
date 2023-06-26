@@ -4064,7 +4064,7 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     Operands << cmp;
     auto subgroup = addSPIRVInst(op, Operands);
     Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
-        << ConstantInt::get(call->getType(), 0);
+        << ConstantInt::get(Call->getType(), 0);
     RID = addSPIRVInst(spv::OpSelect, Ops);
     break;
   }
