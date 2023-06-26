@@ -231,7 +231,7 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
     Name += ".";
     Name += std::to_string(opcode->getZExtValue());
     Name += ".";
-    for (auto i = 1; i < EquivalentTypes.size(); i++) {
+    for (size_t i = 1; i < EquivalentTypes.size(); i++) {
       Name += Builtins::GetMangledTypeName(EquivalentTypes[i]);
     }
   } else {

@@ -3547,8 +3547,7 @@ bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, bool is_signed,
 
 bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
                                                 bool is_add) {
-  return replaceCallsWithValue(F, [&F, this, is_signed,
-                                   is_add](CallInst *Call) {
+  return replaceCallsWithValue(F, [&F, is_signed, is_add](CallInst *Call) {
     auto intrinsic_type =
         is_signed ? (is_add ? Intrinsic::sadd_sat : Intrinsic::ssub_sat)
                   : (is_add ? Intrinsic::uadd_sat : Intrinsic::usub_sat);
