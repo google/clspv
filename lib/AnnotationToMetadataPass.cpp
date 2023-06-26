@@ -30,8 +30,6 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
 
       // list of processed strings to delete at the end
       SmallPtrSet<GlobalValue *, 4> to_erase;
-      // TODO: #816 remove after final transition.
-      SmallPtrSet<Constant *, 4> constants_to_erase;
 
       ConstantArray *annotations_array =
           dyn_cast<ConstantArray>(GV.getOperand(0));
@@ -40,12 +38,10 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
             dyn_cast<ConstantStruct>(annotation_entry.get());
 
         auto op0 = annotation_struct->getOperand(0);
-        Function *entry_point = dyn_cast<Function>(
-            op0->getType()->isOpaquePointerTy() ? op0 : op0->getOperand(0));
+        Function *entry_point = dyn_cast<Function>(op0);
 
         auto op1 = annotation_struct->getOperand(1);
-        GlobalVariable *annotation_gv = dyn_cast<GlobalVariable>(
-            op1->getType()->isOpaquePointerTy() ? op1 : op1->getOperand(0));
+        GlobalVariable *annotation_gv = dyn_cast<GlobalVariable>(op1);
         StringRef annotation =
             dyn_cast<ConstantDataArray>(annotation_gv->getInitializer())
                 ->getAsCString();
@@ -63,22 +59,13 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
         to_erase.insert(annotation_gv);
         // this isn't used so also clean up
         auto op2 = annotation_struct->getOperand(2);
-        GlobalVariable *filename_gv = dyn_cast<GlobalVariable>(
-            op2->getType()->isOpaquePointerTy() ? op2 : op2->getOperand(0));
+        GlobalVariable *filename_gv = dyn_cast<GlobalVariable>(op2);
         to_erase.insert(filename_gv);
-
-        // this constant stays after the global is erased, so kill it
-        // TODO: #816 remove after final transition.
-        if (!op1->getType()->isOpaquePointerTy())
-          constants_to_erase.insert(op0);
       }
 
       GV.eraseFromParent();
       for (auto gv : to_erase) {
         gv->eraseFromParent();
-      }
-      for (auto constant : constants_to_erase) {
-        constant->destroyConstant();
       }
       break;
     }

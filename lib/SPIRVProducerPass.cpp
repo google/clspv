@@ -1566,24 +1566,6 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
     // Nothing
   } else if (type->getNumContainedTypes() != 0) {
     switch (type->getTypeID()) {
-    case Type::PointerTyID: {
-      // For the purposes of our Vulkan SPIR-V type system, constant and global
-      // are conflated.
-      auto *ptr_ty = cast<PointerType>(type);
-      unsigned AddrSpace = ptr_ty->getAddressSpace();
-      if (AddressSpace::Constant == AddrSpace) {
-        if (!clspv::Option::ConstantArgsInUniformBuffer() &&
-            !clspv::Option::PhysicalStorageBuffers()) {
-          AddrSpace = AddressSpace::Global;
-          // The canonical type of __constant is __global unless constants are
-          // passed in uniform buffers.
-          auto *GlobalTy =
-              PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
-          return GlobalTy;
-        }
-      }
-      break;
-    }
     case Type::StructTyID: {
       SmallVector<Type *, 8> subtypes;
       bool changed = false;
