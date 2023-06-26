@@ -3902,7 +3902,6 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 SPIRVID
 SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     CallInst *Call, const FunctionInfo &FuncInfo) {
-  SPIRVID RID;
 
   // requires SPIRV version 1.3 or greater
   if (SpvVersion() != SPIRVVersion::SPIRV_1_3) {
@@ -4014,7 +4013,16 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
   // Ops[3] = Local ID
 
   // The result type.
-  Operands << Call->getType();
+  switch (FuncInfo.getType()) {
+  case Builtins::kSubGroupAny:
+  case Builtins::kSubGroupAll:
+    // SPIR-V needs a bool return type for any/all.
+    Operands << getSPIRVType(Type::getInt1Ty(module->getContext()));
+    break;
+  default:
+    Operands << Call->getType();
+    break;
+  }
 
   // Subgroup Scope
   Operands << getSPIRVInt32Constant(spv::ScopeSubgroup);
@@ -4039,11 +4047,36 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     break;
   }
 
-  for (Use &use : Call->args()) {
-    Operands << use.get();
+  SPIRVID RID;
+  switch (FuncInfo.getType()) {
+  case Builtins::kSubGroupAny:
+  case Builtins::kSubGroupAll: {
+    // OpenCL uses an int predicate instead of the bool from SPIR-V.
+    // Generate:
+    // tmp = predicate != 0
+    // op = Any/All predicate
+    // RID = op ? 1 : 0
+    SPIRVOperandVec Ops;
+    Ops << getSPIRVType(Type::getInt1Ty(module->getContext()))
+        << Call->getArgOperand(0) << ConstantInt::get(Call->getType(), 0);
+    auto cmp = addSPIRVInst(spv::OpINotEqual, Ops);
+    Ops.clear();
+    Operands << cmp;
+    auto subgroup = addSPIRVInst(op, Operands);
+    Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
+        << ConstantInt::get(call->getType(), 0);
+    RID = addSPIRVInst(spv::OpSelect, Ops);
+    break;
+  }
+  default:
+    for (Use &use : Call->args()) {
+      Operands << use.get();
+    }
+    RID = addSPIRVInst(op, Operands);
+    break;
   }
 
-  return addSPIRVInst(op, Operands);
+  return RID;
 }
 
 SPIRVID SPIRVProducerPassImpl::GenerateShuffle2FromCall(Type *Ty, Value *SrcA,
