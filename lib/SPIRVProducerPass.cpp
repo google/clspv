@@ -391,6 +391,8 @@ struct SPIRVProducerPassImpl {
   }
   StrideTypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
 
+  void ReadFunctionAttributes();
+
   void GenerateLLVMIRInfo();
   // Populate GlobalConstFuncTypeMap. Also, if module-scope __constant will
   // *not* be converted to a storage buffer, replace each such global variable
@@ -770,6 +772,8 @@ private:
   SPIRVID ReflectionID;
   DenseMap<Function *, SPIRVID> KernelDeclarations;
 
+  StringMap<std::string> functionAttrStrings;
+
 public:
   static SPIRVProducerPassImpl *Ptr;
 };
@@ -793,6 +797,18 @@ SPIRVOperandVec &operator<<(SPIRVOperandVec &list, Value *v) {
 }
 
 } // namespace
+
+void SPIRVProducerPassImpl::ReadFunctionAttributes() {
+  auto md_node =
+      module->getNamedMetadata(clspv::EntryPointAttributesMetadataName());
+  if (md_node) {
+    for (auto *operand : md_node->operands()) {
+      auto key = cast<MDString>(operand->getOperand(0).get())->getString();
+      auto value = cast<MDString>(operand->getOperand(1).get())->getString();
+      functionAttrStrings[key] = value;
+    }
+  }
+}
 
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
@@ -822,6 +838,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
 
   NonUniformPointers.clear();
 
+  ReadFunctionAttributes();
   PopulateUBOTypeMaps();
   PopulateStructuredCFGMaps();
 
@@ -6672,15 +6689,21 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
       num_args = F.getFunctionType()->getNumParams();
     }
 
+    auto attributes_op_string = addSPIRVInst<kDebug>(
+        spv::OpString, functionAttrStrings[F.getName()].c_str());
+
     // Kernel declaration
     // Ops[0] = void type
     // Ops[1] = reflection ext import
     // Ops[2] = function id
     // Ops[3] = kernel name
     // Ops[4] = number of arguments
+    // Ops[5] = Flags
+    // Ops[6] = Attributes
     SPIRVOperandVec Ops;
     Ops << void_id << import_id << reflection::ExtInstKernel << ValueMap[&F]
-        << kernel_name << getSPIRVInt32Constant(num_args);
+        << kernel_name << getSPIRVInt32Constant(num_args)
+        << getSPIRVInt32Constant(0) << attributes_op_string;
     auto kernel_decl = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
 
     // Generate the required workgroup size property if it was specified.

@@ -906,6 +906,43 @@ public:
     return true;
   }
 };
+
+class EntryPointAttrsConsumer final : public clang::ASTConsumer {
+public:
+  EntryPointAttrsConsumer(ASTContext *c) : context(c) {}
+  virtual bool HandleTopLevelDecl(clang::DeclGroupRef DG) override {
+    for (auto *D : DG) {
+      if (auto *FD = llvm::dyn_cast<clang::FunctionDecl>(D)) {
+        if (FD->hasBody() && FD->hasAttrs()) {
+          std::string str;
+          llvm::raw_string_ostream ss(str);
+          bool kernel_attr_present = false;
+          for (auto &A : FD->getAttrs()) {
+            kernel_attr_present |= std::strcmp(A->getSpelling(), "kernel");
+            kernel_attr_present |= std::strcmp(A->getSpelling(), "spir_kernel");
+            // TODO maybe trim string
+
+            // TODO stop the formatting
+            A->printPretty(ss, context->getPrintingPolicy());
+          }
+          if (kernel_attr_present) {
+            auto attr_str = ss.str();
+            // inline newlines should be removed
+            attr_str.erase(remove(attr_str.begin(), attr_str.end(), '\n'),
+                           attr_str.end());
+            FD->addAttr(AnnotateAttr::Create(FD->getASTContext(), attr_str,
+                                             nullptr, 0, FD->getSourceRange()));
+          }
+        }
+      }
+    }
+    return true; // TODO why true
+  }
+
+private:
+  ASTContext *context;
+};
+
 } // namespace
 
 namespace clspv {
@@ -913,5 +950,11 @@ std::unique_ptr<ASTConsumer>
 ExtraValidationASTAction::CreateASTConsumer(CompilerInstance &CI,
                                             llvm::StringRef InFile) {
   return std::unique_ptr<ASTConsumer>(new ExtraValidationConsumer(CI, InFile));
+}
+std::unique_ptr<ASTConsumer>
+EntryPointAttrsASTAction::CreateASTConsumer(CompilerInstance &CI,
+                                            llvm::StringRef InFile) {
+  return std::unique_ptr<ASTConsumer>(
+      new EntryPointAttrsConsumer(&CI.getASTContext()));
 }
 } // namespace clspv

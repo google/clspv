@@ -31,4 +31,18 @@ struct ExtraValidationASTAction final : public clang::PluginASTAction {
     return clang::PluginASTAction::AddBeforeMainAction;
   }
 };
+
+class EntryPointAttrsASTAction final : public clang::PluginASTAction {
+  virtual std::unique_ptr<clang::ASTConsumer>
+  CreateASTConsumer(clang::CompilerInstance &CI,
+                    llvm::StringRef InFile) override;
+  virtual bool ParseArgs(const clang::CompilerInstance &CI,
+                         const std::vector<std::string> &arg) override {
+    // Parsing succeeded.
+    return true;
+  }
+  virtual clang::PluginASTAction::ActionType getActionType() override {
+    return clang::PluginASTAction::AddBeforeMainAction;
+  }
+};
 } // namespace clspv

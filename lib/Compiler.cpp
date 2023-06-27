@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenAction.h"
@@ -81,6 +80,8 @@ enum class SPIRArch : uint32_t {
 static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
     X("extra-validation",
       "Perform extra validation on OpenCL C when targeting Vulkan");
+static FrontendPluginRegistry::Add<clspv::EntryPointAttrsASTAction>
+    Y("attr-information-getting", "get those attrs");
 
 static llvm::cl::opt<bool> cl_single_precision_constants(
     "cl-single-precision-constant", llvm::cl::init(false),
@@ -507,6 +508,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
+    pm.addPass(clspv::AnnotationToMetadataPass());
     pm.addPass(clspv::AddFunctionAttributesPass());
     pm.addPass(clspv::AutoPodArgsPass());
     pm.addPass(clspv::DeclarePushConstantsPass());
