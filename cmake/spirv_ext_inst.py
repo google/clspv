@@ -25,6 +25,18 @@ def write_enum(grammar, output):
     output.write("  ExtInstMax = 0x7fffffffu\n")
     output.write("}; // enum ExtInst\n\n")
 
+    if not 'operand_kinds' in grammar:
+        return
+
+    enums = grammar['operand_kinds']
+    for enum in enums:
+        output.write("enum Ext%s : unsigned int {\n" % enum['kind'])
+        for enumerant in enum["enumerants"]:
+            output.write("  %s = %s,\n" % (enumerant['enumerant'], enumerant['value']))
+        output.write("  %sMax = 0x7fffffffu\n" % enum['kind'])
+        output.write("}; // enum Ext%s\n\n" % enum['kind'])
+
+
 def write_name_func(grammar, output):
     output.write("inline const char* getExtInstName(const ExtInst thing) {\n")
     output.write("  switch(thing) {\n")

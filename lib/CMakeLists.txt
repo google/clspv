@@ -65,6 +65,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Passes.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PhysicalPointerArgsPass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/PrintfPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/PushConstant.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVOp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp

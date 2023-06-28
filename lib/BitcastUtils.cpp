@@ -835,18 +835,15 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
   // pointer (e.g. gep, alloca, or global variable).
   if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
     source = gep->getPointerOperand();
-    source_ty =
-        clspv::InferType(gep->getPointerOperand(), M.getContext(), &type_cache);
+    source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = gep->getSourceElementType();
   } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
     source = ld->getPointerOperand();
-    source_ty =
-        clspv::InferType(ld->getPointerOperand(), M.getContext(), &type_cache);
+    source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = ld->getType();
   } else if (auto *st = dyn_cast<StoreInst>(&I)) {
     source = st->getPointerOperand();
-    source_ty =
-        clspv::InferType(st->getPointerOperand(), M.getContext(), &type_cache);
+    source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = st->getValueOperand()->getType();
   } else if (auto *phi = dyn_cast<PHINode>(&I)) {
     if (phi->getNumIncomingValues() > 0) {
@@ -872,6 +869,10 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
         }
       }
     }
+  } else if (auto *atomic = dyn_cast<AtomicRMWInst>(&I)) {
+    source = atomic->getPointerOperand();
+    source_ty = clspv::InferType(source, M.getContext(), &type_cache);
+    dest_ty = atomic->getType();
   } else if (auto *call = dyn_cast<CallInst>(&I)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {

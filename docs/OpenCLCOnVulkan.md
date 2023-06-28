@@ -776,7 +776,48 @@ The `shuffle()`, `shuffle2()` and `vec_step()` built-in functions are supported.
 
 #### Printf
 
-The `printf()` built-in function **must not** be used.
+The `printf()` built-in function is supported when the `-enable-printf` flag is
+passed to clspv.
+
+The `printf()` built-in function is supported by adding a program-scope printf
+buffer, in the form of a storage buffer, to the module when one or more kernels
+in a program may use `printf`.
+
+The printf buffer is notionally a buffer of 32-bit unsigned integers. The first
+integer value represents the offset from the second integer value to the next
+free location in the buffer. This value is atomically incremented by the
+`printf` implementation to allocate regions of the buffer.
+
+The values written to the allocated region by the `printf` implementation, in
+the order they are written, are:
+* The unique ID associated with the given `printf` call site.
+* The value of zero or more arguments as they were passed subsequent to the
+  `printf` format string. The stored values of the arguments follow the rules
+  described below.
+
+**Printf argument values**
+
+* Arguments that are not unsigned integers are bit-cast to integers and
+  stored as their bit representation.
+* Values must have a size that is a multiple of 4 bytes. Arguments that do not
+  meet this requirement after the usual promotion rules are zero-extended.
+* Arguments larger than 4 bytes are stored across multiple 4 byte values.
+* String literal arguments (that appear after the usual format string) are
+  handled specially. They are treated like `printf` format strings and given a
+  program-wide unique ID. This ID is stored instead of the actual value of the
+  string literal.
+
+**Printf reflection data**
+
+The [NonSemantic.ClspvReflection](http://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/nonsemantic/NonSemantic.ClspvReflection.html)
+instructions are used to provide the necessary information for a runtime to
+interpret the values in the printf buffer. The two relevant instructions
+describe:
+* The size, descriptor set and binding of the program-scope printf buffer.
+* Each unique printf ID, the associated string (which is either a format string
+  or string literal argument), and the storage size of each associated argument.
+  For printf IDs representing string literal arguments, there are always zero
+  associated arguments.
 
 #### Image Read and Write Functions
 

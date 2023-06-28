@@ -53,6 +53,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "image_metadata";
   case PushConstant::ModuleConstantsPointer:
     return "module_constants_pointer";
+  case PushConstant::PrintfBufferPointer:
+    return "printf_buffer_pointer";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -78,6 +80,8 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
   case PushConstant::ImageMetadata:
     return IntegerType::get(C, 32);
   case PushConstant::ModuleConstantsPointer:
+    return IntegerType::get(C, 64);
+  case PushConstant::PrintfBufferPointer:
     return IntegerType::get(C, 64);
   default:
     break;
@@ -132,7 +136,8 @@ bool UsesGlobalPushConstants(Module &M) {
          ShouldDeclareRegionOffsetPushConstant(M) ||
          ShouldDeclareNumWorkgroupsPushConstant(M) ||
          ShouldDeclareRegionGroupOffsetPushConstant(M) ||
-         ShouldDeclareModuleConstantsPointerPushConstant(M);
+         ShouldDeclareModuleConstantsPointerPushConstant(M) ||
+         ShouldDeclarePrintfBufferPointerPushConstant(M);
 }
 
 bool ShouldDeclareGlobalOffsetPushConstant(Module &M) {
@@ -196,6 +201,13 @@ bool ShouldDeclareModuleConstantsPointerPushConstant(Module &M) {
   return isEnabled && moduleHasGlobals;
 }
 
+bool ShouldDeclarePrintfBufferPointerPushConstant(Module &M) {
+  bool isEnabled =
+      clspv::Option::PrintfSupport() && clspv::Option::PhysicalStorageBuffers();
+  bool isUsed = M.getFunction("printf") != nullptr;
+  return isEnabled && isUsed;
+}
+
 StructType *GlobalPushConstantsType(Module &M) {
   if (auto GV = M.getGlobalVariable(clspv::PushConstantsVariableName())) {
     if (auto *STy = dyn_cast<StructType>(GV->getValueType())) {
@@ -229,6 +241,10 @@ StructType *GlobalPushConstantsType(Module &M) {
   }
   if (ShouldDeclareModuleConstantsPointerPushConstant(M)) {
     auto type = GetPushConstantType(M, PushConstant::ModuleConstantsPointer);
+    types.push_back(type);
+  }
+  if (ShouldDeclarePrintfBufferPointerPushConstant(M)) {
+    auto type = GetPushConstantType(M, PushConstant::PrintfBufferPointer);
     types.push_back(type);
   }
 
