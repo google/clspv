@@ -19,6 +19,8 @@
 
 #include "InlineFuncWithImageMetadataGetterPass.h"
 
+#include <set>
+
 using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithimagemetadatagetterpass"

@@ -14,6 +14,7 @@
 
 #include "PhysicalPointerArgsPass.h"
 
+#include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
