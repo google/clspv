@@ -383,6 +383,16 @@ struct SPIRVProducerPassImpl {
       HasNonUniformPointers = true;
     }
   }
+  bool hasConvertToF() { return HasConvertToF; }
+  void setConvertToF() {
+    if (!HasConvertToF && SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
+        (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16) ||
+         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32) ||
+         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64))) {
+      addCapability(spv::CapabilityRoundingModeRTE);
+      HasConvertToF = true;
+    }
+  }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
     return GlobalConstFuncTypeMap;
   }
@@ -661,6 +671,7 @@ private:
   bool HasVariablePointers;
   std::set<Value *> NonUniformPointers;
   bool HasNonUniformPointers;
+  bool HasConvertToF;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
@@ -3233,6 +3244,29 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     }
   }
 
+  // libclc expects the default rounding mode to be RTE
+  if (hasConvertToF()) {
+    for (auto EntryPoint : EntryPoints) {
+      if (clspv::Option::FP16() &&
+          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 16;
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+      if (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 32;
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+      if (clspv::Option::FP64() &&
+          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 64;
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+    }
+  }
+
   //
   // Generate OpSource.
   //
@@ -4579,6 +4613,12 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
         auto Op = GetSPIRVCastOpcode(I);
         RID = addSPIRVInst(Op, Ops);
+
+        if (Op == spv::OpConvertSToF || Op == spv::OpConvertUToF ||
+            Op == spv::OpFConvert) {
+          // signal that we might want to the set the execution mode
+          setConvertToF();
+        }
 
         if (clspv::Option::HackConvertToFloat() &&
             (Op == spv::OpConvertSToF || Op == spv::OpConvertUToF)) {
