@@ -2,7 +2,6 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
-// XFAIL: *
 
 kernel void test() {
     printf("Simple printf");
@@ -16,7 +15,6 @@ kernel void test() {
 // CHECK-DAG: %[[struct_ty:[0-9a-zA-Z_]+]] = OpTypeStruct %[[array_ty]]
 // CHECK-DAG: %[[printf_buffer_ty:[0-9a-zA-Z_]+]] = OpTypePointer PhysicalStorageBuffer %[[struct_ty]]
 // CHECK-DAG: %[[zero:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
-// CHECK-DAG: %[[zero_long:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 0
 // CHECK-DAG: %[[one:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 1{{$}}
 // CHECK-DAG: %[[string0:[0-9a-zA-Z_]+]] = OpString "Simple printf"
 // CHECK-DAG: %[[ulong_pushconstant_ptr_type:[0-9a-zA-Z_]+]] = OpTypePointer PushConstant %[[ulong]]
@@ -26,7 +24,7 @@ kernel void test() {
 // CHECK: %[[printf_buffer_pc_addr:[0-9a-zA-Z_]+]] = OpAccessChain %[[ulong_pushconstant_ptr_type]]
 // CHECK: %[[printf_buffer_pc:[0-9a-zA-Z_]+]] = OpLoad %[[ulong]] %[[printf_buffer_pc_addr]]
 // CHECK: %[[printf_buffer:[0-9a-zA-Z_]+]] = OpConvertUToPtr %[[printf_buffer_ty]] %[[printf_buffer_pc]]
-// CHECK: %[[printf_buffer_access:[0-9a-zA-Z_]+]] = OpAccessChain %{{[0-9a-zA-Z_]+}} %[[printf_buffer]] %[[zero]] %[[zero_long]]
+// CHECK: %[[printf_buffer_access:[0-9a-zA-Z_]+]] = OpAccessChain %{{[0-9a-zA-Z_]+}} %[[printf_buffer]] %[[zero]] %[[zero]]
 // CHECK: %[[printf_offset:[0-9a-zA-Z_]+]] = OpAtomicIAdd %[[uint]] %[[printf_buffer_access]] %{{[0-9a-zA-Z_]+}} %{{[0-9a-zA-Z_]+}} %[[one]]
 // CHECK: %[[printf_st_offset:[0-9a-zA-Z_]+]] = OpIAdd %[[uint]] %[[printf_offset]] %[[one]]
 // CHECK: %[[printf_st_offset_long:[0-9a-zA-Z_]+]] = OpUConvert %[[ulong]] %[[printf_st_offset]]
