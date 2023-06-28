@@ -96,5 +96,6 @@ echo $(date): Clvk build completed.
 # Run Clvk tests
 echo $(date): Starting Clvk smoke tests...
 export VK_ICD_FILENAMES="$SWIFTSHADER_BUILD/Linux/vk_swiftshader_icd.json"
+export CLVK_LOG=2
 ./simple_test
 echo $(date): Clvk smoke tests completed.
