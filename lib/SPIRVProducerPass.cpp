@@ -313,7 +313,7 @@ struct SPIRVProducerPassImpl {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), HasNonUniformPointers(false),
-        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        HasConvertToF(false), SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
         TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
@@ -328,7 +328,7 @@ struct SPIRVProducerPassImpl {
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), HasNonUniformPointers(false),
-        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        HasConvertToF(false), SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0), TestOutput(true) {
     if (clspv::Option::PhysicalStorageBuffers())
       addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
