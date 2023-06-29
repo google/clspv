@@ -385,7 +385,7 @@ struct SPIRVProducerPassImpl {
   }
   bool hasConvertToF() { return HasConvertToF; }
   void setConvertToF() {
-    if (!HasConvertToF && SpvVersion() >= SPIRVVersion::SPIRV_1_4 &&
+    if (!HasConvertToF &&
         (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16) ||
          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32) ||
          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64))) {
@@ -3116,6 +3116,11 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
       addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_variable_pointers");
     }
   }
+
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 && hasConvertToF()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_float_controls");
+  }
+
   if (clspv::Option::PhysicalStorageBuffers()) {
     addSPIRVInst<kExtensions>(spv::OpExtension,
                               "SPV_KHR_physical_storage_buffer");
