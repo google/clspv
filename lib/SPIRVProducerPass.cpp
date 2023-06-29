@@ -2335,7 +2335,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
     Fn->print(errs());
     llvm_unreachable("Unhandled function declaration/definition");
- } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
+  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
     // If there is exactly one use we know where to insert the instruction
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
