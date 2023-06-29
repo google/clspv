@@ -150,6 +150,8 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
       auto *IntTy =
           IntegerType::get(Ctx, Arg->getType()->getScalarSizeInBits());
       Arg = IR.CreateBitCast(Arg, IntTy);
+    } else if (Arg->getType()->isPointerTy()) {
+      Arg = IR.CreatePtrToInt(Arg, Int32Ty);
     }
 
     // Vectors that are smaller than 4 bytes need padded to reach this size

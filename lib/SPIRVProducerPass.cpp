@@ -1942,6 +1942,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
   case Type::StructTyID: {
     StructType *STy = cast<StructType>(Canonical);
 
+    if (STy->getNumElements() == 1 && STy->getElementType(0)->isArrayTy() &&
+        cast<ArrayType>(STy->getElementType(0))->getNumElements() == 0) {
+      StructTypesNeedingBlock.insert(STy);
+    }
+
     //
     // Generate OpTypeStruct
     //
