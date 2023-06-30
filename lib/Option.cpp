@@ -293,6 +293,19 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
                    "other arguments. Use this to reduce storage buffer "
                    "descriptors."));
 
+static llvm::cl::list<clspv::Option::RoundingModeRTE> rounding_mode_rte(
+    "rounding-mode-rte",
+    llvm::cl::desc(
+        "Set execution mode RoundingModeRTE for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(clEnumValN(clspv::Option::RoundingModeRTE::fp16, "16",
+                                "Set execution mode RoundingModeRTE for fp16")),
+    llvm::cl::values(clEnumValN(clspv::Option::RoundingModeRTE::fp32, "32",
+                                "Set execution mode RoundingModeRTE for fp32")),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::RoundingModeRTE::fp64, "64",
+                   "Set execution mode RoundingModeRTE for fp64")));
+
 static llvm::cl::list<clspv::Option::StorageClass> no_16bit_storage(
     "no-16bit-storage",
     llvm::cl::desc("Disable fine-grained 16-bit storage capabilities."),
@@ -460,6 +473,15 @@ bool NonUniformNDRangeSupported() {
          !UniformWorkgroupSize();
 }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
+
+bool ExecutionModeRoundingModeRTE(RoundingModeRTE fp) {
+  for (auto type : rounding_mode_rte) {
+    if (type == fp) {
+      return true;
+    }
+  }
+  return false;
+}
 
 bool Supports16BitStorageClass(StorageClass sc) {
   // -no-16bit-storage removes storage capabilities.

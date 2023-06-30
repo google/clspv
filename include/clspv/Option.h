@@ -180,6 +180,16 @@ inline bool LanguageUsesGenericAddressSpace() {
               clspv::FeatureMacro::__opencl_c_generic_address_space) > 0);
 }
 
+enum class RoundingModeRTE : uint32_t {
+  fp16,
+  fp32,
+  fp64,
+};
+
+// Returns true when the execution mode RoundingModeRTE should be set for a
+// floating point type.
+bool ExecutionModeRoundingModeRTE(RoundingModeRTE rm);
+
 // Return the SPIR-V binary version
 enum class SPIRVVersion : uint32_t {
   SPIRV_1_0 = 0,

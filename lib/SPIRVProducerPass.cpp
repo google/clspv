@@ -313,7 +313,7 @@ struct SPIRVProducerPassImpl {
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), HasNonUniformPointers(false),
-        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        HasConvertToF(false), SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
         TestOutput(out == nullptr) {
     addCapability(spv::CapabilityShader);
@@ -328,7 +328,7 @@ struct SPIRVProducerPassImpl {
         outputCInitList(false), patchBoundOffset(0), nextID(1),
         OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
         HasVariablePointers(false), HasNonUniformPointers(false),
-        SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
+        HasConvertToF(false), SamplerPointerTy(nullptr), SamplerDataTy(nullptr),
         WorkgroupSizeValueID(0), WorkgroupSizeVarID(0), TestOutput(true) {
     if (clspv::Option::PhysicalStorageBuffers())
       addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
@@ -381,6 +381,16 @@ struct SPIRVProducerPassImpl {
     if (!HasNonUniformPointers) {
       addCapability(spv::CapabilityShaderNonUniform);
       HasNonUniformPointers = true;
+    }
+  }
+  bool hasConvertToF() { return HasConvertToF; }
+  void setConvertToF() {
+    if (!HasConvertToF &&
+        (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16) ||
+         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32) ||
+         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64))) {
+      addCapability(spv::CapabilityRoundingModeRTE);
+      HasConvertToF = true;
     }
   }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
@@ -662,6 +672,7 @@ private:
   bool HasVariablePointers;
   std::set<Value *> NonUniformPointers;
   bool HasNonUniformPointers;
+  bool HasConvertToF;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
@@ -3133,6 +3144,11 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
       addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_variable_pointers");
     }
   }
+
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 && hasConvertToF()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_float_controls");
+  }
+
   if (clspv::Option::PhysicalStorageBuffers()) {
     addSPIRVInst<kExtensions>(spv::OpExtension,
                               "SPV_KHR_physical_storage_buffer");
@@ -3261,6 +3277,29 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
 
         Ops << XDim << YDim << ZDim;
 
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+    }
+  }
+
+  // libclc expects the default rounding mode to be RTE
+  if (hasConvertToF()) {
+    for (auto EntryPoint : EntryPoints) {
+      if (clspv::Option::FP16() &&
+          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 16;
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+      if (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 32;
+        addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+      }
+      if (clspv::Option::FP64() &&
+          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64)) {
+        Ops.clear();
+        Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 64;
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
     }
@@ -4612,6 +4651,12 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
         auto Op = GetSPIRVCastOpcode(I);
         RID = addSPIRVInst(Op, Ops);
+
+        if (Op == spv::OpConvertSToF || Op == spv::OpConvertUToF ||
+            Op == spv::OpFConvert) {
+          // signal that we might want to the set the execution mode
+          setConvertToF();
+        }
 
         if (clspv::Option::HackConvertToFloat() &&
             (Op == spv::OpConvertSToF || Op == spv::OpConvertUToF)) {

@@ -878,6 +878,19 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (!clspv::Option::FP16() &&
+      ExecutionModeRoundingModeRTE(clspv::Option::RoundingModeRTE::fp16)) {
+    llvm::errs() << "error: Cannot set RoundingModeRTE for fp16 if fp16 is not "
+                    "supported\n";
+    return -1;
+  }
+  if (!clspv::Option::FP64() &&
+      ExecutionModeRoundingModeRTE(clspv::Option::RoundingModeRTE::fp64)) {
+    llvm::errs() << "error: Cannot set RoundingModeRTE for fp64 if fp64 is not "
+                    "supported\n";
+    return -1;
+  }
+
   return 0;
 }
 
