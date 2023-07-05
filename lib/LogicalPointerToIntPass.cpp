@@ -21,6 +21,7 @@
 #include "clspv/Option.h"
 
 #include "BitcastUtils.h"
+#include "Types.h"
 
 #include "LogicalPointerToIntPass.h"
 
@@ -41,7 +42,7 @@ using namespace llvm;
 
 // Arbitrary 'large enough' size. We have a 64-bit range to use and in practice
 // the amount of private and local memory will be quite small.
-constexpr uint64_t MaxAllocSize = 0x0000100000000000;
+uint64_t MaxAllocSize = 0x0000100000000000;
 
 static bool IsTargetAddrSpace(unsigned AS) {
   return AS == clspv::AddressSpace::Private ||
@@ -88,10 +89,16 @@ PreservedAnalyses
 clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
   PreservedAnalyses PA;
 
+  if (!clspv::PointersAre64Bit(M)) {
+    nextBaseAddress = 0x10000000ULL;
+    MaxAllocSize = 0x10000000ULL;
+  }
+
   while (InlineFunctions(M)) {
   }
 
   SmallVector<Instruction *, 8> InstrsToProcess;
+  SmallVector<ICmpInst *, 8> PointerICmpToProcess;
   for (auto &F : M) {
     BitcastUtils::RemoveCstExprFromFunction(&F);
 
@@ -114,9 +121,32 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
               }
             }
           }
+        } else if (auto ICmp = dyn_cast<ICmpInst>(&I)) {
+          if (auto *PtrTy =
+                  dyn_cast<PointerType>(ICmp->getOperand(0)->getType())) {
+            if (IsTargetAddrSpace(PtrTy->getAddressSpace())) {
+              PointerICmpToProcess.push_back(ICmp);
+            }
+          }
         }
       }
     }
+  }
+
+  for (auto *ICmp : PointerICmpToProcess) {
+    IntegerType *SizeT = clspv::PointersAre64Bit(M)
+                             ? IntegerType::get(M.getContext(), 64)
+                             : IntegerType::get(M.getContext(), 32);
+    IRBuilder<> B(ICmp);
+    auto LHS = B.CreatePtrToInt(ICmp->getOperand(0), SizeT);
+    if (auto *Cast = dyn_cast<CastInst>(LHS)) {
+      InstrsToProcess.push_back(Cast);
+    }
+    auto RHS = B.CreatePtrToInt(ICmp->getOperand(1), SizeT);
+    if (auto *Cast = dyn_cast<CastInst>(RHS)) {
+      InstrsToProcess.push_back(Cast);
+    }
+    ICmp->replaceAllUsesWith(B.CreateICmp(ICmp->getPredicate(), LHS, RHS));
   }
 
   for (auto *Instr : InstrsToProcess) {

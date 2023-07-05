@@ -19,7 +19,7 @@ entry:
 define dso_local spir_kernel void @foo(ptr %dst) {
 entry:
   %call = call spir_func i32 @bar(ptr %dst)
-; CHECK:  store i32 0, ptr %dst, align 4
+; CHECK:  store i32 268435456, ptr %dst, align 4
   store i32 %call, ptr %dst, align 4
   ret void
 }
