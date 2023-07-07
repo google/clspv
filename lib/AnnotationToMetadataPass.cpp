@@ -49,7 +49,6 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
         const auto entry_point_name_md =
             MDString::get(context, entry_point->getName());
         const auto attrs_md = MDString::get(context, annotation);
-        llvm::errs() << entry_point->getName() << ": '" << annotation << "'\n";
 
         MDTuple *entry =
             MDTuple::get(M.getContext(), {entry_point_name_md, attrs_md});
