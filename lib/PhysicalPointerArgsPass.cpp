@@ -108,6 +108,12 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
     }
 
     F.setCallingConv(CallingConv::SPIR_FUNC);
+    for (auto &U : F.uses()) {
+      if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+        CI->setCallingConv(CallingConv::SPIR_FUNC);
+      }
+    }
+
     NewFunc->copyMetadata(&F, 0);
 
     // Create the function definition. It calls the wrapped function, bitcasting
