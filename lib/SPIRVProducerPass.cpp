@@ -7035,7 +7035,18 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     uint32_t elem_size) {
   // Generate ArgumentInfo for this argument.
   auto import_id = getReflectionImport();
-  auto arg_name = addSPIRVInst<kDebug>(spv::OpString, name.c_str());
+  auto kernel_arg_name = kernelFn.getMetadata("kernel_arg_name");
+  SPIRVID arg_name;
+  if (kernel_arg_name) {
+    arg_name = addSPIRVInst<kDebug>(
+        spv::OpString, dyn_cast<MDString>(kernel_arg_name->getOperand(ordinal))
+                           ->getString()
+                           .str()
+                           .c_str());
+  } else {
+    // For legacy purpose
+    arg_name = addSPIRVInst<kDebug>(spv::OpString, name.c_str());
+  }
   auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
   SPIRVOperandVec Ops;
   Ops << void_id << import_id << reflection::ExtInstArgumentInfo << arg_name;
