@@ -508,6 +508,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
+    pm.addPass(clspv::KernelArgNamesToMetadataPass());
     pm.addPass(clspv::AnnotationToMetadataPass());
     pm.addPass(clspv::AddFunctionAttributesPass());
     pm.addPass(clspv::AutoPodArgsPass());

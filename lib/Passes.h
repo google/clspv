@@ -33,6 +33,7 @@
 #include "InlineFuncWithPointerBitCastArgPass.h"
 #include "InlineFuncWithPointerToFunctionArgPass.h"
 #include "InlineFuncWithSingleCallSitePass.h"
+#include "KernelArgNamesToMetadataPass.h"
 #include "LogicalPointerToIntPass.h"
 #include "LongVectorLoweringPass.h"
 #include "LowerAddrSpaceCastPass.h"

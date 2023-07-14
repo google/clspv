@@ -296,7 +296,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
         "reqd_work_group_size",   "kernel_arg_addr_space",
         "kernel_arg_access_qual", "kernel_arg_type",
         "kernel_arg_base_type",   "kernel_arg_type_qual",
-        pod_md_name.c_str()};
+        "kernel_arg_name",        pod_md_name.c_str()};
     for (auto name : Metadatas) {
       NewFunc->setMetadata(name, F->getMetadata(name));
       F->setMetadata(name, nullptr);
