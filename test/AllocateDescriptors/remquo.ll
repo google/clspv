@@ -1,4 +1,4 @@
-; RUN: clspv-opt -opaque-pointers %s -o %t.ll --passes=allocate-descriptors
+; RUN: clspv-opt %s -o %t.ll --passes=allocate-descriptors
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x i32] } zeroinitializer)

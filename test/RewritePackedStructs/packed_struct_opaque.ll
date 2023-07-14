@@ -1,4 +1,4 @@
-; RUN: clspv-opt --passes=rewrite-packed-structs --opaque-pointers %s -o %t
+; RUN: clspv-opt --passes=rewrite-packed-structs %s -o %t
 ; RUN: FileCheck %s < %t
 
 %struct = type <{ i32, i8 }>

@@ -1,4 +1,4 @@
-; RUN: clspv-opt -opaque-pointers -int8=0 -constant-args-ubo --passes=ubo-type-transform %s -o %t
+; RUN: clspv-opt -int8=0 -constant-args-ubo --passes=ubo-type-transform %s -o %t
 ; RUN: FileCheck --check-prefixes TYPE,CHECK %s < %t
 ; RUN: FileCheck --check-prefixes TYPE,DECLARE %s < %t
 
