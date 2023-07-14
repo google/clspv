@@ -21,7 +21,7 @@ clspv::KernelArgNamesToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
   auto &context = M.getContext();
   for (Function &F : M.functions()) {
     SmallVector<Metadata *> MDs;
-    for (auto &arg: F.args()) {
+    for (auto &arg : F.args()) {
       MDs.push_back(MDString::get(context, arg.getName()));
     }
     F.addMetadata("kernel_arg_name", *MDNode::get(context, MDs));
