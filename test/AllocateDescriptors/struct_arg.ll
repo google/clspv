@@ -1,4 +1,4 @@
-; RUN: clspv-opt -opaque-pointers %s -o %t.ll --passes=allocate-descriptors
+; RUN: clspv-opt %s -o %t.ll --passes=allocate-descriptors
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[type:%[a-zA-Z0-9_.]+]] = type { <4 x i32>, <4 x float> }

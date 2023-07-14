@@ -1,4 +1,4 @@
-; RUN: clspv-opt -opaque-pointers %s -o %t.ll --passes=allocate-descriptors
+; RUN: clspv-opt %s -o %t.ll --passes=allocate-descriptors
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: call target("spirv.Sampler") @_Z25clspv.sampler_var_literal(i32 0, i32 0, i32 21, target("spirv.Sampler") zeroinitializer)

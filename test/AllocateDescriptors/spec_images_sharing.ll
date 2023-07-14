@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll -opaque-pointers --passes=specialize-image-types,allocate-descriptors
+; RUN: clspv-opt %s -o %t.ll --passes=specialize-image-types,allocate-descriptors
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: @foo

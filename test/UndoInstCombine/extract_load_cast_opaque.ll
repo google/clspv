@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll -opaque-pointers --passes=undo-instcombine
+; RUN: clspv-opt %s -o %t.ll --passes=undo-instcombine
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load <3 x i32>, ptr addrspace(8) @__spirv_WorkgroupSize
