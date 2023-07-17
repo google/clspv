@@ -207,14 +207,28 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
 
   const auto &Info = clspv::Builtins::Lookup(F);
   auto fixNameSuffix = [&F](std::string Name) {
-    const auto pattern_size = strlen("PU3AS");
+    std::string AS_pattern = "PU3AS";
+    size_t AS_pattern_size = AS_pattern.size() + 1;
 
-    auto Name_start = Name.find("PU3AS") + pattern_size + 1;
+    auto pos = Name.find(AS_pattern);
+    size_t pattern_size = AS_pattern_size;
+    if (pos == std::string::npos) {
+      // if AS_pattern was not found, it means that we are most probably looking
+      // for a private pointer pattern
+      pos = Name.find("P");
+      pattern_size = strlen("P");
+      if (pos == std::string::npos) {
+        // if this pattern was also not found, just return the input string
+        return Name;
+      }
+    }
+
+    auto Name_start = pos + pattern_size;
     auto Name_end = Name.size() - Name_start;
     auto subName = Name.substr(Name_start, Name_end);
 
     auto FName = F->getName();
-    auto FName_start = FName.find("PU3AS") + pattern_size + 1;
+    auto FName_start = FName.find(AS_pattern) + AS_pattern_size;
     auto FName_end = FName.size() - FName_start;
     auto subFName = FName.substr(FName_start, FName_end);
 
