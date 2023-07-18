@@ -201,3 +201,14 @@ if (ENABLE_CLSPV_INSTALL)
     install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 endif()
+
+# Shared lib version of clspv (C API)
+add_library(clspv_shared SHARED ${CMAKE_CURRENT_SOURCE_DIR}/Clspv.cpp)
+
+target_include_directories(clspv_shared PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CLSPV_INCLUDE_DIRS}
+)
+
+target_link_libraries(clspv_shared PRIVATE clspv_core)
+set_target_properties(clspv_shared PROPERTIES OUTPUT_NAME "clspv")

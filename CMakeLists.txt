@@ -38,6 +38,10 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
+# We keep all exported symbols hidden by default (shared lib will manually EXPORT)
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
 if (NOT DEFINED CMAKE_BUILD_TYPE)
