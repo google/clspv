@@ -4,11 +4,8 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK:     OpConvertSToF %[[float]]
-// CHECK:     OpConvertSToF %[[float]]
-// CHECK:     OpConvertSToF %[[float]]
-// CHECK:     OpConvertSToF %[[float]]
+// CHECK-DAG: %[[float4:[0-9a-zA-Z_]+]] = OpTypeVector %[[float]] 4
+// CHECK:     OpConvertSToF %[[float4]]
 
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float4* dst, global int4* src)
