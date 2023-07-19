@@ -4,11 +4,8 @@
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
 // CHECK-DAG: %[[ulong:[0-9a-zA-Z_]+]] = OpTypeInt 64 0
-// CHECK-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK:     OpConvertFToU %[[ulong]]
-// CHECK:     OpConvertFToU %[[ulong]]
-// CHECK:     OpConvertFToU %[[ulong]]
-// CHECK:     OpConvertFToU %[[ulong]]
+// CHECK-DAG: %[[ulong4:[0-9a-zA-Z_]+]] = OpTypeVector %[[ulong]] 4
+// CHECK:     OpConvertFToU %[[ulong4]]
 
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global ulong4* dst, global float4* src)
