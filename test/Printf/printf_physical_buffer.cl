@@ -27,7 +27,7 @@ kernel void test() {
 // CHECK: %[[printf_buffer_access:[0-9a-zA-Z_]+]] = OpAccessChain %{{[0-9a-zA-Z_]+}} %[[printf_buffer]] %[[zero]] %[[zero]]
 // CHECK: %[[printf_offset:[0-9a-zA-Z_]+]] = OpAtomicIAdd %[[uint]] %[[printf_buffer_access]] %{{[0-9a-zA-Z_]+}} %{{[0-9a-zA-Z_]+}} %[[one]]
 // CHECK: %[[printf_st_offset:[0-9a-zA-Z_]+]] = OpIAdd %[[uint]] %[[printf_offset]] %[[one]]
-// CHECK: %[[printf_st_offset_long:[0-9a-zA-Z_]+]] = OpUConvert %[[ulong]] %[[printf_st_offset]]
+// CHECK: %[[printf_st_offset_long:[0-9a-zA-Z_]+]] = OpSConvert %[[ulong]] %[[printf_st_offset]]
 // CHECK: %[[printf_st_access:[0-9a-zA-Z_]+]] = OpAccessChain %{{[0-9a-zA-Z_]+}} %[[printf_buffer]] %[[zero]] %[[printf_st_offset_long]]
 // CHECK: OpStore %[[printf_st_access]] %[[zero]]
 
