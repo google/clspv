@@ -19,6 +19,7 @@
 
 #include "Constants.h"
 #include "PushConstant.h"
+#include "Types.h"
 
 #include "PrintfPass.h"
 
@@ -80,6 +81,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   std::string FuncName = "__clspv.printf." + std::to_string(PrintfID);
   auto &Ctx = M.getContext();
   auto Int32Ty = IntegerType::getInt32Ty(Ctx);
+  auto Int64Ty = IntegerType::getInt64Ty(Ctx);
   auto *FuncTy = FunctionType::get(Int32Ty, NewArgTypes, false);
   auto FuncCallee = M.getOrInsertFunction(FuncName, FuncTy);
   auto *Func = dyn_cast<Function>(FuncCallee.getCallee());
@@ -151,7 +153,8 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
           IntegerType::get(Ctx, Arg->getType()->getScalarSizeInBits());
       Arg = IR.CreateBitCast(Arg, IntTy);
     } else if (Arg->getType()->isPointerTy()) {
-      Arg = IR.CreatePtrToInt(Arg, Int32Ty);
+      auto IntTy = clspv::PointersAre64Bit(M) ? Int64Ty : Int32Ty;
+      Arg = IR.CreatePtrToInt(Arg, IntTy);
     }
 
     // Vectors that are smaller than 4 bytes need padded to reach this size
