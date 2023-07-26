@@ -15,6 +15,7 @@
 #ifndef CLSPV_INCLUDE_CLSPV_COMPILER_H_
 #define CLSPV_INCLUDE_CLSPV_COMPILER_H_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
