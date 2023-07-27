@@ -1462,7 +1462,8 @@ SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
   case AddressSpace::Global:
     return GetStorageBufferClass();
   case AddressSpace::Constant:
-    return clspv::Option::ConstantArgsInUniformBuffer()
+    return clspv::Option::ConstantArgsInUniformBuffer() &&
+                   !clspv::Option::PhysicalStorageBuffers()
                ? spv::StorageClassUniform
                : GetStorageBufferClass();
   case AddressSpace::Input:
