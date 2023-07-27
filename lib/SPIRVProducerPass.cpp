@@ -2129,6 +2129,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       }
     }
 
+    if (VecTy->getElementCount().getKnownMinValue() == 1) {
+      RID = getSPIRVType(VecTy->getElementType());
+      break;
+    }
+
     // Ops[0] = Component Type ID
     // Ops[1] = Component Count (Literal Number)
     SPIRVOperandVec Ops;
@@ -2296,7 +2301,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       }
 
       RID = getSPIRVInt32Constant(IntValue);
-    } else {
+    } else if (CDS->getNumElements() > 1) {
 
       // A normal constant-data-sequential case.
       for (unsigned k = 0; k < CDS->getNumElements(); k++) {
@@ -2304,6 +2309,8 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       }
 
       Opcode = spv::OpConstantComposite;
+    } else {
+      return getSPIRVValue(CDS->getElementAsConstant(0));
     }
   } else if (const ConstantAggregate *CA = dyn_cast<ConstantAggregate>(Cst)) {
     // Let's convert <4 x i8> constant to int constant specially.
