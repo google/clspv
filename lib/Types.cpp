@@ -196,6 +196,21 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
   return nullptr;
 }
 
+Type *ExtractSmallerStructField(const DataLayout &DL, Type *Ty) {
+  auto *STy = dyn_cast<StructType>(Ty);
+  if (!STy || STy->getNumElements() == 0)
+    return nullptr;
+  Type *Smaller = STy->getElementType(0);
+  for (unsigned i = 1; i < STy->getNumElements(); i++) {
+    Type *Field = STy->getElementType(i);
+    if (BitcastUtils::SizeInBits(DL, Field) <
+        BitcastUtils::SizeInBits(DL, Smaller)) {
+      Smaller = Field;
+    }
+  }
+  return Smaller;
+}
+
 Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   if (TyA == nullptr) {
     return TyB;
@@ -215,9 +230,21 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   }
 
   if (BitcastUtils::SizeInBits(DL, TyA) > BitcastUtils::SizeInBits(DL, TyB)) {
+    if (auto Ty = ExtractSmallerStructField(DL, TyA)) {
+      if (BitcastUtils::SizeInBits(DL, Ty) <
+          BitcastUtils::SizeInBits(DL, TyB)) {
+        return Ty;
+      }
+    }
     return TyB;
   } else if (BitcastUtils::SizeInBits(DL, TyA) <
              BitcastUtils::SizeInBits(DL, TyB)) {
+    if (auto Ty = ExtractSmallerStructField(DL, TyB)) {
+      if (BitcastUtils::SizeInBits(DL, Ty) <
+          BitcastUtils::SizeInBits(DL, TyA)) {
+        return Ty;
+      }
+    }
     return TyA;
   }
   // TyA size == TyB size
