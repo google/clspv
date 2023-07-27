@@ -100,11 +100,13 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   auto *ConstantPrintfID = ConstantInt::get(Int32Ty, PrintfID);
   auto *ConstantAllocSize = ConstantInt::get(Int32Ty, AllocSizeInts);
   auto *ConstantBuffSize =
-      ConstantInt::get(Int32Ty, clspv::Option::PrintfBufferSize());
+      ConstantInt::get(Int32Ty, clspv::Option::PrintfBufferSize() / 4);
   const auto &DL = M.getDataLayout();
 
   auto *EntryBB = BasicBlock::Create(Ctx, "entry", Func);
-  auto *BodyBB = BasicBlock::Create(Ctx, "body", Func);
+  auto *CopyArgsBB = BasicBlock::Create(Ctx, "copy_args", Func);
+  auto *CopyPrintfIdBB = BasicBlock::Create(Ctx, "copy_printf_id", Func);
+  auto *TestPrintfIdBB = BasicBlock::Create(Ctx, "test_printf_id", Func);
   auto *ExitBB = BasicBlock::Create(Ctx, "exit", Func);
   IRBuilder<> IR{EntryBB};
 
@@ -130,19 +132,38 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
       IR.CreateAtomicRMW(AtomicRMWInst::Add, GEP, ConstantAllocSize,
                          MaybeAlign(4), AtomicOrdering::SequentiallyConsistent);
   Offset = IR.CreateAdd(Offset, ConstantOne);
+  Value *EndOffset = IR.CreateAdd(Offset, ConstantAllocSize);
+  Value *ArgsOffset = IR.CreateAdd(Offset, ConstantOne);
 
-  // Now check that this offset is within the buffer bounds
-  auto *ICmp = IR.CreateICmpULT(Offset, ConstantBuffSize);
-  IR.CreateCondBr(ICmp, BodyBB, ExitBB);
+  // Now check that we have enough space to store the printf id and the args
+  auto *ICmp = IR.CreateICmpULE(EndOffset, ConstantBuffSize);
+  IR.CreateCondBr(ICmp, CopyArgsBB, TestPrintfIdBB);
 
-  // The allocations is in bounds, store the printf data
-  IR.SetInsertPoint(BodyBB);
+  //
+  // Copy Printf ID
+  //
+  IR.SetInsertPoint(CopyPrintfIdBB);
+  auto *ReturnValue = IR.CreatePHI(Int32Ty, 2);
+  ReturnValue->addIncoming(ConstantOne, CopyArgsBB);
+  ReturnValue->addIncoming(ConstantNegOne, TestPrintfIdBB);
   // Store the printf ID
   auto *PrintfIDGEP = GetElementPtrInst::Create(
       BufferTy, Buffer, {ConstantZero, ConstantZero, Offset});
   IR.Insert(PrintfIDGEP);
   IR.CreateStore(ConstantPrintfID, PrintfIDGEP);
-  Offset = IR.CreateAdd(Offset, ConstantOne);
+  IR.CreateBr(ExitBB);
+
+  //
+  // Test Printf Id
+  //
+  IR.SetInsertPoint(TestPrintfIdBB);
+  ICmp = IR.CreateICmpULE(ArgsOffset, ConstantBuffSize);
+  IR.CreateCondBr(ICmp, CopyPrintfIdBB, ExitBB);
+
+  //
+  // Copy Args
+  //
+  IR.SetInsertPoint(CopyArgsBB);
 
   // Store the value of each argument
   for (size_t i = 0; i < Func->arg_size(); i++) {
@@ -169,7 +190,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
     }
 
     Value *ArgStoreGEP = GetElementPtrInst::Create(
-        BufferTy, Buffer, {ConstantZero, ConstantZero, Offset});
+        BufferTy, Buffer, {ConstantZero, ConstantZero, ArgsOffset});
     IR.Insert(ArgStoreGEP);
 
     // If the integer is now anything but i32, bitcast the pointer
@@ -182,15 +203,17 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
     IR.CreateStore(Arg, ArgStoreGEP);
     auto *StoreSize =
         ConstantInt::get(Int32Ty, DL.getTypeStoreSize(Arg->getType()) / 4);
-    Offset = IR.CreateAdd(Offset, StoreSize);
+    if (i + 1 < Func->arg_size()) {
+      ArgsOffset = IR.CreateAdd(ArgsOffset, StoreSize);
+    }
   }
-  IR.CreateBr(ExitBB);
+  IR.CreateBr(CopyPrintfIdBB);
 
   // Return 0 on success, otherwise -1
   IR.SetInsertPoint(ExitBB);
   auto *ReturnCodePhi = IR.CreatePHI(Int32Ty, 2);
-  ReturnCodePhi->addIncoming(ConstantZero, BodyBB);
-  ReturnCodePhi->addIncoming(ConstantNegOne, EntryBB);
+  ReturnCodePhi->addIncoming(ReturnValue, CopyPrintfIdBB);
+  ReturnCodePhi->addIncoming(ConstantNegOne, TestPrintfIdBB);
   IR.CreateRet(ReturnCodePhi);
 }
 

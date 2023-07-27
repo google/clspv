@@ -17,8 +17,8 @@ kernel void test() {
 // CHECK-DAG: %[[string1:[0-9a-zA-Z_]+]] = OpString "world"
 
 // Printf ID 0 is stored. The PrintfID 1 representing the string is stored
-// CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[zero]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[one]]
+// CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[zero]]
 
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer %[[zero]] %[[zero]] %[[one]]
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[zero]] %[[string0]] %[[four]]

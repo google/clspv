@@ -33,9 +33,6 @@ kernel void test(char2 c, short2 s, int2 i, float8 f, long4 l) {
 // CHECK-DAG: %[[arg_i:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[v2uint]]
 // CHECK-DAG: %[[arg_l:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[v4ulong]]
 
-// Printf ID 0 is stored.
-// CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[zero]]
-
 // char2 is bitcast to i16, extended to i32, and stored
 // CHECK: %[[arg_c_bitcast:[0-9a-zA-Z_]+]] = OpBitcast %[[ushort]] %[[arg_c]]
 // CHECK: %[[arg_c_int:[0-9a-zA-Z_]+]] = OpUConvert %[[uint]] %[[arg_c_bitcast]]
@@ -100,6 +97,9 @@ kernel void test(char2 c, short2 s, int2 i, float8 f, long4 l) {
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_l_b_1]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_l_b_2]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_l_b_3]]
+
+// Printf ID 0 is stored.
+// CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[zero]]
 
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfBufferStorageBuffer %[[zero]] %[[zero]] %[[one]]
 // CHECK: OpExtInst %void %[[ReflectionImport]] PrintfInfo %[[zero]] %[[string0]] %[[four]] %[[four]] %[[eight]] %[[const_32]] %[[const_32]]
