@@ -1,0 +1,43 @@
+# Top-level build flags used by the project. This should include args that are
+# globally used, and is imported by BUILDCONFIG.gn. As such *do not* import this
+# file in any other gni's and BUILD.gn files.
+
+declare_args() {
+  # Build for debugging. Equivalent to is_optimized=false symbol_level=2.
+  is_debug = false
+
+  # Whether to build with tsan.
+  use_tsan = false
+
+  # Whether to build with ubsan.
+  use_ubsan = false
+
+  # Whether to build with asan.
+  use_asan = false
+
+  # Max jobs per ThinLTO link.
+  max_jobs_per_lto_link = 8
+}
+
+# args that depend on other args must live in a later declare_args() block.
+declare_args() {
+  # Whether to build with optimizations.
+  is_optimized = !is_debug
+
+  if (is_debug) {
+    # Debug info symbol level. 0: No symbols; 1: Line numbers; 2: Full symbols.
+    symbol_level = 2
+  } else {
+    # Debug info symbol level. 0: No symbols; 1: Line numbers; 2: Full symbols.
+    symbol_level = 0
+  }
+}
+
+# sysroot definition
+declare_args() {
+  # Path of sysroot to use.
+  sysroot = ""
+}
+
+# LLVM specific flags
+import("llvm_buildflags.gni")

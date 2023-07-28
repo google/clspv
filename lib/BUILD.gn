@@ -1,0 +1,148 @@
+import("//build_overrides/clspv.gni")
+import("//build_overrides/spirv_tools.gni")
+
+# Args controlling these targets
+# Empty for now
+
+# a common config that will be used by all the clspv targets
+config("clspv_common_config") {  # __has_feature(cxx_range_for) -- how do we
+                                 # check this?
+  include_dirs = [
+    "../include",
+    "${spirv_tools_spirv_headers_dir}/include",
+    "$root_gen_dir",
+    "$target_gen_dir/../",
+  ]
+}
+
+source_set("clspv_passes") {
+  sources = [
+    "AddFunctionAttributesPass.cpp",
+    "AllocateDescriptorsPass.cpp",
+    "AnnotationToMetadataPass.cpp",
+    "ArgKind.cpp",
+    "AutoPodArgsPass.cpp",
+    "BitcastUtils.cpp",
+    "Builtins.cpp",
+    "CallGraphOrderedFunctions.cpp",
+    "ClusterConstants.cpp",
+    "ClusterPodKernelArgumentsPass.cpp",
+    "ComputeStructuredOrder.cpp",
+    "ConstantEmitter.cpp",
+    "Constants.cpp",
+    "DeclarePushConstantsPass.cpp",
+    "DefineOpenCLWorkItemBuiltinsPass.cpp",
+    "DescriptorCounter.cpp",
+    "DirectResourceAccessPass.cpp",
+    "FeatureMacro.cpp",
+    "FixupBuiltinsPass.cpp",
+    "FixupStructuredCFGPass.cpp",
+    "FunctionInternalizerPass.cpp",
+    "HideConstantLoadsPass.cpp",
+    "InlineEntryPointsPass.cpp",
+    "InlineFuncWithImageMetadataGetterPass.cpp",
+    "InlineFuncWithPointerBitCastArgPass.cpp",
+    "InlineFuncWithPointerToFunctionArgPass.cpp",
+    "InlineFuncWithReadImage3DNonLiteralSampler.cpp",
+    "InlineFuncWithSingleCallSitePass.cpp",
+    "KernelArgNamesToMetadataPass.cpp",
+    "Layout.cpp",
+    "LogicalPointerToIntPass.cpp",
+    "LongVectorLoweringPass.cpp",
+    "LowerAddrSpaceCastPass.cpp",
+    "LowerPrivatePointerPHIPass.cpp",
+    "MultiVersionUBOFunctionsPass.cpp",
+    "NativeMathPass.cpp",
+    "NormalizeGlobalVariable.cpp",
+    "OpenCLInlinerPass.cpp",
+    "Option.cpp",
+    "Passes.cpp",
+    "PhysicalPointerArgsPass.cpp",
+    "PrintfPass.cpp",
+    "PushConstant.cpp",
+    "RemoveUnusedArguments.cpp",
+    "ReorderBasicBlocksPass.cpp",
+    "ReplaceLLVMIntrinsicsPass.cpp",
+    "ReplaceOpenCLBuiltinPass.cpp",
+    "ReplacePointerBitcastPass.cpp",
+    "RewriteInsertsPass.cpp",
+    "RewritePackedStructs.cpp",
+    "SPIRVOp.cpp",
+    "SPIRVProducerPass.cpp",
+    "SamplerUtils.cpp",
+    "ScalarizePass.cpp",
+    "SetImageMetadataPass.cpp",
+    "ShareModuleScopeVariables.cpp",
+    "SignedCompareFixupPass.cpp",
+    "SimplifyPointerBitcastPass.cpp",
+    "SpecConstant.cpp",
+    "SpecializeImageTypes.cpp",
+    "SplatArgPass.cpp",
+    "SplatSelectCondition.cpp",
+    "StripFreezePass.cpp",
+    "ThreeElementVectorLoweringPass.cpp",
+    "Types.cpp",
+    "UBOTypeTransformPass.cpp",
+    "UndoBoolPass.cpp",
+    "UndoByvalPass.cpp",
+    "UndoGetElementPtrConstantExprPass.cpp",
+    "UndoInstCombinePass.cpp",
+    "UndoSRetPass.cpp",
+    "UndoTranslateSamplerFoldPass.cpp",
+    "UndoTruncateToOddIntegerPass.cpp",
+    "WrapKernelPass.cpp",
+    "ZeroInitializeAllocasPass.cpp",
+  ]
+
+  deps = [
+    "../:clspv_c_strings",
+    "../:clspv_glsl",
+    "../:clspv_reflection",
+    "../gn/llvm/config:llvm-config",
+    "../gn/llvm/sources:clspv_llvm_components",
+  ]
+
+  configs += [
+    ":clspv_common_config",
+    "../gn/llvm/sources:clspv_llvm_private_config",
+  ]
+
+  configs += clspv_configs_to_append
+  configs -= clspv_configs_to_remove
+
+  include_dirs = [ "$root_gen_dir/$clspv_llvm_dir" ]
+}
+
+static_library("clspv_core") {
+  configs += [ ":clspv_common_config" ]
+  configs += clspv_configs_to_append
+  configs -= clspv_configs_to_remove
+  deps = [
+    "../gn/llvm/sources:clspv_clang_lib_ast",
+    "../gn/llvm/sources:clspv_clang_lib_basic",
+    "../gn/llvm/sources:clspv_clang_lib_codegen",
+    "../gn/llvm/sources:clspv_clang_lib_frontend",
+    "../gn/llvm/sources:clspv_clang_lib_serialization",
+
+    # llvm/clang
+    ":clspv_passes",
+    "../:clspv64_builtin_library",
+    "../:clspv_baked_opencl_header",
+    "../:clspv_builtin_library",
+    "../gn/llvm/sources:clspv_llvm_components",
+    "../gn/llvm/sources:clspv_llvm_lib_irreader",
+    "../gn/llvm/sources:clspv_llvm_lib_linker",
+  ]
+  sources = [
+    "Compiler.cpp",
+    "FrontendPlugin.cpp",
+    "Sampler.cpp",
+  ]
+  include_dirs = [
+    "//$clspv_llvm_dir/clang/include",
+    "//$clspv_llvm_dir/llvm/include",
+    "$root_gen_dir/$clspv_llvm_dir/",
+    "$root_gen_dir/$clspv_llvm_dir/clang/include",  # TODO use common include
+                                                    # for ge
+  ]
+}

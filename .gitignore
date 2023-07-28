@@ -4,3 +4,5 @@ TAGS
 cscope.*
 .DS_Store
 third_party/
+!gn/build*
+!build_overrides/

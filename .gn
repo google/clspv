@@ -1,0 +1,3 @@
+buildconfig = "//gn/BUILDCONFIG.gn"
+
+script_executable = "python3"

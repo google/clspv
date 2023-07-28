@@ -1,0 +1,130 @@
+import("//build_overrides/clspv.gni")
+import("//build_overrides/spirv_tools.gni")
+
+declare_args() {
+  # spirv namespace
+  spirv_namespace_strings = "spv"
+  spirv_namespace_glsl = "glsl"
+  spirv_namespace_reflection = "reflection"
+
+  # bake file variable names
+  clspv_bake_file_data_variable_name = "clspv_builtins_header_data"
+  clspv_bake_file_size_variable_name = "clspv_builtins_header_size"
+  clspv_bake_file_data_base_variable_name = "opencl_base_builtins_header_data"
+  clspv_bake_file_size_base_variable_name = "opencl_base_builtins_header_size"
+
+  # clspv builtin library variable names
+  clspv_library_data_var_name = "clspv_builtin_library_data"
+  clspv_library_size_var_name = "clspv_builtin_library_size"
+  clspv64_library_data_var_name = "clspv64_builtin_library_data"
+  clspv64_library_size_var_name = "clspv64_builtin_library_size"
+}
+
+# Action scripts to generate headers
+action("clspv_c_strings") {
+  script = "cmake/spirv_c_strings.py"
+
+  output = "$target_gen_dir/clspv/spirv_c_strings.hpp"
+  input = "${spirv_tools_spirv_headers_dir}/include/spirv/unified1/spirv.hpp"
+
+  args = [
+    "--input-file=" + rebase_path(input, root_build_dir),
+    "--output-file=" + rebase_path(output, root_build_dir),
+    "--namespace=" + spirv_namespace_strings,
+  ]
+
+  outputs = [ output ]
+}
+
+action("clspv_glsl") {
+  script = "cmake/spirv_ext_inst.py"
+
+  inputs = [ "${spirv_tools_spirv_headers_dir}/include/spirv/unified1/extinst.glsl.std.450.grammar.json" ]
+
+  outputs = [ "$target_gen_dir/clspv/spirv_glsl.hpp" ]
+
+  args = [
+    "--input-file=" + rebase_path(inputs[0], root_build_dir),
+    "--output-file=" + rebase_path(outputs[0], root_build_dir),
+    "--namespace=" + spirv_namespace_glsl,
+  ]
+}
+
+action("clspv_reflection") {
+  script = "cmake/spirv_ext_inst.py"
+
+  inputs = [ "${spirv_tools_spirv_headers_dir}/include/spirv/unified1/extinst.nonsemantic.clspvreflection.grammar.json" ]
+
+  outputs = [ "$target_gen_dir/clspv/spirv_reflection.hpp" ]
+
+  args = [
+    "--input-file=" + rebase_path(inputs[0], root_build_dir),
+    "--output-file=" + rebase_path(outputs[0], root_build_dir),
+    "--namespace=" + spirv_namespace_reflection,
+  ]
+}
+
+action("clspv-builtins") {
+  script = "cmake/define_clspv_builtins.py"
+
+  outputs = [ "$target_gen_dir/clspv-builtins.h" ]
+
+  args = [ "--output-file=" + rebase_path(outputs[0], root_build_dir) ]
+}
+
+# TODO Need a way to generate *.bc files
+action("clspv_builtin_library") {
+  script = "cmake/bake_file.py"
+  inputs = [ "cmake/clspv--.bc" ]
+  outputs = [ "$target_gen_dir/clspv/clspv_builtin_library.h" ]
+
+  args = [
+    "--input-header-file=" + rebase_path(inputs[0], root_build_dir),
+    "--output-file=" + rebase_path(outputs[0], root_build_dir),
+    "--header-var=" + clspv_library_data_var_name,
+    "--header-size=" + clspv_library_size_var_name,
+  ]
+}
+
+action("clspv64_builtin_library") {
+  script = "cmake/bake_file.py"
+  inputs = [ "cmake/clspv64--.bc" ]
+  outputs = [ "$target_gen_dir/clspv/clspv64_builtin_library.h" ]
+
+  args = [
+    "--input-header-file=" + rebase_path(inputs[0], root_build_dir),
+    "--output-file=" + rebase_path(outputs[0], root_build_dir),
+    "--header-var=" + clspv64_library_data_var_name,
+    "--header-size=" + clspv64_library_size_var_name,
+  ]
+}
+
+action("clspv_baked_opencl_header") {
+  script = "cmake/bake_file.py"  # cannot use data_deps as that's a rutime dep
+  deps = [ ":clspv-builtins" ]
+
+  inputs = [
+    "$target_gen_dir/clspv-builtins.h",
+    "//$clspv_llvm_dir/clang/lib/Headers/opencl-c-base.h",
+  ]
+
+  outputs = [ "$target_gen_dir/clspv/opencl_builtins_header.h" ]
+
+  args = [
+    "--input-header-file=" + rebase_path(inputs[0], root_build_dir),
+    "--input-base-file=" + rebase_path(inputs[1], root_build_dir),
+    "--output-file=" + rebase_path(outputs[0], root_build_dir),
+    "--header-var=" + clspv_bake_file_data_variable_name,
+    "--header-size-var=" + clspv_bake_file_size_variable_name,
+    "--base-var=" + clspv_bake_file_data_base_variable_name,
+    "--base-size-var=" + clspv_bake_file_size_base_variable_name,
+  ]
+}
+
+group("clspv") {
+  deps = [
+    "tools/clspv-opt",
+    "tools/driver:clspv",
+    "tools/reflection:clspv-reflection",
+  ]
+}

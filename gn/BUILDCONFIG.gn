@@ -1,0 +1,80 @@
+# BUILDCONFIG.gn
+# Sets up platform, toolchain, and default target configs.
+
+import("//build_overrides/clspv.gni")
+
+# Platform selection
+if (target_os == "") {
+  target_os = host_os
+}
+
+if (target_cpu == "") {
+  target_cpu = host_cpu
+}
+
+if (current_os == "") {
+  current_os = target_os
+}
+
+if (current_cpu == "") {
+  current_cpu = target_cpu
+}
+
+# BUILD FLAGS
+import("//gn/build/buildflags.gni")
+
+# Toolchain setup
+if (host_os == "win") {
+  assert(true, "linux is only supported as host_os for now")
+  #host_toolchain = "//${llvm_build_root}build/toolchain:win"
+} else {
+  host_toolchain = "//gn/toolchain:host"
+}
+
+android_aarch64_toolchain = "//gn/toolchain:android_aarch64"
+android_arm_toolchain = "//gn/toolchain:android_arm"
+
+# Target defaults
+import("//gn/toolchain/compiler.gni")
+if (android_ndk_path != "") {
+  assert(target_cpu == "arm" || target_cpu == "arm64",
+         "target_cpu must be either arm or arm64 for android")
+  if (target_cpu == "arm") {
+    set_default_toolchain(android_arm_toolchain)
+  } else {
+    set_default_toolchain(android_aarch64_toolchain)
+  }
+} else {
+  set_default_toolchain(host_toolchain)
+}
+
+# Target flags
+import("//gn/toolchain/target_flags.gni")
+
+# Default configs for all the targets, as set by LLVM.
+shared_binary_target_configs = [
+  "//gn/build:compiler_defaults",
+  "//gn/build:llvm_code",
+  "//gn/build:no_exceptions",
+  "//gn/build:no_rtti",
+  "//gn/build:thin_archive",
+  "//gn/build:warn_covered_switch_default",
+]
+
+# Apply that default list to the binary target types.
+set_defaults("executable") {
+  configs = shared_binary_target_configs
+}
+set_defaults("loadable_module") {
+  configs = shared_binary_target_configs
+}
+set_defaults("static_library") {
+  configs = shared_binary_target_configs
+}
+set_defaults("shared_library") {
+  configs = shared_binary_target_configs +
+            [ "//$clspv_llvm_dir/llvm/utils/gn/build:zdefs" ]
+}
+set_defaults("source_set") {
+  configs = shared_binary_target_configs
+}

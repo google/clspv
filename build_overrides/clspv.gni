@@ -1,0 +1,14 @@
+# Clspv build overrides for GN
+# Any configuration that could be overridden from a top-level build where clspv
+# is a third-party module goes in here.
+
+# LLVM source location
+clspv_llvm_dir = "third_party/llvm"
+
+# Set this to true if clspv is built as a standalone, and false if being
+# incorporated as a third-party module
+clspv_standalone_build = true
+
+# configs that need adjustment
+clspv_configs_to_append = []
+clspv_configs_to_remove = []

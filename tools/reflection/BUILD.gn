@@ -1,0 +1,31 @@
+import("//build_overrides/clspv.gni")
+import("//build_overrides/spirv_tools.gni")
+
+config("clspv_reflection_config") {
+  # include deps
+  include_dirs = [
+    "${spirv_tools_spirv_headers_dir}/include",
+
+    # generated header file include
+    "$root_gen_dir",
+  ]
+
+  configs = [ "../../lib:clspv_common_config" ]
+}
+
+executable("clspv-reflection") {
+  sources = [
+    "ReflectionParser.cpp",
+    "main.cpp",
+  ]
+
+  configs += [ ":clspv_reflection_config" ]
+  configs += clspv_configs_to_append
+  configs -= clspv_configs_to_remove
+
+  deps = [
+    "${spirv_tools_dir}:spvtools_link",
+    "../../:clspv_reflection",
+    "../../lib:clspv_core",
+  ]
+}
