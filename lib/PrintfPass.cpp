@@ -288,7 +288,12 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     for (unsigned i = 1; i < CI->arg_size(); i++) {
       Value *Arg = CI->getArgOperand(i);
       Type *ArgType = Arg->getType();
-      unsigned ArgSize = GetPrintfStoreSize(DL, ArgType);
+
+      // Literal Arg are store using a 32bits identifier, which differs when
+      // using 64bits pointers from the size returned by GetPrintfStoreSize.
+      bool IsStringLiteral = GetStringLiteral(Arg) != "";
+      unsigned ArgSize = IsStringLiteral ? 4 : GetPrintfStoreSize(DL, ArgType);
+
       auto *ArgSizeConst = ConstantInt::get(Int32Ty, ArgSize);
       ArgMD.push_back(ConstantAsMetadata::get(ArgSizeConst));
     }
