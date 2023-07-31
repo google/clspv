@@ -569,16 +569,6 @@ bool clspv::IsArrayImageType(llvm::Type *type) {
   return false;
 }
 
-bool clspv::IsStorageTexelBufferImageType(llvm::StructType *type) {
-  if (ImageDimensionality(type) != spv::DimBuffer)
-    return false;
-  if (type->getName().contains("_wo") ||
-      type->getName().contains("_rw")) {
-    return true;
-  }
-  return false;
-}
-
 bool clspv::IsFloatImageType(llvm::Type *type) {
   return IsImageType(type) && !IsIntImageType(type) && !IsUintImageType(type);
 }

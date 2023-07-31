@@ -49,7 +49,7 @@ entry:
 }
 
 ; CHECK-LABEL: @test4
-; CHECK: call [[image1dbufferf]] @_Z14clspv.resource.6(i32 1, i32 0, i32 7, i32 0, i32 6, i32 0, [[image1dbufferf]]
+; CHECK: call [[image1dbufferf]] @_Z14clspv.resource.6(i32 1, i32 0, i32 11, i32 0, i32 6, i32 0, [[image1dbufferf]]
 define spir_kernel void @test4(target("spirv.Image", float, 5, 0, 0, 0, 2, 0, 1, 0) %im, ptr addrspace(1) nocapture readonly align 16 %data) !clspv.pod_args_impl !10 {
 entry:
   %0 = load <4 x float>, ptr addrspace(1) %data, align 16

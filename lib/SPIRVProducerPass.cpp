@@ -1934,7 +1934,8 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       RID = addSPIRVInst<kTypes>(spv::OpTypeImage, Ops);
 
       // Only need a sampled version of the type if it is used with a sampler.
-      if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) { // TODO why is DimBuffer excluded?
+      // In SPIR-V 1.6 or later, sampled image dimension must not be Buffer
+      if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) {
           Ops.clear();
           Ops << RID;
           getImageTypeMap()[Canonical] =
@@ -3753,7 +3754,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
         Ops << Call->getType() << RID;
         RID = addSPIRVInst(spv::OpBitcast, Ops);
       }
-    } else if (IsStorageImageType(image_ty) || IsStorageTexelBufferImageType(image_ty)) {
+    } else if (IsStorageImageType(image_ty)) {
       // read_image on a storage image is mapped to OpImageRead.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);

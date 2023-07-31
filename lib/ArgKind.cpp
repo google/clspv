@@ -57,9 +57,13 @@ clspv::ArgKind GetArgKindForType(Type *type) {
       return clspv::ArgKind::Sampler;
     if (clspv::IsImageType(ext_ty)) {
       if (clspv::IsSampledImageType(ext_ty)) {
-        return clspv::ArgKind::SampledImage;
+        return clspv::ImageDimensionality(ext_ty) == spv::DimBuffer
+                   ? clspv::ArgKind::UniformTexelBuffer
+                   : clspv::ArgKind::SampledImage;
       } else {
-        return clspv::ArgKind::StorageImage;
+        return clspv::ImageDimensionality(ext_ty) == spv::DimBuffer
+                   ? clspv::ArgKind::StorageTexelBuffer
+                   : clspv::ArgKind::StorageImage;
       }
     }
     errs() << "Unhandled target ext type: " << *type << "\n";
