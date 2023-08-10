@@ -907,7 +907,7 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       auto Src = call->getArgOperand(1);
       auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
       auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
-      if (DstTy != SrcTy) {
+      if (DstTy && SrcTy && DstTy != SrcTy) {
         if (SizeInBits(M.getDataLayout(), DstTy) >=
             SizeInBits(M.getDataLayout(), SrcTy)) {
           source = Src;
