@@ -1193,8 +1193,8 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
           CreateDiv(Builder, NewSmallerBitWidths / SmallerBitWidths, DynVal);
     }
     if (CstVal != 0) {
-      DynVal = Builder.CreateAdd(
-          DynVal, ConstantInt::get(Builder.getInt32Ty(), CstVal));
+      DynVal = Builder.CreateAdd(DynVal,
+                                 ConstantInt::get(DynVal->getType(), CstVal));
     }
     for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
       size_t size = TyBitWidths[i] / NewSmallerBitWidths;
