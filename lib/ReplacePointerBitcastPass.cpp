@@ -679,7 +679,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       if (DynVal == nullptr) {
         OrgGEPIdx = Builder.getInt32(CstVal);
       } else if (CstVal != 0) {
-        OrgGEPIdx = Builder.CreateAdd(Builder.getInt32(CstVal), DynVal);
+        OrgGEPIdx = Builder.CreateAdd(
+            ConstantInt::get(DynVal->getType(), CstVal), DynVal);
       }
 
       DstTy = GEP->getResultElementType();
