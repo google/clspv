@@ -372,6 +372,12 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
 
   SmallVector<Value *, 8> STValues;
   Value *STVal = ST->getValueOperand();
+  if (auto cst = dyn_cast<Constant>(STVal)) {
+    if (cst->isZeroValue()) {
+      Builder.CreateStore(Constant::getNullValue(SrcTy), Src);
+      return;
+    }
+  }
   STValues.push_back(STVal);
 
   // If the output is a vec3, let's extract those 3 elements.
