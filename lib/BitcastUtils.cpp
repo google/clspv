@@ -261,6 +261,26 @@ Value *ConvertValue(Value *src, Type *dst_type, IRBuilder<> &builder) {
   return nullptr;
 }
 
+// 'Values' is expected to contain elements that will compose struct of type
+// 'Ty'.
+// 'Values' is also the output of this function, containing arrays of type 'Ty'.
+void InsertInArrayLikeStruct(IRBuilder<> &Builder, StructType *Ty,
+                             SmallVector<Value *, 8> &Values) {
+  DEBUG_FCT_TY_VALUES(Ty, Values);
+  unsigned StructNumEles = Ty->getNumElements();
+  assert(Ty->getElementType(0) == Values[0]->getType());
+  assert(Values.size() % StructNumEles == 0);
+  unsigned NumArrays = Values.size() / StructNumEles;
+  for (unsigned i = 0; i < NumArrays; i++) {
+    Value *Ret = PoisonValue::get(Ty);
+    for (unsigned j = 0; j < StructNumEles; j++) {
+      Ret = Builder.CreateInsertValue(Ret, Values[i * StructNumEles + j], {j});
+    }
+    Values[i] = Ret;
+  }
+  Values.resize(NumArrays);
+}
+
 // 'Values' is expected to contain elements that will compose arrays of type
 // 'Ty'.
 // 'Values' is also the output of this function, containing arrays of type 'Ty'.
@@ -705,14 +725,11 @@ void ConvertScalarIntoVector(FixedVectorType *Ty, IRBuilder<> &Builder,
   BitcastValues(Builder, Ty, Values);
 }
 
-// 'Values' is expected to contain scalar elements.
 // Return the scalar values of type 'Ty' into 'Values'.
 void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
                              SmallVector<Value *, 8> &Values) {
   DEBUG_FCT_TY_VALUES(Ty, Values);
   Type *ValueTy = Values[0]->getType();
-  assert(!Ty->isVectorTy() && !Ty->isArrayTy() && !ValueTy->isVectorTy() &&
-         !ValueTy->isArrayTy());
 
   if (Ty == ValueTy) {
     return;
@@ -755,7 +772,12 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
       ConvertScalarIntoVector(VecTy, Builder, Values);
     }
   } else if (auto StructTy = dyn_cast<StructType>(Ty)) {
-    ConvertScalarIntoScalar(StructTy, Builder, Values);
+    if (IsArrayLike(StructTy)) {
+      ConvertScalarIntoScalar(StructTy->getElementType(0), Builder, Values);
+      InsertInArrayLikeStruct(Builder, StructTy, Values);
+    } else {
+      ConvertScalarIntoScalar(StructTy, Builder, Values);
+    }
   } else {
     Type *EleTy = GetEleType(Ty);
     if (ValueTy->isVectorTy()) {

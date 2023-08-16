@@ -33,14 +33,14 @@
 ; CHECK: [[shl:%[a-zA-Z0-9_.]+]] = shl i64 [[zext1_3]], 56
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[or4]], [[shl]]
 
-; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[or]] to i32
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[trunc]], 0
-; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] poison, { i32 } [[insert]], 0
-; CHECK: [[shr:%[a-zA-Z0-9_.]+]] = lshr i64 [[or]], 32
-; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc i64 [[shr]] to i32
-; CHECK: [[insert:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[trunc]], 0
-; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] [[insert0]], { i32 } [[insert]], 1
-; CHECK: store [[out]] [[insert1]], ptr addrspace(1)
+; CHECK: [[bitcast:%[a-zA-Z0-9_.]+]] = bitcast i64 [[or]] to <2 x i32>
+; CHECK: [[extract0:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[bitcast]], i64 0
+; CHECK: [[extract1:%[a-zA-Z0-9_.]+]] = extractelement <2 x i32> [[bitcast]], i64 1
+; CHECK: [[insert0:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[extract0]], 0
+; CHECK: [[insert1:%[a-zA-Z0-9_.]+]] = insertvalue { i32 } poison, i32 [[extract1]], 0
+; CHECK: [[insert2:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] poison, { i32 } [[insert0]], 0
+; CHECK: [[insert3:%[a-zA-Z0-9_.]+]] = insertvalue [[out]] [[insert2]], { i32 } [[insert1]], 1
+; CHECK: store [[out]] [[insert3]], ptr addrspace(1)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
