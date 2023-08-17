@@ -3,13 +3,10 @@
 // RUN: spirv-val %t.spv --target-env spv1.0
 // RUN: FileCheck %s < %t.spvasm
 
-// CHECK: [[uint:%[^ ]+]] = OpTypeInt 32 0
-// CHECK: [[uint2:%[^ ]+]] = OpTypeVector [[uint]] 2
 // CHECK: [[ulong:%[^ ]+]] = OpTypeInt 64 0
 // CHECK: [[ulong_8000000000:%[^ ]+]] = OpConstant [[ulong]] 8000000000
 
-// CHECK: Bitcast [[uint2]] [[ulong_8000000000]]
-// CHECK: Bitcast [[uint2]] [[ulong_8000000000]]
+// CHECK: OpStore {{.*}} [[ulong_8000000000]]
 
 struct S { long i1; int i2; int i3; };
 

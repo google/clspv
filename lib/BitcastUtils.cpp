@@ -1047,8 +1047,7 @@ bool IsArrayLike(StructType *Ty) {
 // found or it cannot descend any further. Writes out levels of indirection to
 // `Steps`.
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
-                               bool &PerfectMatch, const DataLayout &DL,
-                               bool strictAliasing) {
+                               bool &PerfectMatch, const DataLayout &DL) {
   int StepCount = 0;
 
   auto IsIntegerOrFloatTy = [](Type *Ty) {
@@ -1073,8 +1072,6 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
       ContainingTy = ArrayTy->getArrayElementType();
     } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
       if (StructTy->isOpaque())
-        break;
-      if (!IsArrayLike(StructTy) && strictAliasing)
         break;
       ContainingTy = StructTy->getStructElementType(0);
     } else {

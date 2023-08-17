@@ -1,13 +1,11 @@
-; RUN: clspv-opt %s -o %t.ll --passes=replace-pointer-bitcast
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast,replace-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 0
-; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> <i64 8000000000> to <2 x i32>), i64 0), ptr addrspace(1) [[gep]], align 4
-; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 1
-; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> <i64 8000000000> to <2 x i32>), i64 1), ptr addrspace(1) [[gep]], align 4
-; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 2
-; CHECK:  store i32 77, ptr addrspace(1) [[gep]], align 4
-; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 3
+; CHECK:  [[gep:%[^ ]+]] = getelementptr %struct.S, ptr addrspace(1) %s, i32 0, i32 0
+; CHECK:  store i64 8000000000, ptr addrspace(1) [[gep]], align 8
+; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds %struct.S, ptr addrspace(1) %s, i32 0, i32 1
+; CHECK:  store i32 77, ptr addrspace(1) [[gep]], align 8
+; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds %struct.S, ptr addrspace(1) %s, i32 0, i32 2
 ; CHECK:  store i32 88, ptr addrspace(1) [[gep]], align 4
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

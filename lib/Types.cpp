@@ -220,12 +220,12 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
 
   int Steps;
   bool PerfectMatch;
-  if (BitcastUtils::FindAliasingContainedType(TyA, TyB, Steps, PerfectMatch, DL,
-                                              true)) {
+  if (BitcastUtils::FindAliasingContainedType(TyA, TyB, Steps, PerfectMatch,
+                                              DL)) {
     return TyA;
   }
-  if (BitcastUtils::FindAliasingContainedType(TyB, TyA, Steps, PerfectMatch, DL,
-                                              true)) {
+  if (BitcastUtils::FindAliasingContainedType(TyB, TyA, Steps, PerfectMatch,
+                                              DL)) {
     return TyB;
   }
 

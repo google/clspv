@@ -61,8 +61,7 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
 bool IsArrayLike(StructType *Ty);
 
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
-                               bool &PerfectMatch, const DataLayout &DL,
-                               bool structAliasing = false);
+                               bool &PerfectMatch, const DataLayout &DL);
 
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, uint64_t &CstVal,
