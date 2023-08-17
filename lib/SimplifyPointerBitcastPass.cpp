@@ -48,6 +48,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
     changed |= runOnTrivialBitcast(M);
     changed |= runOnBitcastFromBitcast(M);
+    changed |= runOnAllocaNotAliasing(M);
     changed |= runOnGEPFromGEP(M);
     changed |= runOnUnneededCasts(M);
     changed |= runOnImplicitGEP(M);
@@ -779,4 +780,71 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
   }
 
   return changed;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnAllocaNotAliasing(
+    Module &M) const {
+  const DataLayout &DL = M.getDataLayout();
+  DenseMap<Value *, Type *> type_cache;
+
+  DenseMap<AllocaInst *, Type *> Allocas;
+  for (auto &F : M) {
+    for (auto &BB : F) {
+      for (auto &I : BB) {
+        Value *source = nullptr;
+        Type *source_ty = nullptr;
+        Type *dest_ty = nullptr;
+
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
+                             true)) {
+          continue;
+        }
+
+        auto alloca = dyn_cast<AllocaInst>(source);
+        auto gep = dyn_cast<GetElementPtrInst>(&I);
+        if (!alloca || !gep) {
+          continue;
+        }
+        int Steps;
+        bool PerfectMatch;
+        dest_ty = gep->getResultElementType();
+        Type *source_ele_ty = GetEleType(source_ty);
+        while (source_ele_ty != source_ty) {
+          source_ty = source_ele_ty;
+          source_ele_ty = GetEleType(source_ty);
+        }
+        if (FindAliasingContainedType(source_ty, dest_ty, Steps, PerfectMatch,
+                                      DL) ||
+            SizeInBits(DL, dest_ty) >= SizeInBits(DL, source_ty)) {
+          continue;
+        }
+        if (Allocas.count(alloca) == 0) {
+          Allocas.insert(std::make_pair(cast<AllocaInst>(source), dest_ty));
+        } else if (SizeInBits(DL, dest_ty) < SizeInBits(DL, Allocas[alloca])) {
+          Allocas[alloca] = dest_ty;
+        }
+      }
+    }
+  }
+
+  for (auto &pair : Allocas) {
+    auto *alloca = pair.first;
+    auto *Ty = pair.second;
+
+    IRBuilder<> B(alloca);
+    auto nb_elem =
+        alloca->getAllocationSizeInBits(DL).value() / SizeInBits(DL, Ty);
+    if (nb_elem > 1) {
+      Ty = ArrayType::get(Ty, nb_elem);
+    }
+    auto new_alloca = B.CreateAlloca(Ty, alloca->getAddressSpace());
+
+    LLVM_DEBUG(dbgs() << "\n##runOnAllocaNotAliasing:\nreplace: ";
+               alloca->dump(); dbgs() << "by: "; new_alloca->dump());
+
+    alloca->replaceAllUsesWith(new_alloca);
+    alloca->eraseFromParent();
+  }
+
+  return Allocas.size() != 0;
 }
