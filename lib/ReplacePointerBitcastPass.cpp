@@ -543,6 +543,41 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
 
     GV->replaceAllUsesWith(new_GV);
     GV->eraseFromParent();
+  } else if (auto Arg = dyn_cast<Argument>(Src)) {
+    SmallVector<User *, 16> UserWorkList;
+    auto TySize = SizeInBits(DL, Ty);
+    for (auto *U : Arg->users()) {
+      UserWorkList.push_back(U);
+    }
+    while (!UserWorkList.empty()) {
+      auto *user = UserWorkList.back();
+      UserWorkList.pop_back();
+
+      auto gep = dyn_cast<GetElementPtrInst>(user);
+      if (gep && TySize < SizeInBits(DL, gep->getSourceElementType())) {
+        for (auto *U : user->users()) {
+          UserWorkList.push_back(U);
+        }
+        IRBuilder<> B(gep);
+        uint64_t CstVal;
+        Value *DynVal;
+        size_t SmallerBitWidths;
+        Type *RetTy = Ty;
+        if (TySize > SizeInBits(DL, gep->getResultElementType())) {
+          RetTy = gep->getResultElementType();
+        }
+        ExtractOffsetFromGEP(DL, B, gep, CstVal, DynVal, SmallerBitWidths);
+        auto Idxs = GetIdxsForTyFromOffset(
+            DL, B, Ty, RetTy, CstVal, DynVal, SmallerBitWidths,
+            (clspv::AddressSpace::Type)gep->getPointerOperand()
+                ->getType()
+                ->getPointerAddressSpace());
+        auto *new_gep = GetElementPtrInst::Create(Ty, gep->getPointerOperand(),
+                                                  Idxs, "", gep);
+        gep->replaceAllUsesWith(new_gep);
+        gep->eraseFromParent();
+      }
+    }
   }
 }
 
