@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// CHECK-COUNT-32: OpStore
+// CHECK-COUNT-16: OpStore
 
 struct Data
 {
