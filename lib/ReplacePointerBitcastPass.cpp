@@ -372,13 +372,15 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
 
   SmallVector<Value *, 8> STValues;
   Value *STVal = ST->getValueOperand();
-  if (auto cst = dyn_cast<Constant>(STVal)) {
-    if (cst->isZeroValue()) {
-      Builder.CreateStore(Constant::getNullValue(SrcTy), Src);
-      return;
+  auto cst = dyn_cast<Constant>(STVal);
+  if (cst && cst->isZeroValue()) {
+    for (uint32_t i = 0;
+         i < (DstTyBitWidth + SrcTyBitWidth - 1) / SrcTyBitWidth; i++) {
+      STValues.push_back(Constant::getNullValue(SrcTy));
     }
+  } else {
+    STValues.push_back(STVal);
   }
-  STValues.push_back(STVal);
 
   // If the output is a vec3, let's extract those 3 elements.
   bool IsVec3 = DstTy->isVectorTy() && GetNumEle(DstTy) == 3;
