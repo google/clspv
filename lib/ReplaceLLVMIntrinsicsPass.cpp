@@ -187,7 +187,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
   };
 
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.memset")) {
+    if (F.getName().contains("llvm.memset")) {
       SmallVector<CallInst *, 8> CallsToReplace;
 
       for (auto U : F.users()) {
@@ -252,6 +252,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
           Bitcast->eraseFromParent();
         }
       }
+      DeadFunctions.push_back(&F);
     }
   }
 
@@ -265,7 +266,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
   DenseMap<Value *, Type *> type_cache;
 
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.memcpy")) {
+    if (F.getName().contains("llvm.memcpy")) {
       SmallVector<CallInst *, 8> CallsToReplaceWithSpirvCopyMemory;
 
       for (auto U : F.users()) {
@@ -313,6 +314,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         // Erase the call.
         CI->eraseFromParent();
       }
+      DeadFunctions.push_back(&F);
     }
   }
 
