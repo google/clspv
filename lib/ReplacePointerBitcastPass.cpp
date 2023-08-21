@@ -150,7 +150,7 @@ Value *ExtractElementOrSubVector(Type *Ty, IRBuilder<> &Builder, Value *Val,
     // ValueTy: <4 x i32> - Ty: <2 x i16>
     // <4 x i32> -> <4 x i32>[Idx] -> i32
     assert(SrcEleSize == DstSize);
-    return Builder.CreateExtractElement(Val, Idx);
+    return Builder.CreateExtractElement(Val, Idx ? Idx : Builder.getInt32(0));
   } else if (NumElements == 2) {
     // ValueTy: <4 x i32> - Ty: <4 x i16>
     // <4 x i32> -> {<2 x i32>, <2 x i32>}[Idx] -> <2 x i32>
@@ -488,7 +488,8 @@ void CleanModule(WeakInstructions &ToBeDeleted) {
   }
 }
 
-void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
+bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
+  bool changed = false;
   while (auto gep = dyn_cast<GetElementPtrInst>(Src)) {
     IRBuilder<> B(gep);
     uint64_t CstVal;
@@ -505,6 +506,7 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
     gep->replaceAllUsesWith(new_gep);
     gep->eraseFromParent();
     Src = new_gep->getPointerOperand();
+    changed = true;
   }
   if (auto alloca = dyn_cast<AllocaInst>(Src)) {
     IRBuilder<> B(alloca);
@@ -516,6 +518,7 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
     auto new_alloca = B.CreateAlloca(Ty, alloca->getAddressSpace());
     alloca->replaceAllUsesWith(new_alloca);
     alloca->eraseFromParent();
+    changed = true;
   } else if (auto GV = dyn_cast<GlobalVariable>(Src)) {
     auto nb_elem = SizeInBits(DL, GV->getValueType()) / SizeInBits(DL, Ty);
     if (nb_elem > 1) {
@@ -531,7 +534,7 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
         !initializer->isNullValue() && !initializer->isZeroValue() &&
         !isa<UndefValue>(initializer)) {
       // unsupported do nothing...
-      return;
+      return changed;
     } else if (initializer && initializer->isOneValue()) {
       initializer = Constant::getAllOnesValue(Ty);
     } else if (initializer &&
@@ -551,6 +554,7 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
 
     GV->replaceAllUsesWith(new_GV);
     GV->eraseFromParent();
+    changed = true;
   } else if (auto Arg = dyn_cast<Argument>(Src)) {
     SmallVector<User *, 16> UserWorkList;
     auto TySize = SizeInBits(DL, Ty);
@@ -584,19 +588,15 @@ void DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
                                                   Idxs, "", gep);
         gep->replaceAllUsesWith(new_gep);
         gep->eraseFromParent();
+        changed = true;
       }
     }
   }
+  return changed;
 }
 
-} // namespace
-
-PreservedAnalyses
-clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
-  PreservedAnalyses PA;
-
+bool DowngradeModule(Module &M) {
   DenseMap<Value *, Type *> type_cache;
-  WeakInstructions ToBeDeleted;
   const DataLayout &DL = M.getDataLayout();
 
   // Downgrade object type when detecting implicit cast with inner source type
@@ -629,6 +629,10 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
           continue;
         }
 
+        if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
+          dest_ty = gep->getResultElementType();
+        }
+
         Type *EleTy = GetEleType(source_ty);
         while (source_ty != EleTy) {
           source_ty = EleTy;
@@ -637,12 +641,32 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         size_t source_size = SizeInBits(DL, source_ty);
         size_t dest_size = SizeInBits(DL, dest_ty);
         if (source_size > dest_size) {
-          DowngradeSourceToTy(DL, source, dest_ty);
+          if (isa<IntToPtrInst>(source)) {
+            return DowngradeSourceToTy(DL, &I, dest_ty);
+          } else {
+            return DowngradeSourceToTy(DL, source, dest_ty);
+          }
         }
       }
     }
   }
-  type_cache.clear();
+  return false;
+}
+
+} // namespace
+
+PreservedAnalyses
+clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+
+  DenseMap<Value *, Type *> type_cache;
+  WeakInstructions ToBeDeleted;
+  const DataLayout &DL = M.getDataLayout();
+
+  bool changed;
+  do {
+    changed = DowngradeModule(M);
+  } while (changed);
 
   DenseSet<Instruction *> WorkList;
   for (auto &F : M) {

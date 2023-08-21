@@ -1048,7 +1048,7 @@ bool IsArrayLike(StructType *Ty) {
 // `Steps`.
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool &PerfectMatch, const DataLayout &DL,
-                               bool strictAliasing) {
+                               bool StrictStruct) {
   int StepCount = 0;
 
   auto IsIntegerOrFloatTy = [](Type *Ty) {
@@ -1072,9 +1072,8 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
     } else if (auto *ArrayTy = dyn_cast<ArrayType>(ContainingTy)) {
       ContainingTy = ArrayTy->getArrayElementType();
     } else if (auto *StructTy = dyn_cast<StructType>(ContainingTy)) {
-      if (StructTy->isOpaque())
-        break;
-      if (!IsArrayLike(StructTy) && strictAliasing)
+      if (StructTy->isOpaque() ||
+          (StructTy->getStructNumElements() > 1 && StrictStruct))
         break;
       ContainingTy = StructTy->getStructElementType(0);
     } else {
