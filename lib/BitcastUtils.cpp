@@ -745,9 +745,17 @@ void ConvertScalarIntoScalar(Type *Ty, IRBuilder<> &Builder,
     ExtractFromVector(Builder, Values);
   } else if (ValueSize < TySize) {
     assert(TySize % ValueSize == 0);
-    unsigned NumElements = std::min(TySize / ValueSize, (unsigned)4);
-    GroupScalarValuesIntoVector(Builder, Values, NumElements);
-    GroupVectorUntilSizeEquals(Ty, Builder, Values);
+    if (IsComplexStruct(
+            Builder.GetInsertBlock()->getParent()->getParent()->getDataLayout(),
+            Ty)) {
+      unsigned ValuePerTy = TySize / ValueSize;
+      assert(Values.size() % ValuePerTy == 0);
+      InsertInArray(Builder, ArrayType::get(ValueTy, ValuePerTy), Values);
+    } else {
+      unsigned NumElements = std::min(TySize / ValueSize, (unsigned)4);
+      GroupScalarValuesIntoVector(Builder, Values, NumElements);
+      GroupVectorUntilSizeEquals(Ty, Builder, Values);
+    }
   }
 
   BitcastValues(Builder, Ty, Values);
@@ -1039,6 +1047,14 @@ bool IsArrayLike(StructType *Ty) {
     }
   }
   return true;
+}
+
+bool IsComplexStruct(const DataLayout &DL, Type *Ty) {
+  if (auto STy = dyn_cast<StructType>(Ty)) {
+    auto vec4u64 = FixedVectorType::get(Type::getInt64Ty(Ty->getContext()), 4);
+    return !IsArrayLike(STy) && SizeInBits(DL, Ty) > SizeInBits(DL, vec4u64);
+  }
+  return false;
 }
 
 // Check whether a pointer to the type `ContainingTy` is also usable as a

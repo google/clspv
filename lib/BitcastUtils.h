@@ -59,6 +59,7 @@ Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val);
 Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
 
 bool IsArrayLike(StructType *Ty);
+bool IsComplexStruct(const DataLayout &DL, Type *Ty);
 
 bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool &PerfectMatch, const DataLayout &DL,

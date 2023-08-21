@@ -51,14 +51,6 @@ using WeakInstructions = SmallVector<WeakTrackingVH, 16>;
 
 namespace {
 
-bool IsComplexStruct(const DataLayout &DL, Type *Ty) {
-  if (auto STy = dyn_cast<StructType>(Ty)) {
-    auto vec4u64 = FixedVectorType::get(Type::getInt64Ty(Ty->getContext()), 4);
-    return !IsArrayLike(STy) && SizeInBits(DL, Ty) > SizeInBits(DL, vec4u64);
-  }
-  return false;
-}
-
 // 'Val' is expected to be a vector.
 // 'Idx' is the index where to extract the subvector, but in the casted type
 // coordinate. If null, just extract from the origin of the vector.
