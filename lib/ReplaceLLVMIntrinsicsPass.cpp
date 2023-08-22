@@ -73,6 +73,8 @@ clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
 
 bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   switch (F.getIntrinsicID()) {
+  case Intrinsic::bswap:
+    return replaceBswap(F);
   case Intrinsic::fshl:
     return replaceFshl(F);
   case Intrinsic::copysign:
@@ -124,6 +126,60 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   DeadFunctions.push_back(&F);
 
   return !ToRemove.empty();
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceBswap(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    Type *Ty = call->getType();
+    auto VTy = dyn_cast<FixedVectorType>(Ty);
+    Type *ScalarTy = Ty;
+    if (VTy) {
+      ScalarTy = VTy->getElementType();
+    }
+    assert(ScalarTy && ScalarTy->isIntegerTy());
+
+    Value *input = call->getOperand(0);
+    IRBuilder<> B(call);
+    auto cst = [Ty](uint32_t c) { return ConstantInt::get(Ty, c); };
+    if (ScalarTy == Ty->getInt16Ty(Ty->getContext())) {
+      auto shl = B.CreateShl(input, cst(8));
+      auto shr = B.CreateLShr(input, cst(8));
+      return B.CreateOr(shl, shr);
+    } else if (ScalarTy == Ty->getInt32Ty(Ty->getContext())) {
+      auto byte3 = B.CreateShl(input, cst(24));
+      auto byte2 = B.CreateAnd(input, cst(0xff00));
+      byte2 = B.CreateShl(byte2, cst(8));
+      auto byte1 = B.CreateLShr(input, cst(8));
+      byte1 = B.CreateAnd(byte1, cst(0xff00));
+      auto byte0 = B.CreateLShr(input, cst(24));
+      auto bswap = B.CreateOr(byte3, byte2);
+      bswap = B.CreateOr(bswap, byte1);
+      return B.CreateOr(bswap, byte0);
+    } else if (ScalarTy == Ty->getInt64Ty(Ty->getContext())) {
+      auto byte7 = B.CreateShl(input, cst(56));
+      auto byte6 = B.CreateAnd(input, cst(0xff00));
+      byte6 = B.CreateShl(byte6, cst(40));
+      auto byte5 = B.CreateAnd(input, cst(0xff0000));
+      byte5 = B.CreateShl(byte5, cst(24));
+      auto byte4 = B.CreateAnd(input, cst(0xff000000));
+      byte4 = B.CreateShl(byte4, cst(8));
+      auto byte3 = B.CreateLShr(input, cst(8));
+      byte3 = B.CreateAnd(byte3, cst(0xff000000));
+      auto byte2 = B.CreateLShr(input, cst(24));
+      byte2 = B.CreateAnd(byte2, cst(0xff0000));
+      auto byte1 = B.CreateLShr(input, cst(40));
+      byte1 = B.CreateAnd(byte1, cst(0xff00));
+      auto byte0 = B.CreateLShr(input, cst(56));
+      auto bswap = B.CreateOr(byte7, byte6);
+      bswap = B.CreateOr(bswap, byte5);
+      bswap = B.CreateOr(bswap, byte4);
+      bswap = B.CreateOr(bswap, byte3);
+      bswap = B.CreateOr(bswap, byte2);
+      bswap = B.CreateOr(bswap, byte1);
+      return B.CreateOr(bswap, byte0);
+    }
+    llvm_unreachable("unsupported type for BSWAP");
+  });
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
