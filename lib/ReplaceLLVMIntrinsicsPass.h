@@ -29,6 +29,7 @@ struct ReplaceLLVMIntrinsicsPass
   bool replaceMemset(llvm::Module &M);
   bool replaceMemcpy(llvm::Module &M);
   bool removeIntrinsicDeclaration(llvm::Function &F);
+  bool replaceBswap(llvm::Function &F);
   bool replaceFshl(llvm::Function &F);
   bool replaceCountZeroes(llvm::Function &F, bool leading);
   bool replaceCopysign(llvm::Function &F);
