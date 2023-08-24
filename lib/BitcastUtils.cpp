@@ -1158,10 +1158,11 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
-  if (AddrSpace == clspv::AddressSpace::Private ||
-      AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
-      AddrSpace == clspv::AddressSpace::PushConstant ||
-      AddrSpace == clspv::AddressSpace::Input) {
+  if ((AddrSpace == clspv::AddressSpace::Private ||
+       AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
+       AddrSpace == clspv::AddressSpace::PushConstant ||
+       AddrSpace == clspv::AddressSpace::Input) &&
+      SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
     startIdx = 1;
   }
