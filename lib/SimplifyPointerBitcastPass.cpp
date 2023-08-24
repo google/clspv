@@ -422,13 +422,18 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
-  struct ImplicitGEP {
+  struct ImplicitGEPAliasing {
     Instruction *inst;
     int steps;
     GetElementPtrInst *gep;
   };
+  struct ImplicitGEPBeforeStore {
+    Instruction *inst;
+    Type *ty;
+  };
 
-  SmallVector<ImplicitGEP, 8> Worklist;
+  SmallVector<ImplicitGEPAliasing> GEPAliasingList;
+  SmallVector<ImplicitGEPBeforeStore> GEPBeforeStoreList;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -457,9 +462,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
           bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if ((Steps > 0 && !gep) || (Steps == 1)) {
             if (!userCall && (gep || PerfectMatch)) {
-              Worklist.push_back({&I, Steps, PerfectMatch ? nullptr : gep});
+              GEPAliasingList.push_back(
+                  {&I, Steps, PerfectMatch ? nullptr : gep});
             }
           }
+        } else if (isa<StoreInst>(&I) && !isa<GetElementPtrInst>(source)) {
+          GEPBeforeStoreList.push_back({&I, dest_ty});
         }
       }
     }
@@ -467,7 +475,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
 
   // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
   // handled by explcitly inserting the GEP.
-  for (auto GEPInfo : Worklist) {
+  for (auto GEPInfo : GEPAliasingList) {
     auto *I = GEPInfo.inst;
     auto Steps = GEPInfo.steps;
     auto *gep = GEPInfo.gep;
@@ -484,7 +492,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         clspv::InferType(PointerOp, M.getContext(), &type_cache);
     auto *NewGEP =
         GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
-    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP:\nadding: "; NewGEP->dump());
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (aliasing):\nadding: ";
+               NewGEP->dump());
 
     if (gep) {
       // Typical usecase here is a GEP on a struct of float, followed by a GEP
@@ -501,6 +510,22 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
                  I->dump());
       I->setOperand(PointerOperandNum, NewGEP);
     }
+    changed = true;
+  }
+
+  for (auto GEPInfo : GEPBeforeStoreList) {
+    auto *I = GEPInfo.inst;
+    auto *Ty = GEPInfo.ty;
+    IRBuilder<> Builder{I};
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+    Value *PointerOp = I->getOperand(PointerOperandNum);
+    auto gep =
+        GetElementPtrInst::Create(Ty, PointerOp, {Builder.getInt32(0)}, "", I);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (before store):\nadding: ";
+               gep->dump());
+    LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum << " of: ";
+               I->dump());
+    I->setOperand(PointerOperandNum, gep);
     changed = true;
   }
 
