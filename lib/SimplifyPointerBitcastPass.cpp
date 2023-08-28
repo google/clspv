@@ -759,6 +759,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
+  DenseSet<GetElementPtrInst *> Seen;
   SmallVector<std::pair<GetElementPtrInst *, Type *>> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -773,8 +774,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
         }
 
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
-          if (isa<PHINode>(&I)) {
+          if (isa<PHINode>(&I) && !Seen.contains(gep)) {
             Worklist.emplace_back(std::make_pair(gep, dest_ty));
+            Seen.insert(gep);
           }
         }
       }
