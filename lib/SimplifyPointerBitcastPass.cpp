@@ -574,19 +574,29 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
         cast<GetElementPtrInst>(inst_gep->getPointerOperand());
 
     IRBuilder<> Builder{inst_gep};
-    uint64_t CstVal;
-    Value *DynVal;
-    size_t SmallerBitWidths;
-    ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
-                         SmallerBitWidths);
-    auto Idxs = GetIdxsForTyFromOffset(
-        DL, Builder, src_gep->getResultElementType(),
-        inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
-    auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
-                                             src_gep, Idxs, "", inst_gep);
+    SmallVector<Value *> Idxs;
+    Value *src;
+    Type *src_ty;
+    if (src_gep->hasAllZeroIndices()) {
+      src_ty = inst_gep->getSourceElementType();
+      src = src_gep->getPointerOperand();
+      Idxs = SmallVector<Value *>(inst_gep->indices());
+    } else {
+      src_ty = src_gep->getResultElementType();
+      src = src_gep;
+      uint64_t CstVal;
+      Value *DynVal;
+      size_t SmallerBitWidths;
+      ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
+                           SmallerBitWidths);
+      Idxs = GetIdxsForTyFromOffset(
+          DL, Builder, src_gep->getResultElementType(),
+          inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
+          (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
+              ->getType()
+              ->getPointerAddressSpace());
+    }
+    auto new_gep = GetElementPtrInst::Create(src_ty, src, Idxs, "", inst_gep);
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitCasts:\nreplace: "; inst_gep->dump();
                dbgs() << "by: "; new_gep->dump());
     inst_gep->replaceAllUsesWith(new_gep);
