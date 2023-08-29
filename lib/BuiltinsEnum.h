@@ -29,6 +29,7 @@ enum BuiltinType : unsigned int {
   kSpirvCopyMemory,
   kClspvSamplerVarLiteral,
   kClspvCompositeConstruct,
+  kClspvGetImageSizes,
   kType_Clspv_End,
 
   kType_Async_Start,

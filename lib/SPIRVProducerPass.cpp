@@ -3658,6 +3658,37 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     }
     break;
   }
+  case Builtins::kClspvGetImageSizes: {
+    addCapability(spv::CapabilityImageQuery);
+    Value *Image = Call->getArgOperand(0);
+    auto *ImageTy = InferType(Image, module->getContext(), &InferredTypeCache);
+    if (ImageDimensionality(ImageTy) != spv::Dim3D ||
+        !IsSampledImageType(ImageTy)) {
+      llvm_unreachable("Unexpected Image in Builtins::kClspvGetImageSizes");
+    }
+
+    SPIRVOperandVec Ops;
+
+    Ops << getSPIRVType(
+               FixedVectorType::get(Type::getInt32Ty(module->getContext()), 3))
+        << Image << getSPIRVInt32Constant(0);
+    RID = addSPIRVInst(spv::OpImageQuerySizeLod, Ops);
+
+    Ops.clear();
+    auto int4Ty =
+        FixedVectorType::get(Type::getInt32Ty(module->getContext()), 4);
+    Ops << getSPIRVType(int4Ty) << RID
+        << getSPIRVConstant(ConstantInt::get(int4Ty, (uint64_t)1)) << 0 << 1
+        << 2 << 4;
+    RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+
+    Ops.clear();
+    Ops << getSPIRVType(
+               FixedVectorType::get(Type::getFloatTy(module->getContext()), 4))
+        << RID;
+    RID = addSPIRVInst(spv::OpConvertUToF, Ops);
+    break;
+  }
   default:
     llvm_unreachable("Unknown CLSPV Instruction");
     break;

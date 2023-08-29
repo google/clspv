@@ -823,6 +823,13 @@ describe:
 
 All supported.
 
+Reading 3D images with a unormalized sampler is not allowed in Vulkan. Thus
+OpenCL source code performing this operation is emulated by normalizing the
+coordinate before reading the image using a normalized sampler.
+
+The normalization of the coordinate can introduce an accuracy issue as the
+floating point division used is not correctly rounded.
+
 #### cl_khr_subgroups extension
 
 The OpenCL extension `cl_khr_subgroups` requires SPIR-V 1.3 or greater and

@@ -34,6 +34,7 @@ struct ReplaceOpenCLBuiltinPass
 
 private:
   bool runOnFunction(llvm::Function &F);
+  void removeUnusedSamplers(llvm::Module &M);
   bool replaceAbs(llvm::Function &F);
   bool replaceAbsDiff(llvm::Function &F, bool is_signed);
   bool replaceCopysign(llvm::Function &F);
@@ -86,7 +87,7 @@ private:
   bool replaceVstoreHalf16(llvm::Function &F);
   bool replaceHalfReadImage(llvm::Function &F);
   bool replaceHalfWriteImage(llvm::Function &F);
-  bool replaceSampledReadImageWithIntCoords(llvm::Function &F);
+  bool replaceSampledReadImage(llvm::Function &F);
   bool replaceAtomics(llvm::Function &F, spv::Op Op);
   bool replaceAtomics(llvm::Function &F, llvm::AtomicRMWInst::BinOp Op);
   bool replaceAtomicLoad(llvm::Function &F);
