@@ -277,6 +277,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
           NewArg = GetElementPtrInst::Create(
               PointeeTy, NewArg, {ConstantInt::get(I32Ty, 0)}, "", CI);
         }
+        Type *NewArgTy = PointeeTy;
         unsigned Unpacking = 0;
         unpack(*CI, NumBytes, &PointeeTy, &Unpacking);
 
@@ -298,7 +299,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
         for (uint32_t i = 0; i < num_stores; i++) {
           Indices.back() = ConstantInt::get(I32Ty, i);
           auto Ptr =
-              GetElementPtrInst::Create(PointeeTy, NewArg, Indices, "", CI);
+              GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "", CI);
           new StoreInst(NullValue, Ptr, CI);
         }
 

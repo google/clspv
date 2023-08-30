@@ -38,7 +38,15 @@ entry:
   ret void
 }
 
+define dso_local spir_kernel void @fct6() {
+entry:
+  %0 = alloca [16 x i32], align 4
+  tail call void @llvm.memset.p0.i32(ptr %0, i8 0, i32 16, i1 false)
+  ret void
+}
+
 declare void @llvm.memset.p1.i32(ptr addrspace(1), i8, i32, i1)
+declare void @llvm.memset.p0.i32(ptr, i8, i32, i1)
 
 ; CHECK-LABEL: @fct1
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %dst, i32 0
@@ -71,6 +79,17 @@ declare void @llvm.memset.p1.i32(ptr addrspace(1), i8, i32, i1)
 ; CHECK:  store i8 0, ptr addrspace(1) [[gep2]]
 
 ; CHECK-LABEL: @fct5
-; CHECK:  [[gep:%[^ ]+]] = getelementptr %struct.inner, ptr addrspace(1) %dst, i32 0, i32 0, i32 0
+; CHECK:  [[gep:%[^ ]+]] = getelementptr %struct.outer, ptr addrspace(1) %dst, i32 0, i32 0, i32 0
 ; CHECK:  store %struct.inner zeroinitializer, ptr addrspace(1) [[gep]], align 32
 ; CHECK:  getelementptr inbounds %struct.outer, ptr addrspace(1) %dst, i32 0, i32 0, i32 1, i32 0
+
+; CHECK-LABEL: @fct6
+; CHECK:  [[alloca:%[^ ]+]] = alloca [16 x i32], align 4
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [16 x i32], ptr [[alloca]], i32 0, i32 0
+; CHECK:  store i32 0, ptr [[gep]], align 4
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [16 x i32], ptr [[alloca]], i32 0, i32 1
+; CHECK:  store i32 0, ptr [[gep]], align 4
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [16 x i32], ptr [[alloca]], i32 0, i32 2
+; CHECK:  store i32 0, ptr [[gep]], align 4
+; CHECK:  [[gep:%[^ ]+]] = getelementptr [16 x i32], ptr [[alloca]], i32 0, i32 3
+; CHECK:  store i32 0, ptr [[gep]], align 4
