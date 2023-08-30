@@ -191,6 +191,14 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
                        store->getType(), CstVal, DynVal, SmallerBitWidths);
         B.CreateStore(store->getValueOperand(), gep);
         ToBeErased.push_back(store);
+      } else if (auto ptrtoint = dyn_cast<PtrToIntInst>(node)) {
+        IRBuilder<> B(ptrtoint);
+        auto gep = makeNewGEP(DL, B, alloca, alloca->getAllocatedType(),
+                              B.getIntNTy(SmallerBitWidths), CstVal, DynVal,
+                              SmallerBitWidths);
+        auto newPtrToInt = B.CreatePtrToInt(gep, ptrtoint->getDestTy());
+        ptrtoint->replaceAllUsesWith(newPtrToInt);
+        ToBeErased.push_back(ptrtoint);
       } else {
         llvm_unreachable("Unexpected node when traversing alloca users");
       }
