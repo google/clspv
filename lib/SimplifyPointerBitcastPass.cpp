@@ -589,9 +589,40 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
       size_t SmallerBitWidths;
       ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
                            SmallerBitWidths);
+
+      if (DynVal == nullptr &&
+          GoThroughTypeAtOffset(DL, Builder, src_ty, nullptr,
+                                CstVal * SmallerBitWidths, nullptr) != 0) {
+        src = src_gep->getPointerOperand();
+        src_ty = inst_gep->getSourceElementType();
+        uint64_t srcCstVal;
+        Value *srcDynVal;
+        size_t srcSmallerBitWidths;
+        ExtractOffsetFromGEP(DL, Builder, src_gep, srcCstVal, srcDynVal,
+                             srcSmallerBitWidths);
+        if (SmallerBitWidths < srcSmallerBitWidths) {
+          srcCstVal *= srcSmallerBitWidths / SmallerBitWidths;
+          if (srcDynVal) {
+            srcDynVal = CreateMul(
+                Builder, srcSmallerBitWidths / SmallerBitWidths, srcDynVal);
+          }
+        } else if (SmallerBitWidths > srcSmallerBitWidths) {
+          CstVal *= SmallerBitWidths / srcSmallerBitWidths;
+          if (DynVal) {
+            DynVal = CreateMul(Builder, SmallerBitWidths / srcSmallerBitWidths,
+                               DynVal);
+          }
+        }
+        CstVal += srcCstVal;
+        if (DynVal && srcDynVal) {
+          DynVal = Builder.CreateAdd(DynVal, srcDynVal);
+        } else if (srcDynVal) {
+          DynVal = srcDynVal;
+        }
+      }
       Idxs = GetIdxsForTyFromOffset(
-          DL, Builder, src_gep->getResultElementType(),
-          inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
+          DL, Builder, src_ty, inst_gep->getResultElementType(), CstVal, DynVal,
+          SmallerBitWidths,
           (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
               ->getType()
               ->getPointerAddressSpace());
