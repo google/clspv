@@ -882,13 +882,15 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       for (unsigned i = 1; i < phi->getNumIncomingValues(); i++) {
         auto Op = phi->getIncomingValue(i);
         auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
-        if (SizeInBits(M.getDataLayout(), OpTy) >
-            SizeInBits(M.getDataLayout(), RefOpTy)) {
+        if (OpTy && RefOpTy &&
+            SizeInBits(M.getDataLayout(), OpTy) >
+                SizeInBits(M.getDataLayout(), RefOpTy)) {
           source = Op;
           source_ty = OpTy;
           dest_ty = RefOpTy;
-        } else if (SizeInBits(M.getDataLayout(), OpTy) <
-                   SizeInBits(M.getDataLayout(), RefOpTy)) {
+        } else if (OpTy && RefOpTy &&
+                   SizeInBits(M.getDataLayout(), OpTy) <
+                       SizeInBits(M.getDataLayout(), RefOpTy)) {
           source = RefOp;
           source_ty = RefOpTy;
           dest_ty = OpTy;
