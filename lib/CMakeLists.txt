@@ -20,6 +20,11 @@ add_library(clspv_core
   ${CMAKE_CURRENT_SOURCE_DIR}/Sampler.cpp
 )
 
+# Core clspv library (shared).  Mirror sources from clspv_core.
+get_target_property(CLSPV_SHARED_SRCS clspv_core SOURCES)
+add_library(clspv_shared SHARED ${CLSPV_SHARED_SRCS})
+set_target_properties(clspv_shared PROPERTIES OUTPUT_NAME "clspv")
+
 # Pass library.  Transformation passes and pass-specific support are
 # defined here.  This must be loadable by LLVM opt for testing individual
 # passes.
@@ -98,7 +103,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
-foreach(clspv_lib clspv_core clspv_passes)
+foreach(clspv_lib clspv_core clspv_passes clspv_shared)
   # Enable C++11 for our executable
   target_compile_features(${clspv_lib} PRIVATE cxx_range_for)
 
@@ -155,6 +160,12 @@ target_link_libraries(clspv_core PRIVATE
   clangSerialization
 )
 
+# Mirror "clspv_core" deps and link libs for "clspv_shared"
+get_target_property(CLSPV_SHARED_DEPS clspv_core MANUALLY_ADDED_DEPENDENCIES)
+get_target_property(CLSPV_SHARED_LINK_LIBS clspv_core LINK_LIBRARIES)
+add_dependencies(clspv_shared ${CLSPV_SHARED_DEPS})
+target_link_libraries(clspv_shared PRIVATE ${CLSPV_SHARED_LINK_LIBS})
+
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
     # 4596: Upgrade to newer LLVM.  See https://github.com/google/clspv/issues/153
@@ -201,14 +212,3 @@ if (ENABLE_CLSPV_INSTALL)
     install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
 endif()
-
-# Shared lib version of clspv (C API)
-add_library(clspv_shared SHARED ${CMAKE_CURRENT_SOURCE_DIR}/Clspv.cpp)
-
-target_include_directories(clspv_shared PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CLSPV_INCLUDE_DIRS}
-)
-
-target_link_libraries(clspv_shared PRIVATE clspv_core)
-set_target_properties(clspv_shared PROPERTIES OUTPUT_NAME "clspv")

@@ -8,7 +8,7 @@ This folder contains the C API for shared lib version of Clspv.
 #include <cstdio>
 #include <cstdint>
 
-#include "Clspv.h"
+#include "clspv/Compiler.h"
 
 int main() {
     // CL source example:
@@ -19,18 +19,11 @@ int main() {
                         "       dst[i] = tid + i;                                   \n"
                         "}                                                          \n";
 
-    // Create container
-    ClspvContainer container = clspvCreateContainer();
-    if (container == nullptr) {
-        // Handle error ...
-    }
-
     // Compile
     size_t outputSpvSize = 0;
     char* outputSpv = nullptr;
-    const char* outputBuildLog = nullptr;
-    ClspvError ret = clspvCompileFromSourcesString(container,
-                                                   1,
+    char* outputBuildLog = nullptr;
+    ClspvError ret = clspvCompileFromSourcesString(1,
                                                    NULL,
                                                    (const char**)&clSrc,
                                                    "--output-format=spv ",
@@ -43,7 +36,14 @@ int main() {
     }
 
     // Cleanup
-    clspvDestroyContainer(container);
+    clspvFreeOutputBuildObjs(outputSpv, outputBuildLog);
+    /*
+        // User can also cleanup like so:
+
+        free(outputSpv);       outputSpv       = NULL;
+        free(outputBuildLog);  outputBuildLog  = NULL;
+    */
+
     return 0;
 }
 ```
@@ -54,7 +54,7 @@ int main() {
 #include <cstdio>
 #include <cstdint>
 
-#include "Clspv.h"
+#include "clspv/Compiler.h"
 
 int main() {
     // Test/Build CL source example:
@@ -70,26 +70,11 @@ int main() {
                          "    dst[tid] = (int)src[tid];                                         \n"
                          "}                                                                     \n";
 
-    // Create containers
-    ClspvContainer container  = clspvCreateContainer();
-    ClspvContainer container2 = clspvCreateContainer();
-    ClspvContainer container3 = clspvCreateContainer();
-    if (container == nullptr) {
-        // Handle error ...
-    }
-    if (container2 == nullptr) {
-        // Handle error ...
-    }
-    if (container3 == nullptr) {
-        // Handle error ...
-    }
-
     // Compile first program to LLVM IR
     size_t outputBinSize = 0;
     char* outputBin = nullptr;
-    const char* outputBuildLog = nullptr;
-    ClspvError ret = clspvCompileFromSourcesString(container,
-                                                   1,
+    char* outputBuildLog = nullptr;
+    ClspvError ret = clspvCompileFromSourcesString(1,
                                                    NULL,
                                                    (const char**)&clSrc,
                                                    "--output-format=bc ",
@@ -103,9 +88,8 @@ int main() {
     // Compile second program to LLVM IR
     size_t outputBinSize2 = 0;
     char* outputBin2 = nullptr;
-    const char* outputBuildLog2 = nullptr;
-    ret = clspvCompileFromSourcesString(container2,
-                                        1,
+    char* outputBuildLog2 = nullptr;
+    ret = clspvCompileFromSourcesString(1,
                                         NULL,
                                         (const char**)&clSrc2,
                                         "--output-format=bc ",
@@ -121,9 +105,8 @@ int main() {
     char* outputSpv = nullptr;
     size_t outputBinSizes[2] = { outputBinSize, outputBinSize2 };
     const char* outputBinChars[2] = { outputBin, outputBin2 };
-    const char* outputBuildLog3 = nullptr;
-    ret = clspvCompileFromSourcesString(container3,
-                                        2,
+    char* outputBuildLog3 = nullptr;
+    ret = clspvCompileFromSourcesString(2,
                                         outputBinSizes,
                                         outputBinChars,
                                         "-x ir ",
@@ -135,9 +118,20 @@ int main() {
     }
 
     // Cleanup
-    clspvDestroyContainer(container);
-    clspvDestroyContainer(container2);
-    clspvDestroyContainer(container3);
+    clspvFreeOutputBuildObjs(outputBin,  outputBuildLog);
+    clspvFreeOutputBuildObjs(outputBin2, outputBuildLog2);
+    clspvFreeOutputBuildObjs(outputSpv,  outputBuildLog3);
+    /*
+        // User can also cleanup like so:
+
+        free(outputBin);       outputBin       = NULL;
+        free(outputBuildLog);  outputBuildLog  = NULL;
+        free(outputBin2);      outputBin2      = NULL;
+        free(outputBuildLog2); outputBuildLog2 = NULL;
+        free(outputSpv);       outputSpv       = NULL;
+        free(outputBuildLog3); outputBuildLog3 = NULL;
+    */
+
     return 0;
 }
 ```
