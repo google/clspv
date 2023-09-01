@@ -86,14 +86,10 @@ EXPORT ClspvError clspvCompileFromSourcesString(
 // |output_log|         - Handle to compiler build log
 static inline void clspvFreeOutputBuildObjs(char *output_binary,
                                             char *output_log) {
-  if (output_binary) {
-    free(output_binary);
-    output_binary = NULL;
-  }
-  if (output_log) {
-    free(output_log);
-    output_log = NULL;
-  }
+  free(output_binary);
+  output_binary = NULL;
+  free(output_log);
+  output_log = NULL;
 }
 
 #ifdef __cplusplus

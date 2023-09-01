@@ -26,7 +26,7 @@ int main() {
     ClspvError ret = clspvCompileFromSourcesString(1,
                                                    NULL,
                                                    (const char**)&clSrc,
-                                                   "--output-format=spv ",
+                                                   "",
                                                    &outputSpv,
                                                    &outputSpvSize,
                                                    &outputBuildLog);

@@ -663,7 +663,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-
+  
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {
