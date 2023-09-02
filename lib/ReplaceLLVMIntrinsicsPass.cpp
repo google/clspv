@@ -208,7 +208,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshr(Function &F) {
     auto lsb_shift = builder.CreateAnd(arg_shift, mod_mask);
     // The MSB of the result is the first n LSB of the second arg
     auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
-    auto msb_shift =  builder.CreateSub(scalar_size, lsb_shift);
+    auto msb_shift = builder.CreateSub(scalar_size, lsb_shift);
 
     // "The resulting value is undefined if Shift is greater than or equal to
     // the bit width of the components of Base."
@@ -217,8 +217,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshr(Function &F) {
       msb_shift = builder.CreateAnd(msb_shift, mod_mask);
     }
 
-    auto hi_bits = builder.CreateShl(arg_hi,msb_shift);
-    auto lo_bits = builder.CreateLShr(arg_lo,lsb_shift);
+    auto hi_bits = builder.CreateShl(arg_hi, msb_shift);
+    auto lo_bits = builder.CreateLShr(arg_lo, lsb_shift);
 
     return builder.CreateOr(lo_bits, hi_bits);
   });
