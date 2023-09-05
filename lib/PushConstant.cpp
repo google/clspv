@@ -312,7 +312,14 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
 
         for (auto iter = gep_operator->idx_begin();
              iter != gep_operator->idx_end(); ++iter) {
-          indices.push_back(cast<Constant>(*iter));
+          auto cst = cast<Constant>(*iter);
+          if (cst->getType()->isIntegerTy(64) &&
+              GetElementPtrInst::getIndexedType(push_constant_ty, indices)
+                  ->isStructTy()) {
+            cst = ConstantInt::get(IntegerType::get(M.getContext(), 32),
+                                   cast<ConstantInt>(cst)->getZExtValue());
+          }
+          indices.push_back(cst);
         }
         auto new_gep = ConstantExpr::getGetElementPtr(
             push_constant_ty, new_GV, indices, gep_operator->isInBounds());
