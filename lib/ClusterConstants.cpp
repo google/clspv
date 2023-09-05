@@ -150,28 +150,51 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
         } else if (auto *inst = dyn_cast<Instruction>(user)) {
           unsigned index = initializers.idFor(GV->getInitializer()) - 1;
 
-          if (clspv::Option::PhysicalStorageBuffers()) {
-            auto *bb = inst->getParent();
-            auto *clustered_ptr_ty = clspv::GetPushConstantType(
-                M, clspv::PushConstant::ModuleConstantsPointer);
-            auto *ptr_to_ptr = clspv::GetPushConstantPointer(
-                bb, clspv::PushConstant::ModuleConstantsPointer);
-            Value *indices[] = {zero};
-            auto *ptr_gep = Builder.CreateInBoundsGEP(clustered_ptr_ty,
-                                                      ptr_to_ptr, indices);
-            auto *clustered_ptr_val =
-                new LoadInst(clustered_ptr_ty, ptr_gep, "", inst);
-            auto *clustered_ptr =
-                CastInst::Create(Instruction::CastOps::IntToPtr,
-                                  clustered_ptr_val, ptr_type, "", inst);
-            Instruction *gep = GetElementPtrInst::CreateInBounds(
-                type, clustered_ptr, {zero, Builder.getInt32(index)}, "",
-                inst);
-            user->replaceUsesOfWith(GV, gep);
+          auto getTypeAndPtr = [&clustered_gv, &M, &Builder, &type, &ptr_type,
+                                &zero](Type *&PointeeType, Value *&Ptr,
+                                       Instruction *InsertBefore) {
+            if (clspv::Option::PhysicalStorageBuffers()) {
+              auto *bb = InsertBefore->getParent();
+              auto *clustered_ptr_ty = clspv::GetPushConstantType(
+                  M, clspv::PushConstant::ModuleConstantsPointer);
+              auto *ptr_to_ptr = clspv::GetPushConstantPointer(
+                  bb, clspv::PushConstant::ModuleConstantsPointer);
+              Value *indices[] = {zero};
+              auto *ptr_gep = Builder.CreateInBoundsGEP(clustered_ptr_ty,
+                                                        ptr_to_ptr, indices);
+              auto *clustered_ptr_val =
+                  new LoadInst(clustered_ptr_ty, ptr_gep, "", InsertBefore);
+              auto *clustered_ptr = CastInst::Create(
+                  Instruction::CastOps::IntToPtr, clustered_ptr_val, ptr_type,
+                  "", InsertBefore);
+              PointeeType = type;
+              Ptr = clustered_ptr;
+            } else {
+              PointeeType = clustered_gv->getValueType();
+              Ptr = clustered_gv;
+            }
+          };
+
+          if (auto phi = dyn_cast<PHINode>(inst)) {
+            for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
+              if (phi->getIncomingValue(i) != GV) {
+                continue;
+              }
+              auto InsertBefore = phi->getIncomingBlock(i)->getFirstNonPHI();
+              Type *PointeeType;
+              Value *Ptr;
+              getTypeAndPtr(PointeeType, Ptr, InsertBefore);
+              Instruction *gep = GetElementPtrInst::CreateInBounds(
+                  PointeeType, Ptr, {zero, Builder.getInt32(index)}, "",
+                  InsertBefore);
+              phi->setIncomingValue(i, gep);
+            }
           } else {
+            Type *PointeeType;
+            Value *Ptr;
+            getTypeAndPtr(PointeeType, Ptr, inst);
             Instruction *gep = GetElementPtrInst::CreateInBounds(
-                clustered_gv->getValueType(), clustered_gv,
-                {zero, Builder.getInt32(index)}, "", inst);
+                PointeeType, Ptr, {zero, Builder.getInt32(index)}, "", inst);
             user->replaceUsesOfWith(GV, gep);
           }
         } else {
