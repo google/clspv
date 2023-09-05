@@ -75,6 +75,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   switch (F.getIntrinsicID()) {
   case Intrinsic::bswap:
     return replaceBswap(F);
+  case Intrinsic::fshr:
+    return replaceFshr(F);
   case Intrinsic::fshl:
     return replaceFshl(F);
   case Intrinsic::copysign:
@@ -179,6 +181,46 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceBswap(Function &F) {
       return B.CreateOr(bswap, byte0);
     }
     llvm_unreachable("unsupported type for BSWAP");
+  });
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshr(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    auto arg_hi = call->getArgOperand(0);
+    auto arg_lo = call->getArgOperand(1);
+    auto arg_shift = call->getArgOperand(2);
+
+    // Validate argument types with correct sizes.
+    auto type = arg_hi->getType();
+    if ((type->getScalarSizeInBits() != 8) &&
+        (type->getScalarSizeInBits() != 16) &&
+        (type->getScalarSizeInBits() != 32) &&
+        (type->getScalarSizeInBits() != 64)) {
+      return static_cast<Value *>(nullptr);
+    }
+
+    // We need the n LSB of the first arg and size-n MSB of the second arg
+    IRBuilder<> builder(call);
+
+    // The shift amount is treated modulo the element size.
+    auto mod_mask = ConstantInt::get(type, type->getScalarSizeInBits() - 1);
+    // The LSB of the result is the first size - n MSB of the second arg
+    auto lsb_shift = builder.CreateAnd(arg_shift, mod_mask);
+    // The MSB of the result is the first n LSB of the second arg
+    auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
+    auto msb_shift = builder.CreateSub(scalar_size, lsb_shift);
+
+    // "The resulting value is undefined if Shift is greater than or equal to
+    // the bit width of the components of Base."
+    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#Bit
+    if (!dyn_cast<ConstantInt>(arg_shift)) {
+      msb_shift = builder.CreateAnd(msb_shift, mod_mask);
+    }
+
+    auto hi_bits = builder.CreateShl(arg_hi, msb_shift);
+    auto lo_bits = builder.CreateLShr(arg_lo, lsb_shift);
+
+    return builder.CreateOr(lo_bits, hi_bits);
   });
 }
 
