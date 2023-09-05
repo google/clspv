@@ -3355,7 +3355,9 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImage(Function &F) {
         IsUnnormalizedStaticSampler()) {
       IRBuilder<> B(CI);
       // normalized coordinate
-      Coord = NormalizedCoordinate(M, B, Coord, Img, image_ty);
+      auto ImgDimFP = GetImageDimFP(M, B, Img, image_ty);
+      Coord = NormalizedCoordinate(M, B, Coord, ImgDimFP,
+                                   SamplerInitValue & CLK_FILTER_NEAREST);
       // copy the sampler but using normalized coordinate
       Sampler = CallInst::Create(
           SamplerFct,

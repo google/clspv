@@ -8,16 +8,17 @@
 // CHECK-DAG:  [[uint3:%[^ ]+]] = OpTypeVector [[uint]] 3
 // CHECK-DAG:  [[uint4:%[^ ]+]] = OpTypeVector [[uint]] 4
 // CHECK-DAG:  [[float4:%[^ ]+]] = OpTypeVector [[float]] 4
+// CHECK-DAG:  [[float_0_5:%[^ ]+]] = OpConstant [[float]] 0.5
 // CHECK-DAG:  [[float_0:%[^ ]+]] = OpConstant [[float]] 0
 // CHECK-DAG:  [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
-// CHECK-DAG:  [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
 // CHECK-DAG:  [[uint_21:%[^ ]+]] = OpConstant [[uint]] 21
-// CHECK-DAG:  [[vec:%[^ ]+]] = OpConstantComposite [[uint4]] [[uint_1]] [[uint_1]] [[uint_1]] [[uint_1]]
 
 // CHECK:  [[sizes:%[^ ]+]] = OpImageQuerySizeLod [[uint3]] {{.*}} [[uint_0]]
-// CHECK:  [[shuffle:%[^ ]+]] = OpVectorShuffle [[uint4]] [[sizes]] [[vec]] 0 1 2 4
-// CHECK:  [[convert:%[^ ]+]] = OpConvertUToF [[float4]] [[shuffle]]
-// CHECK:  [[div:%[^ ]+]] = OpFDiv [[float4]] %44 [[convert]]
+// CHECK:  [[shuffle:%[^ ]+]] = OpCompositeConstruct [[uint4]] [[sizes]] [[uint_0]]
+// CHECK:  [[convert:%[^ ]+]] = OpConvertSToF [[float4]] [[shuffle]]
+// CHECK:  [[floor:%[^ ]+]] = OpExtInst [[float4]] {{.*}} Floor {{.*}}
+// CHECK:  [[add:%[^ ]+]] = OpFAdd [[float4]] [[floor]] {{.*}}
+// CHECK:  [[div:%[^ ]+]] = OpFDiv [[float4]] [[add]] [[convert]]
 // CHECK:  OpImageSampleExplicitLod [[float4]] {{.*}} [[div]] Lod [[float_0]]
 
 // CHECK:  OpExtInst %void {{.*}} LiteralSampler [[uint_0]] [[uint_0]] [[uint_21]]

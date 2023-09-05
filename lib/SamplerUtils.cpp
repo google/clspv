@@ -13,19 +13,53 @@
 // limitations under the License.
 
 #include "SamplerUtils.h"
+#include "Types.h"
+#include "Constants.h"
 
 using namespace llvm;
 
 namespace clspv {
 
-Value *NormalizedCoordinate(Module &M, IRBuilder<> &B, Value *Coord, Value *Img,
-                            Type *ImgTy) {
+Value *GetImageDimFP(Module &M, IRBuilder<> &B, Value *Img, Type *ImgTy) {
+  auto float4Ty = FixedVectorType::get(B.getFloatTy(), 4);
   auto getImageSizesFct = M.getOrInsertFunction(
-      "clspv.get_image_sizes",
-      FunctionType::get(Coord->getType(), {ImgTy}, false));
+      "_Z13get_image_dim11ocl_image3d",
+      FunctionType::get(FixedVectorType::get(B.getInt32Ty(), 4), {ImgTy},
+                        false));
   Value *ImgSizes = B.CreateCall(getImageSizesFct, {Img});
+  return B.CreateSIToFP(ImgSizes, float4Ty);
+}
 
-  return B.CreateFDiv(Coord, ImgSizes);
+Value *NormalizedCoordinate(Module &M, IRBuilder<> &B, Value *Coord,
+                            Value *ImgDimFP, bool FilteringNearest) {
+  if (FilteringNearest) {
+    auto float4Ty = FixedVectorType::get(B.getFloatTy(), 4);
+    auto getFloorFct = M.getOrInsertFunction(
+        "floor", FunctionType::get(float4Ty, {float4Ty}, false));
+    Coord = B.CreateCall(getFloorFct, {Coord});
+    Coord = B.CreateFAdd(Coord, ConstantFP::get(float4Ty, 0.5));
+  }
+
+  return B.CreateFDiv(Coord, ImgDimFP);
+}
+
+bool isReadImage3DWithNonLiteralSampler(CallInst *call) {
+  DenseMap<Value *, Type *> cache;
+  auto Name = call->getCalledFunction()->getName();
+  if (Name.contains("read_image") && Name.contains("ocl_sampler")) {
+    Type *ImgTy =
+        clspv::InferType(call->getOperand(0), call->getContext(), &cache);
+    auto sampler_call = dyn_cast<CallInst>(call->getOperand(1));
+    bool literal_sampler =
+        sampler_call && (sampler_call->getCalledFunction()->getName().contains(
+                             TranslateSamplerInitializerFunction()) ||
+                         sampler_call->getCalledFunction()->getName().contains(
+                             LiteralSamplerFunction()));
+    if (clspv::ImageDimensionality(ImgTy) == spv::Dim3D && !literal_sampler) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace clspv

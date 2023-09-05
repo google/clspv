@@ -29,11 +29,13 @@ enum class PushConstant : int {
   ImageMetadata,
   ModuleConstantsPointer,
   PrintfBufferPointer,
+  NormalizedSamplerMask,
 };
 
 enum class ImageMetadata : int {
   ChannelOrder,
   ChannelDataType,
+  NormalizedSamplerMask,
 };
 
 // Returns the name of the push constant from its enum.

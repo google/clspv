@@ -8,9 +8,10 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
   *a = read_imagei(i, s, c);
 }
 
-void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(sampler_t s, read_only image3d_t i, float4 c, global int4* a)
+const sampler_t sampler = CLK_NORMALIZED_COORDS_TRUE;
+void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(read_only image3d_t i, float4 c, global int4* a)
 {
-  *a = read_imagei(i, s, c);
+  *a = read_imagei(i, sampler, c);
 }
 
 // CHECK-DAG: OpEntryPoint GLCompute [[foo:%[a-zA-Z0-9_]+]] "foo"
@@ -37,9 +38,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(sampler_t s, read
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]
 // CHECK:  OpStore {{.*}} [[cast]]
 // CHECK:  [[bar]] = OpFunction
-// CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_3D]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v4float]]
+// CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpSampledImage [[sampled3D]] [[_28]] [[_27]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] [[_30]] Lod [[_float_0]]
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]

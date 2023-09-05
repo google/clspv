@@ -24,8 +24,7 @@
 // This is done by the InlineFuncWithImageMetadataGetterPass
 
 namespace clspv {
-struct SetImageChannelMetadataPass
-    : llvm::PassInfoMixin<SetImageChannelMetadataPass> {
+struct SetImageMetadataPass : llvm::PassInfoMixin<SetImageMetadataPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv
