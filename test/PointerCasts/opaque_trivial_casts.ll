@@ -80,7 +80,7 @@ entry:
 
 ; CHECK-LABEL: define void @test7(ptr addrspace(1) %in) {
 ; CHECK: entry:
-; CHECK:   getelementptr float, ptr addrspace(1) %in, i32 2
+; CHECK:   getelementptr i32, ptr addrspace(1) %in, i32 2
 ; CHECK-NEXT: ret void
 ; CHECK: }
 
