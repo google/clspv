@@ -58,9 +58,9 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
                              uint64_t CstVal, Value *DynVal) {
   IRBuilder<> B(Src);
   if (DynVal == nullptr) {
-    DynVal = B.getInt32(CstVal);
+    DynVal = ConstantInt::get(new_phi->getType(), CstVal);
   } else if (CstVal != 0) {
-    DynVal = B.CreateAdd(B.getInt32(CstVal), DynVal);
+    DynVal = B.CreateAdd(ConstantInt::get(new_phi->getType(), CstVal), DynVal);
   }
   BasicBlock *BB = nullptr;
   for (auto &incoming : phi->incoming_values()) {
@@ -163,13 +163,17 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         }
       } else if (auto phi = dyn_cast<PHINode>(node)) {
         IRBuilder<> B(phi);
-        auto new_phi = B.CreatePHI(B.getInt32Ty(), phi->getNumIncomingValues());
+        Type *intTy = clspv::PointersAre64Bit(*(F.getParent()))
+                          ? B.getInt64Ty()
+                          : B.getInt32Ty();
+
+        auto new_phi = B.CreatePHI(intTy, phi->getNumIncomingValues());
         replacePHIIncomingValue(phi, new_phi, Src, CstVal, DynVal);
         PHIMap[phi] = new_phi;
         ToBeErased.push_back(phi);
         for (auto &incoming : phi->incoming_values()) {
           if (isa<UndefValue>(incoming)) {
-            new_phi->addIncoming(UndefValue::get(B.getInt32Ty()),
+            new_phi->addIncoming(UndefValue::get(intTy),
                                  phi->getIncomingBlock(incoming));
           }
         }
