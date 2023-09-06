@@ -57,9 +57,13 @@ clspv::ArgKind GetArgKindForType(Type *type) {
       return clspv::ArgKind::Sampler;
     if (clspv::IsImageType(ext_ty)) {
       if (clspv::IsSampledImageType(ext_ty)) {
-        return clspv::ArgKind::SampledImage;
+        return clspv::ImageDimensionality(ext_ty) == spv::DimBuffer
+                   ? clspv::ArgKind::UniformTexelBuffer
+                   : clspv::ArgKind::SampledImage;
       } else {
-        return clspv::ArgKind::StorageImage;
+        return clspv::ImageDimensionality(ext_ty) == spv::DimBuffer
+                   ? clspv::ArgKind::StorageTexelBuffer
+                   : clspv::ArgKind::StorageImage;
       }
     }
     errs() << "Unhandled target ext type: " << *type << "\n";
@@ -165,6 +169,10 @@ const char *GetArgKindName(ArgKind kind) {
     return "pointer_pushconstant";
   case ArgKind::PointerUBO:
     return "pointer_ubo";
+  case ArgKind::StorageTexelBuffer:
+    return "storage_texel_buffer";
+  case ArgKind::UniformTexelBuffer:
+    return "uniform_texel_buffer";
   }
   errs() << "Unhandled case in clspv::GetArgKindForType: " << int(kind) << "\n";
   llvm_unreachable("Unhandled case in clspv::GetArgKindForType");
@@ -194,6 +202,10 @@ ArgKind GetArgKindFromName(const std::string &name) {
     return ArgKind::PointerPushConstant;
   } else if (name == "pointer_ubo") {
     return ArgKind::PointerUBO;
+  } else if (name == "storage_texel_buffer") {
+    return ArgKind::StorageTexelBuffer;
+  } else if (name == "uniform_texel_buffer") {
+    return ArgKind::UniformTexelBuffer;
   }
   llvm_unreachable("Unhandled case in clspv::GetArgKindFromName");
   return ArgKind::Buffer;
