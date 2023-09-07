@@ -34,12 +34,14 @@
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
+#include "clspv/Sampler.h"
 
 #include "Builtins.h"
 #include "Constants.h"
 #include "MemFence.h"
 #include "ReplaceOpenCLBuiltinPass.h"
 #include "SPIRVOp.h"
+#include "SamplerUtils.h"
 #include "Types.h"
 
 using namespace clspv;
@@ -387,6 +389,9 @@ PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
       func_list.push_front(&F);
     }
   }
+
+  removeUnusedSamplers(M);
+
   if (func_list.size() != 0) {
     // recursively convert functions, but first remove dead
     for (auto *F : func_list) {
@@ -398,6 +403,23 @@ PreservedAnalyses ReplaceOpenCLBuiltinPass::run(Module &M,
     return PA;
   }
   return PA;
+}
+
+void ReplaceOpenCLBuiltinPass::removeUnusedSamplers(Module &M) {
+  auto F = M.getFunction(clspv::TranslateSamplerInitializerFunction());
+  if (!F) {
+    return;
+  }
+  SmallVector<CallInst *> ToErase;
+  for (auto U : F->users()) {
+    auto Call = dyn_cast<CallInst>(U);
+    if (Call != nullptr && Call->getNumUses() == 0) {
+      ToErase.push_back(Call);
+    }
+  }
+  for (auto Call : ToErase) {
+    Call->eraseFromParent();
+  }
 }
 
 bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
@@ -713,9 +735,8 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kReadImagef:
   case Builtins::kReadImagei:
   case Builtins::kReadImageui: {
-    if (FI.getParameter(1).isSampler() &&
-        FI.getParameter(2).type_id == llvm::Type::IntegerTyID) {
-      return replaceSampledReadImageWithIntCoords(F);
+    if (FI.getParameter(1).isSampler()) {
+      return replaceSampledReadImage(F);
     }
     break;
   }
@@ -3271,44 +3292,84 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
   });
 }
 
-bool ReplaceOpenCLBuiltinPass::replaceSampledReadImageWithIntCoords(
-    Function &F) {
-  // convert read_image with int coords to float coords
+bool ReplaceOpenCLBuiltinPass::replaceSampledReadImage(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
+    bool changed = false;
+    auto &FI = Builtins::Lookup(&F);
     // The image.
-    auto Arg0 = CI->getOperand(0);
+    auto Img = CI->getOperand(0);
 
     // The sampler.
-    auto Arg1 = CI->getOperand(1);
+    auto Sampler = CI->getOperand(1);
 
-    // The coordinate (integer type that we can't handle).
-    auto Arg2 = CI->getOperand(2);
+    // The coordinate
+    auto Coord = CI->getOperand(2);
 
-    auto *image_ty = InferType(Arg0, M.getContext(), &InferredTypeCache);
-    uint32_t dim = clspv::ImageNumDimensions(image_ty);
-    uint32_t components = dim + (clspv::IsArrayImageType(image_ty) ? 1 : 0);
-    Type *float_ty = nullptr;
-    if (components == 1) {
-      float_ty = Type::getFloatTy(M.getContext());
-    } else {
-      float_ty = FixedVectorType::get(Type::getFloatTy(M.getContext()),
-                                      cast<VectorType>(Arg2->getType())
-                                          ->getElementCount()
-                                          .getKnownMinValue());
+    FunctionType *NewFType = F.getFunctionType();
+    std::string NewFName = F.getName().str();
+
+    auto *image_ty = InferType(Img, M.getContext(), &InferredTypeCache);
+    if (FI.getParameter(2).type_id == llvm::Type::IntegerTyID) {
+      uint32_t dim = clspv::ImageNumDimensions(image_ty);
+      uint32_t components = dim + (clspv::IsArrayImageType(image_ty) ? 1 : 0);
+      Type *float_ty = nullptr;
+      if (components == 1) {
+        float_ty = Type::getFloatTy(M.getContext());
+      } else {
+        float_ty = FixedVectorType::get(Type::getFloatTy(M.getContext()),
+                                        cast<VectorType>(Coord->getType())
+                                            ->getElementCount()
+                                            .getKnownMinValue());
+      }
+
+      Coord = CastInst::Create(Instruction::SIToFP, Coord, float_ty, "", CI);
+      NewFType = FunctionType::get(
+          CI->getType(), {Img->getType(), Sampler->getType(), float_ty}, false);
+      NewFName[NewFName.length() - 1] = 'f';
+      changed = true;
     }
 
-    auto NewFType = FunctionType::get(
-        CI->getType(), {Arg0->getType(), Arg1->getType(), float_ty}, false);
+    FunctionCallee SamplerFct;
+    uint64_t SamplerInitValue;
+    auto IsUnnormalizedStaticSampler = [&Sampler, &SamplerFct,
+                                        &SamplerInitValue, &M]() {
+      auto SamplerCall = dyn_cast<CallInst>(Sampler);
+      if (SamplerCall == nullptr ||
+          !SamplerCall->getCalledFunction()->getName().contains(
+              TranslateSamplerInitializerFunction())) {
+        return false;
+      }
+      SamplerFct =
+          M.getOrInsertFunction(SamplerCall->getCalledFunction()->getName(),
+                                SamplerCall->getFunctionType());
+      auto cst = dyn_cast<ConstantInt>(SamplerCall->getOperand(0));
+      if (cst == nullptr) {
+        return false;
+      }
+      SamplerInitValue = cst->getZExtValue();
+      return (SamplerInitValue & kSamplerNormalizedCoordsMask) ==
+             CLK_NORMALIZED_COORDS_FALSE;
+    };
+    if (clspv::ImageDimensionality(image_ty) == spv::Dim3D &&
+        IsUnnormalizedStaticSampler()) {
+      IRBuilder<> B(CI);
+      // normalized coordinate
+      Coord = NormalizedCoordinate(M, B, Coord, Img, image_ty);
+      // copy the sampler but using normalized coordinate
+      Sampler = CallInst::Create(
+          SamplerFct,
+          {B.getInt32(SamplerInitValue | CLK_NORMALIZED_COORDS_TRUE)}, "",
+          dyn_cast<Instruction>(Sampler));
+      changed = true;
+    }
 
-    std::string NewFName = F.getName().str();
-    NewFName[NewFName.length() - 1] = 'f';
+    if (!changed) {
+      return (CallInst *)nullptr;
+    }
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
-
-    auto Cast = CastInst::Create(Instruction::SIToFP, Arg2, float_ty, "", CI);
-
-    return CallInst::Create(NewF, {Arg0, Arg1, Cast}, "", CI);
+    return CallInst::Create(NewF, {Img, Sampler, Coord}, "", CI);
   });
 }
 
