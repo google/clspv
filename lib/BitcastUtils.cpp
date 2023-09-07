@@ -882,13 +882,15 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       for (unsigned i = 1; i < phi->getNumIncomingValues(); i++) {
         auto Op = phi->getIncomingValue(i);
         auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
-        if (SizeInBits(M.getDataLayout(), OpTy) >
-            SizeInBits(M.getDataLayout(), RefOpTy)) {
+        if (OpTy && RefOpTy &&
+            SizeInBits(M.getDataLayout(), OpTy) >
+                SizeInBits(M.getDataLayout(), RefOpTy)) {
           source = Op;
           source_ty = OpTy;
           dest_ty = RefOpTy;
-        } else if (SizeInBits(M.getDataLayout(), OpTy) <
-                   SizeInBits(M.getDataLayout(), RefOpTy)) {
+        } else if (OpTy && RefOpTy &&
+                   SizeInBits(M.getDataLayout(), OpTy) <
+                       SizeInBits(M.getDataLayout(), RefOpTy)) {
           source = RefOp;
           source_ty = RefOpTy;
           dest_ty = OpTy;
@@ -1149,6 +1151,40 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
   }
 }
 
+uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
+                               IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
+                               uint64_t Offset, SmallVector<Value *, 2> *Idxs) {
+#ifndef NDEBUG
+  Type *SrcTy = Ty;
+#endif
+  while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
+         (TargetTy == nullptr ||
+          SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy))) {
+    if (auto STy = dyn_cast<StructType>(Ty)) {
+      auto SLayout = DataLayout.getStructLayout(STy);
+      auto SId = SLayout->getElementContainingOffset(Offset / CHAR_BIT);
+      auto off = SLayout->getElementOffsetInBits(SId);
+      Ty = STy->getElementType(SId);
+      if (Idxs) {
+        Idxs->push_back(Builder.getInt32(SId));
+      }
+      Offset -= off;
+    } else {
+      auto NextTy = GetEleType(Ty);
+      assert(NextTy != Ty);
+      Ty = NextTy;
+      auto size = SizeInBits(DataLayout, Ty);
+      if (Idxs) {
+        Idxs->push_back(Builder.getInt32(Offset / size));
+      }
+      Offset %= size;
+    }
+    assert(Idxs == nullptr ||
+           GetElementPtrInst::getIndexedType(SrcTy, *Idxs) == Ty);
+  }
+  return Offset;
+}
+
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
@@ -1158,10 +1194,11 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
 
   // For private pointer, the first Idx needs to be '0'
   unsigned startIdx = 0;
-  if (AddrSpace == clspv::AddressSpace::Private ||
-      AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
-      AddrSpace == clspv::AddressSpace::PushConstant ||
-      AddrSpace == clspv::AddressSpace::Input) {
+  if ((AddrSpace == clspv::AddressSpace::Private ||
+       AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
+       AddrSpace == clspv::AddressSpace::PushConstant ||
+       AddrSpace == clspv::AddressSpace::Input) &&
+      SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
     startIdx = 1;
   }
@@ -1187,25 +1224,8 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
       Idxs.push_back(Builder.getInt32(CstVal / size));
       CstVal %= size;
     }
-    while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
-           SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, DstTy)) {
-      if (auto STy = dyn_cast<StructType>(Ty)) {
-        auto SLayout = DataLayout.getStructLayout(STy);
-        auto SId = SLayout->getElementContainingOffset(CstVal / CHAR_BIT);
-        auto offset = SLayout->getElementOffsetInBits(SId);
-        Ty = STy->getElementType(SId);
-        Idxs.push_back(Builder.getInt32(SId));
-        CstVal -= offset;
-      } else {
-        auto NextTy = GetEleType(Ty);
-        assert(NextTy != Ty);
-        Ty = NextTy;
-        auto size = SizeInBits(DataLayout, Ty);
-        Idxs.push_back(Builder.getInt32(CstVal / size));
-        CstVal %= size;
-      }
-      assert(GetElementPtrInst::getIndexedType(SrcTy, Idxs) == Ty);
-    }
+    CstVal =
+        GoThroughTypeAtOffset(DataLayout, Builder, Ty, DstTy, CstVal, &Idxs);
     if (CstVal != 0) {
       errs() << "Err: SrcTy = ";
       SrcTy->print(errs());

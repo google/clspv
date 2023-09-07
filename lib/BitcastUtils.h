@@ -69,6 +69,10 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, uint64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths);
 
+uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
+                               IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
+                               uint64_t Offset, SmallVector<Value *, 2> *Idxs);
+
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,

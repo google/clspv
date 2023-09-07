@@ -281,9 +281,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
       int coherent = 0;
       if (uses_barriers && (arg_kind == clspv::ArgKind::Buffer ||
-                            arg_kind == clspv::ArgKind::StorageImage)) {
+                            arg_kind == clspv::ArgKind::StorageImage ||
+                            arg_kind == clspv::ArgKind::StorageTexelBuffer)) {
         // Coherency is only required if the argument is an SSBO or storage
-        // image that is both read and written to.
+        // image or texel buffer that is both read and written to.
         bool reads = false;
         bool writes = false;
         std::tie(reads, writes) = HasReadsAndWrites(&Arg);
@@ -584,6 +585,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::Sampler:
         case clspv::ArgKind::SampledImage:
         case clspv::ArgKind::StorageImage:
+        case clspv::ArgKind::StorageTexelBuffer:
+        case clspv::ArgKind::UniformTexelBuffer:
           // We won't be translating the value here.  Keep the type the same.
           // since calls using these values need to keep the same type.
           resource_type = inferred_ty;
@@ -665,6 +668,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         } break;
         case clspv::ArgKind::SampledImage:
         case clspv::ArgKind::StorageImage:
+        case clspv::ArgKind::StorageTexelBuffer:
+        case clspv::ArgKind::UniformTexelBuffer:
         case clspv::ArgKind::Sampler: {
           // The call returns a pointer to an opaque type.  Eventually the
           // SPIR-V will need to load the variable, so the natural thing would

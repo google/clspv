@@ -422,13 +422,18 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
-  struct ImplicitGEP {
+  struct ImplicitGEPAliasing {
     Instruction *inst;
     int steps;
     GetElementPtrInst *gep;
   };
+  struct ImplicitGEPBeforeStore {
+    Instruction *inst;
+    Type *ty;
+  };
 
-  SmallVector<ImplicitGEP, 8> Worklist;
+  SmallVector<ImplicitGEPAliasing> GEPAliasingList;
+  SmallVector<ImplicitGEPBeforeStore> GEPBeforeStoreList;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -457,9 +462,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
           bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if ((Steps > 0 && !gep) || (Steps == 1)) {
             if (!userCall && (gep || PerfectMatch)) {
-              Worklist.push_back({&I, Steps, PerfectMatch ? nullptr : gep});
+              GEPAliasingList.push_back(
+                  {&I, Steps, PerfectMatch ? nullptr : gep});
             }
           }
+        } else if (isa<StoreInst>(&I) && !isa<GetElementPtrInst>(source)) {
+          GEPBeforeStoreList.push_back({&I, dest_ty});
         }
       }
     }
@@ -467,7 +475,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
 
   // Implicit GEPs (i.e. GEPs that are elided because all indices are zero) are
   // handled by explcitly inserting the GEP.
-  for (auto GEPInfo : Worklist) {
+  for (auto GEPInfo : GEPAliasingList) {
     auto *I = GEPInfo.inst;
     auto Steps = GEPInfo.steps;
     auto *gep = GEPInfo.gep;
@@ -484,7 +492,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         clspv::InferType(PointerOp, M.getContext(), &type_cache);
     auto *NewGEP =
         GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
-    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP:\nadding: "; NewGEP->dump());
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (aliasing):\nadding: ";
+               NewGEP->dump());
 
     if (gep) {
       // Typical usecase here is a GEP on a struct of float, followed by a GEP
@@ -501,6 +510,22 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
                  I->dump());
       I->setOperand(PointerOperandNum, NewGEP);
     }
+    changed = true;
+  }
+
+  for (auto GEPInfo : GEPBeforeStoreList) {
+    auto *I = GEPInfo.inst;
+    auto *Ty = GEPInfo.ty;
+    IRBuilder<> Builder{I};
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+    Value *PointerOp = I->getOperand(PointerOperandNum);
+    auto gep =
+        GetElementPtrInst::Create(Ty, PointerOp, {Builder.getInt32(0)}, "", I);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (before store):\nadding: ";
+               gep->dump());
+    LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum << " of: ";
+               I->dump());
+    I->setOperand(PointerOperandNum, gep);
     changed = true;
   }
 
@@ -549,19 +574,60 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
         cast<GetElementPtrInst>(inst_gep->getPointerOperand());
 
     IRBuilder<> Builder{inst_gep};
-    uint64_t CstVal;
-    Value *DynVal;
-    size_t SmallerBitWidths;
-    ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
-                         SmallerBitWidths);
-    auto Idxs = GetIdxsForTyFromOffset(
-        DL, Builder, src_gep->getResultElementType(),
-        inst_gep->getResultElementType(), CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
-    auto new_gep = GetElementPtrInst::Create(src_gep->getResultElementType(),
-                                             src_gep, Idxs, "", inst_gep);
+    SmallVector<Value *> Idxs;
+    Value *src;
+    Type *src_ty;
+    if (src_gep->hasAllZeroIndices()) {
+      src_ty = inst_gep->getSourceElementType();
+      src = src_gep->getPointerOperand();
+      Idxs = SmallVector<Value *>(inst_gep->indices());
+    } else {
+      src_ty = src_gep->getResultElementType();
+      src = src_gep;
+      uint64_t CstVal;
+      Value *DynVal;
+      size_t SmallerBitWidths;
+      ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
+                           SmallerBitWidths);
+
+      if (DynVal == nullptr &&
+          GoThroughTypeAtOffset(DL, Builder, src_ty, nullptr,
+                                CstVal * SmallerBitWidths, nullptr) != 0) {
+        src = src_gep->getPointerOperand();
+        src_ty = inst_gep->getSourceElementType();
+        uint64_t srcCstVal;
+        Value *srcDynVal;
+        size_t srcSmallerBitWidths;
+        ExtractOffsetFromGEP(DL, Builder, src_gep, srcCstVal, srcDynVal,
+                             srcSmallerBitWidths);
+        if (SmallerBitWidths < srcSmallerBitWidths) {
+          srcCstVal *= srcSmallerBitWidths / SmallerBitWidths;
+          if (srcDynVal) {
+            srcDynVal = CreateMul(
+                Builder, srcSmallerBitWidths / SmallerBitWidths, srcDynVal);
+          }
+        } else if (SmallerBitWidths > srcSmallerBitWidths) {
+          CstVal *= SmallerBitWidths / srcSmallerBitWidths;
+          if (DynVal) {
+            DynVal = CreateMul(Builder, SmallerBitWidths / srcSmallerBitWidths,
+                               DynVal);
+          }
+        }
+        CstVal += srcCstVal;
+        if (DynVal && srcDynVal) {
+          DynVal = Builder.CreateAdd(DynVal, srcDynVal);
+        } else if (srcDynVal) {
+          DynVal = srcDynVal;
+        }
+      }
+      Idxs = GetIdxsForTyFromOffset(
+          DL, Builder, src_ty, inst_gep->getResultElementType(), CstVal, DynVal,
+          SmallerBitWidths,
+          (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
+              ->getType()
+              ->getPointerAddressSpace());
+    }
+    auto new_gep = GetElementPtrInst::Create(src_ty, src, Idxs, "", inst_gep);
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitCasts:\nreplace: "; inst_gep->dump();
                dbgs() << "by: "; new_gep->dump());
     inst_gep->replaceAllUsesWith(new_gep);
@@ -734,6 +800,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
+  DenseSet<GetElementPtrInst *> Seen;
   SmallVector<std::pair<GetElementPtrInst *, Type *>> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -748,8 +815,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
         }
 
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
-          if (isa<PHINode>(&I)) {
+          if (isa<PHINode>(&I) && !Seen.contains(gep)) {
             Worklist.emplace_back(std::make_pair(gep, dest_ty));
+            Seen.insert(gep);
           }
         }
       }

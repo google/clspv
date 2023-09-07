@@ -73,6 +73,10 @@ clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
 
 bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   switch (F.getIntrinsicID()) {
+  case Intrinsic::bswap:
+    return replaceBswap(F);
+  case Intrinsic::fshr:
+    return replaceFshr(F);
   case Intrinsic::fshl:
     return replaceFshl(F);
   case Intrinsic::copysign:
@@ -124,6 +128,100 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   DeadFunctions.push_back(&F);
 
   return !ToRemove.empty();
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceBswap(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    Type *Ty = call->getType();
+    auto VTy = dyn_cast<FixedVectorType>(Ty);
+    Type *ScalarTy = Ty;
+    if (VTy) {
+      ScalarTy = VTy->getElementType();
+    }
+    assert(ScalarTy && ScalarTy->isIntegerTy());
+
+    Value *input = call->getOperand(0);
+    IRBuilder<> B(call);
+    auto cst = [Ty](uint32_t c) { return ConstantInt::get(Ty, c); };
+    if (ScalarTy == Ty->getInt16Ty(Ty->getContext())) {
+      auto shl = B.CreateShl(input, cst(8));
+      auto shr = B.CreateLShr(input, cst(8));
+      return B.CreateOr(shl, shr);
+    } else if (ScalarTy == Ty->getInt32Ty(Ty->getContext())) {
+      auto byte3 = B.CreateShl(input, cst(24));
+      auto byte2 = B.CreateAnd(input, cst(0xff00));
+      byte2 = B.CreateShl(byte2, cst(8));
+      auto byte1 = B.CreateLShr(input, cst(8));
+      byte1 = B.CreateAnd(byte1, cst(0xff00));
+      auto byte0 = B.CreateLShr(input, cst(24));
+      auto bswap = B.CreateOr(byte3, byte2);
+      bswap = B.CreateOr(bswap, byte1);
+      return B.CreateOr(bswap, byte0);
+    } else if (ScalarTy == Ty->getInt64Ty(Ty->getContext())) {
+      auto byte7 = B.CreateShl(input, cst(56));
+      auto byte6 = B.CreateAnd(input, cst(0xff00));
+      byte6 = B.CreateShl(byte6, cst(40));
+      auto byte5 = B.CreateAnd(input, cst(0xff0000));
+      byte5 = B.CreateShl(byte5, cst(24));
+      auto byte4 = B.CreateAnd(input, cst(0xff000000));
+      byte4 = B.CreateShl(byte4, cst(8));
+      auto byte3 = B.CreateLShr(input, cst(8));
+      byte3 = B.CreateAnd(byte3, cst(0xff000000));
+      auto byte2 = B.CreateLShr(input, cst(24));
+      byte2 = B.CreateAnd(byte2, cst(0xff0000));
+      auto byte1 = B.CreateLShr(input, cst(40));
+      byte1 = B.CreateAnd(byte1, cst(0xff00));
+      auto byte0 = B.CreateLShr(input, cst(56));
+      auto bswap = B.CreateOr(byte7, byte6);
+      bswap = B.CreateOr(bswap, byte5);
+      bswap = B.CreateOr(bswap, byte4);
+      bswap = B.CreateOr(bswap, byte3);
+      bswap = B.CreateOr(bswap, byte2);
+      bswap = B.CreateOr(bswap, byte1);
+      return B.CreateOr(bswap, byte0);
+    }
+    llvm_unreachable("unsupported type for BSWAP");
+  });
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshr(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    auto arg_hi = call->getArgOperand(0);
+    auto arg_lo = call->getArgOperand(1);
+    auto arg_shift = call->getArgOperand(2);
+
+    // Validate argument types with correct sizes.
+    auto type = arg_hi->getType();
+    if ((type->getScalarSizeInBits() != 8) &&
+        (type->getScalarSizeInBits() != 16) &&
+        (type->getScalarSizeInBits() != 32) &&
+        (type->getScalarSizeInBits() != 64)) {
+      return static_cast<Value *>(nullptr);
+    }
+
+    // We need the n LSB of the first arg and size-n MSB of the second arg
+    IRBuilder<> builder(call);
+
+    // The shift amount is treated modulo the element size.
+    auto mod_mask = ConstantInt::get(type, type->getScalarSizeInBits() - 1);
+    // The LSB of the result is the first size - n MSB of the second arg
+    auto lsb_shift = builder.CreateAnd(arg_shift, mod_mask);
+    // The MSB of the result is the first n LSB of the second arg
+    auto scalar_size = ConstantInt::get(type, type->getScalarSizeInBits());
+    auto msb_shift = builder.CreateSub(scalar_size, lsb_shift);
+
+    // "The resulting value is undefined if Shift is greater than or equal to
+    // the bit width of the components of Base."
+    // https://www.khronos.org/registry/SPIR-V/specs/unified1/SPIRV.html#Bit
+    if (!dyn_cast<ConstantInt>(arg_shift)) {
+      msb_shift = builder.CreateAnd(msb_shift, mod_mask);
+    }
+
+    auto hi_bits = builder.CreateShl(arg_hi, msb_shift);
+    auto lo_bits = builder.CreateLShr(arg_lo, lsb_shift);
+
+    return builder.CreateOr(lo_bits, hi_bits);
+  });
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
@@ -221,6 +319,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
           NewArg = GetElementPtrInst::Create(
               PointeeTy, NewArg, {ConstantInt::get(I32Ty, 0)}, "", CI);
         }
+        Type *NewArgTy = PointeeTy;
         unsigned Unpacking = 0;
         unpack(*CI, NumBytes, &PointeeTy, &Unpacking);
 
@@ -242,7 +341,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
         for (uint32_t i = 0; i < num_stores; i++) {
           Indices.back() = ConstantInt::get(I32Ty, i);
           auto Ptr =
-              GetElementPtrInst::Create(PointeeTy, NewArg, Indices, "", CI);
+              GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "", CI);
           new StoreInst(NullValue, Ptr, CI);
         }
 
