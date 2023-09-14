@@ -1112,13 +1112,13 @@ ProgramToModule(llvm::LLVMContext &context,
 // TODO(#1231): find a better solution for this.
 void StripBuiltinDefinitions(llvm::Module *module) {
   for (auto &F : module->functions()) {
-    if (F.isDeclaration()) continue;
+    if (F.isDeclaration())
+      continue;
 
     const auto info = clspv::Builtins::Lookup(&F);
     if (info.getType() == clspv::Builtins::kSqrt) {
       F.deleteBody();
     }
-
   }
 }
 
