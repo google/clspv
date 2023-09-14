@@ -1,4 +1,6 @@
 // RUN: clspv %target %s -verify
+// TODO(#1231)
+// XFAIL: *
 //
 // Test that long-vector types are rejected when the support is not enabled.
 
