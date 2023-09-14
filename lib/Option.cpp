@@ -219,8 +219,9 @@ llvm::cl::opt<bool> std430_ubo_layout(
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
+// TODO(#1231): long vector support is required due to sqrt.
 llvm::cl::opt<bool> long_vector_support(
-    "long-vector", llvm::cl::init(false),
+    "long-vector", llvm::cl::init(true),
     llvm::cl::desc("Allow vectors of 8 and 16 elements. Experimental"));
 
 llvm::cl::opt<bool> cl_arm_non_uniform_work_group_size(

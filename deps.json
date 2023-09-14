@@ -6,7 +6,7 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "76f20099a5ab72a261661ecb545dceed52e5592d"
+      "commit" : "c7d65e4466eafe518937c59ef9a242234ed7a08a"
     },
     {
       "name" : "SPIRV-Headers",
@@ -14,7 +14,7 @@
       "subrepo" : "KhronosGroup/SPIRV-Headers",
       "branch" : "main",
       "subdir" : "third_party/SPIRV-Headers",
-      "commit" : "aa331ab0ffcb3a67021caa1a0c1c9017712f2f31"
+      "commit" : "fc7d2462765183c784a0c46beb13eee9e506a067"
     },
     {
       "name" : "SPIRV-Tools",
@@ -22,7 +22,7 @@
       "subrepo" : "KhronosGroup/SPIRV-Tools",
       "branch" : "main",
       "subdir" : "third_party/SPIRV-Tools",
-      "commit" : "5d2bc6f064f00935dd552aa13afbff40e66458c5"
+      "commit" : "a996591b1c67e789e88e99ae3881272f5fc47374"
     }
   ]
 }
