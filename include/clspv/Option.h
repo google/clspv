@@ -90,6 +90,10 @@ bool HackLogicalPtrtoint();
 // float to prevent driver optimisation getting rid of the conversion.
 bool HackConvertToFloat();
 
+// Returns true if reading a image1d_buffer with CL_BGRA format without sampler
+// requires components to be shuffled to match OpenCL specification.
+bool HackImage1dBufferBGRA();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
