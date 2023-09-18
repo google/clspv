@@ -18,6 +18,9 @@
 
 #include "Builtins.h"
 #include "FixupBuiltinsPass.h"
+#include "Types.h"
+
+#include "clspv/Option.h"
 
 #include <cmath>
 
@@ -43,6 +46,15 @@ bool FixupBuiltinsPass::runOnFunction(Function &F) {
     return fixupSqrt(F, sqrt);
   case Builtins::kRsqrt:
     return fixupSqrt(F, rsqrt);
+  case Builtins::kReadImagef:
+  case Builtins::kReadImagei:
+  case Builtins::kReadImageui:
+    if (clspv::Option::HackImage1dBufferBGRA() &&
+        !FI.getParameter(1).isSampler()) {
+      return fixupReadImage(F);
+    } else {
+      return false;
+    }
   default:
     return false;
   }
@@ -90,4 +102,43 @@ bool FixupBuiltinsPass::fixupSqrt(Function &F, double (*fct)(double)) {
     modified = true;
   }
   return modified;
+}
+
+bool FixupBuiltinsPass::fixupReadImage(Function &F) {
+  const uint32_t CL_BGRA = 0x10B6;
+  DenseMap<Value *, Type *> cache;
+  bool changed = false;
+  for (auto &U : F.uses()) {
+    if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+      auto Img = CI->getOperand(0);
+      auto *image_ty = InferType(Img, F.getContext(), &cache);
+      if (clspv::ImageDimensionality(image_ty) == spv::DimBuffer) {
+        IRBuilder<> B(CI->getInsertionPointAfterDef());
+
+        auto shuffle =
+            cast<ShuffleVectorInst>(B.CreateShuffleVector(CI, {2, 1, 0, 3}));
+        auto channel_order_fct = F.getParent()->getOrInsertFunction(
+            "_Z23get_image_channel_order21ocl_image1d_buffer_ro",
+            FunctionType::get(B.getInt32Ty(), {image_ty}, false));
+        auto channel_order = B.CreateCall(channel_order_fct, {Img});
+        auto cmp = B.CreateICmpNE(channel_order, B.getInt32(CL_BGRA));
+        SelectInst *select = cast<SelectInst>(B.CreateSelect(cmp, CI, shuffle));
+
+        // Do not use tmp before because llvm can optimize the node and not
+        // create it. But we need to use tmp to be able to replace all uses of
+        // CI without having a circular dependency.
+        auto tmp = UndefValue::get(CI->getType());
+        select->setTrueValue(tmp);
+        shuffle->setOperand(0, tmp);
+
+        CI->replaceAllUsesWith(select);
+
+        // Put the right argument at the proper places.
+        select->setTrueValue(CI);
+        shuffle->setOperand(0, CI);
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }

@@ -423,6 +423,11 @@ static llvm::cl::opt<uint32_t>
     printf_buffer_size("printf-buffer-size",
                        llvm::cl::desc("Size of the printf storage buffer"),
                        llvm::cl::init(1024 << 10));
+
+static llvm::cl::opt<bool> hack_image1d_buffer_bgra(
+    "hack-image1d-buffer-bgra", llvm::cl::init(false),
+    llvm::cl::desc("Shuffle component of read when CL_BGRA format is not "
+                   "supported for image1d_buffer."));
 } // namespace
 
 namespace clspv {
@@ -445,6 +450,7 @@ bool HackClampWidth() { return hack_clamp_width; }
 bool HackMulExtended() { return hack_mul_extended; }
 bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
 bool HackConvertToFloat() { return hack_convert_to_float; }
+bool HackImage1dBufferBGRA() { return hack_image1d_buffer_bgra; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }

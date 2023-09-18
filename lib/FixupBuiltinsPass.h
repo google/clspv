@@ -31,6 +31,10 @@ private:
   // InverseSqrt glsl instructions it adds checks to guarantee the result is a
   // NaN if the input is negative.
   bool fixupSqrt(llvm::Function &F, double (*fct)(double));
+
+  // Shuffle the component of a read_image of a image1d_buffer if the image
+  // order is CL_BGRA.
+  bool fixupReadImage(llvm::Function &F);
 };
 } // namespace clspv
 
