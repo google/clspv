@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "SamplerUtils.h"
-#include "Types.h"
+#include "Builtins.h"
+#include "BuiltinsEnum.h"
 #include "Constants.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -44,20 +46,27 @@ Value *NormalizedCoordinate(Module &M, IRBuilder<> &B, Value *Coord,
 }
 
 bool isReadImage3DWithNonLiteralSampler(CallInst *call) {
-  DenseMap<Value *, Type *> cache;
-  auto Name = call->getCalledFunction()->getName();
-  if (Name.contains("read_image") && Name.contains("ocl_sampler")) {
-    Type *ImgTy =
-        clspv::InferType(call->getOperand(0), call->getContext(), &cache);
-    auto sampler_call = dyn_cast<CallInst>(call->getOperand(1));
-    bool literal_sampler =
-        sampler_call && (sampler_call->getCalledFunction()->getName().contains(
-                             TranslateSamplerInitializerFunction()) ||
-                         sampler_call->getCalledFunction()->getName().contains(
-                             LiteralSamplerFunction()));
-    if (clspv::ImageDimensionality(ImgTy) == spv::Dim3D && !literal_sampler) {
-      return true;
+  auto FI = Builtins::Lookup(call->getCalledFunction());
+  switch (FI.getType()) {
+  case Builtins::kReadImagef:
+  case Builtins::kReadImagei:
+  case Builtins::kReadImageui: {
+    if (FI.getParameter(1).isSampler()) {
+      Type *ImgTy = call->getOperand(0)->getType();
+      auto sampler_call = dyn_cast<CallInst>(call->getOperand(1));
+      bool literal_sampler =
+          sampler_call &&
+          (sampler_call->getCalledFunction()->getName().contains(
+               TranslateSamplerInitializerFunction()) ||
+           sampler_call->getCalledFunction()->getName().contains(
+               LiteralSamplerFunction()));
+      if (clspv::ImageDimensionality(ImgTy) == spv::Dim3D && !literal_sampler) {
+        return true;
+      }
     }
+  } break;
+  default:
+    break;
   }
   return false;
 }
