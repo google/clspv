@@ -69,6 +69,7 @@
 #include "UndoSRetPass.h"
 #include "UndoTranslateSamplerFoldPass.h"
 #include "UndoTruncateToOddIntegerPass.h"
+#include "WrapKernelPass.h"
 #include "ZeroInitializeAllocasPass.h"
 
 #endif

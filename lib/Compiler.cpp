@@ -508,6 +508,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   // Run the following optimizations prior to the standard LLVM pass pipeline.
   pb.registerPipelineStartEPCallback([](llvm::ModulePassManager &pm,
                                         llvm::OptimizationLevel level) {
+    pm.addPass(clspv::WrapKernelPass());
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
     pm.addPass(clspv::KernelArgNamesToMetadataPass());
