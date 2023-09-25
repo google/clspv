@@ -13,8 +13,6 @@
 using namespace llvm;
 
 void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
-    F.removeFnAttr("kernel");
-    // Create a new function to wrap the kernel function
     SmallVector<Type *, 8> NewParamTypes;
     for (auto &Arg : F.args()) {
         NewParamTypes.push_back(Arg.getType());
@@ -43,24 +41,7 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
     // Get the arguments of the source function.
         SmallVector<Value *, 8> WrappedArgs;
     for (unsigned ArgNum = 0; ArgNum < F.arg_size(); ArgNum++) {
-      auto *OriginalArgTy = F.getArg(ArgNum)->getType();
       auto *NewArg = NewFunc->getArg(ArgNum);
-      if (OriginalArgTy != NewArg->getType()) {
-        auto *IntAsPtr = Builder.CreateIntToPtr(NewArg, OriginalArgTy);
-        WrappedArgs.push_back(IntAsPtr);
-
-        // We can't attach metadata to arguments directly, so add to this
-        // use instead. Subsequent passes can determine whether the POD
-        // contains a pointer by checking the users of the argument.
-        if (auto *InstAsPtrInstr = dyn_cast<Instruction>(IntAsPtr)) {
-          auto *EmptyMD = MDNode::get(F.getContext(), {});
-          InstAsPtrInstr->setMetadata(clspv::PointerPodArgMetadataName(),
-                                      EmptyMD);
-          continue;
-        }
-        llvm_unreachable("IntToPtr is not an instruction!");
-      }
-
       WrappedArgs.push_back(NewArg);
     }
 
@@ -78,10 +59,6 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
         break;
       }
     }
-
-    // Inline the function into the wrapper
-    InlineFunctionInfo info;
-    InlineFunction(*CallInst, info);
 }
 
 PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
