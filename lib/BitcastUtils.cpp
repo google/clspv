@@ -1164,6 +1164,21 @@ uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
 #ifndef NDEBUG
   Type *SrcTy = Ty;
 #endif
+  if (!(Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy())) {
+    auto size = SizeInBits(DataLayout, Ty);
+    if (Idxs) {
+      auto val = Offset / size;
+      if (Idxs->size() > 0) {
+        if (auto lastIdxCst = dyn_cast<ConstantInt>(Idxs->back())) {
+          val += lastIdxCst->getZExtValue();
+          Idxs->pop_back();
+        }
+      }
+      Idxs->push_back(Builder.getInt32(val));
+    }
+    Offset %= size;
+    return Offset;
+  }
   while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
          (TargetTy == nullptr ||
           SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy))) {
