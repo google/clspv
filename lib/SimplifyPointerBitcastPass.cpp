@@ -377,8 +377,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededCasts(Module &M) const {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
-                             true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true,
+                             false /* do not rework unsized types */)) {
           continue;
         }
 
@@ -440,8 +440,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
-                             true)) {
+        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true,
+                             false /* do not rework unsized types */)) {
           continue;
         }
 

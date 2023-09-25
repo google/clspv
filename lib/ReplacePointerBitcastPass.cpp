@@ -720,6 +720,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
     SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
+    SrcTy = BitcastUtils::reworkUnsizedType(DL, SrcTy);
+    DstTy = BitcastUtils::reworkUnsizedType(DL, DstTy);
+
     SmallVector<Value *, 4> NewAddrIdxs;
 
     // It consist of User* and bool whether user is gep or not.
