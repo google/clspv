@@ -823,8 +823,15 @@ bool RemoveCstExprFromFunction(Function *F) {
     auto OperandId = WorkList.back().second;
     WorkList.pop_back();
 
-    auto Operand =
-        dyn_cast<ConstantExpr>(I->getOperand(OperandId))->getAsInstruction(I);
+    auto InsertBefore = I;
+    if (auto phi = dyn_cast<PHINode>(I)) {
+      InsertBefore =
+          phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
+              ->getFirstNonPHI();
+    }
+
+    auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))
+                       ->getAsInstruction(InsertBefore);
     CheckInstruction(Operand);
     I->setOperand(OperandId, Operand);
   }
