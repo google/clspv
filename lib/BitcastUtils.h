@@ -25,6 +25,8 @@ using namespace llvm;
 
 namespace BitcastUtils {
 
+Type *reworkUnsizedType(const DataLayout &DL, Type *Ty);
+
 size_t SizeInBits(const DataLayout &DL, Type *Ty);
 size_t SizeInBits(IRBuilder<> &builder, Type *Ty);
 
@@ -44,7 +46,8 @@ bool RemoveCstExprFromFunction(Function *F);
 
 bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
-                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts);
+                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts,
+                     bool reworkUnsizedTy = true);
 
 unsigned PointerOperandNum(Instruction *inst);
 
