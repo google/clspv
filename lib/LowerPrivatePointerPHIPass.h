@@ -35,35 +35,6 @@ private:
 
   using WeakInstructions = llvm::SmallVector<llvm::WeakTrackingVH, 32>;
   void cleanDeadInstructions(WeakInstructions &);
-
-  llvm::Value *makeNewGEP(const llvm::DataLayout &DL, llvm::IRBuilder<> &B,
-                          llvm::Instruction *Src, llvm::Type *SrcTy,
-                          llvm::Type *DstTy, uint64_t CstVal,
-                          llvm::Value *DynVal, size_t SmallerBitWidths);
-
-  struct GEPMap {
-    llvm::Value *Src;
-    llvm::Value *DynVal;
-    uint64_t CstVal;
-    size_t SmallerBitWidths;
-    llvm::Type *SrcTy;
-    llvm::Type *DstTy;
-
-    bool operator<(const clspv::LowerPrivatePointerPHIPass::GEPMap &o) const {
-      return Src < o.Src ||
-             (Src == o.Src &&
-              (DynVal < o.DynVal ||
-               (DynVal == o.DynVal &&
-                (CstVal < o.CstVal ||
-                 (CstVal == o.CstVal &&
-                  (SmallerBitWidths < o.SmallerBitWidths ||
-                   (SmallerBitWidths == o.SmallerBitWidths &&
-                    (SrcTy < o.SrcTy ||
-                     (SrcTy == o.SrcTy && (DstTy < o.DstTy))))))))));
-    };
-  };
-
-  std::map<GEPMap, llvm::Value *> gep_map;
 };
 } // namespace clspv
 

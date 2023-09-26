@@ -9,6 +9,7 @@
 ; CHECK: [[gep:%[^ ]+]] = getelementptr inbounds [64 x i32], ptr [[alloca]], i32 0, i32 [[phi]]
 ; CHECK: load i32, ptr [[gep]], align 4
 ; CHECK: [[add_loop]] = add i32 1, [[phi]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr inbounds [64 x i32], ptr [[alloca]], i32 0, i32 [[phi]]
 ; CHECK: [[icmp:%[^ ]+]] = icmp eq ptr [[gep]], [[alloca]]
 ; CHECK: br i1 [[icmp]], label %exit, label %loop
 

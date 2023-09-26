@@ -65,28 +65,20 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
   phi->removeIncomingValue(BB, false);
 }
 
-} // namespace
-
-Value *clspv::LowerPrivatePointerPHIPass::makeNewGEP(
-    const DataLayout &DL, IRBuilder<> &B, Instruction *Src, Type *SrcTy,
-    Type *DstTy, uint64_t CstVal, Value *DynVal, size_t SmallerBitWidths) {
-  GEPMap key = {Src, DynVal, CstVal, SmallerBitWidths, SrcTy, DstTy};
-  auto find = gep_map.find(key);
-  if (find != gep_map.end()) {
-    return find->second;
-  }
-
+Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
+                  Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                  size_t SmallerBitWidths) {
   auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
       DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
       clspv::AddressSpace::Private);
-  return gep_map[key] = B.CreateGEP(SrcTy, Src, Idxs, "", true);
+  return B.CreateGEP(SrcTy, Src, Idxs, "", true);
 }
+} // namespace
 
 llvm::PreservedAnalyses
 clspv::LowerPrivatePointerPHIPass::run(Module &M,
                                        llvm::ModuleAnalysisManager &) {
   PreservedAnalyses PA;
-  gep_map.clear();
   for (auto &F : M) {
     runOnFunction(F);
   }
