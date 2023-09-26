@@ -16,6 +16,7 @@
 #define CLSPV_INCLUDE_CLSPV_COMPILER_H_
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -43,5 +44,56 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
                              std::vector<uint32_t> *output_buffer,
                              std::string *output_log);
 } // namespace clspv
+
+// C API
+typedef enum ClspvError {
+  CLSPV_SUCCESS = 0,
+  CLSPV_OUT_OF_HOST_MEM,
+  CLSPV_INVALID_ARG,
+  CLSPV_ERROR
+} ClspvError;
+
+#ifdef _WIN32
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT __attribute__((visibility("default")))
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Compile from source string(s).
+//
+// |container|          - Handle to container object.
+// |program_count|      - Number of programs passed in "programs" list.
+// |program_sizes|      - Length of each program in bytes,
+//                        will assume program is null-terminated if size is 0
+//                        or all programs are null-terminated if param is NULL.
+// |programs|           - List of program objects (OpenCL C or LLVM IR sources).
+// |options|            - String of options to pass to Clspv compiler.
+// |output_binary|      - Handle to compiler output/result.
+// |output_binary_size| - Size of compiler output/result (in bytes).
+// |output_log|         - Handle to compiler build log.
+EXPORT ClspvError clspvCompileFromSourcesString(
+    const size_t program_count, const size_t *program_sizes,
+    const char **programs, const char *options, char **output_binary,
+    size_t *output_binary_size, char **output_log);
+
+// Frees the output memory from clspvCompileFromSourcesString
+//
+// |output_binary|      - Handle to spv
+// |output_log|         - Handle to compiler build log
+static inline void clspvFreeOutputBuildObjs(char *output_binary,
+                                            char *output_log) {
+  free(output_binary);
+  output_binary = NULL;
+  free(output_log);
+  output_log = NULL;
+}
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // CLSPV_INCLUDE_CLSPV_COMPILER_H_

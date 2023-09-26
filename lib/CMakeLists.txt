@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Define build type for clspv_core
+if (CLSPV_SHARED_LIB)
+  set(CLSPV_LIB_TYPE SHARED)
+else ()
+  set(CLSPV_LIB_TYPE STATIC)
+endif ()
+
 # Core clspv library.  This contains support code for the driver, including
 # the pass pipeline.
-add_library(clspv_core
+add_library(clspv_core ${CLSPV_LIB_TYPE}
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Sampler.cpp
@@ -165,7 +172,9 @@ endif()
 
 if (ENABLE_CLSPV_INSTALL)
   include(../cmake/util.cmake)
-  clspv_combine_static_lib(clspv_combined clspv_core)
+  if (NOT CLSPV_SHARED_LIB)
+    clspv_combine_static_lib(clspv_combined clspv_core)
+  endif()
 
   install(
     FILES
@@ -187,18 +196,20 @@ if (ENABLE_CLSPV_INSTALL)
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 
-  # Since clspv_combined is defined as an imported library, we cannot use the
-  # install() directive to install it. Install it like a normal file.
-  get_target_property(generated_location clspv_combined LOCATION)
-  string(REGEX MATCH "Visual Studio .*" vs_generator "${CMAKE_GENERATOR}")
-  if (NOT "${vs_generator}" STREQUAL "")
-    # With Visual Studio generators, the LOCATION property is not properly
-    # expanded according to the current build configuration. We need to work
-    # around this problem by manually substitution.
-    string(REPLACE "$(Configuration)" "\${CMAKE_INSTALL_CONFIG_NAME}"
-      install_location "${generated_location}")
-    install(FILES ${install_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  else()
-    install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  if (NOT CLSPV_SHARED_LIB)
+    # Since clspv_combined is defined as an imported library, we cannot use the
+    # install() directive to install it. Install it like a normal file.
+    get_target_property(generated_location clspv_combined LOCATION)
+    string(REGEX MATCH "Visual Studio .*" vs_generator "${CMAKE_GENERATOR}")
+    if (NOT "${vs_generator}" STREQUAL "")
+      # With Visual Studio generators, the LOCATION property is not properly
+      # expanded according to the current build configuration. We need to work
+      # around this problem by manually substitution.
+      string(REPLACE "$(Configuration)" "\${CMAKE_INSTALL_CONFIG_NAME}"
+        install_location "${generated_location}")
+      install(FILES ${install_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    else()
+      install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    endif()
   endif()
 endif()

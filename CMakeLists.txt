@@ -52,6 +52,8 @@ if(NOT IS_DIRECTORY ${path})
 endif()
 endmacro()
 
+option(CLSPV_SHARED_LIB "Build shared lib of clspv (tools will use shared linkage to libclspv_core.so)" OFF)
+
 option(SKIP_CLSPV_INSTALL "Skip installation" ${SKIP_CLSPV_INSTALL})
 if(NOT ${SKIP_CLSPV_INSTALL})
   set(ENABLE_CLSPV_INSTALL ON)

@@ -46,6 +46,7 @@
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 
 #include "clspv/AddressSpace.h"
+#include "clspv/Compiler.h"
 #include "clspv/Option.h"
 #include "clspv/Passes.h"
 #include "clspv/Sampler.h"
@@ -1310,3 +1311,58 @@ int CompileFromSourceString(const std::string &program,
   return CompileProgram("source", program, output_binary, output_log);
 }
 } // namespace clspv
+
+// C API
+ClspvError clspvCompileFromSourcesString(
+    const size_t program_count, const size_t *program_sizes,
+    const char **programs, const char *options, char **output_binary,
+    size_t *output_binary_size, char **output_log) {
+  if (programs == nullptr || program_count == 0 || output_binary == nullptr ||
+      output_binary_size == nullptr) {
+    return CLSPV_INVALID_ARG;
+  }
+
+  int err = CLSPV_SUCCESS;
+  std::string sOptions(options ? options : "");
+  std::vector<std::string> vPrograms(program_count);
+  for (size_t i = 0; i < program_count; ++i) {
+    if (programs[i] == nullptr) {
+      return CLSPV_ERROR;
+    }
+    if (program_sizes && program_sizes[i] != 0) {
+      vPrograms[i].assign(programs[i], program_sizes[i]);
+    } else {
+      vPrograms[i].assign(programs[i]);
+    }
+  }
+
+  std::string buildLog;
+  std::vector<uint32_t> binary;
+  err =
+      clspv::CompileFromSourcesString(vPrograms, sOptions, &binary, &buildLog);
+
+  if (!buildLog.empty()) {
+    // Alloc and copy backing mem for build log
+    *output_log = static_cast<char *>(std::malloc(buildLog.size() + 1));
+    if (*output_log == NULL) {
+      return CLSPV_OUT_OF_HOST_MEM;
+    }
+    std::memcpy(static_cast<void *>(*output_log), buildLog.c_str(),
+                buildLog.size() + 1);
+  }
+
+  if (err != 0) {
+    return CLSPV_ERROR;
+  }
+
+  // Alloc and copy backing mem for spv output
+  size_t spv_bytes = binary.size() * sizeof(uint32_t);
+  *output_binary = static_cast<char *>(std::malloc(spv_bytes));
+  if (*output_binary == NULL) {
+    return CLSPV_OUT_OF_HOST_MEM;
+  }
+  std::memcpy(static_cast<void *>(*output_binary), binary.data(), spv_bytes);
+  *output_binary_size = spv_bytes;
+
+  return CLSPV_SUCCESS;
+}
