@@ -34,9 +34,9 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
       }
     }
     NewFunc->copyMetadata(&F, 0);
-
+    F.clearMetadata();
+    
     IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", NewFunc));
-
     // Copy args from src func to new func
     // Get the arguments of the source function.
     SmallVector<Value *, 8> WrappedArgs;
