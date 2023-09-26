@@ -38,10 +38,6 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
-# We keep all exported symbols hidden by default (shared lib will manually EXPORT)
-set(CMAKE_C_VISIBILITY_PRESET hidden)
-set(CMAKE_CXX_VISIBILITY_PRESET hidden)
-
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
 if (NOT DEFINED CMAKE_BUILD_TYPE)
@@ -55,6 +51,8 @@ if(NOT IS_DIRECTORY ${path})
   message(FATAL_ERROR "Required component '${path}' does not exist! Please run 'python utils/fetch_sources.py' in the '${CMAKE_CURRENT_SOURCE_DIR}' folder.")
 endif()
 endmacro()
+
+option(CLSPV_SHARED_LIB "Build shared lib of clspv (tools will use shared linkage to libclspv_core.so)" OFF)
 
 option(SKIP_CLSPV_INSTALL "Skip installation" ${SKIP_CLSPV_INSTALL})
 if(NOT ${SKIP_CLSPV_INSTALL})

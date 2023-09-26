@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Define build type for clspv_core
+if (CLSPV_SHARED_LIB)
+  set(CLSPV_LIB_TYPE SHARED)
+else ()
+  set(CLSPV_LIB_TYPE STATIC)
+endif ()
+
 # Core clspv library.  This contains support code for the driver, including
 # the pass pipeline.
-add_library(clspv_core
+add_library(clspv_core ${CLSPV_LIB_TYPE}
   ${CMAKE_CURRENT_SOURCE_DIR}/Compiler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FrontendPlugin.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Sampler.cpp
 )
-
-# Core clspv library (shared).  Mirror sources from clspv_core.
-get_target_property(CLSPV_SHARED_SRCS clspv_core SOURCES)
-add_library(clspv_shared SHARED ${CLSPV_SHARED_SRCS})
-set_target_properties(clspv_shared PROPERTIES OUTPUT_NAME "clspv")
 
 # Pass library.  Transformation passes and pass-specific support are
 # defined here.  This must be loadable by LLVM opt for testing individual
@@ -104,7 +106,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/ZeroInitializeAllocasPass.cpp
 )
 
-foreach(clspv_lib clspv_core clspv_passes clspv_shared)
+foreach(clspv_lib clspv_core clspv_passes)
   # Enable C++11 for our executable
   target_compile_features(${clspv_lib} PRIVATE cxx_range_for)
 
@@ -161,12 +163,6 @@ target_link_libraries(clspv_core PRIVATE
   clangSerialization
 )
 
-# Mirror "clspv_core" deps and link libs for "clspv_shared"
-get_target_property(CLSPV_SHARED_DEPS clspv_core MANUALLY_ADDED_DEPENDENCIES)
-get_target_property(CLSPV_SHARED_LINK_LIBS clspv_core LINK_LIBRARIES)
-add_dependencies(clspv_shared ${CLSPV_SHARED_DEPS})
-target_link_libraries(clspv_shared PRIVATE ${CLSPV_SHARED_LINK_LIBS})
-
 if (MSVC)
   set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/SPIRVProducerPass.cpp"
     # 4596: Upgrade to newer LLVM.  See https://github.com/google/clspv/issues/153
@@ -176,7 +172,9 @@ endif()
 
 if (ENABLE_CLSPV_INSTALL)
   include(../cmake/util.cmake)
-  clspv_combine_static_lib(clspv_combined clspv_core)
+  if (NOT CLSPV_SHARED_LIB)
+    clspv_combine_static_lib(clspv_combined clspv_core)
+  endif()
 
   install(
     FILES
@@ -198,18 +196,20 @@ if (ENABLE_CLSPV_INSTALL)
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 
-  # Since clspv_combined is defined as an imported library, we cannot use the
-  # install() directive to install it. Install it like a normal file.
-  get_target_property(generated_location clspv_combined LOCATION)
-  string(REGEX MATCH "Visual Studio .*" vs_generator "${CMAKE_GENERATOR}")
-  if (NOT "${vs_generator}" STREQUAL "")
-    # With Visual Studio generators, the LOCATION property is not properly
-    # expanded according to the current build configuration. We need to work
-    # around this problem by manually substitution.
-    string(REPLACE "$(Configuration)" "\${CMAKE_INSTALL_CONFIG_NAME}"
-      install_location "${generated_location}")
-    install(FILES ${install_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  else()
-    install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  if (NOT CLSPV_SHARED_LIB)
+    # Since clspv_combined is defined as an imported library, we cannot use the
+    # install() directive to install it. Install it like a normal file.
+    get_target_property(generated_location clspv_combined LOCATION)
+    string(REGEX MATCH "Visual Studio .*" vs_generator "${CMAKE_GENERATOR}")
+    if (NOT "${vs_generator}" STREQUAL "")
+      # With Visual Studio generators, the LOCATION property is not properly
+      # expanded according to the current build configuration. We need to work
+      # around this problem by manually substitution.
+      string(REPLACE "$(Configuration)" "\${CMAKE_INSTALL_CONFIG_NAME}"
+        install_location "${generated_location}")
+      install(FILES ${install_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    else()
+      install(FILES ${generated_location} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    endif()
   endif()
 endif()
