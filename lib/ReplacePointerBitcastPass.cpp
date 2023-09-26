@@ -215,7 +215,7 @@ void ReduceType(IRBuilder<> &Builder, bool IsGEPUser, Value *OrgGEPIdx,
       }
     }
   } else {
-    if (SrcTyBitWidth == DstTyBitWidth) {
+    if (SrcTyBitWidth == DstTyBitWidth && OrgGEPIdx) {
       OutAddrIdxs.push_back(OrgGEPIdx);
     } else {
       OutAddrIdxs.push_back(InAddrIdxs[InIdx++]);
@@ -720,6 +720,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     }
     SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
+    SrcTy = BitcastUtils::reworkUnsizedType(DL, SrcTy);
+    DstTy = BitcastUtils::reworkUnsizedType(DL, DstTy);
+
     SmallVector<Value *, 4> NewAddrIdxs;
 
     // It consist of User* and bool whether user is gep or not.
@@ -743,6 +746,12 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       }
 
       DstTy = GEP->getResultElementType();
+
+      if (DynVal == nullptr &&
+          GoThroughTypeAtOffset(DL, Builder, SrcTy, DstTy,
+                                CstVal * SmallerBitWidths, nullptr) != 0) {
+        SrcTy = DstTy;
+      }
       auto Idx = GetIdxsForTyFromOffset(
           DL, Builder, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
           (clspv::AddressSpace::Type)GEP->getPointerOperand()
@@ -776,9 +785,11 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       IRBuilder<> Builder(cast<Instruction>(U));
 
       if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-        ComputeStore(Builder, ST, OrgGEPIdx, IsGEPUser, Src, SrcTy,
-                     ST->getValueOperand()->getType(), NewAddrIdxs,
-                     ToBeDeleted);
+        ComputeStore(Builder, ST,
+                     DstTy == ST->getValueOperand()->getType() ? OrgGEPIdx
+                                                               : nullptr,
+                     IsGEPUser, Src, SrcTy, ST->getValueOperand()->getType(),
+                     NewAddrIdxs, ToBeDeleted);
       } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
         Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
                                     LD->getType(), NewAddrIdxs, ToBeDeleted);

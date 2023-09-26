@@ -219,8 +219,9 @@ llvm::cl::opt<bool> std430_ubo_layout(
 llvm::cl::opt<bool> int8_support("int8", llvm::cl::init(true),
                                  llvm::cl::desc("Allow 8-bit integers"));
 
+// TODO(#1231): long vector support is required due to sqrt.
 llvm::cl::opt<bool> long_vector_support(
-    "long-vector", llvm::cl::init(false),
+    "long-vector", llvm::cl::init(true),
     llvm::cl::desc("Allow vectors of 8 and 16 elements. Experimental"));
 
 llvm::cl::opt<bool> cl_arm_non_uniform_work_group_size(
@@ -422,6 +423,11 @@ static llvm::cl::opt<uint32_t>
     printf_buffer_size("printf-buffer-size",
                        llvm::cl::desc("Size of the printf storage buffer"),
                        llvm::cl::init(1024 << 10));
+
+static llvm::cl::opt<bool> hack_image1d_buffer_bgra(
+    "hack-image1d-buffer-bgra", llvm::cl::init(false),
+    llvm::cl::desc("Shuffle component of read when CL_BGRA format is not "
+                   "supported for image1d_buffer."));
 } // namespace
 
 namespace clspv {
@@ -444,6 +450,7 @@ bool HackClampWidth() { return hack_clamp_width; }
 bool HackMulExtended() { return hack_mul_extended; }
 bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
 bool HackConvertToFloat() { return hack_convert_to_float; }
+bool HackImage1dBufferBGRA() { return hack_image1d_buffer_bgra; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }

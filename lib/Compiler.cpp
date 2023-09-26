@@ -55,6 +55,7 @@
 #include "clspv/opencl_builtins_header.h"
 
 #include "Builtins.h"
+#include "BuiltinsEnum.h"
 #include "Constants.h"
 #include "FrontendPlugin.h"
 #include "Passes.h"
@@ -1104,6 +1105,24 @@ ProgramToModule(llvm::LLVMContext &context,
   return action.takeModule();
 }
 
+// Clang generates definitions for the following builtins:
+// * sqrt
+//
+// These interfere with linking cllib builtins so we strip them.
+// See https://reviews.llvm.org/D156743
+// TODO(#1231): find a better solution for this.
+void StripBuiltinDefinitions(llvm::Module *module) {
+  for (auto &F : module->functions()) {
+    if (F.isDeclaration())
+      continue;
+
+    const auto info = clspv::Builtins::Lookup(&F);
+    if (info.getType() == clspv::Builtins::kSqrt) {
+      F.deleteBody();
+    }
+  }
+}
+
 int CompileModule(const llvm::StringRef &input_filename,
                   std::unique_ptr<llvm::Module> &module,
                   std::vector<uint32_t> *output_buffer,
@@ -1147,6 +1166,8 @@ int CompilePrograms(const std::vector<std::string> &programs,
         ProgramToModule(context, "source", program, output_log, &error));
     if (error != 0)
       return error;
+
+    StripBuiltinDefinitions(modules.back().get());
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
@@ -1171,6 +1192,8 @@ int CompileProgram(const llvm::StringRef &input_filename,
   if (module == nullptr) {
     return error;
   }
+
+  StripBuiltinDefinitions(module.get());
 
   return CompileModule(input_filename, module, output_buffer, output_log);
 }

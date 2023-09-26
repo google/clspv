@@ -38,6 +38,20 @@
 
 namespace BitcastUtils {
 
+// Interface types are often something like: { [ 0 x Ty ] }.
+// SizeInBits returns zero for such types. Try to avoid it by go through the
+// type as long as SizeInBits returns zero to get the real type size for it.
+Type *reworkUnsizedType(const DataLayout &DL, Type *Ty) {
+  auto size = SizeInBits(DL, Ty);
+  auto Ele = GetEleType(Ty);
+  while (size == 0 && Ty != Ele) {
+    Ty = Ele;
+    Ele = GetEleType(Ty);
+    size = SizeInBits(DL, Ty);
+  }
+  return Ty;
+}
+
 void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
                                  SmallVector<Value *, 8> &Values,
                                  unsigned NumElePerVec);
@@ -823,8 +837,15 @@ bool RemoveCstExprFromFunction(Function *F) {
     auto OperandId = WorkList.back().second;
     WorkList.pop_back();
 
-    auto Operand =
-        dyn_cast<ConstantExpr>(I->getOperand(OperandId))->getAsInstruction(I);
+    auto InsertBefore = I;
+    if (auto phi = dyn_cast<PHINode>(I)) {
+      InsertBefore =
+          phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
+              ->getFirstNonPHI();
+    }
+
+    auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))
+                       ->getAsInstruction(InsertBefore);
     CheckInstruction(Operand);
     I->setOperand(OperandId, Operand);
   }
@@ -858,7 +879,8 @@ unsigned PointerOperandNum(Instruction *inst) {
 
 bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
-                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts) {
+                     Type *&dest_ty, bool ReplacePhysicalPointerBitcasts,
+                     bool reworkUnsizedTy) {
   // The following checks use InferType to distinguish when a pointer's
   // interpretation changes between instructions. This requires the input
   // to be an instruction whose result provides a clear type for a
@@ -963,6 +985,12 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
         return false;
       }
     }
+  }
+  if (source_ty && reworkUnsizedTy) {
+    source_ty = reworkUnsizedType(M.getDataLayout(), source_ty);
+  }
+  if (dest_ty && reworkUnsizedTy) {
+    dest_ty = reworkUnsizedType(M.getDataLayout(), dest_ty);
   }
   return source_ty && dest_ty && source_ty != dest_ty;
 }
@@ -1157,6 +1185,21 @@ uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
 #ifndef NDEBUG
   Type *SrcTy = Ty;
 #endif
+  if (!(Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy())) {
+    auto size = SizeInBits(DataLayout, Ty);
+    if (Idxs) {
+      auto val = Offset / size;
+      if (Idxs->size() > 0) {
+        if (auto lastIdxCst = dyn_cast<ConstantInt>(Idxs->back())) {
+          val += lastIdxCst->getZExtValue();
+          Idxs->pop_back();
+        }
+      }
+      Idxs->push_back(Builder.getInt32(val));
+    }
+    Offset %= size;
+    return Offset;
+  }
   while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
          (TargetTy == nullptr ||
           SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy))) {
@@ -1206,6 +1249,10 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   if (DstTy->isVoidTy()) {
     DstTy = Builder.getInt8Ty();
   }
+
+  SrcTy = reworkUnsizedType(DataLayout, SrcTy);
+  DstTy = reworkUnsizedType(DataLayout, DstTy);
+
   if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
       DstTy != SrcTy) {
     DstTy = SrcTy;

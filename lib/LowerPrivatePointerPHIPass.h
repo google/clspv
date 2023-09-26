@@ -15,10 +15,15 @@
 #ifndef _CLSPV_LIB_PRIVATE_POINTER_PHI_PASS_H
 #define _CLSPV_LIB_PRIVATE_POINTER_PHI_PASS_H
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Transforms/Utils/Local.h"
+
+#include <map>
+
+#include "BitcastUtils.h"
 
 namespace clspv {
 struct LowerPrivatePointerPHIPass

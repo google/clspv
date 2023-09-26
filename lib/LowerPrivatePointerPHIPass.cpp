@@ -45,15 +45,6 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
   }
 }
 
-Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
-                  Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
-                  size_t SmallerBitWidths) {
-  auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
-      DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
-      clspv::AddressSpace::Private);
-  return B.CreateGEP(SrcTy, Src, Idxs, "", true);
-}
-
 void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
                              uint64_t CstVal, Value *DynVal) {
   IRBuilder<> B(Src);
@@ -74,6 +65,14 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
   phi->removeIncomingValue(BB, false);
 }
 
+Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
+                  Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                  size_t SmallerBitWidths) {
+  auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
+      DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
+      clspv::AddressSpace::Private);
+  return B.CreateGEP(SrcTy, Src, Idxs, "", true);
+}
 } // namespace
 
 llvm::PreservedAnalyses
@@ -203,6 +202,38 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         auto newPtrToInt = B.CreatePtrToInt(gep, ptrtoint->getDestTy());
         ptrtoint->replaceAllUsesWith(newPtrToInt);
         ToBeErased.push_back(ptrtoint);
+      } else if (auto icmp = dyn_cast<ICmpInst>(node)) {
+        int opId = -1;
+        int otherOpIsIntToPtr = -1;
+        IntToPtrInst *intToPtr = nullptr;
+        for (unsigned i = 0; i < icmp->getNumOperands(); i++) {
+          auto cast = dyn_cast<IntToPtrInst>(icmp->getOperand(i));
+          if (icmp->getOperand(i) == Src) {
+            opId = i;
+          } else if (cast) {
+            otherOpIsIntToPtr = i;
+            intToPtr = cast;
+          }
+        }
+        assert(opId != -1);
+        IRBuilder<> B(icmp);
+        if (intToPtr) {
+          icmp->setOperand(otherOpIsIntToPtr, intToPtr->getOperand(0));
+          if (DynVal == nullptr) {
+            DynVal = B.getInt32(CstVal);
+          } else if (CstVal != 0) {
+            DynVal = B.CreateAdd(DynVal, B.getInt32(CstVal));
+          }
+          icmp->setOperand(opId, DynVal);
+          if (intToPtr->getNumUses() == 0) {
+            ToBeErased.push_back(intToPtr);
+          }
+        } else {
+          auto gep = makeNewGEP(DL, B, alloca, alloca->getAllocatedType(),
+                                B.getIntNTy(SmallerBitWidths), CstVal, DynVal,
+                                SmallerBitWidths);
+          icmp->setOperand(opId, gep);
+        }
       } else {
         llvm_unreachable("Unexpected node when traversing alloca users");
       }
