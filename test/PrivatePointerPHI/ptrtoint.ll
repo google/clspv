@@ -6,6 +6,7 @@
 ; CHECK: [[gep:%[^ ]+]] = getelementptr inbounds [64 x i32], ptr %alloca, i32 0, i32 [[phi]]
 ; CHECK: load i32, ptr [[gep]], align 4
 ; CHECK: [[add]] = add i32 1, [[phi]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr inbounds [64 x i32], ptr %alloca, i32 0, i32 [[phi]]
 ; CHECK: ptrtoint ptr [[gep]] to i32
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
