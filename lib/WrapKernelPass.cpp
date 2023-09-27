@@ -21,10 +21,14 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
         FunctionType::get(F.getReturnType(), NewParamTypes, false);
 
     auto NewFunc = Function::Create(NewFuncTy, F.getLinkage());
-    F.setName(NewFunc->getName().str() + ".inner");
+    NewFunc->setName(F.getName().str());
+    F.setName(F.getName().str() + ".inner");
     NewFunc->setCallingConv(F.getCallingConv());
-
     NewFunc->copyAttributesFrom(&F);
+    
+    for (auto &arg : F.args()) {
+      NewFunc->getArg(arg.getArgNo())->setName(arg.getName());
+    }
 
     F.setCallingConv(CallingConv::SPIR_FUNC);
     for (auto &U : F.uses()) {
@@ -33,12 +37,13 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
       }
     }
     NewFunc->copyMetadata(&F, 0);
+    F.clearMetadata();
 
     IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", NewFunc));
 
     // Copy args from src func to new func
     // Get the arguments of the source function.
-        SmallVector<Value *, 8> WrappedArgs;
+    SmallVector<Value *, 8> WrappedArgs;
     for (unsigned ArgNum = 0; ArgNum < F.arg_size(); ArgNum++) {
       auto *NewArg = NewFunc->getArg(ArgNum);
       WrappedArgs.push_back(NewArg);
@@ -72,7 +77,6 @@ PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
     } else {
         nextIsWrap = false;
     }
-  }
-  
+  } 
   return PA;
 }
