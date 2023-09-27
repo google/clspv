@@ -1,3 +1,4 @@
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstVisitor.h"
@@ -7,8 +8,6 @@
 #include "llvm/Pass.h"
 
 #include "WrapKernelPass.h"
-
-#include "Constants.h"
 
 using namespace llvm;
 
@@ -22,11 +21,11 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
         FunctionType::get(F.getReturnType(), NewParamTypes, false);
 
     auto NewFunc = Function::Create(NewFuncTy, F.getLinkage());
-    NewFunc->setName(F.getName().str());
-    F.setName(F.getName().str() + ".inner");
+    F.setName(NewFunc->getName().str() + ".inner");
     NewFunc->setCallingConv(F.getCallingConv());
+
     NewFunc->copyAttributesFrom(&F);
-    NewFunc->setCallingConv(CallingConv::SPIR_KERNEL);
+
     F.setCallingConv(CallingConv::SPIR_FUNC);
     for (auto &U : F.uses()) {
       if (auto CI = dyn_cast<CallInst>(U.getUser())) {
@@ -34,12 +33,12 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
       }
     }
     NewFunc->copyMetadata(&F, 0);
-    F.clearMetadata();
-    
+
     IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", NewFunc));
+
     // Copy args from src func to new func
     // Get the arguments of the source function.
-    SmallVector<Value *, 8> WrappedArgs;
+        SmallVector<Value *, 8> WrappedArgs;
     for (unsigned ArgNum = 0; ArgNum < F.arg_size(); ArgNum++) {
       auto *NewArg = NewFunc->getArg(ArgNum);
       WrappedArgs.push_back(NewArg);

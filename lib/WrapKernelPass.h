@@ -22,17 +22,9 @@ namespace clspv {
 struct WrapKernelPass : llvm::PassInfoMixin<WrapKernelPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
-  WrapKernelPass(llvm::raw_pwrite_stream *out, bool outputCInitList)
-      : out(out), outputCInitList(outputCInitList) {}
-
-  WrapKernelPass() : out(nullptr), outputCInitList(false) {}
-
 private:
   void runOnFunction(llvm::Module &M,llvm::Function &F);
-
-  llvm::raw_pwrite_stream *out;
-  bool outputCInitList;
-};
+  };
 } // namespace clspv
 
 #endif // _CLSPV_LIB_WRAP_KERNEL_PASS_H
