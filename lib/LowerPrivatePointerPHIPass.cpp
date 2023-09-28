@@ -219,10 +219,13 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         IRBuilder<> B(icmp);
         if (intToPtr) {
           icmp->setOperand(otherOpIsIntToPtr, intToPtr->getOperand(0));
+          Type *PtrOffTy = clspv::PointersAre64Bit(*F.getParent())
+                               ? B.getInt64Ty()
+                               : B.getInt32Ty();
           if (DynVal == nullptr) {
-            DynVal = B.getInt32(CstVal);
+            DynVal = ConstantInt::get(PtrOffTy, CstVal);
           } else if (CstVal != 0) {
-            DynVal = B.CreateAdd(DynVal, B.getInt32(CstVal));
+            DynVal = B.CreateAdd(DynVal, ConstantInt::get(PtrOffTy, CstVal));
           }
           icmp->setOperand(opId, DynVal);
           if (intToPtr->getNumUses() == 0) {
