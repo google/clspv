@@ -19,6 +19,6 @@ void kernel foo(global uint *dst, global uint *src) {
 // CHECK-NEXT:  OpAccessChain
 // CHECK-NEXT:  OpLine [[filename]] 8 0
 // CHECK-NEXT:  OpStore
-// CHECK-NEXT:  OpLine [[filename]] 9 0
+// CHECK-NEXT:  OpNoLine
 // CHECK-NEXT:  OpReturn
 

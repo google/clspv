@@ -20,7 +20,7 @@
 // CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[cluster]] [[gep]]
 // CHECK: [[x:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[ld]] 0
 // CHECK: [[y:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[ld]] 1
-// CHECK: OpIAdd [[int]] [[x]] [[y]]
+// CHECK: OpIAdd [[int]] [[y]] [[x]]
 
 //      MAP: kernel,foo,arg,out,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
 // MAP-NEXT: kernel,foo,arg,x,argOrdinal,1,offset,0,argKind,pod_pushconstant,argSize,4

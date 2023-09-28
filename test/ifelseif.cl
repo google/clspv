@@ -13,7 +13,8 @@
 // CHECK-DAG: %[[CONSTANT_TRUE_ID:[a-zA-Z0-9_]*]] = OpConstantTrue %[[BOOL_TYPE_ID]]
 // CHECK-DAG: %[[CONSTANT_13_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 13
 
-// CHECK: %[[LABEL_ID:[a-zA-Z0-9_]*]] = OpLabel
+// CHECK: %[[LABEL0_ID:[a-zA-Z0-9_]*]] = OpLabel
+// CHECK: %[[LABEL1_ID:[a-zA-Z0-9_]*]] = OpLabel
 // CHECK: %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT_TYPE_ID]]
 // CHECK: %[[CMP0_ID:[a-zA-Z0-9_]*]] = OpULessThanEqual %[[BOOL_TYPE_ID]] %[[LOAD_ID]] %[[CONSTANT_42_ID]]
 // CHECK: OpSelectionMerge %[[MERGE0_LABEL_ID:[a-zA-Z0-9_]*]] None
@@ -32,7 +33,7 @@
 // CHECK: OpBranch %[[MERGE0_LABEL_ID]]
 
 // CHECK: %[[MERGE0_LABEL_ID]] = OpLabel
-// CHECK: %[[PHI_ID:[a-zA-Z0-9_]*]] = OpPhi %[[BOOL_TYPE_ID]] %[[CONSTANT_FALSE_ID]] %[[MERGE1_LABEL_ID]] %[[CONSTANT_TRUE_ID]] %[[LABEL_ID]]
+// CHECK: %[[PHI_ID:[a-zA-Z0-9_]*]] = OpPhi %[[BOOL_TYPE_ID]] %[[CONSTANT_FALSE_ID]] %[[MERGE1_LABEL_ID]] %[[CONSTANT_TRUE_ID]] %[[LABEL1_ID]]
 // CHECK: OpSelectionMerge %[[END_LABEL_ID:[a-zA-Z0-9_]*]] None
 // CHECK: OpBranchConditional %[[PHI_ID]] %[[IF_LABEL_ID:[a-zA-Z0-9_]*]] %[[END_LABEL_ID]]
 

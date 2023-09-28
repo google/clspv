@@ -16,5 +16,5 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(float4 a, float4 
 // CHECK-DAG: [[bool4:%[a-zA-Z0-9_]+]] = OpTypeVector [[bool]] 4
 // CHECK: [[less:%[a-zA-Z0-9_]+]] = OpFOrdLessThanEqual [[bool4]]
 // CHECK: [[greater:%[a-zA-Z0-9_]+]] = OpFOrdGreaterThan [[bool4]]
-// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpLogicalAnd [[bool4]] [[less]] [[greater]]
+// CHECK: [[and:%[a-zA-Z0-9_]+]] = OpLogicalAnd [[bool4]] [[greater]] [[less]]
 // CHECK: OpSelect [[int4]] [[and]]
