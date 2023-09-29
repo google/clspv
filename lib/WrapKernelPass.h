@@ -23,7 +23,7 @@ struct WrapKernelPass : llvm::PassInfoMixin<WrapKernelPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:
-  void runOnFunction(llvm::Module &M,llvm::Function &F);
+  bool runOnFunction(llvm::Module &M,llvm::Function &F);
   };
 } // namespace clspv
 

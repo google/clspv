@@ -11,7 +11,7 @@
 
 using namespace llvm;
 
-void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
+bool clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
     //No need to inline this kernel if there exists no calls to it.
     bool isCalled = false;
     for (auto &U : F.uses()) {
@@ -21,7 +21,7 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
       }
     }
     if (!isCalled){
-      return;
+      return false;
     }
     
     SmallVector<Type *, 8> NewParamTypes;
@@ -75,6 +75,7 @@ void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
         break;
       }
     }
+    return true;
 }
 
 PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
@@ -84,8 +85,7 @@ PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
   bool nextIsWrap = false;
   for (auto &F : M.functions()) {
     if (F.getCallingConv() == CallingConv::SPIR_KERNEL && !nextIsWrap) {
-        runOnFunction(M,F);
-        nextIsWrap = true;
+        nextIsWrap = runOnFunction(M,F);
     } else {
         nextIsWrap = false;
     }
