@@ -12,6 +12,18 @@
 using namespace llvm;
 
 void clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
+    //No need to inline this kernel if there exists no calls to it.
+    bool isCalled = false;
+    for (auto &U : F.uses()) {
+      if (dyn_cast<CallInst>(U.getUser())) {
+        isCalled = true;
+        break;
+      }
+    }
+    if (!isCalled){
+      return;
+    }
+    
     SmallVector<Type *, 8> NewParamTypes;
     for (auto &Arg : F.args()) {
         NewParamTypes.push_back(Arg.getType());
