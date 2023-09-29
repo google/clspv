@@ -11,57 +11,45 @@
 
 using namespace llvm;
 
-bool clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
-    //No need to inline this kernel if there exists no calls to it.
-    bool isCalled = false;
-    for (auto &U : F.uses()) {
-      if (dyn_cast<CallInst>(U.getUser())) {
-        isCalled = true;
-        break;
-      }
-    }
-    if (!isCalled){
-      return false;
-    }
-    
+void clspv::WrapKernelPass::runOnFunction(Module &M, llvm::Function *F) {   
     SmallVector<Type *, 8> NewParamTypes;
-    for (auto &Arg : F.args()) {
+    for (auto &Arg : F->args()) {
         NewParamTypes.push_back(Arg.getType());
     }
     
     auto *NewFuncTy =
-        FunctionType::get(F.getReturnType(), NewParamTypes, false);
+        FunctionType::get(F->getReturnType(), NewParamTypes, false);
 
-    auto NewFunc = Function::Create(NewFuncTy, F.getLinkage());
-    NewFunc->setName(F.getName().str());
-    F.setName(F.getName().str() + ".inner");
-    NewFunc->setCallingConv(F.getCallingConv());
-    NewFunc->copyAttributesFrom(&F);
+    auto NewFunc = Function::Create(NewFuncTy, F->getLinkage());
+    NewFunc->setName(F->getName().str());
+    F->setName(F->getName().str() + ".inner");
+    NewFunc->setCallingConv(F->getCallingConv());
+    NewFunc->copyAttributesFrom(F);
     
-    for (auto &arg : F.args()) {
+    for (auto &arg : F->args()) {
       NewFunc->getArg(arg.getArgNo())->setName(arg.getName());
     }
 
-    F.setCallingConv(CallingConv::SPIR_FUNC);
-    for (auto &U : F.uses()) {
+    F->setCallingConv(CallingConv::SPIR_FUNC);
+    for (auto &U : F->uses()) {
       if (auto CI = dyn_cast<CallInst>(U.getUser())) {
         CI->setCallingConv(CallingConv::SPIR_FUNC);
       }
     }
-    NewFunc->copyMetadata(&F, 0);
-    F.clearMetadata();
+    NewFunc->copyMetadata(F, 0);
+    F->clearMetadata();
 
     IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", NewFunc));
 
     // Copy args from src func to new func
     // Get the arguments of the source function.
     SmallVector<Value *, 8> WrappedArgs;
-    for (unsigned ArgNum = 0; ArgNum < F.arg_size(); ArgNum++) {
+    for (unsigned ArgNum = 0; ArgNum < F->arg_size(); ArgNum++) {
       auto *NewArg = NewFunc->getArg(ArgNum);
       WrappedArgs.push_back(NewArg);
     }
 
-    auto *CallInst = Builder.CreateCall(&F, WrappedArgs);
+    auto *CallInst = Builder.CreateCall(F, WrappedArgs);
     CallInst->setCallingConv(CallingConv::SPIR_FUNC);
     Builder.CreateRetVoid();
 
@@ -70,25 +58,34 @@ bool clspv::WrapKernelPass::runOnFunction(Module &M,llvm::Function &F) {
     auto &FunctionList = M.getFunctionList();
     for (auto Iter = FunctionList.begin(), IterEnd = FunctionList.end();
          Iter != IterEnd; ++Iter) {
-      if (&*Iter == &F) {
+      if (&*Iter == F) {
         FunctionList.insertAfter(Iter, NewFunc);
         break;
       }
     }
-    return true;
+}
+
+bool isCalled(llvm::Function &F) {
+  for (auto &U : F.uses()) {
+    if (dyn_cast<CallInst>(U.getUser())) {
+      return true;
+    }
+  }
+  return false;  
 }
 
 PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
                                                      ModuleAnalysisManager &) {
   PreservedAnalyses PA;
-  SmallVector<Function *, 8> FuncsToDelete;
-  bool nextIsWrap = false;
-  for (auto &F : M.functions()) {
-    if (F.getCallingConv() == CallingConv::SPIR_KERNEL && !nextIsWrap) {
-        nextIsWrap = runOnFunction(M,F);
-    } else {
-        nextIsWrap = false;
+  SmallVector<Function *, 8> FuncsToInline;
+
+  for (auto &F : M.functions()){
+    if (F.getCallingConv() == CallingConv::SPIR_KERNEL && isCalled(F)) {
+      FuncsToInline.emplace_back(&F);
     }
+  }
+  for (unsigned i = 0; i < FuncsToInline.size(); ++i) {
+    runOnFunction(M,FuncsToInline[i]);
   } 
   return PA;
 }
