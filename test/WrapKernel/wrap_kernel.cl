@@ -1,7 +1,7 @@
-; RUN: clspv %s -o %t.spv 
-; RUN: spirv-dis -o %t2.spvasm %t.spv
-; RUN: FileCheck %s < %t2.spvasm
-; RUN: spirv-val %t.spv
+// ; RUN: clspv %s -o %t.spv 
+// ; RUN: spirv-dis -o %t2.spvasm %t.spv
+// ; RUN: FileCheck %s < %t2.spvasm
+// ; RUN: spirv-val %t.spv
 
 __attribute__((work_group_size_hint(1,1,1)))
 __attribute__((reqd_work_group_size(1,1,1)))
