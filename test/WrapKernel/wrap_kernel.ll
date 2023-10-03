@@ -48,16 +48,24 @@ entry:
 !18 = !{!"", !""}
 !19 = !{i32 1, i32 1, i32 1}
 
-; CHECK:define dso_local spir_func void @add.inner(ptr addrspace(1) align 4 %A, ptr addrspace(1) align 4 %B)
+; CHECK:define dso_local spir_func void @add.inner(ptr addrspace(1) align [[alignment:[0-9]*]] %A, ptr addrspace(1) align [[alignment]] %B)
 ; CHECK-NEXT: entry:
 ; CHECK: ret void
 
-; CHECK:  define dso_local spir_kernel void @add(ptr addrspace(1) align 4 %A, ptr addrspace(1) align 4 %B) !kernel_arg_addr_space !0 !kernel_arg_access_qual !1 !kernel_arg_type !2 !kernel_arg_base_type !2 !kernel_arg_type_qual !3 !work_group_size_hint !4 !reqd_work_group_size !4
+; CHECK:  define dso_local spir_kernel void @add(ptr addrspace(1) align [[alignment]] %A, ptr addrspace(1) align [[alignment]] %B) !kernel_arg_addr_space [[args_type:![0-9]*]] !kernel_arg_access_qual [[none:![0-9]*]] !kernel_arg_type [[ptr:![0-9]*]] !kernel_arg_base_type [[ptr]] !kernel_arg_type_qual [[empty:![0-9]*]] !work_group_size_hint [[work_group_hint:![0-9]*]] !reqd_work_group_size [[work_group_hint]]
 ; CHECK-NEXT: entry:
 ; CHECK-NEXT: call spir_func void @add.inner(ptr addrspace(1) %A, ptr addrspace(1) %B)
 ; CHECK: ret void
 
-; CHECK:  define dso_local spir_kernel void @main_kernel(ptr addrspace(1) align 4 %A, ptr addrspace(1) align 4 %B) !kernel_arg_addr_space !0 !kernel_arg_access_qual !1 !kernel_arg_type !2 !kernel_arg_base_type !2 !kernel_arg_type_qual !3
+; CHECK:  define dso_local spir_kernel void @main_kernel(ptr addrspace(1) align [[alignment]] %A, ptr addrspace(1) align [[alignment]] %B) !kernel_arg_addr_space [[args_type]] !kernel_arg_access_qual [[none]] !kernel_arg_type [[ptr]] !kernel_arg_base_type [[ptr]] !kernel_arg_type_qual [[empty]]
 ; CHECK-NEXT: entry:
-; CHECK: call spir_func void @add.inner(ptr addrspace(1) align 4 %0, ptr addrspace(1) align 4 %1)
+; CHECK-DAG: [[paramA:%[a-zA-A0-9_]+]] = load ptr addrspace(1), ptr %A.addr, align [[alignment]]
+; CHECK-DAG: [[paramB:%[a-zA-A0-9_]+]] = load ptr addrspace(1), ptr %B.addr, align [[alignment]]
+; CHECK: call spir_func void @add.inner(ptr addrspace(1) align [[alignment]] [[paramA]], ptr addrspace(1) align [[alignment]] [[paramB]])
 ; CHECK ret void
+
+; CHECK: [[args_type]] = !{i32 1, i32 1}
+; CHECK: [[none]] = !{!"none", !"none"}
+; CHECK: [[ptr]] = !{!"int*", !"int*"}
+; CHECK: [[empty]] = !{!"", !""}
+; CHECK: [[work_group_hint]] = !{i32 1, i32 1, i32 1}
