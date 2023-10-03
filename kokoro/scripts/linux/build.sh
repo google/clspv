@@ -23,7 +23,7 @@ set -x
 
 # Common tools.
 using cmake-3.26.3
-using gcc-9
+using gcc-13
 using ninja-1.10.0
 
 BUILD_ROOT=$PWD
@@ -35,7 +35,7 @@ cd $SRC
 mkdir build && cd $SRC/build
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-8.0.0
+  using clang-13.0.1
 fi
 
 echo $(date): Starting build...
