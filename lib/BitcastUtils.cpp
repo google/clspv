@@ -898,28 +898,16 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = st->getValueOperand()->getType();
   } else if (auto *phi = dyn_cast<PHINode>(&I)) {
-    if (phi->getNumIncomingValues() > 0) {
-      auto RefOp = phi->getIncomingValue(0);
-      auto RefOpTy = clspv::InferType(RefOp, M.getContext(), &type_cache);
-      for (unsigned i = 1; i < phi->getNumIncomingValues(); i++) {
+    auto RefTy = clspv::InferType(phi, M.getContext(), &type_cache);
+    if (RefTy) {
+      for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
         auto Op = phi->getIncomingValue(i);
         auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
-        if (OpTy && RefOpTy &&
-            SizeInBits(M.getDataLayout(), OpTy) >
-                SizeInBits(M.getDataLayout(), RefOpTy)) {
+        if (OpTy != RefTy) {
           source = Op;
           source_ty = OpTy;
-          dest_ty = RefOpTy;
-        } else if (OpTy && RefOpTy &&
-                   SizeInBits(M.getDataLayout(), OpTy) <
-                       SizeInBits(M.getDataLayout(), RefOpTy)) {
-          source = RefOp;
-          source_ty = RefOpTy;
-          dest_ty = OpTy;
-        } else if (OpTy != RefOpTy) {
-          source = Op;
-          source_ty = OpTy;
-          dest_ty = RefOpTy;
+          dest_ty = RefTy;
+          break;
         }
       }
     }

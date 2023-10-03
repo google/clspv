@@ -2,11 +2,12 @@
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[entry:[^:]+]]:
-; CHECK:   [[shl:%[^ ]+]] = shl i32 %i, 1
-; CHECK:   [[gep1:%[^ ]+]] = getelementptr i16, ptr %s1, i32 [[shl]]
+; CHECK:   [[shl:%[^ ]+]] = shl i32 %i, 2
+; CHECK:   [[gep1:%[^ ]+]] = getelementptr i8, ptr %s1, i32 [[shl]]
 ; CHECK:   br i1 %test, label %[[b0:[^,]+]], label %[[b1:[^ ]+]]
 ; CHECK: [[b0]]:
-; CHECK:   [[gep2:%[^ ]+]] = getelementptr i16, ptr %s2, i32 %i
+; CHECK:   [[shl:%[^ ]+]] = shl i32 %i, 1
+; CHECK:   [[gep2:%[^ ]+]] = getelementptr i8, ptr %s2, i32 [[shl]]
 ; CHECK:   br i1 %test, label %[[b1]], label %[[b2:[^ ]+]]
 ; CHECK: [[b1]]:
 ; CHECK:   [[phi1:%[^ ]+]] = phi ptr [ [[gep1]], %entry ], [ [[gep2]], %b0 ]

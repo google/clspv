@@ -800,7 +800,14 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
+  struct ImplicitGEPAliasing {
+    PHINode *phi;
+    int steps;
+    GetElementPtrInst *gep;
+  };
+
   DenseSet<GetElementPtrInst *> Seen;
+  SmallVector<ImplicitGEPAliasing> GEPAliasingList;
   SmallVector<std::pair<GetElementPtrInst *, Type *>> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
@@ -815,8 +822,21 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
         }
 
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
-          if (isa<PHINode>(&I) && !Seen.contains(gep)) {
-            Worklist.emplace_back(std::make_pair(gep, dest_ty));
+          if (Seen.contains(gep)) {
+            continue;
+          }
+          if (auto phi = dyn_cast<PHINode>(&I)) {
+
+            int Steps;
+            bool PerfectMatch;
+            if (FindAliasingContainedType(source_ty, dest_ty, Steps,
+                                          PerfectMatch, DL) &&
+                PerfectMatch) {
+              GEPAliasingList.push_back({phi, Steps, gep});
+            } else {
+
+              Worklist.emplace_back(std::make_pair(gep, dest_ty));
+            }
             Seen.insert(gep);
           }
         }
@@ -847,6 +867,30 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     changed = true;
   }
 
+  for (auto GEPInfo : GEPAliasingList) {
+    auto *phi = GEPInfo.phi;
+    auto Steps = GEPInfo.steps;
+    auto *gep = GEPInfo.gep;
+    IRBuilder<> B(gep);
+    SmallVector<Value *> Idxs;
+    for (int i = 0; i < Steps + 1; i++) {
+      Idxs.push_back(B.getInt32(0));
+    }
+    auto new_gep =
+        GetElementPtrInst::Create(gep->getResultElementType(), gep, Idxs, "",
+                                  gep->getNextNonDebugInstruction());
+    for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
+      if (phi->getIncomingValue(i) != gep) {
+        continue;
+      }
+      changed = true;
+      LLVM_DEBUG(dbgs() << "\n##runOnPHIFromGEPAliasing:\nreplace: ";
+                 gep->dump(); dbgs() << "by: "; new_gep->dump();
+                 dbgs() << "in: "; phi->dump());
+
+      phi->setIncomingValue(i, new_gep);
+    }
+  }
   return changed;
 }
 

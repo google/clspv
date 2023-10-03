@@ -68,6 +68,9 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
 Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
                   Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
                   size_t SmallerBitWidths) {
+  if (isa<AllocaInst>(Src) && !SrcTy->isArrayTy()) {
+    return Src;
+  }
   auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
       DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
       clspv::AddressSpace::Private);
