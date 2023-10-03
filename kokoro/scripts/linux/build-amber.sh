@@ -23,7 +23,7 @@ set -x
 
 # Common tools.
 using cmake-3.26.3
-using gcc-13
+using gcc-10
 using ninja-1.10.0
 
 BUILD_ROOT=$PWD
