@@ -430,14 +430,14 @@ int SetCompilerInstanceOptions(
   std::string includePrefix("include/");
 #endif
 
-  auto entry = instance.getFileManager().getVirtualFile(
+  auto entry = instance.getFileManager().getVirtualFileRef(
       includePrefix + "clspv-builtins.h",
       clspvBuiltinMemoryBuffer->getBufferSize(), 0);
 
   instance.getSourceManager().overrideFileContents(
       entry, std::move(clspvBuiltinMemoryBuffer));
 
-  auto base_entry = instance.getFileManager().getVirtualFile(
+  auto base_entry = instance.getFileManager().getVirtualFileRef(
       includePrefix + "opencl-c-base.h",
       openCLBaseBuiltinMemoryBuffer->getBufferSize(), 0);
 
