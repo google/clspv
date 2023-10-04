@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -28,8 +29,50 @@ clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
   // Run after isolateContinue since this can invalidate loop info.
   breakConditionalHeader(F, FAM);
 
+  removeUndefPHI(F);
+
   PreservedAnalyses PA;
   return PA;
+}
+
+void clspv::FixupStructuredCFGPass::removeUndefPHI(Function &F) {
+  SmallVector<PHINode *> ToBeDeleted;
+  DenseMap<PHINode *, SmallVector<PHINode *>> dict;
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      if (auto phi = dyn_cast<PHINode>(&I)) {
+        if (!phi->getType()->isPointerTy()) {
+          continue;
+        }
+        bool phiIsUndef = true;
+        for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
+          auto Val = phi->getIncomingValue(i);
+          if (auto phi2 = dyn_cast<PHINode>(Val)) {
+            for (unsigned j = 0; j < phi2->getNumIncomingValues(); j++) {
+              auto Val2 = phi2->getIncomingValue(i);
+              if (auto phi3 = dyn_cast<PHINode>(Val2)) {
+                if (phi3 != phi) {
+                  phiIsUndef = false;
+                }
+              } else if (!isa<UndefValue>(Val2)) {
+                phiIsUndef = false;
+              }
+            }
+          } else if (!isa<UndefValue>(Val)) {
+            phiIsUndef = false;
+          }
+        }
+        if (!phiIsUndef) {
+          continue;
+        }
+        phi->replaceAllUsesWith(UndefValue::get(phi->getType()));
+        ToBeDeleted.push_back(phi);
+      }
+    }
+  }
+  for (auto phi : ToBeDeleted) {
+    phi->eraseFromParent();
+  }
 }
 
 void clspv::FixupStructuredCFGPass::breakConditionalHeader(

@@ -24,6 +24,7 @@ struct FixupStructuredCFGPass : llvm::PassInfoMixin<FixupStructuredCFGPass> {
                               llvm::FunctionAnalysisManager &FAM);
 
 private:
+  void removeUndefPHI(llvm::Function &F);
   void breakConditionalHeader(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
   void isolateContinue(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
 
