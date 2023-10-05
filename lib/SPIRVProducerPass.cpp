@@ -29,6 +29,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/UniqueVector.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -561,6 +562,11 @@ struct SPIRVProducerPassImpl {
     SPIRVOperandVec Ops;
     Ops.emplace_back(LITERAL_STRING, V);
     return addSPIRVInst<TSection>(Op, Ops);
+  }
+
+  void addSPIRVLabel(const SPIRVID &RID) {
+    SPIRVOperandVec Ops;
+    SPIRVSections[kFunctions].emplace_back(spv::OpLabel, RID, Ops);
   }
 
   //
@@ -2324,7 +2330,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
     Fn->print(errs());
     llvm_unreachable("Unhandled function declaration/definition");
- } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
+  } else if (auto *ConstExpr = dyn_cast<ConstantExpr>(Cst)) {
     // If there is exactly one use we know where to insert the instruction
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
@@ -3449,7 +3455,6 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVBinaryOpcode(Instruction &I) {
       {Instruction::SDiv, spv::OpSDiv},
       {Instruction::FDiv, spv::OpFDiv},
       {Instruction::URem, spv::OpUMod},
-      {Instruction::FRem, spv::OpFRem},
       {Instruction::Or, spv::OpBitwiseOr},
       {Instruction::Xor, spv::OpBitwiseXor},
       {Instruction::And, spv::OpBitwiseAnd},
@@ -5595,6 +5600,383 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       RID = addSPIRVInst(spv::OpReturnValue, Ops);
       break;
     }
+    break;
+  }
+  case Instruction::FRem: {
+    //
+    // Generate Frem function based on the source
+    // https://github.com/llvm/llvm-project/blob/main/libc/src/__support/FPUtil/generic/FMod.h
+    //
+    auto &Ctx = module->getContext();
+    DeferredInstVecType &DeferredInsts = getDeferredInstVec();
+
+    auto Op0 = I.getOperand(0);
+    auto Op1 = I.getOperand(1);
+
+    // Create Types
+    int vecSize = 1;
+    auto FloatTy = Op0->getType();
+    auto FloatScalarTy = FloatTy;
+    llvm::Type *IntScalarTy =
+        Type::getIntNTy(Ctx, Op0->getType()->getScalarSizeInBits());
+    llvm::Type *IntTy = IntScalarTy;
+
+    auto spvBoolScalarTy =
+        getSPIRVType(Type::getInt1Ty(Ctx));    // %55 = OpTypeBool
+    auto spvBoolTy = spvBoolScalarTy;          // %55_v = OpTypeVector %55 n
+    auto spvFloatTy = getSPIRVType(FloatTy);   // %14_v = OpTypeVector %14 n
+    auto spvIntScalarTy = getSPIRVType(IntTy); // %1 = OpTypeInt 32 0
+    if (FloatTy->isVectorTy()) {
+      auto vecTy = dyn_cast<FixedVectorType>(FloatTy);
+      IntTy = VectorType::get(IntTy, vecTy);
+      FloatScalarTy = vecTy->getElementType();
+      spvBoolTy = getSPIRVType(
+          VectorType::get(Type::getInt1Ty(Ctx), dyn_cast<VectorType>(FloatTy)));
+      vecSize = vecTy->getNumElements();
+    }
+    auto spvFloatScalarTy = getSPIRVType(FloatScalarTy);
+    auto spvIntTy = getSPIRVType(IntTy); // %1 = OpTypeVector %1 n
+
+    // Create Constants
+    const llvm::fltSemantics &Semantics =
+        FloatTy->getScalarType()->getFltSemantics();
+    const uint64_t precision = APFloat::semanticsPrecision(Semantics);
+    const uint64_t sizeInBits = APFloat::semanticsSizeInBits(Semantics);
+    const uint64_t MANTISSA_WIDTH_CONST = precision - 1; //          23
+    const uint64_t MANTISSA_MASK_CONST =
+        (1UL << MANTISSA_WIDTH_CONST) - 1;                    // 0x007F'FFFF
+    const uint64_t SIGN_MASK_CONST = 1UL << (sizeInBits - 1); // 0x8000'0000
+    const uint64_t EXPONENT_MASK_CONST =
+        SIGN_MASK_CONST - MANTISSA_MASK_CONST - 1; // 0x7F80'0000
+    const uint64_t EXP_MANT_MASK_CONST =
+        EXPONENT_MASK_CONST | MANTISSA_MASK_CONST; // 0x7FFF'FFFF
+    const uint64_t SIGN_MANT_MASK_CONST =
+        SIGN_MASK_CONST | MANTISSA_MASK_CONST; // 0x807F'FFFF
+    const uint64_t EXPONENT_FIX_CONST =
+        EXPONENT_MASK_CONST - (SIGN_MASK_CONST >> 1); // 0x3F80'0000
+    const uint64_t NEG_FIX_MASK_CONST =
+        SIGN_MASK_CONST | (1UL << MANTISSA_WIDTH_CONST); // 0x8080'0000
+    const uint64_t POS_FIX_MASK_CONST =
+        (EXPONENT_MASK_CONST - (1UL << MANTISSA_WIDTH_CONST)) |
+        MANTISSA_MASK_CONST; // 0x7F7F'FFFF
+
+    /*
+      %63 = OpConstant %14 0.0f
+      %100 = OpConstant %14 NAN
+      %69 = OpConstant %1 1
+      %26 = OpConstant %1 0
+      %40 = OpConstant %1 2'147'483'647
+      %42 = OpConstant %1            23
+      %46 = OpConstant %1     8,388'607
+      %48 = OpConstant %1 1'065'353'216
+      %77 = OpConstant %1 2'147'483'648
+      %83 = OpConstant %1 2'139,095'040
+      %93 = OpConstant %1 2'139'095'039
+      %95 = OpConstant %1 -2'139'095'041
+      %97 = OpConstant %1 -2'139'095'040
+    */
+    const auto ZERO_SCALAR_FLOAT =
+        getSPIRVConstant(ConstantFP::getZero(FloatScalarTy));
+    const auto ZERO_FLOAT = getSPIRVConstant(ConstantFP::getZero(FloatTy));
+    const auto QNAN_FLOAT = getSPIRVConstant(ConstantFP::getQNaN(FloatTy));
+    const auto ONE_INT = getSPIRVConstant(ConstantInt::get(IntScalarTy, 1));
+    const auto ZERO_INT = getSPIRVConstant(ConstantInt::get(IntTy, 0));
+    const auto EXP_MANT_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, EXP_MANT_MASK_CONST));
+    const auto MANTISSA_WIDTH =
+        getSPIRVConstant(ConstantInt::get(IntTy, MANTISSA_WIDTH_CONST));
+    const auto MANTISSA_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, MANTISSA_MASK_CONST));
+    const auto EXPONENT_FIX =
+        getSPIRVConstant(ConstantInt::get(IntTy, EXPONENT_FIX_CONST));
+    const auto SIGN_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, SIGN_MASK_CONST));
+    const auto EXPONENT_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, EXPONENT_MASK_CONST));
+    const auto POS_FIX_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, POS_FIX_MASK_CONST));
+    const auto SIGN_MANT_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, SIGN_MANT_MASK_CONST));
+    const auto NEG_FIX_MASK =
+        getSPIRVConstant(ConstantInt::get(IntTy, NEG_FIX_MASK_CONST));
+
+    SPIRVID lblMain = incrNextID();
+    SPIRVID tmp;
+
+    // OpBranch %24
+    // %24 = OpLabel
+    SPIRVOperandVec Ops;
+    addSPIRVInst(spv::OpBranch, Ops << lblMain);
+    Ops.clear();
+    addSPIRVLabel(lblMain);
+
+    /*
+      %36 = OpBitcast %1 %35
+      %41 = OpBitwiseAnd %1 %36 %40
+      %43 = OpShiftRightLogical %1 %41 %42
+    */
+    auto Op0Int = addSPIRVInst(spv::OpBitcast, Ops << spvIntTy << Op0);
+    Ops.clear();
+    auto Op0Unint = addSPIRVInst(spv::OpBitwiseAnd,
+                                 Ops << spvIntTy << Op0Int << EXP_MANT_MASK);
+    Ops.clear();
+    auto Op0Exp = addSPIRVInst(spv::OpShiftRightLogical,
+                               Ops << spvIntTy << Op0Unint << MANTISSA_WIDTH);
+    Ops.clear();
+
+    /*
+      %39 = OpBitcast %1 %38
+      %44 = OpBitwiseAnd %1 %39 %40
+      %45 = OpShiftRightLogical %1 %44 %42
+    */
+    auto Op1Int = addSPIRVInst(spv::OpBitcast, Ops << spvIntTy << Op1);
+    Ops.clear();
+    auto Op1Unint = addSPIRVInst(spv::OpBitwiseAnd,
+                                 Ops << spvIntTy << Op1Int << EXP_MANT_MASK);
+    Ops.clear();
+    auto Op1Exp = addSPIRVInst(spv::OpShiftRightLogical,
+                               Ops << spvIntTy << Op1Unint << MANTISSA_WIDTH);
+    Ops.clear();
+
+    /*
+      %47 = OpBitwiseAnd %1 %36 %46
+      %49 = OpBitwiseOr %1 %47 %48
+      %50 = OpBitcast %14 %49
+    */
+    auto Op0Mantissa = addSPIRVInst(spv::OpBitwiseAnd,
+                                    Ops << spvIntTy << Op0Int << MANTISSA_MASK);
+    Ops.clear();
+    auto Op0UnintFixed = addSPIRVInst(
+        spv::OpBitwiseOr, Ops << spvIntTy << Op0Mantissa << EXPONENT_FIX);
+    Ops.clear();
+    auto Op0Float =
+        addSPIRVInst(spv::OpBitcast, Ops << spvFloatTy << Op0UnintFixed);
+    Ops.clear();
+
+    /*
+      %51 = OpBitwiseAnd %1 %39 %46
+      %52 = OpBitwiseOr %1 %51 %48
+      %53 = OpBitcast %14 %52
+    */
+    auto Op1Mantissa = addSPIRVInst(spv::OpBitwiseAnd,
+                                    Ops << spvIntTy << Op1Int << MANTISSA_MASK);
+    Ops.clear();
+    auto Op1UnintFixed = addSPIRVInst(
+        spv::OpBitwiseOr, Ops << spvIntTy << Op1Mantissa << EXPONENT_FIX);
+    Ops.clear();
+    auto Op1Float =
+        addSPIRVInst(spv::OpBitcast, Ops << spvFloatTy << Op1UnintFixed);
+    Ops.clear();
+
+    /*
+      %54 = OpISub %1 %43 %45
+      %56 = OpSGreaterThan %55 %54 %26
+    */
+    auto deltaExp =
+        addSPIRVInst(spv::OpISub, Ops << spvIntTy << Op0Exp << Op1Exp);
+    Ops.clear();
+    auto r56 = addSPIRVInst(spv::OpSGreaterThan,
+                            Ops << spvBoolTy << deltaExp << ZERO_INT);
+    Ops.clear();
+
+    SPIRVID r76;
+    for (int i = 0; i < vecSize; i++) {
+      auto lblLoop = incrNextID();
+      auto lblMerge = incrNextID();
+      auto lblExit = incrNextID();
+
+      SPIRVID loopDeltaExp;
+      SPIRVID loopOp0Float;
+      SPIRVID loopOp1Float;
+      if (vecSize > 1) {
+        loopDeltaExp = addSPIRVInst(spv::OpCompositeExtract,
+                                    Ops << spvIntScalarTy << deltaExp << i);
+        Ops.clear();
+        loopOp0Float = addSPIRVInst(spv::OpCompositeExtract,
+                                    Ops << spvFloatScalarTy << Op0Float << i);
+        Ops.clear();
+        loopOp1Float = addSPIRVInst(spv::OpCompositeExtract,
+                                    Ops << spvFloatScalarTy << Op1Float << i);
+        Ops.clear();
+        tmp = addSPIRVInst(spv::OpCompositeExtract,
+                           Ops << spvBoolScalarTy << r56 << i);
+        Ops.clear();
+      } else {
+        loopDeltaExp = deltaExp;
+        loopOp0Float = Op0Float;
+        loopOp1Float = Op1Float;
+        tmp = r56;
+      }
+
+      /*
+        OpSelectionMerge %75 None
+        OpBranchConditional %56 %59 %75
+      */
+      addSPIRVInst(spv::OpSelectionMerge,
+                   Ops << lblExit << spv::SelectionControlMaskNone);
+      Ops.clear();
+      addSPIRVInst(spv::OpBranchConditional, Ops << tmp << lblLoop << lblExit);
+      Ops.clear();
+
+      /*
+        %59 = OpLabel
+        %60 = OpPhi %14 (%66 : %59) (%50 : %24)
+        %61 = OpPhi %1 (%68 : %59) (%54 : %24)
+        %62 = OpFOrdGreaterThanEqual %55 %60 %53
+        %64 = OpSelect %14 %62 %53 %63 //0.000000e+00
+        %65 = OpFSub %14 %60 %64
+        %66 = OpFAdd %14 %65 %65
+        %68 = OpISub %1 %61 %69
+        %70 = OpULessThanEqual %55 %61 %69
+        OpLoopMerge %73(75) %59 None
+        OpBranchConditional %70 %73(75) %59
+      */
+      addSPIRVLabel(lblLoop);
+      auto r60 = addSPIRVPlaceholder(nullptr);
+      auto r61 = addSPIRVPlaceholder(nullptr);
+      tmp = addSPIRVInst(spv::OpFOrdGreaterThanEqual,
+                         Ops << spvBoolScalarTy << r60 << loopOp1Float);
+      Ops.clear();
+      tmp =
+          addSPIRVInst(spv::OpSelect, Ops << spvFloatScalarTy << tmp
+                                          << loopOp1Float << ZERO_SCALAR_FLOAT);
+      Ops.clear();
+      tmp = addSPIRVInst(spv::OpFSub, Ops << spvFloatScalarTy << r60 << tmp);
+      Ops.clear();
+      auto r66 =
+          addSPIRVInst(spv::OpFAdd, Ops << spvFloatScalarTy << tmp << tmp);
+      Ops.clear();
+      tmp = addSPIRVInst(spv::OpISub, Ops << spvIntScalarTy << r61 << ONE_INT);
+      Ops.clear();
+      replaceSPIRVInst(DeferredInsts.back().second, spv::OpPhi,
+                       Ops << spvIntScalarTy << tmp << lblLoop << loopDeltaExp
+                           << lblMain);
+      Ops.clear();
+      DeferredInsts.pop_back();
+
+      auto r70 = addSPIRVInst(spv::OpULessThanEqual,
+                              Ops << spvBoolScalarTy << r61 << ONE_INT);
+      Ops.clear();
+
+      replaceSPIRVInst(DeferredInsts.back().second, spv::OpPhi,
+                       Ops << spvFloatScalarTy << r66 << lblLoop << loopOp0Float
+                           << lblMain);
+      Ops.clear();
+      DeferredInsts.pop_back();
+
+      addSPIRVInst(spv::OpLoopMerge,
+                   Ops << lblMerge << lblLoop << spv::LoopControlMaskNone);
+      Ops.clear();
+      addSPIRVInst(spv::OpBranchConditional, Ops << r70 << lblMerge << lblLoop);
+      Ops.clear();
+
+      /*
+        %24 = OpLabel
+        OpBranch %24
+      */
+      addSPIRVLabel(lblMerge);
+      addSPIRVInst(spv::OpBranch, Ops << lblExit);
+      Ops.clear();
+
+      /*
+        %75 = OpLabel
+        %76 = OpPhi %14 (%50 : %24) (%66 : %73)
+      */
+      addSPIRVLabel(lblExit);
+      r76 = addSPIRVInst(spv::OpPhi, Ops << spvFloatScalarTy << loopOp0Float
+                                         << lblMain << r66 << lblMerge);
+      Ops.clear();
+      if (vecSize > 1) {
+        r76 = addSPIRVInst(spv::OpCompositeInsert,
+                           Ops << FloatTy << r76 << Op0Float << i);
+        Ops.clear();
+        Op0Float = r76;
+        lblMain = lblExit;
+      }
+    }
+
+    /*
+      %78 = OpBitwiseAnd %1 %36 %77
+      %79 = OpFOrdGreaterThanEqual %55 %76 %53
+      %80 = OpSelect %14 %79 %53 %63
+      %81 = OpFSub %14 %76 %80
+    */
+    auto r78 =
+        addSPIRVInst(spv::OpBitwiseAnd, Ops << spvIntTy << Op0Int << SIGN_MASK);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpFOrdGreaterThanEqual,
+                       Ops << spvBoolTy << r76 << Op1Float);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpSelect,
+                       Ops << spvFloatTy << tmp << Op1Float << ZERO_FLOAT);
+    Ops.clear();
+    auto r81 = addSPIRVInst(spv::OpFSub, Ops << spvFloatTy << r76 << tmp);
+    Ops.clear();
+
+    /*
+      %82 = OpULessThan %55 %43 %45
+      %84 = OpBitwiseAnd %1 %39 %83
+      %85 = OpBitcast %14 %84
+      %86 = OpFMul %14 %81 %85
+    */
+    auto r82 =
+        addSPIRVInst(spv::OpULessThan, Ops << spvBoolTy << Op0Exp << Op1Exp);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpBitwiseAnd,
+                       Ops << spvIntTy << Op1Int << EXPONENT_MASK);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpBitcast, Ops << spvFloatTy << tmp);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpFMul, Ops << spvFloatTy << r81 << tmp);
+    Ops.clear();
+
+    /*
+      %88 = OpBitcast %1 %86
+      %87 = OpIEqual %55 %41 %44
+    */
+    tmp = addSPIRVInst(spv::OpBitcast, Ops << spvIntTy << tmp);
+    Ops.clear();
+    auto r87 =
+        addSPIRVInst(spv::OpIEqual, Ops << spvBoolTy << Op0Unint << Op1Unint);
+    Ops.clear();
+
+    /*
+      %89 = OpSelect %1 %82 %41 %88
+      %90 = OpSelect %1 %87 %26 %89
+      %91 = OpBitwiseXor %1 %90 %78
+      %92 = OpBitcast %14 %91
+    */
+    tmp =
+        addSPIRVInst(spv::OpSelect, Ops << spvIntTy << r82 << Op0Unint << tmp);
+    Ops.clear();
+    tmp =
+        addSPIRVInst(spv::OpSelect, Ops << spvIntTy << r87 << ZERO_INT << tmp);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpBitwiseXor, Ops << spvIntTy << tmp << r78);
+    Ops.clear();
+    auto r92 = addSPIRVInst(spv::OpBitcast, Ops << spvFloatTy << tmp);
+    Ops.clear();
+
+    /*
+      %94 = OpUGreaterThan %55 %41 %93
+      %96 = OpIAdd %1 %44 %95
+      %98 = OpULessThan %55 %96 %97
+      %99 = OpLogicalOr %55 %94 %98
+      %101 = OpSelect %14 %99 %100 %92
+    */
+    auto r94 = addSPIRVInst(spv::OpUGreaterThan,
+                            Ops << spvBoolTy << Op0Unint << POS_FIX_MASK);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpIAdd,
+                       Ops << spvIntTy << Op1Unint << SIGN_MANT_MASK);
+    Ops.clear();
+    tmp =
+        addSPIRVInst(spv::OpULessThan, Ops << spvBoolTy << tmp << NEG_FIX_MASK);
+    Ops.clear();
+    tmp = addSPIRVInst(spv::OpLogicalOr, Ops << spvBoolTy << r94 << tmp);
+    Ops.clear();
+    RID = addSPIRVInst(spv::OpSelect,
+                       Ops << spvFloatTy << tmp << QNAN_FLOAT << r92);
     break;
   }
   }
