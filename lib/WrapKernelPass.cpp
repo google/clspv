@@ -76,15 +76,15 @@ bool isCalled(llvm::Function &F) {
 PreservedAnalyses clspv::WrapKernelPass::run(llvm::Module &M,
                                              ModuleAnalysisManager &) {
   PreservedAnalyses PA;
-  SmallVector<Function *, 8> FuncsToInline;
+  SmallVector<Function *, 8> FuncsToWrap;
 
   for (auto &F : M.functions()) {
     if (F.getCallingConv() == CallingConv::SPIR_KERNEL && isCalled(F)) {
-      FuncsToInline.emplace_back(&F);
+      FuncsToWrap.emplace_back(&F);
     }
   }
-  for (unsigned i = 0; i < FuncsToInline.size(); ++i) {
-    runOnFunction(M, FuncsToInline[i]);
+  for (unsigned i = 0; i < FuncsToWrap.size(); ++i) {
+    runOnFunction(M, FuncsToWrap[i]);
   }
   return PA;
 }

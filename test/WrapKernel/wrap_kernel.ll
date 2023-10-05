@@ -11,7 +11,8 @@ entry:
   %i = alloca i32, align 4
   store ptr addrspace(1) %A, ptr %A.addr, align 4
   store ptr addrspace(1) %B, ptr %B.addr, align 4
-  store i32 0, ptr %i, align 4  ret void
+  store i32 0, ptr %i, align 4  
+  ret void
 }
 
 define dso_local spir_kernel void @main_kernel(ptr addrspace(1) align 4 %A, ptr addrspace(1) align 4 %B) #2 !kernel_arg_addr_space !15 !kernel_arg_access_qual !16 !kernel_arg_type !17 !kernel_arg_base_type !17 !kernel_arg_type_qual !18 {
