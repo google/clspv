@@ -34,16 +34,16 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[cx3]]
 // CHECK: OpStore [[addr1]] [[val1i16]]
 
-// CHECK-64: [[idx1:%[^ ]+]] = OpIAdd [[ulong]] [[cx3]] [[ulong1]]
-// CHECK-32: [[idx1:%[^ ]+]] = OpIAdd [[uint]] [[cx3]] [[uint1]]
 // CHECK: [[val2i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val2i16:%[^ ]+]] = OpUConvert [[ushort]] [[val2i32]]
+// CHECK-64: [[idx1:%[^ ]+]] = OpIAdd [[ulong]] [[cx3]] [[ulong1]]
+// CHECK-32: [[idx1:%[^ ]+]] = OpIAdd [[uint]] [[cx3]] [[uint1]]
 // CHECK: [[addr2:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx1]]
 // CHECK: OpStore [[addr2]] [[val2i16]]
 
-// CHECK-64: [[idx2:%[^ ]+]] = OpIAdd [[ulong]] [[cx3]] [[ulong2]]
-// CHECK-32: [[idx2:%[^ ]+]] = OpIAdd [[uint]] [[cx3]] [[uint2]]
 // CHECK: [[val3i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val3i16:%[^ ]+]] = OpUConvert [[ushort]] [[val3i32]]
+// CHECK-64: [[idx2:%[^ ]+]] = OpIAdd [[ulong]] [[cx3]] [[ulong2]]
+// CHECK-32: [[idx2:%[^ ]+]] = OpIAdd [[uint]] [[cx3]] [[uint2]]
 // CHECK: [[addr3:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx2]]
 // CHECK: OpStore [[addr3]] [[val3i16]]
