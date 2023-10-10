@@ -895,6 +895,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (clspv::Option::PhysicalStorageBuffers() &&
+      clspv::Option::ConstantArgsInUniformBuffer()) {
+    llvm::errs() << "error: -physical-storage-buffers and -constant-args-ubo "
+                    "are incompatible\n";
+    return -1;
+  }
+
   return 0;
 }
 
