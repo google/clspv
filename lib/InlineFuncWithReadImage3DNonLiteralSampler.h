@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
-#include "llvm/IR/Instructions.h"
 
 #ifndef _CLSPV_LIB_INLINE_READ_IMAGE3D_NON_LITERAL_SAMPLER_H
 #define _CLSPV_LIB_INLINE_READ_IMAGE3D_NON_LITERAL_SAMPLER_H

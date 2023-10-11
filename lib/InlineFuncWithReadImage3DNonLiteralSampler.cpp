@@ -26,8 +26,8 @@ using namespace llvm;
 
 #define DEBUG_TYPE "inlinefuncwithreadimage3dnonliteralsamplerpass"
 
-PreservedAnalyses
-clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass::run(Module &M, ModuleAnalysisManager &) {
+PreservedAnalyses clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass::run(
+    Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
 
   // Loop through our inline pass until they stop changing thing.
@@ -70,7 +70,8 @@ static bool FunctionContainsReadImageWithSampler(Function &F) {
   return false;
 }
 
-bool clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass::InlineFunctions(Module &M) {
+bool clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass::InlineFunctions(
+    Module &M) {
   bool Changed = false;
 
   UniqueVector<CallInst *> WorkList;
