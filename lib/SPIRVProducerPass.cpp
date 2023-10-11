@@ -825,7 +825,7 @@ void SPIRVProducerPassImpl::ReadFunctionAttributes() {
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
   // We do not wish to deal with any constexpr
-  for (auto &F : M) {
+  for (auto &F : M.functions()) {
     BitcastUtils::RemoveCstExprFromFunction(&F);
   }
   SPIRVProducerPassImpl impl(out, outputCInitList, MAM);
