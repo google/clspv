@@ -824,6 +824,10 @@ void SPIRVProducerPassImpl::ReadFunctionAttributes() {
 
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
+  // We do not wish to deal with any constexpr
+  for (auto &F : M) {
+    BitcastUtils::RemoveCstExprFromFunction(&F);
+  }
   SPIRVProducerPassImpl impl(out, outputCInitList, MAM);
   impl.runOnModule(M);
   PreservedAnalyses PA;
@@ -831,6 +835,7 @@ PreservedAnalyses SPIRVProducerPass::run(Module &M,
 }
 
 bool SPIRVProducerPassImpl::runOnModule(Module &M) {
+
   // TODO(sjw): Need to reset all data members for each Module, or better
   // yet create a new SPIRVProducer for every module.. For now only
   // allow 1 call.
@@ -2286,9 +2291,22 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     Ops << LiteralNum;
   } else if (isa<ConstantDataSequential>(Cst) &&
              cast<ConstantDataSequential>(Cst)->isString()) {
-    Cst->print(errs());
-    llvm_unreachable("Implement this Constant");
+    // Let's convert the constant to int constant specially.
+    // This case occurs when all the values are specified as constant
+    // ints.
+    const ConstantDataSequential *CDS =
+                 dyn_cast<ConstantDataSequential>(Cst);
+    //
+    // Generate OpConstant with OpTypeInt 32 0.
+    //
+    uint32_t IntValue = 0;
+    for (unsigned k = 0; k < CDS->getNumElements(); k++) {
+      const uint64_t Val = CDS->getElementAsInteger(k);
+      IntValue = (IntValue << 8) | (Val & 0xffu);
+    }
 
+    RID = getSPIRVInt32Constant(IntValue);
+    
   } else if (const ConstantDataSequential *CDS =
                  dyn_cast<ConstantDataSequential>(Cst)) {
     // Let's convert <4 x i8> constant to int constant specially.
@@ -2314,8 +2332,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       }
 
       Opcode = spv::OpConstantComposite;
-    } else {
-      return getSPIRVValue(CDS->getElementAsConstant(0));
     }
   } else if (const ConstantAggregate *CA = dyn_cast<ConstantAggregate>(Cst)) {
     // Let's convert <4 x i8> constant to int constant specially.
