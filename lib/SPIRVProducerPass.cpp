@@ -3673,7 +3673,6 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
         Call->getMetadata(clspv::SamplerMaskPushConstantOffsetName())
             ->getOperand(0)));
     auto i32 = IntegerType::get(module->getContext(), 32);
-    auto i1 = IntegerType::get(module->getContext(), 1);
 
     SPIRVOperandVec Ops;
     Ops << getSPIRVPointerType(
