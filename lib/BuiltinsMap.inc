@@ -1117,7 +1117,7 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"clspv.sampler_var_literal", Builtins::kClspvSamplerVarLiteral},
         {"clspv.composite_construct", Builtins::kClspvCompositeConstruct},
 
-        {"clspv.get_image_sizes", Builtins::kClspvGetImageSizes},
+        {"clspv.get_normalized_sampler_mask", Builtins::kClspvGetNormalizedSamplerMask},
 };
 
 #endif // CLSPV_LIB_BUILTINSMAP_INC_

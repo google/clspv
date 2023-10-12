@@ -602,6 +602,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
     pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
+    pm.addPass(clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass());
 
     if (clspv::Option::HackLogicalPtrtoint()) {
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
@@ -734,9 +735,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // DataLayout anymore so leave this right before SPIR-V generation.
     pm.addPass(clspv::UBOTypeTransformPass());
 
-    // This pass depends on the inlining of the image metadata getter from
-    // InlineFuncWithImageMetadataGetterPass
-    pm.addPass(clspv::SetImageChannelMetadataPass());
+    // This pass depends on the inlining of the image metadata from
+    // InlineFuncWithImageMetadataGetterPass and
+    // InlineFuncWithReadImage3DNonLiteralSamplerPass
+    pm.addPass(clspv::SetImageMetadataPass());
 
     // This is needed to remove long vectors created by SROA passes. Especially
     // with vstore_half, which tends to always recreate long vectors after the

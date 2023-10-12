@@ -55,6 +55,8 @@ const char *GetPushConstantName(PushConstant pc) {
     return "module_constants_pointer";
   case PushConstant::PrintfBufferPointer:
     return "printf_buffer_pointer";
+  case PushConstant::NormalizedSamplerMask:
+    return "normalized_sampler_mask";
   }
   llvm_unreachable("Unknown PushConstant in GetPushConstantName");
   return "";
@@ -82,6 +84,8 @@ Type *GetPushConstantType(Module &M, PushConstant pc) {
   case PushConstant::ModuleConstantsPointer:
     return IntegerType::get(C, 64);
   case PushConstant::PrintfBufferPointer:
+    return IntegerType::get(C, 64);
+  case PushConstant::NormalizedSamplerMask:
     return IntegerType::get(C, 64);
   default:
     break;

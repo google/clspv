@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _CLSPV_SAMPLER_UTILS_H
-#define _CLSPV_SAMPLER_UTILS_H
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Value.h"
+#ifndef _CLSPV_LIB_INLINE_READ_IMAGE3D_NON_LITERAL_SAMPLER_H
+#define _CLSPV_LIB_INLINE_READ_IMAGE3D_NON_LITERAL_SAMPLER_H
 
 namespace clspv {
 
-llvm::Value *GetImageDimFP(llvm::Module &M, llvm::IRBuilder<> &B,
-                           llvm::Value *Img, llvm::Type *ImgTy);
+struct InlineFuncWithReadImage3DNonLiteralSamplerPass
+    : llvm::PassInfoMixin<InlineFuncWithReadImage3DNonLiteralSamplerPass> {
+  llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
-llvm::Value *NormalizedCoordinate(llvm::Module &M, llvm::IRBuilder<> &B,
-                                  llvm::Value *Coord, llvm::Value *ImgDimFP,
-                                  bool FilteringNearest);
-
-bool isReadImage3DWithNonLiteralSampler(llvm::CallInst *call);
-
+  bool InlineFunctions(llvm::Module &M);
+};
 } // namespace clspv
 
-#endif
+#endif // _CLSPV_LIB_INLINE_READ_IMAGE3D_NON_LITERAL_SAMPLER_H

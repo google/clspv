@@ -3,8 +3,11 @@
 
 ; CHECK:  [[sampler:%[^ ]+]] = call target("spirv.Sampler") @__translate_sampler_initializer(i32 21)
 ; CHECK:  [[convert:%[^ ]+]] = sitofp <4 x i32> <i32 2, i32 3, i32 4, i32 5> to <4 x float>
-; CHECK:  [[sizes:%[^ ]+]] = call <4 x float> @clspv.get_image_sizes(target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) %img)
-; CHECK:  [[div:%[^ ]+]] = fdiv <4 x float> [[convert]], [[sizes]]
+; CHECK:  [[sizes:%[^ ]+]] = call <4 x i32> @_Z13get_image_dim11ocl_image3d(target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) %img)
+; CHECK:  [[sizes_convert:%[^ ]+]] = sitofp <4 x i32> [[sizes]] to <4 x float>
+; CHECK:  [[floor:%[^ ]+]] = call <4 x float> @floor(<4 x float> [[convert]])
+; CHECK:  [[add:%[^ ]+]] = fadd <4 x float> [[floor]], <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>
+; CHECK:  [[div:%[^ ]+]] = fdiv <4 x float> [[add]], [[sizes_convert]]
 ; CHECK:  call <4 x float> @_Z11read_imagef14ocl_image3d_ro11ocl_samplerDv4_f(target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) %img, target("spirv.Sampler") [[sampler]], <4 x float> [[div]])
 
 

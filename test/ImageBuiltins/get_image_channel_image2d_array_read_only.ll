@@ -1,5 +1,5 @@
 
-; RUN: clspv-opt %s -o %t.ll --passes=set-image-channel-metadata
+; RUN: clspv-opt %s -o %t.ll --passes=set-image-metadata
 ; RUN: FileCheck %s < %t.ll
 
 ; AUTO-GENERATED TEST FILE

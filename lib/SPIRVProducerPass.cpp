@@ -3667,35 +3667,25 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     }
     break;
   }
-  case Builtins::kClspvGetImageSizes: {
-    addCapability(spv::CapabilityImageQuery);
-    Value *Image = Call->getArgOperand(0);
-    auto *ImageTy = InferType(Image, module->getContext(), &InferredTypeCache);
-    if (ImageDimensionality(ImageTy) != spv::Dim3D ||
-        !IsSampledImageType(ImageTy)) {
-      llvm_unreachable("Unexpected Image in Builtins::kClspvGetImageSizes");
-    }
+  case Builtins::kClspvGetNormalizedSamplerMask: {
+    auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
+    auto offset = getSPIRVValue(mdconst::extract<ConstantInt>(
+        Call->getMetadata(clspv::SamplerMaskPushConstantOffsetName())
+            ->getOperand(0)));
+    auto i32 = IntegerType::get(module->getContext(), 32);
 
     SPIRVOperandVec Ops;
-
-    Ops << getSPIRVType(
-               FixedVectorType::get(Type::getInt32Ty(module->getContext()), 3))
-        << Image << getSPIRVInt32Constant(0);
-    RID = addSPIRVInst(spv::OpImageQuerySizeLod, Ops);
-
-    Ops.clear();
-    auto int4Ty =
-        FixedVectorType::get(Type::getInt32Ty(module->getContext()), 4);
-    Ops << getSPIRVType(int4Ty) << RID
-        << getSPIRVConstant(ConstantInt::get(int4Ty, (uint64_t)1)) << 0 << 1
-        << 2 << 4;
-    RID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+    Ops << getSPIRVPointerType(
+               PointerType::get(i32, GV->getType()->getPointerAddressSpace()),
+               i32)
+        << getSPIRVValue(GV)
+        << getSPIRVInt32Constant(GV->getValueType()->getStructNumElements() - 1)
+        << offset;
+    RID = addSPIRVInst(spv::OpAccessChain, Ops);
 
     Ops.clear();
-    Ops << getSPIRVType(
-               FixedVectorType::get(Type::getFloatTy(module->getContext()), 4))
-        << RID;
-    RID = addSPIRVInst(spv::OpConvertUToF, Ops);
+    Ops << getSPIRVType(i32) << RID;
+    RID = addSPIRVInst(spv::OpLoad, Ops);
     break;
   }
   default:
@@ -7014,6 +7004,43 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
                                 static_cast<uint32_t>(GetTypeAllocSize(
                                     local_arg_info.elem_type, DL)));
         }
+      }
+    }
+
+    auto *sampler_md =
+        F.getMetadata(clspv::PushConstantMetadataSamplerMaskName());
+    if (sampler_md) {
+      auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
+      auto STy = cast<StructType>(GV->getValueType());
+      auto num_operands = sampler_md->getNumOperands();
+      assert(num_operands % 2 == 0);
+      for (unsigned i = 0; i < num_operands; i += 2) {
+        auto ordinal =
+            mdconst::extract<ConstantInt>(sampler_md->getOperand(i + 0))
+                ->getZExtValue();
+
+        // Ordinals could have changed because of pod arguments, remap it to the
+        // initial ordinal if needed.
+        auto find = ordinals_map.find(ordinal);
+        if (find != ordinals_map.end()) {
+          ordinal = find->second;
+        }
+        auto index =
+            mdconst::extract<ConstantInt>(sampler_md->getOperand(i + 1))
+                ->getZExtValue();
+        auto offset = GetExplicitLayoutStructMemberOffset(
+                          STy, STy->getStructNumElements() - 1, DL) +
+                      GetExplicitLayoutStructMemberOffset(
+                          cast<StructType>(STy->getStructElementType(
+                              STy->getStructNumElements() - 1)),
+                          index, DL);
+        Ops.clear();
+        Ops << getSPIRVType(Type::getVoidTy(module->getContext())) << import_id
+            << reflection::ExtInstNormalizedSamplerMaskPushConstant
+            << kernel_decl << getSPIRVInt32Constant(ordinal)
+            << getSPIRVInt32Constant(offset)
+            << getSPIRVInt32Constant(sizeof(uint32_t));
+        addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
       }
     }
 

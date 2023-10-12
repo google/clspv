@@ -28,6 +28,7 @@
 #include "Constants.h"
 #include "Layout.h"
 #include "PushConstant.h"
+#include "SamplerUtils.h"
 #include "Types.h"
 
 using namespace llvm;
@@ -83,6 +84,36 @@ bool FunctionContainsImageChannelGetter(Function *F) {
   }
   return false;
 }
+bool FunctionContainsReadImage3DNonLiteralSampler(Function *F) {
+  std::set<Function *> visited_fct;
+  SmallVector<Function *, 1> fcts_to_visit;
+  fcts_to_visit.push_back(F);
+  while (!fcts_to_visit.empty()) {
+    SmallVector<Function *, 1> next_fcts_to_visit;
+    for (auto *fct : fcts_to_visit) {
+      visited_fct.insert(fct);
+      for (auto &BB : *fct) {
+        for (auto &I : BB) {
+          if (auto call = dyn_cast<CallInst>(&I)) {
+            auto Name = call->getCalledFunction()->getName();
+            if (Name.contains("read_image")) {
+              if (clspv::isReadImage3DWithNonLiteralSampler(call)) {
+                return true;
+              }
+            } else {
+              Function *f = call->getCalledFunction();
+              if (visited_fct.count(f) == 0) {
+                next_fcts_to_visit.push_back(f);
+              }
+            }
+          }
+        }
+      }
+    }
+    fcts_to_visit = std::move(next_fcts_to_visit);
+  }
+  return false;
+}
 } // namespace
 
 void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
@@ -118,6 +149,8 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
     }
   }
   const bool contains_image_channel_getter = FunctionContainsImageChannelGetter(&F);
+  const bool contains_read_image_3d_non_literal_sampler =
+      FunctionContainsReadImage3DNonLiteralSampler(&F);
 
   // Per-kernel push constant interface requires:
   // 1. Clustered pod args.
@@ -127,6 +160,7 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
   // 5. If 16-bit types are used, 16-bit push constants are supported.
   // 6. If 8-bit types are used, 8-bit push constants are supported.
   // 7. Not to have a image channel getter function call.
+  // 8. Not to have a read_image of 3d image with a non-literal sampler.
   const auto pod_struct_ty = StructType::get(M.getContext(), pod_types);
   const bool contains_array = ContainsArrayType(pod_struct_ty);
   const bool support_16bit_pc = !ContainsSizedType(pod_struct_ty, 16) ||
@@ -144,7 +178,8 @@ void clspv::AutoPodArgsPass::runOnFunction(Function &F) {
       clspv::Option::ClusterPodKernelArgs() && support_16bit_pc &&
       support_8bit_pc && fits_push_constant &&
       !clspv::UsesGlobalPushConstants(M) && !contains_array &&
-      !contains_image_channel_getter;
+      !contains_image_channel_getter &&
+      !contains_read_image_3d_non_literal_sampler;
 
   // Global type-mangled push constants require:
   // 1. Clustered pod args.

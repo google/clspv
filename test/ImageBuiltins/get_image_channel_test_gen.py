@@ -63,7 +63,7 @@ void kernel data_type(global int *dst, ${type} ${access} image) {
 """)
 
 TEMPLATE_LL=Template("""
-; RUN: clspv-opt %s -o %t.ll --passes=set-image-channel-metadata
+; RUN: clspv-opt %s -o %t.ll --passes=set-image-metadata
 ; RUN: FileCheck %s < %t.ll
 
 ; AUTO-GENERATED TEST FILE
