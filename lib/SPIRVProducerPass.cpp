@@ -473,6 +473,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
+  SPIRVID GenerateFabs(Value *Input);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -4350,6 +4351,37 @@ SPIRVID SPIRVProducerPassImpl::GeneratePopcount(Type *Ty, Value *BaseValue,
   return RID;
 }
 
+SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
+  Type *InputTy = Input->getType();
+  SPIRVOperandVec Ops;
+
+  auto nativeBuiltins = clspv::Option::UseNativeBuiltins();
+  if (nativeBuiltins.count(Builtins::kFabs)) {
+    Ops << InputTy << getOpExtInstImportID() << glsl::ExtInst::ExtInstFAbs
+        << Input;
+    return addSPIRVInst(spv::OpExtInst, Ops);
+  }
+
+  auto getSameSizeIntegerTy = [](Type *FpTy) {
+    return Type::getIntNTy(FpTy->getContext(), FpTy->getScalarSizeInBits());
+  };
+  Type *IntegerTy;
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    IntegerTy = FixedVectorType::get(
+        getSameSizeIntegerTy(VecTy->getElementType()), VecTy->getNumElements());
+  } else {
+    IntegerTy = getSameSizeIntegerTy(InputTy);
+  }
+  Ops << IntegerTy << Input;
+  auto bitcast = addSPIRVInst(spv::OpBitcast, Ops);
+  Ops.clear();
+  Ops << IntegerTy << bitcast << ConstantInt::get(IntegerTy, 0x7fffffff);
+  auto bitwiseand = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+  Ops.clear();
+  Ops << InputTy << bitwiseand;
+  return addSPIRVInst(spv::OpBitcast, Ops);
+}
+
 SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
@@ -4418,12 +4450,18 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     Ops << Call->getType() << Call->getArgOperand(0);
     return addSPIRVInst(spv::OpBitReverse, Ops);
   }
+  case Intrinsic::fabs: {
+    return GenerateFabs(Call->getOperand(0));
+  }
 
   default:
     break;
   }
 
   switch (func_type) {
+  case Builtins::kFabs: {
+    return GenerateFabs(Call->getOperand(0));
+  }
   case Builtins::kPopcount: {
     return GeneratePopcount(Call->getType(), Call->getOperand(0), Context);
   }
@@ -4876,10 +4914,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
           SPIRVID min = getSPIRVConstant(ConstantFP::get(FPTy, fmin_val));
           SPIRVID c_one = getSPIRVConstant(ConstantFP::get(FPTy, 1.0));
 
-          Ops.clear();
-          Ops << Ty << getOpExtInstImportID() << glsl::ExtInst::ExtInstFAbs
-              << b;
-          SPIRVID abs_b = addSPIRVInst(spv::OpExtInst, Ops);
+          SPIRVID abs_b = GenerateFabs(I.getOperand(1));
 
           Ops.clear();
           Ops << getSPIRVType(boolTy) << abs_b << max;
