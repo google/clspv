@@ -440,7 +440,6 @@ struct SPIRVProducerPassImpl {
   SPIRVID getSPIRVType(Type *Ty);
   SPIRVID getSPIRVConstant(Constant *Cst);
   SPIRVID getSPIRVInt32Constant(uint32_t CstVal);
-  SPIRVID getSPIRVInt64Constant(uint64_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V);
 
@@ -2199,12 +2198,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
 SPIRVID SPIRVProducerPassImpl::getSPIRVInt32Constant(uint32_t CstVal) {
   Type *i32 = Type::getInt32Ty(module->getContext());
   Constant *Cst = ConstantInt::get(i32, CstVal);
-  return getSPIRVValue(Cst);
-}
-
-SPIRVID SPIRVProducerPassImpl::getSPIRVInt64Constant(uint64_t CstVal) {
-  Type *i64 = Type::getInt64Ty(module->getContext());
-  Constant *Cst = ConstantInt::get(i64, CstVal);
   return getSPIRVValue(Cst);
 }
 
