@@ -831,6 +831,7 @@ PreservedAnalyses SPIRVProducerPass::run(Module &M,
 }
 
 bool SPIRVProducerPassImpl::runOnModule(Module &M) {
+
   // TODO(sjw): Need to reset all data members for each Module, or better
   // yet create a new SPIRVProducer for every module.. For now only
   // allow 1 call.
@@ -886,7 +887,8 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
     if (F.isDeclaration()) {
       continue;
     }
-
+    // We do not wish to deal with any constexpr
+    BitcastUtils::RemoveCstExprFromFunction(&F);
     // Generate Function Prologue.
     GenerateFuncPrologue(F);
 
@@ -2200,6 +2202,12 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVInt32Constant(uint32_t CstVal) {
   return getSPIRVValue(Cst);
 }
 
+SPIRVID SPIRVProducerPassImpl::getSPIRVInt64Constant(uint64_t CstVal) {
+  Type *i64 = Type::getInt64Ty(module->getContext());
+  Constant *Cst = ConstantInt::get(i64, CstVal);
+  return getSPIRVValue(Cst);
+}
+
 SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
   ValueMapType &VMap = getValueMap();
   const bool hack_undef = clspv::Option::HackUndef();
@@ -2286,9 +2294,14 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     Ops << LiteralNum;
   } else if (isa<ConstantDataSequential>(Cst) &&
              cast<ConstantDataSequential>(Cst)->isString()) {
-    Cst->print(errs());
-    llvm_unreachable("Implement this Constant");
 
+    const ConstantDataSequential *CDS =
+                 dyn_cast<ConstantDataSequential>(Cst);
+    
+    Opcode = spv::OpConstantComposite;
+    for (unsigned k = 0; k < CDS->getNumElements(); k++) {
+      Ops << CDS->getElementAsConstant(k);
+    }
   } else if (const ConstantDataSequential *CDS =
                  dyn_cast<ConstantDataSequential>(Cst)) {
     // Let's convert <4 x i8> constant to int constant specially.
@@ -2312,7 +2325,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       for (unsigned k = 0; k < CDS->getNumElements(); k++) {
         Ops << CDS->getElementAsConstant(k);
       }
-
+      
       Opcode = spv::OpConstantComposite;
     } else {
       return getSPIRVValue(CDS->getElementAsConstant(0));
