@@ -16,6 +16,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/IR/Type.h"
 
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"

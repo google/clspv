@@ -813,8 +813,9 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
-bool CheckIfConstArray(Instruction *I, unsigned int OperandId) { 
+bool GetConstExprArray(Instruction *I, unsigned int OperandId, std::vector<llvm::Constant*> &values) { 
   IRBuilder<> B(I);
+   
   Value* V = I->getOperand(OperandId);
   if(isa<ArrayType>(V->getType())){
     unsigned Arity = V->getType()->getArrayNumElements();
@@ -823,22 +824,25 @@ bool CheckIfConstArray(Instruction *I, unsigned int OperandId) {
       if (!isa<ConstantExpr>(Scalar)) {
         break;
       }
+      values.push_back(dyn_cast<Constant>(Scalar));
     }
       return true;
   }
   return false;
 }
 
-
 bool RemoveCstExprFromFunction(Function *F) {
   SmallVector<std::pair<Instruction *, unsigned>, 16> WorkList;
-
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
       if (isa<ConstantExpr>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
       } else {
-        if (CheckIfConstArray(I, OperandId)) {
+        std::vector<llvm::Constant*> values;
+        if (GetConstExprArray(I, OperandId, values)) {
+          llvm::ArrayType* aTy = dyn_cast<ArrayType>(I->getOperand(OperandId)->getType());
+          auto newOp = ConstantArray::get(aTy,values);
+          I->setOperand(OperandId, newOp);
           WorkList.push_back(std::make_pair(I, OperandId));
         }
       }
@@ -863,25 +867,12 @@ bool RemoveCstExprFromFunction(Function *F) {
           phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
               ->getFirstNonPHI();
     }
-    if (isa<ArrayType>((I->getOperand(OperandId))->getType())) {
-      auto Operand = dyn_cast<ConstantArray>(I->getOperand(OperandId));
-      for (unsigned i = 0; i < Operand->getNumOperands(); i++) {
-        auto CE = dyn_cast<ConstantExpr>(Operand->getOperand(i));
-        if (CE != nullptr) {
-          auto CI = CE->getAsInstruction(InsertBefore);
-          if (CI != nullptr) {
-            CheckInstruction(CI);
-            I->setOperand(OperandId, CI);
-          }
-        }
-      }
-    } else {
-      auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))
-                       ->getAsInstruction(InsertBefore);
+    if (auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId));
+                       ->getAsInstruction(InsertBefore)) {
       CheckInstruction(Operand);
       I->setOperand(OperandId, Operand);
-      
     }
+    
   }
   return Changed;
 }
