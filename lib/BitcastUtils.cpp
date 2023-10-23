@@ -813,21 +813,36 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
-bool GetConstExprArray(Instruction *I, unsigned int OperandId, std::vector<llvm::Constant*> &values) { 
+bool GetConstExprArray(Instruction *I, unsigned int OperandId, std::vector<llvm::UndefValue*> &values) { 
   IRBuilder<> B(I);
-   
-  Value* V = I->getOperand(OperandId);
-  if(isa<ArrayType>(V->getType())){
+  Value* V = I->getOperand(OperandId);  
+  
+  if (auto CstVec = dyn_cast<ConstantArray>(V)){
+    Type *SrcTy = CstVec->getType()->getElementType();
     unsigned Arity = V->getType()->getArrayNumElements();
+    VectorType *DstTy = FixedVectorType::get(SrcTy, Arity);
+    Value *Vec = UndefValue::get(DstTy);
     for (unsigned i = 0; i < Arity; ++i) {
-      Value *Scalar = B.CreateExtractValue(V, i);
+      Value *Scalar = B.CreateExtractValue(CstVec, i);
       if (!isa<ConstantExpr>(Scalar)) {
         break;
       }
-      values.push_back(dyn_cast<Constant>(Scalar));
+      Vec = B.CreateInsertElement(Vec, Scalar, i);
     }
-      return true;
+    values = Vec;
+    return true;
   }
+   /* if (auto vec_cst = dyn_cast<ConstantDataVector>(I->getOperand(OperandId))){
+      Value *Res = UndefValue::get(vec_cst->getType());
+      for (unsigned int i = 0; i < vec_cst->getNumElements(); i++) {
+
+        Res = builder.CreateInsertElement(
+            Res, ConstantFP::get(I->getType()->getScalarType(), fct(fp)), i);
+      }
+      I->replaceAllUsesWith(Res);
+      return true;
+    }
+    */
   return false;
 }
 
@@ -838,11 +853,9 @@ bool RemoveCstExprFromFunction(Function *F) {
       if (isa<ConstantExpr>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
       } else {
-        std::vector<llvm::Constant*> values;
+        std::vector<llvm::UndefValue*> values;
         if (GetConstExprArray(I, OperandId, values)) {
-          llvm::ArrayType* aTy = dyn_cast<ArrayType>(I->getOperand(OperandId)->getType());
-          auto newOp = ConstantArray::get(aTy,values);
-          I->setOperand(OperandId, newOp);
+          I->setOperand(OperandId, values);
           WorkList.push_back(std::make_pair(I, OperandId));
         }
       }
@@ -867,9 +880,8 @@ bool RemoveCstExprFromFunction(Function *F) {
           phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
               ->getFirstNonPHI();
     }
-    if (auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId));
-                       ->getAsInstruction(InsertBefore)) {
-      CheckInstruction(Operand);
+    if (auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
+      CheckInstruction(Operand->getAsInstruction(InsertBefore));
       I->setOperand(OperandId, Operand);
     }
     
