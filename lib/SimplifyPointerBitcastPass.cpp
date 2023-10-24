@@ -460,11 +460,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
           auto *gep = dyn_cast<GetElementPtrInst>(&I);
           auto *call = dyn_cast_or_null<CallInst>(&I);
           bool userCall = call && !call->getCalledFunction()->isDeclaration();
-          if ((Steps > 0 && !gep) || (Steps == 1)) {
-            if (!userCall && (gep || PerfectMatch)) {
-              GEPAliasingList.push_back(
-                  {&I, Steps, PerfectMatch ? nullptr : gep});
-            }
+          if (!userCall && (gep || PerfectMatch)) {
+            GEPAliasingList.push_back(
+                {&I, Steps, PerfectMatch ? nullptr : gep});
           }
         } else if (isa<StoreInst>(&I) && !isa<GetElementPtrInst>(source)) {
           GEPBeforeStoreList.push_back({&I, dest_ty});
