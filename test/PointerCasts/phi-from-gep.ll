@@ -31,16 +31,15 @@ define spir_kernel void @test2(ptr addrspace(1) %a, i32 %i) {
 entry:
 ; CHECK: entry
 ; CHECK-NEXT: [[shl0:%[^ ]+]] = shl i32 %i, 2
-; CHECK-NEXT: [[shl1:%[^ ]+]] = shl i32 [[shl0]], 1
-; CHECK-NEXT: [[add:%[^ ]+]] = add i32 [[shl1]], 4
-; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %a, i32 [[add]]
+; CHECK-NEXT: [[shl1:%[^ ]+]] = shl i32 [[shl0]], 2
+; CHECK-NEXT: [[add:%[^ ]+]] = add i32 [[shl1]], 8
+; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr i8, ptr addrspace(1) %a, i32 [[add]]
   %0 = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 %i, i32 2
   br label %end
 
 block:
 ; CHECK: block
-; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 %i, 1
-; CHECK-NEXT: [[gepblock:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %a, i32 [[lshr]]
+; CHECK-NEXT: [[gepblock:%[^ ]+]] = getelementptr i8, ptr addrspace(1) %a, i32 %i
   %1 = getelementptr i8, ptr addrspace(1) %a, i32 %i
   br label %end
 
@@ -54,7 +53,7 @@ end:
 define spir_kernel void @test3(ptr addrspace(1) %a, i32 %i) {
 entry:
 ; CHECK: entry
-; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 %i, i32 0
+; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 %i
   %0 = getelementptr <4 x i32>, ptr addrspace(1) %a, i32 %i
   br label %end
 

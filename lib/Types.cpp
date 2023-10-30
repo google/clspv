@@ -269,6 +269,63 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   return TyA;
 }
 
+Type *InferUsersType(Value *v, LLVMContext &context,
+                     DenseMap<Value *, Type *> *cache) {
+  std::vector<std::pair<User *, unsigned>> worklist;
+  for (auto &use : v->uses()) {
+    worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
+  }
+
+  Type *backup_ty = nullptr;
+  Type *user_ty = nullptr;
+  DenseSet<Value *> seen;
+  while (!worklist.empty()) {
+    User *user = worklist.back().first;
+    unsigned operand = worklist.back().second;
+    worklist.pop_back();
+    bool isPointerTy = false;
+    if (!seen.insert(user).second) {
+      continue;
+    }
+
+    Instruction *userI = dyn_cast<Instruction>(user);
+    if (!userI) {
+      continue;
+    }
+    const DataLayout &DL =
+        userI->getParent()->getParent()->getParent()->getDataLayout();
+
+    Type *user_backup_ty = nullptr;
+    Type *ty = InferUserType(user, isPointerTy, operand, user_backup_ty,
+                             context, cache, v);
+    user_ty = SmallerTypeNotAliasing(DL, user_ty, ty);
+    if (user_ty == nullptr) {
+      backup_ty = SmallerTypeNotAliasing(DL, backup_ty, user_backup_ty);
+    }
+
+    // If the result is also a pointer, try to infer from further uses.
+    if (user_ty == nullptr && (user->getType()->isPointerTy() || isPointerTy)) {
+      // Handle stores with only pointer operands.
+      if (auto *store = dyn_cast<StoreInst>(user)) {
+        if (store->getPointerOperand() != v) {
+          user = dyn_cast<User>(store->getPointerOperand());
+        } else if (auto *value = dyn_cast<User>(store->getValueOperand())) {
+          user = value;
+        }
+      }
+      for (auto &use : user->uses()) {
+        worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
+      }
+    }
+  }
+  if (user_ty) {
+    return user_ty;
+  } else if (backup_ty) {
+    return backup_ty;
+  }
+  return nullptr;
+}
+
 } // namespace
 
 Type *clspv::InferType(Value *v, LLVMContext &context,
@@ -320,57 +377,24 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     }
   }
 
-  std::vector<std::pair<User *, unsigned>> worklist;
-  for (auto &use : v->uses()) {
-    worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
-  }
+  auto users_ty = InferUsersType(v, context, cache);
 
-  Type *backup_ty = nullptr;
-  Type *user_ty = nullptr;
-  DenseSet<Value *> seen;
-  while (!worklist.empty()) {
-    User *user = worklist.back().first;
-    unsigned operand = worklist.back().second;
-    worklist.pop_back();
-    bool isPointerTy = false;
-    if (!seen.insert(user).second) {
-      continue;
-    }
-
-    Instruction *userI = dyn_cast<Instruction>(user);
-    if (!userI) {
-      continue;
-    }
-    const DataLayout &DL =
-        userI->getParent()->getParent()->getParent()->getDataLayout();
-
-    Type *user_backup_ty = nullptr;
-    Type *ty = InferUserType(user, isPointerTy, operand, user_backup_ty,
-                             context, cache, v);
-    user_ty = SmallerTypeNotAliasing(DL, user_ty, ty);
-    if (user_ty == nullptr) {
-      backup_ty = SmallerTypeNotAliasing(DL, backup_ty, user_backup_ty);
-    }
-
-    // If the result is also a pointer, try to infer from further uses.
-    if (user_ty == nullptr && (user->getType()->isPointerTy() || isPointerTy)) {
-      // Handle stores with only pointer operands.
-      if (auto *store = dyn_cast<StoreInst>(user)) {
-        if (store->getPointerOperand() != v) {
-          user = dyn_cast<User>(store->getPointerOperand());
-        } else if (auto *value = dyn_cast<User>(store->getValueOperand())) {
-          user = value;
-        }
-      }
-      for (auto &use : user->uses()) {
-        worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
+  if (auto *phi = dyn_cast<PHINode>(v)) {
+    Type *phi_ty = users_ty;
+    const DataLayout &DL = phi->getModule()->getDataLayout();
+    for (unsigned twice = 0; twice < 2; twice++) {
+      for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
+        (*cache)[phi] = phi_ty;
+        auto IncValTy = InferType(phi->getIncomingValue(i), context, cache);
+        phi_ty = SmallerTypeNotAliasing(DL, phi_ty, IncValTy);
       }
     }
-  }
-  if (user_ty) {
-    return CacheType(user_ty);
-  } else if (backup_ty) {
-    return CacheType(backup_ty);
+    cache->erase(phi);
+    if (phi_ty != nullptr) {
+      return CacheType(phi_ty);
+    }
+  } else if (users_ty) {
+    return CacheType(users_ty);
   }
 
   // If we have not figured out the type yet and the value is a kernel function
