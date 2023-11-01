@@ -785,7 +785,7 @@ public:
                 layout = UBO;
               }
               auto array_type = FD->getASTContext().getIncompleteArrayType(
-                  type->getPointeeType(), clang::ArrayType::Normal, 0);
+                  type->getPointeeType(), clang::ArraySizeModifier::Normal, 0);
               if (!clspv::Option::RewritePackedStructs() &&
                   !IsSupportedLayout(array_type, 0, layout, FD->getASTContext(),
                                      P->getSourceRange(),
