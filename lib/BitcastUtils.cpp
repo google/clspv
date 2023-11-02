@@ -813,36 +813,33 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
-bool GetConstExprArray(Instruction *I, unsigned int OperandId, std::vector<llvm::UndefValue*> &values) { 
-  IRBuilder<> B(I);
-  Value* V = I->getOperand(OperandId);  
-  
-  if (auto CstVec = dyn_cast<ConstantArray>(V)){
-    Type *SrcTy = CstVec->getType()->getElementType();
-    unsigned Arity = V->getType()->getArrayNumElements();
-    VectorType *DstTy = FixedVectorType::get(SrcTy, Arity);
-    Value *Vec = UndefValue::get(DstTy);
-    for (unsigned i = 0; i < Arity; ++i) {
-      Value *Scalar = B.CreateExtractValue(CstVec, i);
-      if (!isa<ConstantExpr>(Scalar)) {
-        break;
-      }
-      Vec = B.CreateInsertElement(Vec, Scalar, i);
-    }
-    values = Vec;
-    return true;
-  }
-   /* if (auto vec_cst = dyn_cast<ConstantDataVector>(I->getOperand(OperandId))){
-      Value *Res = UndefValue::get(vec_cst->getType());
-      for (unsigned int i = 0; i < vec_cst->getNumElements(); i++) {
 
-        Res = builder.CreateInsertElement(
-            Res, ConstantFP::get(I->getType()->getScalarType(), fct(fp)), i);
+
+bool isConstExprStruct(Instruction *I, unsigned int OperandId) { 
+  Value* V = I->getOperand(OperandId);
+  auto CheckCstExpr = [](Instruction *I, ConstantAggregate *CstStruct, unsigned int numEle) {
+    IRBuilder<> B(I);
+    for (unsigned i = 0; i < numEle; ++i) {
+      // CreateExtract element for vector.
+       Value *Scalar;
+      Scalar = isa<ConstantArray>(CstStruct)? B.CreateExtractValue(CstStruct, i) : B.CreateExtractElement(CstStruct, i);
+      if (isa<ConstantExpr>(Scalar)) {
+        return true;
       }
-      I->replaceAllUsesWith(Res);
-      return true;
     }
-    */
+    return false;
+  };
+
+  if (auto CstArray = dyn_cast<ConstantArray>(V)){
+    unsigned numEle = V->getType()->getArrayNumElements();
+    return CheckCstExpr(I, CstArray, numEle);
+  }
+
+  if (auto CstVec = dyn_cast<ConstantVector>(V)){
+    auto FxVecTy = dyn_cast<FixedVectorType>(CstVec->getType());
+    unsigned numEle = FxVecTy->getNumElements();
+    return CheckCstExpr(I, CstVec, numEle);
+  }
   return false;
 }
 
@@ -853,9 +850,7 @@ bool RemoveCstExprFromFunction(Function *F) {
       if (isa<ConstantExpr>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
       } else {
-        std::vector<llvm::UndefValue*> values;
-        if (GetConstExprArray(I, OperandId, values)) {
-          I->setOperand(OperandId, values);
+        if (isConstExprStruct(I, OperandId)) {
           WorkList.push_back(std::make_pair(I, OperandId));
         }
       }
@@ -873,13 +868,38 @@ bool RemoveCstExprFromFunction(Function *F) {
     auto *I = WorkList.back().first;
     auto OperandId = WorkList.back().second;
     WorkList.pop_back();
-
+    IRBuilder<> B(I);
     auto InsertBefore = I;
     if (auto phi = dyn_cast<PHINode>(I)) {
       InsertBefore =
           phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
               ->getFirstNonPHI();
     }
+
+  if (auto CstStruct = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
+      unsigned numEle = CstStruct->getType()->getArrayNumElements();
+      Value *ArrayNew = UndefValue::get(CstStruct->getType());
+      for (unsigned i = 0; i < numEle; ++i) {
+        Value *Scalar = B.CreateExtractValue(CstStruct, i);
+        auto *ScalarInst = dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
+        ArrayNew = B.CreateInsertValue(ArrayNew,ScalarInst,i);
+        WorkList.push_back(std::make_pair(ScalarInst,OperandId));
+      }
+      I->setOperand(OperandId, ArrayNew);
+    } 
+    if (auto CstStruct = dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
+      auto FxVecTy = dyn_cast<FixedVectorType>(CstStruct->getType());
+      unsigned numEle = FxVecTy->getNumElements();
+      Value *VecNew = UndefValue::get(CstStruct->getType());
+      for (unsigned i = 0; i < numEle; ++i) {
+        Value *Scalar = B.CreateExtractElement(CstStruct, i);
+        auto *ScalarInst = dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
+        VecNew = B.CreateInsertElement(VecNew,ScalarInst,i);
+        WorkList.push_back(std::make_pair(ScalarInst,OperandId));
+      }
+      I->setOperand(OperandId, VecNew);
+    }
+
     if (auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
       CheckInstruction(Operand->getAsInstruction(InsertBefore));
       I->setOperand(OperandId, Operand);
