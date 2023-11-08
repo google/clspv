@@ -813,46 +813,16 @@ void ConvertInto(Type *Ty, IRBuilder<> &Builder,
   }
 }
 
-
-
-bool isConstExprStruct(Instruction *I, unsigned int OperandId) { 
-  Value* V = I->getOperand(OperandId);
-  auto CheckCstExpr = [](Instruction *I, ConstantAggregate *CstStruct, unsigned int numEle) {
-    IRBuilder<> B(I);
-    for (unsigned i = 0; i < numEle; ++i) {
-      // CreateExtract element for vector.
-       Value *Scalar;
-      Scalar = isa<ConstantArray>(CstStruct)? B.CreateExtractValue(CstStruct, i) : B.CreateExtractElement(CstStruct, i);
-      if (isa<ConstantExpr>(Scalar)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  if (auto CstArray = dyn_cast<ConstantArray>(V)){
-    unsigned numEle = V->getType()->getArrayNumElements();
-    return CheckCstExpr(I, CstArray, numEle);
-  }
-
-  if (auto CstVec = dyn_cast<ConstantVector>(V)){
-    auto FxVecTy = dyn_cast<FixedVectorType>(CstVec->getType());
-    unsigned numEle = FxVecTy->getNumElements();
-    return CheckCstExpr(I, CstVec, numEle);
-  }
-  return false;
-}
-
 bool RemoveCstExprFromFunction(Function *F) {
   SmallVector<std::pair<Instruction *, unsigned>, 16> WorkList;
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
-      if (isa<ConstantExpr>(I->getOperand(OperandId))) {
+      if (dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
-      } else {
-        if (isConstExprStruct(I, OperandId)) {
-          WorkList.push_back(std::make_pair(I, OperandId));
-        }
+      } else if (dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
+        WorkList.push_back(std::make_pair(I, OperandId));
+      } else if (dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
+        WorkList.push_back(std::make_pair(I, OperandId));
       }
     }
   };
@@ -876,35 +846,41 @@ bool RemoveCstExprFromFunction(Function *F) {
               ->getFirstNonPHI();
     }
 
-  if (auto CstStruct = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
+    if (auto CstStruct = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
       unsigned numEle = CstStruct->getType()->getArrayNumElements();
       Value *ArrayNew = UndefValue::get(CstStruct->getType());
       for (unsigned i = 0; i < numEle; ++i) {
         Value *Scalar = B.CreateExtractValue(CstStruct, i);
-        auto *ScalarInst = dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
-        ArrayNew = B.CreateInsertValue(ArrayNew,ScalarInst,i);
-        WorkList.push_back(std::make_pair(ScalarInst,OperandId));
+        auto *ScalarInst =
+            dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
+        if (ScalarInst) {
+          ArrayNew = B.CreateInsertValue(ArrayNew, ScalarInst, i);
+          WorkList.push_back(std::make_pair(ScalarInst, OperandId));
+        }
       }
       I->setOperand(OperandId, ArrayNew);
-    } 
+    }
     if (auto CstStruct = dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
       auto FxVecTy = dyn_cast<FixedVectorType>(CstStruct->getType());
       unsigned numEle = FxVecTy->getNumElements();
       Value *VecNew = UndefValue::get(CstStruct->getType());
       for (unsigned i = 0; i < numEle; ++i) {
         Value *Scalar = B.CreateExtractElement(CstStruct, i);
-        auto *ScalarInst = dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
-        VecNew = B.CreateInsertElement(VecNew,ScalarInst,i);
-        WorkList.push_back(std::make_pair(ScalarInst,OperandId));
+        auto *ScalarInst =
+            dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
+        if (ScalarInst) {
+          VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
+          WorkList.push_back(std::make_pair(ScalarInst, OperandId));
+        }
       }
       I->setOperand(OperandId, VecNew);
     }
 
-    if (auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
-      CheckInstruction(Operand->getAsInstruction(InsertBefore));
+    if (auto CstExpr = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
+      auto Operand = CstExpr->getAsInstruction(InsertBefore);
+      CheckInstruction(Operand);
       I->setOperand(OperandId, Operand);
     }
-    
   }
   return Changed;
 }
