@@ -399,7 +399,9 @@ struct SPIRVProducerPassImpl {
   SmallPtrSet<Value *, 16> &getGlobalConstArgSet() {
     return GlobalConstArgumentSet;
   }
-  StrideTypeList &getTypesNeedingArrayStride() { return TypesNeedingArrayStride; }
+  StrideTypeList &getTypesNeedingArrayStride() {
+    return TypesNeedingArrayStride;
+  }
 
   void ReadFunctionAttributes();
 
@@ -1286,8 +1288,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
       if (module_scope_constant_external_init &&
           spv::BuiltInMax == BuiltinType) {
-        StructTypesNeedingBlock.insert(
-            cast<StructType>(GV.getValueType()));
+        StructTypesNeedingBlock.insert(cast<StructType>(GV.getValueType()));
       }
     }
   }
@@ -1844,22 +1845,22 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       const auto dim = ImageDimensionality(ext_ty);
       const auto sampled = IsSampledImageType(ext_ty);
       switch (dim) {
-        case spv::Dim1D:
-          if (sampled) {
-            addCapability(spv::CapabilitySampled1D);
-          } else {
-            addCapability(spv::CapabilityImage1D);
-          }
-          break;
-        case spv::DimBuffer:
-          if (sampled) {
-            addCapability(spv::CapabilitySampledBuffer);
-          } else {
-            addCapability(spv::CapabilityImageBuffer);
-          }
-          break;
-        default:
-          break;
+      case spv::Dim1D:
+        if (sampled) {
+          addCapability(spv::CapabilitySampled1D);
+        } else {
+          addCapability(spv::CapabilityImage1D);
+        }
+        break;
+      case spv::DimBuffer:
+        if (sampled) {
+          addCapability(spv::CapabilitySampledBuffer);
+        } else {
+          addCapability(spv::CapabilityImageBuffer);
+        }
+        break;
+      default:
+        break;
       }
 
       //
@@ -1878,30 +1879,30 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       SPIRVID SampledTyID;
       // None of the sampled types have a layout.
       if (IsFloatImageType(ext_ty)) {
-          SampledTyID =
-              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
+        SampledTyID =
+            getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
       } else if (IsUintImageType(ext_ty)) {
-          SampledTyID =
-              getSPIRVType(Type::getInt32Ty(Canonical->getContext()), false);
+        SampledTyID =
+            getSPIRVType(Type::getInt32Ty(Canonical->getContext()), false);
       } else if (IsIntImageType(ext_ty)) {
-          // Generate a signed 32-bit integer if necessary.
-          if (int32ID == 0) {
-            SPIRVOperandVec intOps;
-            intOps << 32 << 1;
-            int32ID = addSPIRVInst<kTypes>(spv::OpTypeInt, intOps);
-          }
-          SampledTyID = int32ID;
+        // Generate a signed 32-bit integer if necessary.
+        if (int32ID == 0) {
+          SPIRVOperandVec intOps;
+          intOps << 32 << 1;
+          int32ID = addSPIRVInst<kTypes>(spv::OpTypeInt, intOps);
+        }
+        SampledTyID = int32ID;
 
-          // Generate a vec4 of the signed int if necessary.
-          if (v4int32ID == 0) {
-            SPIRVOperandVec vecOps;
-            vecOps << int32ID << 4;
-            v4int32ID = addSPIRVInst<kTypes>(spv::OpTypeVector, vecOps);
-          }
+        // Generate a vec4 of the signed int if necessary.
+        if (v4int32ID == 0) {
+          SPIRVOperandVec vecOps;
+          vecOps << int32ID << 4;
+          v4int32ID = addSPIRVInst<kTypes>(spv::OpTypeVector, vecOps);
+        }
       } else {
-          // This was likely an UndefValue.
-          SampledTyID =
-              getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
+        // This was likely an UndefValue.
+        SampledTyID =
+            getSPIRVType(Type::getFloatTy(Canonical->getContext()), false);
       }
       Ops << SampledTyID;
 
@@ -1926,7 +1927,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       // 2 indicates will be used without a sampler (a storage image)
       uint32_t Sampled = 1;
       if (!IsSampledImageType(ext_ty)) {
-          Sampled = 2;
+        Sampled = 2;
       }
       Ops << Sampled;
 
@@ -1937,10 +1938,10 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
       // Only need a sampled version of the type if it is used with a sampler.
       // In SPIR-V 1.6 or later, sampled image dimension must not be Buffer
       if (Sampled == 1 && ImageDimensionality(ext_ty) != spv::DimBuffer) {
-          Ops.clear();
-          Ops << RID;
-          getImageTypeMap()[Canonical] =
-              addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
+        Ops.clear();
+        Ops << RID;
+        getImageTypeMap()[Canonical] =
+            addSPIRVInst<kTypes>(spv::OpTypeSampledImage, Ops);
       }
       break;
     } else if (IsSamplerType(ext_ty)) {
@@ -2288,9 +2289,8 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
   } else if (isa<ConstantDataSequential>(Cst) &&
              cast<ConstantDataSequential>(Cst)->isString()) {
 
-    const ConstantDataSequential *CDS =
-                 dyn_cast<ConstantDataSequential>(Cst);
-    
+    const ConstantDataSequential *CDS = dyn_cast<ConstantDataSequential>(Cst);
+
     Opcode = spv::OpConstantComposite;
     for (unsigned k = 0; k < CDS->getNumElements(); k++) {
       Ops << CDS->getElementAsConstant(k);
@@ -2318,7 +2318,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       for (unsigned k = 0; k < CDS->getNumElements(); k++) {
         Ops << CDS->getElementAsConstant(k);
       }
-      
+
       Opcode = spv::OpConstantComposite;
     } else {
       return getSPIRVValue(CDS->getElementAsConstant(0));
@@ -2356,7 +2356,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     }
   } else if (Cst->isNullValue()) {
     Opcode = spv::OpConstantNull;
-  } else if(const Function *Fn = dyn_cast<Function>(Cst)) {
+  } else if (const Function *Fn = dyn_cast<Function>(Cst)) {
     if (Fn->isIntrinsic()) {
       Fn->print(errs());
       llvm_unreachable("Unsupported llvm intrinsic");
@@ -2688,8 +2688,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
         SPIRVID ZDimCstID =
             getSPIRVValue(mdconst::extract<ConstantInt>(MD->getOperand(2)));
 
-        Ops << GV.getValueType() << XDimCstID << YDimCstID
-            << ZDimCstID;
+        Ops << GV.getValueType() << XDimCstID << YDimCstID << ZDimCstID;
 
         InitializerID =
             addSPIRVInst<kGlobalVariables>(spv::OpConstantComposite, Ops);
@@ -3511,7 +3510,7 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVCastOpcode(Instruction &I) {
       {Instruction::BitCast, spv::OpBitcast},
       {Instruction::PtrToInt, spv::OpConvertPtrToU},
       {Instruction::IntToPtr, spv::OpConvertUToPtr},
-      };
+  };
 
   assert(0 != Map.count(I.getOpcode()));
 
@@ -3937,8 +3936,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 
     Value *Image = Call->getArgOperand(0);
     const uint32_t dim = ImageNumDimensions(image_ty);
-    const uint32_t components =
-        dim + (IsArrayImageType(image_ty) ? 1 : 0);
+    const uint32_t components = dim + (IsArrayImageType(image_ty) ? 1 : 0);
     if (components == 1) {
       SizesTypeID = getSPIRVType(Type::getInt32Ty(Context));
     } else {
@@ -7025,7 +7023,8 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
 
     // Generate the reflection for the image channel getter function if it is
     // used in this kernel.
-    auto *image_getter_md = F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
+    auto *image_getter_md =
+        F.getMetadata(clspv::PushConstantsMetadataImageChannelName());
     if (image_getter_md) {
       auto GV = module->getGlobalVariable(clspv::PushConstantsVariableName());
       auto STy = cast<StructType>(GV->getValueType());
@@ -7106,10 +7105,9 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
 
   if (clspv::Option::KernelArgInfo()) {
     assert(kernelFn.getMetadata("kernel_arg_type") &&
-            kernelFn.getMetadata("kernel_arg_addr_space") &&
-            kernelFn.getMetadata("kernel_arg_access_qual") &&
-            kernelFn.getMetadata("kernel_arg_type_qual")
-          );
+           kernelFn.getMetadata("kernel_arg_addr_space") &&
+           kernelFn.getMetadata("kernel_arg_access_qual") &&
+           kernelFn.getMetadata("kernel_arg_type_qual"));
     auto const &type_op =
         kernelFn.getMetadata("kernel_arg_type")->getOperand(ordinal);
     auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
@@ -7167,7 +7165,6 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     }
     auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
     Ops << type_qual_enum;
-  
   }
 
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
