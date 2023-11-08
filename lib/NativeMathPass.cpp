@@ -37,6 +37,12 @@ bool is_libclc_builtin(llvm::Function *F) {
   }
   return false;
 }
+bool builtin_needs_noimplicitfloat(const StringRef &builtin) {
+  // Using noimplicitfloat for those functions allow to have compliant OpenCL
+  // implementation of them even with native version of fabs.
+  DenseSet<StringRef> list = {"cbrt", "frexp", "powr"};
+  return list.contains(builtin);
+}
 } // namespace
 
 PreservedAnalyses clspv::NativeMathPass::run(Module &M,
@@ -63,6 +69,11 @@ PreservedAnalyses clspv::NativeMathPass::run(Module &M,
       // that we will not do it, let's remove the attribute so that they
       // can be inline if appropriate.
       F.removeFnAttr(Attribute::AttrKind::NoInline);
+
+      // Prevent unwanted transformation from InstCombine (Ref #1253).
+      if (builtin_needs_noimplicitfloat(F.getName())) {
+        F.addFnAttr(Attribute::AttrKind::NoImplicitFloat);
+      }
     }
   }
 
