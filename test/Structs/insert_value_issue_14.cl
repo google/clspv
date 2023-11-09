@@ -28,19 +28,18 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 
 // CHECK-DAG: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
 // no longer checked: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
-
  
-// With undef mapping to a 0 byte sequence, (undef,1,2,3) maps to 66051.
-// CHECK-DAG: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
-// CHECK-DAG: [[int_255:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 255
+// CHECK-DAG: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]]
 // CHECK-DAG: [[int_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
-
+// CHECK-DAG: [[int_255:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 255
+// CHECK-DAG: [[undef_uint:%[a-zA-Z0-9_]+]] = OpUndef [[uint]]
 // no longer checked: [[undef_struct:%[_a-zA-Z0-9]+]] = OpUndef [[struct]]
 
+// CHECK: [[loadOp:%[a-zA-z0-9_]+]] = OpLoad [[struct]] %{{.*}}
+// CHECK: [[theconst:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[uint]] [[loadOp]] 0
 // CHECK: [[and:%[a-zA-Z0-9_]+]] = OpBitwiseAnd [[uint]] %{{.*}} [[int_255]]
 // CHECK: [[mask_255:%[a-zA-Z0-9_]+]] = OpShiftLeftLogical %uint [[int_255]] [[int_0]]
 // CHECK: [[mask:%[a-zA-Z0-9_]+]] = OpNot %uint [[mask_255]]
-// CHECK: [[otherelems:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %uint [[theconst]] [[mask]]
+// CHECK: [[otherelems:%[a-zA-Z0-9_]+]] = OpBitwiseAnd %uint [[undef_uint]] [[mask]]
 // CHECK: [[firstelem:%[a-zA-Z0-9_]+]] = OpShiftLeftLogical %uint [[and]] [[int_0]]
-
 // CHECK: OpBitwiseOr [[uint]] [[otherelems]] [[firstelem]]

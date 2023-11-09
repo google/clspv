@@ -7,17 +7,17 @@
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
 // CHECK-DAG: %[[FLOAT3_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 3
+// CHECK-DAG: %[[UINT_TYPE:[a-zA-Z0-9_]*]] = OpTypeInt 32 
+// CHECK-DAG: %[[FLOAT_CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE]] 0
 
 // CHECK: %[[FLOAT4_UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT4_TYPE_ID]]
-// CHECK-DAG: %[[FLOAT_CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0
-// CHECK: %[[FLOAT_UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT_TYPE_ID]]
-// CHECK-DAG: %[[FLOAT3_CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[FLOAT3_TYPE_ID]] %[[FLOAT_CONSTANT_0_ID]] %[[FLOAT_UNDEF_ID]] %[[FLOAT_UNDEF_ID]]
+// CHECK: %[[FLOAT3_UNDEF_ID:[a-zA-Z0-9_]*]] = OpUndef %[[FLOAT3_TYPE_ID]]
 // CHECK: %[[LOADA_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT4_TYPE_ID]]
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT4_TYPE_ID]]
 // CHECK: %[[SHUFFLEA_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT3_TYPE_ID]] %[[LOADA_ID]] %[[FLOAT4_UNDEF_ID]] 0 1 2
 // CHECK: %[[SHUFFLEB_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT3_TYPE_ID]] %[[LOADB_ID]] %[[FLOAT4_UNDEF_ID]] 0 1 2
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT3_TYPE_ID]] %[[EXT_INST]] Cross %[[SHUFFLEA_ID]] %[[SHUFFLEB_ID]]
-// CHECK: %[[SHUFFLEOP_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT4_TYPE_ID]] %[[OP_ID]] %[[FLOAT3_CONSTANT_0_ID]] 0 1 2 3
+// CHECK: %[[SHUFFLEOP_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT4_TYPE_ID]] %[[OP_ID]] %[[FLOAT3_UNDEF_ID]] 0 1 2 
 // CHECK: OpStore {{.*}} %[[SHUFFLEOP_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float4* a, global float4* b)

@@ -16,7 +16,7 @@ kernel void foo(global char4* A, float f) {
 // CHECK:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK:  [[_uint_255:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 255
 // CHECK:  [[_uint_16:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 16
-// CHECK:  [[_uint_16908292:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 16908292
+// CHECK:  [[_uint_16908292:%[0-9a-zA-Z_]+]] = OpUndef [[_uint]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_float]]
 // CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpConvertFToS [[_uint]] [[_33]]
 // CHECK:  [[_35:%[0-9a-zA-Z_]+]] = OpShiftLeftLogical [[_uint]] [[_uint_255]] [[_uint_16]]

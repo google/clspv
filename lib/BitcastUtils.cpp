@@ -866,9 +866,8 @@ bool RemoveCstExprFromFunction(Function *F) {
       Value *VecNew = UndefValue::get(CstStruct->getType());
       for (unsigned i = 0; i < numEle; ++i) {
         Value *Scalar = B.CreateExtractElement(CstStruct, i);
-        auto *ScalarInst =
-            dyn_cast<ConstantExpr>(Scalar)->getAsInstruction(InsertBefore);
-        if (ScalarInst) {
+        if (auto *CstScalar = dyn_cast<ConstantExpr>(Scalar)) {
+          auto ScalarInst = CstScalar->getAsInstruction(InsertBefore);
           VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
           WorkList.push_back(std::make_pair(ScalarInst, OperandId));
         }
