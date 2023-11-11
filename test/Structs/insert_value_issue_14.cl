@@ -29,7 +29,7 @@ kernel void foo(global S* A, global uchar4* B, int n) {
 // CHECK-DAG: [[uint:%[_a-zA-Z0-9]+]] = OpTypeInt 32 0
 // no longer checked: [[struct:%[_a-zA-Z0-9]+]] = OpTypeStruct [[uint]] [[uint]] [[uint]]
 
-  
+ 
 // With undef mapping to a 0 byte sequence, (undef,1,2,3) maps to 66051.
 // CHECK-DAG: [[theconst:%[_a-zA-Z0-9]+]] = OpConstant [[uint]] 66051
 // CHECK-DAG: [[int_255:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 255
