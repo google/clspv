@@ -29,7 +29,7 @@ entry:
 ; CHECK: [[ins6:%[^ ]+]] = insertvalue [16 x float] [[ins5]], float [[ld6]], 6
 ; CHECK: [[ld7:%[^ ]+]] = extractvalue [8 x float] [[load]], 7
 ; CHECK: [[ins7:%[^ ]+]] = insertvalue [16 x float] [[ins6]], float [[ld7]], 7
-; CHECK: [[ins8:%[^ ]+]] = insertvalue [16 x float] [[ins7]], float undef, 8
+; CHECK: [[ins8:%[^ ]+]] = insertvalue [16 x float] [[ins7]], float 0.000000e+00, 8
 ; CHECK: [[ld0:%[^ ]+]] = extractvalue [8 x float] [[load]], 0
 ; CHECK: [[ins9:%[^ ]+]] = insertvalue [16 x float] [[ins8]], float [[ld0]], 9
 ; CHECK: [[ld0:%[^ ]+]] = extractvalue [8 x float] [[load]], 0
