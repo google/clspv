@@ -1286,7 +1286,8 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       const spv::BuiltIn BuiltinType = GetBuiltin(GV.getName());
       if (module_scope_constant_external_init &&
           spv::BuiltInMax == BuiltinType) {
-        StructTypesNeedingBlock.insert(cast<StructType>(GV.getValueType()));
+        StructTypesNeedingBlock.insert(
+            cast<StructType>(GV.getValueType()));
       }
     }
   }
@@ -1851,7 +1852,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
           }
           break;
         case spv::DimBuffer:
-        if (sampled) {
+          if (sampled) {
             addCapability(spv::CapabilitySampledBuffer);
           } else {
             addCapability(spv::CapabilityImageBuffer);
@@ -7165,7 +7166,7 @@ void SPIRVProducerPassImpl::AddArgumentReflection(
     }
     auto type_qual_enum = getSPIRVInt32Constant(type_qual_enum_value);
     Ops << type_qual_enum;
-
+  
   }
 
   auto arg_info = addSPIRVInst<kReflection>(spv::OpExtInst, Ops);

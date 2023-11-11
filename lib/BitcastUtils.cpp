@@ -833,11 +833,12 @@ bool RemoveCstExprFromFunction(Function *F) {
   }
 
   bool Changed = !WorkList.empty();
+
   while (!WorkList.empty()) {
     auto *I = WorkList.back().first;
     auto OperandId = WorkList.back().second;
     WorkList.pop_back();
-    
+
     IRBuilder<> B(I);
     auto InsertBefore = I;
     if (auto phi = dyn_cast<PHINode>(I)) {
@@ -884,6 +885,7 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, Operand);
     }
   }
+  
   return Changed;
 }
 
