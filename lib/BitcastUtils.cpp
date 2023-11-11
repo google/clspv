@@ -818,7 +818,7 @@ bool RemoveCstExprFromFunction(Function *F) {
 
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
-      if (dyn_cast<ConstantExpr>(I->getOperand(OperandId)) || 
+      if (dyn_cast<ConstantExpr>(I->getOperand(OperandId)) ||
           dyn_cast<ConstantVector>(I->getOperand(OperandId)) || 
           dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));      
@@ -857,7 +857,7 @@ bool RemoveCstExprFromFunction(Function *F) {
           ArrayNew = B.CreateInsertValue(ArrayNew, ScalarInst, i);
           WorkList.push_back(std::make_pair(ScalarInst, OperandId));
         } else {
-          ArrayNew = B.CreateInsertValue(ArrayNew,Scalar, i);
+          ArrayNew = B.CreateInsertValue(ArrayNew, Scalar, i);
         }
       }
       I->setOperand(OperandId, ArrayNew);
@@ -873,11 +873,12 @@ bool RemoveCstExprFromFunction(Function *F) {
           VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
           WorkList.push_back(std::make_pair(ScalarInst, OperandId));
         } else {
-          VecNew = B.CreateInsertElement(VecNew,Scalar, i);
+          VecNew = B.CreateInsertElement(VecNew, Scalar, i);
         }
       }
       I->setOperand(OperandId, VecNew);
-    } else if (auto CstExpr = dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
+    } else if (auto CstExpr =
+                   dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
       auto Operand = CstExpr->getAsInstruction(InsertBefore);
       CheckInstruction(Operand);
       I->setOperand(OperandId, Operand);
