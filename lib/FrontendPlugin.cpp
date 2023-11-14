@@ -73,6 +73,7 @@ private:
     CustomDiagnosticMemoryScopeAllDevices,
     CustomDiagnosticMemoryScopeWorkItem,
     CustomDiagnosticAtomicClearAcquire,
+    CustomDiagnosticInt128,
     CustomDiagnosticTotal
   };
   std::vector<unsigned> CustomDiagnosticsIDMap;
@@ -262,8 +263,18 @@ private:
       return true;
     }
 
-    if (QT->isBuiltinType()) {
-      return true;
+    if (auto *BT = llvm::dyn_cast<BuiltinType>(canonicalType)) {
+      switch (BT->getKind()) {
+      case clang::BuiltinType::ULongLong:
+      case clang::BuiltinType::UInt128:
+      case clang::BuiltinType::LongLong:
+      case clang::BuiltinType::Int128:
+        Instance.getDiagnostics().Report(
+            SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticInt128]);
+        return false;
+      default:
+        return true;
+      }
     }
 
     if (QT->isAtomicType()) {
@@ -725,6 +736,8 @@ public:
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "The order of atomic_flag_clear_explicit cannot be "
                            "memory_order_acquire/memory_order_acq_rel.");
+    CustomDiagnosticsIDMap[CustomDiagnosticInt128] = DE.getCustomDiagID(
+        DiagnosticsEngine::Error, "128-bit Integers are not uspported.");
   }
 
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) override {
