@@ -76,6 +76,26 @@ Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
       clspv::AddressSpace::Private);
   return B.CreateGEP(SrcTy, Src, Idxs, "", true);
 }
+
+Type *getSmallestTypeInStruct(const DataLayout &DL, StructType *Ty) {
+  Type *SmallestTy = Ty;
+  for (auto ElTy : Ty->elements()) {
+    Type *Prev = nullptr;
+    while (Prev != ElTy) {
+      Prev = ElTy;
+      if (auto ElSTy = dyn_cast<StructType>(ElTy)) {
+        ElTy = getSmallestTypeInStruct(DL, ElSTy);
+      } else {
+        ElTy = BitcastUtils::GetEleType(ElTy);
+      }
+    }
+    if (BitcastUtils::SizeInBits(DL, SmallestTy) >
+        BitcastUtils::SizeInBits(DL, ElTy)) {
+      SmallestTy = ElTy;
+    }
+  }
+  return SmallestTy;
+}
 } // namespace
 
 llvm::PreservedAnalyses
@@ -115,6 +135,22 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
   WeakInstructions ToBeErased;
   DenseMap<PHINode *, PHINode *> PHIMap;
   for (auto alloca : worklist) {
+    auto allocaSTy = dyn_cast<StructType>(alloca->getAllocatedType());
+    if (allocaSTy && BitcastUtils::IsComplexStruct(DL, allocaSTy)) {
+      auto SmallestTypeInStruct = getSmallestTypeInStruct(DL, allocaSTy);
+      IRBuilder<> B(alloca);
+      auto nb_elem = alloca->getAllocationSizeInBits(DL).value() /
+                     BitcastUtils::SizeInBits(DL, SmallestTypeInStruct);
+      if (nb_elem > 1) {
+        SmallestTypeInStruct = ArrayType::get(SmallestTypeInStruct, nb_elem);
+      }
+      auto new_alloca =
+          B.CreateAlloca(SmallestTypeInStruct, alloca->getAddressSpace());
+      alloca->replaceAllUsesWith(new_alloca);
+      ToBeErased.push_back(alloca);
+      alloca = new_alloca;
+    }
+
     SmallVector<std::tuple<Value *, Instruction *, uint64_t, Value *>> nodes;
     for (auto use : alloca->users()) {
       nodes.push_back(std::make_tuple(use, alloca, 0, nullptr));
