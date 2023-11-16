@@ -1126,7 +1126,8 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
   DynVal = nullptr;
 
   unsigned NbIdx = GEP->getNumOperands() - 1;
-  SmallerBitWidths = SizeInBits(DataLayout, GEP->getResultElementType());
+  SmallerBitWidths = SizeInBits(
+      DataLayout, reworkUnsizedType(DataLayout, GEP->getResultElementType()));
   SmallVector<Value *, 8> Idxs;
 
   Type *PrevTy = GEP->getSourceElementType();
@@ -1151,7 +1152,9 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
         CstVal += offset / SmallerBitWidths;
       }
     } else {
-      auto size = SizeInBits(DataLayout, NextTy) / SmallerBitWidths;
+      auto size =
+          SizeInBits(DataLayout, reworkUnsizedType(DataLayout, NextTy)) /
+          SmallerBitWidths;
       if (auto Cst = dyn_cast<ConstantInt>(Op)) {
         CstVal += Cst->getZExtValue() * size;
       } else {

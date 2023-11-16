@@ -1,4 +1,5 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=replace-pointer-bitcast
+; RUN: FileCheck %s < %t.ll
 
 ; CHECK:  [[alloca:%[^ ]+]] = alloca [65 x i32], align 4
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr [65 x i32], ptr [[alloca]], i32 0
