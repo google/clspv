@@ -666,6 +666,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           if (!seen.insert(gep).second) {
             continue;
           }
+          if (!source_ty->isIntegerTy() || !dest_ty->isIntegerTy()) {
+            continue;
+          }
 
           // For some reason, with opaque pointer, LLVM tends to transform
           // memcpy/memset into a series of gep and load/store. But while the
