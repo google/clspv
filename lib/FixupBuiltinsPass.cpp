@@ -113,7 +113,7 @@ bool FixupBuiltinsPass::fixupReadImage(Function &F) {
       auto Img = CI->getOperand(0);
       auto *image_ty = InferType(Img, F.getContext(), &cache);
       if (clspv::ImageDimensionality(image_ty) == spv::DimBuffer) {
-        IRBuilder<> B(CI);;
+        IRBuilder<> B(CI);
         B.SetInsertPoint(*CI->getInsertionPointAfterDef());
 
         auto shuffle =
