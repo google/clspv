@@ -847,11 +847,11 @@ bool RemoveCstExprFromFunction(Function *F) {
               ->getFirstNonPHI();
     }
 
-    if (auto CstStruct = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
-      unsigned numEle = CstStruct->getType()->getArrayNumElements();
-      Value *ArrayNew = UndefValue::get(CstStruct->getType());
+    if (auto CstArray = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
+      unsigned numEle = CstArray->getType()->getArrayNumElements();
+      Value *ArrayNew = UndefValue::get(CstArray->getType());
       for (unsigned i = 0; i < numEle; ++i) {
-        Value *Scalar = B.CreateExtractValue(CstStruct, i);
+        Value *Scalar = B.CreateExtractValue(CstArray, i);
         auto *ScalarCst = dyn_cast<ConstantExpr>(Scalar);
         if (ScalarCst) {
           auto *ScalarInst = ScalarCst->getAsInstruction(InsertBefore);
@@ -863,12 +863,12 @@ bool RemoveCstExprFromFunction(Function *F) {
       }
       I->setOperand(OperandId, ArrayNew);
     }
-    else if (auto CstStruct = dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
-      auto FxVecTy = dyn_cast<FixedVectorType>(CstStruct->getType());
+    else if (auto CstVector = dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
+      auto FxVecTy = dyn_cast<FixedVectorType>(CstVector->getType());
       unsigned numEle = FxVecTy->getNumElements();
-      Value *VecNew = UndefValue::get(CstStruct->getType());
+      Value *VecNew = UndefValue::get(CstVector->getType());
       for (unsigned i = 0; i < numEle; ++i) {
-        Value *Scalar = B.CreateExtractElement(CstStruct, i);
+        Value *Scalar = B.CreateExtractElement(CstVector, i);
         if (auto *CstScalar = dyn_cast<ConstantExpr>(Scalar)) {
           auto ScalarInst = CstScalar->getAsInstruction(InsertBefore);
           VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
