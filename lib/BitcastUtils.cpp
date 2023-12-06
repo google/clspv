@@ -885,7 +885,7 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, Operand);
     }
   }
-  
+
   return Changed;
 }
 
