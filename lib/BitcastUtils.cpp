@@ -819,9 +819,9 @@ bool RemoveCstExprFromFunction(Function *F) {
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
       if (dyn_cast<ConstantExpr>(I->getOperand(OperandId)) ||
-          dyn_cast<ConstantVector>(I->getOperand(OperandId)) || 
+          dyn_cast<ConstantVector>(I->getOperand(OperandId)) ||
           dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
-        WorkList.push_back(std::make_pair(I, OperandId));      
+        WorkList.push_back(std::make_pair(I, OperandId));
       }
     }
   };
@@ -862,8 +862,8 @@ bool RemoveCstExprFromFunction(Function *F) {
         }
       }
       I->setOperand(OperandId, ArrayNew);
-    }
-    else if (auto CstVector = dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
+    } else if (auto CstVector =
+                   dyn_cast(I->getOperand(OperandId))) {
       auto FxVecTy = dyn_cast<FixedVectorType>(CstVector->getType());
       unsigned numEle = FxVecTy->getNumElements();
       Value *VecNew = UndefValue::get(CstVector->getType());
@@ -885,7 +885,7 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, Operand);
     }
   }
-  
+
   return Changed;
 }
 
