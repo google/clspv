@@ -1579,7 +1579,7 @@ Type *SPIRVProducerPassImpl::CanonicalType(Type *type) {
         AddrSpace = AddressSpace::Global;
         // The canonical type of __constant is __global unless constants are
         // passed in uniform buffers.
-        auto *GlobalTy = PointerType::getWithSamePointeeType(ptr_ty, AddrSpace);
+        auto *GlobalTy = PointerType::get(type->getContext(), AddrSpace);
         return GlobalTy;
       }
     }
@@ -4993,8 +4993,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     if (GEP->getPointerAddressSpace() == AddressSpace::ModuleScopePrivate ||
         GlobalConstArgSet.count(GEP->getPointerOperand())) {
       // Use pointer type with private address space for global constant.
-      ResultType = PointerType::getWithSamePointeeType(
-          ResultType, AddressSpace::ModuleScopePrivate);
+      ResultType = PointerType::get(module->getContext(),
+                                    AddressSpace::ModuleScopePrivate);
     }
 
     Ops << getSPIRVPointerType(ResultType, GEP->getResultElementType());
