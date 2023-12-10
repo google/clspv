@@ -864,8 +864,7 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, ArrayNew);
     } else if (auto CstVector =
                    dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
-      auto FxVecTy = dyn_cast<FixedVectorType>(CstVector->getType());
-      unsigned numEle = FxVecTy->getNumElements();
+      unsigned numEle = (CstVector->getType())->getNumElements();
       Value *VecNew = UndefValue::get(CstVector->getType());
       for (unsigned i = 0; i < numEle; ++i) {
         Value *Scalar = B.CreateExtractElement(CstVector, i);
