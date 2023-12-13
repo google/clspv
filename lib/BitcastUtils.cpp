@@ -818,7 +818,9 @@ bool RemoveCstExprFromFunction(Function *F) {
 
   auto CheckInstruction = [&WorkList](Instruction *I) {
     for (unsigned OperandId = 0; OperandId < I->getNumOperands(); OperandId++) {
-      if (isa<ConstantExpr>(I->getOperand(OperandId))) {
+      if (dyn_cast<ConstantExpr>(I->getOperand(OperandId)) ||
+          dyn_cast<ConstantVector>(I->getOperand(OperandId)) ||
+          dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
         WorkList.push_back(std::make_pair(I, OperandId));
       }
     }
@@ -837,6 +839,7 @@ bool RemoveCstExprFromFunction(Function *F) {
     auto OperandId = WorkList.back().second;
     WorkList.pop_back();
 
+    IRBuilder<> B(I);
     auto InsertBefore = I;
     if (auto phi = dyn_cast<PHINode>(I)) {
       InsertBefore =
@@ -844,10 +847,42 @@ bool RemoveCstExprFromFunction(Function *F) {
               ->getFirstNonPHI();
     }
 
-    auto Operand = dyn_cast<ConstantExpr>(I->getOperand(OperandId))
-                       ->getAsInstruction(InsertBefore);
-    CheckInstruction(Operand);
-    I->setOperand(OperandId, Operand);
+    if (auto CstArray = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
+      unsigned numEle = CstArray->getType()->getArrayNumElements();
+      Value *ArrayNew = UndefValue::get(CstArray->getType());
+      for (unsigned i = 0; i < numEle; ++i) {
+        Value *Scalar = B.CreateExtractValue(CstArray, i);
+        auto *ScalarCst = dyn_cast<ConstantExpr>(Scalar);
+        if (ScalarCst) {
+          auto *ScalarInst = ScalarCst->getAsInstruction(InsertBefore);
+          ArrayNew = B.CreateInsertValue(ArrayNew, ScalarInst, i);
+          WorkList.push_back(std::make_pair(ScalarInst, OperandId));
+        } else {
+          ArrayNew = B.CreateInsertValue(ArrayNew, Scalar, i);
+        }
+      }
+      I->setOperand(OperandId, ArrayNew);
+    } else if (auto CstVector =
+                   dyn_cast<ConstantVector>(I->getOperand(OperandId))) {
+      unsigned numEle = (CstVector->getType())->getNumElements();
+      Value *VecNew = UndefValue::get(CstVector->getType());
+      for (unsigned i = 0; i < numEle; ++i) {
+        Value *Scalar = B.CreateExtractElement(CstVector, i);
+        if (auto *CstScalar = dyn_cast<ConstantExpr>(Scalar)) {
+          auto ScalarInst = CstScalar->getAsInstruction(InsertBefore);
+          VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
+          WorkList.push_back(std::make_pair(ScalarInst, OperandId));
+        } else {
+          VecNew = B.CreateInsertElement(VecNew, Scalar, i);
+        }
+      }
+      I->setOperand(OperandId, VecNew);
+    } else if (auto CstExpr =
+                   dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
+      auto Operand = CstExpr->getAsInstruction(InsertBefore);
+      CheckInstruction(Operand);
+      I->setOperand(OperandId, Operand);
+    }
   }
 
   return Changed;

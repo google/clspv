@@ -887,7 +887,8 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
     if (F.isDeclaration()) {
       continue;
     }
-
+    // We do not wish to deal with any constexpr
+    BitcastUtils::RemoveCstExprFromFunction(&F);
     // Generate Function Prologue.
     GenerateFuncPrologue(F);
 
@@ -2287,9 +2288,13 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     Ops << LiteralNum;
   } else if (isa<ConstantDataSequential>(Cst) &&
              cast<ConstantDataSequential>(Cst)->isString()) {
-    Cst->print(errs());
-    llvm_unreachable("Implement this Constant");
 
+    const ConstantDataSequential *CDS = dyn_cast<ConstantDataSequential>(Cst);
+
+    Opcode = spv::OpConstantComposite;
+    for (unsigned k = 0; k < CDS->getNumElements(); k++) {
+      Ops << CDS->getElementAsConstant(k);
+    }
   } else if (const ConstantDataSequential *CDS =
                  dyn_cast<ConstantDataSequential>(Cst)) {
     // Let's convert <4 x i8> constant to int constant specially.
