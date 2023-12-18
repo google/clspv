@@ -1,5 +1,5 @@
-; RUN: clspv-opt %s -o %t.spv --passes=spirv-producer
-; RUN: FileCheck %s < %t.spv
+; RUN: clspv-opt %s -o %t.ll --passes=spirv-producer --producer-out-file %t.spv
+; RUN: FileCheck %s < %t.ll
 
 ; CHECK: @array = global [8 x i8] zeroinitializer
 ; CHECK: [[ARRAY_PTR:[a-zA-Z0-9_]*]] = getelementptr inbounds [8 x i8], ptr @array, i32 0, i32 0
