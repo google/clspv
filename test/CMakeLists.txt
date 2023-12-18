@@ -40,6 +40,8 @@ endif()
 get_filename_component(LIT_PATH ${LLVM_SOURCE_DIR}/utils/lit/lit.py ABSOLUTE)
 get_filename_component(FILECHECK_PATH ${LLVM_BINARY_DIR}/${LLVM_BINARY_SUBDIR} ABSOLUTE)
 
+set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
+
 add_custom_target(check-spirv
   COMMAND ${PYTHON_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
     -DCLSPV_TARGET="-arch=spir"

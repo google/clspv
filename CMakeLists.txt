@@ -81,19 +81,19 @@ if (NOT DEFINED SPIRV_TOOLS_SOURCE_DIR)
   use_component(${SPIRV_TOOLS_SOURCE_DIR})
 endif()
 
-option(CLSPV_BUILD_SPIRV_DIS "Enable build of spirv-dis if the target does not exist" ON)
-if (NOT TARGET spirv-dis AND CLSPV_BUILD_SPIRV_DIS)
-  # First tell SPIR-V Tools where to find SPIR-V Headers
-  set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
+if (NOT ANDROID)
+  option(CLSPV_BUILD_SPIRV_DIS "Enable build of spirv-dis if the target does not exist" ON)
+  if (NOT TARGET spirv-dis AND CLSPV_BUILD_SPIRV_DIS)
+    # First tell SPIR-V Tools where to find SPIR-V Headers
+    set(SPIRV-Headers_SOURCE_DIR ${SPIRV_HEADERS_SOURCE_DIR})
 
-  # Bring in the SPIR-V Tools repository
-  add_subdirectory(${SPIRV_TOOLS_SOURCE_DIR}
-      ${CMAKE_CURRENT_BINARY_DIR}/third_party/SPIRV-Tools EXCLUDE_FROM_ALL)
+    # Bring in the SPIR-V Tools repository
+    add_subdirectory(${SPIRV_TOOLS_SOURCE_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}/third_party/SPIRV-Tools EXCLUDE_FROM_ALL)
+  endif()
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
 option(ENABLE_CLSPV_OPT "Enable the clspv-opt driver." ON)
 
@@ -185,8 +185,10 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 # Bring in our tools folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
-option(CLSPV_BUILD_TESTS "Enable the build of clspv tests" ON)
-if (CLSPV_BUILD_TESTS)
-  # Bring in our test folder
-  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+if (NOT ANDROID)
+  option(CLSPV_BUILD_TESTS "Enable the build of clspv tests" ON)
+  if (CLSPV_BUILD_TESTS)
+    # Bring in our test folder
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+  endif()
 endif()
