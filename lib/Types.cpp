@@ -413,7 +413,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
           dyn_cast<MDString>(access_qual_op)->getString();
 
       if (access_qual_str == "none") {
-        assert(type_name_str.endswith("*") && "Only expect pointer types here");
+        assert(type_name_str.ends_with("*") &&
+               "Only expect pointer types here");
         auto type_name = type_name_str.drop_back(1);
         Type *base_ty = nullptr;
         if (type_name.consume_front("char") ||

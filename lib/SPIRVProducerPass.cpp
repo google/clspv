@@ -866,7 +866,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
     // If the GV is one of our special __spirv_* variables, remove the
     // initializer as it was only placed there to force LLVM to not throw the
     // value away.
-    if (GV.getName().startswith("__spirv_") ||
+    if (GV.getName().starts_with("__spirv_") ||
         GV.getAddressSpace() == clspv::AddressSpace::PushConstant) {
       GV.setInitializer(nullptr);
     }
