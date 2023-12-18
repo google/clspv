@@ -976,7 +976,8 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           dest_ty = call->getType();
         }
       }
-    } else if (call->getCalledFunction()->getName().starts_with("llvm.memcpy")) {
+    } else if (call->getCalledFunction()->getName().starts_with(
+                   "llvm.memcpy")) {
       // To help lower memcpy, try to rework memcpy inputs to have the same type
       // with the samer of them. It avoids upgrading a type which can lead to
       // complicated issues.
