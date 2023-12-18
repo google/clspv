@@ -113,7 +113,7 @@ PreservedAnalyses clspv::UnhideConstantLoadsPass::run(Module &M,
 
   SmallVector<Function *, 16> WorkList;
   for (auto &F : M.getFunctionList()) {
-    if (F.getName().startswith(kWrapFunctionPrefix)) {
+    if (F.getName().starts_with(kWrapFunctionPrefix)) {
       WorkList.push_back(&F);
     }
   }

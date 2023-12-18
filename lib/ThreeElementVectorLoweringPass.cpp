@@ -49,7 +49,7 @@ namespace {
 using PartitionCallback = std::function<void(Instruction *)>;
 
 bool isSpirvGlobalVariable(llvm::StringRef Name) {
-  return Name.startswith("__spirv_") || Name == "__push_constants";
+  return Name.starts_with("__spirv_") || Name == "__push_constants";
 }
 
 /// Partition the @p Instructions based on their liveness.
