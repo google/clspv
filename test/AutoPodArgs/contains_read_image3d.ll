@@ -12,7 +12,7 @@ target triple = "spir-unknown-unknown"
 define dso_local spir_func <4 x float> @bar(target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) %img, target("spirv.Sampler") %sampler, <4 x i32> %coord) #0 !kernel_arg_name !14 {
 entry:
   %img.addr = alloca target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0), align 4
-  store target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) zeroinitializer, ptr %img.addr, align 4
+  store target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) undef, ptr %img.addr, align 4
   %sampler.addr = alloca target("spirv.Sampler"), align 4
   store target("spirv.Sampler") zeroinitializer, ptr %sampler.addr, align 4
   %coord.addr = alloca <4 x i32>, align 16
@@ -34,7 +34,7 @@ declare !kernel_arg_name !17 spir_func <4 x float> @_Z11read_imagef14ocl_image3d
 define dso_local spir_kernel void @foo(target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) %img, target("spirv.Sampler") %sampler, ptr addrspace(1) align 16 %out, <4 x i32> %coord) #2 !kernel_arg_name !16 !kernel_arg_addr_space !17 !kernel_arg_access_qual !18 !kernel_arg_type !19 !kernel_arg_base_type !20 !kernel_arg_type_qual !21 {
 entry:
   %img.addr = alloca target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0), align 4
-  store target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) zeroinitializer, ptr %img.addr, align 4
+  store target("spirv.Image", void, 2, 0, 0, 0, 0, 0, 0) undef, ptr %img.addr, align 4
   %sampler.addr = alloca target("spirv.Sampler"), align 4
   store target("spirv.Sampler") zeroinitializer, ptr %sampler.addr, align 4
   %out.addr = alloca ptr addrspace(1), align 4

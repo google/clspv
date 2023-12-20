@@ -13,7 +13,7 @@ target triple = "spir-unknown-unknown"
 
 define dso_local spir_kernel void @sample_kernel(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %input, ptr addrspace(1) nocapture writeonly align 4 %outData) !kernel_arg_addr_space !7 !kernel_arg_access_qual !8 !kernel_arg_type !9 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 !push_constants_image_channel !12 {
 entry:
-  %0 = call target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
+  %0 = call target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) undef)
   %1 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x %struct.image_kernel_data] } zeroinitializer)
   %call = tail call spir_func i32 @_Z15get_image_width28ocl_image1d_ro.float.sampled(target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) %0) #2
   %2 = getelementptr { [0 x %struct.image_kernel_data] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0, i32 0

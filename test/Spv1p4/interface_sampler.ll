@@ -17,7 +17,7 @@ declare <4 x float> @_Z11read_imagef33opencl.image2d_ro_t.float.sampled11ocl_sam
 
 define spir_kernel void @test(target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) %img, <4 x float> addrspace(1)* nocapture %out) !clspv.pod_args_impl !4 {
 entry:
-  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
+  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) undef)
   %1 = call { [0 x <4 x float>] } addrspace(1)* @_Z14clspv.resource.1(i32 1, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x <4 x float>] } zeroinitializer)
   %2 = getelementptr { [0 x <4 x float>] }, { [0 x <4 x float>] } addrspace(1)* %1, i32 0, i32 0, i32 0
   %3 = call target("spirv.Sampler") @_Z25clspv.sampler_var_literal(i32 0, i32 0, i32 16, target("spirv.Sampler") zeroinitializer)

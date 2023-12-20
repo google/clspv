@@ -14,7 +14,7 @@ declare spir_func void @_Z13write_imageui24opencl.image2d_wo_t.uintDv2_iDv4_j(ta
 
 define spir_kernel void @foo(target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) %i)!clspv.pod_args_impl !8 {
 entry:
-  %0 = call target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) @_Z14clspv.resource.0(i32 0, i32 0, i32 7, i32 0, i32 0, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) zeroinitializer)
+  %0 = call target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) @_Z14clspv.resource.0(i32 0, i32 0, i32 7, i32 0, i32 0, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) undef)
   tail call spir_func void @_Z13write_imageui24opencl.image2d_wo_t.uintDv2_iDv4_j(target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 1, 1) %0, <2 x i32> zeroinitializer, <4 x i32> zeroinitializer)
   ret void
 }

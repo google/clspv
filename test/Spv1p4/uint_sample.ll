@@ -16,7 +16,7 @@ define spir_kernel void @foo(<4 x i32> addrspace(1)* nocapture %out, target("spi
 entry:
   %0 = call { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x <4 x i32>] } zeroinitializer)
   %1 = getelementptr { [0 x <4 x i32>] }, { [0 x <4 x i32>] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call target("spirv.Image", i32, 1, 0, 0, 0, 1, 0, 0, 1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 1, 0, 0, 1) zeroinitializer)
+  %2 = call target("spirv.Image", i32, 1, 0, 0, 0, 1, 0, 0, 1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 1, 0, 0, 1) undef)
   %3 = call target("spirv.Sampler") @_Z14clspv.resource.2(i32 0, i32 2, i32 8, i32 2, i32 2, i32 0, target("spirv.Sampler") zeroinitializer)
   %4 = tail call <4 x i32> @_Z12read_imageui32opencl.image2d_ro_t.uint.sampled11ocl_samplerDv2_f(target("spirv.Image", i32, 1, 0, 0, 0, 1, 0, 0, 1) %2, target("spirv.Sampler") %3, <2 x float> zeroinitializer)
   store <4 x i32> %4, <4 x i32> addrspace(1)* %1, align 16
