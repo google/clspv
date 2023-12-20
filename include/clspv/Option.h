@@ -280,7 +280,9 @@ enum class Vec3ToVec4SupportClass : int {
 
 Vec3ToVec4SupportClass Vec3ToVec4();
 
-// Returns true if opaque pointers are enabled
+// Returns true if opaque pointers are enabled.
+// Do not add new code that depends on this value. Assume it is true.
+// The false case is not supported.
 bool OpaquePointers();
 
 // Returns true if the debug information should be generated
