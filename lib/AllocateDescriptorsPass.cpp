@@ -637,7 +637,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
             Builder.getInt32(discriminants_list[discriminant_index].index);
         auto *coherent_arg = Builder.getInt32(
             discriminants_list[discriminant_index].discriminant.coherent);
-        auto *resource_type_arg = Constant::getNullValue(resource_type);
+        auto *resource_type_arg = clspv::GetDummyValue(resource_type);
         auto *call = Builder.CreateCall(
             var_fn, {set_arg, binding_arg, arg_kind_arg, arg_index_arg,
                      discriminant_index_arg, coherent_arg, resource_type_arg});

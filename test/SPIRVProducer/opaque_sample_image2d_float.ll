@@ -24,7 +24,7 @@ target triple = "spir-unknown-unknown"
 
 define dso_local spir_kernel void @test(target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) %t, target("spirv.Sampler") %s, ptr addrspace(1) nocapture writeonly align 16 %out) !clspv.pod_args_impl !10 {
 entry:
-  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
+  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) undef)
   %1 = call target("spirv.Sampler") @_Z14clspv.resource.1(i32 0, i32 1, i32 8, i32 1, i32 1, i32 0, target("spirv.Sampler") zeroinitializer)
   %2 = call ptr addrspace(1) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x <4 x float>] } zeroinitializer)
   %3 = getelementptr { [0 x <4 x float>] }, ptr addrspace(1) %2, i32 0, i32 0, i32 0

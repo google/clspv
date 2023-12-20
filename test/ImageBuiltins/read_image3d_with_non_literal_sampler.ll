@@ -35,7 +35,7 @@ declare <4 x float> @_Z11read_imagef30ocl_image3d_ro_t.float.sampled11ocl_sample
 ; Function Attrs: norecurse nounwind
 define spir_kernel void @foo(target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) %img, target("spirv.Sampler") %sampler, ptr addrspace(1) nocapture writeonly align 16 %out) #0 !kernel_arg_addr_space !16 !kernel_arg_access_qual !17 !kernel_arg_type !18 !kernel_arg_base_type !19 !kernel_arg_type_qual !20 !kernel_arg_name !21 !clspv.pod_args_impl !22 !kernel_arg_map !23 {
 entry:
-  %0 = call target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
+  %0 = call target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 0, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) undef)
   %1 = call target("spirv.Sampler") @_Z14clspv.resource.1(i32 0, i32 1, i32 8, i32 1, i32 1, i32 0, target("spirv.Sampler") zeroinitializer)
   %2 = call ptr addrspace(1) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x <4 x float>] } zeroinitializer)
   %3 = getelementptr { [0 x <4 x float>] }, ptr addrspace(1) %2, i32 0, i32 0, i32 0

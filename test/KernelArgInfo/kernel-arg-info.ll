@@ -23,9 +23,9 @@ entry:
   %QUA.addr = alloca i32, align 4
   store i32 0, ptr %QUA.addr, align 4
   %im0.addr = alloca target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 0), align 8
-  store target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 0) zeroinitializer, ptr %im0.addr, align 8
+  store target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 0) undef, ptr %im0.addr, align 8
   %im1.addr = alloca target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1), align 8
-  store target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) zeroinitializer, ptr %im1.addr, align 8
+  store target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) undef, ptr %im1.addr, align 8
   %ptr.addr = alloca ptr addrspace(1), align 8
   store ptr addrspace(1) null, ptr %ptr.addr, align 8
   %tmp = alloca <4 x float>, align 16

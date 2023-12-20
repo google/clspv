@@ -16,7 +16,7 @@ define spir_kernel void @foo(<4 x i32> addrspace(1)* nocapture %out, target("spi
 entry:
   %0 = call { [0 x <4 x i32>] } addrspace(1)* @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x <4 x i32>] } zeroinitializer)
   %1 = getelementptr { [0 x <4 x i32>] }, { [0 x <4 x i32>] } addrspace(1)* %0, i32 0, i32 0, i32 0
-  %2 = call target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 2, 1) @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 2, 1) zeroinitializer)
+  %2 = call target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 2, 1) @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 2, 1) undef)
   %call = tail call spir_func <4 x i32> @_Z12read_imageui24opencl.image2d_rw_t.uintDv2_i(target("spirv.Image", i32, 1, 0, 0, 0, 2, 0, 2, 1) %2, <2 x i32> zeroinitializer)
   store <4 x i32> %call, <4 x i32> addrspace(1)* %1, align 16
   ret void

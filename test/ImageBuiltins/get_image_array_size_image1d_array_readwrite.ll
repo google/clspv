@@ -12,7 +12,7 @@ define spir_kernel void @foo(ptr addrspace(1) %out, target("spirv.Image", float,
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call target("spirv.Image", float, 0, 0, 1, 0, 2, 0, 2, 0) @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, target("spirv.Image", float, 0, 0, 1, 0, 2, 0, 2, 0) zeroinitializer)
+  %2 = call target("spirv.Image", float, 0, 0, 1, 0, 2, 0, 2, 0) @_Z14clspv.resource.1(i32 0, i32 1, i32 7, i32 1, i32 1, i32 0, target("spirv.Image", float, 0, 0, 1, 0, 2, 0, 2, 0) undef)
   %call = tail call spir_func i32 @_Z20get_image_array_size31opencl.image1d_array_rw_t.float(target("spirv.Image", float, 0, 0, 1, 0, 2, 0, 2, 0) %2)
   store i32 %call, ptr addrspace(1) %1, align 4
   ret void

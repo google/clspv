@@ -12,7 +12,7 @@ target triple = "spir-unknown-unknown"
 
 define spir_kernel void @test(target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) %t, ptr addrspace(1) nocapture writeonly align 16 %out, { <2 x float> } %podargs) !clspv.pod_args_impl !4 !kernel_arg_map !10 {
 entry:
-  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) zeroinitializer)
+  %0 = call target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) @_Z14clspv.resource.0(i32 1, i32 0, i32 6, i32 0, i32 0, i32 0, target("spirv.Image", float, 1, 0, 0, 0, 1, 0, 0, 0) undef)
   %1 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 1, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x <4 x float>] } zeroinitializer)
   %2 = getelementptr { [0 x <4 x float>] }, ptr addrspace(1) %1, i32 0, i32 0, i32 0
   %3 = call ptr addrspace(9) @_Z14clspv.resource.2(i32 -1, i32 2, i32 5, i32 2, i32 2, i32 0, { { <2 x float> } } zeroinitializer)

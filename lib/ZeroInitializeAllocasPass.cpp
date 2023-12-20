@@ -23,6 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "Types.h"
 #include "ZeroInitializeAllocasPass.h"
 
 using namespace llvm;
@@ -55,9 +56,9 @@ clspv::ZeroInitializeAllocasPass::run(Module &M, ModuleAnalysisManager &) {
   }
 
   for (AllocaInst *alloca : WorkList) {
-    auto *valueTy = alloca->getAllocatedType();
-    auto *store = new StoreInst(Constant::getNullValue(valueTy), alloca, false,
-                                Align(alloca->getAlign()));
+    auto *value = GetDummyValue(alloca->getAllocatedType());
+    auto *store =
+        new StoreInst(value, alloca, false, Align(alloca->getAlign()));
     store->insertAfter(alloca);
   }
 

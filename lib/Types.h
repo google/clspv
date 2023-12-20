@@ -16,6 +16,7 @@
 #define CLSPV_LIB_TYPES_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -82,6 +83,10 @@ bool IsWriteOnlyImageType(llvm::Type *type);
 
 // Returns true if pointers in the module are 64-bit.
 bool PointersAre64Bit(llvm::Module &m);
+
+// Returns the null value for the type if the type supports it,
+// otherwise returns the undef value.
+llvm::Constant *GetDummyValue(llvm::Type *type);
 
 } // namespace clspv
 
