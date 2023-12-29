@@ -72,8 +72,7 @@ Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
     return Src;
   }
   auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
-      DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
-      clspv::AddressSpace::Private);
+      DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths, Src);
   return B.CreateGEP(SrcTy, Src, Idxs, "", true);
 }
 

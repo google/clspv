@@ -488,11 +488,9 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
     Value *DynVal;
     size_t SmallerBitWidths;
     ExtractOffsetFromGEP(DL, B, gep, CstVal, DynVal, SmallerBitWidths);
-    auto Idxs = GetIdxsForTyFromOffset(
-        DL, B, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)gep->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
+    auto Idxs =
+        GetIdxsForTyFromOffset(DL, B, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
+                               gep->getPointerOperand());
     auto *new_gep =
         GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
     gep->replaceAllUsesWith(new_gep);
@@ -571,11 +569,9 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
           RetTy = gep->getResultElementType();
         }
         ExtractOffsetFromGEP(DL, B, gep, CstVal, DynVal, SmallerBitWidths);
-        auto Idxs = GetIdxsForTyFromOffset(
-            DL, B, Ty, RetTy, CstVal, DynVal, SmallerBitWidths,
-            (clspv::AddressSpace::Type)gep->getPointerOperand()
-                ->getType()
-                ->getPointerAddressSpace());
+        auto Idxs =
+            GetIdxsForTyFromOffset(DL, B, Ty, RetTy, CstVal, DynVal,
+                                   SmallerBitWidths, gep->getPointerOperand());
         auto *new_gep = GetElementPtrInst::Create(Ty, gep->getPointerOperand(),
                                                   Idxs, "", gep);
         gep->replaceAllUsesWith(new_gep);
@@ -752,11 +748,9 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
                                 CstVal * SmallerBitWidths, nullptr) != 0) {
         SrcTy = DstTy;
       }
-      auto Idx = GetIdxsForTyFromOffset(
-          DL, Builder, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths,
-          (clspv::AddressSpace::Type)GEP->getPointerOperand()
-              ->getType()
-              ->getPointerAddressSpace());
+      auto Idx =
+          GetIdxsForTyFromOffset(DL, Builder, SrcTy, DstTy, CstVal, DynVal,
+                                 SmallerBitWidths, GEP->getPointerOperand());
       NewAddrIdxs.append(Idx);
 
       // If bitcast's user is gep, investigate gep's users too.

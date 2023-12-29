@@ -50,7 +50,6 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed |= runOnBitcastFromBitcast(M);
     changed |= runOnAllocaNotAliasing(M);
     changed |= runOnGEPFromGEP(M);
-    changed |= runOnUnneededCasts(M);
     changed |= runOnImplicitGEP(M);
     changed |= runOnUpgradeableConstantCasts(M);
     changed |= runOnUnneededIndices(M);
@@ -189,23 +188,28 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
             if (OtherGEP->getResultElementType() ==
                 GEP->getSourceElementType()) {
 
-              auto LastTypeIsStruct = [](Type *Ty, SmallVector<Value *> Idxs) {
+              auto LastTypeStruct = [](Type *Ty, SmallVector<Value *> Idxs) {
                 Idxs.pop_back();
-                return isa<StructType>(
+                return dyn_cast<StructType>(
                     GetElementPtrInst::getIndexedType(Ty, Idxs));
               };
-              auto NotZero = [](Value *V) {
+              auto ConstantValue = [](Value *V) {
                 if (auto CstVal = dyn_cast<ConstantInt>(V)) {
-                  if (CstVal->getZExtValue() == 0)
-                    return false;
+                  return CstVal->getZExtValue();
                 }
-                return true;
+                return UINT64_MAX;
               };
-              if (GEP->getNumOperands() > 1 && NotZero(GEP->getOperand(1)) &&
-                  LastTypeIsStruct(OtherGEP->getSourceElementType(),
-                                   SmallVector<Value *>(OtherGEP->indices()))) {
-                LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (struct "
-                                     "follow by not zero): ";
+              auto LastTypeStructTy =
+                  LastTypeStruct(OtherGEP->getSourceElementType(),
+                                 SmallVector<Value *>(OtherGEP->indices()));
+              if (GEP->getNumOperands() > 1 && LastTypeStructTy != nullptr &&
+                  ((ConstantValue(GEP->getOperand(1)) >=
+                        LastTypeStructTy->getStructNumElements() &&
+                    IsArrayLike(LastTypeStructTy)) ||
+                   (ConstantValue(GEP->getOperand(1)) != 0 &&
+                    !IsArrayLike(LastTypeStructTy)))) {
+                LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (out-of-bound "
+                                     "struct access): ";
                            OtherGEP->dump(); GEP->dump());
                 continue;
               }
@@ -244,17 +248,18 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       unsigned numEle =
           BitcastUtils::GetNumEle(GetElementPtrInst::getIndexedType(
               OtherGEP->getSourceElementType(), Idxs));
-      if (numEle > 1) {
+      if (numEle > 1 || numEle == 0) {
         VecOrArraySize = numEle;
       }
+    } else if (OtherGEP->getNumOperands() == 2) {
+      VecOrArraySize =
+          BitcastUtils::GetNumEle(OtherGEP->getSourceElementType());
     }
 
     SmallVector<Value *, 8> Idxs;
-    if (CstGEPIdxOp && CstGEPIdxOp->isZero()) {
-      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end());
-    } else if (CstSrcLastIdxOp && CstGEPIdxOp &&
-               (CstSrcLastIdxOp->getZExtValue() + CstGEPIdxOp->getZExtValue() <
-                VecOrArraySize)) {
+    if (CstSrcLastIdxOp && CstGEPIdxOp &&
+        (CstSrcLastIdxOp->getZExtValue() + CstGEPIdxOp->getZExtValue() <
+         VecOrArraySize)) {
       Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
       if (CstGEPIdxOp->isZero()) {
         Idxs.push_back(SrcLastIdxOp);
@@ -269,11 +274,27 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                                  : 32),
             CstGEPIdxOp->getZExtValue() + CstSrcLastIdxOp->getZExtValue()));
       }
-    } else if (cast<PointerType>(OtherGEP->getPointerOperand()->getType())
-                       ->getAddressSpace() == clspv::AddressSpace::Private &&
-               (OtherGEP->getSourceElementType()->isArrayTy() ||
-                OtherGEP->getSourceElementType()->isStructTy() ||
-                OtherGEP->getSourceElementType()->isVectorTy())) {
+    } else if (CstGEPIdxOp && CstGEPIdxOp->isZero()) {
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end());
+    } else if (VecOrArraySize == 0) {
+      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
+      if (CstSrcLastIdxOp && CstGEPIdxOp) {
+        Idxs.push_back(ConstantInt::get(
+            IntegerType::get(M.getContext(),
+                             clspv::PointersAre64Bit(M) &&
+                                     !OtherGEP->getType()->isStructTy()
+                                 ? 64
+                                 : 32),
+            CstGEPIdxOp->getZExtValue() + CstSrcLastIdxOp->getZExtValue()));
+      } else if (CstSrcLastIdxOp && CstSrcLastIdxOp->isZero()) {
+        Idxs.push_back(*(GEP->op_begin() + 1));
+      } else if (CstGEPIdxOp && CstGEPIdxOp->isZero()) {
+        Idxs.push_back(*(OtherGEP->op_end() - 1));
+      } else {
+        Idxs.push_back(Builder.CreateAdd(*(GEP->op_begin() + 1),
+                                         *(OtherGEP->op_end() - 1)));
+      }
+    } else {
       uint64_t cstVal;
       Value *dynVal;
       size_t smallerBitWidths;
@@ -289,24 +310,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
           OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          clspv::AddressSpace::Private);
+          OtherGEP->getPointerOperand());
       Idxs.append(NewGEPIdxs);
-    } else {
-      if (!CstSrcLastIdxOp || !CstSrcLastIdxOp->isZero()) {
-        if (clspv::PointersAre64Bit(M) && !OtherGEP->getType()->isStructTy()) {
-          if (GEPIdxOp->getType()->isIntegerTy(32)) {
-            GEPIdxOp = Builder.CreateZExt(GEPIdxOp,
-                                          IntegerType::get(M.getContext(), 64));
-          }
-          if (SrcLastIdxOp->getType()->isIntegerTy(32)) {
-            SrcLastIdxOp = Builder.CreateZExt(
-                SrcLastIdxOp, IntegerType::get(M.getContext(), 64));
-          }
-        }
-        GEPIdxOp = Builder.CreateAdd(SrcLastIdxOp, GEPIdxOp);
-      }
-      Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
-      Idxs.push_back(GEPIdxOp);
     }
 
     Idxs.append(GEP->op_begin() + 2, GEP->op_end());
@@ -364,57 +369,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
   }
 
   return Changed;
-}
-
-bool clspv::SimplifyPointerBitcastPass::runOnUnneededCasts(Module &M) const {
-  const DataLayout &DL = M.getDataLayout();
-  bool changed = false;
-  DenseMap<Value *, Type *> type_cache;
-  SmallVector<GetElementPtrInst *, 8> Worklist;
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        Value *source = nullptr;
-        Type *source_ty = nullptr;
-        Type *dest_ty = nullptr;
-        if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty, true,
-                             false /* do not rework unsized types */)) {
-          continue;
-        }
-
-        if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
-          if (source_ty == gep->getResultElementType()) {
-            Worklist.push_back(gep);
-          }
-        }
-      }
-    }
-  }
-
-  for (auto *GEP : Worklist) {
-    IRBuilder<> Builder(GEP);
-    LLVM_DEBUG(dbgs() << "\n##runOnUnneededCasts:\nreplace: "; GEP->dump());
-    Type *Ty = GEP->getResultElementType();
-    uint64_t CstVal;
-    Value *DynVal;
-    size_t SmallerBitWidths;
-    ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
-    auto Indices = GetIdxsForTyFromOffset(
-        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)GEP->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
-
-    auto *NewGEP = GetElementPtrInst::Create(Ty, GEP->getPointerOperand(),
-                                             Indices, "", GEP);
-    LLVM_DEBUG(dbgs() << "by: "; NewGEP->dump());
-    GEP->replaceAllUsesWith(NewGEP);
-    GEP->eraseFromParent();
-
-    changed = true;
-  }
-
-  return changed;
 }
 
 bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
@@ -620,10 +574,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
       }
       Idxs = GetIdxsForTyFromOffset(
           DL, Builder, src_ty, inst_gep->getResultElementType(), CstVal, DynVal,
-          SmallerBitWidths,
-          (clspv::AddressSpace::Type)inst_gep->getPointerOperand()
-              ->getType()
-              ->getPointerAddressSpace());
+          SmallerBitWidths, src_gep->getPointerOperand());
     }
     auto new_gep = GetElementPtrInst::Create(src_ty, src, Idxs, "", inst_gep);
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitCasts:\nreplace: "; inst_gep->dump();
@@ -858,11 +809,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     Value *DynVal;
     size_t SmallerBitWidths;
     ExtractOffsetFromGEP(DL, Builder, gep, CstVal, DynVal, SmallerBitWidths);
-    auto Idxs = GetIdxsForTyFromOffset(
-        DL, Builder, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
-        (clspv::AddressSpace::Type)gep->getPointerOperand()
-            ->getType()
-            ->getPointerAddressSpace());
+    auto Idxs =
+        GetIdxsForTyFromOffset(DL, Builder, Ty, nullptr, CstVal, DynVal,
+                               SmallerBitWidths, gep->getPointerOperand());
     auto new_gep =
         GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
     LLVM_DEBUG(dbgs() << "\n##runOnPHIFromGEP:\nreplace: "; gep->dump();

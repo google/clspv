@@ -79,8 +79,7 @@ uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
-                       size_t SmallerBitWidths,
-                       clspv::AddressSpace::Type AddrSpace);
+                       size_t SmallerBitWidths, Value *Src);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H
