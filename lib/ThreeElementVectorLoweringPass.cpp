@@ -614,8 +614,12 @@ Value *clspv::ThreeElementVectorLoweringPass::visitExtractValueInst(
 Value *clspv::ThreeElementVectorLoweringPass::visitGetElementPtrInst(
     GetElementPtrInst &I) {
   // do not lower GEP of spirv global variables as we do not lower them to vec4
-  if (isSpirvGlobalVariable(I.getPointerOperand()->getName())) {
-    return &I;
+  GetElementPtrInst *gep = &I;
+  while (gep) {
+    if (isSpirvGlobalVariable(gep->getPointerOperand()->getName())) {
+      return &I;
+    }
+    gep = dyn_cast<GetElementPtrInst>(gep->getPointerOperand());
   }
   Value *EquivalentPointer = visitOrSelf(I.getPointerOperand());
 
