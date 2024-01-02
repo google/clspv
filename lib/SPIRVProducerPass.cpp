@@ -2934,7 +2934,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
           module->getGlobalVariable(clspv::PushConstantsVariableName());
       auto STy = cast<StructType>(PushConstGV->getValueType());
       auto MD = PushConstGV->getMetadata(clspv::PushConstantsMetadataName());
-      bool Found = false;
+      bool Found [[maybe_unused]] = false;
       uint32_t Offset = 0;
 
       // Find the push constant offset for the module constants pointer

@@ -138,7 +138,7 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   };
 
   // The common valid parameter info across all the callers seen so far.
-  ParamInfo common;
+  ParamInfo common = {};
   bool seen_one = false;
 
   // Tries to merge the given parameter info into |common|.  If it is the first
