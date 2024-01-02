@@ -390,10 +390,10 @@ static llvm::cl::opt<bool>
     force_no_vec3_to_vec4("no-vec3-to-vec4", llvm::cl::init(false),
                           llvm::cl::desc("Force NOT lowering vec3 to vec4"));
 
-static llvm::cl::opt<bool>
-    opaque_pointers("enable-opaque-pointers",
-                    llvm::cl::desc("Use opaque pointers"),
-                    llvm::cl::init(true));
+static llvm::cl::opt<bool> opaque_pointers(
+    "enable-opaque-pointers",
+    llvm::cl::desc("Use opaque pointers. DEPRECATED. This is always enabled"),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
     debug_info("g", llvm::cl::init(false),

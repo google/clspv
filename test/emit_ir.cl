@@ -1,7 +1,7 @@
-// RUN: clspv %target %s --output-format=ll -o %t.ll -enable-opaque-pointers=1
+// RUN: clspv %target %s --output-format=ll -o %t.ll
 // RUN: FileCheck %s < %t.ll
 
-// RUN: clspv %s --output-format=bc -o %t.bc -enable-opaque-pointers=1
+// RUN: clspv %s --output-format=bc -o %t.bc
 // RUN: llvm-dis %t.bc -o %t.bc.ll
 // RUN: FileCheck %s < %t.bc.ll
 

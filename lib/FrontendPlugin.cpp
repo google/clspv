@@ -194,7 +194,7 @@ private:
     if (Ty->isPointerType()) {
       const Type *pointeeTy = Ty->getPointeeType().getTypePtr();
       if (pointeeTy && pointeeTy->isVoidType() &&
-          !(clspv::Option::OpaquePointers() && clspv::Option::Int8Support())) {
+          !clspv::Option::Int8Support()) {
         // We don't support void pointers.
         Instance.getDiagnostics().Report(
             SR.getBegin(), CustomDiagnosticsIDMap[CustomDiagnosticVoidPointer]);

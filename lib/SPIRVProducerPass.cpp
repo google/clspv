@@ -1775,7 +1775,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty) {
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
-  if (Ty->isOpaquePointerTy()) {
+  if (Ty->isPointerTy()) {
     llvm_unreachable("Unsupported opaque pointer");
   }
 
