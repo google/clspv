@@ -21,6 +21,7 @@
 #include "clspv/Option.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
@@ -622,11 +623,11 @@ bool clspv::IsWriteOnlyImageType(llvm::Type *type) {
   return false;
 }
 
-Constant *clspv::GetDummyValue(Type *valueTy) {
-  if (auto *targetExtTy = dyn_cast<TargetExtType>(valueTy)) {
+Constant *clspv::GetDummyValue(Type *type) {
+  if (auto *targetExtTy = dyn_cast<TargetExtType>(type)) {
     if (!targetExtTy->hasProperty(TargetExtType::HasZeroInit)) {
       return UndefValue::get(targetExtTy);
     }
   }
-  return Constant::getNullValue(valueTy);
+  return Constant::getNullValue(type);
 }
