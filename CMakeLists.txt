@@ -29,7 +29,7 @@ if(NOT COMMAND find_host_package)
 endif()
 
 # Tests require Python3
-find_host_package(PythonInterp 3 REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # If we are the parent CMakeLists.txt, need to declare a project
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
