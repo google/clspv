@@ -230,6 +230,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kHalfPowr:
   case clspv::Builtins::kHalfRsqrt:
   case clspv::Builtins::kHalfSin:
+  case clspv::Builtins::kHalfSqrt:
   case clspv::Builtins::kHalfTan:
   case clspv::Builtins::kLdexp:
   case clspv::Builtins::kLog:
