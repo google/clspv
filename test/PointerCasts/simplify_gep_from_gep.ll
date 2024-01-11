@@ -52,9 +52,11 @@ entry:
 ; CHECK-NEXT: entry
 ; CHECK-NEXT: [[shl:%[^ ]+]] = shl i32 %i, 2
 ; CHECK-NEXT: [[add:%[^ ]+]] = add i32 [[shl]], 4
-; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 [[add]], 2
-; CHECK-NEXT: [[and:%[^ ]+]] = and i32 [[add]], 3
-; CHECK-NEXT: getelementptr [2 x [4 x <4 x i32>]], ptr %a, i32 0, i32 [[lshr]], i32 [[and]], i32 %i
+; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 [[add]], 3
+; CHECK-NEXT: [[and:%[^ ]+]] = and i32 [[add]], 7
+; CHECK-NEXT: [[lshr2:%[^ ]+]] = lshr i32 [[and]], 2
+; CHECK-NEXT: [[and2:%[^ ]+]] = and i32 [[and]], 3
+; CHECK-NEXT: getelementptr [2 x [4 x <4 x i32>]], ptr %a, i32 [[lshr]], i32 [[lshr2]], i32 [[and2]], i32 %i
 
 define spir_kernel void @foo5(ptr %a, i32 %i) {
 entry:
@@ -90,9 +92,11 @@ entry:
 ; CHECK-NEXT: [[shl:%[^ ]+]] = shl i32 %i, 2
 ; CHECK-NEXT: [[add1:%[^ ]+]] = add i32 [[shl]], %i
 ; CHECK-NEXT: [[add2:%[^ ]+]] = add i32 [[add1]], 3
-; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 [[add2]], 2
-; CHECK-NEXT: [[and:%[^ ]+]] = and i32 [[add2]], 3
-; CHECK-NEXT: getelementptr [2 x [4 x <4 x i32>]], ptr %a, i32 0, i32 [[lshr]], i32 [[and]], i32 %i
+; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 [[add2]], 3
+; CHECK-NEXT: [[and:%[^ ]+]] = and i32 [[add2]], 7
+; CHECK-NEXT: [[lshr2:%[^ ]+]] = lshr i32 [[and]], 2
+; CHECK-NEXT: [[and2:%[^ ]+]] = and i32 [[and]], 3
+; CHECK-NEXT: getelementptr [2 x [4 x <4 x i32>]], ptr %a, i32 [[lshr]], i32 [[lshr2]], i32 [[and2]], i32 %i
 
 define spir_kernel void @foo8(ptr %a, i32 %i) {
 entry:

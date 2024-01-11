@@ -1258,22 +1258,25 @@ uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
-                       size_t SmallerBitWidths,
-                       clspv::AddressSpace::Type AddrSpace) {
+                       size_t SmallerBitWidths, Value *Src) {
   SmallVector<Value *, 2> Idxs;
 
-  // For private pointer, the first Idx needs to be '0'
+  assert(Src->getType()->isPointerTy());
+  bool clspv_resource = false;
+  if (auto call = dyn_cast<CallInst>(Src)) {
+    clspv_resource =
+        clspv::Builtins::Lookup(call->getCalledFunction()).getType() ==
+        clspv::Builtins::kClspvResource;
+  }
+
   unsigned startIdx = 0;
-  if ((AddrSpace == clspv::AddressSpace::Private ||
-       AddrSpace == clspv::AddressSpace::ModuleScopePrivate ||
-       AddrSpace == clspv::AddressSpace::PushConstant ||
-       AddrSpace == clspv::AddressSpace::Input) &&
+  if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
       SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
     startIdx = 1;
   }
 
-  if (DstTy->isVoidTy()) {
+  if (DstTy == nullptr || DstTy->isVoidTy()) {
     DstTy = Builder.getInt8Ty();
   }
 
