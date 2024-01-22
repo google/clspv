@@ -789,7 +789,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
                                           PerfectMatch, DL) &&
                 PerfectMatch) {
               GEPAliasingList.push_back({phi, Steps, gep});
-            } else {
+            } else if (!FindAliasingContainedType(dest_ty, source_ty, Steps,
+                                                  PerfectMatch, DL)) {
 
               Worklist.emplace_back(std::make_pair(gep, dest_ty));
             }
