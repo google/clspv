@@ -229,6 +229,12 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
     if (clspv::Option::ImageSupport()) {
       EnabledFeatureMacros.insert(clspv::FeatureMacro::__opencl_c_images);
     }
+    // The futures should be enabled for __OPENCL_C_VERSION__ == 300
+    // while the __SPIR__ and __SPIRV__ defines are undefined.
+    EnabledFeatureMacros.insert(
+        clspv::FeatureMacro::__opencl_c_atomic_scope_device);
+    EnabledFeatureMacros.insert(
+        clspv::FeatureMacro::__opencl_c_atomic_order_seq_cst);
 
     // TODO remove when feature macros are added to OpenCLExtensions.def
     // https://github.com/llvm/llvm-project/blob/main/clang/include/clang/Basic/OpenCLExtensions.def#L119

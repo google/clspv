@@ -24,8 +24,8 @@
 #error __opencl_c_atomic_order_seq_cst should be defined
 #endif
 
-#ifdef __opencl_c_atomic_scope_device
-#error __opencl_c_atomic_scope_device should not be defined
+#ifndef __opencl_c_atomic_scope_device
+#error __opencl_c_atomic_scope_device should be defined
 #endif
 
 #ifdef __opencl_c_atomic_scope_all_devices

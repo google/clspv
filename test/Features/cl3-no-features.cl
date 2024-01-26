@@ -20,14 +20,6 @@
 #error __opencl_c_subgroups should not be defined
 #endif
 
-#ifdef __opencl_c_atomic_order_seq_cst
-#error __opencl_c_atomic_order_seq_cst should not be defined
-#endif
-
-#ifdef __opencl_c_atomic_scope_device
-#error __opencl_c_atomic_scope_device should not be defined
-#endif
-
 #ifdef __opencl_c_atomic_scope_all_devices
 #error __opencl_c_atomic_scope_all_devices should not be defined
 #endif
