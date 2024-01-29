@@ -1350,6 +1350,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       for (auto *elem_ty : cast<StructType>(type)->elements()) {
         work_list.push_back(elem_ty);
       }
+      break;
     default:
       // This type and its contained types don't get layout.
       break;
