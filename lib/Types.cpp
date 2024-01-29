@@ -647,7 +647,7 @@ bool clspv::IsWriteOnlyImageType(llvm::Type *type) {
   return false;
 }
 
-Constant *clspv::GetDummyValue(Type *type) {
+Constant *clspv::GetPlaceholderValue(Type *type) {
   if (auto *targetExtTy = dyn_cast<TargetExtType>(type)) {
     if (!targetExtTy->hasProperty(TargetExtType::HasZeroInit)) {
       return UndefValue::get(targetExtTy);

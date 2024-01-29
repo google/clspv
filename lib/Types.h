@@ -86,7 +86,7 @@ bool PointersAre64Bit(llvm::Module &m);
 
 // Returns the null value for the type if the type supports it,
 // otherwise returns the undef value.
-llvm::Constant *GetDummyValue(llvm::Type *type);
+llvm::Constant *GetPlaceholderValue(llvm::Type *type);
 
 } // namespace clspv
 
