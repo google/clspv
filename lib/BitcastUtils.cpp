@@ -1264,16 +1264,19 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   assert(Src->getType()->isPointerTy());
   bool clspv_resource = false;
   if (auto call = dyn_cast<CallInst>(Src)) {
-    clspv_resource =
-        clspv::Builtins::Lookup(call->getCalledFunction()).getType() ==
-        clspv::Builtins::kClspvResource;
+    auto builtin_type =
+        clspv::Builtins::Lookup(call->getCalledFunction()).getType();
+    clspv_resource = builtin_type == clspv::Builtins::kClspvResource ||
+                     builtin_type == clspv::Builtins::kClspvLocal;
   }
 
   unsigned startIdx = 0;
   if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
       SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
-    startIdx = 1;
+    if (!(SrcTy->isArrayTy() && GetNumEle(SrcTy) == 0)) {
+      startIdx = 1;
+    }
   }
 
   if (DstTy == nullptr || DstTy->isVoidTy()) {
