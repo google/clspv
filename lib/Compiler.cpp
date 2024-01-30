@@ -156,6 +156,10 @@ static llvm::cl::opt<bool>
     WarningsAsErrors("Werror", llvm::cl::init(false),
                      llvm::cl::desc("Turn warnings into errors"));
 
+static llvm::cl::opt<bool> qcomAccelerate16Bit(
+    "qcom-accelerate-16bit", llvm::cl::init(false),
+    llvm::cl::desc("Qualcomm specific option, always ignored"));
+
 enum OutputFormat {
   OutputFormatLLVMIR,
   OutputFormatLLVMIRBinary,
@@ -902,6 +906,11 @@ int ParseOptions(const int argc, const char *const argv[]) {
     llvm::errs() << "error: -physical-storage-buffers and -constant-args-ubo "
                     "are incompatible\n";
     return -1;
+  }
+
+  if (qcomAccelerate16Bit) {
+    llvm::outs() << "warning: -qcom-accelerate-16-bit is not supported, it "
+                    "will be ignored\n";
   }
 
   return 0;
