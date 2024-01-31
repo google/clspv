@@ -388,6 +388,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
 
   SmallVector<ImplicitGEPAliasing> GEPAliasingList;
   SmallVector<ImplicitGEPBeforeStore> GEPBeforeStoreList;
+  SmallVector<LoadInst *> GEPBeforeLoadList;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -420,6 +421,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
           }
         } else if (isa<StoreInst>(&I) && !isa<GetElementPtrInst>(source)) {
           GEPBeforeStoreList.push_back({&I, dest_ty});
+        } else if (isa<LoadInst>(&I) && isa<GetElementPtrInst>(source) &&
+                   SizeInBits(DL, dest_ty) < SizeInBits(DL, source_ty)) {
+          GEPBeforeLoadList.push_back(dyn_cast<LoadInst>(&I));
         }
       }
     }
@@ -478,6 +482,40 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum << " of: ";
                I->dump());
     I->setOperand(PointerOperandNum, gep);
+    changed = true;
+  }
+
+  for (auto *LoadInst : GEPBeforeLoadList) {
+    IRBuilder<> Builder{LoadInst};
+    auto *Ty = LoadInst->getType();
+    auto initial_gep =
+        dyn_cast<GetElementPtrInst>(LoadInst->getPointerOperand());
+    auto Ptr = initial_gep->getPointerOperand();
+
+    uint64_t cstVal;
+    Value *dynVal;
+    size_t smallerBitWidths;
+    ExtractOffsetFromGEP(M.getDataLayout(), Builder, initial_gep, cstVal,
+                         dynVal, smallerBitWidths);
+    auto newBitWidths = SizeInBits(DL, Ty);
+
+    assert(smallerBitWidths > newBitWidths);
+    cstVal *= smallerBitWidths / newBitWidths;
+    if (dynVal) {
+      dynVal = CreateMul(Builder, smallerBitWidths / newBitWidths, dynVal);
+    }
+    auto NewGEPIdxs =
+        GetIdxsForTyFromOffset(M.getDataLayout(), Builder, Ty, Ty, cstVal,
+                               dynVal, SizeInBits(DL, Ty), Ptr);
+
+    auto gep = GetElementPtrInst::Create(Ty, Ptr, NewGEPIdxs, "", LoadInst);
+    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(LoadInst);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (before load):\nadding: ";
+               gep->dump());
+    LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum << ": ";
+               LoadInst->getPointerOperand()->dump(););
+    LLVM_DEBUG(dbgs() << "of: "; LoadInst->dump(););
+    LoadInst->setOperand(PointerOperandNum, gep);
     changed = true;
   }
 
