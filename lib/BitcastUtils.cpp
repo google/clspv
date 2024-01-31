@@ -38,6 +38,10 @@
 
 namespace BitcastUtils {
 
+bool IsUnsizedType(const DataLayout &DL, Type *Ty) {
+  return SizeInBits(DL, Ty) == 0;
+}
+
 // Interface types are often something like: { [ 0 x Ty ] }.
 // SizeInBits returns zero for such types. Try to avoid it by go through the
 // type as long as SizeInBits returns zero to get the real type size for it.
@@ -1274,7 +1278,9 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
       SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
-    if (!(SrcTy->isArrayTy() && GetNumEle(SrcTy) == 0)) {
+    // Unsized types will be removed in `reworkUnsizedType`, no need to bump
+    // startIdx for them.
+    if (!IsUnsizedType(DataLayout, SrcTy)) {
       startIdx = 1;
     }
   }
