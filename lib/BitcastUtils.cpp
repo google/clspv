@@ -38,6 +38,10 @@
 
 namespace BitcastUtils {
 
+bool IsUnsizedType(const DataLayout &DL, Type *Ty) {
+  return SizeInBits(DL, Ty) == 0;
+}
+
 // Interface types are often something like: { [ 0 x Ty ] }.
 // SizeInBits returns zero for such types. Try to avoid it by go through the
 // type as long as SizeInBits returns zero to get the real type size for it.
@@ -1264,16 +1268,21 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   assert(Src->getType()->isPointerTy());
   bool clspv_resource = false;
   if (auto call = dyn_cast<CallInst>(Src)) {
-    clspv_resource =
-        clspv::Builtins::Lookup(call->getCalledFunction()).getType() ==
-        clspv::Builtins::kClspvResource;
+    auto builtin_type =
+        clspv::Builtins::Lookup(call->getCalledFunction()).getType();
+    clspv_resource = builtin_type == clspv::Builtins::kClspvResource ||
+                     builtin_type == clspv::Builtins::kClspvLocal;
   }
 
   unsigned startIdx = 0;
   if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
       SrcTy != DstTy) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
-    startIdx = 1;
+    // Unsized types will be removed in `reworkUnsizedType`, no need to bump
+    // startIdx for them.
+    if (!IsUnsizedType(DataLayout, SrcTy)) {
+      startIdx = 1;
+    }
   }
 
   if (DstTy == nullptr || DstTy->isVoidTy()) {
