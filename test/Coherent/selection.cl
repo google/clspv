@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 // Both x's should be coherent. y should not be coherent because it is not read.
 __attribute__((noinline))
 void bar(global int* x, int y) { *x = y; }

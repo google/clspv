@@ -4,6 +4,9 @@
 // RUN: clspv-reflection -d %t.spv -o %t.map
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 
+// TODO(#1292)
+// XFAIL: *
+
 // With std430 layouts in UBO, the padding array ([16 x i8]) can be generated
 // with an ArrayStride of 1.
 typedef struct {

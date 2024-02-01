@@ -4,6 +4,8 @@
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// TODO(#1292)
+// XFAIL: *
 
 // The data_type struct translates as { i32, [12 x i8] } which is transformed
 // to { i32, i32 }

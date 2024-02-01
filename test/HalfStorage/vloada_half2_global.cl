@@ -10,7 +10,7 @@
 
 kernel void foo(global float2* A, global uint* B, uint n) {
   A[0] = vloada_half2(n, (global half*)B);
-  A[1] = vloada_half2(0, (global half*)B+2);
+  A[1] = vloada_half2(0, (global half*)(B+1));
 }
 
 // CHECK-DAG: [[float:%[^ ]+]] = OpTypeFloat 32

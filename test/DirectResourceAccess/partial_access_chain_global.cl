@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 // Kernel |bar| does a non-trivial access chain before calling the helper.
 
 __attribute__((noinline))

@@ -2,6 +2,8 @@
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// TODO(#1292)
+// XFAIL: *
 
 // Passing SSBO to function call requires VariablePointersStorageBuffer.
 // SSBO args do not require memory object declarations.

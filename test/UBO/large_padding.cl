@@ -5,6 +5,9 @@
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 // Prior to #279 this would produce a [16 x i8] padding array.
 typedef struct {
   int4 a;

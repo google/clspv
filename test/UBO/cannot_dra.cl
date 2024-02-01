@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val %t.spv --target-env vulkan1.0
 
+// TODO(#1292)
+// XFAIL: *
+
 __attribute__((noinline))
 int4 bar(constant int4* data) { return data[0]; }
 

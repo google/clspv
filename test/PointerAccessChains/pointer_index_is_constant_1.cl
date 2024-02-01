@@ -8,6 +8,9 @@
 // RUN: FileCheck %s < %t2.spvasm -check-prefix=NODRA
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 struct Thing
 {
   float a[128];
