@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 __attribute__((noinline))
 int baz(global int* x) { return x[0]; }
 

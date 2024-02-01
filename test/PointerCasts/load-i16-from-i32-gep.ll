@@ -9,19 +9,19 @@
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %source, i32 1
 ; CHECK:  [[load:%[^ ]+]] = load i16, ptr addrspace(1) [[gep]], align 2
 ; CHECK:  [[insert:%[^ ]+]] = insertelement <2 x i16> <i16 0, i16 poison>, i16 [[load]], i64 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds i8, ptr addrspace(1) %dest, i32 4
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i16>, ptr addrspace(1) %dest, i32 1
 ; CHECK:  store <2 x i16> [[insert]], ptr addrspace(1) [[gep]], align 4
 
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %source, i32 2
 ; CHECK:  [[load:%[^ ]+]] = load i16, ptr addrspace(1) [[gep]], align 2
 ; CHECK:  [[insert:%[^ ]+]] = insertelement <2 x i16> <i16 0, i16 poison>, i16 [[load]], i64 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds i8, ptr addrspace(1) %dest, i32 8
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i16>, ptr addrspace(1) %dest, i32 2
 ; CHECK:  store <2 x i16> [[insert]], ptr addrspace(1) [[gep]], align 4
 
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %source, i32 3
 ; CHECK:  [[load:%[^ ]+]] = load i16, ptr addrspace(1) [[gep]], align 2
 ; CHECK:  [[insert:%[^ ]+]] = insertelement <2 x i16> <i16 0, i16 poison>, i16 [[load]], i64 1
-; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds i8, ptr addrspace(1) %dest, i32 12
+; CHECK:  [[gep:%[^ ]+]] = getelementptr <2 x i16>, ptr addrspace(1) %dest, i32 3
 ; CHECK:  store <2 x i16> [[insert]], ptr addrspace(1) [[gep]], align 4
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"

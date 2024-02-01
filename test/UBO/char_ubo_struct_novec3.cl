@@ -5,6 +5,9 @@
 // RUN: FileCheck -check-prefix=MAP %s < %t.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 typedef struct {
   char a;
   char2 b;

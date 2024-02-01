@@ -45,13 +45,18 @@ bool IsUnsizedType(const DataLayout &DL, Type *Ty) {
 // Interface types are often something like: { [ 0 x Ty ] }.
 // SizeInBits returns zero for such types. Try to avoid it by go through the
 // type as long as SizeInBits returns zero to get the real type size for it.
-Type *reworkUnsizedType(const DataLayout &DL, Type *Ty) {
+Type *reworkUnsizedType(const DataLayout &DL, Type *Ty, unsigned *steps) {
+  unsigned s = 0;
   auto size = SizeInBits(DL, Ty);
   auto Ele = GetEleType(Ty);
   while (size == 0 && Ty != Ele) {
+    s++;
     Ty = Ele;
     Ele = GetEleType(Ty);
     size = SizeInBits(DL, Ty);
+  }
+  if (steps != nullptr) {
+    *steps = s;
   }
   return Ty;
 }
@@ -1259,6 +1264,16 @@ uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
   return Offset;
 }
 
+bool IsClspvResourceOrLocal(Value *val) {
+  if (auto call = dyn_cast<CallInst>(val)) {
+    auto builtin_type =
+        clspv::Builtins::Lookup(call->getCalledFunction()).getType();
+    return builtin_type == clspv::Builtins::kClspvResource ||
+           builtin_type == clspv::Builtins::kClspvLocal;
+  }
+  return false;
+}
+
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
@@ -1266,13 +1281,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   SmallVector<Value *, 2> Idxs;
 
   assert(Src->getType()->isPointerTy());
-  bool clspv_resource = false;
-  if (auto call = dyn_cast<CallInst>(Src)) {
-    auto builtin_type =
-        clspv::Builtins::Lookup(call->getCalledFunction()).getType();
-    clspv_resource = builtin_type == clspv::Builtins::kClspvResource ||
-                     builtin_type == clspv::Builtins::kClspvLocal;
-  }
+  bool clspv_resource = IsClspvResourceOrLocal(Src);
 
   unsigned startIdx = 0;
   if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
@@ -1289,8 +1298,12 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     DstTy = Builder.getInt8Ty();
   }
 
-  SrcTy = reworkUnsizedType(DataLayout, SrcTy);
+  unsigned steps;
+  SrcTy = reworkUnsizedType(DataLayout, SrcTy, &steps);
   DstTy = reworkUnsizedType(DataLayout, DstTy);
+  for (unsigned i = Idxs.size(); i < steps; i++) {
+    Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
+  }
 
   if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
       DstTy != SrcTy) {

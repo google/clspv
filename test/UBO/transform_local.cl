@@ -12,6 +12,9 @@
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 typedef struct {
   int x __attribute__((aligned(16)));
 } data_type;

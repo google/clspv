@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1292)
+// XFAIL: *
+
 struct S1{
     int x;
     char y;

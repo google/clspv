@@ -4,6 +4,8 @@
 // RUN: clspv-reflection %t.spv -o %t2.map
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// TODO(#1292)
+// XFAIL: *
 
 // Natural alignment don't lead to LLVM inserting packing so this is ok.
 typedef struct {

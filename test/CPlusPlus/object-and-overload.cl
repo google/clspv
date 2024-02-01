@@ -38,13 +38,13 @@
 // CHECK-64-DAG: %[[ulong_1:[0-9a-zA-Z_]+]] = OpConstant %[[ulong]] 1
 // CHECK-DAG: %[[__original_id_27:[0-9]+]] = OpVariable %[[_ptr_StorageBuffer__struct_7]] StorageBuffer
 // CHECK-DAG: %[[__original_id_1:[0-9]+]] = OpVariable %[[_ptr_Workgroup__arr_uint_2]] Workgroup
-// CHECK:     %[[__original_id_30:[0-9]+]] = OpAccessChain %[[_ptr_Workgroup_uint]] %[[__original_id_1]] %[[uint_0]]
 // CHECK:     %[[__original_id_31:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_uint]] %[[__original_id_27]] %[[uint_0]] %[[uint_0]]
 // CHECK:     OpStore %[[__original_id_31]] %[[uint_0]]
 // CHECK:     %[[__original_id_32:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_uint]] %[[__original_id_27]] %[[uint_0]] %[[uint_1]]
 // CHECK:     OpStore %[[__original_id_32]] %[[uint_46]]
 // CHECK:     %[[__original_id_33:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_uint]] %[[__original_id_27]] %[[uint_0]] %[[uint_2]]
 // CHECK:     OpStore %[[__original_id_33]] %[[uint_92]]
+// CHECK:     %[[__original_id_30:[0-9]+]] = OpAccessChain %[[_ptr_Workgroup_uint]] %[[__original_id_1]] %[[uint_0]]
 // CHECK:     OpStore %[[__original_id_30]] %[[uint_25]]
 // CHECK-64:     %[[__original_id_34:[0-9]+]] = OpAccessChain %[[_ptr_Workgroup_uint]] %[[__original_id_1]] %[[ulong_1]]
 // CHECK-32:     %[[__original_id_34:[0-9]+]] = OpAccessChain %[[_ptr_Workgroup_uint]] %[[__original_id_1]] %[[uint_1]]

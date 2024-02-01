@@ -25,7 +25,8 @@ using namespace llvm;
 
 namespace BitcastUtils {
 
-Type *reworkUnsizedType(const DataLayout &DL, Type *Ty);
+Type *reworkUnsizedType(const DataLayout &DL, Type *Ty,
+                        unsigned *steps = nullptr);
 
 size_t SizeInBits(const DataLayout &DL, Type *Ty);
 size_t SizeInBits(IRBuilder<> &builder, Type *Ty);
@@ -75,6 +76,8 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
 uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
                                IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
                                uint64_t Offset, SmallVector<Value *, 2> *Idxs);
+
+bool IsClspvResourceOrLocal(Value *val);
 
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,

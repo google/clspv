@@ -17,7 +17,6 @@ __kernel void test(__global half *a, int b, __global float16 *dst) {
 // CHECK-DAG: [[uint:%[^ ]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint4:%[^ ]+]] = OpTypeVector [[uint]] 4
 // CHECK-64-DAG: [[ulong:%[^ ]+]] = OpTypeInt 64 0
-// CHECK-DAG: [[uint_16:%[^ ]+]] = OpConstant [[uint]] 16
 // CHECK-DAG: [[uint_0:%[^ ]+]] = OpConstant [[uint]] 0
 // CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
 // CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2
@@ -90,35 +89,35 @@ __kernel void test(__global half *a, int b, __global float16 *dst) {
 // CHECK: [[val14:%[^ ]+]] = OpCompositeExtract [[float]] [[val7f2]] 0
 // CHECK: [[val15:%[^ ]+]] = OpCompositeExtract [[float]] [[val7f2]] 1
 
-// CHECK: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_0]]
+// CHECK: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
 // CHECK: OpStore [[addr0]] [[val0]]
-// CHECK: [[addr1:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_1]]
+// CHECK: [[addr1:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_1]]
 // CHECK: OpStore [[addr1]] [[val1]]
-// CHECK: [[addr2:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_2]]
+// CHECK: [[addr2:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_2]]
 // CHECK: OpStore [[addr2]] [[val2]]
-// CHECK: [[addr3:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_3]]
+// CHECK: [[addr3:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_3]]
 // CHECK: OpStore [[addr3]] [[val3]]
-// CHECK: [[addr4:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_4]]
+// CHECK: [[addr4:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_4]]
 // CHECK: OpStore [[addr4]] [[val4]]
-// CHECK: [[addr5:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_5]]
+// CHECK: [[addr5:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_5]]
 // CHECK: OpStore [[addr5]] [[val5]]
-// CHECK: [[addr6:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_6]]
+// CHECK: [[addr6:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_6]]
 // CHECK: OpStore [[addr6]] [[val6]]
-// CHECK: [[addr7:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_7]]
+// CHECK: [[addr7:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_7]]
 // CHECK: OpStore [[addr7]] [[val7]]
-// CHECK: [[addr8:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_8]]
+// CHECK: [[addr8:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_8]]
 // CHECK: OpStore [[addr8]] [[val8]]
-// CHECK: [[addr9:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_9]]
+// CHECK: [[addr9:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_9]]
 // CHECK: OpStore [[addr9]] [[val9]]
-// CHECK: [[addr10:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_10]]
+// CHECK: [[addr10:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_10]]
 // CHECK: OpStore [[addr10]] [[val10]]
-// CHECK: [[addr11:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_11]]
+// CHECK: [[addr11:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_11]]
 // CHECK: OpStore [[addr11]] [[val11]]
-// CHECK: [[addr12:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_12]]
+// CHECK: [[addr12:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_12]]
 // CHECK: OpStore [[addr12]] [[val12]]
-// CHECK: [[addr13:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_13]]
+// CHECK: [[addr13:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_13]]
 // CHECK: OpStore [[addr13]] [[val13]]
-// CHECK: [[addr14:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_14]]
+// CHECK: [[addr14:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_14]]
 // CHECK: OpStore [[addr14]] [[val14]]
-// CHECK: [[addr15:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]] [[uint_15]]
+// CHECK: [[addr15:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_15]]
 // CHECK: OpStore [[addr15]] [[val15]]

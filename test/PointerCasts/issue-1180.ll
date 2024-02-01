@@ -8,5 +8,6 @@ define dso_local spir_kernel void @kernel() {
 entry:
   %0 = alloca [4 x i64], align 8
   %1 = getelementptr [8 x i8], ptr %0, i32 0, i32 7
+  store i8 0, ptr %1, align 1
   ret void
 }

@@ -43,10 +43,10 @@ kernel void foo(global float4* data, read_only image2d_t im) {
 // CHECK-DAG: [[float2_0:%[a-zA-Z0-9_]+]] = OpConstantNull [[float2]]
 // CHECK-DAG: [[sampler:%[a-zA-Z0-9_]+]] = OpTypeSampler
 //
-// CHECK: [[gep0:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
 // CHECK: [[s1_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s1]]
 // CHECK: [[s1_combined:%[a-zA-Z0-9_]+]] = OpSampledImage {{.*}} {{.*}} [[s1_ld]]
 // CHECK: [[read:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod {{.*}} [[s1_combined]]
+// CHECK: [[gep0:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[uint_0]]
 // CHECK: OpStore [[gep0]] [[read]]
 //
 // CHECK: [[s2_ld:%[a-zA-Z0-9_]+]] = OpLoad [[sampler]] [[s2]]
