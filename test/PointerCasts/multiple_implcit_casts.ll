@@ -1,15 +1,13 @@
-; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast,dce
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: @test1
-; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr %struct.Line, ptr addrspace(1) %lines, i32 %n, i32 1
-; CHECK: [[gep2:%[a-zA-Z0-9_.]+]] = getelementptr %struct.Line, ptr addrspace(1) %lines, i32 %n, i32 1
-; CHECK: store float 0.000000e+00, ptr addrspace(1) [[gep2]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr %struct.Line, ptr addrspace(1) %lines, i32 %n, i32 1
+; CHECK: store float 0.000000e+00, ptr addrspace(1) [[gep]]
 
 ; CHECK: @test2
-; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr %S, ptr addrspace(1) %data, i32 %n, i32 0, i32 1
-; CHECK: [[gep2:%[a-zA-Z0-9_.]+]] = getelementptr %S, ptr addrspace(1) %data, i32 %n, i32 0, i32 1
-; CHECK: store float 0.000000e+00, ptr addrspace(1) [[gep2]]
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr %S, ptr addrspace(1) %data, i32 %n, i32 0, i32 1
+; CHECK: store float 0.000000e+00, ptr addrspace(1) [[gep]]
 
 ; CHECK: @test3
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr %S2, ptr addrspace(1) %data, i32 %n, i32 1, i32 1, i32 1
