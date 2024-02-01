@@ -8,8 +8,6 @@
 // RUN: FileCheck %s < %t2.spvasm -check-prefix=NODRA
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// TODO(#1292)
-// XFAIL: *
 
 struct Thing
 {
@@ -29,51 +27,54 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* a, 
   *a = bar(b);
 }
 
-// CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// CHECK-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// CHECK-DAG:  [[_uint_128:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 128
-// CHECK-DAG:  [[__arr_float_uint_128:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_uint_128]]
-// CHECK-DAG:  [[__struct_5:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__arr_float_uint_128]]
-// CHECK-DAG:  [[__runtimearr__struct_5:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[__struct_5]]
-// CHECK-DAG:  [[__struct_7:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr__struct_5]]
-// CHECK-DAG:  [[__ptr_StorageBuffer__struct_7:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_7]]
-// CHECK-DAG:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
-// CHECK-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// CHECK-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// CHECK-DAG:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK-DAG:  [[_uint_5:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 5
-// CHECK-DAG:  [[_20:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_7]] StorageBuffer
-// CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpFunction
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_22:%[0-9a-zA-Z_]+]]
-// CHECK:  [[_22]] = OpFunction
-// CHECK:  [[_25:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer_float]] [[_20]] [[_uint_0]] [[_uint_1]] [[_uint_0]] [[_uint_5]]
-// CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_25]]
+// CHECK-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK-DAG: %[[_runtimearr_float:[0-9a-zA-Z_]+]] = OpTypeRuntimeArray %[[float]]
+// CHECK-DAG: %[[_struct_3:[0-9a-zA-Z_]+]] = OpTypeStruct %[[_runtimearr_float]]
+// CHECK-DAG: %[[_ptr_StorageBuffer__struct_3:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[_struct_3]]
+// CHECK-DAG: %[[void:[0-9a-zA-Z_]+]] = OpTypeVoid
+// CHECK-DAG: %[[_ptr_StorageBuffer_float:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[float]]
+// CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
+// CHECK-DAG: %[[uint_133:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 133
+// CHECK-DAG: %[[_5:[0-9]+]] = OpVariable %[[_ptr_StorageBuffer__struct_3]] StorageBuffer
+// CHECK-DAG: %[[_6:[0-9]+]] = OpVariable %[[_ptr_StorageBuffer__struct_3]] StorageBuffer
+// CHECK:     %[[_9:[0-9]+]] = OpFunction %[[void]]
+// CHECK:     %[[_14:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_float]] %[[_5]] %[[uint_0]] %[[uint_0]]
+// CHECK:     %[[_15:[0-9]+]] = OpFunctionCall %[[float]] %[[_17:[0-9]+]]
+// CHECK:     OpStore %[[_14]] %[[_15]]
+// CHECK:     OpReturn
+// CHECK:     OpFunctionEnd
+// CHECK:     %[[_17]] = OpFunction %[[float]]
+// CHECK:     %[[_20:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_float]] %[[_6]] %[[uint_0]] %[[uint_133]]
+// CHECK:     %[[_21:[0-9]+]] = OpLoad %[[float]] %[[_20]]
+// CHECK:     OpReturnValue %[[_21]]
+// CHECK:     OpFunctionEnd
 
 
-
-// NODRA-DAG: OpDecorate [[__runtimearr__struct_8:%[0-9a-zA-Z_]+]] ArrayStride 512
-// NODRA-DAG: OpDecorate [[__ptr_StorageBuffer__struct_8:%[0-9a-zA-Z_]+]] ArrayStride 512
-// NODRA-DAG:  [[_float:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
-// NODRA-DAG:  [[__runtimearr_float:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_float]]
-// NODRA-DAG:  [[__struct_3:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr_float]]
-// NODRA-DAG:  [[__ptr_StorageBuffer__struct_3:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_3]]
-// NODRA-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
-// NODRA-DAG:  [[_uint_128:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 128
-// NODRA-DAG:  [[__arr_float_uint_128:%[0-9a-zA-Z_]+]] = OpTypeArray [[_float]] [[_uint_128]]
-// NODRA-DAG:  [[__struct_8:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__arr_float_uint_128]]
-// NODRA-DAG:  [[__runtimearr__struct_8]] = OpTypeRuntimeArray [[__struct_8]]
-// NODRA-DAG:  [[__struct_10:%[0-9a-zA-Z_]+]] = OpTypeStruct [[__runtimearr__struct_8]]
-// NODRA-DAG:  [[__ptr_StorageBuffer__struct_10:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[__struct_10]]
-// NODRA-DAG:  [[__ptr_StorageBuffer_float:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[_float]]
-// NODRA-DAG:  [[__ptr_StorageBuffer__struct_8]] = OpTypePointer StorageBuffer [[__struct_8]]
-// NODRA:  [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// NODRA-DAG:  [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
-// NODRA-DAG:  [[_uint_5:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 5
-// NODRA:  [[_21:%[0-9a-zA-Z_]+]] = OpVariable [[__ptr_StorageBuffer__struct_10]] StorageBuffer
-// NODRA:  [[_22:%[0-9a-zA-Z_]+]] = OpFunction
-// NODRA:  [[_23:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[__ptr_StorageBuffer__struct_8]]
-// NODRA:  [[_25:%[0-9a-zA-Z_]+]] = OpPtrAccessChain [[__ptr_StorageBuffer_float]] [[_23]] [[_uint_1]] [[_uint_0]] [[_uint_5]]
-// NODRA:  [[_26:%[0-9a-zA-Z_]+]] = OpLoad [[_float]] [[_25]]
-// NODRA:  [[_27:%[0-9a-zA-Z_]+]] = OpFunction
-// NODRA:  [[_30:%[0-9a-zA-Z_]+]] = OpAccessChain [[__ptr_StorageBuffer__struct_8]] [[_21]] [[_uint_0]] [[_uint_0]]
-// NODRA:  [[_31:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_float]] [[_22]] [[_30]]
+// NODRA-DAG: %[[float:[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// NODRA-DAG: %[[_runtimearr_float:[0-9a-zA-Z_]+]] = OpTypeRuntimeArray %[[float]]
+// NODRA-DAG: %[[_struct_3:[0-9a-zA-Z_]+]] = OpTypeStruct %[[_runtimearr_float]]
+// NODRA-DAG: %[[_ptr_StorageBuffer__struct_3:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[_struct_3]]
+// NODRA-DAG: %[[_ptr_StorageBuffer_float:[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer %[[float]]
+// NODRA-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
+// NODRA-DAG: %[[uint_133:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 133
+// NODRA-DAG: %[[void:[0-9a-zA-Z_]+]] = OpTypeVoid
+// NODRA-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
+// NODRA-DAG: %[[uint_1:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 1
+// NODRA-DAG: %[[_5:[0-9]+]] = OpVariable %[[_ptr_StorageBuffer__struct_3]] StorageBuffer
+// NODRA-DAG: %[[_6:[0-9]+]] = OpVariable %[[_ptr_StorageBuffer__struct_3]] StorageBuffer
+// NODRA:     %[[_9:[0-9]+]] = OpFunction %[[float]]
+// NODRA:     %[[_10:[0-9]+]] = OpFunctionParameter %[[_ptr_StorageBuffer_float]]
+// NODRA:     %[[_11:[0-9]+]] = OpLabel
+// NODRA:     %[[_14:[0-9]+]] = OpPtrAccessChain %[[_ptr_StorageBuffer_float]] %[[_10]] %[[uint_133]]
+// NODRA:     %[[_15:[0-9]+]] = OpLoad %[[float]] %[[_14]]
+// NODRA:     OpReturnValue %[[_15]]
+// NODRA:     OpFunctionEnd
+// NODRA:     %[[_18:[0-9]+]] = OpFunction %[[void]]
+// NODRA:     %[[_19:[0-9]+]] = OpLabel
+// NODRA:     %[[_21:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_float]] %[[_5]] %[[uint_0]] %[[uint_0]]
+// NODRA:     %[[_22:[0-9]+]] = OpAccessChain %[[_ptr_StorageBuffer_float]] %[[_6]] %[[uint_0]] %[[uint_0]]
+// NODRA:     %[[_23:[0-9]+]] = OpFunctionCall %[[float]] %[[_9]] %[[_22]]
+// NODRA:     OpStore %[[_21]] %[[_23]]
+// NODRA:     OpReturn
+// NODRA:     OpFunctionEnd
