@@ -27,41 +27,32 @@ entry:
 ; CHECK-DAG: [[V6:%[^ ]+]] = extractvalue [[FLOAT8]] [[VAL]], 6
 ; CHECK-DAG: [[V7:%[^ ]+]] = extractvalue [[FLOAT8]] [[VAL]], 7
 
-; CHECK-DAG: [[A0:%[^ ]+]] = bitcast float [[V0]] to i32
-; CHECK-DAG: [[A1:%[^ ]+]] = bitcast float [[V1]] to i32
-; CHECK-DAG: [[A2:%[^ ]+]] = bitcast float [[V2]] to i32
-; CHECK-DAG: [[A3:%[^ ]+]] = bitcast float [[V3]] to i32
-; CHECK-DAG: [[A4:%[^ ]+]] = bitcast float [[V4]] to i32
-; CHECK-DAG: [[A5:%[^ ]+]] = bitcast float [[V5]] to i32
-; CHECK-DAG: [[A6:%[^ ]+]] = bitcast float [[V6]] to i32
-; CHECK-DAG: [[A7:%[^ ]+]] = bitcast float [[V7]] to i32
+; CHECK-DAG: [[ABS0:%[^ ]+]] = call float @llvm.fabs.f32(float [[V0]])
+; CHECK-DAG: [[ABS1:%[^ ]+]] = call float @llvm.fabs.f32(float [[V1]])
+; CHECK-DAG: [[ABS2:%[^ ]+]] = call float @llvm.fabs.f32(float [[V2]])
+; CHECK-DAG: [[ABS3:%[^ ]+]] = call float @llvm.fabs.f32(float [[V3]])
+; CHECK-DAG: [[ABS4:%[^ ]+]] = call float @llvm.fabs.f32(float [[V4]])
+; CHECK-DAG: [[ABS5:%[^ ]+]] = call float @llvm.fabs.f32(float [[V5]])
+; CHECK-DAG: [[ABS6:%[^ ]+]] = call float @llvm.fabs.f32(float [[V6]])
+; CHECK-DAG: [[ABS7:%[^ ]+]] = call float @llvm.fabs.f32(float [[V7]])
 
-; CHECK-DAG: [[B0:%[^ ]+]] = and i32 [[A0]], 2139095040
-; CHECK-DAG: [[B1:%[^ ]+]] = and i32 [[A1]], 2139095040
-; CHECK-DAG: [[B2:%[^ ]+]] = and i32 [[A2]], 2139095040
-; CHECK-DAG: [[B3:%[^ ]+]] = and i32 [[A3]], 2139095040
-; CHECK-DAG: [[B4:%[^ ]+]] = and i32 [[A4]], 2139095040
-; CHECK-DAG: [[B5:%[^ ]+]] = and i32 [[A5]], 2139095040
-; CHECK-DAG: [[B6:%[^ ]+]] = and i32 [[A6]], 2139095040
-; CHECK-DAG: [[B7:%[^ ]+]] = and i32 [[A7]], 2139095040
+; CHECK-DAG: [[CMP0:%[^ ]+]] = fcmp one float [[ABS0]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP1:%[^ ]+]] = fcmp one float [[ABS1]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP2:%[^ ]+]] = fcmp one float [[ABS2]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP3:%[^ ]+]] = fcmp one float [[ABS3]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP4:%[^ ]+]] = fcmp one float [[ABS4]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP5:%[^ ]+]] = fcmp one float [[ABS5]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP6:%[^ ]+]] = fcmp one float [[ABS6]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP7:%[^ ]+]] = fcmp one float [[ABS7]], 0x7FF0000000000000
 
-; CHECK-DAG: [[C0:%[^ ]+]] = icmp ne i32 [[B0]], 2139095040
-; CHECK-DAG: [[C1:%[^ ]+]] = icmp ne i32 [[B1]], 2139095040
-; CHECK-DAG: [[C2:%[^ ]+]] = icmp ne i32 [[B2]], 2139095040
-; CHECK-DAG: [[C3:%[^ ]+]] = icmp ne i32 [[B3]], 2139095040
-; CHECK-DAG: [[C4:%[^ ]+]] = icmp ne i32 [[B4]], 2139095040
-; CHECK-DAG: [[C5:%[^ ]+]] = icmp ne i32 [[B5]], 2139095040
-; CHECK-DAG: [[C6:%[^ ]+]] = icmp ne i32 [[B6]], 2139095040
-; CHECK-DAG: [[C7:%[^ ]+]] = icmp ne i32 [[B7]], 2139095040
-
-; CHECK-DAG: [[D0:%[^ ]+]] = sext i1 [[C0]] to i32
-; CHECK-DAG: [[D1:%[^ ]+]] = sext i1 [[C1]] to i32
-; CHECK-DAG: [[D2:%[^ ]+]] = sext i1 [[C2]] to i32
-; CHECK-DAG: [[D3:%[^ ]+]] = sext i1 [[C3]] to i32
-; CHECK-DAG: [[D4:%[^ ]+]] = sext i1 [[C4]] to i32
-; CHECK-DAG: [[D5:%[^ ]+]] = sext i1 [[C5]] to i32
-; CHECK-DAG: [[D6:%[^ ]+]] = sext i1 [[C6]] to i32
-; CHECK-DAG: [[D7:%[^ ]+]] = sext i1 [[C7]] to i32
+; CHECK-DAG: [[D0:%[^ ]+]] = sext i1 [[CMP0]] to i32
+; CHECK-DAG: [[D1:%[^ ]+]] = sext i1 [[CMP1]] to i32
+; CHECK-DAG: [[D2:%[^ ]+]] = sext i1 [[CMP2]] to i32
+; CHECK-DAG: [[D3:%[^ ]+]] = sext i1 [[CMP3]] to i32
+; CHECK-DAG: [[D4:%[^ ]+]] = sext i1 [[CMP4]] to i32
+; CHECK-DAG: [[D5:%[^ ]+]] = sext i1 [[CMP5]] to i32
+; CHECK-DAG: [[D6:%[^ ]+]] = sext i1 [[CMP6]] to i32
+; CHECK-DAG: [[D7:%[^ ]+]] = sext i1 [[CMP7]] to i32
 
 ; CHECK-DAG: [[E1:%[^ ]+]] = getelementptr inbounds [[INT8:i8]], ptr addrspace(1) [[OUT]], i64 4
 ; CHECK-DAG: [[E2:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 8
