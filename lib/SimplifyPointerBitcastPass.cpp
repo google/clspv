@@ -669,6 +669,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Value *ptr;
   };
   SmallVector<UpgradeInfo, 8> Worklist;
+  SmallVector<UpgradeInfo, 8> GEPsDefiningPHIsWorklist;
+  DenseSet<GetElementPtrInst *> GEPsDefiningPHISeen;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -703,6 +705,45 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
           Worklist.push_back({&I, cstVal, smallerBitWidths, dest_ty,
                               gep->getPointerOperand()});
+        } else if (auto *phi = dyn_cast<PHINode>(source)) {
+          auto &context = M.getContext();
+          auto get_geps_defining_phis_type = [&DL, phi, source_ty, dest_ty,
+                                              &context, &type_cache,
+                                              &GEPsDefiningPHISeen]() {
+            SmallVector<UpgradeInfo> geps;
+            for (auto user : phi->users()) {
+              auto user_ty = clspv::InferType(user, context, &type_cache);
+              if (user_ty != source_ty) {
+                continue;
+              }
+              auto gep = dyn_cast<GetElementPtrInst>(user);
+              if (gep == nullptr || !gep->hasAllConstantIndices()) {
+                geps.clear();
+                return geps;
+              }
+              // should not be used as all indices are constant
+              IRBuilder<> Builder{gep};
+
+              uint64_t cstVal;
+              Value *dynVal;
+              size_t smallerBitWidths;
+              ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal,
+                                   smallerBitWidths);
+              assert(dynVal == nullptr);
+              if (((cstVal * smallerBitWidths) % SizeInBits(DL, dest_ty)) !=
+                  0) {
+                geps.clear();
+                return geps;
+              }
+              if (GEPsDefiningPHISeen.count(gep) == 0) {
+                GEPsDefiningPHISeen.insert(gep);
+                geps.push_back({gep, cstVal, smallerBitWidths, dest_ty,
+                                gep->getPointerOperand()});
+              }
+            }
+            return geps;
+          };
+          GEPsDefiningPHIsWorklist.append(get_geps_defining_phis_type());
         }
       }
     }
@@ -728,6 +769,29 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
                       << PointerOperandNum << " of: ";
                I->dump(); dbgs() << "by: "; new_gep->dump());
     I->setOperand(PointerOperandNum, new_gep);
+
+    changed = true;
+  }
+
+  for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
+    auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
+    uint64_t cst = GEPInfo.cst;
+    size_t smallerBitWidths = GEPInfo.smallerBitWidth;
+    Type *dest_ty = GEPInfo.dest_ty;
+    Value *ptr = GEPInfo.ptr;
+    IRBuilder Builder{gep};
+
+    auto NewGEPIdxs =
+        GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
+                               cst, nullptr, smallerBitWidths, ptr);
+
+    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", gep);
+    LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace gep "
+                         "defining phi type: ";
+               gep->dump(); dbgs() << "by: "; new_gep->dump());
+
+    gep->replaceAllUsesWith(new_gep);
+    gep->eraseFromParent();
 
     changed = true;
   }
