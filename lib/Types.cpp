@@ -300,7 +300,7 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   return TyA;
 }
 
-// Returns the type inferred by inspecting the users of |v|.
+// Returns the type of |v| inferred by inspecting its users.
 // Updates |cache|.
 Type *InferUsersType(Value *v, LLVMContext &context,
                      DenseMap<Value *, Type *> *cache) {
