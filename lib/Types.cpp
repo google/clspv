@@ -224,7 +224,7 @@ Type *ExtractSmallerStructField(const DataLayout &DL, Type *Ty) {
 //   level of nesting "matches" the other, then return the aggregate or vector.
 //   They both have the same machine byte address, but we prefer the larger
 //   type.  Here two types "match" if they're the same, or if they are
-//   scalar numeric types (integer or float0 with the same bit size.
+//   scalar numeric types (integer or float with the same bit size.
 // - If one type is a struct and is larger than the other type, but its
 //   smallest member is smaller than the other type, then return
 //   that member.
