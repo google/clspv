@@ -3,9 +3,6 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// TODO(#1292)
-// XFAIL: *
-
 struct A {
   float4 x;
 };
@@ -19,8 +16,8 @@ static float4 bar(global struct A* in, int n) {
   return in[n].x;
 }
 
-kernel void foo(global float* out, global struct B* in, int n) {
-  *out = bar(&in->a[1], n)[0];
+kernel void foo(global float* out, global struct B* in, int n, int x) {
+  *out = bar(&in[x].a[1], n)[0];
 }
 
 // CHECK-DAG: OpDecorate [[array_struct_A:%[a-zA-Z0-9_]+]] ArrayStride 16

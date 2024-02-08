@@ -3,9 +3,6 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// TODO(#1292)
-// XFAIL: *
-
 // Kernel |bar| does a non-trivial access chain before calling the helper.
 
 __attribute__((noinline))
@@ -13,7 +10,7 @@ void apple(global int *A, global int *B, int n) { A[n] = B[n + 2]; }
 
 kernel void foo(global int *A, global int *B, int n) { apple(A, B, n); }
 
-kernel void bar(global int *A, global int *B, int n) { apple(A + 1, B, n); }
+kernel void bar(global int *A, global int *B, int n) { apple(A + n, B, n); }
 // CHECK:  OpEntryPoint GLCompute [[_33:%[0-9a-zA-Z_]+]] "foo"
 // CHECK:  OpEntryPoint GLCompute [[_40:%[0-9a-zA-Z_]+]] "bar"
 // CHECK-DAG:  OpDecorate [[_21:%[0-9a-zA-Z_]+]] Binding 1
