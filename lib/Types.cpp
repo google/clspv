@@ -199,6 +199,9 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
   return nullptr;
 }
 
+// Returns the type of the member in the given struct with the smallest bit
+// representation. Returns nullptr if the given type is not a struct, or has no
+// members.
 Type *ExtractSmallerStructField(const DataLayout &DL, Type *Ty) {
   auto *STy = dyn_cast<StructType>(Ty);
   if (!STy || STy->getNumElements() == 0)
@@ -214,6 +217,19 @@ Type *ExtractSmallerStructField(const DataLayout &DL, Type *Ty) {
   return Smaller;
 }
 
+// Returns a preferred type chosen from two types.
+// In particular:
+// - If either is nullptr, return the other.
+// - When one is an aggregate or vector whose first nested member at some
+//   level of nesting "matches" the other, then return the aggregate or vector.
+//   They both have the same machine byte address, but we prefer the larger
+//   type.  Here two types "match" if they're the same, or if they are
+//   scalar numeric types (integer or float with the same bit size.
+// - If one type is a struct and is larger than the other type, but its
+//   smallest member is smaller than the other type, then return
+//   that member.
+// - Otherwise, if one type is smaller than the other, return the smaller one.
+// - When the sizes are the same, prefer the packed structure, if it exists.
 Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   if (TyA == nullptr) {
     return TyB;
@@ -221,35 +237,50 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
     return TyA;
   }
 
-  int Steps;
-  bool PerfectMatch;
-  if (BitcastUtils::FindAliasingContainedType(TyA, TyB, Steps, PerfectMatch, DL,
-                                              true)) {
-    return TyA;
+  {
+    // Check if the types are the same, or if one type is nested in the other
+    // and would have the same machine address.
+    int Steps;         // not used
+    bool PerfectMatch; // not used
+    if (BitcastUtils::FindAliasingContainedType(TyA, TyB, Steps, PerfectMatch,
+                                                DL, true)) {
+      // Prefer the composite type (or the same);
+      return TyA;
+    }
+    if (BitcastUtils::FindAliasingContainedType(TyB, TyA, Steps, PerfectMatch,
+                                                DL, true)) {
+      // Prefer the composite type.
+      return TyB;
+    }
   }
-  if (BitcastUtils::FindAliasingContainedType(TyB, TyA, Steps, PerfectMatch, DL,
-                                              true)) {
-    return TyB;
-  }
+
+  // Handle more cases where TyA != TyB
 
   if (BitcastUtils::SizeInBits(DL, TyA) > BitcastUtils::SizeInBits(DL, TyB)) {
     if (auto Ty = ExtractSmallerStructField(DL, TyA)) {
       if (BitcastUtils::SizeInBits(DL, Ty) <
           BitcastUtils::SizeInBits(DL, TyB)) {
+        // TyA is a struct whose smallest member is smaller than TyB.
+        // Return the type of that smallest member.
         return Ty;
       }
     }
+    // Prefer the smaller.
     return TyB;
   } else if (BitcastUtils::SizeInBits(DL, TyA) <
              BitcastUtils::SizeInBits(DL, TyB)) {
     if (auto Ty = ExtractSmallerStructField(DL, TyB)) {
       if (BitcastUtils::SizeInBits(DL, Ty) <
           BitcastUtils::SizeInBits(DL, TyA)) {
+        // TyB is a struct whose smallest member is smaller than TyA.
+        // Return the type of that smallest member.
         return Ty;
       }
     }
+    // Prefer the smaller.
     return TyA;
   }
+
   // TyA size == TyB size
   if (auto STy = dyn_cast<StructType>(TyB)) {
     // If we need to make the choice between 2 packed struct, we need to choose
@@ -269,6 +300,8 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   return TyA;
 }
 
+// Returns the type of |v| inferred by inspecting its users.
+// Updates |cache|.
 Type *InferUsersType(Value *v, LLVMContext &context,
                      DenseMap<Value *, Type *> *cache) {
   std::vector<std::pair<User *, unsigned>> worklist;
@@ -355,8 +388,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     return CacheType(func->getFunctionType());
   }
 
-  // Special resource-related functions. The last parameter of each function is
-  // the inferred type.
+  // Special resource-related functions. The last parameter of each function
+  // has a placeholder value of the inferred type.
   if (auto *call = dyn_cast<CallInst>(v)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     switch (info.getType()) {
@@ -379,6 +412,8 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
 
   auto users_ty = InferUsersType(v, context, cache);
 
+  // For phis, consider the incoming values in addition to the users
+  // of the result.
   if (auto *phi = dyn_cast<PHINode>(v)) {
     Type *phi_ty = users_ty;
     const DataLayout &DL = phi->getModule()->getDataLayout();
