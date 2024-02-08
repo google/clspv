@@ -74,11 +74,17 @@ void clspv::RemoveUnusedArguments::removeUnusedParameters(
     f->removeFromParent();
 
     // Rebuild the type.
+    auto fn_attrs = f->getAttributes();
     SmallVector<Type *, 8> arg_types;
+    uint32_t idx = 0;
     for (auto *arg : candidate.args) {
       if (arg) {
         arg_types.push_back(arg->getType());
+      } else {
+        // Remove any parameter attributes for deleted args.
+        fn_attrs = fn_attrs.removeParamAttributes(M.getContext(), idx);
       }
+      idx++;
     }
     FunctionType *new_type =
         FunctionType::get(f->getReturnType(), arg_types, false);
@@ -86,8 +92,7 @@ void clspv::RemoveUnusedArguments::removeUnusedParameters(
     // Insert the new function. Copy the calling convention, attributes and
     // metadata.
     auto inserted =
-        M.getOrInsertFunction(f->getName(), new_type, f->getAttributes())
-            .getCallee();
+        M.getOrInsertFunction(f->getName(), new_type, fn_attrs).getCallee();
     Function *new_function = cast<Function>(inserted);
     new_function->setCallingConv(f->getCallingConv());
     new_function->copyMetadata(f, 0);
