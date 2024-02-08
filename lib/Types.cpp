@@ -254,7 +254,7 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
     }
   }
 
-  // Handle more cases where TyA !=TyB
+  // Handle more cases where TyA != TyB
 
   if (BitcastUtils::SizeInBits(DL, TyA) > BitcastUtils::SizeInBits(DL, TyB)) {
     if (auto Ty = ExtractSmallerStructField(DL, TyA)) {
