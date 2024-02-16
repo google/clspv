@@ -93,6 +93,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
     return replaceAddSubSat(F, true, false);
   case Intrinsic::sadd_sat:
     return replaceAddSubSat(F, true, true);
+  case Intrinsic::is_fpclass:
+    return replaceIsFpClass(F);
   // SPIR-V OpAssumeTrueKHR requires ExpectAssumeKHR capability in SPV_KHR_expect_assume extension.
   // Vulkan doesn't support that, so remove assume declaration.
   case Intrinsic::assume:
@@ -128,6 +130,22 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   DeadFunctions.push_back(&F);
 
   return !ToRemove.empty();
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *call) {
+    auto mask = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+    Value *result = nullptr;
+    IRBuilder<> builder(call);
+    // TODO(#1307): handle other codes
+    if (mask & 0x40) {
+      return builder.CreateFCmpOEQ(
+          call->getArgOperand(0),
+          Constant::getNullValue(call->getArgOperand(0)->getType()));
+    }
+    assert(false);
+    return result;
+  });
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceBswap(Function &F) {

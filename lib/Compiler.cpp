@@ -1049,9 +1049,19 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
       Err.print("internal_additional_library:", llvm::errs());
       return false;
     }
+    for (auto &F : *add_library) {
+      if (!F.isDeclaration()) {
+        F.setIsNewDbgInfoFormat(true);
+      }
+    }
     L.linkInModule(std::move(add_library), 0);
   }
 
+  for (auto &F : *library) {
+    if (!F.isDeclaration()) {
+      F.setIsNewDbgInfoFormat(true);
+    }
+  }
   L.linkInModule(std::move(library), 0);
 
   return true;

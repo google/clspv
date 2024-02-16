@@ -20,6 +20,7 @@ void clspv::WrapKernelPass::runOnFunction(Module &M, llvm::Function *F) {
   auto *NewFuncTy = FunctionType::get(F->getReturnType(), NewParamTypes, false);
 
   auto NewFunc = Function::Create(NewFuncTy, F->getLinkage());
+  NewFunc->setIsNewDbgInfoFormat(true);
   NewFunc->setName(F->getName().str());
   F->setName(F->getName().str() + ".inner");
   NewFunc->setCallingConv(F->getCallingConv());

@@ -214,6 +214,7 @@ clspv::RewriteInsertsPass::GetConstructFunction(Module &M,
     FunctionType *fnTy = FunctionType::get(constructed_type, elements, false);
     auto fn_constant = M.getOrInsertFunction(fn_name, fnTy);
     fn = cast<Function>(fn_constant.getCallee());
+    fn->setIsNewDbgInfoFormat(true);
     fn->setOnlyReadsMemory();
   }
   return fn;

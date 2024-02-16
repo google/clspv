@@ -368,6 +368,7 @@ void SpecializeImageTypesPass::RewriteFunction(Function *f) {
   auto callee =
       module->getOrInsertFunction(f->getName(), func_type, f->getAttributes());
   auto new_func = cast<Function>(callee.getCallee());
+  new_func->setIsNewDbgInfoFormat(true);
   new_func->setCallingConv(f->getCallingConv());
   new_func->copyMetadata(f, 0);
 
