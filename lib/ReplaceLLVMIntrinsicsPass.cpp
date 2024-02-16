@@ -132,7 +132,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
   return !ToRemove.empty();
 }
 
-bool clspv::ReplaceLLVMIntrinsicsPass : replaceIsFpClass(Function &F) {
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
   return replaceCallsWithValue(F, [](CallInst *call) {
     auto mask = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
     Value *result = nullptr;
