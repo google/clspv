@@ -86,6 +86,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   auto FuncCallee = M.getOrInsertFunction(FuncName, FuncTy);
   auto *Func = dyn_cast<Function>(FuncCallee.getCallee());
   assert(Func);
+  Func->setIsNewDbgInfoFormat(true);
 
   auto *NewCI = CallInst::Create(Func, NewArgs, "", CI);
   CI->replaceAllUsesWith(NewCI);

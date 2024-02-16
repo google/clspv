@@ -278,6 +278,7 @@ bool clspv::UBOTypeTransformPass::RemapFunctions(
     auto inserted = M.getOrInsertFunction(func->getName(), replacement_type,
                                           func->getAttributes());
     Function *replacement = cast<Function>(inserted.getCallee());
+    replacement->setIsNewDbgInfoFormat(true);
     function_replacements_[func] = replacement;
     replacement->setCallingConv(func->getCallingConv());
     replacement->copyMetadata(func, 0);

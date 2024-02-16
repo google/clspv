@@ -94,6 +94,7 @@ void clspv::RemoveUnusedArguments::removeUnusedParameters(
     auto inserted =
         M.getOrInsertFunction(f->getName(), new_type, fn_attrs).getCallee();
     Function *new_function = cast<Function>(inserted);
+    new_function->setIsNewDbgInfoFormat(true);
     new_function->setCallingConv(f->getCallingConv());
     new_function->copyMetadata(f, 0);
 
