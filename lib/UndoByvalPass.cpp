@@ -144,6 +144,8 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
 
         CallInst *NewCall = CallInst::Create(NewFunc, Args, "", Call);
         NewCall->setCallingConv(NewFunc->getCallingConv());
+        auto Instr = dyn_cast<Instruction>(User);
+        NewCall->copyMetadata(*Instr);
 
         Call->replaceAllUsesWith(NewCall);
         Call->eraseFromParent();
