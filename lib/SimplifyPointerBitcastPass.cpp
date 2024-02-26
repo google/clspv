@@ -711,12 +711,19 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
                                               &context, &type_cache,
                                               &GEPsDefiningPHISeen]() {
             SmallVector<UpgradeInfo> geps;
+            SmallVector<Value *> values;
+            for (auto &incoming_value : phi->incoming_values()) {
+              values.push_back(incoming_value.get());
+            }
             for (auto user : phi->users()) {
-              auto user_ty = clspv::InferType(user, context, &type_cache);
+              values.push_back(user);
+            }
+            for (auto value : values) {
+              auto user_ty = clspv::InferType(value, context, &type_cache);
               if (user_ty != source_ty) {
                 continue;
               }
-              auto gep = dyn_cast<GetElementPtrInst>(user);
+              auto gep = dyn_cast<GetElementPtrInst>(value);
               if (gep == nullptr || !gep->hasAllConstantIndices()) {
                 geps.clear();
                 return geps;
