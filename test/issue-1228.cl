@@ -4,8 +4,7 @@ typedef struct Baz {
     float x;
 } Baz;
 
-static int foo(Baz baz) {
-	return 1;
+static void foo(Baz baz) {
 }
 
 __kernel void test(__global Baz *baz) {
