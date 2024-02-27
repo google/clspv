@@ -69,3 +69,28 @@ end:
   %gep = getelementptr i32, ptr addrspace(1) %phi, i32 7
   ret void
 }
+
+define spir_kernel void @test4(i1 %cmp, i32 %offset, ptr addrspace(1) %a) {
+entry:
+; CHECK: entry
+; CHECK-NEXT: br label %pre
+  %gep = getelementptr inbounds i8, ptr addrspace(1) %a, i32 %offset
+  br label %pre
+pre:
+; CHECK: pre
+; CHECK-NEXT: [[shl:%[^ ]+]] = shl i32 %offset, 3
+; CHECK-NEXT: [[add:%[^ ]+]] = add i32 %offset, [[shl]]
+; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr i8, ptr addrspace(1) %a, i32 %1
+; CHECK-NEXT: br label %loop
+  %gep2 = getelementptr inbounds <4 x half>, ptr addrspace(1) %gep, i32 %offset
+  br label %loop
+loop:
+; CHECK: loop
+; CHECK-NEXT: phi ptr addrspace(1) [ [[gep]], %pre ]
+  %phi = phi ptr addrspace(1) [ %gep2, %pre ], [ %add, %loop ]
+  %load = load <4 x half>, ptr addrspace(1) %phi, align 8
+  %add = getelementptr inbounds i8, ptr addrspace(1) %phi, i32 64
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
