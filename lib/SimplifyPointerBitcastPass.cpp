@@ -664,9 +664,69 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
   struct UpgradeInfo {
     Instruction *inst;
     uint64_t cst;
+    Value *val;
     size_t smallerBitWidth;
     Type *dest_ty;
     Value *ptr;
+  };
+  auto gepIndicesCanBeUpgradedTo = [&DL, &M](Type *ty, GetElementPtrInst *gep,
+                                             uint64_t &cstVal, Value *&dynVal,
+                                             size_t &smallerBitWidths) {
+    if (gep->hasAllConstantIndices()) {
+      // should not be used as all indices are constant
+      IRBuilder<> Builder{gep};
+
+      ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
+      assert(dynVal == nullptr);
+      if (((cstVal * smallerBitWidths) % SizeInBits(DL, ty)) != 0) {
+        return false;
+      }
+    } else {
+      // if gep contains dynamic indices, only consider i8 gep with and look for
+      // mul and shl composing the single indice.
+      if (gep->getSourceElementType() != Type::getInt8Ty(M.getContext()) &&
+          gep->getNumIndices() == 1) {
+        return false;
+      }
+      cstVal = 0;
+      smallerBitWidths = CHAR_BIT;
+      dynVal = gep->getOperand(gep->getNumOperands() - 1);
+
+      SmallVector<Value *> vector;
+      vector.push_back(dynVal);
+      uint32_t coef = CHAR_BIT;
+      uint32_t coef_target = SizeInBits(DL, ty);
+      while (!vector.empty()) {
+        auto val = vector.back();
+        vector.pop_back();
+        if (auto cst = dyn_cast<ConstantInt>(val)) {
+          coef *= cst->getZExtValue();
+          continue;
+        }
+        auto binary_op = dyn_cast<BinaryOperator>(val);
+        if (!binary_op) {
+          continue;
+        }
+        switch (binary_op->getOpcode()) {
+        case Instruction::BinaryOps::Mul:
+          vector.push_back(binary_op->getOperand(0));
+          vector.push_back(binary_op->getOperand(1));
+          break;
+        case Instruction::BinaryOps::Shl:
+          vector.push_back(binary_op->getOperand(0));
+          if (auto cst = dyn_cast<ConstantInt>(binary_op->getOperand(1))) {
+            coef <<= cst->getZExtValue();
+          }
+          break;
+        default:
+          continue;
+        }
+      }
+      if ((coef % coef_target) != 0) {
+        return false;
+      }
+    }
+    return true;
   };
   SmallVector<UpgradeInfo, 8> Worklist;
   SmallVector<UpgradeInfo, 8> GEPsDefiningPHIsWorklist;
@@ -677,8 +737,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
+        // calls like memcpy cannot be simplify by this function, skip them to
+        // avoid having to support them in function like
+        // `BitcastUtils::PointerOperandNum`.
         if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
-                             true)) {
+                             true) ||
+            dyn_cast<CallInst>(&I)) {
           continue;
         }
 
@@ -687,36 +751,51 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
-          if (!gep->hasAllConstantIndices()) {
-            continue;
-          }
-          // should not be used as all indices are constant
-          IRBuilder<> Builder{gep};
-
           uint64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
-          ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal,
-                               smallerBitWidths);
-          assert(dynVal == nullptr);
-          if (((cstVal * smallerBitWidths) % SizeInBits(DL, dest_ty)) != 0) {
+          if (!gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
+                                         smallerBitWidths)) {
             continue;
           }
 
-          Worklist.push_back({&I, cstVal, smallerBitWidths, dest_ty,
+          Worklist.push_back({&I, cstVal, dynVal, smallerBitWidths, dest_ty,
                               gep->getPointerOperand()});
         } else if (auto *phi = dyn_cast<PHINode>(source)) {
           auto &context = M.getContext();
-          auto get_geps_defining_phis_type = [&DL, phi, source_ty, dest_ty,
-                                              &context, &type_cache,
-                                              &GEPsDefiningPHISeen]() {
+          auto get_geps_defining_phis_type = [phi, source_ty, dest_ty, &context,
+                                              &type_cache, &GEPsDefiningPHISeen,
+                                              gepIndicesCanBeUpgradedTo]() {
             SmallVector<UpgradeInfo> geps;
             SmallVector<Value *> values;
-            for (auto &incoming_value : phi->incoming_values()) {
-              values.push_back(incoming_value.get());
-            }
-            for (auto user : phi->users()) {
-              values.push_back(user);
+            SmallVector<PHINode *> phis;
+            DenseSet<PHINode *> phis_seen;
+            phis.push_back(phi);
+            // phi can depend on other phis recursively, go through them to find
+            // all the values that needing to be upgraded to change the phi
+            // type.
+            while (!phis.empty()) {
+              auto current_phi = phis.back();
+              phis.pop_back();
+              if (phis_seen.count(current_phi) != 0) {
+                continue;
+              }
+              phis_seen.insert(current_phi);
+              for (auto &incoming_value : current_phi->incoming_values()) {
+                auto val = incoming_value.get();
+                if (auto phi_node = dyn_cast<PHINode>(val)) {
+                  phis.push_back(phi_node);
+                } else {
+                  values.push_back(val);
+                }
+              }
+              for (auto user : current_phi->users()) {
+                if (auto phi_node = dyn_cast<PHINode>(user)) {
+                  phis.push_back(phi_node);
+                } else {
+                  values.push_back(user);
+                }
+              }
             }
             for (auto value : values) {
               auto user_ty = clspv::InferType(value, context, &type_cache);
@@ -724,27 +803,18 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
                 continue;
               }
               auto gep = dyn_cast<GetElementPtrInst>(value);
-              if (gep == nullptr || !gep->hasAllConstantIndices()) {
-                geps.clear();
-                return geps;
-              }
-              // should not be used as all indices are constant
-              IRBuilder<> Builder{gep};
-
               uint64_t cstVal;
               Value *dynVal;
               size_t smallerBitWidths;
-              ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal,
-                                   smallerBitWidths);
-              assert(dynVal == nullptr);
-              if (((cstVal * smallerBitWidths) % SizeInBits(DL, dest_ty)) !=
-                  0) {
+              if (gep == nullptr ||
+                  !gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
+                                             smallerBitWidths)) {
                 geps.clear();
                 return geps;
               }
               if (GEPsDefiningPHISeen.count(gep) == 0) {
                 GEPsDefiningPHISeen.insert(gep);
-                geps.push_back({gep, cstVal, smallerBitWidths, dest_ty,
+                geps.push_back({gep, cstVal, dynVal, smallerBitWidths, dest_ty,
                                 gep->getPointerOperand()});
               }
             }
@@ -759,6 +829,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
   for (auto GEPInfo : Worklist) {
     Instruction *I = GEPInfo.inst;
     uint64_t cst = GEPInfo.cst;
+    Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
     Value *ptr = GEPInfo.ptr;
@@ -766,7 +837,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
     auto NewGEPIdxs =
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
-                               cst, nullptr, smallerBitWidths, ptr);
+                               cst, val, smallerBitWidths, ptr);
 
     auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", I);
 
@@ -783,6 +854,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
   for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
     auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
     uint64_t cst = GEPInfo.cst;
+    Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
     Value *ptr = GEPInfo.ptr;
@@ -790,7 +862,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
     auto NewGEPIdxs =
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
-                               cst, nullptr, smallerBitWidths, ptr);
+                               cst, val, smallerBitWidths, ptr);
 
     auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", gep);
     LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace gep "

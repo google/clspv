@@ -94,3 +94,34 @@ loop:
 exit:
   ret void
 }
+
+define spir_kernel void @test5(i32 %cst, ptr addrspace(2) %a, i1 %cmp) {
+entry:
+; CHECK: entry
+; CHECK-NEXT: [[shl:%[^ ]+]] = shl i32 %cst, 3
+; CHECK-NEXT: [[mul:%[^ ]+]] = mul i32 [[shl]], %cst
+; CHECK-NEXT: [[lshr:%[^ ]+]] = lshr i32 %mul, 3
+; CHECK-NEXT: [[gep_entry:%[^ ]+]] = getelementptr <4 x half>, ptr addrspace(2) %a, i32 [[lshr]]
+; CHECK-NEXT: br label %pre
+  %shl = shl i32 %cst, 3
+  %mul = mul i32 %shl, %cst
+  %gep_entry = getelementptr i8, ptr addrspace(2) %a, i32 %mul
+  br label %pre
+pre:
+; CHECK: pre
+; CHECK-NEXT: [[phi_pre:%[^ ]+]] = phi ptr addrspace(2) [ [[gep:%[^ ]+]], %loop ], [ [[gep_entry:%[^ ]+]], %entry ]
+; CHECK-NEXT: br i1 %cmp, label %loop, label %exit
+  %phi_pre = phi ptr addrspace(2) [ %gep, %loop ], [ %gep_entry, %entry ]
+  br i1 %cmp, label %loop, label %exit
+loop:
+; CHECK: loop
+; CHECK-NEXT: [[phi:%[^ ]+]] = phi ptr addrspace(2) [ [[gep]], %loop ], [ [[phi_pre]], %pre ]
+; CHECK-NEXT: load <4 x half>
+; CHECK-NEXT: [[gep]] = getelementptr <4 x half>, ptr addrspace(2) [[phi]], i32 16
+  %phi = phi ptr addrspace(2) [ %gep, %loop ], [ %phi_pre, %pre ]
+  %load = load <4 x half>, ptr addrspace(2) %phi, align 8
+  %gep = getelementptr inbounds i8, ptr addrspace(2) %phi, i32 128
+  br i1 %cmp, label %loop, label %pre
+exit:
+  ret void
+}
