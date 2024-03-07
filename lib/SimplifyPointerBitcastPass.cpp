@@ -737,12 +737,19 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
-        // calls like memcpy cannot be simplify by this function, skip them to
-        // avoid having to support them in function like
-        // `BitcastUtils::PointerOperandNum`.
+
+        auto isMemcpy = [](Instruction *I) {
+          auto memcpy = dyn_cast<CallInst>(I);
+          if (memcpy == nullptr)
+            return false;
+          return memcpy->getCalledFunction()->getIntrinsicID() ==
+                 Intrinsic::memcpy;
+        };
+        // memcpy cannot be simplify by this function, skip them to avoid having
+        // to support them in function like `BitcastUtils::PointerOperandNum`.
         if (!IsImplicitCasts(M, type_cache, I, source, source_ty, dest_ty,
                              true) ||
-            dyn_cast<CallInst>(&I)) {
+            isMemcpy(&I)) {
           continue;
         }
 
