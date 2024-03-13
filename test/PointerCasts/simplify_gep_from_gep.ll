@@ -104,3 +104,15 @@ entry:
   %1 = getelementptr <4 x i32>, ptr %0, i32 %i, i32 %i
   ret void
 }
+
+; CHECK: foo9
+; CHECK-NEXT: entry
+; CHECK-NEXT: [[add:%[^ ]+]] = add i64 1, %i
+; CHECK-NEXT: getelementptr { [0 x i32] }, ptr addrspace(1) %a, i64 0, i32 0, i64 [[add]]
+
+define spir_kernel void @foo9(ptr addrspace(1) %a, i64 %i) {
+entry:
+  %0 = getelementptr { [0 x i32] }, ptr addrspace(1) %a, i64 0, i32 0, i64 %i
+  %1 = getelementptr i32, ptr addrspace(1) %0, i32 1
+  ret void
+}

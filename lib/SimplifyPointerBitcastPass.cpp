@@ -291,8 +291,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       } else if (CstGEPIdxOp && CstGEPIdxOp->isZero()) {
         Idxs.push_back(*(OtherGEP->op_end() - 1));
       } else {
-        Idxs.push_back(Builder.CreateAdd(*(GEP->op_begin() + 1),
-                                         *(OtherGEP->op_end() - 1)));
+        Idxs.push_back(CreateAdd(Builder, *(GEP->op_begin() + 1),
+                                 *(OtherGEP->op_end() - 1)));
       }
     } else {
       uint64_t cstVal;
@@ -303,7 +303,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       if (CstGEPIdxOp) {
         cstVal += CstGEPIdxOp->getZExtValue();
       } else if (dynVal) {
-        dynVal = Builder.CreateAdd(dynVal, GEPIdxOp);
+        dynVal = CreateAdd(Builder, dynVal, GEPIdxOp);
       } else {
         dynVal = GEPIdxOp;
       }

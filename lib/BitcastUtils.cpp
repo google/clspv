@@ -1100,6 +1100,19 @@ Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val) {
   }
 }
 
+Value *CreateAdd(IRBuilder<> &Builder, Value *LHS, Value *RHS) {
+  auto LHSTy = LHS->getType();
+  auto RHSTy = RHS->getType();
+  if (LHSTy != RHSTy && LHSTy->isIntegerTy() && RHSTy->isIntegerTy()) {
+    if (SizeInBits(Builder, RHSTy) > SizeInBits(Builder, LHSTy)) {
+      LHS = Builder.CreateZExtOrTrunc(LHS, RHSTy);
+    } else {
+      RHS = Builder.CreateZExtOrTrunc(RHS, LHSTy);
+    }
+  }
+  return Builder.CreateAdd(LHS, RHS);
+}
+
 bool IsArrayLike(StructType *Ty) {
   if (Ty->getNumElements() == 0)
     return false;
