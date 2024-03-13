@@ -61,6 +61,7 @@ ConstantInt *GetIndexTyConst(IRBuilder<> &Builder, uint64_t C);
 Value *CreateDiv(IRBuilder<> &Builder, unsigned div, Value *Val);
 Value *CreateMul(IRBuilder<> &Builder, unsigned mul, Value *Val);
 Value *CreateRem(IRBuilder<> &Builder, unsigned rem, Value *Val);
+Value *CreateAdd(IRBuilder<> &Builder, Value *LHS, Value *RHS);
 
 bool IsArrayLike(StructType *Ty);
 bool IsComplexStruct(const DataLayout &DL, Type *Ty);
