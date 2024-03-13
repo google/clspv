@@ -386,6 +386,11 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     return CacheType(gv->getValueType());
   } else if (auto *func = dyn_cast<Function>(v)) {
     return CacheType(func->getFunctionType());
+  } else if (auto *select = dyn_cast<SelectInst>(v)) {
+    const DataLayout &DL = select->getModule()->getDataLayout();
+    auto false_ty = InferType(select->getFalseValue(), context, cache);
+    auto true_ty = InferType(select->getTrueValue(), context, cache);
+    return CacheType(SmallerTypeNotAliasing(DL, false_ty, true_ty));
   }
 
   // Special resource-related functions. The last parameter of each function
