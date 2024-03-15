@@ -110,6 +110,12 @@ if (${EXTERNAL_LLVM} EQUAL 1)
   if (NOT DEFINED CLSPV_LLVM_BINARY_DIR)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_BINARY_DIR to be specified")
   endif()
+  if (NOT DEFINED CLSPV_LIBCLC_SOURCE_DIR)
+    message(FATAL_ERROR "External LLVM requires CLSPV_LIBCLC_SOURCE_DIR to be specified")
+  endif()
+  if (NOT DEFINED CLSPV_LLVM_CMAKE_MODULES_DIR)
+    message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_CMAKE_MODULES_DIR to be specified")
+  endif()
 else()
   # Setup to use the LLVM monorepo.
   if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
@@ -118,6 +124,14 @@ else()
 
   if (NOT DEFINED CLSPV_CLANG_SOURCE_DIR)
     set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/clang)
+  endif()
+
+  if (NOT DEFINED CLSPV_LIBCLC_SOURCE_DIR)
+    set(CLSPV_LIBCLC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/libclc)
+  endif()
+
+  if (NOT DEFINED CLSPV_LLVM_CMAKE_MODULES_DIR)
+    set(CLSPV_LLVM_CMAKE_MODULES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/cmake/Modules)
   endif()
 
   use_component(${CLSPV_LLVM_SOURCE_DIR})
@@ -129,6 +143,7 @@ else()
 
   # First tell LLVM where to find clang.
   set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
+  set(LLVM_ENABLE_PROJECTS clang)
 
   # Tell LLVM not to build any targets.
   set(LLVM_TARGETS_TO_BUILD ""
@@ -141,6 +156,9 @@ else()
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/llvm/cmake/modules/)
   include(HandleLLVMOptions)
 endif()
+
+include(${CLSPV_LLVM_CMAKE_MODULES_DIR}/LLVMVersion.cmake)
+set(LLVM_VERSION ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH})
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -175,6 +193,10 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable -Werror-switch")
 endif()
+
+set(LIBCLC_TARGETS_TO_BUILD clspv--;clspv64--)
+string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}" "" CLSPV_LIBCLC_SUFFIX "${CLSPV_LIBCLC_SOURCE_DIR}")
+add_subdirectory(${CLSPV_LIBCLC_SOURCE_DIR} EXCLUDE_FROM_ALL)
 
 # Bring in our cmake folder
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/cmake)

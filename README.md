@@ -9,7 +9,7 @@ It consists of:
   OpenCL C into a Vulkan compute shader.
 
 Clspv depends on external projects:
-* Top-of-tree versions of [Clang][Clang] and [LLVM][LLVM]
+* Top-of-tree versions of [Clang][Clang], [LLVM][LLVM] and [libclc][libclc]
 * [SPIRV-Tools][SPIRV-Tools]
 * [SPIRV-Headers][SPIRV-Headers]
 
@@ -133,33 +133,8 @@ Or if you are using Ninja:
 [clvk]: https://github.com/kpet/clvk
 [CMake-doc]: https://cmake.org/documentation
 [CMake]: https://cmake.org
+[libclc] https://libclc.llvm.org
 [LLVM]: http://llvm.org
 [Ninja]: https://ninja-build.org
 [SPIRV-Headers]: https://github.com/KhronosGroup/SPIRV-Headers
 [SPIRV-Tools]: https://github.com/KhronosGroup/SPIRV-Tools
-
-## Builtin Libraries
-
-Clspv includes two LLVM IR libraries (cmake/clspv--.bc, cmake/clspv64--.bc)
-containing implementations of some OpenCL builtin functions, for the spir and
-spir64 targets respectively. These files are distributed under the LLVM license
-(included in LICENSE) as they are generated from the LLVM sub-project
-[libclc](https://libclc.llvm.org). Refer to the source for the relevant
-copyrights.
-
-### Rebuilding the Library
-
-#### Required Tools
-
-You will need a pre-built version of [LLVM](https://github.com/llvm/llvm-project) for
-your system, CMake, and (optionally) Ninja.
-
-#### Build
-
-To rebuild the library run the following commands:
-
-    cmake -GNinja <libclc dir> -DLIBCLC_TARGETS_TO_BUILD="clspv--;clspv64--" -DLLVM_CMAKE_DIR=</path/to/llvm_installation/lib/cmake/>
-    ninja
-
-Copy the resulting `clspv--.bc` and `clspv64--.bc` files into the cmake/
-directory and rebuild clspv.
