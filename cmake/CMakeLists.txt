@@ -14,6 +14,56 @@
 
 set(CLSPV_GENERATED_INCLUDES_DIR ${CLSPV_BINARY_DIR}/include/clspv)
 
+set(CLSPV_GENERATED_BC_DIR ${CLSPV_BINARY_DIR}/libclc-clspv)
+set(CLSPV64_GENERATED_BC_DIR ${CLSPV_BINARY_DIR}/libclc-clspv64)
+set(LIBCLC_SOURCE_DIR ${CLSPV_LIBCLC_SOURCE_DIR})
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/libclc/CMakeLists.txt DESTINATION ${LIBCLC_SOURCE_DIR})
+
+include(ExternalProject)
+ExternalProject_add(libclc_clspv
+  DEPENDS clang llvm-as llvm-config llvm-link opt
+  SOURCE_DIR ${LIBCLC_SOURCE_DIR}
+  BINARY_DIR ${CLSPV_GENERATED_BC_DIR}
+  CMAKE_ARGS -DLIBCLC_TARGETS_TO_BUILD=clspv--
+    -DCMAKE_CLC_COMPILER_FORCED=1
+    -DCMAKE_LLAsm_COMPILER_FORCED=1
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DLLVM_CMAKE_DIR=${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm
+    --debug-output
+    --trace-expand
+  INSTALL_COMMAND ""
+  BUILD_BYPRODUCTS ${CLSPV_GENERATED_BC_DIR}/clspv--.bc
+  USES_TERMINAL_BUILD 1
+)
+ExternalProject_add(libclc_clspv64
+  DEPENDS clang llvm-as llvm-config llvm-link opt
+  SOURCE_DIR ${LIBCLC_SOURCE_DIR}
+  BINARY_DIR ${CLSPV64_GENERATED_BC_DIR}
+  CMAKE_ARGS -DLIBCLC_TARGETS_TO_BUILD=clspv64--
+    -DCMAKE_CLC_COMPILER_FORCED=1
+    -DCMAKE_LLAsm_COMPILER_FORCED=1
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DLLVM_CMAKE_DIR=${CLSPV_LLVM_BINARY_DIR}/lib/cmake/llvm
+  INSTALL_COMMAND ""
+  BUILD_BYPRODUCTS ${CLSPV64_GENERATED_BC_DIR}/clspv64--.bc
+)
+
+# Pre-build step to force CMake to recognize the libclc sources are dependencies
+# of the build step. This way we can avoid using BUILD_ALWAYS above and only
+# rebuild libclc when the target sources actually change.
+file(GLOB_RECURSE LIBCLC_SOURCES "${LIBCLC_SOURCE_DIR}/*")
+ExternalProject_Add_Step(libclc_clspv prebuild
+  COMMAND ""
+  DEPENDEES configure
+  DEPENDERS build
+  DEPENDS ${LIBCLC_SOURCES})
+ExternalProject_Add_Step(libclc_clspv64 prebuild
+  COMMAND ""
+  DEPENDEES configure
+  DEPENDERS build
+  DEPENDS ${LIBCLC_SOURCES})
+
 set(SPIRV_C_STRINGS_INPUT_FILE ${SPIRV_HEADERS_SOURCE_DIR}/include/spirv/unified1/spirv.hpp)
 set(SPIRV_C_STRINGS_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/spirv_c_strings.hpp)
 set(SPIRV_C_STRINGS_NAMESPACE spv)
@@ -101,12 +151,12 @@ add_custom_command(
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   DEPENDS ${SPIRV_REFLECTION_INPUT_FILE} ${SPIRV_REFLECTION_PYTHON_FILE})
 
-set(CLSPV_LIBRARY_INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/clspv--.bc)
+set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_GENERATED_BC_DIR}/clspv--.bc)
 set(CLSPV_LIBRARY_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/clspv_builtin_library.h)
 set(CLSPV_LIBRARY_DATA_VAR_NAME clspv_builtin_library_data)
 set(CLSPV_LIBRARY_SIZE_VAR_NAME clspv_builtin_library_size)
 
-set(CLSPV64_LIBRARY_INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/clspv64--.bc)
+set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV64_GENERATED_BC_DIR}/clspv64--.bc)
 set(CLSPV64_LIBRARY_OUTPUT_FILE ${CLSPV_GENERATED_INCLUDES_DIR}/clspv64_builtin_library.h)
 set(CLSPV64_LIBRARY_DATA_VAR_NAME clspv64_builtin_library_data)
 set(CLSPV64_LIBRARY_SIZE_VAR_NAME clspv64_builtin_library_size)
