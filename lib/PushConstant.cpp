@@ -427,7 +427,7 @@ Value *BuildFromElements(Module &M, IRBuilder<> &builder, Type *dst_type,
             builder.CreateBitCast(elements[base_index + i], scaled_vec_ty));
       }
       SmallVector<int, 4> indices(num_elements);
-      uint32_t i = 0;
+      uint32_t i = base_offset * ratio / kIntBytes;
       std::generate_n(indices.data(), num_elements, [&i]() { return i++; });
       switch (casts.size()) {
         case 1:
