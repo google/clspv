@@ -1049,19 +1049,11 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
       Err.print("internal_additional_library:", llvm::errs());
       return false;
     }
-    for (auto &F : *add_library) {
-      if (!F.isDeclaration()) {
-        F.setIsNewDbgInfoFormat(true);
-      }
-    }
+    add_library->setIsNewDbgInfoFormat(true);
     L.linkInModule(std::move(add_library), 0);
   }
 
-  for (auto &F : *library) {
-    if (!F.isDeclaration()) {
-      F.setIsNewDbgInfoFormat(true);
-    }
-  }
+  library->setIsNewDbgInfoFormat(true);
   L.linkInModule(std::move(library), 0);
 
   return true;
@@ -1171,6 +1163,9 @@ int CompilePrograms(const std::vector<std::string> &programs,
 
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
+  for (auto &module : modules) {
+    module->setIsNewDbgInfoFormat(true);
+  }
 
   std::unique_ptr<llvm::Module> module(modules.back().release());
   modules.pop_back();
