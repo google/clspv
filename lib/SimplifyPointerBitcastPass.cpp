@@ -761,13 +761,39 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           uint64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
-          if (!gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
-                                         smallerBitWidths)) {
-            continue;
-          }
 
-          Worklist.push_back({&I, cstVal, dynVal, smallerBitWidths, dest_ty,
-                              gep->getPointerOperand()});
+          auto &context = M.getContext();
+          auto findBiggerTyToUpdate = [DL, &context, gepIndicesCanBeUpgradedTo,
+                                       source_ty, gep, &cstVal, &dynVal,
+                                       &smallerBitWidths](Type *dest_ty) {
+            if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
+                                          smallerBitWidths)) {
+              return dest_ty;
+            }
+            if (!dest_ty->isIntegerTy()) {
+              return source_ty;
+            }
+            size_t dest_ty_size = SizeInBits(DL, dest_ty);
+            dest_ty_size /= 2;
+            dest_ty = Type::getIntNTy(context, dest_ty_size);
+
+            while (dest_ty != source_ty) {
+              if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
+                                            smallerBitWidths)) {
+                return dest_ty;
+              }
+              dest_ty_size /= 2;
+              dest_ty = Type::getIntNTy(context, dest_ty_size);
+            }
+
+            return source_ty;
+          };
+          dest_ty = findBiggerTyToUpdate(dest_ty);
+          if (dest_ty != source_ty) {
+
+            Worklist.push_back({&I, cstVal, dynVal, smallerBitWidths, dest_ty,
+                                gep->getPointerOperand()});
+          }
         } else if (auto *phi = dyn_cast<PHINode>(source)) {
           auto &context = M.getContext();
           auto get_geps_defining_phis_type = [phi, source_ty, dest_ty, &context,
