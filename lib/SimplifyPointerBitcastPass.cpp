@@ -833,6 +833,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     }
   }
 
+  DenseSet<Instruction *> ToBeRemoved;
   for (auto GEPInfo : Worklist) {
     Instruction *I = GEPInfo.inst;
     uint64_t cst = GEPInfo.cst;
@@ -853,7 +854,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace operand "
                       << PointerOperandNum << " of: ";
                I->dump(); dbgs() << "by: "; new_gep->dump());
+    auto initial_inst = dyn_cast<Instruction>(I->getOperand(PointerOperandNum));
     I->setOperand(PointerOperandNum, new_gep);
+
+    if (initial_inst != nullptr && initial_inst->getNumUses() == 0) {
+      ToBeRemoved.insert(initial_inst);
+    }
 
     changed = true;
   }
@@ -880,6 +886,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     gep->eraseFromParent();
 
     changed = true;
+  }
+
+  for (auto *I : ToBeRemoved) {
+    if (I->getParent() != nullptr) {
+      I->eraseFromParent();
+    }
   }
 
   return changed;
