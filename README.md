@@ -1,7 +1,6 @@
 # clspv [![Discord Shield](https://discordapp.com/api/guilds/1002628585250631681/widget.png?style=shield)](https://discord.gg/xsVdjmhFM9)
 
-**Clspv** is a prototype compiler for a subset of OpenCL C to Vulkan
-compute shaders.
+**Clspv** is a compiler for OpenCL C targeting Vulkan compute shaders.
 
 It consists of:
 * A set of LLVM Module passes to transform a dialect of LLVM IR into
@@ -28,12 +27,15 @@ Clspv is not an official Google product.
 
 ## Status
 
-The compiler is an incomplete prototype, with many rough edges.
+Clspv has passed OpenCL3.0 conformance with:
+- [clvk][clvk] as the runtime driver ([submission 419](https://www.khronos.org/conformance/adopters/conformant-products/opencl#submission_419))
+using the following tags:
+  - clvk: [khronos-submission-419](https://github.com/kpet/clvk/releases/tag/khronos-submission-419)
+  - clspv: [clvk-khronos-submission-419](https://github.com/google/clspv/releases/tag/clvk-khronos-submission-419)
 
-The input language is a subset of OpenCL C version 1.2.
-The [OpenCL C on Vulkan Specification](docs/OpenCLCOnVulkan.md)
-describes the specific subset, and also the mapping into Vulkan compute
-shaders.
+The input language is OpenCL C version 1.2.
+Read the [OpenCL C on Vulkan Specification](docs/OpenCLCOnVulkan.md) for more
+information on the support and the mapping into Vulkan compute shaders.
 
 ## Examples
 
@@ -128,6 +130,7 @@ Or if you are using Ninja:
     ninja check-spirv
 
 [Clang]: http://clang.llvm.org
+[clvk]: https://github.com/kpet/clvk
 [CMake-doc]: https://cmake.org/documentation
 [CMake]: https://cmake.org
 [LLVM]: http://llvm.org

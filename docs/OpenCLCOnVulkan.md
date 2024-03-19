@@ -666,12 +666,6 @@ The OpenCL C work-item functions map to Vulkan SPIR-V as follows:
 Some OpenCL C language features that have no expressible equivalents in Vulkan's
 variant of SPIR-V are restricted.
 
-### Kernels
-
-OpenCL C language kernels **must not** be called from other kernels.
-
-Pointers of type `half` **must not** be used as kernel arguments.
-
 ### Types
 #### Boolean
 
@@ -690,10 +684,6 @@ can be used. To disable general support for these types, use `-int8=0`.
 #### 64-Bit Types
 
 The `double`, `double2`, `double3` and `double4` types **must not** be used.
-
-#### Events
-
-The `event_t` type **must not** be used.
 
 #### Pointers
 
@@ -729,11 +719,6 @@ the OpenCL C specification. This means kernels will operate as if compiled with
 some builtin functions, clspv also provides the `--cl-native-math` option. This
 option goes beyond fast-relaxed math and provides no precision guarantees
 (similar to the native_ functions in OpenCL).
-
-#### Atomic Functions
-
-The `atomic_xchg()` built-in function that takes a floating-point argument
-**must not** be used.
 
 ##### OpenCL 2.0 Atomic Functions
 
@@ -887,51 +872,37 @@ These extension built-in functions are not supported:
 
 ### Numerical Compliance
 
-Clspv is not able to reach full accuracy requirements on the supported builtin
-functions in all cases. Instead, currently, it is able to meet the requirements
-tested by OpenCL CTS under relaxed precision requirements. In order to achieve
-this goal, some functions are implemented using the GLSL.std.450 extended or
-core instructions, some are implemented in the builtin library and some are
-emulated by the compiler.
-
-Note: Clspv has been tested against five Vulkan implementations from different
-vendors and is able to achieve the relaxed accuracy requirements broadly.
-
-#### Implementations Using Core and Extended Instructions
-
-`add`, `subtract`, `divide`, `multiply`, `assignment`, `not`, `acos`, `asin`,
-`ceil`, `cos`, `cosh`, `exp`, `exp2`, `exp10`, `fabs`, `floor`, `fmax`, `fmin`,
-`log`, `log2`, `log10`, `mad`, `pow`, `powr`, `rint`, `rsqrt`, `sin`, `sinh`,
-`tan`, `trunc`, `half_cos`, `half_exp`, `half_exp2`, `half_exp10`, `half_log`,
-`half_log2`, `half_log10`, `half_powr`, `half_rsqrt`, `half_sin`, `half_tan`,
-`clamp`, `degrees`, `mix`, `radians`, `sign`, `smoothstep`, `step`, `cross`,
-`dot`, `normalize`, `fast_distance`, `fast_length`, `fast_normalize`.
+Clspv is not able to reach full accuracy requirements on all builtin functions
+using the GLSL.std.450 extended or core instructions or compiler emulation.
+In order to achieve this goal, some functions are implemented using a builtin
+library (from [libclc](https://libclc.llvm.org/)).
 
 #### Implementations Using Builtin Library
 
-`acosh`, `asinh`, `atanh`, `cbrt`, `erfc`, `erf`, `fma`, `fmod`, `fract`,
-`frexp`, `hypot`, `ilogb`, `ldexp`, `lgamma`, `lgamma_r`, `logb`, `maxmag`,
-`modf`, `nan`, `nextafter`, `remainder`, `remquo`, `rootn`, `sqrt`, `tanh`,
-`tgamma`, `half_divide`, `half_recip`, `half_sqrt`, `distance`, `length`,
-`atan`, `atan2pi`, `atanpi`, `atan2`.
+Find the latest list in clspv's libclc [SOURCES file](https://github.com/llvm/llvm-project/blob/main/libclc/clspv/lib/SOURCES).
+
+Here is the list as of March 2024:
+
+`acos`, `acosh`, `acospi`, `asin`, `asinh`, `asinh`, `asinpi`, `atan`, `atan2`,
+`atan2pi`, `atanh`, `atanpi`, `cbrt`, `cos`, `cosh`, `cospi`, `distance`,
+`erf`, `erfc`, `exp`, `exp10`, `exp2`, `exp_helper`, `expm1`, `fdim`, `fma`,
+`fmod`, `fract`, `frexp`, `half_cos`, `half_divide`, `half_exp`, `half_exp10`,
+`half_exp2`, `half_log`, `half_log10`, `half_log2`, `half_powr`, `half_recip`,
+`half_sin`, `half_sqrt`, `half_tan`, `hypot`, `ilogb`, `ldexp`, `length`,
+`lgamma`, `lgamma_r`, `log`, `log10`, `log1p`, `log2`, `logb`, `maxmag`,
+`minmag`, `modf`, `nan`, `nextafter`, `pow`, `pown`, `powr`, `remainder`,
+`remquo`, `rootn`, `sin`, `sincos`, `sincos_helpers`, `sinh`, `sinpi`,
+`tables`, `tan`, `tanh`, `tanpi`, `tanpi`, `tgamma`, `vstore_half`.
 
 Note: `fma` has a very high runtime cost unless compiling with
 `-cl-native-math`. Its accuracy requirements are not relaxed by
 `-cl-fast-relaxed-math` and the library implementation emulates it using
 integers.
 
-Note: `acosh`, `asinh`, `atanh`, `atan`, `atan2`, `atanpi` and `atan2pi`,
-`fma`, `fmod`, `fract`, `frexp`, `ldexp`, `rsqrt`, `half_sqrt`, `sqrt`, `tanh`,
-`distance`, and `length` are all implemented using core or extended
-instructions when compiling with `-cl-native-math`.
+Note: if a builtin also has a core or extended instructions or an emulated
+implementations, clspv can be force to use it with `-cl-native-math` or
+`-use-native-builtins`.
 
-#### Implementations Using Emulation
+#### Implementations Using core or extended instructions or emulation
 
-`acospi`, `asinpi`, `copysign`, `cospi`, `expm1`, `fdim`, `log1p`, `pown`,
-`round`, `sincos`, `sinpi`, `tanpi`.
-
-#### Known Conformance Issues
-
-* `frexp` fails using Swiftshader as an implementation due to an internal error.
-* `ldexp` and `rsqrt` fail to meet accuracy requirements on some Adreno GPUs. 
-
+The list can be found in [ReplaceOpenCLBuiltinPass.cpp](https://github.com/google/clspv/blob/main/lib/ReplaceOpenCLBuiltinPass.cpp)
