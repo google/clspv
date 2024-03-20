@@ -142,7 +142,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
     if (!OtherBitcast) {
       auto CE = dyn_cast<ConstantExpr>(Bitcast->getOperand(0));
       assert(CE && CE->getOpcode() == Instruction::BitCast);
-      OtherBitcast = CE->getAsInstruction(Bitcast);
+      OtherBitcast = CE->getAsInstruction();
+      OtherBitcast->insertBefore(Bitcast);
     }
     LLVM_DEBUG(dbgs() << "\n##runOnBitcastFromBitcast:\nremove:";
                Bitcast->dump());

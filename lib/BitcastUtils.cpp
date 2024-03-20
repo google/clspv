@@ -863,7 +863,8 @@ bool RemoveCstExprFromFunction(Function *F) {
         Value *Scalar = B.CreateExtractValue(CstArray, i);
         auto *ScalarCst = dyn_cast<ConstantExpr>(Scalar);
         if (ScalarCst) {
-          auto *ScalarInst = ScalarCst->getAsInstruction(InsertBefore);
+          auto *ScalarInst = ScalarCst->getAsInstruction();
+          ScalarInst->insertBefore(InsertBefore);
           ArrayNew = B.CreateInsertValue(ArrayNew, ScalarInst, i);
           WorkList.push_back(std::make_pair(ScalarInst, OperandId));
         } else {
@@ -878,7 +879,8 @@ bool RemoveCstExprFromFunction(Function *F) {
       for (unsigned i = 0; i < numEle; ++i) {
         Value *Scalar = B.CreateExtractElement(CstVector, i);
         if (auto *CstScalar = dyn_cast<ConstantExpr>(Scalar)) {
-          auto ScalarInst = CstScalar->getAsInstruction(InsertBefore);
+          auto ScalarInst = CstScalar->getAsInstruction();
+          ScalarInst->insertBefore(InsertBefore);
           VecNew = B.CreateInsertElement(VecNew, ScalarInst, i);
           WorkList.push_back(std::make_pair(ScalarInst, OperandId));
         } else {
@@ -888,7 +890,8 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, VecNew);
     } else if (auto CstExpr =
                    dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
-      auto Operand = CstExpr->getAsInstruction(InsertBefore);
+      auto Operand = CstExpr->getAsInstruction();
+      Operand->insertBefore(InsertBefore);
       CheckInstruction(Operand);
       I->setOperand(OperandId, Operand);
     }
