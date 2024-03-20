@@ -748,7 +748,7 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
 
       auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
           EquivalentSourceTy, EquivalentPointer, Indices, GEP->isInBounds(),
-          GEP->getInRangeIndex());
+          GEP->getInRange());
 
       return EquivalentGEP;
     }

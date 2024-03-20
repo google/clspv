@@ -2368,8 +2368,8 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     // If there is exactly one use we know where to insert the instruction
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
-      auto *EquivInstr =
-          ConstExpr->getAsInstruction(dyn_cast<Instruction>(User));
+      auto *EquivInstr = ConstExpr->getAsInstruction();
+      EquivInstr->insertBefore(dyn_cast<Instruction>(User));
       GenerateInstruction(*EquivInstr);
       RID = VMap[EquivInstr];
     } else {
