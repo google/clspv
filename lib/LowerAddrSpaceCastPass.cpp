@@ -115,6 +115,17 @@ clspv::LowerAddrSpaceCastPass::visitAllocaInst(llvm::AllocaInst &I) {
   return alloca;
 }
 
+llvm::Value *
+clspv::LowerAddrSpaceCastPass::visitAtomicRMWInst(llvm::AtomicRMWInst &I) {
+  IRBuilder<> B(&I);
+  auto atomic =
+      B.CreateAtomicRMW(I.getOperation(), visit(I.getPointerOperand()),
+                        I.getValOperand(), I.getAlign(), I.getOrdering());
+  registerReplacement(&I, atomic);
+  I.replaceAllUsesWith(atomic);
+  return atomic;
+}
+
 llvm::Value *clspv::LowerAddrSpaceCastPass::visitLoadInst(llvm::LoadInst &I) {
   IRBuilder<> B(&I);
   Type *Ty = I.getType();

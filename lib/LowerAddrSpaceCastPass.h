@@ -36,6 +36,7 @@ private:
 
   llvm::Value *visit(llvm::Value *V);
   llvm::Value *visitAllocaInst(llvm::AllocaInst &I);
+  llvm::Value *visitAtomicRMWInst(llvm::AtomicRMWInst &I);
   llvm::Value *visitLoadInst(llvm::LoadInst &I);
   llvm::Value *visitStoreInst(llvm::StoreInst &I);
   llvm::Value *visitGetElementPtrInst(llvm::GetElementPtrInst &I);
