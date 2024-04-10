@@ -531,13 +531,23 @@ struct SPIRVProducerPassImpl {
   bool CalledWithCoherentResource(Argument &Arg);
 
   bool NeedDecorationNoContraction(spv::Op op) {
-    spv::Op list[] = {spv::OpFMul, spv::OpFDiv, spv::OpFNegate,
-                      spv::OpFAdd, spv::OpFSub, spv::OpFRem};
-    for (auto opf : list) {
-      if (op == opf)
-        return true;
+    static const SmallVector<spv::Op> list_full = {spv::OpFMul,    spv::OpFDiv,
+                                                   spv::OpFNegate, spv::OpFAdd,
+                                                   spv::OpFSub,    spv::OpFRem};
+    static const SmallVector<spv::Op> list_mad_enable = {
+        spv::OpFDiv, spv::OpFNegate, spv::OpFSub, spv::OpFRem};
+    auto check_list = [&op](const SmallVector<spv::Op> &list) {
+      for (auto opf : list) {
+        if (op == opf)
+          return true;
+      }
+      return false;
+    };
+    if (clspv::Option::ClMadEnable()) {
+      return check_list(list_mad_enable);
+    } else {
+      return check_list(list_full);
     }
-    return false;
   }
 
   //

@@ -105,11 +105,6 @@ static llvm::cl::opt<bool>
                    llvm::cl::desc("This option disables all optimizations. The "
                                   "default is optimizations are enabled."));
 
-static llvm::cl::opt<bool> cl_mad_enable(
-    "cl-mad-enable", llvm::cl::init(false),
-    llvm::cl::desc("Allow a * b + c to be replaced by a mad. The mad computes "
-                   "a * b + c with reduced accuracy."));
-
 static llvm::cl::opt<bool> cl_no_signed_zeros(
     "cl-no-signed-zeros", llvm::cl::init(false),
     llvm::cl::desc("Allow optimizations for floating-point arithmetic that "
@@ -325,7 +320,7 @@ int SetCompilerInstanceOptions(
   // cl_denorms_are_zero ignored for now!
   // cl_fp32_correctly_rounded_divide_sqrt ignored for now!
   instance.getCodeGenOpts().LessPreciseFPMAD =
-      cl_mad_enable || clspv::Option::UnsafeMath();
+      clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath();
   // cl_no_signed_zeros ignored for now!
   instance.getLangOpts().UnsafeFPMath = clspv::Option::UnsafeMath();
   instance.getLangOpts().FiniteMathOnly = clspv::Option::FiniteMath();

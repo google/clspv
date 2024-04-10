@@ -302,6 +302,9 @@ bool PrintfSupport();
 // Returns the size of the printf buffer in bytes. The default value is 1MB.
 uint32_t PrintfBufferSize();
 
+// Returns true when compiling with '-cl-mad-enable'
+bool ClMadEnable();
+
 } // namespace Option
 } // namespace clspv
 

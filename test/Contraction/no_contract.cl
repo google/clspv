@@ -14,6 +14,14 @@
 // FAST: [[mul:%[a-zA-Z0-9_]+]] = OpFMul
 // FAST: OpFAdd %{{.*}} [[mul]]
 
+// RUN: clspv %target %s -o %t2.spv -cl-mad-enable
+// RUN: spirv-dis %t2.spv -o %t2.spvasm
+// RUN: FileCheck --check-prefix=MAD %s < %t2.spvasm
+// MAD-NOT: OpDecorate [[mul:%[a-zA-Z0-9_]+]] NoContraction
+// MAD-NOT: OpExtInst %{{.*}} %{{.*}} Fma
+// MAD: [[mul:%[a-zA-Z0-9_]+]] = OpFMul
+// MAD: OpFAdd %{{.*}} [[mul]]
+
 #pragma OPENCL FP_CONTRACT OFF
 kernel void test(global float *out, global float *a, global float *b, global float *c) {
   int i = get_global_id(0);
