@@ -427,6 +427,12 @@ static llvm::cl::opt<bool> hack_image1d_buffer_bgra(
     "hack-image1d-buffer-bgra", llvm::cl::init(false),
     llvm::cl::desc("Shuffle component of read when CL_BGRA format is not "
                    "supported for image1d_buffer."));
+
+static llvm::cl::opt<bool> cl_mad_enable(
+    "cl-mad-enable", llvm::cl::init(false),
+    llvm::cl::desc("Allow a * b + c to be replaced by a mad. The mad computes "
+                   "a * b + c with reduced accuracy."));
+
 } // namespace
 
 namespace clspv {
@@ -554,6 +560,8 @@ bool PhysicalStorageBuffers() { return physical_storage_buffers; }
 
 bool PrintfSupport() { return printf_support; }
 uint32_t PrintfBufferSize() { return printf_buffer_size; }
+
+bool ClMadEnable() { return cl_mad_enable; }
 
 } // namespace Option
 } // namespace clspv
