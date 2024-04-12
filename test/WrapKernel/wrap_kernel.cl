@@ -20,7 +20,7 @@ kernel void main_kernel(global int* C, global int* D) {
 
 // CHECK: [[extinst:%[a-zA-A0-9_]+]] = OpExtInstImport "NonSemantic.ClspvReflection.5"
 // CHECK-DAG: [[kernel_add_name:%[a-zA-Z0-9_]+]] = OpString "add"
-// CHECK: [[attributes:%[^ ]+]] = OpString " __attribute__((work_group_size_hint(1, 1, 1))) __attribute__((reqd_work_group_size(1, 1, 1))) __kernel"
+// CHECK: [[attributes:%[^ ]+]] = OpString "__attribute__((work_group_size_hint(1, 1, 1)))__attribute__((reqd_work_group_size(1, 1, 1))) __kernel"
 // CHECK-DAG: [[k0arg0:%[a-zA-Z0-9_]+]] = OpString "A"
 // CHECK-DAG: [[k0arg1:%[a-zA-Z0-9_]+]] = OpString "B"
 // CHECK-DAG: [[kernel_main_name:%[a-zA-Z0-9_]+]] = OpString "main_kernel"
