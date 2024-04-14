@@ -687,6 +687,7 @@ private:
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
+  DenseSet<uint32_t> DecoratedNonUniform;
 
   // If a function F has a pointer-to-__constant parameter, then this variable
   // will map F's type to (G, index of the parameter), where in a first phase
@@ -4638,8 +4639,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         setNonUniformPointers();
 
         SPIRVOperandVec Ops;
-        Ops << getSPIRVValue(op) << spv::DecorationNonUniform;
-        addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+        auto id = getSPIRVValue(op);
+        if (DecoratedNonUniform.insert(id.get()).second) {
+          Ops << id << spv::DecorationNonUniform;
+          addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+        }
       }
     }
   }
