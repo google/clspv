@@ -126,10 +126,7 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
       // Update caller site.
       for (auto User : Users) {
         // Create new call instruction for new function without byval.
-        CallInst *Call = dyn_cast<CallInst>(User);
-        if (Call == nullptr) {
-          continue;
-        }
+        CallInst *Call = cast<CallInst>(User);
         auto Callee = Call->getCalledFunction();
 
         SmallVector<Value *, 8> Args;

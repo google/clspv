@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Operator.h"
 
 #include "AnnotationToMetadataPass.h"
 #include "Constants.h"
@@ -30,6 +31,7 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
 
       // list of processed strings to delete at the end
       SmallPtrSet<GlobalValue *, 4> to_erase;
+      SmallPtrSet<Constant *, 4> addrspacecast_to_erase;
 
       ConstantArray *annotations_array =
           dyn_cast<ConstantArray>(GV.getOperand(0));
@@ -38,6 +40,11 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
             dyn_cast<ConstantStruct>(annotation_entry.get());
 
         auto op0 = annotation_struct->getOperand(0);
+        if (isa<AddrSpaceCastOperator>(op0)) {
+          // We need to make sure to erase those to avoid keeping a reference on
+          // functions preventing them from being removed
+          addrspacecast_to_erase.insert(op0);
+        }
         Function *entry_point = dyn_cast<Function>(op0->stripPointerCasts());
 
         auto op1 = annotation_struct->getOperand(1);
@@ -65,6 +72,9 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
       GV.eraseFromParent();
       for (auto gv : to_erase) {
         gv->eraseFromParent();
+      }
+      for (auto as: addrspacecast_to_erase) {
+        as->destroyConstant();
       }
       break;
     }
