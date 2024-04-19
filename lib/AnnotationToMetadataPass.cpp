@@ -73,7 +73,7 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
       for (auto gv : to_erase) {
         gv->eraseFromParent();
       }
-      for (auto as: addrspacecast_to_erase) {
+      for (auto as : addrspacecast_to_erase) {
         as->destroyConstant();
       }
       break;
