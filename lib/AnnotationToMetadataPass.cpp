@@ -38,7 +38,7 @@ clspv::AnnotationToMetadataPass::run(Module &M, ModuleAnalysisManager &) {
             dyn_cast<ConstantStruct>(annotation_entry.get());
 
         auto op0 = annotation_struct->getOperand(0);
-        Function *entry_point = dyn_cast<Function>(op0);
+        Function *entry_point = dyn_cast<Function>(op0->stripPointerCasts());
 
         auto op1 = annotation_struct->getOperand(1);
         GlobalVariable *annotation_gv = dyn_cast<GlobalVariable>(op1);
