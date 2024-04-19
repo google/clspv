@@ -1961,11 +1961,8 @@ void clspv::LongVectorLoweringPass::cleanDeadFunctions() {
     Progress = (DeadFunctions.size() < PreviousSize);
   }
 
-  // TODO: uncomment assert.
-  // LLVM now creates some addrspacecast on function that are never used in any
-  // function. It prevents supposedly-dead functions from being removed
-  // assert(DeadFunctions.empty() &&
-  //        "Not all supposedly-dead functions were removed!");
+  assert(DeadFunctions.empty() &&
+         "Not all supposedly-dead functions were removed!");
 }
 
 void clspv::LongVectorLoweringPass::cleanDeadGlobals() {
