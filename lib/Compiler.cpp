@@ -39,6 +39,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/DCE.h"
+#include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/InferAddressSpaces.h"
 #include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/StructurizeCFG.h"
@@ -590,6 +591,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // See https://github.com/google/clspv/issues/71
     pm.addPass(clspv::HideConstantLoadsPass());
 
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::EarlyCSEPass()));
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
 
