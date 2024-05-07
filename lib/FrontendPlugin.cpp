@@ -191,7 +191,7 @@ private:
     }
 
     // First check if we have a pointer type.
-    if (Ty->isPointerType()) {
+    if (Ty->isPointerType() || (!IsKernelParameter && Ty->isReferenceType())) {
       const Type *pointeeTy = Ty->getPointeeType().getTypePtr();
       if (pointeeTy && pointeeTy->isVoidType() &&
           !clspv::Option::Int8Support()) {
