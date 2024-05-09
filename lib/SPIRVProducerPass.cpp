@@ -3372,6 +3372,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     LangID = spv::SourceLanguageOpenCL_CPP;
     LangVer = 100;
     break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP_2021:
+    LangID = spv::SourceLanguageOpenCL_CPP;
+    LangVer = 202100;
+    break;
   default:
     break;
   }

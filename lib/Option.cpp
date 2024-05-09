@@ -241,7 +241,9 @@ llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_30,
                                 "CL3.0", "OpenCL C 3.0"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP,
-                                "CLC++", "C++ for OpenCL")));
+                                "CLC++", "C++ for OpenCL"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP_2021,
+                                "CLC++2021", "C++ for OpenCL")));
 
 llvm::cl::opt<clspv::Option::SPIRVVersion> spv_version(
     "spv-version", llvm::cl::desc("Specify the SPIR-V binary version"),
@@ -479,6 +481,7 @@ bool GlobalOffset() { return global_offset; }
 bool GlobalOffsetPushConstant() { return global_offset_push_constant; }
 bool NonUniformNDRangeSupported() {
   return ((Language() == SourceLanguage::OpenCL_CPP) ||
+          (Language() == SourceLanguage::OpenCL_CPP_2021) ||
           (Language() == SourceLanguage::OpenCL_C_20) ||
           (Language() == SourceLanguage::OpenCL_C_30) ||
           ArmNonUniformWorkGroupSize()) &&
