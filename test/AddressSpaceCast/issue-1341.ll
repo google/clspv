@@ -1,7 +1,8 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=lower-addrspacecast
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: %0 = phi ptr [ %{{.*}}, %entry ], [ %{{.*}}, %arrayinit.body ]
+; CHECK: arrayinit.body:
+; CHECK-NEXT: {{.*}} = phi ptr [ %{{.*}}, %entry ], [ %{{.*}}, %arrayinit.body ]
 ; CHECK-NOT: %arrayinit.cur = phi ptr addrspace(4) [ %arrayinit.begin, %entry ], [ %arrayinit.next, %arrayinit.body ]
 
 define dso_local spir_kernel void @fun() {
