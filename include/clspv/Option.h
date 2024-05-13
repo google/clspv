@@ -168,7 +168,8 @@ enum class SourceLanguage {
   OpenCL_C_12,
   OpenCL_C_20,
   OpenCL_C_30,
-  OpenCL_CPP
+  OpenCL_CPP,
+  OpenCL_CPP_2021
 };
 
 SourceLanguage Language();
@@ -178,6 +179,7 @@ std::set<FeatureMacro> EnabledFeatureMacros();
 // Returns true when the source language makes use of the generic address space.
 inline bool LanguageUsesGenericAddressSpace() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
+         (Language() == SourceLanguage::OpenCL_CPP_2021) ||
          (Language() == SourceLanguage::OpenCL_C_20) ||
          (Language() == SourceLanguage::OpenCL_C_30 &&
           EnabledFeatureMacros().count(

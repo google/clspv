@@ -288,6 +288,9 @@ int SetCompilerInstanceOptions(
   case clspv::Option::SourceLanguage::OpenCL_CPP:
     standard = clang::LangStandard::lang_openclcpp10;
     break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP_2021:
+    standard = clang::LangStandard::lang_openclcpp2021;
+    break;
   default:
     llvm_unreachable("Unknown source language");
   }
@@ -314,6 +317,16 @@ int SetCompilerInstanceOptions(
   instance.getDiagnosticOpts().Warnings.push_back("no-builtin-macro-redefined");
   // TODO(#995): Re-enable this warning.
   instance.getDiagnosticOpts().Warnings.push_back("no-unsafe-buffer-usage");
+
+  if (clspv::Option::Language() == clspv::Option::SourceLanguage::OpenCL_CPP ||
+      clspv::Option::Language() ==
+          clspv::Option::SourceLanguage::OpenCL_CPP_2021) {
+    instance.getDiagnosticOpts().Warnings.push_back("no-missing-prototypes");
+  }
+  if (clspv::Option::Language() ==
+      clspv::Option::SourceLanguage::OpenCL_CPP_2021) {
+    instance.getDiagnosticOpts().Warnings.push_back("no-c++98-compat");
+  }
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
@@ -835,7 +848,9 @@ int ParseOptions(const int argc, const char *const argv[]) {
         clspv::Option::Language() ==
             clspv::Option::SourceLanguage::OpenCL_C_20 ||
         clspv::Option::Language() ==
-            clspv::Option::SourceLanguage::OpenCL_CPP) {
+            clspv::Option::SourceLanguage::OpenCL_CPP ||
+        clspv::Option::Language() ==
+            clspv::Option::SourceLanguage::OpenCL_CPP_2021) {
       llvm::errs() << "POD arguments as push constants are not compatible with "
                       "module scope push constants\n";
       return -1;
