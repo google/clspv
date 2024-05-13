@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Builtins.h"
@@ -777,11 +778,33 @@ glsl::ExtInst Builtins::getDirectOrIndirectExtInstEnum(
 }
 
 bool Builtins::BuiltinWithGenericPointer(StringRef name) {
-  if (name.contains("fract") || name.contains("frexp") ||
-      name.contains("modf") || name.contains("remquo") ||
-      name.contains("lgamma_r") || name.contains("vstore_half") ||
-      name.contains("sincos"))
-    return true;
+  StringRef prefix("_Z");
+  if (!name.starts_with(prefix)) {
+    return false;
+  }
+  size_t pos = prefix.size();
+  std::string demangled = GetUnmangledName(name.str(), &pos);
+  if (demangled.empty()) {
+    // It could be a local symbol (_ZLxx)
+    return false;
+  }
+
+  const char *list[] = {"fract",  "frexp",    "modf",
+                        "remquo", "lgamma_r", "sincos"};
+
+  for (const auto &fn_name : list) {
+    if (demangled == fn_name) {
+      return true;
+    }
+  }
+
+  // Check for vstore_half family of functions.
+  if (demangled.size() >= strlen("vstore_half")) {
+    static Regex regex("^vstore_half(2|3|4|8|16)?(_rte|_rtz|_rtp|_rtn)?$");
+    if (regex.match(demangled)) {
+      return true;
+    }
+  }
   return false;
 }
 
