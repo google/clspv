@@ -29,13 +29,7 @@ using namespace llvm;
 
 namespace {
 bool is_libclc_builtin(llvm::Function *F) {
-  for (auto &Attr : F->getAttributes().getFnAttrs()) {
-    if (Attr.isStringAttribute() && Attr.getKindAsString() == "llvm.assume" &&
-        Attr.getValueAsString() == "clspv_libclc_builtin") {
-      return true;
-    }
-  }
-  return false;
+  return F->getMetadata("clspv_libclc_builtin");
 }
 } // namespace
 
