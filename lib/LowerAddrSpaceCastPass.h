@@ -45,6 +45,7 @@ private:
   llvm::Value *visitCallInst(llvm::CallInst &I);
   llvm::Value *visitIntToPtrInst(llvm::IntToPtrInst &I);
   llvm::Value *visitPtrToIntInst(llvm::PtrToIntInst &I);
+  llvm::Value *visitPHINode(llvm::PHINode &I);
   llvm::Value *visitInstruction(llvm::Instruction &I);
 
   void runOnFunction(llvm::Function &F);

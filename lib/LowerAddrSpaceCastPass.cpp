@@ -350,6 +350,25 @@ Value *clspv::LowerAddrSpaceCastPass::visitPtrToIntInst(PtrToIntInst &I) {
   return ptrToInt;
 }
 
+Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
+  IRBuilder<> B(&I);
+  // NOTE: We assume that the first incoming value does not depend on I.
+  auto *V1 = visit(I.getIncomingValue(0));
+  auto *B1 = I.getIncomingBlock(0);
+
+  // Register the replacement early in order to avoid recursive calls
+  // when an incoming value depends on this PHI node.
+  auto Phi = B.CreatePHI(V1->getType(), I.getNumIncomingValues());
+  registerReplacement(&I, Phi);
+
+  Phi->addIncoming(V1, B1);
+  for (unsigned i = 1; i < I.getNumIncomingValues(); ++i) {
+    Phi->addIncoming(visit(I.getIncomingValue(i)), I.getIncomingBlock(i));
+  }
+
+  return Phi;
+}
+
 Value *clspv::LowerAddrSpaceCastPass::visitInstruction(Instruction &I) {
 #ifndef NDEBUG
   dbgs() << "Instruction not handled: " << I << '\n';
@@ -456,6 +475,11 @@ void clspv::LowerAddrSpaceCastPass::cleanDeadInstructions() {
           }
         },
         [&NextBatch](Instruction *AliveInstruction) {
+          if (PHINode *Phi = dyn_cast<PHINode>(AliveInstruction)) {
+            if (RecursivelyDeleteDeadPHINode(Phi)) {
+              return;
+            }
+          }
           NextBatch.push_back(AliveInstruction);
         });
 
