@@ -46,7 +46,7 @@ Compile a set of kernels into a SPIR-V binary module:
 Emit the binary as a C initializer list, for easy embedding of a shader in
 in a C or C++ program source:
 
-    clspv -mfmt=c foo.cl -o -
+    clspv --output-format=c foo.cl -o -
 
 Predefine some preprocessor symbols:
 
