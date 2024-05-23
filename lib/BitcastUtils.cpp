@@ -66,6 +66,9 @@ void GroupScalarValuesIntoVector(IRBuilder<> &Builder,
                                  unsigned NumElePerVec);
 // Returns the size in bits of 'Ty'
 size_t SizeInBits(const DataLayout &DL, Type *Ty) {
+  if (Ty->isVoidTy()) {
+    return 0;
+  }
   return DL.getTypeAllocSizeInBits(Ty);
 }
 
