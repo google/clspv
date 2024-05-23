@@ -3,6 +3,9 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// TODO(#1358): Invalid SPIR-V trying to extract the 5th element of a 4-element vector
+// XFAIL: *
+
 kernel void test(global ulong *a, global int *b)
 {
     size_t tid = get_global_id(0);

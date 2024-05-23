@@ -563,6 +563,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     //   %2 = bitcast float* %1
     //   %3 = load float %2
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
+    pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ClusterPodKernelArgumentsPass());
 
     pm.addPass(clspv::InlineEntryPointsPass());
