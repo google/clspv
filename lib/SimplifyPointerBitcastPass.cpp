@@ -391,6 +391,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
   SmallVector<ImplicitGEPBeforeStore> GEPBeforeStoreList;
   SmallVector<LoadInst *> GEPBeforeLoadList;
   SmallVector<GetElementPtrInst *> GEPCastList;
+  SmallVector<GetElementPtrInst *> GEPGVList;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -429,6 +430,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         } else if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
           if (IsClspvResourceOrLocal(gep->getPointerOperand())) {
             GEPCastList.push_back(dyn_cast<GetElementPtrInst>(&I));
+          } else if (isa<GlobalVariable>(gep->getPointerOperand()) &&
+                     gep->hasAllConstantIndices()) {
+            GEPGVList.push_back(dyn_cast<GetElementPtrInst>(&I));
           }
         }
       }
@@ -543,6 +547,24 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
                                cstVal, dynVal, smallerBitWidths, ptr);
     auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "", gep);
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (gep cast):\nreplacing: ";
+               gep->dump());
+    LLVM_DEBUG(dbgs() << "by: "; new_gep->dump(););
+    gep->replaceAllUsesWith(new_gep);
+    gep->eraseFromParent();
+    changed = true;
+  }
+  for (auto gep : GEPGVList) {
+    auto ptr = gep->getPointerOperand();
+    auto ty = InferType(ptr, M.getContext(), &type_cache);
+    IRBuilder<> Builder{gep};
+    uint64_t cstVal;
+    Value *dynVal;
+    size_t smallerBitWidths;
+    ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
+    auto new_gep_idxs = GetIdxsForTyFromOffset(DL, Builder, ty, nullptr, cstVal,
+                                               dynVal, smallerBitWidths, ptr);
+    auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "", gep);
+    LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (from GV):\nreplacing: ";
                gep->dump());
     LLVM_DEBUG(dbgs() << "by: "; new_gep->dump(););
     gep->replaceAllUsesWith(new_gep);
