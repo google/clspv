@@ -571,6 +571,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass needs to be after every inlining to make sure we are capable of
     // removing every addrspacecast. It only needs to run if generic addrspace
     // is used.
+
+    pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
+
     if (clspv::Option::LanguageUsesGenericAddressSpace()) {
       pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
       pm.addPass(clspv::LowerAddrSpaceCastPass());

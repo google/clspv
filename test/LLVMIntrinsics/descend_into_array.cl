@@ -18,7 +18,7 @@ __kernel void foo(__global outer* out, global outer* in) {
 // CHECK: [[zero:%[0-9a-zA-Z_]+]] = OpConstant {{.*}} 0
 // CHECK: [[dst:%[0-9a-zA-Z_]+]] = OpVariable {{.*}} StorageBuffer
 // CHECK: [[src:%[0-9a-zA-Z_]+]] = OpVariable {{.*}} StorageBuffer
-// CHECK: [[src_gep:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[src]] [[zero]] [[zero]]
-// CHECK: OpLoad {{.*}} [[src_gep]]
-// CHECK: [[dst_gep:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[dst]] [[zero]] [[zero]]
-// CHECK: OpStore [[dst_gep]]
+// CHECK-DAG: [[src_gep:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[src]] [[zero]] [[zero]]
+// CHECK-DAG: OpLoad {{.*}} [[src_gep]]
+// CHECK-DAG: [[dst_gep:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[dst]] [[zero]] [[zero]]
+// CHECK-DAG: OpStore [[dst_gep]]
