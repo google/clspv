@@ -350,20 +350,92 @@ Value *clspv::LowerAddrSpaceCastPass::visitPtrToIntInst(PtrToIntInst &I) {
   return ptrToInt;
 }
 
-Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
-  IRBuilder<> B(&I);
-  // NOTE: We assume that the first incoming value does not depend on I.
-  auto *V1 = visit(I.getIncomingValue(0));
-  auto *B1 = I.getIncomingBlock(0);
+static bool DependsOnPhiNode(const Value *Value, const PHINode *PhiNode,
+                             DenseSet<const llvm::Value *> &Visited) {
+  if (!isa<Instruction>(Value)) {
+    return false;
+  }
+  if (Visited.contains(Value)) {
+    return false;
+  }
 
-  // Register the replacement early in order to avoid recursive calls
-  // when an incoming value depends on this PHI node.
-  auto Phi = B.CreatePHI(V1->getType(), I.getNumIncomingValues());
+  Visited.insert(Value);
+
+  // If the value is the PHI node itself, return true
+  if (Value == PhiNode) {
+    return true;
+  }
+
+  // Recursively check if any of the operands depend on the PHI node
+  for (const auto *Op : cast<Instruction>(Value)->operand_values()) {
+    if (DependsOnPhiNode(Op, PhiNode, Visited)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
+  if (!isGenericPTy(I.getType())) {
+    // Nothing to do.
+    return &I;
+  }
+
+  IRBuilder<> B(&I);
+
+  unsigned N = I.getNumIncomingValues();
+
+  // Analyse the incoming values anche check whether the types agree.
+  // Ignore any incoming value that depends on the node itself, as that would
+  // lead to infinite recursion. Instead, we delay processing them until
+  // after we have registered the replacement.
+  SmallVector<Value *, 2> Replacements(N);
+
+  DenseSet<const llvm::Value *> VisitedForSelfDep;
+  SmallVector<unsigned, 2> DependentOperands;
+  Type *CommonTy = nullptr;
+  bool HasCommonTy = true;
+
+  for (unsigned j = 0; j < N; ++j) {
+    VisitedForSelfDep.clear();
+    auto *V = I.getIncomingValue(j);
+
+    if (DependsOnPhiNode(V, &I, VisitedForSelfDep)) {
+      DependentOperands.push_back(j);
+    } else {
+      V = visit(V);
+      if (HasCommonTy && !CommonTy) {
+        CommonTy = V->getType();
+      }
+      HasCommonTy &= CommonTy == V->getType();
+    }
+    Replacements[j] = V;
+  }
+
+  if (!HasCommonTy) {
+    // We don't have a common address space. To keep the node legal, we have to
+    // add addrspacecasts again.
+    CommonTy = B.getPtrTy(clspv::AddressSpace::Generic);
+    for (unsigned j = 0; j < N; ++j) {
+      if (Replacements[j]->getType() != CommonTy) {
+        Replacements[j] = B.CreateAddrSpaceCast(Replacements[j], CommonTy);
+      }
+    }
+  }
+
+  auto *Phi = B.CreatePHI(CommonTy, N);
+
   registerReplacement(&I, Phi);
 
-  Phi->addIncoming(V1, B1);
-  for (unsigned i = 1; i < I.getNumIncomingValues(); ++i) {
-    Phi->addIncoming(visit(I.getIncomingValue(i)), I.getIncomingBlock(i));
+  // Now that we have registered the replacement, we can process the dependent
+  // operands.
+  for (auto i : DependentOperands) {
+    Replacements[i] = visit(Replacements[i]);
+  }
+
+  for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
+    Phi->addIncoming(Replacements[i], I.getIncomingBlock(i));
   }
 
   return Phi;
