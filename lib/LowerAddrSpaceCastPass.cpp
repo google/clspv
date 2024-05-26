@@ -419,7 +419,12 @@ Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
     CommonTy = B.getPtrTy(clspv::AddressSpace::Generic);
     for (unsigned j = 0; j < N; ++j) {
       if (Replacements[j]->getType() != CommonTy) {
-        Replacements[j] = B.CreateAddrSpaceCast(Replacements[j], CommonTy);
+        // Insert the addrspacecast in the original BB, after the original
+        // operand.
+        IRBuilder<> IBB(I.getIncomingBlock(j));
+        IBB.SetInsertPoint(
+            cast<Instruction>(I.getIncomingValue(j))->getNextNode());
+        Replacements[j] = IBB.CreateAddrSpaceCast(Replacements[j], CommonTy);
       }
     }
   }
