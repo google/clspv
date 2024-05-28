@@ -350,26 +350,32 @@ Value *clspv::LowerAddrSpaceCastPass::visitPtrToIntInst(PtrToIntInst &I) {
   return ptrToInt;
 }
 
-static bool DependsOnPhiNode(const Value *Value, const PHINode *PhiNode,
-                             DenseSet<const llvm::Value *> &Visited) {
-  if (!isa<Instruction>(Value)) {
-    return false;
-  }
-  if (Visited.contains(Value)) {
+static bool DependsOnPhiNode(const Value *V, const PHINode *PhiNode) {
+  DenseSet<const llvm::Value *> Visited;
+  if (!isa<Instruction>(V)) {
     return false;
   }
 
-  Visited.insert(Value);
+  SmallVector<const Value *, 16> Stack;
+  Stack.push_back(V);
 
-  // If the value is the PHI node itself, return true
-  if (Value == PhiNode) {
-    return true;
-  }
+  while (!Stack.empty()) {
+    const Value *Current = Stack.pop_back_val();
+    if (Visited.contains(Current)) {
+      continue;
+    }
+    Visited.insert(Current);
 
-  // Recursively check if any of the operands depend on the PHI node
-  for (const auto *Op : cast<Instruction>(Value)->operand_values()) {
-    if (DependsOnPhiNode(Op, PhiNode, Visited)) {
+    if (Current == PhiNode) {
       return true;
+    }
+
+    if (const auto *Inst = dyn_cast<Instruction>(Current)) {
+      for (const auto *Op : Inst->operand_values()) {
+        if (!Visited.contains(Op)) {
+          Stack.push_back(Op);
+        }
+      }
     }
   }
 
@@ -377,13 +383,7 @@ static bool DependsOnPhiNode(const Value *Value, const PHINode *PhiNode,
 }
 
 Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
-  if (!isGenericPTy(I.getType())) {
-    // Nothing to do.
-    return &I;
-  }
-
   IRBuilder<> B(&I);
-
   unsigned N = I.getNumIncomingValues();
 
   // Analyse the incoming values anche check whether the types agree.
@@ -391,17 +391,13 @@ Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
   // lead to infinite recursion. Instead, we delay processing them until
   // after we have registered the replacement.
   SmallVector<Value *, 2> Replacements(N);
-
-  DenseSet<const llvm::Value *> VisitedForSelfDep;
   SmallVector<unsigned, 2> DependentOperands;
   Type *CommonTy = nullptr;
   bool HasCommonTy = true;
 
   for (unsigned j = 0; j < N; ++j) {
-    VisitedForSelfDep.clear();
     auto *V = I.getIncomingValue(j);
-
-    if (DependsOnPhiNode(V, &I, VisitedForSelfDep)) {
+    if (DependsOnPhiNode(V, &I)) {
       DependentOperands.push_back(j);
     } else {
       V = visit(V);
@@ -414,19 +410,8 @@ Value *clspv::LowerAddrSpaceCastPass::visitPHINode(llvm::PHINode &I) {
   }
 
   if (!HasCommonTy) {
-    // We don't have a common address space. To keep the node legal, we have to
-    // add addrspacecasts again.
-    CommonTy = B.getPtrTy(clspv::AddressSpace::Generic);
-    for (unsigned j = 0; j < N; ++j) {
-      if (Replacements[j]->getType() != CommonTy) {
-        // Insert the addrspacecast in the original BB, after the original
-        // operand.
-        IRBuilder<> IBB(I.getIncomingBlock(j));
-        IBB.SetInsertPoint(
-            cast<Instruction>(I.getIncomingValue(j))->getNextNode());
-        Replacements[j] = IBB.CreateAddrSpaceCast(Replacements[j], CommonTy);
-      }
-    }
+    // We don't have a common address space.
+    llvm_unreachable("PHI nodes with different address spaces are unsupported");
   }
 
   auto *Phi = B.CreatePHI(CommonTy, N);
