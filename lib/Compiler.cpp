@@ -525,6 +525,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::AutoPodArgsPass());
     pm.addPass(clspv::DeclarePushConstantsPass());
     pm.addPass(clspv::DefineOpenCLWorkItemBuiltinsPass());
+    // Replace the LLVM intrinsics. This will give them a chance to be better
+    // optimized through the pipeline. It also helps with generic address space
+    // lowering.
+    pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
 
     // RewritePackedStructsPass will rewrite packed struct types, and
     // ReplacePointerBitcastPass will lower the new packed struct type. So,
@@ -571,9 +575,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // This pass needs to be after every inlining to make sure we are capable of
     // removing every addrspacecast. It only needs to run if generic addrspace
     // is used.
-
-    pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
-
     if (clspv::Option::LanguageUsesGenericAddressSpace()) {
       pm.addPass(clspv::ReplaceOpenCLBuiltinPass());
       pm.addPass(clspv::LowerAddrSpaceCastPass());
