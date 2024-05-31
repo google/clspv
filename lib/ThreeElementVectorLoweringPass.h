@@ -104,8 +104,9 @@ private:
 private:
   // High-level implementation details of runOnModule.
 
-  /// Look for bitcast of vec3 inside the function
-  bool vec3BitcastInFunction(llvm::Function &F);
+  /// Look for vec3 patterns inside the function that requires lowering vec3 to
+  /// vec4.
+  bool vec3ShouldBeLowered(llvm::Function &F);
 
   /// Returns whether the vec3 should be transformed into vec4
   bool vec3ShouldBeLowered(llvm::Module &M);
@@ -113,6 +114,10 @@ private:
   /// Returns whether a value have an implicit cast or not, works only with
   /// opaque pointers
   bool haveImplicitCast(llvm::Value *Value);
+
+  // Returns true if the type before last indice is a vec3 and last indice is
+  // not constant or bigger or equal to 3.
+  bool haveInvalidVec3GEP(llvm::Value *Value);
 
   /// Lower all global variables in the module.
   bool runOnGlobals(llvm::Module &M);
