@@ -269,19 +269,43 @@ bool clspv::ThreeElementVectorLoweringPass::vec3ShouldBeLowered(Module &M) {
     return false;
   default:
     for (auto &F : M.functions()) {
-      if (vec3BitcastInFunction(F))
+      if (vec3ShouldBeLowered(F))
         return true;
     }
     return false;
   }
 }
 
-bool clspv::ThreeElementVectorLoweringPass::vec3BitcastInFunction(Function &F) {
+bool clspv::ThreeElementVectorLoweringPass::vec3ShouldBeLowered(Function &F) {
   for (Instruction &I : instructions(F)) {
     if (haveImplicitCast(&I)) {
       return true;
+    } else if (haveInvalidVec3GEP(&I)) {
+      return true;
     }
   }
+  return false;
+}
+
+bool clspv::ThreeElementVectorLoweringPass::haveInvalidVec3GEP(Value *Value) {
+  auto gep = dyn_cast<GetElementPtrInst>(Value);
+  if (!gep) {
+    return false;
+  }
+
+  SmallVector<llvm::Value *> idxs(gep->idx_begin(), gep->idx_end() - 1);
+  auto last_type =
+      GetElementPtrInst::getIndexedType(gep->getSourceElementType(), idxs);
+  auto vec_type = dyn_cast<FixedVectorType>(last_type);
+  if (!vec_type || vec_type->getNumElements() != 3) {
+    return false;
+  }
+  auto last_idx = gep->getOperand(gep->getNumOperands() - 1);
+  auto cst_idx = dyn_cast<ConstantInt>(last_idx);
+  if (!cst_idx || cst_idx->getZExtValue() >= 3) {
+    return true;
+  }
+
   return false;
 }
 
