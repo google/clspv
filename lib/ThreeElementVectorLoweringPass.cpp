@@ -289,7 +289,7 @@ bool clspv::ThreeElementVectorLoweringPass::vec3ShouldBeLowered(Function &F) {
 
 bool clspv::ThreeElementVectorLoweringPass::haveInvalidVec3GEP(Value *Value) {
   auto gep = dyn_cast<GetElementPtrInst>(Value);
-  if (!gep) {
+  if (!gep || gep->getNumIndices() <= 1) {
     return false;
   }
 
