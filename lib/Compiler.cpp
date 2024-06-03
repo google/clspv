@@ -347,6 +347,13 @@ int SetCompilerInstanceOptions(
     instance.getPreprocessorOpts().addMacroDef("__FAST_RELAXED_MATH__");
   }
 
+  if (clspv::Option::SpvVersion() >= clspv::Option::SPIRVVersion::SPIRV_1_3) {
+    // TODO remove when extension is added to OpenCLExtensions.def
+    // https://github.com/llvm/llvm-project/blob/main/clang/include/clang/Basic/OpenCLExtensions.def
+    instance.getPreprocessorOpts().addMacroDef(
+        "cl_khr_subgroup_extended_types");
+  }
+
   for (auto define : Defines) {
     instance.getPreprocessorOpts().addMacroDef(define);
   }
