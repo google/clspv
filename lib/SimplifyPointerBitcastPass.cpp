@@ -882,6 +882,30 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     }
   }
 
+  for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
+    auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
+    uint64_t cst = GEPInfo.cst;
+    Value *val = GEPInfo.val;
+    size_t smallerBitWidths = GEPInfo.smallerBitWidth;
+    Type *dest_ty = GEPInfo.dest_ty;
+    Value *ptr = GEPInfo.ptr;
+    IRBuilder Builder{gep};
+
+    auto NewGEPIdxs =
+        GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
+                               cst, val, smallerBitWidths, ptr);
+
+    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", gep);
+    LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace gep "
+                         "defining phi type: ";
+               gep->dump(); dbgs() << "by: "; new_gep->dump());
+
+    gep->replaceAllUsesWith(new_gep);
+    gep->eraseFromParent();
+
+    changed = true;
+  }
+
   DenseSet<Instruction *> ToBeRemoved;
   for (auto GEPInfo : Worklist) {
     Instruction *I = GEPInfo.inst;
@@ -913,34 +937,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     changed = true;
   }
 
-  for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
-    auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
-    uint64_t cst = GEPInfo.cst;
-    Value *val = GEPInfo.val;
-    size_t smallerBitWidths = GEPInfo.smallerBitWidth;
-    Type *dest_ty = GEPInfo.dest_ty;
-    Value *ptr = GEPInfo.ptr;
-    IRBuilder Builder{gep};
-
-    auto NewGEPIdxs =
-        GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
-                               cst, val, smallerBitWidths, ptr);
-
-    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", gep);
-    LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace gep "
-                         "defining phi type: ";
-               gep->dump(); dbgs() << "by: "; new_gep->dump());
-
-    gep->replaceAllUsesWith(new_gep);
-    gep->eraseFromParent();
-
-    changed = true;
-  }
-
   for (auto *I : ToBeRemoved) {
-    if (I->getParent() != nullptr) {
-      I->eraseFromParent();
-    }
+    I->eraseFromParent();
   }
 
   return changed;
