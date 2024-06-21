@@ -4396,7 +4396,10 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
   Ops << IntegerTy << Input;
   auto bitcast = addSPIRVInst(spv::OpBitcast, Ops);
   Ops.clear();
-  Ops << IntegerTy << bitcast << ConstantInt::get(IntegerTy, 0x7fffffff);
+  Constant *Mask = InputTy->getScalarType()->isHalfTy()
+                       ? ConstantInt::get(IntegerTy, 0x7fff)
+                       : ConstantInt::get(IntegerTy, 0x7fffffff);
+  Ops << IntegerTy << bitcast << Mask;
   auto bitwiseand = addSPIRVInst(spv::OpBitwiseAnd, Ops);
   Ops.clear();
   Ops << InputTy << bitwiseand;
