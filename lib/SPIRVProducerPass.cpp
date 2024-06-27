@@ -4516,7 +4516,42 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     glsl::ExtInst EInst = Builtins::getDirectOrIndirectExtInstEnum(func_info);
 
     // Do not replace functions with implementations.
-    if (EInst && Call->getCalledFunction()->isDeclaration()) {
+    if (EInst && EInst == glsl::ExtInst::ExtInstFma &&
+        !clspv::Option::UnsafeMath() &&
+        clspv::Option::UseNativeBuiltins().count(
+            clspv::Builtins::BuiltinType::kFma) == 0 &&
+        Call->getType()->getScalarType()->isHalfTy()) {
+      Type *FP16Ty = Call->getType();
+
+      Type *FP32Ty = Type::getFloatTy(Context);
+      if (FP16Ty->isVectorTy()) {
+        FP32Ty = FixedVectorType::get(
+            FP32Ty, dyn_cast<FixedVectorType>(FP16Ty)->getNumElements());
+      }
+
+      SPIRVOperandVec Ops;
+      Ops.clear();
+      Ops << FP32Ty << Call->getOperand(0);
+      auto a_f32 = addSPIRVInst(spv::OpFConvert, Ops);
+
+      Ops.clear();
+      Ops << FP32Ty << Call->getOperand(1);
+      auto b_f32 = addSPIRVInst(spv::OpFConvert, Ops);
+
+      Ops.clear();
+      Ops << FP32Ty << Call->getOperand(2);
+      auto c_f32 = addSPIRVInst(spv::OpFConvert, Ops);
+
+      Ops.clear();
+      Ops << FP32Ty << getOpExtInstImportID() << EInst << a_f32 << b_f32
+          << c_f32;
+      auto fma_f32 = addSPIRVInst(spv::OpExtInst, Ops);
+
+      Ops.clear();
+      Ops << FP16Ty << fma_f32;
+      RID = addSPIRVInst(spv::OpFConvert, Ops);
+
+    } else if (EInst && Call->getCalledFunction()->isDeclaration()) {
       SPIRVID ExtInstImportID = getOpExtInstImportID();
 
       //
