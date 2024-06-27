@@ -2054,10 +2054,23 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
     auto Arg = CI->getOperand(0);
     auto Op = is_vec ? Instruction::AShr : Instruction::LShr;
 
-    auto Bitcast = CastInst::CreateZExtOrBitCast(Arg, CI->getType(), "", CI);
+    auto IntSizeInBits = Arg->getType()->getScalarSizeInBits();
+    Type *IntTy = Type::getIntNTy(CI->getContext(), IntSizeInBits);
+    if (is_vec) {
+      IntTy = FixedVectorType::get(
+          IntTy, dyn_cast<FixedVectorType>(CI->getType())->getNumElements());
+    }
+    auto Bitcast = CastInst::CreateZExtOrBitCast(Arg, IntTy, "", CI);
 
-    return BinaryOperator::Create(Op, Bitcast,
-                                  ConstantInt::get(CI->getType(), 31), "", CI);
+    auto Shift = BinaryOperator::Create(
+        Op, Bitcast, ConstantInt::get(IntTy, IntSizeInBits - 1), "", CI);
+
+    if (is_vec) {
+      return Shift;
+    } else {
+      return CastInst::CreateZExtOrBitCast(
+          Shift, Type::getInt32Ty(CI->getContext()), "", CI);
+    }
   });
 }
 
