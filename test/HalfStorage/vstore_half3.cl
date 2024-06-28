@@ -23,14 +23,17 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1{{$}}
 // CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2{{$}}
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpConstant [[uint]] 2{{$}}
-// CHECK-32-DAG: [[uint3:%[^ ]+]] = OpConstant [[uint]] 3{{$}}
-// CHECK-64-DAG: [[ulong3:%[^ ]+]] = OpConstant [[ulong]] 3{{$}}
-
-// CHECK-64: [[cx3:%[^ ]+]] = OpIMul [[ulong]] {{.*}} [[ulong3]]
-// CHECK-32: [[cx3:%[^ ]+]] = OpIMul [[uint]] {{.*}} [[uint3]]
+// CHECK-32-DAG: [[uint6:%[^ ]+]] = OpConstant [[uint]] 6
+// CHECK-64-DAG: [[ulong6:%[^ ]+]] = OpConstant [[ulong]] 6
 
 // CHECK: [[val1i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val1i16:%[^ ]+]] = OpUConvert [[ushort]] [[val1i32]]
+
+// CHECK-64: [[cx6:%[^ ]+]] = OpIMul [[ulong]] {{.*}} [[ulong6]]
+// CHECK-64: [[cx3:%[^ ]+]] = OpShiftRightLogical [[ulong]] [[cx6]] [[ulong1]]
+// CHECK-32: [[cx6:%[^ ]+]] = OpIMul [[uint]] {{.*}} [[uint6]]
+// CHECK-32: [[cx3:%[^ ]+]] = OpShiftRightLogical [[uint]] [[cx6]] [[uint1]]
+
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[cx3]]
 // CHECK: OpStore [[addr1]] [[val1i16]]
 

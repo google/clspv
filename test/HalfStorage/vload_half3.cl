@@ -24,8 +24,8 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK-64-DAG: [[ulong_1:%[^ ]+]] = OpConstant [[ulong]] 1
 // CHECK-64-DAG: [[ulong_2:%[^ ]+]] = OpConstant [[ulong]] 2
 // CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2
-// CHECK-32-DAG: [[uint_3:%[^ ]+]] = OpConstant [[uint]] 3
-// CHECK-64-DAG: [[ulong_3:%[^ ]+]] = OpConstant [[ulong]] 3
+// CHECK-32-DAG: [[uint_6:%[^ ]+]] = OpConstant [[uint]] 6
+// CHECK-64-DAG: [[ulong_6:%[^ ]+]] = OpConstant [[ulong]] 6
 
 // CHECK-DAG: [[half_array:%[^ ]+]] = OpTypeRuntimeArray [[ushort]]
 // CHECK-DAG: [[half_ptr:%[^ ]+]] = OpTypeStruct [[half_array]]
@@ -35,9 +35,11 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
 
 // CHECK-64: [[b_ulong:%[^ ]+]] = OpSConvert [[ulong]] [[b]]
-// CHECK-64: [[bx3:%[^ ]+]] = OpIMul [[ulong]] [[b_ulong]] [[ulong_3]]
+// CHECK-64: [[bx6:%[^ ]+]] = OpIMul [[ulong]] [[b_ulong]] [[ulong_6]]
+// CHECK-64: [[bx3:%[^ ]+]] = OpShiftRightLogical [[ulong]] [[bx6]] [[ulong_1]]
 // CHECK-64: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[bx3]]
-// CHECK-32: [[bx3:%[^ ]+]] = OpIMul [[uint]] [[b]] [[uint_3]]
+// CHECK-32: [[bx6:%[^ ]+]] = OpIMul [[uint]] [[b]] [[uint_6]]
+// CHECK-32: [[bx3:%[^ ]+]] = OpShiftRightLogical [[uint]] [[bx6]] [[uint_1]]
 // CHECK-32: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[bx3]]
 // CHECK: [[val0i16:%[^ ]+]] = OpLoad [[ushort]] [[addr0]]
 // CHECK: [[val0i32:%[^ ]+]] = OpUConvert [[uint]] [[val0i16]]
