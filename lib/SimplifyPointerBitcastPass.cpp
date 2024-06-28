@@ -48,13 +48,15 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
     changed |= runOnTrivialBitcast(M);
     changed |= runOnBitcastFromBitcast(M);
-    changed |= runOnGEPFromGEP(M);
     changed |= runOnImplicitGEP(M);
-    changed |= runOnUpgradeableConstantCasts(M);
+    while (runOnUpgradeableConstantCasts(M)) {
+      changed = true;
+    }
     changed |= runOnUnneededIndices(M);
     changed |= runOnImplicitCasts(M);
     changed |= runOnAllocaNotAliasing(M);
     changed |= runOnPHIFromGEP(M);
+    changed |= runOnGEPFromGEP(M);
   }
 
   return PA;
@@ -690,7 +692,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Value *val;
     size_t smallerBitWidth;
     Type *dest_ty;
-    Value *ptr;
+    GetElementPtrInst *gep;
   };
   auto gepIndicesCanBeUpgradedTo = [&DL, &M](Type *ty, GetElementPtrInst *gep,
                                              uint64_t &cstVal, Value *&dynVal,
@@ -814,8 +816,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           dest_ty = findBiggerTyToUpdate(dest_ty);
           if (dest_ty != source_ty) {
 
-            Worklist.push_back({&I, cstVal, dynVal, smallerBitWidths, dest_ty,
-                                gep->getPointerOperand()});
+            Worklist.push_back(
+                {&I, cstVal, dynVal, smallerBitWidths, dest_ty, gep});
           }
         } else if (auto *phi = dyn_cast<PHINode>(source)) {
           auto &context = M.getContext();
@@ -870,8 +872,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               }
               if (GEPsDefiningPHISeen.count(gep) == 0) {
                 GEPsDefiningPHISeen.insert(gep);
-                geps.push_back({gep, cstVal, dynVal, smallerBitWidths, dest_ty,
-                                gep->getPointerOperand()});
+                geps.push_back(
+                    {gep, cstVal, dynVal, smallerBitWidths, dest_ty, gep});
               }
             }
             return geps;
@@ -888,7 +890,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
-    Value *ptr = GEPInfo.ptr;
+    Value *ptr = GEPInfo.gep->getPointerOperand();
     IRBuilder Builder{gep};
 
     auto NewGEPIdxs =
@@ -905,6 +907,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
     changed = true;
   }
+  if (changed) {
+    return changed;
+  }
 
   DenseSet<Instruction *> ToBeRemoved;
   for (auto GEPInfo : Worklist) {
@@ -913,14 +918,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
-    Value *ptr = GEPInfo.ptr;
-    IRBuilder Builder{I};
+    Value *ptr = GEPInfo.gep->getPointerOperand();
+    IRBuilder Builder{GEPInfo.gep};
 
     auto NewGEPIdxs =
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
                                cst, val, smallerBitWidths, ptr);
 
-    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", I);
+    auto new_gep =
+        GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", GEPInfo.gep);
 
     unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
 
@@ -930,8 +936,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     auto initial_inst = dyn_cast<Instruction>(I->getOperand(PointerOperandNum));
     I->setOperand(PointerOperandNum, new_gep);
 
-    if (initial_inst != nullptr && initial_inst->getNumUses() == 0) {
+    if (initial_inst != nullptr) {
       ToBeRemoved.insert(initial_inst);
+      if (initial_inst->getNumUses() > 0) {
+        initial_inst->replaceAllUsesWith(new_gep);
+      }
     }
 
     changed = true;
