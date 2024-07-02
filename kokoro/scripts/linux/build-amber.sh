@@ -25,18 +25,19 @@ set -x
 using cmake-3.26.3
 using gcc-10
 using ninja-1.10.0
+using python-3.12
 
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 AMBER_SRC=$PWD/github/amber
 
 cd $SRC
-/usr/bin/python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py
 
 cd $BUILD_ROOT/github
 git clone https://github.com/google/amber.git amber
 cd $BUILD_ROOT/github/amber
-/usr/bin/python3 tools/git-sync-deps --with-swiftshader
+python3 tools/git-sync-deps --with-swiftshader
 
 mkdir build && cd $BUILD_ROOT/github/amber/build
 
@@ -47,7 +48,7 @@ fi
 # Invoke the build.
 BUILD_SHA=${KOKORO_GITHUB_COMMIT:-$KOKORO_GITHUB_PULL_REQUEST_COMMIT}
 echo $(date): Starting build...
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DAMBER_ENABLE_SWIFTSHADER=TRUE -DAMBER_USE_CLSPV=TRUE \
   -DBUILD_WSI_XCB_SUPPORT=OFF \
   -DAMBER_CLSPV_DIR=$SRC -DAMBER_CLSPV_LLVM_DIR=$SRC/third_party/llvm \
@@ -58,7 +59,7 @@ ninja
 echo $(date): Build completed.
 
 echo $(date): Starting amber tests...
-/usr/bin/python3 $SRC/amber/run_tests.py \
+python3 $SRC/amber/run_tests.py \
   --amber $BUILD_ROOT/github/amber/build/amber \
   --dir $SRC/amber \
   --swiftshader \
