@@ -29,11 +29,12 @@ SRC=$PWD/github/clspv
 # Marking the root of the repo as safe for ownership changes.
 git config --global --add safe.directory $SRC
 
+using python-3.12
 using clang-8.0.0
 which clang-format
 
 cd $SRC
-/usr/bin/python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py
 cp third_party/llvm/clang/tools/clang-format/clang-format-diff.py utils/clang-format-diff.py
 
 echo $(date): Check formatting...

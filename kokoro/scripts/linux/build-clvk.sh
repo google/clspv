@@ -25,6 +25,7 @@ set -x
 using cmake-3.26.3
 using gcc-10
 using ninja-1.10.0
+using python-3.12
 
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
@@ -35,7 +36,7 @@ fi
 
 # Get Clspv dependencies.
 cd $SRC
-/usr/bin/python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py
 
 VULKAN_VERSION=v1.3.243
 
@@ -59,7 +60,7 @@ VULKAN_LOADER_BUILD="${VULKAN_LOADER_SRC}/build"
 git clone https://github.com/KhronosGroup/Vulkan-Loader "${VULKAN_LOADER_SRC}"
 git -C "${VULKAN_LOADER_SRC}" checkout tags/${VULKAN_VERSION}
 mkdir "${VULKAN_LOADER_BUILD}"
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+cmake -GNinja -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -DVULKAN_HEADERS_INSTALL_DIR="${VULKAN_HEADERS_INSTALL}" -DBUILD_WSI_WAYLAND_SUPPORT=OFF -DBUILD_WSI_XLIB_SUPPORT=OFF \
       -DBUILD_WSI_XCB_SUPPORT=OFF -S "${VULKAN_LOADER_SRC}" -B "${VULKAN_LOADER_BUILD}"
 cmake --build "${VULKAN_LOADER_BUILD}"
@@ -71,7 +72,7 @@ SWIFTSHADER_SRC="$BUILD_ROOT/github/swiftshader"
 SWIFTSHADER_BUILD="$SWIFTSHADER_SRC/kokoro-build"
 git clone https://swiftshader.googlesource.com/SwiftShader.git "$SWIFTSHADER_SRC"
 mkdir "$SWIFTSHADER_BUILD" && cd "$SWIFTSHADER_BUILD"
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DSWIFTSHADER_WARNINGS_AS_ERRORS=OFF  -DSWIFTSHADER_BUILD_VULKAN=ON -DSWIFTSHADER_BUILD_EGL=OFF -DSWIFTSHADER_BUILD_GLESv2=OFF \
       -DSWIFTSHADER_BUILD_GLES_CM=OFF -DSWIFTSHADER_BUILD_SAMPLES=OFF -DSWIFTSHADER_BUILD_TESTS=OFF -DSWIFTSHADER_BUILD_PVR=OFF \
       "$SWIFTSHADER_SRC"
@@ -85,7 +86,7 @@ CLVK_BUILD="$CLVK_SRC/build"
 git clone https://github.com/kpet/clvk "$CLVK_SRC"
 cd "$CLVK_SRC" && git submodule update --init
 mkdir "$CLVK_BUILD" && cd "$CLVK_BUILD"
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DCLVK_CLSPV_ONLINE_COMPILER=ON -DCLSPV_SOURCE_DIR="$SRC" \
   -DCLVK_ENABLE_ASSERTIONS=ON \
   -DCLVK_VULKAN_IMPLEMENTATION=custom -DVulkan_INCLUDE_DIRS=${VULKAN_HEADERS_SRC}/include -DVulkan_LIBRARIES="$VULKAN_LOADER_BUILD/loader/libvulkan.so" \

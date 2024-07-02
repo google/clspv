@@ -25,12 +25,13 @@ set -x
 using cmake-3.26.3
 using gcc-13
 using ninja-1.10.0
+using python-3.12
 
 BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
 cd $SRC
-/usr/bin/python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py
 
 mkdir build && cd $SRC/build
 
@@ -39,7 +40,7 @@ if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
 fi
 
 echo $(date): Starting build...
-cmake -DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python3 -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
 
 echo $(date): Build everything...
 ninja
