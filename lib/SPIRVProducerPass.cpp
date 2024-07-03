@@ -4768,8 +4768,12 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         // But OpUConvert only takes integer types in input, not boolean type.
         // Instead use OpINotEqual.
         SPIRVOperandVec Ops;
-        Ops << Ty << I.getOperand(0)
-            << getSPIRVValue(ConstantInt::get(OpTy, 0));
+        Ops << OpTy << I.getOperand(0)
+            << getSPIRVValue(ConstantInt::get(OpTy, 1));
+        auto oAnd1 = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+
+        Ops.clear();
+        Ops << Ty << oAnd1 << getSPIRVValue(ConstantInt::get(OpTy, 0));
         RID = addSPIRVInst(spv::OpINotEqual, Ops);
       } else {
         // Ops[0] = Result Type ID
