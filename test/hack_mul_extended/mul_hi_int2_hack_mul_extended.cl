@@ -12,8 +12,8 @@
 // CHECK-DAG: [[uint2_16:%[^ ]+]] = OpConstantComposite [[uint2]] [[uint_16]] [[uint_16]]
 // CHECK-DAG: [[uint_65535:%[^ ]+]] = OpConstant [[uint]] 65535
 // CHECK-DAG: [[uint2_65535:%[^ ]+]] = OpConstantComposite [[uint2]] [[uint_65535]] [[uint_65535]]
-// CHECK-DAG: [[uint_4294901760:%[^ ]+]] = OpConstant [[uint]] 4294901760
-// CHECK-DAG: [[uint2_4294901760:%[^ ]+]] = OpConstantComposite [[uint2]] [[uint_4294901760]] [[uint_4294901760]]
+// CHECK-DAG: [[uint_2147418112:%[^ ]+]] = OpConstant [[uint]] 2147418112
+// CHECK-DAG: [[uint2_2147418112:%[^ ]+]] = OpConstantComposite [[uint2]] [[uint_2147418112]] [[uint_2147418112]]
 // CHECK-DAG: [[uint_4294967295:%[^ ]+]] = OpConstant [[uint]] 4294967295
 // CHECK-DAG: [[uint2_4294967295:%[^ ]+]] = OpConstantComposite [[uint2]] [[uint_4294967295]] [[uint_4294967295]]
 // CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1
@@ -35,7 +35,7 @@
 // CHECK:     [[a0b1:%[^ ]+]] = OpIMul [[uint2]] [[b1]] [[a0]]
 // CHECK:     [[a0b1_1:%[^ ]+]] = OpShiftRightLogical [[uint2]] [[a0b1]] [[uint2_16]]
 // CHECK:     [[a1b1:%[^ ]+]] = OpIMul [[uint2]] [[b1]] [[a1]]
-// CHECK:     [[a1b1_1:%[^ ]+]] = OpBitwiseAnd [[uint2]] [[a1b1]] [[uint2_4294901760]]
+// CHECK:     [[a1b1_1:%[^ ]+]] = OpBitwiseAnd [[uint2]] [[a1b1]] [[uint2_2147418112]]
 // CHECK:     [[a0b0_0:%[^ ]+]] = OpBitwiseAnd [[uint2]] [[a0b0]] [[uint2_65535]]
 // CHECK:     [[a1b0_0:%[^ ]+]] = OpBitwiseAnd [[uint2]] [[a1b0]] [[uint2_65535]]
 // CHECK:     [[a0b1_0:%[^ ]+]] = OpBitwiseAnd [[uint2]] [[a0b1]] [[uint2_65535]]

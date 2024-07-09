@@ -12,8 +12,8 @@
 // CHECK-DAG: [[ulong2_32:%[^ ]+]] = OpConstantComposite [[ulong2]] [[ulong_32]] [[ulong_32]]
 // CHECK-DAG: [[ulong_4294967295:%[^ ]+]] = OpConstant [[ulong]] 4294967295
 // CHECK-DAG: [[ulong2_4294967295:%[^ ]+]] = OpConstantComposite [[ulong2]] [[ulong_4294967295]] [[ulong_4294967295]]
-// CHECK-DAG: [[ulong_18446744069414584320:%[^ ]+]] = OpConstant [[ulong]] 18446744069414584320
-// CHECK-DAG: [[ulong2_18446744069414584320:%[^ ]+]] = OpConstantComposite [[ulong2]] [[ulong_18446744069414584320]] [[ulong_18446744069414584320]]
+// CHECK-DAG: [[ulong_9223372032559808512:%[^ ]+]] = OpConstant [[ulong]] 9223372032559808512
+// CHECK-DAG: [[ulong2_9223372032559808512:%[^ ]+]] = OpConstantComposite [[ulong2]] [[ulong_9223372032559808512]] [[ulong_9223372032559808512]]
 // CHECK-DAG: [[ulong_18446744073709551615:%[^ ]+]] = OpConstant [[ulong]] 18446744073709551615
 // CHECK-DAG: [[ulong2_18446744073709551615:%[^ ]+]] = OpConstantComposite [[ulong2]] [[ulong_18446744073709551615]] [[ulong_18446744073709551615]]
 // CHECK-DAG: [[ulong_1:%[^ ]+]] = OpConstant [[ulong]] 1
@@ -35,7 +35,7 @@
 // CHECK:     [[a0b1:%[^ ]+]] = OpIMul [[ulong2]] [[b1]] [[a0]]
 // CHECK:     [[a0b1_1:%[^ ]+]] = OpShiftRightLogical [[ulong2]] [[a0b1]] [[ulong2_32]]
 // CHECK:     [[a1b1:%[^ ]+]] = OpIMul [[ulong2]] [[b1]] [[a1]]
-// CHECK:     [[a1b1_1:%[^ ]+]] = OpBitwiseAnd [[ulong2]] [[a1b1]] [[ulong2_18446744069414584320]]
+// CHECK:     [[a1b1_1:%[^ ]+]] = OpBitwiseAnd [[ulong2]] [[a1b1]] [[ulong2_9223372032559808512]]
 // CHECK:     [[a0b0_0:%[^ ]+]] = OpBitwiseAnd [[ulong2]] [[a0b0]] [[ulong2_4294967295]]
 // CHECK:     [[a1b0_0:%[^ ]+]] = OpBitwiseAnd [[ulong2]] [[a1b0]] [[ulong2_4294967295]]
 // CHECK:     [[a0b1_0:%[^ ]+]] = OpBitwiseAnd [[ulong2]] [[a0b1]] [[ulong2_4294967295]]
