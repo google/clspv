@@ -48,10 +48,10 @@ std::string clspv::PrintfPass::GetStringLiteral(Value *Val) {
   if (GlobalVal) {
     auto *Initializer = GlobalVal->getInitializer();
     if (auto *InitArray = dyn_cast<ConstantDataArray>(Initializer)) {
-      if (InitArray->isCString()) {
+      if (InitArray->isString()) {
         if (ConstExprEquivInstr)
           ConstExprEquivInstr->deleteValue();
-        return InitArray->getAsCString().str();
+        return InitArray->getAsString().str();
       }
     }
   }
