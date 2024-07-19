@@ -14,6 +14,7 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+#include <optional>
 
 #ifndef _CLSPV_LIB_PRINTF_PASS_H
 #define _CLSPV_LIB_PRINTF_PASS_H
@@ -24,8 +25,8 @@ struct PrintfPass : llvm::PassInfoMixin<PrintfPass> {
 
 private:
   // Find the underlying compile-time string literal, if any, for the given
-  // value
-  std::string GetStringLiteral(llvm::Value *);
+  // value.
+  std::optional<std::string> GetStringLiteral(llvm::Value *);
 
   // Get the printf buffer storage size for the given type
   unsigned GetPrintfStoreSize(const llvm::DataLayout &DL, llvm::Type *Ty);
