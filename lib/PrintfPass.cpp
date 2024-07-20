@@ -25,7 +25,7 @@
 
 using namespace llvm;
 
-std::string clspv::PrintfPass::GetStringLiteral(Value *Val) {
+std::optional<std::string> clspv::PrintfPass::GetStringLiteral(Value *Val) {
   GlobalVariable *GlobalVal = nullptr;
   Instruction *ConstExprEquivInstr = nullptr;
   // If opaque pointers aren't enabled, the global may be hidden behind a
@@ -54,9 +54,19 @@ std::string clspv::PrintfPass::GetStringLiteral(Value *Val) {
         return InitArray->getAsString().str();
       }
     }
+    // The empty C string, and strings of null chars, are
+    // constant-aggregate-zero.
+    if (auto *InitArray = dyn_cast<ConstantAggregateZero>(Initializer)) {
+      if (auto *arrTy = dyn_cast<ArrayType>(InitArray->getType())) {
+        if (arrTy->getElementType()->isIntegerTy(8)) {
+          return std::string(arrTy->getNumElements(), '\0');
+        }
+      }
+    }
   }
 
-  return "";
+  // Not a string.
+  return {};
 }
 
 unsigned clspv::PrintfPass::GetPrintfStoreSize(const DataLayout &DL, Type *Ty) {
@@ -278,7 +288,7 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     // Check format string is valid
     auto *FmtStringValue = CI->getArgOperand(0);
     auto FmtString = GetStringLiteral(FmtStringValue);
-    if (FmtString == "") {
+    if (!FmtString.has_value()) {
       continue;
     }
 
@@ -292,7 +302,7 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
 
       // Literal Arg are store using a 32bits identifier, which differs when
       // using 64bits pointers from the size returned by GetPrintfStoreSize.
-      bool IsStringLiteral = GetStringLiteral(Arg) != "";
+      bool IsStringLiteral = GetStringLiteral(Arg).has_value();
       unsigned ArgSize = IsStringLiteral ? 4 : GetPrintfStoreSize(DL, ArgType);
 
       auto *ArgSizeConst = ConstantInt::get(Int32Ty, ArgSize);
@@ -300,7 +310,7 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     }
 
     auto *PrintfMD =
-        CreatePrintfArgsMetadata(M, ArgMD, FmtString, PrintfCallID);
+        CreatePrintfArgsMetadata(M, ArgMD, FmtString.value(), PrintfCallID);
     PrintfMDs->addOperand(PrintfMD);
 
     // Get string literal arguments to printf (not including format string) and
@@ -309,10 +319,10 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     for (unsigned i = 1; i < CI->arg_size(); i++) {
       Value *Arg = CI->getArgOperand(i);
       auto StringLiteral = GetStringLiteral(Arg);
-      if (StringLiteral != "") {
+      if (StringLiteral.has_value()) {
         auto StringLiteralID = PrintfID++;
-        auto *StringLiteralMD =
-            CreatePrintfArgsMetadata(M, {}, StringLiteral, StringLiteralID);
+        auto *StringLiteralMD = CreatePrintfArgsMetadata(
+            M, {}, StringLiteral.value(), StringLiteralID);
         PrintfMDs->addOperand(StringLiteralMD);
 
         // The printf now stores the string's ID rather than its data
