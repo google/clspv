@@ -336,8 +336,10 @@ int SetCompilerInstanceOptions(
       clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath();
   // cl_no_signed_zeros ignored for now!
   instance.getLangOpts().UnsafeFPMath = clspv::Option::UnsafeMath();
-  instance.getLangOpts().FiniteMathOnly = clspv::Option::FiniteMath();
   instance.getLangOpts().FastRelaxedMath = clspv::Option::FastRelaxedMath();
+
+  instance.getLangOpts().NoHonorInfs = clspv::Option::FiniteMath();
+  instance.getLangOpts().NoHonorNaNs = clspv::Option::FiniteMath();
 
   // Preprocessor options
   if (!clspv::Option::ImageSupport()) {
