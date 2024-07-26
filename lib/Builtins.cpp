@@ -532,7 +532,6 @@ std::string Builtins::GetMangledTypeName(Type *Ty) {
   case Type::PPC_FP128TyID:
   case Type::LabelTyID:
   case Type::MetadataTyID:
-  case Type::X86_MMXTyID:
   case Type::TokenTyID:
   default:
     assert(0);
