@@ -155,7 +155,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     if (pod_arg_impl == clspv::PodArgImpl::kUBO &&
         !clspv::Option::Std430UniformBufferLayout()) {
       SmallVector<Type *, 16> PaddedPodArgTys;
-      const DataLayout DL(&M);
+      const auto &DL = M.getDataLayout();
       const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
       unsigned pod_index = 0;
       for (auto &Arg : F->args()) {
@@ -200,7 +200,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
     // We've recorded the remapping for pointer arguments.  Now record the
     // remapping for POD arguments.
     {
-      const DataLayout DL(&M);
+      const auto &DL = M.getDataLayout();
       const auto StructLayout = DL.getStructLayout(PodArgsStructTy);
       // Construct the updated struct
       uint64_t global_push_constant_kernel_args_offset = 0;
