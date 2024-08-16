@@ -25,7 +25,7 @@ BUILD_TYPE=$1
 SKIP_TESTS="False"
 
 # Get NINJA.
-wget -q https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-mac.zip
+wget -q https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip
 unzip -q ninja-mac.zip
 chmod +x ninja
 export PATH="$PWD:$PATH"
