@@ -30,6 +30,14 @@ unzip -q ninja-mac.zip
 chmod +x ninja
 export PATH="$PWD:$PATH"
 
+# Get Cmake (required for Kokoro Apple Silicon images)
+CMAKE_VER=3.30.2
+wget -q https://github.com/Kitware/CMake/releases/download/v$CMAKE_VER/cmake-$CMAKE_VER-macos-universal.tar.gz
+tar xf cmake-$CMAKE_VER-macos-universal.tar.gz
+chmod +x cmake-$CMAKE_VER-macos-universal/CMake.app/Contents/bin/*
+export PATH="$PWD/cmake-$CMAKE_VER-macos-universal/CMake.app/Contents/bin:$PATH"
+
+
 # Get dependencies.
 cd $SRC
 python utils/fetch_sources.py
