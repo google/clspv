@@ -1373,8 +1373,9 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     }
     for (unsigned i = startIdx; i < TyBitWidths.size(); i++) {
       size_t size = TyBitWidths[i] / NewSmallerBitWidths;
+      auto IndexedType = GetElementPtrInst::getIndexedType(SrcTy, Idxs);
       auto STy =
-          dyn_cast<StructType>(GetElementPtrInst::getIndexedType(SrcTy, Idxs));
+          IndexedType != nullptr ? dyn_cast<StructType>(IndexedType) : nullptr;
       if (i != 0 && STy) {
         if (STy->getNumElements() > 1) {
           llvm_unreachable("Cannot create gep with dynamic indices for this "
