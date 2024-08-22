@@ -182,8 +182,8 @@ GlobalVariable *NormalizeVariable(GlobalVariable *GV, User *user, Type *to_type)
 
 // Normalize the users of |GV|.
 void NormalizeVariableUsers(GlobalVariable *GV) {
-  SmallVector<User*, 8> users(GV->users());
-  DenseMap<Type*, GlobalVariable*> reuse;
+  SmallVector<User *, 8> users(GV->users());
+  DenseMap<Type *, GlobalVariable *> reuse;
   for (auto *user : users) {
     auto *gep = dyn_cast<GEPOperator>(user);
     if (!gep)
