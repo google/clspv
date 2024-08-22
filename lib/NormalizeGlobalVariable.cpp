@@ -182,7 +182,9 @@ GlobalVariable *NormalizeVariable(GlobalVariable *GV, User *user, Type *to_type)
 
 // Normalize the users of |GV|.
 void NormalizeVariableUsers(GlobalVariable *GV) {
-  for (auto *user : GV->users()) {
+  SmallVector<User *, 8> users(GV->users());
+  DenseMap<Type *, GlobalVariable *> reuse;
+  for (auto *user : users) {
     auto *gep = dyn_cast<GEPOperator>(user);
     if (!gep)
       continue;
@@ -195,8 +197,11 @@ void NormalizeVariableUsers(GlobalVariable *GV) {
     if (!VariableNeedsNormalized(GV, gv_contained_ty, to_type))
       continue;
 
-    if (to_type)
-      NormalizeVariable(GV, user, to_type);
+    if (reuse.count(to_type)) {
+      user->replaceUsesOfWith(GV, reuse[to_type]);
+    } else if (to_type) {
+      reuse[to_type] = NormalizeVariable(GV, user, to_type);
+    }
   }
 
   GV->removeDeadConstantUsers();
