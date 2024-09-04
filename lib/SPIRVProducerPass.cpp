@@ -393,6 +393,8 @@ struct SPIRVProducerPassImpl {
       HasConvertToF = true;
     }
   }
+  bool hasArmDot() { return HasArmDot; }
+  void setArmDot() { HasArmDot = true; }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
     return GlobalConstFuncTypeMap;
   }
@@ -687,6 +689,7 @@ private:
   std::set<Value *> NonUniformPointers;
   bool HasNonUniformPointers;
   bool HasConvertToF;
+  bool HasArmDot;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
@@ -3197,6 +3200,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_EXT_descriptor_indexing");
   }
 
+  if (hasArmDot()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_integer_dot_product");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -4411,6 +4418,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
 
 SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
                                               BuiltinType func_type) {
+  setArmDot();
   addCapability(spv::CapabilityDotProduct);
   auto fct_name = Call->getCalledFunction()->getName();
   auto a_val = Call->getOperand(0);
