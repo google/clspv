@@ -474,6 +474,7 @@ struct SPIRVProducerPassImpl {
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   SPIRVID GenerateFabs(Value *Input);
+  SPIRVID GenerateArmDot(CallInst *Call, BuiltinType func_type);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -4408,6 +4409,105 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
   return addSPIRVInst(spv::OpBitcast, Ops);
 }
 
+SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
+                                              BuiltinType func_type) {
+  addCapability(spv::CapabilityDotProduct);
+  auto fct_name = Call->getCalledFunction()->getName();
+  auto a_val = Call->getOperand(0);
+  auto b_val = Call->getOperand(1);
+  assert(a_val->getType() == b_val->getType());
+  auto input_ty = a_val->getType();
+  auto a = getSPIRVValue(a_val);
+  auto b = getSPIRVValue(b_val);
+  auto IsIxJBit = [](Type *Ty, unsigned i, unsigned j) {
+    auto VecTy = dyn_cast<FixedVectorType>(Ty);
+    if (VecTy == nullptr) {
+      return false;
+    }
+    if (VecTy->getNumElements() != i) {
+      return false;
+    }
+    if (!VecTy->getScalarType()->isIntegerTy() ||
+        VecTy->getScalarSizeInBits() != j) {
+      return false;
+    }
+    return true;
+  };
+  bool Is4x8Bit = IsIxJBit(input_ty, 4, 8);
+  bool Is2x16Bit = IsIxJBit(input_ty, 2, 16);
+  bool Is1x32Bit = input_ty->isIntegerTy() && !input_ty->isVectorTy() &&
+                   input_ty->getScalarSizeInBits() == 32;
+  if (Is4x8Bit && clspv::Option::Int8Support()) {
+    addCapability(spv::CapabilityDotProductInput4x8Bit);
+  }
+  if (Is2x16Bit) {
+    addCapability(spv::CapabilityDotProductInputAll);
+  }
+  if (Is1x32Bit || (!clspv::Option::Int8Support() && Is4x8Bit)) {
+    addCapability(spv::CapabilityDotProductInput4x8BitPacked);
+  }
+
+  SPIRVOperandVec Ops;
+  switch (func_type) {
+  case Builtins::kArmDotAccSat: {
+    Ops << Call->getType() << a << b << Call->getOperand(2);
+    if (Is1x32Bit || !clspv::Option::Int8Support()) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    spv::Op opcode;
+    if (fct_name == "_Z15arm_dot_acc_satDv4_hS_j") {
+      opcode = spv::OpUDotAccSat;
+    } else if (fct_name == "_Z15arm_dot_acc_satDv4_cS_i") {
+      opcode = spv::OpSDotAccSat;
+    } else {
+      llvm_unreachable("unknown kArmDot builtin name");
+    }
+    return addSPIRVInst(opcode, Ops);
+  }
+  case Builtins::kArmDotAcc: {
+    spv::Op opcode;
+    if (fct_name == "_Z11arm_dot_accDv4_hS_j" ||
+        fct_name == "_Z11arm_dot_accDv2_tS_j") {
+      opcode = spv::OpUDot;
+    } else if (fct_name == "_Z11arm_dot_accDv4_cS_i" ||
+               fct_name == "_Z11arm_dot_accDv2_sS_i") {
+      opcode = spv::OpSDot;
+    } else {
+      llvm_unreachable("unknown kArmDotAcc builtin name");
+    }
+    Ops << Call->getType() << a << b;
+    if (Is1x32Bit || (!clspv::Option::Int8Support() && !Is2x16Bit)) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    auto dot = addSPIRVInst(opcode, Ops);
+    Ops.clear();
+
+    Ops << Call->getType() << dot << Call->getOperand(2);
+    return addSPIRVInst(spv::OpIAdd, Ops);
+  }
+  case Builtins::kArmDot: {
+    Ops << Call->getType() << a << b;
+    if (Is1x32Bit || !clspv::Option::Int8Support()) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    spv::Op opcode;
+    if (fct_name == "_Z7arm_dotDv4_hS_") {
+      opcode = spv::OpUDot;
+    } else if (fct_name == "_Z7arm_dotDv4_cS_") {
+      opcode = spv::OpSDot;
+    } else {
+      llvm_unreachable("unknown kArmDot builtin name");
+    }
+    return addSPIRVInst(opcode, Ops);
+  }
+  default:
+    llvm_unreachable("unexpected builtins in GenerateArmDot");
+  }
+}
+
 SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
@@ -4512,6 +4612,14 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     SPIRVOperandVec Ops;
     Ops << Call->getType() << Call->getOperand(0) << Call->getOperand(1);
     RID = addSPIRVInst(spv::OpFDiv, Ops);
+    break;
+  }
+  case Builtins::kArmDotAccSat:
+  case Builtins::kArmDotAcc:
+  case Builtins::kArmDot: {
+    if (SpvVersion() >= SPIRVVersion::SPIRV_1_6) {
+      RID = GenerateArmDot(Call, func_type);
+    }
     break;
   }
   default: {
@@ -6325,6 +6433,10 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpAtomicOr:
     case spv::OpAtomicXor:
     case spv::OpDot:
+    case spv::OpUDot:
+    case spv::OpSDot:
+    case spv::OpUDotAccSat:
+    case spv::OpSDotAccSat:
     case spv::OpGroupNonUniformAll:
     case spv::OpGroupNonUniformAny:
     case spv::OpGroupNonUniformBroadcast:

@@ -356,6 +356,17 @@ int SetCompilerInstanceOptions(
         "cl_khr_subgroup_extended_types");
   }
 
+  if (clspv::Option::ArmIntegerDotProduct()) {
+    instance.getPreprocessorOpts().addMacroDef(
+        "cl_arm_integer_dot_product_int8");
+    instance.getPreprocessorOpts().addMacroDef(
+        "cl_arm_integer_dot_product_accumulate_int8");
+    instance.getPreprocessorOpts().addMacroDef(
+        "cl_arm_integer_dot_product_accumulate_int16");
+    instance.getPreprocessorOpts().addMacroDef(
+        "cl_arm_integer_dot_product_accumulate_saturate_int8");
+  }
+
   for (auto define : Defines) {
     instance.getPreprocessorOpts().addMacroDef(define);
   }

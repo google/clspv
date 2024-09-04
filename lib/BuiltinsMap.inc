@@ -1102,6 +1102,11 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"get_kernel_max_sub_group_size_for_ndrange",
          Builtins::kGetKernelMaxSubGroupSizeForNdrange},
 
+        // ARM_integer_dot_product
+        {"arm_dot", Builtins::kArmDot},
+        {"arm_dot_acc", Builtins::kArmDotAcc},
+        {"arm_dot_acc_sat", Builtins::kArmDotAccSat},
+
         // Internal
         {"clspv.fract", Builtins::kClspvFract},
         {"spirv.atomic_xor", Builtins::kSpirvAtomicXor},

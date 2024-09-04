@@ -360,6 +360,12 @@ enum BuiltinType : unsigned int {
   kGetKernelSubGroupCountForNdrange,
   kGetKernelMaxSubGroupSizeForNdrange,
   kType_SubgroupsKHR_End,
+
+  kType_ArmDot_Start,
+  kArmDot,
+  kArmDotAcc,
+  kArmDotAccSat,
+  kType_ArmDot_End,
 }; // enum BuiltinType
 
 } // namespace Builtins

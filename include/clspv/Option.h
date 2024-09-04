@@ -307,6 +307,9 @@ uint32_t PrintfBufferSize();
 // Returns true when compiling with '-cl-mad-enable'
 bool ClMadEnable();
 
+// Returns true if cl_arm_integer_dot_product is enabled
+bool ArmIntegerDotProduct();
+
 } // namespace Option
 } // namespace clspv
 

@@ -435,6 +435,10 @@ static llvm::cl::opt<bool> cl_mad_enable(
     llvm::cl::desc("Allow a * b + c to be replaced by a mad. The mad computes "
                    "a * b + c with reduced accuracy."));
 
+static llvm::cl::opt<bool> cl_arm_integer_dot_product(
+    "cl-arm-integer-dot-product", llvm::cl::init(false),
+    llvm::cl::desc("Enable to cl_arm_integer_dot_product extension."));
+
 } // namespace
 
 namespace clspv {
@@ -565,6 +569,8 @@ bool PrintfSupport() { return printf_support; }
 uint32_t PrintfBufferSize() { return printf_buffer_size; }
 
 bool ClMadEnable() { return cl_mad_enable; }
+
+bool ArmIntegerDotProduct() { return cl_arm_integer_dot_product; }
 
 } // namespace Option
 } // namespace clspv
