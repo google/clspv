@@ -476,7 +476,7 @@ struct SPIRVProducerPassImpl {
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   SPIRVID GenerateFabs(Value *Input);
-  SPIRVID GenerateArmDot(CallInst *Call, BuiltinType func_type);
+  SPIRVID GenerateArmDot(CallInst *Call, const FunctionInfo &func_info);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -4417,10 +4417,9 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
 }
 
 SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
-                                              BuiltinType func_type) {
+                                              const FunctionInfo &func_info) {
   setArmDot();
   addCapability(spv::CapabilityDotProduct);
-  auto fct_name = Call->getCalledFunction()->getName();
   auto a_val = Call->getOperand(0);
   auto b_val = Call->getOperand(1);
   assert(a_val->getType() == b_val->getType());
@@ -4456,7 +4455,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
   }
 
   SPIRVOperandVec Ops;
-  switch (func_type) {
+  switch (func_info.getType()) {
   case Builtins::kArmDotAccSat: {
     Ops << Call->getType() << a << b << Call->getOperand(2);
     if (Is1x32Bit || !clspv::Option::Int8Support()) {
@@ -4464,25 +4463,19 @@ SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
               PackedVectorFormatPackedVectorFormat4x8BitKHR;
     }
     spv::Op opcode;
-    if (fct_name == "_Z15arm_dot_acc_satDv4_hS_j") {
-      opcode = spv::OpUDotAccSat;
-    } else if (fct_name == "_Z15arm_dot_acc_satDv4_cS_i") {
+    if (func_info.getParameter(0).is_signed) {
       opcode = spv::OpSDotAccSat;
-    } else {
-      llvm_unreachable("unknown kArmDot builtin name");
+    } else  {
+      opcode = spv::OpUDotAccSat;
     }
     return addSPIRVInst(opcode, Ops);
   }
   case Builtins::kArmDotAcc: {
     spv::Op opcode;
-    if (fct_name == "_Z11arm_dot_accDv4_hS_j" ||
-        fct_name == "_Z11arm_dot_accDv2_tS_j") {
-      opcode = spv::OpUDot;
-    } else if (fct_name == "_Z11arm_dot_accDv4_cS_i" ||
-               fct_name == "_Z11arm_dot_accDv2_sS_i") {
+    if (func_info.getParameter(0).is_signed) {
       opcode = spv::OpSDot;
     } else {
-      llvm_unreachable("unknown kArmDotAcc builtin name");
+      opcode = spv::OpUDot;
     }
     Ops << Call->getType() << a << b;
     if (Is1x32Bit || (!clspv::Option::Int8Support() && !Is2x16Bit)) {
@@ -4502,12 +4495,10 @@ SPIRVID SPIRVProducerPassImpl::GenerateArmDot(CallInst *Call,
               PackedVectorFormatPackedVectorFormat4x8BitKHR;
     }
     spv::Op opcode;
-    if (fct_name == "_Z7arm_dotDv4_hS_") {
-      opcode = spv::OpUDot;
-    } else if (fct_name == "_Z7arm_dotDv4_cS_") {
+    if (func_info.getParameter(0).is_signed) {
       opcode = spv::OpSDot;
     } else {
-      llvm_unreachable("unknown kArmDot builtin name");
+      opcode = spv::OpUDot;
     }
     return addSPIRVInst(opcode, Ops);
   }
@@ -4626,7 +4617,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   case Builtins::kArmDotAcc:
   case Builtins::kArmDot: {
     if (SpvVersion() >= SPIRVVersion::SPIRV_1_6) {
-      RID = GenerateArmDot(Call, func_type);
+      RID = GenerateArmDot(Call, func_info);
     }
     break;
   }
