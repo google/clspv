@@ -227,10 +227,13 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
 
     // TODO remove when feature macros are added to OpenCLExtensions.def
     // https://github.com/llvm/llvm-project/blob/main/clang/include/clang/Basic/OpenCLExtensions.def#L119
-    constexpr std::array<clspv::FeatureMacro, 3> specialDefines{
+    constexpr std::array<clspv::FeatureMacro, 5> specialDefines{
         clspv::FeatureMacro::__opencl_c_atomic_scope_device,
         clspv::FeatureMacro::__opencl_c_atomic_scope_all_devices,
-        clspv::FeatureMacro::__opencl_c_work_group_collective_functions};
+        clspv::FeatureMacro::__opencl_c_work_group_collective_functions,
+        clspv::FeatureMacro::__opencl_c_integer_dot_product_input_4x8bit,
+        clspv::FeatureMacro::__opencl_c_integer_dot_product_input_4x8bit_packed,
+    };
 
     const auto featureList = clspv::FeatureMacroList;
     for (auto [feat, str] : featureList) {

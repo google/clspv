@@ -1222,6 +1222,10 @@ bool ReplaceOpenCLBuiltinPass::replaceDot(Function &F) {
     auto Op1 = CI->getOperand(1);
 
     Value *V = nullptr;
+    if (CI->getType()->isIntegerTy()) {
+      return V;
+    }
+
     if (Op0->getType()->isVectorTy()) {
       V = clspv::InsertSPIRVOp(CI, spv::OpDot, {}, CI->getType(), {Op0, Op1},
                                MemoryEffects::none());
