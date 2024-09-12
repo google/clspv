@@ -2084,8 +2084,12 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
         // Ops[2] = Stride Number(Literal Number)
         Ops.clear();
 
-        Ops << RID << spv::DecorationArrayStride
-            << static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL));
+        // if stride is 1 automatically set it to 2 to avoid stride issues.
+        auto CurrStride = static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL));
+        if (CurrStride == 1 && !Int8Support()) {
+          CurrStride = 2;
+        }
+        Ops << RID << spv::DecorationArrayStride << CurrStride;
 
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
       }
