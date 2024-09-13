@@ -884,6 +884,15 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
         {"rotate", Builtins::kRotate},
         {"sub_sat", Builtins::kSubSat},
         {"upsample", Builtins::kUpsample},
+        {"dot_acc_sat", Builtins::kIDotAccSat},
+        {"dot_acc_sat_4x8packed_uu_uint", Builtins::kIDotAccSatPackedUUU},
+        {"dot_acc_sat_4x8packed_ss_int", Builtins::kIDotAccSatPackedSSS},
+        {"dot_acc_sat_4x8packed_us_int", Builtins::kIDotAccSatPackedUSS},
+        {"dot_acc_sat_4x8packed_su_int", Builtins::kIDotAccSatPackedSUS},
+        {"dot_4x8packed_uu_uint", Builtins::kIDotPackedUUU},
+        {"dot_4x8packed_ss_int", Builtins::kIDotPackedSSS},
+        {"dot_4x8packed_us_int", Builtins::kIDotPackedUSS},
+        {"dot_4x8packed_su_int", Builtins::kIDotPackedSUS},
 
         // Math
         {"acos", Builtins::kAcos},
@@ -1101,6 +1110,11 @@ static std::unordered_map<const char *, Builtins::BuiltinType, cstr_hash,
          Builtins::kGetKernelSubGroupCountForNdrange},
         {"get_kernel_max_sub_group_size_for_ndrange",
          Builtins::kGetKernelMaxSubGroupSizeForNdrange},
+
+        // ARM_integer_dot_product
+        {"arm_dot", Builtins::kDot},
+        {"arm_dot_acc", Builtins::kArmDotAcc},
+        {"arm_dot_acc_sat", Builtins::kIDotAccSat},
 
         // Internal
         {"clspv.fract", Builtins::kClspvFract},

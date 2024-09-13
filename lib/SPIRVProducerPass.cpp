@@ -393,6 +393,8 @@ struct SPIRVProducerPassImpl {
       HasConvertToF = true;
     }
   }
+  bool hasIntegerDot() { return HasIntegerDot; }
+  void setIntegerDot() { HasIntegerDot = true; }
   GlobalConstFuncMapType &getGlobalConstFuncTypeMap() {
     return GlobalConstFuncTypeMap;
   }
@@ -474,6 +476,7 @@ struct SPIRVProducerPassImpl {
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   SPIRVID GenerateFabs(Value *Input);
+  SPIRVID GenerateIntegerDot(CallInst *Call, const FunctionInfo &func_info);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
   void HandleDeferredInstruction();
@@ -686,6 +689,7 @@ private:
   std::set<Value *> NonUniformPointers;
   bool HasNonUniformPointers;
   bool HasConvertToF;
+  bool HasIntegerDot;
   Type *SamplerPointerTy;
   Type *SamplerDataTy;
   DenseMap<unsigned, SPIRVID> SamplerLiteralToIDMap;
@@ -3196,6 +3200,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_EXT_descriptor_indexing");
   }
 
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_6 && hasIntegerDot()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_integer_dot_product");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -4408,6 +4416,161 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
   return addSPIRVInst(spv::OpBitcast, Ops);
 }
 
+SPIRVID
+SPIRVProducerPassImpl::GenerateIntegerDot(CallInst *Call,
+                                          const FunctionInfo &func_info) {
+  setIntegerDot();
+  addCapability(spv::CapabilityDotProduct);
+  auto a_val = Call->getOperand(0);
+  auto b_val = Call->getOperand(1);
+  assert(a_val->getType() == b_val->getType());
+  auto input_ty = a_val->getType();
+  auto a = getSPIRVValue(a_val);
+  auto b = getSPIRVValue(b_val);
+  auto IsIxJBit = [](Type *Ty, unsigned i, unsigned j) {
+    auto VecTy = dyn_cast<FixedVectorType>(Ty);
+    if (VecTy == nullptr) {
+      return false;
+    }
+    if (VecTy->getNumElements() != i) {
+      return false;
+    }
+    if (!VecTy->getScalarType()->isIntegerTy() ||
+        VecTy->getScalarSizeInBits() != j) {
+      return false;
+    }
+    return true;
+  };
+  bool Is4x8Bit = IsIxJBit(input_ty, 4, 8);
+  bool Is2x16Bit = IsIxJBit(input_ty, 2, 16);
+  bool Is1x32Bit = input_ty->isIntegerTy() && !input_ty->isVectorTy() &&
+                   input_ty->getScalarSizeInBits() == 32;
+  if (Is4x8Bit && clspv::Option::Int8Support()) {
+    addCapability(spv::CapabilityDotProductInput4x8Bit);
+  }
+  if (Is2x16Bit) {
+    addCapability(spv::CapabilityDotProductInputAll);
+  }
+  if (Is1x32Bit || (!clspv::Option::Int8Support() && Is4x8Bit)) {
+    addCapability(spv::CapabilityDotProductInput4x8BitPacked);
+  }
+
+  SPIRVOperandVec Ops;
+  switch (func_info.getType()) {
+  case Builtins::kIDotAccSatPackedUUU: {
+    Ops << Call->getType() << a << b << Call->getOperand(2)
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpUDotAccSat, Ops);
+  }
+  case Builtins::kIDotAccSatPackedSSS: {
+    Ops << Call->getType() << a << b << Call->getOperand(2)
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSDotAccSat, Ops);
+  }
+  case Builtins::kIDotAccSatPackedSUS: {
+    Ops << Call->getType() << a << b << Call->getOperand(2)
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSUDotAccSat, Ops);
+  }
+  case Builtins::kIDotAccSatPackedUSS: {
+    Ops << Call->getType() << b << a << Call->getOperand(2)
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSUDotAccSat, Ops);
+  }
+  case Builtins::kIDotPackedUUU: {
+    Ops << Call->getType() << a << b
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpUDot, Ops);
+  }
+  case Builtins::kIDotPackedSSS: {
+    Ops << Call->getType() << a << b
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSDot, Ops);
+  }
+  case Builtins::kIDotPackedSUS: {
+    Ops << Call->getType() << a << b
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSUDot, Ops);
+  }
+  case Builtins::kIDotPackedUSS: {
+    Ops << Call->getType() << b << a
+        << spv::PackedVectorFormat::PackedVectorFormatPackedVectorFormat4x8Bit;
+    return addSPIRVInst(spv::OpSUDot, Ops);
+  }
+  case Builtins::kIDotAccSat: {
+    spv::Op opcode;
+    Ops << Call->getType();
+    if (!func_info.getParameter(0).is_signed &&
+        func_info.getParameter(1).is_signed) {
+      opcode = spv::OpSUDotAccSat;
+      Ops << b << a;
+    } else {
+      Ops << a << b;
+      if (func_info.getParameter(0).is_signed &&
+          func_info.getParameter(1).is_signed) {
+        opcode = spv::OpSDotAccSat;
+      } else if (!func_info.getParameter(0).is_signed &&
+                 !func_info.getParameter(1).is_signed) {
+        opcode = spv::OpUDotAccSat;
+      } else {
+        opcode = spv::OpSUDotAccSat;
+      }
+    }
+    Ops << Call->getOperand(2);
+    if (Is1x32Bit || !clspv::Option::Int8Support()) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    return addSPIRVInst(opcode, Ops);
+  }
+  case Builtins::kArmDotAcc: {
+    spv::Op opcode;
+    if (func_info.getParameter(0).is_signed) {
+      opcode = spv::OpSDot;
+    } else {
+      opcode = spv::OpUDot;
+    }
+    Ops << Call->getType() << a << b;
+    if (Is1x32Bit || (!clspv::Option::Int8Support() && !Is2x16Bit)) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    auto dot = addSPIRVInst(opcode, Ops);
+    Ops.clear();
+
+    Ops << Call->getType() << dot << Call->getOperand(2);
+    return addSPIRVInst(spv::OpIAdd, Ops);
+  }
+  case Builtins::kDot: {
+    spv::Op opcode;
+    Ops << Call->getType();
+    if (!func_info.getParameter(0).is_signed &&
+        func_info.getParameter(1).is_signed) {
+      opcode = spv::OpSUDot;
+      Ops << b << a;
+    } else {
+      Ops << a << b;
+      if (func_info.getParameter(0).is_signed &&
+          func_info.getParameter(1).is_signed) {
+        opcode = spv::OpSDot;
+      } else if (!func_info.getParameter(0).is_signed &&
+                 !func_info.getParameter(1).is_signed) {
+        opcode = spv::OpUDot;
+      } else {
+        opcode = spv::OpSUDot;
+      }
+    }
+    if (Is1x32Bit || !clspv::Option::Int8Support()) {
+      Ops << spv::PackedVectorFormat::
+              PackedVectorFormatPackedVectorFormat4x8BitKHR;
+    }
+    return addSPIRVInst(opcode, Ops);
+  }
+  default:
+    llvm_unreachable("unexpected builtins in GenerateArmDot");
+  }
+}
+
 SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   LLVMContext &Context = module->getContext();
 
@@ -4512,6 +4675,20 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     SPIRVOperandVec Ops;
     Ops << Call->getType() << Call->getOperand(0) << Call->getOperand(1);
     RID = addSPIRVInst(spv::OpFDiv, Ops);
+    break;
+  }
+  case Builtins::kDot:
+  case Builtins::kIDotAccSat:
+  case Builtins::kIDotAccSatPackedUUU:
+  case Builtins::kIDotAccSatPackedSSS:
+  case Builtins::kIDotAccSatPackedUSS:
+  case Builtins::kIDotAccSatPackedSUS:
+  case Builtins::kIDotPackedUUU:
+  case Builtins::kIDotPackedSSS:
+  case Builtins::kIDotPackedUSS:
+  case Builtins::kIDotPackedSUS:
+  case Builtins::kArmDotAcc: {
+    RID = GenerateIntegerDot(Call, func_info);
     break;
   }
   default: {
@@ -6325,6 +6502,12 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpAtomicOr:
     case spv::OpAtomicXor:
     case spv::OpDot:
+    case spv::OpUDot:
+    case spv::OpSDot:
+    case spv::OpSUDot:
+    case spv::OpUDotAccSat:
+    case spv::OpSDotAccSat:
+    case spv::OpSUDotAccSat:
     case spv::OpGroupNonUniformAll:
     case spv::OpGroupNonUniformAny:
     case spv::OpGroupNonUniformBroadcast:
