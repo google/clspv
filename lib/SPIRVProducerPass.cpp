@@ -3200,7 +3200,7 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_EXT_descriptor_indexing");
   }
 
-  if (hasIntegerDot()) {
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_6 && hasIntegerDot()) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_integer_dot_product");
   }
 
@@ -4688,11 +4688,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   case Builtins::kIDotPackedUSS:
   case Builtins::kIDotPackedSUS:
   case Builtins::kArmDotAcc: {
-    if (SpvVersion() >= SPIRVVersion::SPIRV_1_6) {
-      RID = GenerateIntegerDot(Call, func_info);
-    } else {
-      llvm_unreachable("Integer dot product not supported before SPIR-V 1.6");
-    }
+    RID = GenerateIntegerDot(Call, func_info);
     break;
   }
   default: {
