@@ -14,3 +14,4 @@ void kernel __attribute__((reqd_work_group_size(4, 1, 1))) foo(global uchar* a)
 // CHECK-DAG:  OpTypePointer StorageBuffer [[struct:%[^ ]+]]
 // CHECK-DAG:  [[struct]] = OpTypeStruct [[runtimearr:%[^ ]+]]
 // CHECK-DAG:  OpDecorate [[runtimearr]] ArrayStride 4
+
