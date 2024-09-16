@@ -2087,7 +2087,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
         // if stride is 1 automatically set it to 2 to avoid stride issues.
         auto CurrStride = static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL));
         if (CurrStride == 1 && !Int8Support()) {
-          CurrStride = 2;
+          CurrStride = 4;
         }
         Ops << RID << spv::DecorationArrayStride << CurrStride;
 
@@ -6010,6 +6010,9 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
     // Ops[2] = Stride number (Literal Number)
     SPIRVOperandVec Ops;
 
+    if (stride == 1 && !Int8Support()) {
+      stride = 4;
+    }
     Ops << id << spv::DecorationArrayStride << stride;
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
