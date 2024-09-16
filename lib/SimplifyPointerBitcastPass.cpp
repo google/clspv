@@ -929,6 +929,13 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", GEPInfo.gep);
 
     unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+    if (auto phi = dyn_cast<PHINode>(I)) {
+      for (uint32_t iOp = 0; iOp < phi->getNumOperands(); iOp++) {
+        if (I->getOperand(iOp) == GEPInfo.gep) {
+          PointerOperandNum = iOp;
+        }
+      }
+    }
 
     LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace operand "
                       << PointerOperandNum << " of: ";
