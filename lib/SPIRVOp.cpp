@@ -30,7 +30,7 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
                            Type *RetType, ArrayRef<Value *> Args,
                            const MemoryEffects &MemEffects) {
-  
+
   // Prepare mangled name
   std::string MangledName = clspv::SPIRVOpIntrinsicFunction();
   MangledName += ".";
