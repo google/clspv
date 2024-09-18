@@ -70,7 +70,7 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
 
   Instruction *NewInst = CallInst::Create(func, ArgValues, "", Insert);
 
-  // Set the location for the new one
+  // Set the source location for the new one
   if (DbgLoc) {
     NewInst->setDebugLoc(DbgLoc);
   }
