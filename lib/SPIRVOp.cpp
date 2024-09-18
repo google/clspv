@@ -30,9 +30,6 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
                            ArrayRef<Attribute::AttrKind> Attributes,
                            Type *RetType, ArrayRef<Value *> Args,
                            const MemoryEffects &MemEffects) {
-
-  // Get the source location for the instruction
-  const DILocation *DbgLoc = Insert->getDebugLoc();
   
   // Prepare mangled name
   std::string MangledName = clspv::SPIRVOpIntrinsicFunction();
@@ -71,9 +68,7 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
   Instruction *NewInst = CallInst::Create(func, ArgValues, "", Insert);
 
   // Set the source location for the new instruction
-  if (DbgLoc) {
-    NewInst->setDebugLoc(DbgLoc);
-  }
+  NewInst->setDebugLoc(Insert->getDebugLoc());
 
   return NewInst;
 }
