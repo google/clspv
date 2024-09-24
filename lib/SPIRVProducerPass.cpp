@@ -555,6 +555,13 @@ struct SPIRVProducerPassImpl {
     }
   }
 
+  uint32_t getCorrectedStride(uint32_t CurrStride) {
+    if (CurrStride == 1 && !Int8Support()) {
+      return 4;
+    }
+    return CurrStride;
+  }
+
   //
   // Primary interface for adding SPIRVInstructions to a SPIRVSection.
   template <enum SPIRVSection TSection = kFunctions>
@@ -2101,8 +2108,10 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
         // Ops[2] = Stride Number(Literal Number)
         Ops.clear();
 
+        auto CurrStride = static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL));
+        // if stride is 1 automatically set it to 4 to avoid stride issues.
         Ops << RID << spv::DecorationArrayStride
-            << static_cast<uint32_t>(GetTypeAllocSize(EleTy, DL));
+            << getCorrectedStride(CurrStride);
 
         addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
       }
@@ -6242,8 +6251,8 @@ void SPIRVProducerPassImpl::HandleDeferredDecorations() {
     // Ops[1] = Decoration (ArrayStride)
     // Ops[2] = Stride number (Literal Number)
     SPIRVOperandVec Ops;
-
-    Ops << id << spv::DecorationArrayStride << stride;
+    // if stride is 1 automatically set it to 4 to avoid stride issues.
+    Ops << id << spv::DecorationArrayStride << getCorrectedStride(stride);
 
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
   }
