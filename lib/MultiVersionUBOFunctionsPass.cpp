@@ -216,7 +216,8 @@ void clspv::MultiVersionUBOFunctionsPass::SpecializeCall(
   for (auto extra : extra_args) {
     new_args.push_back(extra);
   }
-  auto *replacement = CallInst::Create(clone, new_args, "", call);
+  auto *replacement =
+      CallInst::Create(clone, new_args, "", call->getIterator());
   call->replaceAllUsesWith(replacement);
   call->eraseFromParent();
 }

@@ -86,8 +86,9 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
       ValueToValueMapTy ArgVMap;
       for (Argument *Arg : ByValList) {
         Type *ArgTy = Arg->getParamByValType();
-        AllocaInst *ArgAddr = new AllocaInst(
-            ArgTy, 0, nullptr, Arg->getName() + ".addr", InsertPoint);
+        AllocaInst *ArgAddr =
+            new AllocaInst(ArgTy, 0, nullptr, Arg->getName() + ".addr",
+                           InsertPoint->getIterator());
 
         // Change arg's users with ArgAddr.
         Arg->replaceAllUsesWith(ArgAddr);
@@ -113,7 +114,7 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
         Instruction *NewAlloca = cast<Instruction>(VMap[Alloca]);
         Argument *NewArg = cast<Argument>(VMap[Arg]);
         new StoreInst(NewArg, NewAlloca,
-                      &*std::next(BasicBlock::iterator(*NewAlloca)));
+                      std::next(BasicBlock::iterator(*NewAlloca)));
 
         // Remove byval and align attributes.
         NewArg->removeAttr(Attribute::ByVal);
@@ -136,14 +137,15 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
           auto param = Call->getArgOperand(i);
 
           if (Arg->hasByValAttr()) {
-            Args.push_back(
-                new LoadInst(Arg->getParamByValType(), param, "", Call));
+            Args.push_back(new LoadInst(Arg->getParamByValType(), param, "",
+                                        Call->getIterator()));
           } else {
             Args.push_back(param);
           }
         }
 
-        CallInst *NewCall = CallInst::Create(NewFunc, Args, "", Call);
+        CallInst *NewCall =
+            CallInst::Create(NewFunc, Args, "", Call->getIterator());
         NewCall->setCallingConv(NewFunc->getCallingConv());
         NewCall->copyMetadata(*Call);
 

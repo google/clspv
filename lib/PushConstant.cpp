@@ -294,8 +294,8 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
         for (auto iter = gep->idx_begin(); iter != gep->idx_end(); ++iter) {
           indices.push_back(*iter);
         }
-        auto new_gep = GetElementPtrInst::Create(push_constant_ty, new_GV,
-                                                 indices, "", gep);
+        auto new_gep = GetElementPtrInst::Create(
+            push_constant_ty, new_GV, indices, "", gep->getIterator());
         new_gep->setIsInBounds(gep->isInBounds());
         gep->replaceAllUsesWith(new_gep);
         gep->eraseFromParent();
@@ -329,7 +329,8 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
             push_constant_ty, new_GV, indices, gep_operator->isInBounds());
         user->replaceAllUsesWith(new_gep);
       } else if (auto load = dyn_cast<LoadInst>(user)) {
-        auto new_load = new LoadInst(load->getType(), new_GV, "", load);
+        auto new_load =
+            new LoadInst(load->getType(), new_GV, "", load->getIterator());
         load->replaceAllUsesWith(new_load);
         load->eraseFromParent();
       } else {

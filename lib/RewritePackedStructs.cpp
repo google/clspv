@@ -199,8 +199,9 @@ bool clspv::RewritePackedStructs::runOnFunction(Function &F) {
     if (EquivalentTy == gep->getSourceElementType()) {
       continue;
     }
-    auto NewGEP = GetElementPtrInst::Create(
-        EquivalentTy, gep->getPointerOperand(), {gep->getOperand(1)}, "", gep);
+    auto NewGEP =
+        GetElementPtrInst::Create(EquivalentTy, gep->getPointerOperand(),
+                                  {gep->getOperand(1)}, "", gep->getIterator());
     if (gep->getNumOperands() > 2) {
       SmallVector<Value *, 2> Indices;
       Indices.push_back(ConstantInt::get(Type::getInt32Ty(F.getContext()), 0));
@@ -208,7 +209,7 @@ bool clspv::RewritePackedStructs::runOnFunction(Function &F) {
         Indices.push_back(gep->getOperand(i));
       }
       NewGEP = GetElementPtrInst::Create(gep->getSourceElementType(), NewGEP,
-                                         Indices, "", gep);
+                                         Indices, "", gep->getIterator());
     }
     gep->replaceAllUsesWith(NewGEP);
     gep->eraseFromParent();

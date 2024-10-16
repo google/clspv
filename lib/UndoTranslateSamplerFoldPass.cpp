@@ -64,12 +64,12 @@ clspv::UndoTranslateSamplerFoldPass::run(Module &M, ModuleAnalysisManager &) {
     auto Arg = CI->getArgOperand(0);
 
     if (auto Sel = dyn_cast<SelectInst>(Arg)) {
-      auto NewTrue = CallInst::Create(CI->getCalledFunction(),
-                                      Sel->getTrueValue(), "", CI);
-      auto NewFalse = CallInst::Create(CI->getCalledFunction(),
-                                       Sel->getFalseValue(), "", CI);
-      auto NewSel =
-          SelectInst::Create(Sel->getCondition(), NewTrue, NewFalse, "", CI);
+      auto NewTrue = CallInst::Create(
+          CI->getCalledFunction(), Sel->getTrueValue(), "", CI->getIterator());
+      auto NewFalse = CallInst::Create(
+          CI->getCalledFunction(), Sel->getFalseValue(), "", CI->getIterator());
+      auto NewSel = SelectInst::Create(Sel->getCondition(), NewTrue, NewFalse,
+                                       "", CI->getIterator());
 
       CI->replaceAllUsesWith(NewSel);
       CI->eraseFromParent();

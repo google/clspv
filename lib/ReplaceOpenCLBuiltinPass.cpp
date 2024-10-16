@@ -957,12 +957,12 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
         Instruction::Shl, Builder.getInt32(MemFence::CLK_LOCAL_MEM_FENCE),
         Builder.getInt32(clz(spv::MemorySemanticsWorkgroupMemoryMask) -
                          clz(MemFence::CLK_LOCAL_MEM_FENCE)),
-        "", CI);
+        "", CI->getIterator());
     auto MemorySemantics = BinaryOperator::Create(
         Instruction::Or, MemorySemanticsWorkgroup,
         ConstantInt::get(Builder.getInt32Ty(),
                          spv::MemorySemanticsAcquireReleaseMask),
-        "", CI);
+        "", CI->getIterator());
 
     return clspv::InsertSPIRVOp(
         CI, spv::OpControlBarrier,
@@ -1194,7 +1194,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
     auto intrinsic = Intrinsic::getOrInsertDeclaration(
         F.getParent(), Intrinsic::copysign, Call->getType());
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic, {x, y}, "",
-                            Call);
+                            Call->getIterator());
   });
 }
 
@@ -1213,7 +1213,7 @@ bool ReplaceOpenCLBuiltinPass::replaceNativeRecip(Function &F) {
         Builtins::GetMangledFunctionName("native_divide", NativeDivideType);
     auto NativeDivide =
         M.getOrInsertFunction(NativeDivideName, NativeDivideType);
-    return CallInst::Create(NativeDivide, {Cst1, Arg}, "", CI);
+    return CallInst::Create(NativeDivide, {Cst1, Arg}, "", CI->getIterator());
   });
 }
 
@@ -1231,7 +1231,8 @@ bool ReplaceOpenCLBuiltinPass::replaceDot(Function &F) {
       V = clspv::InsertSPIRVOp(CI, spv::OpDot, {}, CI->getType(), {Op0, Op1},
                                MemoryEffects::none());
     } else {
-      V = BinaryOperator::Create(Instruction::FMul, Op0, Op1, "", CI);
+      V = BinaryOperator::Create(Instruction::FMul, Op0, Op1, "",
+                                 CI->getIterator());
     }
 
     return V;
@@ -1256,10 +1257,11 @@ bool ReplaceOpenCLBuiltinPass::replaceExp10(Function &F,
     const double Ln10 =
         2.302585092994045684017991454684364207601101488628772976033;
 
-    auto Mul = BinaryOperator::Create(
-        Instruction::FMul, ConstantFP::get(Arg->getType(), Ln10), Arg, "", CI);
+    auto Mul = BinaryOperator::Create(Instruction::FMul,
+                                      ConstantFP::get(Arg->getType(), Ln10),
+                                      Arg, "", CI->getIterator());
 
-    return CallInst::Create(NewF, Mul, "", CI);
+    return CallInst::Create(NewF, Mul, "", CI->getIterator());
   });
 }
 
@@ -1271,7 +1273,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFmod(Function &F) {
   return replaceCallsWithValue(F, [](CallInst *CI) {
     auto Op0 = CI->getOperand(0);
     auto Op1 = CI->getOperand(1);
-    return BinaryOperator::Create(Instruction::FRem, Op0, Op1, "", CI);
+    return BinaryOperator::Create(Instruction::FRem, Op0, Op1, "",
+                                  CI->getIterator());
   });
 }
 
@@ -1293,11 +1296,11 @@ bool ReplaceOpenCLBuiltinPass::replaceLog10(Function &F,
     const double Ln10 =
         0.434294481903251827651128918916605082294397005803666566114;
 
-    auto NewCI = CallInst::Create(NewF, Arg, "", CI);
+    auto NewCI = CallInst::Create(NewF, Arg, "", CI->getIterator());
 
     return BinaryOperator::Create(Instruction::FMul,
                                   ConstantFP::get(Arg->getType(), Ln10), NewCI,
-                                  "", CI);
+                                  "", CI->getIterator());
   });
 }
 
@@ -1306,12 +1309,13 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *CI) {
     auto Arg = CI->getOperand(0);
 
-    auto ArgP1 = BinaryOperator::Create(
-        Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
+    auto ArgP1 = BinaryOperator::Create(Instruction::FAdd,
+                                        ConstantFP::get(Arg->getType(), 1.0),
+                                        Arg, "", CI->getIterator());
 
     auto log = Intrinsic::getOrInsertDeclaration(F.getParent(), Intrinsic::log,
                                                  CI->getType());
-    return CallInst::Create(log, ArgP1, "", CI);
+    return CallInst::Create(log, ArgP1, "", CI->getIterator());
   });
 }
 
@@ -1337,43 +1341,48 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         ConstantInt::get(Arg->getType(), spv::ScopeSubgroup);
 
     // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
-    const auto LocalMemFenceMask =
-        BinaryOperator::Create(Instruction::And, LocalMemFence, Arg, "", CI);
+    const auto LocalMemFenceMask = BinaryOperator::Create(
+        Instruction::And, LocalMemFence, Arg, "", CI->getIterator());
     const auto WorkgroupShiftAmount =
         clz(spv::MemorySemanticsWorkgroupMemoryMask) -
         clz(MemFence::CLK_LOCAL_MEM_FENCE);
     const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
         Instruction::Shl, LocalMemFenceMask,
-        ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "",
+        CI->getIterator());
 
     // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
-    const auto GlobalMemFenceMask =
-        BinaryOperator::Create(Instruction::And, GlobalMemFence, Arg, "", CI);
+    const auto GlobalMemFenceMask = BinaryOperator::Create(
+        Instruction::And, GlobalMemFence, Arg, "", CI->getIterator());
     const auto UniformShiftAmount = clz(spv::MemorySemanticsUniformMemoryMask) -
                                     clz(MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto MemorySemanticsUniform = BinaryOperator::Create(
         Instruction::Shl, GlobalMemFenceMask,
-        ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), UniformShiftAmount), "",
+        CI->getIterator());
 
     // OpenCL 2.0
     // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
-    const auto ImageMemFenceMask =
-        BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
+    const auto ImageMemFenceMask = BinaryOperator::Create(
+        Instruction::And, ImageMemFence, Arg, "", CI->getIterator());
     const auto ImageShiftAmount = clz(spv::MemorySemanticsImageMemoryMask) -
                                   clz(MemFence::CLK_IMAGE_MEM_FENCE);
     const auto MemorySemanticsImage = BinaryOperator::Create(
         Instruction::Shl, ImageMemFenceMask,
-        ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), ImageShiftAmount), "",
+        CI->getIterator());
 
     // And combine the above together, also adding in
     // MemorySemanticsSequentiallyConsistentMask.
     auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
-                               ConstantAcquireRelease, "", CI);
-    auto MemorySemantics2 = BinaryOperator::Create(
-        Instruction::Or, MemorySemanticsUniform, MemorySemanticsImage, "", CI);
-    auto MemorySemantics = BinaryOperator::Create(
-        Instruction::Or, MemorySemantics1, MemorySemantics2, "", CI);
+                               ConstantAcquireRelease, "", CI->getIterator());
+    auto MemorySemantics2 =
+        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
+                               MemorySemanticsImage, "", CI->getIterator());
+    auto MemorySemantics =
+        BinaryOperator::Create(Instruction::Or, MemorySemantics1,
+                               MemorySemantics2, "", CI->getIterator());
 
     // If the memory scope is not specified explicitly, it is either Subgroup
     // or Workgroup depending on the type of barrier.
@@ -1391,15 +1400,17 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
       const auto MemoryScopeDevice =
           ConstantInt::get(Arg->getType(), CL_MEMORY_SCOPE_DEVICE);
 
-      auto Cmp =
-          CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
-                          MemoryScopeSubgroup, CI->getOperand(1), "", CI);
-      MemoryScope = SelectInst::Create(Cmp, ConstantScopeSubgroup,
-                                       ConstantScopeWorkgroup, "", CI);
-      Cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
-                            MemoryScopeDevice, CI->getOperand(1), "", CI);
+      auto Cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                                 MemoryScopeSubgroup, CI->getOperand(1), "",
+                                 CI->getIterator());
       MemoryScope =
-          SelectInst::Create(Cmp, ConstantScopeDevice, MemoryScope, "", CI);
+          SelectInst::Create(Cmp, ConstantScopeSubgroup, ConstantScopeWorkgroup,
+                             "", CI->getIterator());
+      Cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                            MemoryScopeDevice, CI->getOperand(1), "",
+                            CI->getIterator());
+      MemoryScope = SelectInst::Create(Cmp, ConstantScopeDevice, MemoryScope,
+                                       "", CI->getIterator());
     }
 
     // Lastly, the Execution Scope is either Workgroup or Subgroup depending on
@@ -1433,33 +1444,36 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
         ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
 
     // Map CLK_LOCAL_MEM_FENCE to MemorySemanticsWorkgroupMemoryMask.
-    const auto LocalMemFenceMask =
-        BinaryOperator::Create(Instruction::And, LocalMemFence, Arg, "", CI);
+    const auto LocalMemFenceMask = BinaryOperator::Create(
+        Instruction::And, LocalMemFence, Arg, "", CI->getIterator());
     const auto WorkgroupShiftAmount =
         clz(spv::MemorySemanticsWorkgroupMemoryMask) -
         clz(MemFence::CLK_LOCAL_MEM_FENCE);
     const auto MemorySemanticsWorkgroup = BinaryOperator::Create(
         Instruction::Shl, LocalMemFenceMask,
-        ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), WorkgroupShiftAmount), "",
+        CI->getIterator());
 
     // Map CLK_GLOBAL_MEM_FENCE to MemorySemanticsUniformMemoryMask.
-    const auto GlobalMemFenceMask =
-        BinaryOperator::Create(Instruction::And, GlobalMemFence, Arg, "", CI);
+    const auto GlobalMemFenceMask = BinaryOperator::Create(
+        Instruction::And, GlobalMemFence, Arg, "", CI->getIterator());
     const auto UniformShiftAmount = clz(spv::MemorySemanticsUniformMemoryMask) -
                                     clz(MemFence::CLK_GLOBAL_MEM_FENCE);
     const auto MemorySemanticsUniform = BinaryOperator::Create(
         Instruction::Shl, GlobalMemFenceMask,
-        ConstantInt::get(Arg->getType(), UniformShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), UniformShiftAmount), "",
+        CI->getIterator());
 
     // OpenCL 2.0
     // Map CLK_IMAGE_MEM_FENCE to MemorySemanticsImageMemoryMask.
-    const auto ImageMemFenceMask =
-        BinaryOperator::Create(Instruction::And, ImageMemFence, Arg, "", CI);
+    const auto ImageMemFenceMask = BinaryOperator::Create(
+        Instruction::And, ImageMemFence, Arg, "", CI->getIterator());
     const auto ImageShiftAmount = clz(spv::MemorySemanticsImageMemoryMask) -
                                   clz(MemFence::CLK_IMAGE_MEM_FENCE);
     const auto MemorySemanticsImage = BinaryOperator::Create(
         Instruction::Shl, ImageMemFenceMask,
-        ConstantInt::get(Arg->getType(), ImageShiftAmount), "", CI);
+        ConstantInt::get(Arg->getType(), ImageShiftAmount), "",
+        CI->getIterator());
 
     Value *MemOrder = ConstantMemorySemantics;
     Value *MemScope = ConstantScopeWorkgroup;
@@ -1513,11 +1527,13 @@ bool ReplaceOpenCLBuiltinPass::replaceRelational(Function &F,
     auto Arg1 = CI->getOperand(0);
     auto Arg2 = CI->getOperand(1);
 
-    const auto Cmp =
-        CmpInst::Create(Instruction::FCmp, Predicate, Arg1, Arg2, "", CI);
+    const auto Cmp = CmpInst::Create(Instruction::FCmp, Predicate, Arg1, Arg2,
+                                     "", CI->getIterator());
     if (isa<VectorType>(F.getReturnType()))
-      return CastInst::Create(Instruction::SExt, Cmp, CI->getType(), "", CI);
-    return CastInst::Create(Instruction::ZExt, Cmp, CI->getType(), "", CI);
+      return CastInst::Create(Instruction::SExt, Cmp, CI->getType(), "",
+                              CI->getIterator());
+    return CastInst::Create(Instruction::ZExt, Cmp, CI->getType(), "",
+                            CI->getIterator());
   });
 }
 
@@ -1545,7 +1561,8 @@ bool ReplaceOpenCLBuiltinPass::replaceIsInfAndIsNan(Function &F,
         clspv::InsertSPIRVOp(CI, SPIRVOp, {}, CorrespondingBoolTy,
                              {CI->getOperand(0)}, MemoryEffects::none());
 
-    return SelectInst::Create(NewCI, TrueValue, FalseValue, "", CI);
+    return SelectInst::Create(NewCI, TrueValue, FalseValue, "",
+                              CI->getIterator());
   });
 }
 
@@ -1607,7 +1624,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Function &F, spv::Op SPIRVOp) {
     // If the argument is a 32-bit int, just use a shift
     if (Arg->getType() == Type::getInt32Ty(M.getContext())) {
       V = BinaryOperator::Create(Instruction::LShr, Arg,
-                                 ConstantInt::get(Arg->getType(), 31), "", CI);
+                                 ConstantInt::get(Arg->getType(), 31), "",
+                                 CI->getIterator());
     } else {
       // The value for zero to compare against.
       const auto ZeroValue = Constant::getNullValue(Arg->getType());
@@ -1619,7 +1637,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Function &F, spv::Op SPIRVOp) {
       const auto FalseValue = Constant::getNullValue(CI->getType());
 
       const auto Cmp = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_SLT,
-                                       Arg, ZeroValue, "", CI);
+                                       Arg, ZeroValue, "", CI->getIterator());
 
       Value *SelectSource = nullptr;
 
@@ -1636,7 +1654,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAllAndAny(Function &F, spv::Op SPIRVOp) {
         SelectSource = Cmp;
       }
 
-      V = SelectInst::Create(SelectSource, TrueValue, FalseValue, "", CI);
+      V = SelectInst::Create(SelectSource, TrueValue, FalseValue, "",
+                             CI->getIterator());
     }
     return V;
   });
@@ -1680,17 +1699,20 @@ bool ReplaceOpenCLBuiltinPass::replaceUpsample(Function &F) {
     }
 
     // Convert both operands to the result type
-    auto HiCast = CastInst::CreateZExtOrBitCast(HiValue, CI->getType(), "", CI);
-    auto LoCast = CastInst::CreateZExtOrBitCast(LoValue, CI->getType(), "", CI);
+    auto HiCast = CastInst::CreateZExtOrBitCast(HiValue, CI->getType(), "",
+                                                CI->getIterator());
+    auto LoCast = CastInst::CreateZExtOrBitCast(LoValue, CI->getType(), "",
+                                                CI->getIterator());
 
     // Shift high operand
     auto ShiftAmount =
         ConstantInt::get(CI->getType(), HiType->getScalarSizeInBits());
-    auto HiShifted =
-        BinaryOperator::Create(Instruction::Shl, HiCast, ShiftAmount, "", CI);
+    auto HiShifted = BinaryOperator::Create(Instruction::Shl, HiCast,
+                                            ShiftAmount, "", CI->getIterator());
 
     // OR both results
-    return BinaryOperator::Create(Instruction::Or, HiShifted, LoCast, "", CI);
+    return BinaryOperator::Create(Instruction::Or, HiShifted, LoCast, "",
+                                  CI->getIterator());
   });
 }
 
@@ -1732,7 +1754,8 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
     Function *intrinsic = Intrinsic::getOrInsertDeclaration(
         F.getParent(), Intrinsic::fshl, SrcType);
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic,
-                            {SrcValue, SrcValue, RotAmount}, "", CI);
+                            {SrcValue, SrcValue, RotAmount}, "",
+                            CI->getIterator());
   });
 }
 
@@ -1778,21 +1801,26 @@ bool ReplaceOpenCLBuiltinPass::replaceConvert(Function &F, bool SrcIsSigned,
       // Unnecessary cast operation.
       V = SrcValue;
     } else if (SrcIsFloat && DstIsFloat) {
-      V = CastInst::CreateFPCast(SrcValue, DstType, "", CI);
+      V = CastInst::CreateFPCast(SrcValue, DstType, "", CI->getIterator());
     } else if (SrcIsFloat && DstIsInt) {
       if (DstIsSigned) {
-        V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "", CI);
+        V = CastInst::Create(Instruction::FPToSI, SrcValue, DstType, "",
+                             CI->getIterator());
       } else {
-        V = CastInst::Create(Instruction::FPToUI, SrcValue, DstType, "", CI);
+        V = CastInst::Create(Instruction::FPToUI, SrcValue, DstType, "",
+                             CI->getIterator());
       }
     } else if (SrcIsInt && DstIsFloat) {
       if (SrcIsSigned) {
-        V = CastInst::Create(Instruction::SIToFP, SrcValue, DstType, "", CI);
+        V = CastInst::Create(Instruction::SIToFP, SrcValue, DstType, "",
+                             CI->getIterator());
       } else {
-        V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "", CI);
+        V = CastInst::Create(Instruction::UIToFP, SrcValue, DstType, "",
+                             CI->getIterator());
       }
     } else if (SrcIsInt && DstIsInt) {
-      V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "", CI);
+      V = CastInst::CreateIntegerCast(SrcValue, DstType, SrcIsSigned, "",
+                                      CI->getIterator());
     } else {
       // Not something we're supposed to handle, just move on
     }
@@ -1843,11 +1871,12 @@ bool ReplaceOpenCLBuiltinPass::replaceMulHi(Function &F, bool is_signed,
 
     // Get the high part of the result
     unsigned Idxs[] = {1};
-    V = ExtractValueInst::Create(Call, Idxs, "", CI);
+    V = ExtractValueInst::Create(Call, Idxs, "", CI->getIterator());
 
     // If we're handling a mad_hi, add the third argument to the result
     if (is_mad) {
-      V = BinaryOperator::Create(Instruction::Add, V, CValue, "", CI);
+      V = BinaryOperator::Create(Instruction::Add, V, CValue, "",
+                                 CI->getIterator());
     }
 
     return V;
@@ -1915,10 +1944,11 @@ bool ReplaceOpenCLBuiltinPass::replaceSelect(Function &F) {
 
     // Create comparison instruction
     auto Cmp = CmpInst::Create(Instruction::ICmp, Pred, PredicateValue,
-                               ZeroValue, "", CI);
+                               ZeroValue, "", CI->getIterator());
 
     // Create select
-    return SelectInst::Create(Cmp, TrueValue, FalseValue, "", CI);
+    return SelectInst::Create(Cmp, TrueValue, FalseValue, "",
+                              CI->getIterator());
   });
 }
 
@@ -1969,10 +1999,12 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
       BitType = getIntOrIntVectorTyForCast(F.getContext(), OpType);
 
       // Then bitcast all operands
-      PredicateValue =
-          CastInst::CreateZExtOrBitCast(PredicateValue, BitType, "", CI);
-      FalseValue = CastInst::CreateZExtOrBitCast(FalseValue, BitType, "", CI);
-      TrueValue = CastInst::CreateZExtOrBitCast(TrueValue, BitType, "", CI);
+      PredicateValue = CastInst::CreateZExtOrBitCast(PredicateValue, BitType,
+                                                     "", CI->getIterator());
+      FalseValue = CastInst::CreateZExtOrBitCast(FalseValue, BitType, "",
+                                                 CI->getIterator());
+      TrueValue = CastInst::CreateZExtOrBitCast(TrueValue, BitType, "",
+                                                CI->getIterator());
 
     } else {
       // The operands have an integer type, use it directly
@@ -1985,20 +2017,21 @@ bool ReplaceOpenCLBuiltinPass::replaceBitSelect(Function &F) {
     // Create our negated predicate value
     auto AllOnes = Constant::getAllOnesValue(BitType);
     auto NotPredicateValue = BinaryOperator::Create(
-        Instruction::Xor, PredicateValue, AllOnes, "", CI);
+        Instruction::Xor, PredicateValue, AllOnes, "", CI->getIterator());
 
     // Then put everything together
     auto BitsFalse = BinaryOperator::Create(Instruction::And, NotPredicateValue,
-                                            FalseValue, "", CI);
+                                            FalseValue, "", CI->getIterator());
     auto BitsTrue = BinaryOperator::Create(Instruction::And, PredicateValue,
-                                           TrueValue, "", CI);
+                                           TrueValue, "", CI->getIterator());
 
-    V = BinaryOperator::Create(Instruction::Or, BitsFalse, BitsTrue, "", CI);
+    V = BinaryOperator::Create(Instruction::Or, BitsFalse, BitsTrue, "",
+                               CI->getIterator());
 
     // If we were dealing with a floating point type, we must bitcast
     // the result back to that
     if (OpType->getScalarType()->isFloatingPointTy()) {
-      V = CastInst::CreateZExtOrBitCast(V, OpType, "", CI);
+      V = CastInst::CreateZExtOrBitCast(V, OpType, "", CI->getIterator());
     }
 
     return V;
@@ -2029,8 +2062,8 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
       for (size_t i = 0; i < VecType->getElementCount().getKnownMinValue();
            i++) {
         auto index = ConstantInt::get(Type::getInt32Ty(M.getContext()), i);
-        NewVectorArg =
-            InsertElementInst::Create(NewVectorArg, arg, index, "", CI);
+        NewVectorArg = InsertElementInst::Create(NewVectorArg, arg, index, "",
+                                                 CI->getIterator());
       }
       SplatArgs.push_back(NewVectorArg);
     }
@@ -2050,7 +2083,7 @@ bool ReplaceOpenCLBuiltinPass::replaceStep(Function &F, bool is_smooth) {
     }
     NewArgs.push_back(VectorArg);
 
-    return CallInst::Create(NewF, NewArgs, "", CI);
+    return CallInst::Create(NewF, NewArgs, "", CI->getIterator());
   });
 }
 
@@ -2065,16 +2098,18 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
       IntTy = FixedVectorType::get(
           IntTy, dyn_cast<FixedVectorType>(CI->getType())->getNumElements());
     }
-    auto Bitcast = CastInst::CreateZExtOrBitCast(Arg, IntTy, "", CI);
+    auto Bitcast =
+        CastInst::CreateZExtOrBitCast(Arg, IntTy, "", CI->getIterator());
 
     auto Shift = BinaryOperator::Create(
-        Op, Bitcast, ConstantInt::get(IntTy, IntSizeInBits - 1), "", CI);
+        Op, Bitcast, ConstantInt::get(IntTy, IntSizeInBits - 1), "",
+        CI->getIterator());
 
     if (is_vec) {
       return Shift;
     } else {
       return CastInst::CreateZExtOrBitCast(
-          Shift, Type::getInt32Ty(CI->getContext()), "", CI);
+          Shift, Type::getInt32Ty(CI->getContext()), "", CI->getIterator());
     }
   });
 }
@@ -2087,14 +2122,16 @@ bool ReplaceOpenCLBuiltinPass::replaceMul(Function &F, bool is_float,
 
     SmallVector<Value *, 8> Args(CI->arg_begin(), CI->arg_end());
 
-    Value *V = BinaryOperator::Create(MulInst, CI->getArgOperand(0),
-                                      CI->getArgOperand(1), "", CI);
+    Value *V =
+        BinaryOperator::Create(MulInst, CI->getArgOperand(0),
+                               CI->getArgOperand(1), "", CI->getIterator());
 
     if (is_mad) {
       // The add instruction to use.
       auto AddInst = is_float ? Instruction::FAdd : Instruction::Add;
 
-      V = BinaryOperator::Create(AddInst, V, CI->getArgOperand(2), "", CI);
+      V = BinaryOperator::Create(AddInst, V, CI->getArgOperand(2), "",
+                                 CI->getIterator());
     }
 
     return V;
@@ -2252,19 +2289,22 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVloadHalf(llvm::Module &M,
     auto ShortTy = Type::getInt16Ty(M.getContext());
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(ShortTy, ptr, index, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(ShortTy, ptr, index, "", CI->getIterator());
 
     // Load from the short* we casted to.
-    auto Load = new LoadInst(ShortTy, Index, "", CI);
+    auto Load = new LoadInst(ShortTy, Index, "", CI->getIterator());
 
     // ZExt the short -> int.
-    auto ZExt = CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI);
+    auto ZExt =
+        CastInst::CreateZExtOrBitCast(Load, IntTy, "", CI->getIterator());
 
     // Get our float2.
-    auto Call = CallInst::Create(NewF, ZExt, "", CI);
+    auto Call = CallInst::Create(NewF, ZExt, "", CI->getIterator());
 
     // Extract out the bottom element which is our float result.
-    V = ExtractElementInst::Create(Call, ConstantInt::get(IntTy, 0), "", CI);
+    V = ExtractElementInst::Create(Call, ConstantInt::get(IntTy, 0), "",
+                                   CI->getIterator());
   } else {
     // Assume the pointer argument points to storage aligned to 32bits
     // or more.
@@ -2282,21 +2322,24 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVloadHalf(llvm::Module &M,
     //   x float> %converted, %index_is_odd32
 
     auto One = ConstantInt::get(IntTy, 1);
-    auto IndexIsOdd = BinaryOperator::CreateAnd(index, One, "", CI);
-    auto IndexIntoI32 = BinaryOperator::CreateLShr(index, One, "", CI);
+    auto IndexIsOdd =
+        BinaryOperator::CreateAnd(index, One, "", CI->getIterator());
+    auto IndexIntoI32 =
+        BinaryOperator::CreateLShr(index, One, "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Ptr = GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32, "", CI);
+    auto Ptr = GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32, "",
+                                         CI->getIterator());
 
     // Load from the int* we casted to.
-    auto Load = new LoadInst(IntTy, Ptr, "", CI);
+    auto Load = new LoadInst(IntTy, Ptr, "", CI->getIterator());
 
     // Get our float2.
-    auto Call = CallInst::Create(NewF, Load, "", CI);
+    auto Call = CallInst::Create(NewF, Load, "", CI->getIterator());
 
     // Extract out the float result, where the element number is
     // determined by whether the original index was even or odd.
-    V = ExtractElementInst::Create(Call, IndexIsOdd, "", CI);
+    V = ExtractElementInst::Create(Call, IndexIsOdd, "", CI->getIterator());
   }
   return V;
 }
@@ -2328,10 +2371,11 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(IntTy, Arg1, Arg0, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(IntTy, Arg1, Arg0, "", CI->getIterator());
 
     // Load from the int* we casted to.
-    auto Load = new LoadInst(IntTy, Index, "", CI);
+    auto Load = new LoadInst(IntTy, Index, "", CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2339,7 +2383,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf2(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Get our float2.
-    return CallInst::Create(NewF, Load, "", CI);
+    return CallInst::Create(NewF, Load, "", CI->getIterator());
   });
 }
 
@@ -2365,25 +2409,28 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf3(Function &F) {
     // Load the first element
     auto Index0 = BinaryOperator::Create(
         Instruction::Add,
-        BinaryOperator::Create(Instruction::Shl, Arg0, Int1, "", CI), Arg0, "",
-        CI);
+        BinaryOperator::Create(Instruction::Shl, Arg0, Int1, "",
+                               CI->getIterator()),
+        Arg0, "", CI->getIterator());
     auto Y0 = createVloadHalf(M, CI, Index0, Arg1);
 
     // Load the second element
-    auto Index1 =
-        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto Index1 = BinaryOperator::Create(Instruction::Add, Index0, Int1, "",
+                                         CI->getIterator());
     auto Y1 = createVloadHalf(M, CI, Index1, Arg1);
 
     // Load the third element
-    auto Index2 =
-        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto Index2 = BinaryOperator::Create(Instruction::Add, Index1, Int1, "",
+                                         CI->getIterator());
     auto Y2 = createVloadHalf(M, CI, Index2, Arg1);
 
     // Create the final float3 to be returned
-    auto Combine =
-        InsertElementInst::Create(PoisonValue::get(Float3Ty), Y0, Int0, "", CI);
-    Combine = InsertElementInst::Create(Combine, Y1, Int1, "", CI);
-    Combine = InsertElementInst::Create(Combine, Y2, Int2, "", CI);
+    auto Combine = InsertElementInst::Create(PoisonValue::get(Float3Ty), Y0,
+                                             Int0, "", CI->getIterator());
+    Combine =
+        InsertElementInst::Create(Combine, Y1, Int1, "", CI->getIterator());
+    Combine =
+        InsertElementInst::Create(Combine, Y2, Int2, "", CI->getIterator());
 
     return Combine;
   });
@@ -2404,16 +2451,17 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI->getIterator());
 
     // Load from the int2* we casted to.
-    auto Load = new LoadInst(Int2Ty, Index, "", CI);
+    auto Load = new LoadInst(Int2Ty, Index, "", CI->getIterator());
 
     // Extract each element from the loaded int2.
-    auto X =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
-    auto Y =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
+    auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "",
+                                        CI->getIterator());
+    auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "",
+                                        CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2421,10 +2469,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Get the lower (x & y) components of our final float4.
-    auto Lo = CallInst::Create(NewF, X, "", CI);
+    auto Lo = CallInst::Create(NewF, X, "", CI->getIterator());
 
     // Get the higher (z & w) components of our final float4.
-    auto Hi = CallInst::Create(NewF, Y, "", CI);
+    auto Hi = CallInst::Create(NewF, Y, "", CI->getIterator());
 
     Constant *ShuffleMask[3] = {ConstantInt::get(IntTy, 0),
                                 ConstantInt::get(IntTy, 1),
@@ -2432,7 +2480,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadaHalf3(Function &F) {
 
     // Combine our two float2's into one float4.
     return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask), "",
-                                 CI);
+                                 CI->getIterator());
   });
 }
 
@@ -2451,16 +2499,17 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(Int2Ty, Arg1, Arg0, "", CI->getIterator());
 
     // Load from the int2* we casted to.
-    auto Load = new LoadInst(Int2Ty, Index, "", CI);
+    auto Load = new LoadInst(Int2Ty, Index, "", CI->getIterator());
 
     // Extract each element from the loaded int2.
-    auto X =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
-    auto Y =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
+    auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "",
+                                        CI->getIterator());
+    auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "",
+                                        CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2468,10 +2517,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Get the lower (x & y) components of our final float4.
-    auto Lo = CallInst::Create(NewF, X, "", CI);
+    auto Lo = CallInst::Create(NewF, X, "", CI->getIterator());
 
     // Get the higher (z & w) components of our final float4.
-    auto Hi = CallInst::Create(NewF, Y, "", CI);
+    auto Hi = CallInst::Create(NewF, Y, "", CI->getIterator());
 
     Constant *ShuffleMask[4] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2479,7 +2528,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf4(Function &F) {
 
     // Combine our two float2's into one float4.
     return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask), "",
-                                 CI);
+                                 CI->getIterator());
   });
 }
 
@@ -2498,20 +2547,21 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(Int4Ty, Arg1, Arg0, "", CI->getIterator());
 
     // Load from the int4* we casted to.
-    auto Load = new LoadInst(Int4Ty, Index, "", CI);
+    auto Load = new LoadInst(Int4Ty, Index, "", CI->getIterator());
 
     // Extract each element from the loaded int4.
-    auto X1 =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
-    auto X2 =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
-    auto X3 =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 2), "", CI);
-    auto X4 =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 3), "", CI);
+    auto X1 = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "",
+                                         CI->getIterator());
+    auto X2 = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "",
+                                         CI->getIterator());
+    auto X3 = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 2), "",
+                                         CI->getIterator());
+    auto X4 = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 3), "",
+                                         CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2519,10 +2569,10 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Convert the 4 int into 4 float2
-    auto Y1 = CallInst::Create(NewF, X1, "", CI);
-    auto Y2 = CallInst::Create(NewF, X2, "", CI);
-    auto Y3 = CallInst::Create(NewF, X3, "", CI);
-    auto Y4 = CallInst::Create(NewF, X4, "", CI);
+    auto Y1 = CallInst::Create(NewF, X1, "", CI->getIterator());
+    auto Y2 = CallInst::Create(NewF, X2, "", CI->getIterator());
+    auto Y3 = CallInst::Create(NewF, X3, "", CI->getIterator());
+    auto Y4 = CallInst::Create(NewF, X4, "", CI->getIterator());
 
     Constant *ShuffleMask4[4] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2530,9 +2580,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
 
     // Combine our two float2's into one float4.
     auto Z1 = new ShuffleVectorInst(Y1, Y2, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
     auto Z2 = new ShuffleVectorInst(Y3, Y4, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
 
     Constant *ShuffleMask8[8] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2542,7 +2592,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf8(Function &F) {
 
     // Combine our two float4's into one float8.
     return new ShuffleVectorInst(Z1, Z2, ConstantVector::get(ShuffleMask8), "",
-                                 CI);
+                                 CI->getIterator());
   });
 }
 
@@ -2564,33 +2614,37 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
 
     // Index into the correct address of the casted pointer.
     auto Arg0x2 = BinaryOperator::Create(Instruction::Shl, Arg0,
-                                         ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index1 = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2, "", CI);
-    auto Arg0x2p1 = BinaryOperator::Create(
-        Instruction::Add, Arg0x2, ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2p1, "", CI);
+                                         ConstantInt::get(IndexTy, 1), "",
+                                         CI->getIterator());
+    auto Index1 =
+        GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2, "", CI->getIterator());
+    auto Arg0x2p1 = BinaryOperator::Create(Instruction::Add, Arg0x2,
+                                           ConstantInt::get(IndexTy, 1), "",
+                                           CI->getIterator());
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg1, Arg0x2p1, "",
+                                            CI->getIterator());
 
     // Load from the int4* we casted to.
-    auto Load1 = new LoadInst(Int4Ty, Index1, "", CI);
-    auto Load2 = new LoadInst(Int4Ty, Index2, "", CI);
+    auto Load1 = new LoadInst(Int4Ty, Index1, "", CI->getIterator());
+    auto Load2 = new LoadInst(Int4Ty, Index2, "", CI->getIterator());
 
     // Extract each element from the two loaded int4.
-    auto X1 =
-        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 0), "", CI);
-    auto X2 =
-        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 1), "", CI);
-    auto X3 =
-        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 2), "", CI);
-    auto X4 =
-        ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 3), "", CI);
-    auto X5 =
-        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 0), "", CI);
-    auto X6 =
-        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 1), "", CI);
-    auto X7 =
-        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 2), "", CI);
-    auto X8 =
-        ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 3), "", CI);
+    auto X1 = ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 0), "",
+                                         CI->getIterator());
+    auto X2 = ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 1), "",
+                                         CI->getIterator());
+    auto X3 = ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 2), "",
+                                         CI->getIterator());
+    auto X4 = ExtractElementInst::Create(Load1, ConstantInt::get(IntTy, 3), "",
+                                         CI->getIterator());
+    auto X5 = ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 0), "",
+                                         CI->getIterator());
+    auto X6 = ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 1), "",
+                                         CI->getIterator());
+    auto X7 = ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 2), "",
+                                         CI->getIterator());
+    auto X8 = ExtractElementInst::Create(Load2, ConstantInt::get(IntTy, 3), "",
+                                         CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2598,14 +2652,14 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Convert the eight int into float2
-    auto Y1 = CallInst::Create(NewF, X1, "", CI);
-    auto Y2 = CallInst::Create(NewF, X2, "", CI);
-    auto Y3 = CallInst::Create(NewF, X3, "", CI);
-    auto Y4 = CallInst::Create(NewF, X4, "", CI);
-    auto Y5 = CallInst::Create(NewF, X5, "", CI);
-    auto Y6 = CallInst::Create(NewF, X6, "", CI);
-    auto Y7 = CallInst::Create(NewF, X7, "", CI);
-    auto Y8 = CallInst::Create(NewF, X8, "", CI);
+    auto Y1 = CallInst::Create(NewF, X1, "", CI->getIterator());
+    auto Y2 = CallInst::Create(NewF, X2, "", CI->getIterator());
+    auto Y3 = CallInst::Create(NewF, X3, "", CI->getIterator());
+    auto Y4 = CallInst::Create(NewF, X4, "", CI->getIterator());
+    auto Y5 = CallInst::Create(NewF, X5, "", CI->getIterator());
+    auto Y6 = CallInst::Create(NewF, X6, "", CI->getIterator());
+    auto Y7 = CallInst::Create(NewF, X7, "", CI->getIterator());
+    auto Y8 = CallInst::Create(NewF, X8, "", CI->getIterator());
 
     Constant *ShuffleMask4[4] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2613,13 +2667,13 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
 
     // Combine our two float2's into one float4.
     auto Z1 = new ShuffleVectorInst(Y1, Y2, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
     auto Z2 = new ShuffleVectorInst(Y3, Y4, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
     auto Z3 = new ShuffleVectorInst(Y5, Y6, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
     auto Z4 = new ShuffleVectorInst(Y7, Y8, ConstantVector::get(ShuffleMask4),
-                                    "", CI);
+                                    "", CI->getIterator());
 
     Constant *ShuffleMask8[8] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2629,9 +2683,9 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
 
     // Combine our two float4's into one float8.
     auto Z5 = new ShuffleVectorInst(Z1, Z2, ConstantVector::get(ShuffleMask8),
-                                    "", CI);
+                                    "", CI->getIterator());
     auto Z6 = new ShuffleVectorInst(Z3, Z4, ConstantVector::get(ShuffleMask8),
-                                    "", CI);
+                                    "", CI->getIterator());
     Constant *ShuffleMask16[16] = {
         ConstantInt::get(IntTy, 0),  ConstantInt::get(IntTy, 1),
         ConstantInt::get(IntTy, 2),  ConstantInt::get(IntTy, 3),
@@ -2643,7 +2697,7 @@ bool ReplaceOpenCLBuiltinPass::replaceVloadHalf16(Function &F) {
         ConstantInt::get(IntTy, 14), ConstantInt::get(IntTy, 15)};
     // Combine our two float8's into one float16.
     return new ShuffleVectorInst(Z5, Z6, ConstantVector::get(ShuffleMask16), "",
-                                 CI);
+                                 CI->getIterator());
   });
 }
 
@@ -2662,8 +2716,9 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    auto IndexedPtr = GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI);
-    auto Load = new LoadInst(IntTy, IndexedPtr, "", CI);
+    auto IndexedPtr =
+        GetElementPtrInst::Create(IntTy, Ptr, Index, "", CI->getIterator());
+    auto Load = new LoadInst(IntTy, IndexedPtr, "", CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2671,7 +2726,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf2(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Get our final float2.
-    return CallInst::Create(NewF, Load, "", CI);
+    return CallInst::Create(NewF, Load, "", CI->getIterator());
   });
 }
 
@@ -2695,14 +2750,15 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
     auto Float2Ty = FixedVectorType::get(Type::getFloatTy(M.getContext()), 2);
     auto NewFType = FunctionType::get(Float2Ty, IntTy, false);
 
-    auto IndexedPtr = GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI);
-    auto Load = new LoadInst(Int2Ty, IndexedPtr, "", CI);
+    auto IndexedPtr =
+        GetElementPtrInst::Create(Int2Ty, Ptr, Index, "", CI->getIterator());
+    auto Load = new LoadInst(Int2Ty, IndexedPtr, "", CI->getIterator());
 
     // Extract each element from the loaded int2.
-    auto X =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "", CI);
-    auto Y =
-        ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "", CI);
+    auto X = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 0), "",
+                                        CI->getIterator());
+    auto Y = ExtractElementInst::Create(Load, ConstantInt::get(IntTy, 1), "",
+                                        CI->getIterator());
 
     // Our intrinsic to unpack a float2 from an int.
     auto SPIRVIntrinsic = clspv::UnpackFunction();
@@ -2710,10 +2766,10 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Get the lower (x & y) components of our final float4.
-    auto Lo = CallInst::Create(NewF, X, "", CI);
+    auto Lo = CallInst::Create(NewF, X, "", CI->getIterator());
 
     // Get the higher (z & w) components of our final float4.
-    auto Hi = CallInst::Create(NewF, Y, "", CI);
+    auto Hi = CallInst::Create(NewF, Y, "", CI->getIterator());
 
     Constant *ShuffleMask[4] = {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
@@ -2721,7 +2777,7 @@ bool ReplaceOpenCLBuiltinPass::replaceClspvVloadaHalf4(Function &F) {
 
     // Combine our two float2's into one float4.
     return new ShuffleVectorInst(Lo, Hi, ConstantVector::get(ShuffleMask), "",
-                                 CI);
+                                 CI->getIterator());
   });
 }
 
@@ -2764,10 +2820,11 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
 
   // Insert our value into a float2 so that we can pack it.
   auto TempVec = InsertElementInst::Create(PoisonValue::get(Float2Ty), value,
-                                           ConstantInt::get(IntTy, 0), "", CI);
+                                           ConstantInt::get(IntTy, 0), "",
+                                           CI->getIterator());
 
   // Pack the float2 -> half2 (in an int).
-  auto X = CallInst::Create(NewF, TempVec, "", CI);
+  auto X = CallInst::Create(NewF, TempVec, "", CI->getIterator());
 
   bool supports_16bit_storage = true;
   switch (ptr->getType()->getPointerAddressSpace()) {
@@ -2794,13 +2851,15 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
     auto ShortTy = Type::getInt16Ty(M.getContext());
 
     // Truncate our i32 to an i16.
-    auto Trunc = CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI);
+    auto Trunc =
+        CastInst::CreateTruncOrBitCast(X, ShortTy, "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(ShortTy, ptr, index, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(ShortTy, ptr, index, "", CI->getIterator());
 
     // Store to the int* we casted to.
-    V = new StoreInst(Trunc, Index, CI);
+    V = new StoreInst(Trunc, Index, CI->getIterator());
   } else {
     // We can only write to 32-bit aligned words.
     //
@@ -2829,32 +2888,34 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
     auto Four =
         ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 4);
     auto FFFF = ConstantInt::get(IntTy, 0xffff);
-    auto IndexIsOdd =
-        BinaryOperator::CreateAnd(index, One, "index_is_odd_i32", CI);
+    auto IndexIsOdd = BinaryOperator::CreateAnd(index, One, "index_is_odd_i32",
+                                                CI->getIterator());
     // Compute index / 2
-    auto IndexIntoI32 =
-        BinaryOperator::CreateLShr(index, One, "index_into_i32", CI);
+    auto IndexIntoI32 = BinaryOperator::CreateLShr(index, One, "index_into_i32",
+                                                   CI->getIterator());
 
-    auto OutPtr =
-        GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32, "base_i32_ptr", CI);
-    auto CurrentValue = new LoadInst(IntTy, OutPtr, "current_value", CI);
-    Value *Shift = BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI);
+    auto OutPtr = GetElementPtrInst::Create(IntTy, ptr, IndexIntoI32,
+                                            "base_i32_ptr", CI->getIterator());
+    auto CurrentValue =
+        new LoadInst(IntTy, OutPtr, "current_value", CI->getIterator());
+    Value *Shift =
+        BinaryOperator::CreateShl(IndexIsOdd, Four, "shift", CI->getIterator());
     // The shift is safe to truncate as it will definitely fit in a 32-bit int
     if (Shift->getType() != IntTy) {
       Shift = CastInst::Create(Instruction::CastOps::Trunc, Shift, IntTy,
-                               "shift_trunc", CI);
+                               "shift_trunc", CI->getIterator());
     }
-    auto MaskBitsToWrite =
-        BinaryOperator::CreateShl(FFFF, Shift, "mask_bits_to_write", CI);
+    auto MaskBitsToWrite = BinaryOperator::CreateShl(
+        FFFF, Shift, "mask_bits_to_write", CI->getIterator());
     auto MaskedCurrent = BinaryOperator::CreateAnd(
-        MaskBitsToWrite, CurrentValue, "masked_current", CI);
+        MaskBitsToWrite, CurrentValue, "masked_current", CI->getIterator());
 
-    auto XLowerBits =
-        BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed", CI);
-    auto NewBitsToWrite =
-        BinaryOperator::CreateShl(XLowerBits, Shift, "new_bits_to_write", CI);
-    auto ValueToXor = BinaryOperator::CreateXor(MaskedCurrent, NewBitsToWrite,
-                                                "value_to_xor", CI);
+    auto XLowerBits = BinaryOperator::CreateAnd(X, FFFF, "lower_bits_of_packed",
+                                                CI->getIterator());
+    auto NewBitsToWrite = BinaryOperator::CreateShl(
+        XLowerBits, Shift, "new_bits_to_write", CI->getIterator());
+    auto ValueToXor = BinaryOperator::CreateXor(
+        MaskedCurrent, NewBitsToWrite, "value_to_xor", CI->getIterator());
 
     // Generate the call to atomi_xor.
     SmallVector<Type *, 5> ParamTypes;
@@ -2881,12 +2942,13 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
 
     SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
                                    ConstantMemorySemantics, ValueToXor};
-    CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
+    CallInst::Create(NewF, Params, "store_halfword_xor_trick",
+                     CI->getIterator());
 
     // Return a Nop so the old Call is removed
     Function *donothing =
         Intrinsic::getOrInsertDeclaration(&M, Intrinsic::donothing);
-    V = CallInst::Create(donothing, {}, "", CI);
+    V = CallInst::Create(donothing, {}, "", CI->getIterator());
   }
 
   return V;
@@ -2930,13 +2992,14 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf2(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Turn the packed x & y into the final packing.
-    auto X = CallInst::Create(NewF, Arg0, "", CI);
+    auto X = CallInst::Create(NewF, Arg0, "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(IntTy, Arg2, Arg1, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(IntTy, Arg2, Arg1, "", CI->getIterator());
 
     // Store to the int* we casted to.
-    return new StoreInst(X, Index, CI);
+    return new StoreInst(X, Index, CI->getIterator());
   });
 }
 
@@ -2960,22 +3023,23 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf3(Function &F) {
     auto Int1 = ConstantInt::get(IndexTy, 1);
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
-    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI);
-    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI);
-    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI);
+    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI->getIterator());
+    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI->getIterator());
+    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI->getIterator());
 
     auto Index0 = BinaryOperator::Create(
         Instruction::Add,
-        BinaryOperator::Create(Instruction::Shl, Arg1, Int1, "", CI), Arg1, "",
-        CI);
+        BinaryOperator::Create(Instruction::Shl, Arg1, Int1, "",
+                               CI->getIterator()),
+        Arg1, "", CI->getIterator());
     createVstoreHalf(M, CI, X0, Index0, Arg2);
 
-    auto Index1 =
-        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto Index1 = BinaryOperator::Create(Instruction::Add, Index0, Int1, "",
+                                         CI->getIterator());
     createVstoreHalf(M, CI, X1, Index1, Arg2);
 
-    auto Index2 =
-        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto Index2 = BinaryOperator::Create(Instruction::Add, Index1, Int1, "",
+                                         CI->getIterator());
     return createVstoreHalf(M, CI, X2, Index2, Arg2);
   });
 }
@@ -3000,19 +3064,20 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreaHalf3(Function &F) {
     auto Int1 = ConstantInt::get(IndexTy, 1);
     auto Int2 = ConstantInt::get(IndexTy, 2);
 
-    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI);
-    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI);
-    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI);
+    auto X0 = ExtractElementInst::Create(Arg0, Int0, "", CI->getIterator());
+    auto X1 = ExtractElementInst::Create(Arg0, Int1, "", CI->getIterator());
+    auto X2 = ExtractElementInst::Create(Arg0, Int2, "", CI->getIterator());
 
-    auto Index0 = BinaryOperator::Create(Instruction::Shl, Arg1, Int2, "", CI);
+    auto Index0 = BinaryOperator::Create(Instruction::Shl, Arg1, Int2, "",
+                                         CI->getIterator());
     createVstoreHalf(M, CI, X0, Index0, Arg2);
 
-    auto Index1 =
-        BinaryOperator::Create(Instruction::Add, Index0, Int1, "", CI);
+    auto Index1 = BinaryOperator::Create(Instruction::Add, Index0, Int1, "",
+                                         CI->getIterator());
     createVstoreHalf(M, CI, X1, Index1, Arg2);
 
-    auto Index2 =
-        BinaryOperator::Create(Instruction::Add, Index1, Int1, "", CI);
+    auto Index2 = BinaryOperator::Create(Instruction::Add, Index1, Int1, "",
+                                         CI->getIterator());
     return createVstoreHalf(M, CI, X2, Index2, Arg2);
   });
 }
@@ -3039,14 +3104,16 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
 
     // Extract out the x & y components of our to store value.
     auto Lo = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(LoShuffleMask), "", CI);
+                                    ConstantVector::get(LoShuffleMask), "",
+                                    CI->getIterator());
 
     Constant *HiShuffleMask[2] = {ConstantInt::get(IntTy, 2),
                                   ConstantInt::get(IntTy, 3)};
 
     // Extract out the z & w components of our to store value.
     auto Hi = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(HiShuffleMask), "", CI);
+                                    ConstantVector::get(HiShuffleMask), "",
+                                    CI->getIterator());
 
     // Our intrinsic to pack a float2 to an int.
     auto SPIRVIntrinsic = clspv::PackFunction();
@@ -3054,21 +3121,23 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf4(Function &F) {
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
     // Turn the packed x & y into the final component of our int2.
-    auto X = CallInst::Create(NewF, Lo, "", CI);
+    auto X = CallInst::Create(NewF, Lo, "", CI->getIterator());
 
     // Turn the packed z & w into the final component of our int2.
-    auto Y = CallInst::Create(NewF, Hi, "", CI);
+    auto Y = CallInst::Create(NewF, Hi, "", CI->getIterator());
 
-    auto Combine = InsertElementInst::Create(
-        PoisonValue::get(Int2Ty), X, ConstantInt::get(IntTy, 0), "", CI);
+    auto Combine = InsertElementInst::Create(PoisonValue::get(Int2Ty), X,
+                                             ConstantInt::get(IntTy, 0), "",
+                                             CI->getIterator());
     Combine = InsertElementInst::Create(Combine, Y, ConstantInt::get(IntTy, 1),
-                                        "", CI);
+                                        "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int2Ty, Arg2, Arg1, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(Int2Ty, Arg2, Arg1, "", CI->getIterator());
 
     // Store to the int2* we casted to.
-    return new StoreInst(Combine, Index, CI);
+    return new StoreInst(Combine, Index, CI->getIterator());
   });
 }
 
@@ -3091,49 +3160,51 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf8(Function &F) {
 
     Constant *ShuffleMask01[2] = {ConstantInt::get(IntTy, 0),
                                   ConstantInt::get(IntTy, 1)};
-    auto X01 =
-        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                              ConstantVector::get(ShuffleMask01), "", CI);
+    auto X01 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
+                                     ConstantVector::get(ShuffleMask01), "",
+                                     CI->getIterator());
     Constant *ShuffleMask23[2] = {ConstantInt::get(IntTy, 2),
                                   ConstantInt::get(IntTy, 3)};
-    auto X23 =
-        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                              ConstantVector::get(ShuffleMask23), "", CI);
+    auto X23 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
+                                     ConstantVector::get(ShuffleMask23), "",
+                                     CI->getIterator());
     Constant *ShuffleMask45[2] = {ConstantInt::get(IntTy, 4),
                                   ConstantInt::get(IntTy, 5)};
-    auto X45 =
-        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                              ConstantVector::get(ShuffleMask45), "", CI);
+    auto X45 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
+                                     ConstantVector::get(ShuffleMask45), "",
+                                     CI->getIterator());
     Constant *ShuffleMask67[2] = {ConstantInt::get(IntTy, 6),
                                   ConstantInt::get(IntTy, 7)};
-    auto X67 =
-        new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                              ConstantVector::get(ShuffleMask67), "", CI);
+    auto X67 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
+                                     ConstantVector::get(ShuffleMask67), "",
+                                     CI->getIterator());
 
     // Our intrinsic to pack a float2 to an int.
     auto SPIRVIntrinsic = clspv::PackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-    auto Y01 = CallInst::Create(NewF, X01, "", CI);
-    auto Y23 = CallInst::Create(NewF, X23, "", CI);
-    auto Y45 = CallInst::Create(NewF, X45, "", CI);
-    auto Y67 = CallInst::Create(NewF, X67, "", CI);
+    auto Y01 = CallInst::Create(NewF, X01, "", CI->getIterator());
+    auto Y23 = CallInst::Create(NewF, X23, "", CI->getIterator());
+    auto Y45 = CallInst::Create(NewF, X45, "", CI->getIterator());
+    auto Y67 = CallInst::Create(NewF, X67, "", CI->getIterator());
 
-    auto Combine = InsertElementInst::Create(
-        PoisonValue::get(Int4Ty), Y01, ConstantInt::get(IntTy, 0), "", CI);
-    Combine = InsertElementInst::Create(Combine, Y23,
-                                        ConstantInt::get(IntTy, 1), "", CI);
-    Combine = InsertElementInst::Create(Combine, Y45,
-                                        ConstantInt::get(IntTy, 2), "", CI);
-    Combine = InsertElementInst::Create(Combine, Y67,
-                                        ConstantInt::get(IntTy, 3), "", CI);
+    auto Combine = InsertElementInst::Create(PoisonValue::get(Int4Ty), Y01,
+                                             ConstantInt::get(IntTy, 0), "",
+                                             CI->getIterator());
+    Combine = InsertElementInst::Create(
+        Combine, Y23, ConstantInt::get(IntTy, 1), "", CI->getIterator());
+    Combine = InsertElementInst::Create(
+        Combine, Y45, ConstantInt::get(IntTy, 2), "", CI->getIterator());
+    Combine = InsertElementInst::Create(
+        Combine, Y67, ConstantInt::get(IntTy, 3), "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Index = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1, "", CI);
+    auto Index =
+        GetElementPtrInst::Create(Int4Ty, Arg2, Arg1, "", CI->getIterator());
 
     // Store to the int4* we casted to.
-    return new StoreInst(Combine, Index, CI);
+    return new StoreInst(Combine, Index, CI->getIterator());
   });
 }
 
@@ -3159,83 +3230,97 @@ bool ReplaceOpenCLBuiltinPass::replaceVstoreHalf16(Function &F) {
     Constant *ShuffleMask0[2] = {ConstantInt::get(IntTy, 0),
                                  ConstantInt::get(IntTy, 1)};
     auto X0 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask0), "", CI);
+                                    ConstantVector::get(ShuffleMask0), "",
+                                    CI->getIterator());
     Constant *ShuffleMask1[2] = {ConstantInt::get(IntTy, 2),
                                  ConstantInt::get(IntTy, 3)};
     auto X1 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask1), "", CI);
+                                    ConstantVector::get(ShuffleMask1), "",
+                                    CI->getIterator());
     Constant *ShuffleMask2[2] = {ConstantInt::get(IntTy, 4),
                                  ConstantInt::get(IntTy, 5)};
     auto X2 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask2), "", CI);
+                                    ConstantVector::get(ShuffleMask2), "",
+                                    CI->getIterator());
     Constant *ShuffleMask3[2] = {ConstantInt::get(IntTy, 6),
                                  ConstantInt::get(IntTy, 7)};
     auto X3 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask3), "", CI);
+                                    ConstantVector::get(ShuffleMask3), "",
+                                    CI->getIterator());
     Constant *ShuffleMask4[2] = {ConstantInt::get(IntTy, 8),
                                  ConstantInt::get(IntTy, 9)};
     auto X4 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask4), "", CI);
+                                    ConstantVector::get(ShuffleMask4), "",
+                                    CI->getIterator());
     Constant *ShuffleMask5[2] = {ConstantInt::get(IntTy, 10),
                                  ConstantInt::get(IntTy, 11)};
     auto X5 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask5), "", CI);
+                                    ConstantVector::get(ShuffleMask5), "",
+                                    CI->getIterator());
     Constant *ShuffleMask6[2] = {ConstantInt::get(IntTy, 12),
                                  ConstantInt::get(IntTy, 13)};
     auto X6 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask6), "", CI);
+                                    ConstantVector::get(ShuffleMask6), "",
+                                    CI->getIterator());
     Constant *ShuffleMask7[2] = {ConstantInt::get(IntTy, 14),
                                  ConstantInt::get(IntTy, 15)};
     auto X7 = new ShuffleVectorInst(Arg0, PoisonValue::get(Arg0->getType()),
-                                    ConstantVector::get(ShuffleMask7), "", CI);
+                                    ConstantVector::get(ShuffleMask7), "",
+                                    CI->getIterator());
 
     // Our intrinsic to pack a float2 to an int.
     auto SPIRVIntrinsic = clspv::PackFunction();
 
     auto NewF = M.getOrInsertFunction(SPIRVIntrinsic, NewFType);
 
-    auto Y0 = CallInst::Create(NewF, X0, "", CI);
-    auto Y1 = CallInst::Create(NewF, X1, "", CI);
-    auto Y2 = CallInst::Create(NewF, X2, "", CI);
-    auto Y3 = CallInst::Create(NewF, X3, "", CI);
-    auto Y4 = CallInst::Create(NewF, X4, "", CI);
-    auto Y5 = CallInst::Create(NewF, X5, "", CI);
-    auto Y6 = CallInst::Create(NewF, X6, "", CI);
-    auto Y7 = CallInst::Create(NewF, X7, "", CI);
+    auto Y0 = CallInst::Create(NewF, X0, "", CI->getIterator());
+    auto Y1 = CallInst::Create(NewF, X1, "", CI->getIterator());
+    auto Y2 = CallInst::Create(NewF, X2, "", CI->getIterator());
+    auto Y3 = CallInst::Create(NewF, X3, "", CI->getIterator());
+    auto Y4 = CallInst::Create(NewF, X4, "", CI->getIterator());
+    auto Y5 = CallInst::Create(NewF, X5, "", CI->getIterator());
+    auto Y6 = CallInst::Create(NewF, X6, "", CI->getIterator());
+    auto Y7 = CallInst::Create(NewF, X7, "", CI->getIterator());
 
-    auto Combine1 = InsertElementInst::Create(
-        PoisonValue::get(Int4Ty), Y0, ConstantInt::get(IntTy, 0), "", CI);
-    Combine1 = InsertElementInst::Create(Combine1, Y1,
-                                         ConstantInt::get(IntTy, 1), "", CI);
-    Combine1 = InsertElementInst::Create(Combine1, Y2,
-                                         ConstantInt::get(IntTy, 2), "", CI);
-    Combine1 = InsertElementInst::Create(Combine1, Y3,
-                                         ConstantInt::get(IntTy, 3), "", CI);
+    auto Combine1 = InsertElementInst::Create(PoisonValue::get(Int4Ty), Y0,
+                                              ConstantInt::get(IntTy, 0), "",
+                                              CI->getIterator());
+    Combine1 = InsertElementInst::Create(
+        Combine1, Y1, ConstantInt::get(IntTy, 1), "", CI->getIterator());
+    Combine1 = InsertElementInst::Create(
+        Combine1, Y2, ConstantInt::get(IntTy, 2), "", CI->getIterator());
+    Combine1 = InsertElementInst::Create(
+        Combine1, Y3, ConstantInt::get(IntTy, 3), "", CI->getIterator());
 
-    auto Combine2 = InsertElementInst::Create(
-        PoisonValue::get(Int4Ty), Y4, ConstantInt::get(IntTy, 0), "", CI);
-    Combine2 = InsertElementInst::Create(Combine2, Y5,
-                                         ConstantInt::get(IntTy, 1), "", CI);
-    Combine2 = InsertElementInst::Create(Combine2, Y6,
-                                         ConstantInt::get(IntTy, 2), "", CI);
-    Combine2 = InsertElementInst::Create(Combine2, Y7,
-                                         ConstantInt::get(IntTy, 3), "", CI);
+    auto Combine2 = InsertElementInst::Create(PoisonValue::get(Int4Ty), Y4,
+                                              ConstantInt::get(IntTy, 0), "",
+                                              CI->getIterator());
+    Combine2 = InsertElementInst::Create(
+        Combine2, Y5, ConstantInt::get(IntTy, 1), "", CI->getIterator());
+    Combine2 = InsertElementInst::Create(
+        Combine2, Y6, ConstantInt::get(IntTy, 2), "", CI->getIterator());
+    Combine2 = InsertElementInst::Create(
+        Combine2, Y7, ConstantInt::get(IntTy, 3), "", CI->getIterator());
 
     // Index into the correct address of the casted pointer.
     auto Arg1x2 = BinaryOperator::Create(Instruction::Shl, Arg1,
-                                         ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index1 = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1x2, "", CI);
+                                         ConstantInt::get(IndexTy, 1), "",
+                                         CI->getIterator());
+    auto Index1 =
+        GetElementPtrInst::Create(Int4Ty, Arg2, Arg1x2, "", CI->getIterator());
 
     // Store to the int4* we casted to.
-    new StoreInst(Combine1, Index1, CI);
+    new StoreInst(Combine1, Index1, CI->getIterator());
 
     // Index into the correct address of the casted pointer.
-    auto Arg1Plus1 = BinaryOperator::Create(
-        Instruction::Add, Arg1x2, ConstantInt::get(IndexTy, 1), "", CI);
-    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1Plus1, "", CI);
+    auto Arg1Plus1 = BinaryOperator::Create(Instruction::Add, Arg1x2,
+                                            ConstantInt::get(IndexTy, 1), "",
+                                            CI->getIterator());
+    auto Index2 = GetElementPtrInst::Create(Int4Ty, Arg2, Arg1Plus1, "",
+                                            CI->getIterator());
 
     // Store to the int4* we casted to.
-    return new StoreInst(Combine2, Index2, CI);
+    return new StoreInst(Combine2, Index2, CI->getIterator());
   });
 }
 
@@ -3263,10 +3348,10 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfReadImage(Function &F) {
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
-    auto NewCI = CallInst::Create(NewF, args, "", CI);
+    auto NewCI = CallInst::Create(NewF, args, "", CI->getIterator());
 
     // Convert to the half type.
-    return CastInst::CreateFPCast(NewCI, CI->getType(), "", CI);
+    return CastInst::CreateFPCast(NewCI, CI->getType(), "", CI->getIterator());
   });
 }
 
@@ -3304,10 +3389,11 @@ bool ReplaceOpenCLBuiltinPass::replaceHalfWriteImage(Function &F) {
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
 
     // Convert data to the float type.
-    auto Cast = CastInst::CreateFPCast(CI->getArgOperand(2), types[2], "", CI);
+    auto Cast = CastInst::CreateFPCast(CI->getArgOperand(2), types[2], "",
+                                       CI->getIterator());
     args[2] = Cast;
 
-    return CallInst::Create(NewF, args, "", CI);
+    return CallInst::Create(NewF, args, "", CI->getIterator());
   });
 }
 
@@ -3342,7 +3428,8 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImage(Function &F) {
                                             .getKnownMinValue());
       }
 
-      Coord = CastInst::Create(Instruction::SIToFP, Coord, float_ty, "", CI);
+      Coord = CastInst::Create(Instruction::SIToFP, Coord, float_ty, "",
+                               CI->getIterator());
       NewFType = FunctionType::get(
           CI->getType(), {Img->getType(), Sampler->getType(), float_ty}, false);
       NewFName[NewFName.length() - 1] = 'f';
@@ -3381,7 +3468,7 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImage(Function &F) {
       Sampler = CallInst::Create(
           SamplerFct,
           {B.getInt32(SamplerInitValue | CLK_NORMALIZED_COORDS_TRUE)}, "",
-          dyn_cast<Instruction>(Sampler));
+          dyn_cast<Instruction>(Sampler)->getIterator());
       changed = true;
     }
 
@@ -3390,7 +3477,7 @@ bool ReplaceOpenCLBuiltinPass::replaceSampledReadImage(Function &F) {
     }
 
     auto NewF = M.getOrInsertFunction(NewFName, NewFType);
-    return CallInst::Create(NewF, {Img, Sampler, Coord}, "", CI);
+    return CallInst::Create(NewF, {Img, Sampler, Coord}, "", CI->getIterator());
   });
 }
 
@@ -3440,7 +3527,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F,
         CI->getArgOperand(1)->getType());
     return new AtomicRMWInst(Op, CI->getArgOperand(0), CI->getArgOperand(1),
                              align, AtomicOrdering::SequentiallyConsistent,
-                             SyncScope::System, CI);
+                             SyncScope::System, CI->getIterator());
   });
 }
 
@@ -3463,12 +3550,12 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
                              PoisonValue::get(FloatTy)};
 
     auto Vec4Ty = CI->getArgOperand(0)->getType();
-    auto Arg0 =
-        new ShuffleVectorInst(CI->getArgOperand(0), PoisonValue::get(Vec4Ty),
-                              ConstantVector::get(DownShuffleMask), "", CI);
-    auto Arg1 =
-        new ShuffleVectorInst(CI->getArgOperand(1), PoisonValue::get(Vec4Ty),
-                              ConstantVector::get(DownShuffleMask), "", CI);
+    auto Arg0 = new ShuffleVectorInst(
+        CI->getArgOperand(0), PoisonValue::get(Vec4Ty),
+        ConstantVector::get(DownShuffleMask), "", CI->getIterator());
+    auto Arg1 = new ShuffleVectorInst(
+        CI->getArgOperand(1), PoisonValue::get(Vec4Ty),
+        ConstantVector::get(DownShuffleMask), "", CI->getIterator());
     auto Vec3Ty = Arg0->getType();
 
     auto NewFType = FunctionType::get(Vec3Ty, {Vec3Ty, Vec3Ty}, false);
@@ -3476,10 +3563,12 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
 
     auto Cross3Func = M.getOrInsertFunction(NewFName, NewFType);
 
-    auto DownResult = CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI);
+    auto DownResult =
+        CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI->getIterator());
 
     return new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec),
-                                 ConstantVector::get(UpShuffleMask), "", CI);
+                                 ConstantVector::get(UpShuffleMask), "",
+                                 CI->getIterator());
   });
 }
 
@@ -3620,7 +3709,8 @@ bool ReplaceOpenCLBuiltinPass::replaceHadd(Function &F, bool is_signed,
       b_shift = builder.CreateLShr(b, 1);
     }
     auto add = builder.CreateAdd(a_shift, b_shift);
-    auto join = BinaryOperator::Create(join_opcode, a, b, "", Call);
+    auto join =
+        BinaryOperator::Create(join_opcode, a, b, "", Call->getIterator());
     auto constant_one = ConstantInt::get(a->getType(), 1);
     auto and_bit = builder.CreateAnd(join, constant_one);
     return builder.CreateAdd(add, and_bit);
@@ -3638,7 +3728,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
     auto intrinsic = Intrinsic::getOrInsertDeclaration(
         F.getParent(), intrinsic_type, Call->getType());
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic, {a, b}, "",
-                            Call);
+                            Call->getIterator());
   });
 }
 
@@ -3828,7 +3918,8 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
         Call->getType());
     const auto c_false = ConstantInt::getFalse(Call->getContext());
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic,
-                            {Call->getArgOperand(0), c_false}, "", Call);
+                            {Call->getArgOperand(0), c_false}, "",
+                            Call->getIterator());
   });
 }
 

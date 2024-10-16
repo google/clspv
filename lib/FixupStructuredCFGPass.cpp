@@ -171,8 +171,9 @@ void clspv::FixupStructuredCFGPass::isolateContinue(
               // exit.
               phi->addIncoming(phi_values[0], new_exit);
             } else if (!phi_values.empty()) {
-              auto new_phi = PHINode::Create(phi->getType(), phi_values.size(),
-                                             "", new_exit->getTerminator());
+              auto new_phi =
+                  PHINode::Create(phi->getType(), phi_values.size(), "",
+                                  new_exit->getTerminator()->getIterator());
               for (size_t i = 0; i < phi_values.size(); ++i) {
                 new_phi->addIncoming(phi_values[i], loop_preds[i]);
               }

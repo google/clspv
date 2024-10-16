@@ -63,7 +63,7 @@ Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
   SmallVector<Value *, 16> replacements;
   for (auto *subtype : phi->getType()->subtypes()) {
     PHINode *replacement =
-        PHINode::Create(subtype, num_incoming_values, "", phi);
+        PHINode::Create(subtype, num_incoming_values, "", phi->getIterator());
     for (unsigned i = 0; i != num_incoming_values; ++i) {
       auto *incoming_block = phi->getIncomingBlock(i);
       auto *incoming_value = phi->getIncomingValue(i);
@@ -74,7 +74,8 @@ Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
       } else {
         // Extract the value just before the incoming block's branch.
         extracted_value = ExtractValueInst::Create(
-            incoming_value, {type_index}, "", incoming_block->getTerminator());
+            incoming_value, {type_index}, "",
+            incoming_block->getTerminator()->getIterator());
       }
       replacement->addIncoming(extracted_value, incoming_block);
     }
@@ -87,8 +88,8 @@ Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
   // insertion location to aid RewriteInsertsPass.
   Value *prev = Constant::getNullValue(phi->getType());
   for (unsigned i = 0; i != replacements.size(); ++i) {
-    auto insert =
-        InsertValueInst::Create(prev, replacements[i], {i}, "", where);
+    auto insert = InsertValueInst::Create(prev, replacements[i], {i}, "",
+                                          where->getIterator());
     prev = insert;
   }
 

@@ -335,8 +335,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
         auto PointeeTy = clspv::InferType(NewArg, M.getContext(), &type_cache);
         if (PointeeTy == nullptr) {
           PointeeTy = UpdateTy(M.getContext(), NumBytes);
-          NewArg = GetElementPtrInst::Create(
-              PointeeTy, NewArg, {ConstantInt::get(I32Ty, 0)}, "", CI);
+          NewArg = GetElementPtrInst::Create(PointeeTy, NewArg,
+                                             {ConstantInt::get(I32Ty, 0)}, "",
+                                             CI->getIterator());
         }
         Type *NewArgTy = PointeeTy;
         unsigned Unpacking = 0;
@@ -359,9 +360,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
 
         for (uint32_t i = 0; i < num_stores; i++) {
           Indices.back() = ConstantInt::get(I32Ty, i);
-          auto Ptr =
-              GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "", CI);
-          new StoreInst(NullValue, Ptr, CI);
+          auto Ptr = GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "",
+                                               CI->getIterator());
+          new StoreInst(NullValue, Ptr, CI->getIterator());
         }
 
         CI->eraseFromParent();
@@ -422,8 +423,8 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
           // Avoid the builder for Src in order to prevent the folder from
           // creating constant expressions for constant memcpys.
-          auto SrcElemPtr =
-              GetElementPtrInst::CreateInBounds(ElemTy, Src, Indices, "", CI);
+          auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
+              ElemTy, Src, Indices, "", CI->getIterator());
           auto Srci = Builder.CreateLoad(ElemTy, SrcElemPtr, Volatile);
           auto DstElemPtr = Builder.CreateGEP(ElemTy, Dst, Indices);
           Builder.CreateStore(Srci, DstElemPtr, Volatile);

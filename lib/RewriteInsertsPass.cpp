@@ -379,7 +379,8 @@ bool clspv::RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
           } else if (const auto *ca = dyn_cast<ConstantAggregate>(base)) {
             members[i] = ca->getOperand(i);
           } else {
-            members[i] = ExtractValueInst::Create(base, {i}, "", insertion);
+            members[i] = ExtractValueInst::Create(base, {i}, "",
+                                                  insertion->getIterator());
           }
         }
       }
@@ -387,7 +388,8 @@ bool clspv::RewriteInsertsPass::ReplacePartialInsertions(Module &M) {
       // Create the call.  It's dominated by any extractions we've just
       // created.
       Function *construct_fn = GetConstructFunction(M, resultTy);
-      auto *call = CallInst::Create(construct_fn, members, "", insertion);
+      auto *call =
+          CallInst::Create(construct_fn, members, "", insertion->getIterator());
 
       // Disconnect this insertion.  We'll remove it later.
       insertion->replaceAllUsesWith(call);

@@ -57,11 +57,11 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
     auto input = trunc->getOperand(0);
     uint32_t input_bit_width = input->getType()->getIntegerBitWidth();
     if (input_bit_width > desired_bit_width) {
-      tmp = new TruncInst(input, desired_int_ty, "", trunc);
+      tmp = new TruncInst(input, desired_int_ty, "", trunc->getIterator());
     } else if (input_bit_width == desired_bit_width) {
       tmp = input;
     } else if (input_bit_width > bit_width) {
-      tmp = new ZExtInst(input, desired_int_ty, "", trunc);
+      tmp = new ZExtInst(input, desired_int_ty, "", trunc->getIterator());
     } else {
       tmp = ZeroExtend(input, desired_bit_width);
     }
@@ -72,13 +72,13 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
         Instruction::And, tmp,
         ConstantInt::get(desired_int_ty,
                          (uint32_t)APInt::getAllOnes(bit_width).getZExtValue()),
-        "", trunc);
+        "", trunc->getIterator());
   } else if (auto *zext = dyn_cast<ZExtInst>(v)) {
     auto tmp = ZeroExtend(zext->getOperand(0), desired_bit_width);
     uint32_t zext_width = zext->getType()->getIntegerBitWidth();
     //
     if (zext_width < desired_bit_width) {
-      result = new TruncInst(tmp, zext->getType(), "", zext);
+      result = new TruncInst(tmp, zext->getType(), "", zext->getIterator());
     } else if (zext_width > desired_bit_width) {
       zext->setOperand(0, tmp);
       result = zext;
@@ -87,7 +87,8 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
     }
   } else if (auto *phi = dyn_cast<PHINode>(v)) {
     const auto num_branches = phi->getNumIncomingValues();
-    PHINode *new_phi = PHINode::Create(desired_int_ty, num_branches, "", phi);
+    PHINode *new_phi =
+        PHINode::Create(desired_int_ty, num_branches, "", phi->getIterator());
     for (unsigned i = 0; i < num_branches; i++) {
       new_phi->addIncoming(
           ZeroExtend(phi->getIncomingValue(i), desired_bit_width),
@@ -97,8 +98,8 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
   } else if (auto *sel = dyn_cast<SelectInst>(v)) {
     auto *ext_true = ZeroExtend(sel->getTrueValue(), desired_bit_width);
     auto *ext_false = ZeroExtend(sel->getFalseValue(), desired_bit_width);
-    result =
-        SelectInst::Create(sel->getCondition(), ext_true, ext_false, "", sel);
+    result = SelectInst::Create(sel->getCondition(), ext_true, ext_false, "",
+                                sel->getIterator());
   } else if (auto *binop = dyn_cast<BinaryOperator>(v)) {
     // White-list binary operators that are ok to transform.
     if (binop->getOpcode() == Instruction::Add ||
@@ -109,7 +110,8 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
         binop->getOpcode() == Instruction::Xor) {
       auto *op1 = ZeroExtend(binop->getOperand(0), desired_bit_width);
       auto *op2 = ZeroExtend(binop->getOperand(1), desired_bit_width);
-      result = BinaryOperator::Create(binop->getOpcode(), op1, op2, "", binop);
+      result = BinaryOperator::Create(binop->getOpcode(), op1, op2, "",
+                                      binop->getIterator());
       if (binop->getOpcode() == Instruction::Add ||
           binop->getOpcode() == Instruction::Sub ||
           binop->getOpcode() == Instruction::Mul) {
@@ -119,7 +121,7 @@ clspv::UndoTruncateToOddIntegerPass::ZeroExtend(Value *v,
             ConstantInt::get(
                 desired_int_ty,
                 (uint32_t)APInt::getAllOnes(bit_width).getZExtValue()),
-            "", binop);
+            "", binop->getIterator());
       }
     } else {
       errs() << "Unhandled instruction feeding switch " << *v << "\n";
