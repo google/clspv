@@ -143,8 +143,8 @@ bool clspv::AllocateDescriptorsPass::AllocateLiteralSamplerDescriptors(
           outs() << "  translate literal sampler " << *const_val << " to ("
                  << descriptor_set << "," << binding << ")\n";
         }
-        auto *new_call =
-            CallInst::Create(var_fn, args, "", dyn_cast<Instruction>(call));
+        auto *new_call = CallInst::Create(
+            var_fn, args, "", dyn_cast<Instruction>(call)->getIterator());
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();
       }

@@ -98,7 +98,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   assert(Func);
   Func->setIsNewDbgInfoFormat(true);
 
-  auto *NewCI = CallInst::Create(Func, NewArgs, "", CI);
+  auto *NewCI = CallInst::Create(Func, NewArgs, "", CI->getIterator());
   CI->replaceAllUsesWith(NewCI);
   CI->eraseFromParent();
 

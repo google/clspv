@@ -157,7 +157,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
       // Create a new bitcast from the other bitcasts argument to our type.
       auto NewBitcast =
           CastInst::Create(Instruction::BitCast, OtherBitcast->getOperand(0),
-                           Bitcast->getType(), "", Bitcast);
+                           Bitcast->getType(), "", Bitcast->getIterator());
 
       // And replace the original bitcast with our replacement bitcast.
       Bitcast->replaceAllUsesWith(NewBitcast);
@@ -350,11 +350,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     if (GEP->isInBounds() && OtherGEP->isInBounds()) {
       NewGEP = GetElementPtrInst::CreateInBounds(
           OtherGEP->getSourceElementType(), OtherGEP->getPointerOperand(), Idxs,
-          "", GEP);
+          "", GEP->getIterator());
     } else {
       NewGEP = GetElementPtrInst::Create(OtherGEP->getSourceElementType(),
                                          OtherGEP->getPointerOperand(), Idxs,
-                                         "", GEP);
+                                         "", GEP->getIterator());
     }
     LLVM_DEBUG(dbgs() << "by: "; NewGEP->dump());
 
@@ -458,8 +458,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     Value *PointerOp = I->getOperand(PointerOperandNum);
     auto *PointerOpType =
         clspv::InferType(PointerOp, M.getContext(), &type_cache);
-    auto *NewGEP =
-        GetElementPtrInst::Create(PointerOpType, PointerOp, GEPIndices, "", I);
+    auto *NewGEP = GetElementPtrInst::Create(PointerOpType, PointerOp,
+                                             GEPIndices, "", I->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (aliasing):\nadding: ";
                NewGEP->dump());
 
@@ -468,7 +468,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
       // on a int. Replace the last GEP by a GEP on a float.
       auto *NewCastGEP = GetElementPtrInst::Create(
           NewGEP->getResultElementType(), NewGEP,
-          SmallVector<Value *, 1>(gep->indices()), "", I);
+          SmallVector<Value *, 1>(gep->indices()), "", I->getIterator());
       LLVM_DEBUG(dbgs() << "instead of: "; I->dump());
       I->replaceAllUsesWith(NewCastGEP);
       I->eraseFromParent();
@@ -487,8 +487,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     IRBuilder<> Builder{I};
     unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
     Value *PointerOp = I->getOperand(PointerOperandNum);
-    auto gep =
-        GetElementPtrInst::Create(Ty, PointerOp, {Builder.getInt32(0)}, "", I);
+    auto gep = GetElementPtrInst::Create(Ty, PointerOp, {Builder.getInt32(0)},
+                                         "", I->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (before store):\nadding: ";
                gep->dump());
     LLVM_DEBUG(dbgs() << "instead of operand " << PointerOperandNum << " of: ";
@@ -520,7 +520,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, Ty, Ty, cstVal,
                                dynVal, SizeInBits(DL, Ty), Ptr);
 
-    auto gep = GetElementPtrInst::Create(Ty, Ptr, NewGEPIdxs, "", LoadInst);
+    auto gep = GetElementPtrInst::Create(Ty, Ptr, NewGEPIdxs, "",
+                                         LoadInst->getIterator());
     unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(LoadInst);
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (before load):\nadding: ";
                gep->dump());
@@ -547,7 +548,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     auto new_gep_idxs =
         GetIdxsForTyFromOffset(DL, Builder, ty, reworkUnsizedType(DL, ty),
                                cstVal, dynVal, smallerBitWidths, ptr);
-    auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "", gep);
+    auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "",
+                                             gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (gep cast):\nreplacing: ";
                gep->dump());
     LLVM_DEBUG(dbgs() << "by: "; new_gep->dump(););
@@ -565,7 +567,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
     auto new_gep_idxs = GetIdxsForTyFromOffset(DL, Builder, ty, nullptr, cstVal,
                                                dynVal, smallerBitWidths, ptr);
-    auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "", gep);
+    auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "",
+                                             gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (from GV):\nreplacing: ";
                gep->dump());
     LLVM_DEBUG(dbgs() << "by: "; new_gep->dump(););
@@ -669,7 +672,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
           DL, Builder, src_ty, inst_gep->getResultElementType(), CstVal, DynVal,
           SmallerBitWidths, src_gep->getPointerOperand());
     }
-    auto new_gep = GetElementPtrInst::Create(src_ty, src, Idxs, "", inst_gep);
+    auto new_gep = GetElementPtrInst::Create(src_ty, src, Idxs, "",
+                                             inst_gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitCasts:\nreplace: "; inst_gep->dump();
                dbgs() << "by: "; new_gep->dump());
     inst_gep->replaceAllUsesWith(new_gep);
@@ -897,7 +901,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
                                cst, val, smallerBitWidths, ptr);
 
-    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", gep);
+    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "",
+                                             gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnUpgradeableConstantCasts:\nreplace gep "
                          "defining phi type: ";
                gep->dump(); dbgs() << "by: "; new_gep->dump());
@@ -925,8 +930,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
                                cst, val, smallerBitWidths, ptr);
 
-    auto new_gep =
-        GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "", GEPInfo.gep);
+    auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "",
+                                             GEPInfo.gep->getIterator());
 
     unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
     if (auto phi = dyn_cast<PHINode>(I)) {
@@ -1009,9 +1014,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
       }
     }
     IRBuilder<> Builder{gep};
-    auto new_gep =
-        GetElementPtrInst::Create(gep->getSourceElementType(),
-                                  gep->getPointerOperand(), Indices, "", gep);
+    auto new_gep = GetElementPtrInst::Create(gep->getSourceElementType(),
+                                             gep->getPointerOperand(), Indices,
+                                             "", gep->getIterator());
     LLVM_DEBUG(dbgs() << "\nrunOnUnneededIndices:\nreplace: "; gep->dump();
                dbgs() << "by: "; new_gep->dump(); dbgs() << "in: "; I->dump());
     I->replaceUsesOfWith(gep, new_gep);
@@ -1086,8 +1091,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     auto Idxs =
         GetIdxsForTyFromOffset(DL, Builder, Ty, nullptr, CstVal, DynVal,
                                SmallerBitWidths, gep->getPointerOperand());
-    auto new_gep =
-        GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
+    auto new_gep = GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs,
+                                             "", gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnPHIFromGEP:\nreplace: "; gep->dump();
                dbgs() << "by: "; new_gep->dump());
     gep->replaceAllUsesWith(new_gep);
@@ -1104,9 +1109,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     for (int i = 0; i < Steps + 1; i++) {
       Idxs.push_back(B.getInt32(0));
     }
-    auto new_gep =
-        GetElementPtrInst::Create(gep->getResultElementType(), gep, Idxs, "",
-                                  gep->getNextNonDebugInstruction());
+    auto new_gep = GetElementPtrInst::Create(
+        gep->getResultElementType(), gep, Idxs, "",
+        gep->getNextNonDebugInstruction()->getIterator());
     for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
       if (phi->getIncomingValue(i) != gep) {
         continue;

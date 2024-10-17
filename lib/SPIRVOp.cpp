@@ -65,7 +65,8 @@ Instruction *InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
     ArgValues.push_back(Arg);
   }
 
-  Instruction *NewInst = CallInst::Create(func, ArgValues, "", Insert);
+  Instruction *NewInst =
+      CallInst::Create(func, ArgValues, "", Insert->getIterator());
 
   // Set the source location for the new instruction
   NewInst->setDebugLoc(Insert->getDebugLoc());

@@ -134,8 +134,8 @@ void clspv::RemoveUnusedArguments::removeUnusedParameters(
             args.push_back(call->getOperand(i));
           }
         }
-        CallInst *new_call =
-            CallInst::Create(new_type, new_function, args, "", call);
+        CallInst *new_call = CallInst::Create(new_type, new_function, args, "",
+                                              call->getIterator());
         new_call->takeName(call);
         call->replaceAllUsesWith(new_call);
         call->eraseFromParent();

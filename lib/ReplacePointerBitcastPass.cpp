@@ -491,8 +491,8 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
     auto Idxs =
         GetIdxsForTyFromOffset(DL, B, Ty, Ty, CstVal, DynVal, SmallerBitWidths,
                                gep->getPointerOperand());
-    auto *new_gep =
-        GetElementPtrInst::Create(Ty, gep->getPointerOperand(), Idxs, "", gep);
+    auto *new_gep = GetElementPtrInst::Create(Ty, gep->getPointerOperand(),
+                                              Idxs, "", gep->getIterator());
     gep->replaceAllUsesWith(new_gep);
     gep->eraseFromParent();
     Src = new_gep->getPointerOperand();
@@ -573,7 +573,7 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
             GetIdxsForTyFromOffset(DL, B, Ty, RetTy, CstVal, DynVal,
                                    SmallerBitWidths, gep->getPointerOperand());
         auto *new_gep = GetElementPtrInst::Create(Ty, gep->getPointerOperand(),
-                                                  Idxs, "", gep);
+                                                  Idxs, "", gep->getIterator());
         gep->replaceAllUsesWith(new_gep);
         gep->eraseFromParent();
         changed = true;

@@ -53,8 +53,8 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
         Type *RetTy = Arg.getParamStructRetType();
         // Create alloca instruction for return value on function's entry
         // block.
-        AllocaInst *RetVal =
-            new AllocaInst(RetTy, 0, nullptr, "retval", InsertPoint);
+        AllocaInst *RetVal = new AllocaInst(RetTy, 0, nullptr, "retval",
+                                            InsertPoint->getIterator());
 
         // Change arg's users with retval.
         Arg.replaceAllUsesWith(RetVal);
@@ -112,8 +112,10 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
         // %retv = load %retval;
         // ret %retv;
         for (auto Ret : RetInsts) {
-          LoadInst *LD = new LoadInst(RetTy, VMap[RetVal], "", Ret);
-          ReturnInst *NewRet = ReturnInst::Create(Context, LD, Ret);
+          LoadInst *LD =
+              new LoadInst(RetTy, VMap[RetVal], "", Ret->getIterator());
+          ReturnInst *NewRet =
+              ReturnInst::Create(Context, LD, Ret->getIterator());
           Ret->replaceAllUsesWith(NewRet);
           Ret->eraseFromParent();
         }
@@ -126,7 +128,8 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
             // Create new call instruction for new function without sret.
             SmallVector<Value *, 8> NewArgs(Call->arg_begin() + 1,
                                             Call->arg_end());
-            CallInst *NewCall = CallInst::Create(NewFunc, NewArgs, "", Call);
+            CallInst *NewCall =
+                CallInst::Create(NewFunc, NewArgs, "", Call->getIterator());
 
             NewCall->takeName(Call);
             NewCall->setCallingConv(Call->getCallingConv());
@@ -150,7 +153,7 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
 
             // Store the value we returned from our function call into the
             // the orignal destination.
-            new StoreInst(NewCall, Call->getArgOperand(0), Call);
+            new StoreInst(NewCall, Call->getArgOperand(0), Call->getIterator());
           }
 
           ToRemoves.push_back(User);
