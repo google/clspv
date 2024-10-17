@@ -878,7 +878,8 @@ Value *ReplaceOpenCLBuiltinPass::InsertOpMulExtended(Instruction *InsertPoint,
       res_neg = Builder.CreateICmpSLT(a_b_xor, ConstantInt::get(Ty, 0, true));
 
       auto F = InsertPoint->getFunction();
-      auto abs = Intrinsic::getDeclaration(F->getParent(), Intrinsic::abs, Ty);
+      auto abs =
+          Intrinsic::getOrInsertDeclaration(F->getParent(), Intrinsic::abs, Ty);
       a = Builder.CreateCall(abs, {a, Builder.getInt1(false)});
       b = Builder.CreateCall(abs, {b, Builder.getInt1(false)});
     }
@@ -1190,7 +1191,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCopysign(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *Call) {
     const auto x = Call->getArgOperand(0);
     const auto y = Call->getArgOperand(1);
-    auto intrinsic = Intrinsic::getDeclaration(
+    auto intrinsic = Intrinsic::getOrInsertDeclaration(
         F.getParent(), Intrinsic::copysign, Call->getType());
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic, {x, y}, "",
                             Call);
@@ -1308,8 +1309,8 @@ bool ReplaceOpenCLBuiltinPass::replaceLog1p(Function &F) {
     auto ArgP1 = BinaryOperator::Create(
         Instruction::FAdd, ConstantFP::get(Arg->getType(), 1.0), Arg, "", CI);
 
-    auto log =
-        Intrinsic::getDeclaration(F.getParent(), Intrinsic::log, CI->getType());
+    auto log = Intrinsic::getOrInsertDeclaration(F.getParent(), Intrinsic::log,
+                                                 CI->getType());
     return CallInst::Create(log, ArgP1, "", CI);
   });
 }
@@ -1728,8 +1729,8 @@ bool ReplaceOpenCLBuiltinPass::replaceRotate(Function &F) {
 
     // Replace with LLVM's funnel shift left intrinsic because it is more
     // generic than rotate.
-    Function *intrinsic =
-        Intrinsic::getDeclaration(F.getParent(), Intrinsic::fshl, SrcType);
+    Function *intrinsic = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::fshl, SrcType);
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic,
                             {SrcValue, SrcValue, RotAmount}, "", CI);
   });
@@ -2883,7 +2884,8 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
     CallInst::Create(NewF, Params, "store_halfword_xor_trick", CI);
 
     // Return a Nop so the old Call is removed
-    Function *donothing = Intrinsic::getDeclaration(&M, Intrinsic::donothing);
+    Function *donothing =
+        Intrinsic::getOrInsertDeclaration(&M, Intrinsic::donothing);
     V = CallInst::Create(donothing, {}, "", CI);
   }
 
@@ -3633,8 +3635,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAddSubSat(Function &F, bool is_signed,
                   : (is_add ? Intrinsic::uadd_sat : Intrinsic::usub_sat);
     auto a = Call->getArgOperand(0);
     auto b = Call->getArgOperand(1);
-    auto intrinsic = Intrinsic::getDeclaration(F.getParent(), intrinsic_type,
-                                               Call->getType());
+    auto intrinsic = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), intrinsic_type, Call->getType());
     return CallInst::Create(intrinsic->getFunctionType(), intrinsic, {a, b}, "",
                             Call);
   });
@@ -3821,7 +3823,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCountZeroes(Function &F, bool leading) {
     return false;
 
   return replaceCallsWithValue(F, [&F, leading](CallInst *Call) {
-    Function *intrinsic = Intrinsic::getDeclaration(
+    Function *intrinsic = Intrinsic::getOrInsertDeclaration(
         F.getParent(), leading ? Intrinsic::ctlz : Intrinsic::cttz,
         Call->getType());
     const auto c_false = ConstantInt::getFalse(Call->getContext());
@@ -4104,13 +4106,13 @@ bool ReplaceOpenCLBuiltinPass::replaceRound(Function &F) {
       clspv_fract_fn->setCallingConv(CallingConv::SPIR_FUNC);
     }
 
-    auto ceil = Intrinsic::getDeclaration(F.getParent(), Intrinsic::ceil,
-                                          Call->getType());
-    auto floor = Intrinsic::getDeclaration(F.getParent(), Intrinsic::floor,
-                                           Call->getType());
-    auto fabs = Intrinsic::getDeclaration(F.getParent(), Intrinsic::fabs,
-                                          Call->getType());
-    auto copysign = Intrinsic::getDeclaration(
+    auto ceil = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::ceil, Call->getType());
+    auto floor = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::floor, Call->getType());
+    auto fabs = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::fabs, Call->getType());
+    auto copysign = Intrinsic::getOrInsertDeclaration(
         F.getParent(), Intrinsic::copysign, {Call->getType(), Call->getType()});
 
     IRBuilder<> builder(Call);
@@ -4138,21 +4140,21 @@ bool ReplaceOpenCLBuiltinPass::replaceTrigPi(Function &F,
     auto mul = builder.CreateFMul(x, pi);
     switch (type) {
     case Builtins::kSinpi: {
-      auto func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
-                                            x->getType());
+      auto func = Intrinsic::getOrInsertDeclaration(
+          F.getParent(), Intrinsic::sin, x->getType());
       return builder.CreateCall(func->getFunctionType(), func, {mul});
     }
     case Builtins::kCospi: {
-      auto func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
-                                            x->getType());
+      auto func = Intrinsic::getOrInsertDeclaration(
+          F.getParent(), Intrinsic::cos, x->getType());
       return builder.CreateCall(func->getFunctionType(), func, {mul});
     }
     case Builtins::kTanpi: {
-      auto sin = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
-                                           x->getType());
+      auto sin = Intrinsic::getOrInsertDeclaration(
+          F.getParent(), Intrinsic::sin, x->getType());
       auto sin_call = builder.CreateCall(sin->getFunctionType(), sin, {mul});
-      auto cos = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
-                                           x->getType());
+      auto cos = Intrinsic::getOrInsertDeclaration(
+          F.getParent(), Intrinsic::cos, x->getType());
       auto cos_call = builder.CreateCall(cos->getFunctionType(), cos, {mul});
       return builder.CreateFDiv(sin_call, cos_call);
     }
@@ -4166,10 +4168,10 @@ bool ReplaceOpenCLBuiltinPass::replaceTrigPi(Function &F,
 
 bool ReplaceOpenCLBuiltinPass::replaceSincos(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *Call) {
-    auto sin_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::sin,
-                                              Call->getType());
-    auto cos_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::cos,
-                                              Call->getType());
+    auto sin_func = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::sin, Call->getType());
+    auto cos_func = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::cos, Call->getType());
 
     IRBuilder<> builder(Call);
     auto sin = builder.CreateCall(sin_func->getFunctionType(), sin_func,
@@ -4183,8 +4185,8 @@ bool ReplaceOpenCLBuiltinPass::replaceSincos(Function &F) {
 
 bool ReplaceOpenCLBuiltinPass::replaceExpm1(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *Call) {
-    auto exp_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::exp,
-                                              Call->getType());
+    auto exp_func = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::exp, Call->getType());
 
     IRBuilder<> builder(Call);
     auto exp = builder.CreateCall(exp_func->getFunctionType(), exp_func,
@@ -4195,8 +4197,8 @@ bool ReplaceOpenCLBuiltinPass::replaceExpm1(Function &F) {
 
 bool ReplaceOpenCLBuiltinPass::replacePown(Function &F) {
   return replaceCallsWithValue(F, [&F](CallInst *Call) {
-    auto pow_func = Intrinsic::getDeclaration(F.getParent(), Intrinsic::pow,
-                                              Call->getType());
+    auto pow_func = Intrinsic::getOrInsertDeclaration(
+        F.getParent(), Intrinsic::pow, Call->getType());
 
     IRBuilder<> builder(Call);
     auto conv = builder.CreateSIToFP(Call->getArgOperand(1), Call->getType());

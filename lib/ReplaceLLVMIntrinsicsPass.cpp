@@ -95,8 +95,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
     return replaceAddSubSat(F, true, true);
   case Intrinsic::is_fpclass:
     return replaceIsFpClass(F);
-  // SPIR-V OpAssumeTrueKHR requires ExpectAssumeKHR capability in SPV_KHR_expect_assume extension.
-  // Vulkan doesn't support that, so remove assume declaration.
+  // SPIR-V OpAssumeTrueKHR requires ExpectAssumeKHR capability in
+  // SPV_KHR_expect_assume extension. Vulkan doesn't support that, so remove
+  // assume declaration.
   case Intrinsic::assume:
   // SPIR-V OpLifetimeStart and OpLifetimeEnd require Kernel capability.
   // Vulkan doesn't support that, so remove all lifteime bounds declarations.
@@ -465,7 +466,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCountZeroes(Function &F,
     IRBuilder<> builder(Call);
     auto ty = Call->getType()->getWithNewBitWidth(32);
     auto c32 = ConstantInt::get(ty, 32);
-    auto func_32bit = Intrinsic::getDeclaration(
+    auto func_32bit = Intrinsic::getOrInsertDeclaration(
         F.getParent(), leading ? Intrinsic::ctlz : Intrinsic::cttz, ty);
     if (bitwidth < 32) {
       // Extend the input to 32-bits and perform a clz/ctz.

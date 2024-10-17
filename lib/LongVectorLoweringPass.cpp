@@ -31,9 +31,9 @@
 #include "Constants.h"
 #include "clspv/Passes.h"
 
+#include "BitcastUtils.h"
 #include "Builtins.h"
 #include "LongVectorLoweringPass.h"
-#include "BitcastUtils.h"
 
 #include <array>
 #include <functional>
@@ -120,7 +120,8 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
       Param = Param->getScalarType();
     }
 
-    return Intrinsic::getDeclaration(Intrinsic.getParent(), id, ParamTys);
+    return Intrinsic::getOrInsertDeclaration(Intrinsic.getParent(), id,
+                                             ParamTys);
     break;
   }
   }
@@ -154,29 +155,28 @@ std::string getSpirvCompliantName(const clspv::Builtins::FunctionInfo &IInfo) {
 Type *getScalarPointerType(Function &Builtin) {
   const auto &Info = clspv::Builtins::Lookup(&Builtin);
   switch (Info.getType()) {
-    case clspv::Builtins::kSincos:
-    case clspv::Builtins::kModf:
-    case clspv::Builtins::kFract:
-      return Builtin.getReturnType()->getScalarType();
-    case clspv::Builtins::kFrexp:
-    case clspv::Builtins::kRemquo:
-    case clspv::Builtins::kLgammaR:
-      return Type::getInt32Ty(Builtin.getParent()->getContext());
-    case clspv::Builtins::kVloadHalf:
-    case clspv::Builtins::kVloadaHalf:
-    case clspv::Builtins::kVstoreHalf:
-    case clspv::Builtins::kVstoreaHalf:
-      return Type::getHalfTy(Builtin.getParent()->getContext());
-    case clspv::Builtins::kVstore:
-      return Builtin.getArg(0)->getType()->getScalarType();
-    case clspv::Builtins::kVload:
-      return Builtin.getReturnType()->getScalarType();
-    default:
-      // What about llvm intrinsics (e.g. memcpy) or other OpenCL builtins?
-      return nullptr;
+  case clspv::Builtins::kSincos:
+  case clspv::Builtins::kModf:
+  case clspv::Builtins::kFract:
+    return Builtin.getReturnType()->getScalarType();
+  case clspv::Builtins::kFrexp:
+  case clspv::Builtins::kRemquo:
+  case clspv::Builtins::kLgammaR:
+    return Type::getInt32Ty(Builtin.getParent()->getContext());
+  case clspv::Builtins::kVloadHalf:
+  case clspv::Builtins::kVloadaHalf:
+  case clspv::Builtins::kVstoreHalf:
+  case clspv::Builtins::kVstoreaHalf:
+    return Type::getHalfTy(Builtin.getParent()->getContext());
+  case clspv::Builtins::kVstore:
+    return Builtin.getArg(0)->getType()->getScalarType();
+  case clspv::Builtins::kVload:
+    return Builtin.getReturnType()->getScalarType();
+  default:
+    // What about llvm intrinsics (e.g. memcpy) or other OpenCL builtins?
+    return nullptr;
   }
 }
-
 
 /// Get the scalar overload for the given OpenCL builtin function @p Builtin.
 Function *getBIFScalarVersion(Function &Builtin) {
@@ -520,7 +520,8 @@ Function *createFunctionWithMappedTypes(Function &F,
     B.CreateRetVoid();
   } else {
     auto *EquivalentReturnTy = EquivalentFunctionTy->getReturnType();
-    Value *ReturnValue = convertEquivalentValue(B, Call, EquivalentReturnTy, DL);
+    Value *ReturnValue =
+        convertEquivalentValue(B, Call, EquivalentReturnTy, DL);
     B.CreateRet(ReturnValue);
   }
 
@@ -916,8 +917,7 @@ Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
     V = B.CreatePtrToInt(EquivalentValue, EquivalentDestTy, I.getName());
     break;
   }
-  case Instruction::IntToPtr:
-  {
+  case Instruction::IntToPtr: {
     IRBuilder<> B(&I);
     V = B.CreateIntToPtr(EquivalentValue, EquivalentDestTy, I.getName());
     break;
@@ -1049,7 +1049,7 @@ void clspv::LongVectorLoweringPass::reworkIndices(
   for (unsigned i = 1; i < Idxs.size(); i++) {
     Indices.push_back(Idxs[i]);
     // Get original indices up to ith element for below:
-    auto CumulativeOldIdxs = ArrayRef<Value*>(Idxs.begin(), Idxs.begin() + i);
+    auto CumulativeOldIdxs = ArrayRef<Value *>(Idxs.begin(), Idxs.begin() + i);
     auto IndexedTy = GetElementPtrInst::getIndexedType(Ty, CumulativeOldIdxs);
     if (getEquivalentType(IndexedTy)) {
       auto Idx = Indices.pop_back_val();
