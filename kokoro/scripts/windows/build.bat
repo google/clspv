@@ -19,8 +19,12 @@ set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
 
-:: Force usage of python 3.6.
-set PATH=C:\python36;%PATH%
+:: Define the Python version and download URL
+set "pythonVersion=3.8.10"
+:: Download Python installer
+wget "https://www.python.org/ftp/python/%pythonVersion%/python-%pythonVersion%-amd64.exe" -O "%TEMP%\python-installer.exe"
+:: Install Python silently
+"%TEMP%\python-installer.exe" /quiet InstallAllUsers=1 PrependPath=1
 
 cd %SRC%
 python utils/fetch_sources.py
