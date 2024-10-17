@@ -54,11 +54,10 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: [[c_var_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[array]]
 // CHECK-DAG: [[c_var_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[int]]
 // CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
-// CHECK-DAG: [[undef:%[0-9a-zA-Z_]+]] = OpUndef [[int]]
-// CHECK-DAG: [[zero_undef:%[0-9a-zA-Z_]+]] = OpConstantComposite [[data_type]] [[zero]] [[undef]]
+// CHECK-DAG: [[zero_zero:%[0-9a-zA-Z_]+]] = OpConstantNull [[data_type]]
 // CHECK-DAG: [[one:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 1
-// CHECK-DAG: [[one_undef:%[0-9a-zA-Z_]+]] = OpConstantComposite [[data_type]] [[one]] [[undef]]
-// CHECK-DAG: [[array_const:%[0-9a-zA-Z_]+]] = OpConstantComposite [[array]] [[zero_undef]] [[one_undef]]
+// CHECK-DAG: [[one_zero:%[0-9a-zA-Z_]+]] = OpConstantComposite [[data_type]] [[one]] [[zero]]
+// CHECK-DAG: [[array_const:%[0-9a-zA-Z_]+]] = OpConstantComposite [[array]] [[zero_zero]] [[one_zero]]
 // CHECK-DAG: [[c_var:%[0-9a-zA-Z_]+]] = OpVariable [[c_var_ptr]] Private [[array_const]]
 // CHECK-DAG: [[data]] = OpVariable [[data_ptr]] StorageBuffer
 //     CHECK: [[c_arg]] = OpVariable [[c_arg_ptr]] Uniform
