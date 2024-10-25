@@ -369,6 +369,7 @@ int SetCompilerInstanceOptions(
     instance.getPreprocessorOpts().addMacroDef(
         "cl_arm_integer_dot_product_accumulate_saturate_int8");
   }
+  instance.getPreprocessorOpts().addMacroDef("cl_khr_integer_dot_product");
 
   for (auto define : Defines) {
     instance.getPreprocessorOpts().addMacroDef(define);
