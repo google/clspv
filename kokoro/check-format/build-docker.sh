@@ -40,3 +40,5 @@ cp third_party/llvm/clang/tools/clang-format/clang-format-diff.py utils/clang-fo
 echo $(date): Check formatting...
 ./utils/check_code_format.sh
 echo $(date): check completed.
+
+cp $SRC/README.md ${KOKORO_ARTIFACTS_DIR}/
