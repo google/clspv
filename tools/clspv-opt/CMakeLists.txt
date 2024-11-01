@@ -52,3 +52,8 @@ endif()
 target_link_libraries(clspv-opt PRIVATE clspv_passes ${CLSPV_LLVM_COMPONENTS})
 
 set_target_properties(clspv-opt PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CLSPV_BINARY_DIR}/bin)
+
+if(ENABLE_CLSPV_TOOLS_INSTALL)
+  install(TARGETS clspv-opt
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif(ENABLE_CLSPV_TOOLS_INSTALL)
