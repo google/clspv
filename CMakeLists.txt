@@ -109,12 +109,7 @@ if (${EXTERNAL_LLVM} EQUAL 1)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_BINARY_DIR to be specified")
   endif()
   if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
-    if (NOT DEFINED CLSPV_LIBCLC_SOURCE_DIR)
-      message(FATAL_ERROR "External LLVM requires CLSPV_LIBCLC_SOURCE_DIR to be specified")
-    endif()
-    if (NOT DEFINED CLSPV_LLVM_CMAKE_MODULES_DIR)
-      message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_CMAKE_MODULES_DIR to be specified")
-    endif()
+    message(FATAL_ERROR "External LLVM requires CLSPV_EXTERNAL_LIBCLC_DIR to be specified")
   endif()
 else()
   # Setup to use the LLVM monorepo.
@@ -126,16 +121,6 @@ else()
     set(CLSPV_CLANG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/clang)
   endif()
 
-  if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
-    if (NOT DEFINED CLSPV_LIBCLC_SOURCE_DIR)
-      set(CLSPV_LIBCLC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/libclc)
-    endif()
-
-    if (NOT DEFINED CLSPV_LLVM_CMAKE_MODULES_DIR)
-      set(CLSPV_LLVM_CMAKE_MODULES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/cmake/Modules)
-    endif()
-  endif()
-
   use_component(${CLSPV_LLVM_SOURCE_DIR})
   use_component(${CLSPV_CLANG_SOURCE_DIR})
 
@@ -145,7 +130,19 @@ else()
 
   # First tell LLVM where to find clang.
   set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
-  set(LLVM_ENABLE_PROJECTS clang)
+  set(LLVM_ENABLE_PROJECTS clang CACHE STRING "LLVM enabled projects for clspv")
+
+  # Also tell LLVM where to find libclc if required.
+  if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
+    if (NOT DEFINED CLSPV_LIBCLC_SOURCE_DIR)
+      set(CLSPV_LIBCLC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/libclc)
+    endif()
+    use_component(${CLSPV_LIBCLC_SOURCE_DIR})
+
+    set(LLVM_ENABLE_PROJECTS "${LLVM_ENABLE_PROJECTS};libclc")
+    set(LIBCLC_TARGETS_TO_BUILD clspv--;clspv64--)
+    set(LLVM_EXTERNAL_LIBCLC_SOURCE_DIR ${CLSPV_LIBCLC_SOURCE_DIR})
+  endif()
 
   # Tell LLVM not to build any targets.
   set(LLVM_TARGETS_TO_BUILD ""
@@ -157,11 +154,6 @@ else()
   # Ensure clspv and LLVM use the same build options (e.g. -D_FILE_OFFSET_BITS=64).
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/llvm/cmake/modules/)
   include(HandleLLVMOptions)
-endif()
-
-if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
-  include(${CLSPV_LLVM_CMAKE_MODULES_DIR}/LLVMVersion.cmake)
-  set(LLVM_VERSION ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH})
 endif()
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -196,12 +188,6 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=unused-variable -Werror=switch")
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror-unused-variable -Werror-switch")
-endif()
-
-if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
-  set(LIBCLC_TARGETS_TO_BUILD clspv--;clspv64--)
-  string(REPLACE "${CMAKE_CURRENT_SOURCE_DIR}" "" CLSPV_LIBCLC_SUFFIX "${CLSPV_LIBCLC_SOURCE_DIR}")
-  add_subdirectory(${CLSPV_LIBCLC_SOURCE_DIR} EXCLUDE_FROM_ALL)
 endif()
 
 # Bring in our cmake folder
