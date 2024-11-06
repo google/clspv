@@ -663,7 +663,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
   // Run the following passes after the default LLVM pass pipeline.
   pb.registerOptimizerLastEPCallback([binaryStream](llvm::ModulePassManager &pm,
-                                                    llvm::OptimizationLevel) {
+                                                    llvm::OptimizationLevel,
+                                                    llvm::ThinOrFullLTOPhase) {
     // No point attempting to handle freeze currently so strip them from the
     // IR.
     pm.addPass(clspv::StripFreezePass());
