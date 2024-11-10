@@ -354,6 +354,11 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
 
   Type *OrigSrcTy = SrcTy;
+  if (dyn_cast<IntToPtrInst>(Src)) {
+    DenseMap<Value *, Type *> TypeCache;
+    Type *arg_type = clspv::InferType(Src, Builder.getContext(), &TypeCache);
+    OrigSrcTy = arg_type ? arg_type : OrigSrcTy;
+  }
   SmallVector<Value *, 4> AddrIdxs;
   ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
              AddrIdxs, ToBeDeleted);
