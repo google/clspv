@@ -13,7 +13,7 @@ entry:
 declare spir_func <2 x double> @_Z5expm1Dv2_d(<2 x double> %x)
 
 ; CHECK: [[exp:%[a-zA-Z0-9_.]+]] = call <2 x double> @llvm.exp.v2f64(<2 x double> %x)
-; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = fsub <2 x double> [[exp]], <double 1.000000e+00, double 1.000000e+00>
+; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = fsub <2 x double> [[exp]], splat (double 1.000000e+00)
 ; CHECK: ret <2 x double> [[sub]]
 
 

@@ -20,6 +20,6 @@ declare <3 x i16> @_Z7sub_satDv3_sS_(<3 x i16>, <3 x i16>)
 ; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <3 x i16> %a to <3 x i32>
 ; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <3 x i16> %b to <3 x i32>
 ; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = sub nuw nsw <3 x i32> [[sext_a]], [[sext_b]]
-; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <3 x i32> @_Z5clampDv3_iS_S_(<3 x i32> [[sub]], <3 x i32> <i32 -32768, i32 -32768, i32 -32768>, <3 x i32> <i32 32767, i32 32767, i32 32767>)
+; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <3 x i32> @_Z5clampDv3_iS_S_(<3 x i32> [[sub]], <3 x i32> splat (i32 -32768), <3 x i32> splat (i32 32767))
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <3 x i32> [[clamp]] to <3 x i16>
 ; CHECK: ret <3 x i16> [[trunc]]

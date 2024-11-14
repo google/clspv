@@ -8,9 +8,9 @@ define spir_kernel void @test(<2 x float> %val, <2 x i32> addrspace(1)* nocaptur
 entry:
   %call = tail call spir_func <2 x i32> @_Z8isfiniteDv2_f(<2 x float> %val)
   ;CHECK: %0 = bitcast <2 x float> %val to <2 x i32>
-  ;CHECK: %1 = and <2 x i32> <i32 2139095040, i32 2139095040>, %0
-  ;CHECK: %2 = icmp eq <2 x i32> %1, <i32 2139095040, i32 2139095040>
-  ;CHECK: %3 = select <2 x i1> %2, <2 x i32> zeroinitializer, <2 x i32> <i32 -1, i32 -1>
+  ;CHECK: %1 = and <2 x i32> splat (i32 2139095040), %0
+  ;CHECK: %2 = icmp eq <2 x i32> %1, splat (i32 2139095040)
+  ;CHECK: %3 = select <2 x i1> %2, <2 x i32> zeroinitializer, <2 x i32> splat (i32 -1)
   store <2 x i32> %call, <2 x i32> addrspace(1)* %out, align 8
   ret void
 }

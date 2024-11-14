@@ -17,10 +17,10 @@ entry:
 
 declare <2 x i16> @_Z5rhaddDv2_tS_(<2 x i16>, <2 x i16>)
 
-; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr <2 x i16> %a, <i16 1, i16 1>
-; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr <2 x i16> %b, <i16 1, i16 1>
+; CHECK: [[a_shr:%[a-zA_Z0-9_.]+]] = lshr <2 x i16> %a, splat (i16 1)
+; CHECK: [[b_shr:%[a-zA-Z0-9_.]+]] = lshr <2 x i16> %b, splat (i16 1)
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <2 x i16> [[a_shr]], [[b_shr]]
 ; CHECK: [[join:%[a-zA-Z0-9_.]+]] = or <2 x i16> %a, %b
-; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <2 x i16> [[join]], <i16 1, i16 1>
+; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <2 x i16> [[join]], splat (i16 1)
 ; CHECK: [[hadd:%[a-zA-Z0-9_.]+]] = add <2 x i16> [[add]], [[and]]
 ; CHECK: ret <2 x i16> [[hadd]]

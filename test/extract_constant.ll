@@ -6,20 +6,20 @@
 ; CHECK: [[ARRAY_ALLOC:[a-zA-Z0-9_]*]] = alloca [8 x i8], align 8
 ; CHECK: %[[GET_ELE_PTR:[a-zA-Z0-9_]*]] = getelementptr [8 x i8], ptr %{{.*}}.[[ARRAY_ALLOC]], i32 0
 
-; CHECK: %[[BITCAST1:[a-zA-Z0-9_]*]] = bitcast <1 x i64> <i64 369832251558649162> to <4 x i16>
+; CHECK: %[[BITCAST1:[a-zA-Z0-9_]*]] = bitcast <1 x i64> splat (i64 369832251558649162) to <4 x i16>
 ; CHECK: %[[EXTRACT_ELE1:[a-zA-Z0-9_]*]] = extractelement <4 x i16> %[[BITCAST1]], i32 0
 ; CHECK: %[[INSERT_ELE1:[a-zA-Z0-9_]*]] = insertelement <2 x i16> {{.*}}, i16 %[[EXTRACT_ELE1]], i64 0
-; CHECK: %[[BITCAST2:[a-zA-Z0-9_]*]] = bitcast <1 x i64> <i64 369832251558649162> to <4 x i16>
+; CHECK: %[[BITCAST2:[a-zA-Z0-9_]*]] = bitcast <1 x i64> splat (i64 369832251558649162) to <4 x i16>
 ; CHECK: %[[EXTRACT_ELE2:[a-zA-Z0-9_]*]] = extractelement <4 x i16> %[[BITCAST2]], i32 1
 ; CHECK: %[[INSERT_ELE2:[a-zA-Z0-9_]*]] = insertelement <2 x i16> %[[INSERT_ELE1]], i16 %[[EXTRACT_ELE2]], i64 1
 ; CHECK: %[[BITCAST3:[a-zA-Z0-9_]*]] = bitcast <2 x i16> %[[INSERT_ELE2]] to <4 x i8>
 ; CHECK: %[[ELEMENT1:[a-zA-Z0-9_]*]] = extractelement <4 x i8> %[[BITCAST3]], i64 0
 ; CHECK: %[[INSERT_VALUE1:[a-zA-Z0-9_]*]] = insertvalue [8 x i8] {{.*}}, i8 %[[ELEMENT1]]
 
-; CHECK: %[[BITCAST4:[a-zA-Z0-9_]*]] = bitcast <1 x i64> <i64 369832251558649162> to <4 x i16>
+; CHECK: %[[BITCAST4:[a-zA-Z0-9_]*]] = bitcast <1 x i64> splat (i64 369832251558649162) to <4 x i16>
 ; CHECK: %[[EXTRACT_ELE3:[a-zA-Z0-9_]*]] = extractelement <4 x i16> %[[BITCAST4]], i32 0
 ; CHECK: %[[INSERT_ELE3:[a-zA-Z0-9_]*]] = insertelement <2 x i16> {{.*}}, i16 %[[EXTRACT_ELE3]], i64 0
-; CHECK: %[[BITCAST5:[a-zA-Z0-9_]*]] = bitcast <1 x i64> <i64 369832251558649162> to <4 x i16>
+; CHECK: %[[BITCAST5:[a-zA-Z0-9_]*]] = bitcast <1 x i64> splat (i64 369832251558649162) to <4 x i16>
 ; CHECK: %[[EXTRACT_ELE4:[a-zA-Z0-9_]*]] = extractelement <4 x i16> %[[BITCAST5]], i32 1
 ; CHECK: %[[INSERT_ELE4:[a-zA-Z0-9_]*]] = insertelement <2 x i16> %[[INSERT_ELE3]], i16 %[[EXTRACT_ELE4]], i64 1
 ; CHECK: %[[BITCAST6:[a-zA-Z0-9_]*]] = bitcast <2 x i16> %[[INSERT_ELE4]] to <4 x i8>

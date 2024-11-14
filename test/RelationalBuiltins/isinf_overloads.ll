@@ -8,9 +8,9 @@ target triple = "spir-unknown-unknown"
 define spir_func void @test() {
 entry:
   %call = tail call spir_func i32 @_Z5isinff(float 0x40035C2900000000) #3
-  %call1 = tail call spir_func <2 x i32> @_Z5isinfDv2_f(<2 x float> <float 0x40035C2900000000, float 0x40035C2900000000>) #3
-  %call2 = tail call spir_func <3 x i32> @_Z5isinfDv3_f(<3 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>) #3
-  %call3 = tail call spir_func <4 x i32> @_Z5isinfDv4_f(<4 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>) #3
+  %call1 = tail call spir_func <2 x i32> @_Z5isinfDv2_f(<2 x float> splat (float 0x40035C2900000000)) #3
+  %call2 = tail call spir_func <3 x i32> @_Z5isinfDv3_f(<3 x float> splat (float 0x40035C2900000000)) #3
+  %call3 = tail call spir_func <4 x i32> @_Z5isinfDv4_f(<4 x float> splat (float 0x40035C2900000000)) #3
   ret void
 }
 
@@ -29,6 +29,6 @@ declare spir_func <3 x i32> @_Z5isinfDv3_f(<3 x float>) local_unnamed_addr #2
 declare spir_func <4 x i32> @_Z5isinfDv4_f(<4 x float>) local_unnamed_addr #2
 
 ; CHECK: call i1 @_Z8spirv.op.157.f(i32 157, float 0x40035C2900000000)
-; CHECK: call <2 x i1> @_Z8spirv.op.157.Dv2_f(i32 157, <2 x float> <float 0x40035C2900000000, float 0x40035C2900000000>)
-; CHECK: call <3 x i1> @_Z8spirv.op.157.Dv3_f(i32 157, <3 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)
-; CHECK: call <4 x i1> @_Z8spirv.op.157.Dv4_f(i32 157, <4 x float> <float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000, float 0x40035C2900000000>)
+; CHECK: call <2 x i1> @_Z8spirv.op.157.Dv2_f(i32 157, <2 x float> splat (float 0x40035C2900000000))
+; CHECK: call <3 x i1> @_Z8spirv.op.157.Dv3_f(i32 157, <3 x float> splat (float 0x40035C2900000000))
+; CHECK: call <4 x i1> @_Z8spirv.op.157.Dv4_f(i32 157, <4 x float> splat (float 0x40035C2900000000))

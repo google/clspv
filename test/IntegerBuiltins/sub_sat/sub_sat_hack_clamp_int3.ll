@@ -21,7 +21,7 @@ declare <3 x i32> @_Z7sub_satDv3_iS_(<3 x i32>, <3 x i32>)
 ; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <3 x i32> %b, zeroinitializer
 ; CHECK: [[sub_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <3 x i32> [[sub]], %a
 ; CHECK: [[sub_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <3 x i32> [[sub]], %a
-; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[sub_lt_a]], <3 x i32> <i32 2147483647, i32 2147483647, i32 2147483647>, <3 x i32> [[sub]]
-; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[sub_gt_a]], <3 x i32> <i32 -2147483648, i32 -2147483648, i32 -2147483648>, <3 x i32> [[sub]]
+; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[sub_lt_a]], <3 x i32> splat (i32 2147483647), <3 x i32> [[sub]]
+; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[sub_gt_a]], <3 x i32> splat (i32 -2147483648), <3 x i32> [[sub]]
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[b_lt_0]], <3 x i32> [[neg_clamp]], <3 x i32> [[pos_clamp]]
 ; CHECK: ret <3 x i32> [[sel]]

@@ -12,5 +12,5 @@ entry:
 
 declare spir_func <2 x float> @_Z5cospiDv2_f(<2 x float>)
 
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul <2 x float> %x, <float 0x400921FB60000000, float 0x400921FB60000000>
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul <2 x float> %x, splat (float 0x400921FB60000000)
 ; CHECK: [[cos:%[a-zA-Z0-9_.]+]] = call <2 x float> @llvm.cos.v2f32(<2 x float> [[mul]])

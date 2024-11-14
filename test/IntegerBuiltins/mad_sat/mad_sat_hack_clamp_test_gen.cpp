@@ -18,7 +18,7 @@
 #include <vector>
 
 const std::string preamble = R"(
-; RUN: clspv-opt -ReplaceOpenCLBuiltin -hack-clamp-width %s -o %t.ll
+; RUN: clspv-opt --passes=replace-opencl-builtin -hack-clamp-width %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
 ; AUTO-GENERATED TEST FILE
@@ -122,13 +122,7 @@ std::string SplatConstant(uint32_t vector, const std::string &type,
   if (vector == 1)
     return value;
 
-  std::string constant = "<";
-  for (auto i = 0; i < vector; ++i) {
-    constant += type + " " + value;
-    constant += (i == (vector - 1) ? "" : ", ");
-  }
-  constant += ">";
-  return constant;
+  return "splat (" + type + " " + value + ")";
 }
 
 std::string NotConstant(uint32_t vector) {

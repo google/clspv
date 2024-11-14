@@ -13,6 +13,6 @@ entry:
 declare spir_func <2 x i8> @_Z3ctzDv2_h(<2 x i8>)
 
 ; CHECK: [[zext:%[a-zA-Z0-9_.]+]] = zext <2 x i8> %in to <2 x i32>
-; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or <2 x i32> [[zext]], <i32 256, i32 256>
+; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or <2 x i32> [[zext]], splat (i32 256)
 ; CHECK: [[call:%[a-zA-Z0-9_.]+]] = call <2 x i32> @llvm.cttz.v2i32(<2 x i32> [[or]], i1 false)
 ; CHECK: trunc <2 x i32> [[call]] to <2 x i8>

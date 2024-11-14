@@ -11,8 +11,8 @@ entry:
 }
 
 ; CHECK: [[sub1:%[a-zA-Z0-9_.]+]] = sub <4 x i32> %x, <i32 0, i32 1, i32 2, i32 3>
-; CHECK: [[sub2:%[a-zA-Z0-9_.]+]] = sub <4 x i32> [[sub1]], <i32 1, i32 1, i32 1, i32 1>
-; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <4 x i32> [[sub2]], <i32 -2147483648, i32 -2147483648, i32 -2147483648, i32 -2147483648>
+; CHECK: [[sub2:%[a-zA-Z0-9_.]+]] = sub <4 x i32> [[sub1]], splat (i32 1)
+; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <4 x i32> [[sub2]], splat (i32 -2147483648)
 ; CHECK: [[cmp:%[a-zA-Z0-9_.]+]] = icmp eq <4 x i32> [[and]], zeroinitializer
 ; CHECK: ret <4 x i1> [[cmp]]
 

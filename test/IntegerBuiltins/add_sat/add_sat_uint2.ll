@@ -21,5 +21,5 @@ declare <2 x i32> @_Z7add_satDv2_jS_(<2 x i32>, <2 x i32>)
 ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractvalue { <2 x i32>, <2 x i32> } [[call]], 0
 ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue { <2 x i32>, <2 x i32> } [[call]], 1
 ; CHECK: [[cmp:%[a-zA-Z0-9_.]+]] = icmp eq <2 x i32> [[ex1]], zeroinitializer
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[cmp]], <2 x i32> [[ex0]], <2 x i32> <i32 -1, i32 -1>
+; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[cmp]], <2 x i32> [[ex0]], <2 x i32> splat (i32 -1)
 ; CHECK: ret <2 x i32> [[sel]]
