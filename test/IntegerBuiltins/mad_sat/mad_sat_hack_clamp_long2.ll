@@ -22,18 +22,18 @@ declare <2 x i64> @_Z7mad_satDv2_lS_S_(<2 x i64>, <2 x i64>, <2 x i64>)
 ; CHECK: [[mul_hi:%[a-zA-Z0-9_.]+]] = extractvalue { <2 x i64>, <2 x i64> } [[mul_ext]], 1
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add <2 x i64> [[mul_lo]], %c
 ; CHECK: [[xor:%[a-zA-Z0-9_.]+]] = xor <2 x i64> %a, %b
-; CHECK: [[same_sign:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> [[xor]], <i64 -1, i64 -1>
-; CHECK: [[diff_sign:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[same_sign]], <i1 true, i1 true>
+; CHECK: [[same_sign:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> [[xor]], splat (i64 -1)
+; CHECK: [[diff_sign:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[same_sign]], splat (i1 true)
 ; CHECK: [[hi_eq_0:%[a-zA-Z0-9_.]+]] = icmp eq <2 x i64> [[mul_hi]], zeroinitializer
-; CHECK: [[hi_ne_0:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[hi_eq_0]], <i1 true, i1 true>
-; CHECK: [[lo_ge_max:%[a-zA-Z0-9_.]+]] = icmp uge <2 x i64> [[mul_lo]], <i64 9223372036854775807, i64 9223372036854775807>
+; CHECK: [[hi_ne_0:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[hi_eq_0]], splat (i1 true)
+; CHECK: [[lo_ge_max:%[a-zA-Z0-9_.]+]] = icmp uge <2 x i64> [[mul_lo]], splat (i64 9223372036854775807)
 ; CHECK: [[c_gt_0:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> %c, zeroinitializer
 ; CHECK: [[c_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> %c, zeroinitializer
-; CHECK: [[add_gt_max:%[a-zA-Z0-9_.]+]] = icmp ugt <2 x i64> [[add]], <i64 9223372036854775807, i64 9223372036854775807>
-; CHECK: [[hi_eq_m1:%[a-zA-Z0-9_.]+]] = icmp eq <2 x i64> [[mul_hi]], <i64 -1, i64 -1>
-; CHECK: [[hi_ne_m1:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[hi_eq_m1]], <i1 true, i1 true>
-; CHECK: [[lo_le_max_plus_1:%[a-zA-Z0-9_.]+]] = icmp ule <2 x i64> [[mul_lo]], <i64 -9223372036854775808, i64 -9223372036854775808>
-; CHECK: [[max_sub_lo:%[a-zA-Z0-9_.]+]] = sub <2 x i64> <i64 9223372036854775807, i64 9223372036854775807>, [[mul_lo]]
+; CHECK: [[add_gt_max:%[a-zA-Z0-9_.]+]] = icmp ugt <2 x i64> [[add]], splat (i64 9223372036854775807)
+; CHECK: [[hi_eq_m1:%[a-zA-Z0-9_.]+]] = icmp eq <2 x i64> [[mul_hi]], splat (i64 -1)
+; CHECK: [[hi_ne_m1:%[a-zA-Z0-9_.]+]] = xor <2 x i1> [[hi_eq_m1]], splat (i1 true)
+; CHECK: [[lo_le_max_plus_1:%[a-zA-Z0-9_.]+]] = icmp ule <2 x i64> [[mul_lo]], splat (i64 -9223372036854775808)
+; CHECK: [[max_sub_lo:%[a-zA-Z0-9_.]+]] = sub <2 x i64> splat (i64 9223372036854775807), [[mul_lo]]
 ; CHECK: [[c_lt_max_sub_lo:%[a-zA-Z0-9_.]+]] = icmp ult <2 x i64> %c, [[max_sub_lo]]
 ; CHECK: [[max_clamp1:%[a-zA-Z0-9_.]+]] = and <2 x i1> [[same_sign]], [[hi_ne_0]]
 ; CHECK: [[tmp:%[a-zA-Z0-9_.]+]] = or <2 x i1> [[c_gt_0]], [[add_gt_max]]
@@ -45,6 +45,6 @@ declare <2 x i64> @_Z7mad_satDv2_lS_S_(<2 x i64>, <2 x i64>, <2 x i64>)
 ; CHECK: [[tmp2:%[a-zA-Z0-9_.]+]] = and <2 x i1> [[hi_eq_m1]], [[lo_le_max_plus_1]]
 ; CHECK: [[min_clamp2:%[a-zA-Z0-9_.]+]] = and <2 x i1> [[tmp2]], [[tmp]]
 ; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = or <2 x i1> [[min_clamp1]], [[min_clamp2]]
-; CHECK: [[sel1:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[min_clamp]], <2 x i64> <i64 -9223372036854775808, i64 -9223372036854775808>, <2 x i64> [[add]]
-; CHECK: [[sel2:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[max_clamp]], <2 x i64> <i64 9223372036854775807, i64 9223372036854775807>, <2 x i64> [[sel1]]
+; CHECK: [[sel1:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[min_clamp]], <2 x i64> splat (i64 -9223372036854775808), <2 x i64> [[add]]
+; CHECK: [[sel2:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[max_clamp]], <2 x i64> splat (i64 9223372036854775807), <2 x i64> [[sel1]]
 ; CHECK: ret <2 x i64> [[sel2]]

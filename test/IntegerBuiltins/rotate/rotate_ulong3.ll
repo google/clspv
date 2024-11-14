@@ -1,9 +1,9 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=replace-opencl-builtin,replace-llvm-intrinsics
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: [[mask1:%[0-9]+]] = and <3 x i64> %b, <i64 63, i64 63, i64 63>
-; CHECK: [[sub:%[0-9]+]] = sub <3 x i64> <i64 64, i64 64, i64 64>
-; CHECK: [[mask2:%[0-9]+]] = and <3 x i64> [[sub]], <i64 63, i64 63, i64 63>
+; CHECK: [[mask1:%[0-9]+]] = and <3 x i64> %b, splat (i64 63)
+; CHECK: [[sub:%[0-9]+]] = sub <3 x i64> splat (i64 64)
+; CHECK: [[mask2:%[0-9]+]] = and <3 x i64> [[sub]], splat (i64 63)
 ; CHECK: [[shl:%[0-9]+]] = shl <3 x i64> %a, [[mask1]]
 ; CHECK: [[shr:%[0-9]+]] = lshr <3 x i64> %a, [[mask2]]
 ; CHECK: [[or:%[0-9]+]] = or <3 x i64> [[shr]], [[shl]]

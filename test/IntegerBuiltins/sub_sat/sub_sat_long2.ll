@@ -21,7 +21,7 @@ declare <2 x i64> @_Z7sub_satDv2_lS_(<2 x i64>, <2 x i64>)
 ; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> %b, zeroinitializer
 ; CHECK: [[sub_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <2 x i64> [[sub]], %a
 ; CHECK: [[sub_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <2 x i64> [[sub]], %a
-; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[sub_lt_a]], <2 x i64> <i64 9223372036854775807, i64 9223372036854775807>, <2 x i64> [[sub]]
-; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[sub_gt_a]], <2 x i64> <i64 -9223372036854775808, i64 -9223372036854775808>, <2 x i64> [[sub]]
+; CHECK: [[neg_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[sub_lt_a]], <2 x i64> splat (i64 9223372036854775807), <2 x i64> [[sub]]
+; CHECK: [[pos_clamp:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[sub_gt_a]], <2 x i64> splat (i64 -9223372036854775808), <2 x i64> [[sub]]
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[b_lt_0]], <2 x i64> [[neg_clamp]], <2 x i64> [[pos_clamp]]
 ; CHECK: ret <2 x i64> [[sel]]

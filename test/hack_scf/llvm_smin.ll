@@ -22,8 +22,8 @@ declare i32 @llvm.smin.i32(i32, i32)
 
 ; CHECK-LABEL: smin2
 ; CHECK: [[a_m_b:%[0-9]+]] = sub <2 x i32> %a, %b
-; CHECK: [[m_1:%[0-9]+]] = sub <2 x i32> [[a_m_b]], <i32 1, i32 1>
-; CHECK: [[and:%[0-9]+]] = and <2 x i32> [[m_1]], <i32 -2147483648, i32 -2147483648>
+; CHECK: [[m_1:%[0-9]+]] = sub <2 x i32> [[a_m_b]], splat (i32 1)
+; CHECK: [[and:%[0-9]+]] = and <2 x i32> [[m_1]], splat (i32 -2147483648)
 ; CHECK: [[cmp:%[0-9]+]] = icmp eq <2 x i32> [[and]], zeroinitializer
 ; CHECK: [[sel:%[0-9]+]] = select <2 x i1> [[cmp]], <2 x i32> %b, <2 x i32> %a
 ; CHECK: ret <2 x i32> [[sel]]

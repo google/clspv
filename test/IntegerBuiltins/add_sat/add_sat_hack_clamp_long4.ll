@@ -21,7 +21,7 @@ declare <4 x i64> @_Z7add_satDv4_lS_(<4 x i64>, <4 x i64>)
 ; CHECK: [[b_lt_0:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i64> %b, zeroinitializer
 ; CHECK: [[add_gt_a:%[a-zA-Z0-9_.]+]] = icmp sgt <4 x i64> [[add]], %a
 ; CHECK: [[add_lt_a:%[a-zA-Z0-9_.]+]] = icmp slt <4 x i64> [[add]], %a
-; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_gt_a]], <4 x i64> <i64 -9223372036854775808, i64 -9223372036854775808, i64 -9223372036854775808, i64 -9223372036854775808>, <4 x i64> [[add]]
-; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_lt_a]], <4 x i64> <i64 9223372036854775807, i64 9223372036854775807, i64 9223372036854775807, i64 9223372036854775807>, <4 x i64> [[add]]
+; CHECK: [[min_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_gt_a]], <4 x i64> splat (i64 -9223372036854775808), <4 x i64> [[add]]
+; CHECK: [[max_clamp:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[add_lt_a]], <4 x i64> splat (i64 9223372036854775807), <4 x i64> [[add]]
 ; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <4 x i1> [[b_lt_0]], <4 x i64> [[min_clamp]], <4 x i64> [[max_clamp]]
 ; CHECK: ret <4 x i64> [[sel]]

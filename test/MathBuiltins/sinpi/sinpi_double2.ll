@@ -12,7 +12,7 @@ entry:
 
 declare spir_func <2 x double> @_Z5sinpiDv2_d(<2 x double>)
 
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul <2 x double> %x, <double  0x400921FB54442D18, double  0x400921FB54442D18>
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul <2 x double> %x, splat (double  0x400921FB54442D18)
 ; CHECK: [[sin:%[a-zA-Z0-9_.]+]] = call <2 x double> @llvm.sin.v2f64(<2 x double> [[mul]])
 
 

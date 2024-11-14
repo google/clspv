@@ -21,5 +21,5 @@ declare <3 x i64> @_Z7add_satDv3_mS_(<3 x i64>, <3 x i64>)
 ; CHECK: [[ex0:%[a-zA-Z0-9_.]+]] = extractvalue { <3 x i64>, <3 x i64> } [[call]], 0
 ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue { <3 x i64>, <3 x i64> } [[call]], 1
 ; CHECK: [[cmp:%[a-zA-Z0-9_.]+]] = icmp eq <3 x i64> [[ex1]], zeroinitializer
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[cmp]], <3 x i64> [[ex0]], <3 x i64> <i64 -1, i64 -1, i64 -1>
+; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <3 x i1> [[cmp]], <3 x i64> [[ex0]], <3 x i64> splat (i64 -1)
 ; CHECK: ret <3 x i64> [[sel]]

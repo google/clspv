@@ -13,9 +13,9 @@ entry:
 declare spir_func <2 x i16> @_Z8isnormalDv2_Dh(<2 x half>)
 
 ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = bitcast <2 x half> %x to <2 x i16>
-; CHECK: [[abs:%[a-zA-Z0-9_.]+]] = and <2 x i16> [[cast]], <i16 32767, i16 32767>
-; CHECK: [[lt:%[a-zA-Z0-9_.]+]] = icmp ult <2 x i16> [[abs]], <i16 31744, i16 31744>
-; CHECK: [[ge:%[a-zA-Z0-9_.]+]] = icmp uge <2 x i16> [[abs]], <i16 1024, i16 1024>
+; CHECK: [[abs:%[a-zA-Z0-9_.]+]] = and <2 x i16> [[cast]], splat (i16 32767)
+; CHECK: [[lt:%[a-zA-Z0-9_.]+]] = icmp ult <2 x i16> [[abs]], splat (i16 31744)
+; CHECK: [[ge:%[a-zA-Z0-9_.]+]] = icmp uge <2 x i16> [[abs]], splat (i16 1024)
 ; CHECK: [[and:%[a-zA-Z0-9_.]+]] = and <2 x i1> [[lt]], [[ge]]
 ; CHECK: [[zext:%[a-zA-Z0-9_]+]] = sext <2 x i1> [[and]] to <2 x i16>
 ; CHECK: ret <2 x i16> [[zext]]

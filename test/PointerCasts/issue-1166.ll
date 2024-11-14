@@ -2,9 +2,9 @@
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 0
-; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> <i64 8000000000> to <2 x i32>), i64 0), ptr addrspace(1) [[gep]], align 4
+; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> splat (i64 8000000000) to <2 x i32>), i64 0), ptr addrspace(1) [[gep]], align 4
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 1
-; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> <i64 8000000000> to <2 x i32>), i64 1), ptr addrspace(1) [[gep]], align 4
+; CHECK:  store i32 extractelement (<2 x i32> bitcast (<1 x i64> splat (i64 8000000000) to <2 x i32>), i64 1), ptr addrspace(1) [[gep]], align 4
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 2
 ; CHECK:  store i32 77, ptr addrspace(1) [[gep]], align 4
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %s, i32 3

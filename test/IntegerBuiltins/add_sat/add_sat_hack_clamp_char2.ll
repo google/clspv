@@ -20,6 +20,6 @@ declare <2 x i8> @_Z7add_satDv2_cS_(<2 x i8>, <2 x i8>)
 ; CHECK: [[sext_a:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %a to <2 x i32>
 ; CHECK: [[sext_b:%[a-zA-Z0-9_.]+]] = sext <2 x i8> %b to <2 x i32>
 ; CHECK: [[add:%[a-zA-Z0-9_.]+]] = add nuw nsw <2 x i32> [[sext_a]], [[sext_b]]
-; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <2 x i32> @_Z5clampDv2_iS_S_(<2 x i32> [[add]], <2 x i32> <i32 -128, i32 -128>, <2 x i32> <i32 127, i32 127>)
+; CHECK: [[clamp:%[a-zA-Z0-9_.]+]] = call <2 x i32> @_Z5clampDv2_iS_S_(<2 x i32> [[add]], <2 x i32> splat (i32 -128), <2 x i32> splat (i32 127))
 ; CHECK: [[trunc:%[a-zA-Z0-9_.]+]] = trunc <2 x i32> [[clamp]] to <2 x i8>
 ; CHECK: ret <2 x i8> [[trunc]]

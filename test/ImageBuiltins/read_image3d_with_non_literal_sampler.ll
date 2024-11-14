@@ -5,7 +5,7 @@
 ; CHECK:  [[image_dim:%[^ ]+]] = call <4 x i32> @_Z13get_image_dim11ocl_image3d(target("spirv.Image", float, 2, 0, 0, 0, 1, 0, 0, 0) %0)
 ; CHECK:  [[convert:%[^ ]+]] = sitofp <4 x i32> [[image_dim]] to <4 x float>
 ; CHECK:  [[floor:%[^ ]+]] = call <4 x float> @floor(<4 x float> [[coord]])
-; CHECK:  [[fadd:%[^ ]+]] = fadd <4 x float> [[floor]], <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>
+; CHECK:  [[fadd:%[^ ]+]] = fadd <4 x float> [[floor]], splat (float 5.000000e-01)
 ; CHECK:  [[fdiv_nearest:%[^ ]+]] = fdiv <4 x float> [[fadd]], [[convert]]
 ; CHECK:  [[fdiv_linear:%[^ ]+]] = fdiv <4 x float> [[coord]], [[convert]]
 ; CHECK:  [[sampler_mask:%[^ ]+]] = call i32 @clspv.get_normalized_sampler_mask(), !sampler_mask_push_constant_offset !29

@@ -25,5 +25,5 @@ declare <2 x i64> @_Z7mad_satDv2_mS_S_(<2 x i64>, <2 x i64>, <2 x i64>)
 ; CHECK: [[ex1:%[a-zA-Z0-9_.]+]] = extractvalue { <2 x i64>, <2 x i64> } [[add]], 1
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or <2 x i64> [[mul_hi]], [[ex1]]
 ; CHECK: [[cmp:%[a-zA-Z0-9_.]+]] = icmp eq <2 x i64> [[or]], zeroinitializer
-; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[cmp]], <2 x i64> [[ex0]], <2 x i64> <i64 -1, i64 -1>
+; CHECK: [[sel:%[a-zA-Z0-9_.]+]] = select <2 x i1> [[cmp]], <2 x i64> [[ex0]], <2 x i64> splat (i64 -1)
 ; CHECK: ret <2 x i64> [[sel]]
