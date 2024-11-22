@@ -2557,7 +2557,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::StorageTexelBuffer:
     case clspv::ArgKind::UniformTexelBuffer:
-      type = info->data_type->getPointerTo(AddressSpace::UniformConstant);
+      type = PointerType::get(info->data_type, AddressSpace::UniformConstant);
       break;
     default:
       break;
@@ -3604,7 +3604,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
     addCapability(Cap);
 
     auto *data_ty = IntegerType::get(module->getContext(), 32);
-    auto *ptr_ty = data_ty->getPointerTo(AddressSpace::Input);
+    auto *ptr_ty = PointerType::get(data_ty, AddressSpace::Input);
     auto ptr_id = getSPIRVPointerType(ptr_ty, data_ty);
     RID = addSPIRVGlobalVariable(ptr_id, spv::StorageClassInput);
 

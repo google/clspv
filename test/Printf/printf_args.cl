@@ -54,7 +54,7 @@ kernel void test(char c, short s, int i, float f, long l) {
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[f_i32_0]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[f_i32_1]]
 // CHECK: %[[arg_l_bitcast:[0-9a-zA-Z_]+]] = OpBitcast %[[v2uint]] %[[arg_l]]
-// CHECK: %[[l_i32_0:[0-9a-zA-Z_]+]] = OpUConvert %[[uint]] %[[arg_l]]
+// CHECK: %[[l_i32_0:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uint]] %[[arg_l_bitcast]] 0
 // CHECK: %[[l_i32_1:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uint]] %[[arg_l_bitcast]] 1
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[l_i32_0]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[l_i32_1]]
