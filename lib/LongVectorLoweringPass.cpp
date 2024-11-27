@@ -1969,6 +1969,8 @@ void clspv::LongVectorLoweringPass::cleanDeadGlobals() {
   for (auto const &Mapping : GlobalVariableMap) {
     auto *GV = Mapping.first;
     GV->removeDeadConstantUsers();
-    GV->eraseFromParent();
+    if (GV->getNumUses() == 0) {
+      GV->eraseFromParent();
+    }
   }
 }
