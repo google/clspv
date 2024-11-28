@@ -152,7 +152,7 @@ else()
   add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm EXCLUDE_FROM_ALL)
 
   # Ensure clspv and LLVM use the same build options (e.g. -D_FILE_OFFSET_BITS=64).
-  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm/llvm/cmake/modules/)
+  list(APPEND CMAKE_MODULE_PATH ${CLSPV_LLVM_SOURCE_DIR}/cmake/modules/)
   include(HandleLLVMOptions)
 endif()
 
