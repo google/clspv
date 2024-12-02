@@ -339,14 +339,6 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
         F->addMetadata(clspv::PrintfKernelMetadataName(),
                        *MDNode::get(M.getContext(), {}));
       }
-    } else {
-      for (auto &F : M) {
-        if (!F.getMetadata(clspv::PrintfKernelMetadataName())) {
-          F.addMetadata(clspv::PrintfKernelMetadataName(),
-                        *MDNode::get(M.getContext(), {}));
-        }
-        break;
-      }
     }
   }
 
