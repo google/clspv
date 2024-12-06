@@ -54,13 +54,13 @@ entry:
 ; CHECK-DAG: [[D6:%[^ ]+]] = sext i1 [[CMP6]] to i32
 ; CHECK-DAG: [[D7:%[^ ]+]] = sext i1 [[CMP7]] to i32
 
-; CHECK-DAG: [[E1:%[^ ]+]] = getelementptr inbounds [[INT8:i8]], ptr addrspace(1) [[OUT]], i64 4
-; CHECK-DAG: [[E2:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 8
-; CHECK-DAG: [[E3:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 12
-; CHECK-DAG: [[E4:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 16
-; CHECK-DAG: [[E5:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 20
-; CHECK-DAG: [[E6:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 24
-; CHECK-DAG: [[E7:%[^ ]+]] = getelementptr inbounds [[INT8]], ptr addrspace(1) [[OUT]], i64 28
+; CHECK-DAG: [[E1:%[^ ]+]] = getelementptr inbounds nuw [[INT8:i8]], ptr addrspace(1) [[OUT]], i64 4
+; CHECK-DAG: [[E2:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 8
+; CHECK-DAG: [[E3:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 12
+; CHECK-DAG: [[E4:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 16
+; CHECK-DAG: [[E5:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 20
+; CHECK-DAG: [[E6:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 24
+; CHECK-DAG: [[E7:%[^ ]+]] = getelementptr inbounds nuw [[INT8]], ptr addrspace(1) [[OUT]], i64 28
 
 ; CHECK-DAG: store i32 [[D0]], ptr addrspace(1) %out
 ; CHECK-DAG: store i32 [[D1]], ptr addrspace(1) [[E1]]
