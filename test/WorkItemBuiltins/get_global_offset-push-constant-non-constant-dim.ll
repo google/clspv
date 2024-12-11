@@ -9,7 +9,7 @@
 ; CHECK: define spir_func i32 @_Z17get_global_offsetj(i32 [[p:%[0-9]+]])
 ; CHECK: [[cmp:%[0-9]+]] = icmp ult i32 [[p]], 3
 ; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 [[p]], i32 0
-; CHECK: [[gep:%[0-9]+]] = getelementptr inbounds [[type]], ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 [[sel]]
+; CHECK: [[gep:%[0-9]+]] = getelementptr inbounds {{(nuw )?}}[[type]], ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 [[sel]]
 ; CHECK: [[ld:%[0-9]+]] = load i32, ptr addrspace(9) [[gep]]
 ; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 [[ld]], i32 0
 ; CHECK: ret i32 [[sel]]
