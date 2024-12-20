@@ -6,9 +6,11 @@
 
 ; CHECK: define spir_func i32 @_Z14get_local_sizej(i32 [[p:%[0-9]+]])
 ; CHECK: [[cmp:%[0-9]+]] = icmp ult i32 [[p]], 3
-; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 [[p]], i32 0
 ; CHECK: [[ld:%[0-9]+]] = load <3 x i32>, ptr addrspace(8) @__spirv_WorkgroupSize
-; CHECK: [[ex:%[0-9]+]] = extractelement <3 x i32> [[ld]], i32 [[sel]]
+
+; If p is out of bounds, then the extract element yields a poison value that
+; is then thrown away by the select on the next line.
+; CHECK: [[ex:%[0-9]+]] = extractelement <3 x i32> [[ld]], i32 [[p]]
 ; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 [[ex]], i32 1
 ; CHECK: ret i32 [[sel]]
 
