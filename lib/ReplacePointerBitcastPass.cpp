@@ -354,6 +354,19 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   unsigned DstEleTyBitWidth = SizeInBits(Builder, DstEleTy);
 
   Type *OrigSrcTy = SrcTy;
+
+  // PhysicalPointerArgsPass uses IntToPtrInst to convert an integer argument
+  // that contains a pointer value into a pointer variable back.
+  // Other LLVM passes can change the pointer types into other pointer types.
+  // For example the type char4* into int*.
+  // The problem is that spirv creates a global variable for the pointer
+  // argument, and the source argument type for all getelementptr must be
+  // synchronized to bind them to the global variable.
+  if (dyn_cast<IntToPtrInst>(Src)) {
+    DenseMap<Value *, Type *> TypeCache;
+    Type *arg_type = clspv::InferType(Src, Builder.getContext(), &TypeCache);
+    OrigSrcTy = arg_type ? arg_type : OrigSrcTy;
+  }
   SmallVector<Value *, 4> AddrIdxs;
   ReduceType(Builder, IsGEPUser, OrgGEPIdx, SrcTy, DstTyBitWidth, NewAddrIdxs,
              AddrIdxs, ToBeDeleted);
