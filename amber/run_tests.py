@@ -53,6 +53,8 @@ def main():
                       help='Specify the path to the Vulkan ICD json')
   parser.add_argument('--one-dir', dest='one_dir', action='store_true',
                       help='Avoid large globs and assume tests are directly in --dir')
+  parser.add_argument( '--validate', dest='validate', action='store_true',
+                      help='Enable Vulkan validation layers')
 
   args = parser.parse_args()
 
@@ -72,7 +74,9 @@ def main():
       adjusted = os.path.join(args.test_dir, p)
       if adjusted in tests:
         tests.remove(adjusted)
-  cmd = [args.amber, '-d', '-V']
+  cmd = [args.amber, '-V']
+  if not args.validate:
+    cmd = cmd + ['-d']
   cmd = cmd + tests
   p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
   (stdout, _) = p.communicate()
