@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.22.1)
 
 # Enable ccache if installed. Use all default options currently:
 # https://ccache.dev/manual/latest.html#_configuration_options
