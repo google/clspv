@@ -743,11 +743,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
 
       DstTy = GEP->getResultElementType();
 
-      if (DynVal == nullptr &&
-          GoThroughTypeAtOffset(DL, Builder, SrcTy, DstTy,
-                                CstVal * SmallerBitWidths, nullptr) != 0) {
-        SrcTy = DstTy;
-      }
       auto Idx =
           GetIdxsForTyFromOffset(DL, Builder, SrcTy, DstTy, CstVal, DynVal,
                                  SmallerBitWidths, GEP->getPointerOperand());
