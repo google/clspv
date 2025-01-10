@@ -34,15 +34,9 @@ python utils/fetch_sources.py
 if %VS_VERSION% == 2019 (
   set GENERATOR="Visual Studio 16 2019"
   echo "Using VS 2019..."
-) else if %VS_VERSION% == 2017 (
-  set GENERATOR="Visual Studio 15 2017 Win64"
-  echo "Using VS 2017..."
-) else if %VS_VERSION% == 2015 (
-  set GENERATOR="Visual Studio 14 2015 Win64"
-  echo "Using VS 2015..."
-) else if %VS_VERSION% == 2013 (
-  set GENERATOR="Visual Studio 12 2013 Win64"
-  echo "Using VS 2013..."
+) else if %VS_VERSION% == 2022 (
+  set GENERATOR="Visual Studio 17 2022"
+  echo "Using VS 2022..."
 )
 
 cd %SRC%

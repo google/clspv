@@ -1,4 +1,4 @@
-:: Copyright 2018 The Clspv Authors. All rights reserved.
+:: Copyright 2020 The Clspv Authors. All rights reserved.
 ::
 :: Licensed under the Apache License, Version 2.0 (the "License");
 :: you may not use this file except in compliance with the License.
@@ -18,5 +18,5 @@
 set SCRIPT_DIR=%~dp0
 
 :: Call with correct parameter
-call %SCRIPT_DIR%\..\scripts\windows\build.bat RelWithDebInfo 2019
+call %SCRIPT_DIR%\..\scripts\windows\build.bat Release 2019
 
