@@ -55,8 +55,8 @@ private:
    * SPIR-V does not guarantee reconvergence (without maximal reconvergence)
    * into a fully structured section where reconvergence is guaranteed.
    */
-  void isolateConvergentLatch(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
-
+  void isolateConvergentLatch(llvm::Function &F,
+                              llvm::FunctionAnalysisManager &FAM);
 };
 } // namespace clspv
 
