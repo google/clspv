@@ -28,6 +28,35 @@ private:
   void breakConditionalHeader(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
   void isolateContinue(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
 
+  /**
+   * Transforms a loop such as:
+   *
+   *  header --\
+   *   /   \   |
+   *  body |   |
+   *    \ /    ^
+   *   latch   |
+   *    /  \   |
+   *  exit  ---/
+   *
+   * Into:
+   *  header  --------\
+   *   /   \          |
+   *  body |          |
+   *    \ /           ^
+   *   old_latch      |
+   *    /  \          |
+   *  exit new_latch -/
+   *
+   * When the latch contains a convergent call (e.g. a barrier). This will force
+   * breakConditionalHeader to transform the loop also and effectively
+   * encapsulates body within a selection now fully contained in the body of the
+   * loop. This effectively moves the convergent call out of the latch where
+   * SPIR-V does not guarantee reconvergence (without maximal reconvergence)
+   * into a fully structured section where reconvergence is guaranteed.
+   */
+  void isolateConvergentLatch(llvm::Function &F, llvm::FunctionAnalysisManager &FAM);
+
 };
 } // namespace clspv
 
