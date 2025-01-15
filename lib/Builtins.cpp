@@ -686,6 +686,9 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
     return glsl::ExtInst::ExtInstPackHalf2x16;
   case Builtins::kSpirvUnpack:
     return glsl::ExtInst::ExtInstUnpackHalf2x16;
+  case Builtins::kMad:
+    // Only floating-point kMad should be able to get here
+    return glsl::ExtInst::ExtInstFma;
   default:
     break;
   }
