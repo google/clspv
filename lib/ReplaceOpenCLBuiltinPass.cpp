@@ -2116,6 +2116,13 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
 
 bool ReplaceOpenCLBuiltinPass::replaceMul(Function &F, bool is_float,
                                           bool is_mad) {
+  // floating-point fma can be handle later in the flow if they are allowed
+  if (is_float && is_mad &&
+      (clspv::Option::UseNativeBuiltins().count(
+           clspv::Builtins::BuiltinType::kFma) > 0 ||
+       clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath())) {
+    return false;
+  }
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
     // The multiply instruction to use.
     auto MulInst = is_float ? Instruction::FMul : Instruction::Mul;
