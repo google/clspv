@@ -1485,8 +1485,6 @@ spv::StorageClass SPIRVProducerPassImpl::GetStorageBufferClass() const {
 spv::StorageClass
 SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
   switch (AddrSpace) {
-  default:
-    llvm_unreachable("Unsupported OpenCL address space");
   case AddressSpace::Private:
     return spv::StorageClassFunction;
   case AddressSpace::Global:
@@ -1507,6 +1505,8 @@ SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
     return spv::StorageClassPrivate;
   case AddressSpace::PushConstant:
     return spv::StorageClassPushConstant;
+  default:
+    llvm_unreachable("Unsupported OpenCL address space");
   }
 }
 
@@ -5915,9 +5915,6 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     spv::Op opcode;
 
     switch (AtomicRMW->getOperation()) {
-    default:
-      I.print(errs());
-      llvm_unreachable("Unsupported instruction???");
     case llvm::AtomicRMWInst::Add:
       opcode = spv::OpAtomicIAdd;
       break;
@@ -5948,6 +5945,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     case llvm::AtomicRMWInst::Xor:
       opcode = spv::OpAtomicXor;
       break;
+    default:
+      I.print(errs());
+      llvm_unreachable("Unsupported instruction???");
     }
 
     //
@@ -6040,6 +6040,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
     SPIRVOperandVec Operands;
 
     auto nextDeferred = [&i, &Inst, &DeferredInsts, &Placeholder]() {
+      (void)Inst;
       ++i;
       assert(DeferredInsts.size() > i);
       assert(Inst == DeferredInsts[i].first);
