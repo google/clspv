@@ -426,7 +426,11 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
       for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
         (*cache)[phi] = phi_ty;
         auto IncValTy = InferType(phi->getIncomingValue(i), context, cache);
-        phi_ty = SmallerTypeNotAliasing(DL, phi_ty, IncValTy);
+        if (phi_ty && IncValTy &&
+            BitcastUtils::SizeInBits(DL, phi_ty) >
+                BitcastUtils::SizeInBits(DL, IncValTy)) {
+          phi_ty = IncValTy;
+        }
       }
     }
     cache->erase(phi);

@@ -125,3 +125,22 @@ loop:
 exit:
   ret void
 }
+
+define spir_kernel void @test6(ptr addrspace(1) %buf, i32 %cst, i1 %cond) {
+entry:
+; CHECK: entry
+; CHECK-NEXT: [[gep:%[^ ]+]] = getelementptr { [0 x i32] }, ptr addrspace(1) %buf, i32 0, i32 0, i32 %cst
+; CHECK-NEXT: br label %loop
+  %0 = getelementptr { [0 x i32] }, ptr addrspace(1) %buf, i32 0, i32 0, i32 0
+  %gep = getelementptr inbounds nuw i32, ptr addrspace(1) %0, i32 %cst
+  br label %loop
+loop:
+; CHECK: loop
+; CHECK-NEXT: [[phi:%[^ ]+]] = phi ptr addrspace(1) [ [[gep]], %entry ], [ [[gep2:%[^ ]+]], %loop ]
+; CHECK-NEXT: [[gep2]] = getelementptr <4 x i32>, ptr addrspace(1) [[phi]], i32 4, i32 0
+  %phi = phi ptr addrspace(1) [ %gep, %entry ], [ %gep2, %loop ]
+  %gep2 = getelementptr <4 x i32>, ptr addrspace(1) %phi, i32 4
+  br i1 %cond, label %exit, label %loop
+exit:
+  ret void
+}
