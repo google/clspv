@@ -2,7 +2,8 @@
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: entry:
-; CHECK: [[new_header:[a-zA-Z0-9_.]+]]:
+; CHECK-NEXT: br label %[[new_header:[a-zA-Z0-9_.]+]]
+; CHECK: [[new_header]]:
 ; CHECK-NEXT: br label %loop
 ; CHECK: loop:
 ; CHECK-NEXT: br i1 undef, label %then, label %[[pre_cont:[a-zA-Z0-9_.]+]]
