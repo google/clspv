@@ -134,7 +134,7 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
 
     // Break the latch such that it is a single-entry single-exit block.
     // This will force later transforms in this fixup to break the loop header
-    // which puts the whole loop body as a secltion.
+    // which puts the whole loop body as a selection.
     if (latch_terminator->isConditional()) {
       // Safety valve: if this is not an exiting block then the loop is not
       // structured as expected.
