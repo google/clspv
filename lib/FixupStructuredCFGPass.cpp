@@ -26,7 +26,7 @@ PreservedAnalyses
 clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
   // Assumes CFG has been structurized.
   isolateContinue(F, FAM);
-  // Run after isolateContinue since this can invalidate loop info.
+  isolateConvergentLatch(F, FAM);
   breakConditionalHeader(F, FAM);
 
   removeUndefPHI(F);
@@ -75,6 +75,97 @@ void clspv::FixupStructuredCFGPass::removeUndefPHI(Function &F) {
   }
 }
 
+void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
+    Function &F, FunctionAnalysisManager &FAM) {
+  auto &LI = FAM.getResult<LoopAnalysis>(F);
+
+  std::vector<BasicBlock *> blocks;
+  blocks.reserve(F.size());
+  for (auto &BB : F) {
+    blocks.push_back(&BB);
+  }
+
+  for (auto *BB : blocks) {
+    if (!LI.isLoopHeader(BB))
+      continue;
+
+    auto *loop = LI.getLoopFor(BB);
+    auto *latch = loop->getLoopLatch();
+    // Skip single block loops.
+    if (!latch || latch == BB) {
+      continue;
+    }
+
+    // Latch needs two predecessors.
+    if (!latch->hasNPredecessors(2)) {
+      continue;
+    }
+
+    // Header is a conditional branch.
+    auto header_terminator = dyn_cast_or_null<BranchInst>(BB->getTerminator());
+    if (!header_terminator || !header_terminator->isConditional()) {
+      continue;
+    }
+
+    // One edge jumps to the continue target.
+    if (header_terminator->getSuccessor(0) != latch &&
+        header_terminator->getSuccessor(1) != latch) {
+      continue;
+    }
+
+    // The continue contains a convergent call.
+    bool has_convergent_call = false;
+    for (auto &inst : *latch) {
+      if (auto *call = dyn_cast<CallInst>(&inst)) {
+        if (call->hasFnAttr(Attribute::Convergent)) {
+          has_convergent_call = true;
+          break;
+        }
+      }
+    }
+    if (!has_convergent_call) {
+      continue;
+    }
+
+    auto *latch_terminator =
+        dyn_cast_or_null<BranchInst>(latch->getTerminator());
+    if (!latch_terminator)
+      continue;
+
+    // Break the latch such that it is a single-entry single-exit block.
+    // This will force later transforms in this fixup to break the loop header
+    // which puts the whole loop body as a selection.
+    if (latch_terminator->isConditional()) {
+      // Safety valve: if this is not an exiting block then the loop is not
+      // structured as expected.
+      if (!loop->isLoopExiting(latch)) {
+        continue;
+      }
+
+      // Conditional branch case: one edge back to header and one out of the
+      // loop. Transformed into one edge out of the loop and one edge to the new
+      // continue and thence to the header.
+      auto new_latch =
+          BasicBlock::Create(F.getContext(), "", &F, latch->getNextNode());
+      BranchInst::Create(BB, new_latch);
+      loop->addBlockEntry(new_latch);
+
+      const auto idx = latch_terminator->getSuccessor(0) == BB ? 0 : 1;
+      latch_terminator->setSuccessor(idx, new_latch);
+
+      // Update phis to use the new basic block.
+      for (auto iter = BB->begin(); &*iter != BB->getFirstNonPHI(); ++iter) {
+        PHINode *phi = cast<PHINode>(&*iter);
+        phi->replaceIncomingBlockWith(latch, new_latch);
+      }
+    } else {
+      // Simple case: just split the block.
+      auto new_block = latch->splitBasicBlockBefore(latch_terminator);
+      loop->addBlockEntry(new_block);
+    }
+  }
+}
+
 void clspv::FixupStructuredCFGPass::breakConditionalHeader(
     Function &F, FunctionAnalysisManager &FAM) {
   auto &LI = FAM.getResult<LoopAnalysis>(F);
@@ -106,7 +197,8 @@ void clspv::FixupStructuredCFGPass::breakConditionalHeader(
     bool succ2_in_body = succ2 != latch && succ2 != exit;
 
     if (succ1_in_body && succ2_in_body) {
-      BB->splitBasicBlockBefore(terminator);
+      auto new_block = BB->splitBasicBlockBefore(terminator);
+      loop->addBlockEntry(new_block);
     }
   }
 }
