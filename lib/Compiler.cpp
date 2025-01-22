@@ -416,7 +416,7 @@ int SetCompilerInstanceOptions(
   instance.getTargetOpts().Triple = triple.str();
 
   instance.getCodeGenOpts().MainFileName = overiddenInputFilename.str();
-  instance.getCodeGenOpts().PreserveVec3Type = true;
+  instance.getLangOpts().PreserveVec3Type = true;
   // Disable generation of lifetime intrinsic.
   instance.getCodeGenOpts().DisableLifetimeMarkers = true;
   if (InputLanguage == clang::Language::OpenCL) {
