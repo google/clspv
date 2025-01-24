@@ -30,7 +30,7 @@ SRC=$PWD/github/clspv
 git config --global --add safe.directory $SRC
 
 using python-3.12
-using clang-8.0.0
+using clang-13.0.1
 which clang-format
 
 cd $SRC
