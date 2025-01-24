@@ -23,7 +23,7 @@ set -x
 
 # Common tools.
 using cmake-3.31.2
-using gcc-10
+using gcc-13
 using ninja-1.10.0
 using python-3.12
 
