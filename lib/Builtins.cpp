@@ -27,9 +27,12 @@ using namespace clspv;
 ////////////////////////////////////////////////////////////////////////////////
 ////  Convert Builtin function name to a Type enum
 ////////////////////////////////////////////////////////////////////////////////
-Builtins::BuiltinType Builtins::LookupBuiltinType(const std::string &name) {
-  if (name.find("__clc_convert_") == 0 || name.find("convert_") == 0) {
-    return Builtins::kConvert;
+Builtins::BuiltinType
+Builtins::LookupBuiltinType(const std::string &builtin_name) {
+  const char *clc_prefix = "__clc_";
+  std::string name = builtin_name;
+  if (name.find(clc_prefix) == 0) {
+    name.erase(0, strlen(clc_prefix));
   }
 
 // Build static map of builtin function names

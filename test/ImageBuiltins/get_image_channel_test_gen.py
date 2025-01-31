@@ -79,7 +79,7 @@ declare spir_func i32 ${order_function}(ptr addrspace(1) %0)
 
 declare spir_func i32 ${data_type_function}(ptr addrspace(1) %0)
 
-define spir_kernel void @order(ptr addrspace(1) nocapture writeonly align 4 %dst, ptr addrspace(1) %image) {
+define spir_kernel void @order(ptr addrspace(1) writeonly align 4 %dst, ptr addrspace(1) %image) {
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
@@ -89,7 +89,7 @@ entry:
   ret void
 }
 
-define spir_kernel void @data_type(ptr addrspace(1) nocapture writeonly align 4 %dst, ptr addrspace(1) %image) {
+define spir_kernel void @data_type(ptr addrspace(1) writeonly align 4 %dst, ptr addrspace(1) %image) {
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
@@ -105,10 +105,10 @@ declare ptr addrspace(1) @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i
 
 ; CHECK: @__push_constants = addrspace(9) global %0 zeroinitializer, !push_constants [[pc:![^ ]+]]
 
-; CHECK: define spir_kernel void @order(ptr addrspace(1) nocapture writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[order_kernel:![^ ]+]]
+; CHECK: define spir_kernel void @order(ptr addrspace(1) writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[order_kernel:![^ ]+]]
 ; CHECK: tail call spir_func i32 ${order_function}(ptr addrspace(1) {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
 
-; CHECK: define spir_kernel void @data_type(ptr addrspace(1) nocapture writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[data_type_kernel:![^ ]+]]
+; CHECK: define spir_kernel void @data_type(ptr addrspace(1) writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[data_type_kernel:![^ ]+]]
 ; CHECK: tail call spir_func i32 ${data_type_function}(ptr addrspace(1) {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
 
 ; CHECK: [[pc]] = !{i32 {{.*}}}
