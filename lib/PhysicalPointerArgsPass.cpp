@@ -92,7 +92,8 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
     mask.addAttribute(Attribute::AttrKind::ElementType);
     mask.addAttribute(Attribute::AttrKind::InAlloca);
     mask.addAttribute(Attribute::AttrKind::Preallocated);
-    mask.addAttribute(Attribute::AttrKind::NoCapture);
+    mask.addAttribute(
+        Attribute::getWithCaptureInfo(M.getContext(), CaptureInfo::none()));
     mask.addAttribute(Attribute::AttrKind::NoFree);
     mask.addAttribute(Attribute::AttrKind::Nest);
     mask.addAttribute(Attribute::AttrKind::NonNull);

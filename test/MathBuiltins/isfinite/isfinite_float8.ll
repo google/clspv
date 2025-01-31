@@ -6,7 +6,7 @@ target triple = "spir64-unknown-unknown"
 
 declare spir_func <8 x i32> @_Z8isfiniteDv8_f(<8 x float>)
 
-define spir_kernel void @test(<8 x float> %val, ptr addrspace(1) nocapture %out) {
+define spir_kernel void @test(<8 x float> %val, ptr addrspace(1) %out) {
 entry:
   %call = tail call spir_func <8 x i32> @_Z8isfiniteDv8_f(<8 x float> %val)
   store <8 x i32> %call, ptr addrspace(1) %out, align 32
@@ -15,7 +15,7 @@ entry:
 
 ; CHECK-LABEL: define spir_kernel void @test(
 ; CHECK-SAME: [[FLOAT8:\[8 x float\]]] [[VAL:%[^ ,]+]],
-; CHECK-SAME: ptr addrspace(1) nocapture [[OUT:%[^ )]+]]
+; CHECK-SAME: ptr addrspace(1) [[OUT:%[^ )]+]]
 ; CHECK-SAME: )
 
 ; CHECK-DAG: [[V0:%[^ ]+]] = extractvalue [[FLOAT8]] [[VAL]], 0

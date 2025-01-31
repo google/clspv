@@ -14,7 +14,7 @@ target triple = "spir-unknown-unknown"
 
 
 ; CHECK: define dso_local spir_kernel void @foo(ptr addrspace(1){{.*}} align 16 {{%[a-zA-Z0-9_.]+}}, ptr addrspace(2){{.*}} align 16 {{%[a-zA-Z0-9_.]+}}, ptr addrspace(3) {{.*}} align 16 {{%[a-zA-Z0-9_.]+}}) !clspv.pod_args_impl [[POD_IMPL_MD:![0-9]+]] {
-define dso_local spir_kernel void @foo(ptr addrspace(1) nocapture writeonly align 16 %data, ptr addrspace(2) nocapture readonly align 16 %c_arg, ptr addrspace(3) nocapture readonly align 16 %l_arg) !clspv.pod_args_impl !0 {
+define dso_local spir_kernel void @foo(ptr addrspace(1) writeonly align 16 %data, ptr addrspace(2) readonly align 16 %c_arg, ptr addrspace(3) readonly align 16 %l_arg) !clspv.pod_args_impl !0 {
 entry:
 ; get args
 ; CHECK: [[ARG_LOCAL:%[a-zA-Z0-9_.]+]] = call ptr addrspace(3) @_Z11clspv.local.3(i32 3, [0 x [[DATA_TYPE]]] zeroinitializer)
