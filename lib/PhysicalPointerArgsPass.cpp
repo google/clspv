@@ -22,6 +22,7 @@
 #include "clspv/Option.h"
 
 #include "Constants.h"
+#include "NormalizeGlobalVariable.h"
 #include "Types.h"
 
 using namespace llvm;
@@ -169,6 +170,7 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
       F->eraseFromParent();
     }
   }
+  clspv::NormalizeGlobalVariables(M);
 
   return PA;
 }
