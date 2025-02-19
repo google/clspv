@@ -23,8 +23,8 @@
 // CHECK: OpControlBarrier [[uint_2]] [[uint_2]] [[uint_328]]
 
 kernel void foo() {
-  work_group_barrier(0);
-  work_group_barrier(CLK_GLOBAL_MEM_FENCE);
-  work_group_barrier(CLK_LOCAL_MEM_FENCE);
-  work_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+  barrier(0);
+  barrier(CLK_GLOBAL_MEM_FENCE);
+  barrier(CLK_LOCAL_MEM_FENCE);
+  barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
 }

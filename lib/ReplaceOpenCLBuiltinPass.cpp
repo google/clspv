@@ -1373,16 +1373,24 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
         CI->getIterator());
 
     // And combine the above together, also adding in
-    // MemorySemanticsSequentiallyConsistentMask.
+    // MemorySemanticsAcquireReleaseMask if semantics is not zero
     auto MemorySemantics1 =
         BinaryOperator::Create(Instruction::Or, MemorySemanticsWorkgroup,
-                               ConstantAcquireRelease, "", CI->getIterator());
+                               MemorySemanticsUniform, "", CI->getIterator());
     auto MemorySemantics2 =
-        BinaryOperator::Create(Instruction::Or, MemorySemanticsUniform,
-                               MemorySemanticsImage, "", CI->getIterator());
-    auto MemorySemantics =
         BinaryOperator::Create(Instruction::Or, MemorySemantics1,
-                               MemorySemantics2, "", CI->getIterator());
+                               MemorySemanticsImage, "", CI->getIterator());
+    auto MemorySemantics3 =
+        BinaryOperator::Create(Instruction::Or, MemorySemantics2,
+                               ConstantAcquireRelease, "", CI->getIterator());
+
+    auto ZeroValue = Constant::getNullValue(MemorySemantics2->getType());
+    auto IsMemorySemanticsZero =
+        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
+                        MemorySemantics2, ZeroValue, "", CI->getIterator());
+    auto MemorySemantics =
+        SelectInst::Create(IsMemorySemanticsZero, ZeroValue, MemorySemantics3,
+                           "", CI->getIterator());
 
     // If the memory scope is not specified explicitly, it is either Subgroup
     // or Workgroup depending on the type of barrier.
