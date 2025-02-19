@@ -6,10 +6,27 @@
 #pragma OPENCL EXTENSION cl_khr_subgroups : enable
 
 // CHECK: [[uint:%[a-zA-Z0-9_.]+]] = OpTypeInt 32 0
-// CHECK-DAG: [[uint_3:%[a-zA-Z0-9_.]+]] = OpConstant [[uint]] 3
-// CHECK-DAG: [[uint_264:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 264
-// CHECK: OpControlBarrier [[uint_3]] [[uint_3]] [[uint_264]]
-kernel void foo() {
-  sub_group_barrier(CLK_LOCAL_MEM_FENCE);
-}
 
+// Subgroup
+// CHECK-DAG: [[uint_3:%[a-zA-Z0-9_.]+]] = OpConstant [[uint]] 3
+
+// Relaxed
+// CHECK-DAG: [[uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
+// AcquireRelease | StorageBufferMemory
+// CHECK-DAG: [[uint_72:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 72
+// AcquireRelease | WorkgroupMemory
+// CHECK-DAG: [[uint_264:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 264
+// AcquireRelease | StorageBufferMemory | WorkgroupMemory
+// CHECK-DAG: [[uint_328:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 328
+
+// CHECK: OpControlBarrier [[uint_3]] [[uint_3]] [[uint_0]]
+// CHECK: OpControlBarrier [[uint_3]] [[uint_3]] [[uint_72]]
+// CHECK: OpControlBarrier [[uint_3]] [[uint_3]] [[uint_264]]
+// CHECK: OpControlBarrier [[uint_3]] [[uint_3]] [[uint_328]]
+
+kernel void foo() {
+  sub_group_barrier(0);
+  sub_group_barrier(CLK_GLOBAL_MEM_FENCE);
+  sub_group_barrier(CLK_LOCAL_MEM_FENCE);
+  sub_group_barrier(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+}
