@@ -23,7 +23,7 @@
 #    - 'clang-format-diff.py' is in the utils directory, or env var
 #       points to it.CLANG_FORMAT_DIFF
 
-CLANG_FORMAT=${CLANG_FORMAT_DIFF:-clang-format}
+CLANG_FORMAT=${CLANG_FORMAT:-clang-format}
 if [ ! -f "$CLANG_FORMAT" ]; then
   echo missing clang-format: set CLANG_FORMAT or put clang-format in the PATH
   exit 1
