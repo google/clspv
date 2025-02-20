@@ -25,4 +25,4 @@ docker run --rm -i \
   --volume "${ROOT_DIR}:${ROOT_DIR}" \
   --workdir "${ROOT_DIR}" \
   "us-east4-docker.pkg.dev/shaderc-build/radial-docker/ubuntu-24.04-amd64/formatter" \
-  "${SCRIPT_DIR}/build-docker.sh"
+  "${SCRIPT_DIR}/build-docker.sh" FULL

@@ -13,30 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script should be run from the project root directory.
+
 # Fail on any error.
 set -e
 
-. /bin/using.sh # Declare the bash 'using' function
-
-# Display commands being run.
-set -x
-
-BUILD_ROOT=$PWD
-SRC=$PWD/github/clspv
+# Verify this script is run from the root directory.
+[ -d .git ]
+[ -f docs/OpenCLCOnVulkan.md ]
 
 # This is required to run any git command in the docker since owner will
 # have changed between the clone environment, and the docker container.
 # Marking the root of the repo as safe for ownership changes.
-git config --global --add safe.directory $SRC
+git config --global --add safe.directory $(pwd)
 
-using python-3.12
-using clang-13.0.1
-which clang-format
-
-cd $SRC
-python3 utils/fetch_sources.py
-cp third_party/llvm/clang/tools/clang-format/clang-format-diff.py utils/clang-format-diff.py
+# The docker image should have set these
+[ -f "$CLANG_FORMAT" ]
+[ -f "$CLANG_FORMAT_DIFF" ]
 
 echo $(date): Check formatting...
-./utils/check_code_format.sh
+# $1 should be FULL for continuous build, so formatting is checked against the
+# parent of HEAD.
+# Otherwise, compare formatting against 'main'
+./utils/check_code_format.sh $1
 echo $(date): check completed.
