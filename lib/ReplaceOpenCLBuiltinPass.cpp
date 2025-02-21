@@ -1386,8 +1386,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 
     auto ZeroValue = Constant::getNullValue(MemorySemantics2->getType());
     auto IsMemorySemanticsZero =
-        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ,
-                        MemorySemantics2, ZeroValue, "", CI->getIterator());
+        CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_EQ, MemorySemantics2,
+                        ZeroValue, "", CI->getIterator());
     auto MemorySemantics =
         SelectInst::Create(IsMemorySemanticsZero, ZeroValue, MemorySemantics3,
                            "", CI->getIterator());
