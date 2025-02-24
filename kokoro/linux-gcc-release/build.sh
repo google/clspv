@@ -28,7 +28,7 @@ docker run --rm -i \
   --env BUILD_TOOLCHAIN="gcc" \
   --env BUILD_TYPE="RelWithDebInfo" \
   --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build.sh" \
-  "gcr.io/shaderc-build/radial-build:latest"
+  us-east4-docker.pkg.dev/shaderc-build/radial-docker/ubuntu-24.04-amd64/cpp-builder
 
 
 # chown the given directory to the current user, if it exists.

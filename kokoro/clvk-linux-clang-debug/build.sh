@@ -28,4 +28,4 @@ docker run --rm -i \
   --env BUILD_TOOLCHAIN="clang" \
   --env BUILD_TYPE="Release" \
   --entrypoint "${ROOT_DIR}/${SCRIPT_DIR}/../scripts/linux/build-clvk.sh" \
-  "gcr.io/shaderc-build/radial-build:latest"
+  us-east4-docker.pkg.dev/shaderc-build/radial-docker/ubuntu-24.04-amd64/cpp-builder
