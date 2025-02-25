@@ -4706,7 +4706,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
 
     // Do not replace functions with implementations.
     if (EInst && EInst == glsl::ExtInst::ExtInstFma &&
-        !clspv::Option::UnsafeMath() &&
+        !clspv::Option::UnsafeMath() && !clspv::Option::ClMadEnable() &&
         clspv::Option::UseNativeBuiltins().count(
             clspv::Builtins::BuiltinType::kFma) == 0 &&
         Call->getType()->getScalarType()->isHalfTy()) {
