@@ -8,7 +8,7 @@ __constant float myconst[4] = {
 };
 
 __kernel void test(__global float* a) {
-    a[get_global_id(0)] = myconst[2];
+    a[0] = myconst[2];
 }
 
 // CHECK: OpExtension "SPV_KHR_physical_storage_buffer"
