@@ -700,7 +700,8 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   }
 
   // TODO: improve this by checking the intrinsic id.
-  if (func_info.getName().find("llvm.fmuladd.") == 0) {
+  if (func_info.getName().find("llvm.fmuladd.") == 0 ||
+      func_info.getName().find("llvm.fma.") == 0) {
     return glsl::ExtInst::ExtInstFma;
   }
   if (func_info.getName().find("llvm.sqrt.") == 0) {
