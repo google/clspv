@@ -630,6 +630,7 @@ struct SPIRVProducerPassImpl {
   void GeneratePrintfReflection();
   void GeneratePushConstantReflection();
   void GenerateSpecConstantReflection();
+  void GenerateWorkgroupSizeReflection();
   void AddArgumentReflection(const Function &F, SPIRVID kernel_decl,
                              const std::string &name, clspv::ArgKind arg_kind,
                              uint32_t ordinal, uint32_t descriptor_set,
@@ -813,6 +814,8 @@ private:
   DenseMap<Function *, SPIRVID> KernelDeclarations;
 
   StringMap<std::string> functionAttrStrings;
+
+  DenseMap<uint32_t, uint32_t> WorkgroupVariableSizeMap;
 
 public:
   static SPIRVProducerPassImpl *Ptr;
@@ -2948,6 +2951,11 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   if (!(module_scope_constant_external_init &&
         clspv::Option::PhysicalStorageBuffers())) {
     var_id = addSPIRVGlobalVariable(ptr_id, spvSC, InitializerID, interface);
+    if (spvSC == spv::StorageClass::StorageClassWorkgroup) {
+      WorkgroupVariableSizeMap.insert(std::make_pair(
+          var_id.get(),
+          BitcastUtils::SizeInBits(DL, GV.getValueType()) / CHAR_BIT));
+    }
     VMap[&GV] = var_id;
   }
 
@@ -6991,6 +6999,19 @@ void SPIRVProducerPassImpl::GenerateReflection() {
   GeneratePrintfReflection();
   GeneratePushConstantReflection();
   GenerateSpecConstantReflection();
+  GenerateWorkgroupSizeReflection();
+}
+
+void SPIRVProducerPassImpl::GenerateWorkgroupSizeReflection() {
+  auto import_id = getReflectionImport();
+  auto void_id = getSPIRVType(Type::getVoidTy(module->getContext()));
+  for (auto workgroup_var : WorkgroupVariableSizeMap) {
+    SPIRVOperandVec Ops;
+    Ops << void_id << import_id << reflection::ExtInstWorkgroupVariableSize
+        << workgroup_var.getFirst()
+        << getSPIRVInt32Constant(workgroup_var.getSecond());
+    addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
+  }
 }
 
 void SPIRVProducerPassImpl::GeneratePushConstantReflection() {
