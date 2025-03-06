@@ -450,7 +450,13 @@ int SetCompilerInstanceOptions(
   instance.getPreprocessorOpts().addMacroDef("VULKAN=100");
 
   // Add the __OPENCL_VERSION__ macro.
-  instance.getPreprocessorOpts().addMacroDef("__OPENCL_VERSION__=120");
+  if (standard == clang::LangStandard::lang_opencl20) {
+    instance.getPreprocessorOpts().addMacroDef("__OPENCL_VERSION__=200");
+  } else if (standard == clang::LangStandard::lang_opencl30) {
+    instance.getPreprocessorOpts().addMacroDef("__OPENCL_VERSION__=300");
+  } else {
+    instance.getPreprocessorOpts().addMacroDef("__OPENCL_VERSION__=120");
+  }
 
   instance.setTarget(PrepareTargetInfo(instance));
 
