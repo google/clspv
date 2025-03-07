@@ -1589,7 +1589,8 @@ SPIRVID SPIRVProducerPassImpl::addSPIRVGlobalVariable(const SPIRVID &TypeID,
   return VID;
 }
 
-SPIRVID SPIRVProducerPassImpl::ChangeLayout(SPIRVID object, Type *type, bool removeLayout) {
+SPIRVID SPIRVProducerPassImpl::ChangeLayout(SPIRVID object, Type *type,
+                                            bool removeLayout) {
   auto dst_id = getSPIRVType(type, !removeLayout);
 
   SPIRVID copy = object;
@@ -1604,9 +1605,11 @@ SPIRVID SPIRVProducerPassImpl::ChangeLayout(SPIRVID object, Type *type, bool rem
     if (struct_ty || array_ty) {
       SPIRVOperandVec constructOps;
       constructOps << dst_id;
-      uint32_t num_eles = struct_ty ? struct_ty->getNumElements() : array_ty->getNumElements();
+      uint32_t num_eles =
+          struct_ty ? struct_ty->getNumElements() : array_ty->getNumElements();
       for (uint32_t i = 0; i < num_eles; i++) {
-        auto sub_type = struct_ty ? struct_ty->getElementType(i) : array_ty->getElementType();
+        auto sub_type = struct_ty ? struct_ty->getElementType(i)
+                                  : array_ty->getElementType();
 
         // Extract from src
         SPIRVOperandVec Ops;
@@ -5906,7 +5909,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     auto value_ty = value->getType();
     auto needs_layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
     if (needs_layout && (value_ty->isArrayTy() || value_ty->isStructTy())) {
-      RID = ChangeLayout(getSPIRVValue(value), value_ty, /* removeLayout = */ false);
+      RID = ChangeLayout(getSPIRVValue(value), value_ty,
+                         /* removeLayout = */ false);
     }
 
     // Ops[0] = Pointer ID
