@@ -28,10 +28,10 @@ declare spir_func i32 @_Z24atomic_exchange_explicitPU3AS4VU7_Atomicii12memory_or
 
 ; CHECK-LABEL: global
 ; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(1) %atomic, i32 1, i32 72, i32 100)
-; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(1) %atomic, i32 1, i32 64, i32 101)
+; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(1) %atomic, i32 1, i32 0, i32 101)
 ; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(1) %atomic, i32 1, i32 72, i32 102)
 
 ; CHECK-LABEL: local
 ; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(3) %atomic, i32 2, i32 264, i32 100)
-; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(3) %atomic, i32 2, i32 256, i32 101)
+; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(3) %atomic, i32 2, i32 0, i32 101)
 ; CHECK: call i32 @_Z8spirv.op.229.{{.*}}(i32 229, ptr addrspace(3) %atomic, i32 2, i32 264, i32 102)

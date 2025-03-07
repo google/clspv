@@ -31,11 +31,11 @@ declare spir_func void @_Z21atomic_store_explicitPU3AS4VU7_Atomicii12memory_orde
 
 ; CHECK-LABEL: global
 ; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(1) %atomic, i32 1, i32 68, i32 100)
-; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(1) %atomic, i32 1, i32 64, i32 101)
+; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(1) %atomic, i32 1, i32 0, i32 101)
 ; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(1) %atomic, i32 1, i32 68, i32 102)
 
 ; CHECK-LABEL: local
 ; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(3) %atomic, i32 2, i32 260, i32 100)
-; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(3) %atomic, i32 2, i32 256, i32 101)
+; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(3) %atomic, i32 2, i32 0, i32 101)
 ; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(3) %atomic, i32 2, i32 260, i32 102)
 ; CHECK: call void @_Z8spirv.op.228.{{.*}}(i32 228, ptr addrspace(3) @local_mem, i32 2, i32 260, i32 100)
