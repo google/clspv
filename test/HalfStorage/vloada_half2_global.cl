@@ -42,12 +42,11 @@ kernel void foo(global float2* A, global uint* B, uint n) {
 // CHECK-DAG: [[A1:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_v2float]] [[A]] [[uint_0]] [[uint_1]]
 // CHECK-DAG: [[n0:%[^ ]+]] = OpAccessChain [[_ptr_PushConstant__struct_19]] [[n]] [[uint_0]]
 // CHECK-DAG: [[n0s:%[^ ]+]] = OpLoad [[_struct_19]] [[n0]]
-// CHECK-DAG: [[nVal:%[^ ]+]] = OpCompositeExtract [[uint]] [[n0s]] 0
 
-// CHECK-64-DAG: [[nValL:%[^ ]+]] = OpUConvert [[ulong]] [[nVal]]
+// CHECK-64-DAG: [[nValL:%[^ ]+]] = OpUConvert [[ulong]]
 
-// CHECK-32-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]] [[nVal]]
-// CHECK-64-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]] [[nValL]]
+// CHECK-32-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]]
+// CHECK-64-DAG: [[BnPtr:%[^ ]+]] = OpAccessChain [[_ptr_StorageBuffer_uint]] [[B]] [[uint_0]]
 // CHECK-DAG: [[Bn:%[^ ]+]] = OpLoad [[uint]] [[BnPtr]]
 // CHECK-DAG: [[Bn2f:%[^ ]+]] = OpExtInst [[v2float]] {{.*}} UnpackHalf2x16 [[Bn]]
 // CHECK-DAG: OpStore [[A0]] [[Bn2f]]

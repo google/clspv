@@ -7,9 +7,7 @@
 // CHECK-DAG: %[[WRITE_ONLY_IMAGE_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeImage %[[UINT_TYPE_ID]] 3D 0 0 0 2 Unknown
 // CHECK-DAG: %[[UINT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[UINT_TYPE_ID]] 4
 // CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[WRITE_ONLY_IMAGE_TYPE_ID]]
-// CHECK: %[[C_LOAD_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT4_TYPE_ID]]
-// CHECK: %[[A_LOAD_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT4_TYPE_ID]]
-// CHECK: OpImageWrite %[[I_LOAD_ID]] %[[C_LOAD_ID]] %[[A_LOAD_ID]]
+// CHECK: OpImageWrite %[[I_LOAD_ID]]
 
 #pragma OPENCL EXTENSION cl_khr_3d_image_writes : enable
 

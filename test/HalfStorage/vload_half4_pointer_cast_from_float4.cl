@@ -11,11 +11,8 @@
 // CHECK-DAG: %[[CONSTANT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 0
 // CHECK-DAG: %[[CONSTANT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 1
 
-// CHECK: %[[LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[UINT2_TYPE_ID]]
-// CHECK: %[[EX0:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[LOAD_ID]] 0
-// CHECK: %[[EX1:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]] %[[LOAD_ID]] 1
-// CHECK: %[[LO_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT2_TYPE_ID]] {{.*}} UnpackHalf2x16 %[[EX0]]
-// CHECK: %[[HI_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT2_TYPE_ID]] {{.*}} UnpackHalf2x16 %[[EX1]]
+// CHECK: %[[LO_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT2_TYPE_ID]] {{.*}} UnpackHalf2x16
+// CHECK: %[[HI_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT2_TYPE_ID]] {{.*}} UnpackHalf2x16
 // CHECK: %[[RECOMBINE_ID:[a-zA-Z0-9_]*]] = OpVectorShuffle %[[FLOAT4_TYPE_ID]] %[[LO_ID]] %[[HI_ID]] 0 1 2 3
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float4* a, global float4* b)

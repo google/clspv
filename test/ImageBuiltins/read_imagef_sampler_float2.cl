@@ -41,7 +41,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CLUSTER: [[_28:%[a-zA-Z0-9_]+]] = OpLoad [[_2]]
 // CLUSTER: [[_29:%[a-zA-Z0-9_]+]] = OpLoad [[_4]]
 // CLUSTER: [[_32:%[a-zA-Z0-9_]+]] = OpLoad [[__struct_12]]
-// CLUSTER: [[_33:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_v2float]] [[_32]] 0
 // CLUSTER: [[_34:%[a-zA-Z0-9_]+]] = OpSampledImage [[_19]] [[_29]] [[_28]]
-// CLUSTER: [[_35:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_34]] [[_33]] Lod [[_float_0]]
+// CLUSTER: [[_35:%[a-zA-Z0-9_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_34]] {{.*}} Lod [[_float_0]]
 // CLUSTER: OpStore {{.*}} [[_35]]

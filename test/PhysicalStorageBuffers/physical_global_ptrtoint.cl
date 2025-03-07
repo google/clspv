@@ -1,7 +1,7 @@
-// RUN: clspv %target %s -o %t.spv -arch=spir64 -physical-storage-buffers
+// RUN: clspv %target %s -o %t.spv -arch=spir64 -physical-storage-buffers -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 kernel void test(global ulong *a, global int *b)
 {
@@ -20,8 +20,9 @@ kernel void test(global ulong *a, global int *b)
 // CHECK-DAG: [[pod_struct_ty:%[a-zA-Z0-9_]+]] = OpTypeStruct [[ulong]] [[ulong]]
 
 // CHECK: [[pod_struct:%[a-zA-Z0-9_]+]] = OpLoad [[pod_struct_ty]]
-// CHECK: [[ptr_int_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[pod_struct]] 0
-// CHECK: [[ptr_int_b:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[pod_struct]] 1
+// CHECK: [[copy:%[a-zA-Z0-9_]+]] = OpCopyLogical {{.*}} [[pod_struct]]
+// CHECK: [[ptr_int_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[copy]] 0
+// CHECK: [[ptr_int_b:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[copy]] 1
 // CHECK: [[ptr_a:%[a-zA-Z0-9_]+]] = OpConvertUToPtr [[ptr_physical_ulong]] [[ptr_int_a]]
 // CHECK: [[gid_x_ptr:%[a-zA-Z0-9_]+]] = OpAccessChain %{{[a-zA-Z0-9_]+}} [[global_id]] [[uint_0]]
 // CHECK: [[gid_x_load:%[a-zA-Z0-9_]+]] = OpLoad [[uint]] [[gid_x_ptr]]

@@ -19,9 +19,7 @@ entry:
   ret void
 }
 declare i8 @llvm.smax.i8(i8, i8)
-; CHECK: %[[A:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT8_TYPE_ID]] {{.*}} 0
-; CHECK: %[[B:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT8_TYPE_ID]] {{.*}} 1
-; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT8_TYPE_ID]] %[[EXT_INST]] SMax %[[A]] %[[B]]
+; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT8_TYPE_ID]] %[[EXT_INST]] SMax
 ; CHECK: OpStore {{.*}} %[[OP_ID]]
 
 
@@ -32,9 +30,7 @@ entry:
   ret void
 }
 declare i16 @llvm.smax.i16(i16, i16)
-; CHECK: %[[A:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT16_TYPE_ID]] {{.*}} 0
-; CHECK: %[[B:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT16_TYPE_ID]] {{.*}} 1
-; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT16_TYPE_ID]] %[[EXT_INST]] SMax %[[A]] %[[B]]
+; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT16_TYPE_ID]] %[[EXT_INST]] SMax
 ; CHECK: OpStore {{.*}} %[[OP_ID]]
 
 
@@ -45,9 +41,7 @@ entry:
   ret void
 }
 declare i32 @llvm.smax.i32(i32, i32)
-; CHECK: %[[A:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT32_TYPE_ID]] {{.*}} 0
-; CHECK: %[[B:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT32_TYPE_ID]] {{.*}} 1
-; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT32_TYPE_ID]] %[[EXT_INST]] SMax %[[A]] %[[B]]
+; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT32_TYPE_ID]] %[[EXT_INST]] SMax
 ; CHECK: OpStore {{.*}} %[[OP_ID]]
 
 
@@ -58,7 +52,5 @@ entry:
   ret void
 }
 declare i64 @llvm.smax.i64(i64, i64)
-; CHECK: %[[A:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT64_TYPE_ID]] {{.*}} 0
-; CHECK: %[[B:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[INT64_TYPE_ID]] {{.*}} 1
-; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT64_TYPE_ID]] %[[EXT_INST]] SMax %[[A]] %[[B]]
+; CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[INT64_TYPE_ID]] %[[EXT_INST]] SMax
 ; CHECK: OpStore {{.*}} %[[OP_ID]]

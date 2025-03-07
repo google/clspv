@@ -1,7 +1,7 @@
-// RUN: clspv %s -o %t.spv -enable-printf -long-vector
+// RUN: clspv %s -o %t.spv -enable-printf -long-vector -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 kernel void test(char2 c, short2 s, int2 i, float8 f, long4 l) {
     printf("Vectors: %v2hhd %v2hd %v2d %v8hlf %v4ld", c, s, i, f, l);
@@ -28,6 +28,7 @@ kernel void test(char2 c, short2 s, int2 i, float8 f, long4 l) {
 // CHECK-DAG: %[[const_32:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 32{{$}}
 // CHECK-DAG: %[[string0:[0-9a-zA-Z_]+]] = OpString "Vectors: %v2hhd %v2hd %v2d %v8hlf %v4ld"
 
+// CHECK: OpCopyLogical
 // CHECK-DAG: %[[arg_c:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[v2uchar]]
 // CHECK-DAG: %[[arg_s:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[v2ushort]]
 // CHECK-DAG: %[[arg_i:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[v2uint]]

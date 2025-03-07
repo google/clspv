@@ -4,10 +4,10 @@ kernel void foo(global uchar4* A, float f) {
  *A = (uchar4)(1,2,(uchar)f,4);
 }
 
-// RUN: clspv %target %s -o %t.spv -int8=0
+// RUN: clspv %target %s -o %t.spv -int8=0 --spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 
 

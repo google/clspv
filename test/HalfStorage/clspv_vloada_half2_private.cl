@@ -13,14 +13,13 @@ kernel void foo(global float2* A, uint v, uint w, uint n) {
 // CHECK-DAG: [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_uint]]
 // CHECK: OpStore
 // CHECK: OpStore
 // CHECK: [[_44:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]]
 // CHECK: [[_45:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[_44]]
 // CHECK: [[_34:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
 // CHECK: OpStore [[_34]] [[_45]]
-// CHECK: [[_46:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[_36]]
+// CHECK: [[_46:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16
 // CHECK: [[_47:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_uint_0]] [[_uint_1]]
 // CHECK: OpStore [[_47]] [[_46]]
 // CHECK: OpReturn

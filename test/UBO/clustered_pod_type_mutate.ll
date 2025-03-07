@@ -1,8 +1,8 @@
-; RUN: clspv-opt -constant-args-ubo %s -o %t.ll -producer-out-file %t.spv --passes=ubo-type-transform,spirv-producer
+; RUN: clspv-opt -constant-args-ubo %s -o %t.ll -producer-out-file %t.spv --passes=ubo-type-transform,spirv-producer --spv-version=1.4
 ; RUN: spirv-dis %t.spv -o %t.spvasm
-; RUN: spirv-val --target-env vulkan1.0 %t.spv
+; RUN: spirv-val --target-env vulkan1.2 %t.spv
 ; RUN: FileCheck %s < %t.spvasm
-; RUN: clspv-reflection %t.spv -o %t.map
+; RUN: clspv-reflection %t.spv -o %t.map --target-env vulkan1.2
 ; RUN: FileCheck --check-prefix=MAP %s < %t.map
 
 ; MAP:      kernel,foo,arg,out,argOrdinal,0,descriptorSet,0,binding,0,offset,0,argKind,buffer
@@ -21,11 +21,13 @@
 ; CHECK: [[char:%[a-zA-Z0-9_]+]] = OpTypeInt 8 0
 ; CHECK: [[S]] = OpTypeStruct [[int]] [[char]]
 ; CHECK: [[cluster]] = OpTypeStruct [[int]] [[int]] [[int]] [[int]] [[S]]
+; CHECK: [[alt_S:%[a-zA-Z0-9_]+]] = OpTypeStruct [[int]] [[char]]
 ; CHECK: [[pod_var:%[a-zA-Z0-9_]+]] = OpVariable {{.*}} Uniform
 ; CHECK: [[gep:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} [[pod_var]]
 ; CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[cluster]] [[gep]]
-; CHECK: [[a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[ld]] 0
-; CHECK: [[s:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[S]] [[ld]] 4
+; CHECK: [[copy:%[a-zA-Z0-9_]+]] = OpCopyLogical {{.*}} [[ld]]
+; CHECK: [[a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[copy]] 0
+; CHECK: [[s:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[alt_S]] [[copy]] 4
 ; CHECK: [[s_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]] [[s]] 0
 ; CHECK: OpIAdd [[int]] [[s_a]] [[a]]
 

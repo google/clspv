@@ -19,9 +19,8 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image2
 // CHECK-DAG:  [[_v2uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 2
 // CHECK-DAG:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
 // CHECK:  = OpFunction
-// CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2uint]]
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]]
-// CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpFunctionCall {{.*}} [[_21:%[0-9a-zA-Z_]+]] [[_31]] [[_33]]
+// CHECK:  [[_34:%[0-9a-zA-Z_]+]] = OpFunctionCall {{.*}} [[_21:%[0-9a-zA-Z_]+]] {{.*}} [[_33]]
 // CHECK:  [[_21]] = OpFunction
 // CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v2uint]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v4float]]
