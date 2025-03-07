@@ -30,9 +30,8 @@ kernel void foo(global char* in, global char* out, int idx) {
 // CHECK: [[add:%[a-zA-Z0-9_]+]] = OpIAdd [[char]] [[b]] [[a]]
 // CHECK: OpReturnValue [[add]]
 // CHECK: OpFunction
-// CHECK: [[idx:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[int]]
-// CHECK-64: [[idx_long:%[a-zA-Z0-9_]+]] = OpSConvert [[long]] [[idx]]
-// CHECK-32-DAG: [[idx1:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[idx]] [[one]]
+// CHECK-64: [[idx_long:%[a-zA-Z0-9_]+]] = OpSConvert [[long]] [[idx:%[a-zA-Z0-9_]+]]
+// CHECK-32-DAG: [[idx1:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[idx:%[a-zA-Z0-9_]+]] [[one]]
 // CHECK-64-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx_long]]
 // CHECK-32-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx]]
 // CHECK-64-DAG: [[idx1_long:%[a-zA-Z0-9_]+]] = OpIAdd [[long]] [[idx_long]] [[one_long]]

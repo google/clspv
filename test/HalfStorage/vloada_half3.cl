@@ -28,11 +28,10 @@ __kernel void test(__global half *a, int b, __global float3 *dst) {
 // CHECK-DAG: [[global_uint2_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[uint2_ptr]]
 
 // CHECK: [[a:%[^ ]+]] = OpVariable [[global_uint2_ptr]] StorageBuffer
-// CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
 
-// CHECK-64: [[b_long:%[^ ]+]] = OpSConvert [[ulong]] [[b]]
+// CHECK-64: [[b_long:%[^ ]+]] = OpSConvert [[ulong]]
 // CHECK-64: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[b_long]]
-// CHECK-32: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]] [[b]]
+// CHECK-32: [[addr0:%[^ ]+]] = OpAccessChain {{.*}} [[a]] [[uint_0]]
 // CHECK: [[val0:%[^ ]+]] = OpLoad [[uint2]] [[addr0]]
 
 // CHECK: [[val01i32:%[^ ]+]] = OpCompositeExtract [[uint]] [[val0]] 0

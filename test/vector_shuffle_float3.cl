@@ -1,7 +1,7 @@
-// RUN: clspv %target %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv --spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 3

@@ -20,6 +20,7 @@
 ; CHECK-NOT: OpExtension
 ; CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 ; CHECK-DAG: [[data_type]] = OpTypeStruct [[int]] [[int]]
+; CHECK-DAG: [[alt_data_type:%[a-zA-Z0-9_.]+]] = OpTypeStruct [[int]] [[int]]
 ; CHECK-DAG: [[runtime]] = OpTypeRuntimeArray [[data_type]]
 ; CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 ; CHECK-DAG: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
@@ -31,7 +32,7 @@
 ; CHECK-DAG: [[size2:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
 ; CHECK-DAG: [[size3:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
 ; CHECK-DAG: [[size:%[0-9a-zA-Z_]+]] = OpSpecConstant [[int]] 1
-; CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[size]]
+; CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[alt_data_type]] [[size]]
 ; CHECK-DAG: [[l_arg_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Workgroup [[array]]
 ; CHECK-DAG: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 ; CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0

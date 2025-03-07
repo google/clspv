@@ -1,12 +1,12 @@
-// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir --spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir64
+// RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args -arch=spir64 --spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, float f, global float* B, uint n)
 {
@@ -27,8 +27,9 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float* A, 
 // CHECK: [[_16:%[a-zA-Z0-9_]+]] = OpVariable [[__ptr_PushConstant__struct_8]] PushConstant
 // CHECK: [[_19:%[a-zA-Z0-9_]+]] = OpAccessChain [[__ptr_PushConstant__struct_7]] [[_16]] [[_uint_0]]
 // CHECK: [[_20:%[a-zA-Z0-9_]+]] = OpLoad [[__struct_7]] [[_19]]
-// CHECK: [[_21:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_float]] [[_20]] 0
-// CHECK: [[_22:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_uint]] [[_20]] 1
+// CHECK: [[copy:%[a-zA-Z0-9_]+]] = OpCopyLogical {{.*}} [[_20]]
+// CHECK: [[_21:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_float]] [[copy]] 0
+// CHECK: [[_22:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[_uint]] [[copy]] 1
 // CHECK-64: [[_22_long:%[a-zA-Z0-9_]+]] = OpUConvert [[_ulong]] [[_22]]
 // CHECK-64: [[_23:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[_uint_0]] [[_22_long]]
 // CHECK-32: [[_23:%[a-zA-Z0-9_]+]] = OpAccessChain {{.*}} {{.*}} [[_uint_0]] [[_22]]

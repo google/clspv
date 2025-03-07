@@ -1,7 +1,7 @@
-// RUN: clspv %target %s -o %t.spv
+// RUN: clspv %target %s -o %t.spv -spv-version=1.4
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
 

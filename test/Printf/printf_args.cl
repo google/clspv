@@ -1,7 +1,7 @@
-// RUN: clspv %s -o %t.spv -enable-printf
+// RUN: clspv %s -o %t.spv -enable-printf -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 kernel void test(char c, short s, int i, float f, long l) {
     printf("Argument: %f", f);
@@ -24,6 +24,7 @@ kernel void test(char c, short s, int i, float f, long l) {
 // CHECK-DAG: %[[eight:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 8{{$}}
 // CHECK-DAG: %[[string0:[0-9a-zA-Z_]+]] = OpString "Argument: %f"
 // CHECK-DAG: %[[string1:[0-9a-zA-Z_]+]] = OpString "Arguments: %c %hd %d %f %ld"
+// CHECK: OpCopyLogical
 // CHECK-DAG: %[[arg_c:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uchar]]
 // CHECK-DAG: %[[arg_s:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[ushort]]
 // CHECK-DAG: %[[arg_f:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[float]]

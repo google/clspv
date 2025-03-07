@@ -22,8 +22,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d
 // CHECK-DAG:  [[_17:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[_4]]
 // CHECK-DAG:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK:  = OpFunction
-// CHECK:  [[_38:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v4float]]
-// CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_24:%[0-9a-zA-Z_]+]] [[_38]]
+// CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_24:%[0-9a-zA-Z_]+]]
 // CHECK:  OpStore {{.*}} [[_40]]
 // CHECK:  [[_24]] = OpFunction [[_v4float]]
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v4float]]

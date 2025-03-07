@@ -8,9 +8,7 @@
 // CHECK-DAG: %[[UINT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeInt 32 0
 // CHECK-DAG: %[[FLOAT4_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
 // CHECK: %[[I_LOAD_ID:[a-zA-Z0-9_]*]] = OpLoad %[[WRITE_ONLY_IMAGE_TYPE_ID]]
-// CHECK: %[[C_LOAD_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[UINT_TYPE_ID]]
-// CHECK: %[[A_LOAD_ID:[a-zA-Z0-9_]*]] = OpCompositeExtract %[[FLOAT4_TYPE_ID]]
-// CHECK: OpImageWrite %[[I_LOAD_ID]] %[[C_LOAD_ID]] %[[A_LOAD_ID]]
+// CHECK: OpImageWrite %[[I_LOAD_ID]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image1d_t i, int c, float4 a)
 {

@@ -3,14 +3,16 @@
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val %t.spv
 
+; CHECK: OpMemberDecorate [[struct:%[a-zA-Z0-9_]+]] 1 Offset 16
 ; CHECK: OpDecorate [[size:%[a-zA-Z0-9_]+]] SpecId 3
 ; CHECK-DAG: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 ; CHECK-DAG: [[int4:%[a-zA-Z0-9_]+]] = OpTypeVector [[int]] 4
 ; CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
 ; CHECK-DAG: [[float4:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 4
-; CHECK-DAG: [[struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[int4]] [[float4]]
+; CHECK-DAG: [[struct]] = OpTypeStruct [[int4]] [[float4]]
+; CHECK-DAG: [[alt_struct:%[a-zA-Z0-9_]+]] = OpTypeStruct [[int4]] [[float4]]
 ; CHECK-DAG: [[size]] = OpSpecConstant [[int]]
-; CHECK-DAG: [[array:%[a-zA-Z0-9_]+]] = OpTypeArray [[struct]] [[size]]
+; CHECK-DAG: [[array:%[a-zA-Z0-9_]+]] = OpTypeArray [[alt_struct]] [[size]]
 ; CHECK-DAG: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer Workgroup [[array]]
 ; CHECK: OpVariable [[ptr]] Workgroup
 

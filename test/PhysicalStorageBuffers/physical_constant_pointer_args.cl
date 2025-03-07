@@ -1,12 +1,12 @@
-// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-pushconstant
+// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-pushconstant -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-PC
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-ubo
+// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-ubo -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-UBO
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 kernel void copy(constant short *a, global int *b, int x, int y) {
     size_t gid = get_global_id(0);
@@ -29,8 +29,9 @@ kernel void copy(constant short *a, global int *b, int x, int y) {
 // CHECK-DAG: [[ptr_physical_uint]] = OpTypePointer PhysicalStorageBuffer [[uint]]
 
 // CHECK: [[pod_struct:%[a-zA-Z0-9_]+]] = OpLoad [[pod_struct_ty]]
-// CHECK: [[ptr_int_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[pod_struct]] 0
-// CHECK: [[ptr_int_b:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[pod_struct]] 1
+// CHECK: [[copy:%[a-zA-Z0-9_]+]] = OpCopyLogical {{.*}} [[pod_struct]]
+// CHECK: [[ptr_int_a:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[copy]] 0
+// CHECK: [[ptr_int_b:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[ulong]] [[copy]] 1
 // CHECK: [[ptr_a:%[a-zA-Z0-9_]+]] = OpConvertUToPtr [[ptr_physical_ushort]] [[ptr_int_a]]
 // CHECK: [[ptr_b:%[a-zA-Z0-9_]+]] = OpConvertUToPtr [[ptr_physical_uint]] [[ptr_int_b]]
 // CHECK: [[ptr_a_access_chain:%[a-zA-Z0-9_]+]] = OpPtrAccessChain [[ptr_physical_ushort]] [[ptr_a]]

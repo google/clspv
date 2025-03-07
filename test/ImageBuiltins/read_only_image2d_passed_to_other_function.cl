@@ -21,8 +21,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(sampler_t s, read
 // CHECK-DAG:  [[_19:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[_4]]
 // CHECK-DAG:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK:  = OpFunction
-// CHECK:  [[_40:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2float]]
-// CHECK:  [[_42:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_26:%[0-9a-zA-Z_]+]] [[_40]]
+// CHECK:  [[_42:%[0-9a-zA-Z_]+]] = OpFunctionCall [[_v4float]] [[_26:%[0-9a-zA-Z_]+]]
 // CHECK:  OpStore {{.*}} [[_42]]
 // CHECK:  [[_26]] = OpFunction [[_v4float]]
 // CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v2float]]

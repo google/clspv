@@ -1,16 +1,16 @@
-// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
-// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: clspv-reflection %t.spv -o %t2.map --target-env vulkan1.2
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir64
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir64 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
-// RUN: clspv-reflection %t.spv -o %t2.map
+// RUN: clspv-reflection %t.spv -o %t2.map --target-env vulkan1.2
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 typedef struct {
   int x __attribute__((aligned(16)));
@@ -40,6 +40,7 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: [[int:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-64-DAG: [[long:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[data_type]] = OpTypeStruct [[int]] [[int]]
+// CHECK-DAG: [[alt_data_type:%[a-zA-Z0-9_.]+]] = OpTypeStruct [[int]] [[int]]
 // CHECK-DAG: [[runtime]] = OpTypeRuntimeArray [[data_type]]
 // CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[runtime]]
 // CHECK-DAG: [[data_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
@@ -50,13 +51,13 @@ __kernel void foo(__global data_type *data, __constant data_type *c_arg,
 // CHECK-DAG: [[data_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[int]]
 // CHECK-DAG: [[c_arg_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Uniform [[int]]
 // CHECK-DAG: [[two:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 2
-// CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[data_type]] [[two]]
+// CHECK-DAG: [[array:%[0-9a-zA-Z_]+]] = OpTypeArray [[alt_data_type]] [[two]]
 // CHECK-DAG: [[c_var_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[array]]
 // CHECK-DAG: [[c_var_ele_ptr:%[0-9a-zA-Z_]+]] = OpTypePointer Private [[int]]
 // CHECK-DAG: [[zero:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 0
-// CHECK-DAG: [[zero_zero:%[0-9a-zA-Z_]+]] = OpConstantNull [[data_type]]
+// CHECK-DAG: [[zero_zero:%[0-9a-zA-Z_]+]] = OpConstantNull [[alt_data_type]]
 // CHECK-DAG: [[one:%[0-9a-zA-Z_]+]] = OpConstant [[int]] 1
-// CHECK-DAG: [[one_zero:%[0-9a-zA-Z_]+]] = OpConstantComposite [[data_type]] [[one]] [[zero]]
+// CHECK-DAG: [[one_zero:%[0-9a-zA-Z_]+]] = OpConstantComposite [[alt_data_type]] [[one]] [[zero]]
 // CHECK-DAG: [[array_const:%[0-9a-zA-Z_]+]] = OpConstantComposite [[array]] [[zero_zero]] [[one_zero]]
 // CHECK-DAG: [[c_var:%[0-9a-zA-Z_]+]] = OpVariable [[c_var_ptr]] Private [[array_const]]
 // CHECK-DAG: [[data]] = OpVariable [[data_ptr]] StorageBuffer

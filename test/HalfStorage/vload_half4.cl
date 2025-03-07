@@ -1,12 +1,12 @@
-// RUN: clspv %target %s -o %t.spv -arch=spir
+// RUN: clspv %target %s -o %t.spv -arch=spir -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -arch=spir64
+// RUN: clspv %target %s -o %t.spv -arch=spir64 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 __kernel void test(__global half *a, int b, __global float4 *dst) {
     *dst = vload_half4(b, a);
@@ -28,6 +28,7 @@ __kernel void test(__global half *a, int b, __global float4 *dst) {
 // CHECK-DAG: [[global_uint2_ptr:%[^ ]+]] = OpTypePointer StorageBuffer [[uint2_ptr]]
 
 // CHECK: [[a:%[^ ]+]] = OpVariable [[global_uint2_ptr]] StorageBuffer
+// CHECK: OpCopyLogical
 // CHECK: [[b:%[^ ]+]] = OpCompositeExtract [[uint]] {{.*}} 0
 
 // CHECK-64: [[b_long:%[^ ]+]] = OpSConvert [[ulong]] [[b]]

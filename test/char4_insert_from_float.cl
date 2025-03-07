@@ -4,10 +4,10 @@ kernel void foo(global char4* A, float f) {
  *A = (char4)(1,2,(char)f,4);
 }
 
-// RUN: clspv %target %s -o %t.spv -int8=0
+// RUN: clspv %target %s -o %t.spv -int8=0 --spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
-// RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 // This is ok because results ought to be unspecified if the conversion overflows.
 

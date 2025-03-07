@@ -32,16 +32,14 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) bar(read_only image3d
 // CHECK:  [[foo]] = OpFunction
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_2D]]
-// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v2float]]
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpSampledImage [[sampled2D]] [[_28]] [[_27]]
-// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] [[_30]] Lod [[_float_0]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] {{.*}} Lod [[_float_0]]
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]
 // CHECK:  OpStore {{.*}} [[cast]]
 // CHECK:  [[bar]] = OpFunction
 // CHECK:  [[_28:%[0-9a-zA-Z_]+]] = OpLoad [[_3D]]
-// CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpCompositeExtract [[_v4float]]
 // CHECK:  [[_27:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpSampledImage [[sampled3D]] [[_28]] [[_27]]
-// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] [[_30]] Lod [[_float_0]]
+// CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4int]] [[_32]] {{.*}} Lod [[_float_0]]
 // CHECK:  [[cast:%[0-9a-zA-Z_]+]] = OpBitcast [[_v4uint]] [[_33]]
 // CHECK:  OpStore {{.*}} [[cast]]
