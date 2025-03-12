@@ -16,6 +16,7 @@
 // CHECK-DAG: %[[UINT:[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[BOOL:[a-zA-Z0-9_]+]] = OpTypeBool
 
+// 0 = Relaxed
 // CHECK-DAG: %[[UINT_0:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 0
 
 // 1 = Device Scope
@@ -25,8 +26,6 @@
 // 3 = Subgroup Scope
 // CHECK-DAG: %[[UINT_3:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 3
 
-// dec 64 = hex 40 = UniformMemory
-// CHECK-DAG: %[[UINT_64:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 64
 // dec 66 = hex 42 = Acquire & UniformMemory
 // CHECK-DAG: %[[UINT_66:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 66
 // dec 68 = hex 44 = Release & UniformMemory
@@ -34,8 +33,6 @@
 // dec 72 = hex 48 = AcquireRelease & UniformMemory
 // CHECK-DAG: %[[UINT_72:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 72
 
-// dec 256 = hex 100 WorkgroupMemory
-// CHECK-DAG: %[[UINT_256:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 256
 // dec 258 = hex 102 Acquire & WorkgroupMemory
 // CHECK-DAG: %[[UINT_258:[a-zA-Z0-9_]+]] = OpConstant %[[UINT]] 258
 // dec 260 = hex 104 Release & WorkgroupMemory
@@ -87,7 +84,7 @@ kernel void flag_set_partial_explicit_global(global int *out, global atomic_flag
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release);
 
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_64]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed);
 }
@@ -110,7 +107,7 @@ kernel void flag_set_partial_explicit_local(global int *out, local atomic_flag *
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release);
 
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_256]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed);
 }
@@ -123,7 +120,7 @@ kernel void flag_clear_partial_explicit_global(global atomic_flag *flag) {
 // CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release);
 
-// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_64]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed);
 }
 
@@ -135,7 +132,7 @@ kernel void flag_clear_partial_explicit_local(local atomic_flag *flag) {
 // CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release);
 
-// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_256]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed);
 }
 
@@ -156,7 +153,7 @@ kernel void flag_set_full_explicit_global(global int *out, global atomic_flag *f
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_68]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_sub_group);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_64]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_sub_group);
 
@@ -172,7 +169,7 @@ kernel void flag_set_full_explicit_global(global int *out, global atomic_flag *f
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_68]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_work_group);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_64]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_work_group);
 
@@ -188,7 +185,7 @@ kernel void flag_set_full_explicit_global(global int *out, global atomic_flag *f
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_68]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_device);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_64]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_device);
 
@@ -209,7 +206,7 @@ kernel void flag_set_full_explicit_local(global int *out, local atomic_flag *fla
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_260]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_sub_group);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_256]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_3]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_sub_group);
 
@@ -225,7 +222,7 @@ kernel void flag_set_full_explicit_local(global int *out, local atomic_flag *fla
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_260]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_work_group);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_256]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_work_group);
 
@@ -241,7 +238,7 @@ kernel void flag_set_full_explicit_local(global int *out, local atomic_flag *fla
 // CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_260]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_release, memory_scope_device);
-// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_256]] %[[UINT_1]]
+// CHECK: %[[previous_value:[a-zA-Z0-9_]+]] = OpAtomicExchange %[[UINT]] {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_1]]
 // CHECK: OpIEqual %bool %[[previous_value]] %[[UINT_1]]
   *out = atomic_flag_test_and_set_explicit(flag, memory_order_relaxed, memory_scope_device);
 
@@ -253,21 +250,21 @@ kernel void flag_set_full_explicit_local(global int *out, local atomic_flag *fla
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_sub_group);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_64]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_sub_group);
   
 // CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_work_group);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_work_group);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_64]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_work_group);
   
 // CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_device);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_68]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_device);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_64]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_device);
   
 }
@@ -279,20 +276,20 @@ kernel void flag_set_full_explicit_local(global int *out, local atomic_flag *fla
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_sub_group);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_sub_group);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_256]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_3]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_sub_group);
   
 // CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_work_group);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_work_group);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_256]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_2]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_work_group);
   
 // CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_seq_cst, memory_scope_device);
 // CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_260]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_release, memory_scope_device);
-// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_256]] %[[UINT_0]]
+// CHECK: OpAtomicStore {{.*}} %[[UINT_1]] %[[UINT_0]] %[[UINT_0]]
   atomic_flag_clear_explicit(flag, memory_order_relaxed, memory_scope_device);
 }

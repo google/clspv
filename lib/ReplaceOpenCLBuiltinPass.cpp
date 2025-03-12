@@ -280,15 +280,14 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
   auto is_acquire = builder.CreateICmpEQ(order, acquire);
   auto is_release = builder.CreateICmpEQ(order, release);
   auto is_acq_rel = builder.CreateICmpEQ(order, acq_rel);
+
   auto semantics =
-      builder.CreateSelect(is_relaxed, RelaxedSemantics, base_order);
-  semantics = builder.CreateSelect(is_acquire, AcquireSemantics, semantics);
+      builder.CreateSelect(is_acquire, AcquireSemantics, base_order);
   semantics = builder.CreateSelect(is_release, ReleaseSemantics, semantics);
   semantics = builder.CreateSelect(is_acq_rel, AcqRelSemantics, semantics);
   if (include_storage)
-    return builder.CreateOr({storage, semantics});
-  else
-    return semantics;
+    semantics = builder.CreateOr({storage, semantics});
+  return builder.CreateSelect(is_relaxed, RelaxedSemantics, semantics);
 }
 
 Value *MemoryScope(Value *scope, bool is_global, Instruction *InsertBefore) {
