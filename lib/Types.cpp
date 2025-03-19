@@ -537,7 +537,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
 }
 
 bool clspv::PointersAre64Bit(llvm::Module &m) {
-  return m.getTargetTriple() == "spir64-unknown-unknown";
+  return m.getTargetTriple().getArch() == llvm::Triple::ArchType::spir64;
 }
 
 bool clspv::IsResourceType(Type *type) {
