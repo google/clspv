@@ -572,13 +572,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (from GV):\nreplacing: ";
                gep->dump());
     LLVM_DEBUG(dbgs() << "by: "; new_gep->dump(););
-
-    // Tag all-constant-indice-global-GEPs to stay in normalized form to
-    // prevent conversion-thrashing with latter sub-passes
-    // TODO: this could be better handled without the use of metadata tagging
-    MDNode *MD = MDNode::get(new_gep->getContext(), {});
-    new_gep->setMetadata("clspv.const_gep_gv", MD);
-
     gep->replaceAllUsesWith(new_gep);
     gep->eraseFromParent();
     changed = true;
@@ -794,7 +787,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
-          if (gep->getMetadata("clspv.const_gep_gv"))
+          if (isa<GlobalVariable>(gep->getPointerOperand()) &&
+              gep->hasAllConstantIndices())
             continue;
 
           uint64_t cstVal;
@@ -994,7 +988,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
           if (gep->getNumIndices() <= 1)
             continue;
-          if (gep->getMetadata("clspv.const_gep_gv"))
+          if (isa<GlobalVariable>(gep->getPointerOperand()) &&
+              gep->hasAllConstantIndices())
             continue;
           if (SizeInBits(DL, source_ty) < SizeInBits(DL, dest_ty)) {
             if (auto cst = dyn_cast<ConstantInt>(
