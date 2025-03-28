@@ -787,6 +787,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
+          if (isa<GlobalVariable>(gep->getPointerOperand()) &&
+              gep->hasAllConstantIndices())
+            continue;
+
           uint64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
@@ -983,6 +987,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
         }
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
           if (gep->getNumIndices() <= 1)
+            continue;
+          if (isa<GlobalVariable>(gep->getPointerOperand()) &&
+              gep->hasAllConstantIndices())
             continue;
           if (SizeInBits(DL, source_ty) < SizeInBits(DL, dest_ty)) {
             if (auto cst = dyn_cast<ConstantInt>(
