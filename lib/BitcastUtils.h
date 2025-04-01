@@ -84,6 +84,8 @@ SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
                        size_t SmallerBitWidths, Value *Src);
+
+bool IsGVConstantGEP(GetElementPtrInst *GEP);
 } // namespace BitcastUtils
 
 #endif // _CLSPV_LIB_BITCAST_UTILS_PASS_H

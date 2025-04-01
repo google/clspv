@@ -1392,4 +1392,10 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   return Idxs;
 }
 
+bool IsGVConstantGEP(GetElementPtrInst *GEP) {
+  assert(GEP != nullptr);
+  return isa<GlobalVariable>(GEP->getPointerOperand()) &&
+         GEP->hasAllConstantIndices();
+}
+
 } // namespace BitcastUtils
