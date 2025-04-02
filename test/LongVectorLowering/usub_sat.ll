@@ -13,12 +13,12 @@ entry:
 
 declare <8 x i8> @_Z7sub_satDv8_hS_(<8 x i8>, <8 x i8>)
 
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
-; CHECK: @_Z8spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
+; CHECK: @_Z13spirv.op
 

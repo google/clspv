@@ -1,10 +1,10 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=lower-addrspacecast
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: declare i32 @_Z8spirv.op.234.PU3AS3jjj(i32, ptr addrspace(3), i32, i32, i32)
+; CHECK: declare i32 @_Z13spirv.op.234.jPU3AS3jjj(i32, ptr addrspace(3), i32, i32, i32)
 
 ; CHECK-NOT: addrspacecast
-; CHECK-COUNT-4: call i32 @_Z8spirv.op.234.PU3AS3jjj(i32 234, ptr addrspace(3)
+; CHECK-COUNT-4: call i32 @_Z13spirv.op.234.jPU3AS3jjj(i32 234, ptr addrspace(3)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"

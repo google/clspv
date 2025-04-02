@@ -26,7 +26,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a0:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 0
 ; CHECK: [[b0:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 0
-; CHECK: [[addc0:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a0]], i32 [[b0]])
+; CHECK: [[addc0:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a0]], i32 [[b0]])
 ; CHECK: [[addc0val:%[^ ]+]] = extractvalue [[rettype]] [[addc0]], 0
 ; CHECK: [[res0:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } poison, i32 [[addc0val]], 0, 0
 ; CHECK: [[addc0carry:%[^ ]+]] = extractvalue [[rettype]] [[addc0]], 1
@@ -34,7 +34,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a1:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 1
 ; CHECK: [[b1:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 1
-; CHECK: [[addc1:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a1]], i32 [[b1]])
+; CHECK: [[addc1:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a1]], i32 [[b1]])
 ; CHECK: [[addc1val:%[^ ]+]] = extractvalue [[rettype]] [[addc1]], 0
 ; CHECK: [[res01:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res00]], i32 [[addc1val]], 0, 1
 ; CHECK: [[addc1carry:%[^ ]+]] = extractvalue [[rettype]] [[addc1]], 1
@@ -42,7 +42,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a2:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 2
 ; CHECK: [[b2:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 2
-; CHECK: [[addc2:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a2]], i32 [[b2]])
+; CHECK: [[addc2:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a2]], i32 [[b2]])
 ; CHECK: [[addc2val:%[^ ]+]] = extractvalue [[rettype]] [[addc2]], 0
 ; CHECK: [[res12:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res11]], i32 [[addc2val]], 0, 2
 ; CHECK: [[addc2carry:%[^ ]+]] = extractvalue [[rettype]] [[addc2]], 1
@@ -50,7 +50,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a3:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 3
 ; CHECK: [[b3:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 3
-; CHECK: [[addc3:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a3]], i32 [[b3]])
+; CHECK: [[addc3:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a3]], i32 [[b3]])
 ; CHECK: [[addc3val:%[^ ]+]] = extractvalue [[rettype]] [[addc3]], 0
 ; CHECK: [[res23:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res22]], i32 [[addc3val]], 0, 3
 ; CHECK: [[addc3carry:%[^ ]+]] = extractvalue [[rettype]] [[addc3]], 1
@@ -58,7 +58,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a4:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 4
 ; CHECK: [[b4:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 4
-; CHECK: [[addc4:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a4]], i32 [[b4]])
+; CHECK: [[addc4:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a4]], i32 [[b4]])
 ; CHECK: [[addc4val:%[^ ]+]] = extractvalue [[rettype]] [[addc4]], 0
 ; CHECK: [[res34:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res33]], i32 [[addc4val]], 0, 4
 ; CHECK: [[addc4carry:%[^ ]+]] = extractvalue [[rettype]] [[addc4]], 1
@@ -66,7 +66,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a5:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 5
 ; CHECK: [[b5:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 5
-; CHECK: [[addc5:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a5]], i32 [[b5]])
+; CHECK: [[addc5:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a5]], i32 [[b5]])
 ; CHECK: [[addc5val:%[^ ]+]] = extractvalue [[rettype]] [[addc5]], 0
 ; CHECK: [[res45:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res44]], i32 [[addc5val]], 0, 5
 ; CHECK: [[addc5carry:%[^ ]+]] = extractvalue [[rettype]] [[addc5]], 1
@@ -74,7 +74,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a6:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 6
 ; CHECK: [[b6:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 6
-; CHECK: [[addc6:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a6]], i32 [[b6]])
+; CHECK: [[addc6:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a6]], i32 [[b6]])
 ; CHECK: [[addc6val:%[^ ]+]] = extractvalue [[rettype]] [[addc6]], 0
 ; CHECK: [[res56:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res55]], i32 [[addc6val]], 0, 6
 ; CHECK: [[addc6carry:%[^ ]+]] = extractvalue [[rettype]] [[addc6]], 1
@@ -82,7 +82,7 @@ declare { <8 x i32>, <8 x i32> } @_Z8spirv.op.149.Dv8_jDv8_j(i32, <8 x i32>, <8 
 
 ; CHECK: [[a7:%[^ ]+]] = extractvalue [8 x i32] [[loada]], 7
 ; CHECK: [[b7:%[^ ]+]] = extractvalue [8 x i32] [[loadb]], 7
-; CHECK: [[addc7:%[^ ]+]] = call [[rettype]] @_Z8spirv.op(i32 149, i32 [[a7]], i32 [[b7]])
+; CHECK: [[addc7:%[^ ]+]] = call [[rettype]] @_Z13spirv.op.149.jj(i32 149, i32 [[a7]], i32 [[b7]])
 ; CHECK: [[addc7val:%[^ ]+]] = extractvalue [[rettype]] [[addc7]], 0
 ; CHECK: [[res67:%[^ ]+]] = insertvalue { [8 x i32], [8 x i32] } [[res66]], i32 [[addc7val]], 0, 7
 ; CHECK: [[addc7carry:%[^ ]+]] = extractvalue [[rettype]] [[addc7]], 1

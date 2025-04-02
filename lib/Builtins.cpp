@@ -34,6 +34,9 @@ Builtins::LookupBuiltinType(const std::string &builtin_name) {
   if (name.find(clc_prefix) == 0) {
     name.erase(0, strlen(clc_prefix));
   }
+  if (name.find("spirv.op") == 0) {
+    return Builtins::kSpirvOp;
+  }
 
 // Build static map of builtin function names
 #include "BuiltinsMap.inc"
@@ -74,7 +77,16 @@ std::string GetUnmangledName(const std::string &str, size_t *pos) {
   }
 
   *pos = name_pos + name_len;
-  return str.substr(size_t(name_pos), name_len);
+  auto substr = str.substr(size_t(name_pos), name_len);
+  if (substr != "spirv.op") {
+    return substr;
+  }
+  auto args_pos = str.find(".", *pos + 1);
+  if (args_pos == std::string::npos) {
+    return substr;
+  }
+  *pos = args_pos + 1;
+  return str.substr(size_t(name_pos), *pos - name_pos);
 }
 
 // Capture parameter type and qualifiers starting at |pos|
