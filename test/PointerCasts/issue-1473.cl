@@ -2,6 +2,8 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// This test used to involve an infinite loop
+
 __kernel void test(__global int8 *output)
 { 
     int i = 0;
