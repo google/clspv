@@ -106,6 +106,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::smax:
   case Intrinsic::umax:
   case Intrinsic::pow:
+  case Intrinsic::rint:
   case Intrinsic::sin:
   case Intrinsic::sqrt:
   case Intrinsic::trunc:
