@@ -432,8 +432,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         } else if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
           if (IsClspvResourceOrLocal(gep->getPointerOperand())) {
             GEPCastList.push_back(dyn_cast<GetElementPtrInst>(&I));
-          } else if (isa<GlobalVariable>(gep->getPointerOperand()) &&
-                     gep->hasAllConstantIndices()) {
+          } else if (IsGVConstantGEP(gep)) {
             GEPGVList.push_back(dyn_cast<GetElementPtrInst>(&I));
           }
         }
@@ -787,6 +786,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
+          if (IsGVConstantGEP(gep))
+            continue;
+
           uint64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
@@ -983,6 +985,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
         }
         if (auto gep = dyn_cast<GetElementPtrInst>(source)) {
           if (gep->getNumIndices() <= 1)
+            continue;
+          if (IsGVConstantGEP(gep))
             continue;
           if (SizeInBits(DL, source_ty) < SizeInBits(DL, dest_ty)) {
             if (auto cst = dyn_cast<ConstantInt>(
