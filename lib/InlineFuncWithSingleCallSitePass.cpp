@@ -60,17 +60,8 @@ bool clspv::InlineFuncWithSingleCallSitePass::InlineFunctions(Module &M) {
   bool Changed = false;
   std::vector<CallInst *> to_inline;
   for (auto &F : M) {
-    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
-      continue;
-
-    bool has_local_ptr_arg = false;
-    for (auto &Arg : F.args()) {
-      if (clspv::IsLocalPtr(Arg.getType()))
-        has_local_ptr_arg = true;
-    }
-
-    // Only inline if the function has a local address space parameter.
-    if (!has_local_ptr_arg)
+    if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL ||
+        F.hasFnAttribute(Attribute::AttrKind::NoInline))
       continue;
 
     if (F.getNumUses() == 1) {

@@ -30,10 +30,10 @@ kernel void test(char c, short s, int i, float f, long l) {
 // CHECK-DAG: %[[arg_f:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[float]]
 // CHECK-DAG: %[[arg_i:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uint]]
 // CHECK-DAG: %[[arg_l:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[ulong]]
-// CHECK-DAG: %[[arg_f_double:[0-9a-zA-Z_]+]] = OpFConvert %[[double]] %[[arg_f]]
 
 // Printf ID 0 is stored. Float argument is promoted to double, bitcast to an
 // i64 and stored to the i32 printf buffer as a two component i32 vector
+// CHECK: %[[arg_f_double:[0-9a-zA-Z_]+]] = OpFConvert %[[double]] %[[arg_f]]
 // CHECK: %[[f_bitcast:[0-9a-zA-Z_]+]] = OpBitcast %[[v2uint]] %[[arg_f_double]]
 // CHECK: %[[f_i32_0:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uint]] %[[f_bitcast]] 0
 // CHECK: %[[f_i32_1:[0-9a-zA-Z_]+]] = OpCompositeExtract %[[uint]] %[[f_bitcast]] 1
@@ -44,6 +44,7 @@ kernel void test(char c, short s, int i, float f, long l) {
 // Printf ID 1 is stored. Char and short arguments are promoted to integer and stored.
 // Int argument is stored as-is. Float argument is promoted to double and stored as 2x i32.
 // Long argument is stored as 2x i32.
+// CHECK-DAG: %[[arg_f_double:[0-9a-zA-Z_]+]] = OpFConvert %[[double]] %[[arg_f]]
 // CHECK-DAG: %[[arg_c_promoted:[0-9a-zA-Z_]+]] = OpSConvert %[[uint]] %[[arg_c]]
 // CHECK-DAG: %[[arg_s_promoted:[0-9a-zA-Z_]+]] = OpSConvert %[[uint]] %[[arg_s]]
 // CHECK: OpStore %{{[0-9a-zA-Z_]+}} %[[arg_c_promoted]]
