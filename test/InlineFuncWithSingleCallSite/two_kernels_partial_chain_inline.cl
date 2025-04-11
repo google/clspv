@@ -17,9 +17,7 @@
 // CHECK-NOT: OpFunctionCall
 // CHECK: OpFunctionEnd
 
-__attribute__((noinline))
 int func_3(local int *in, int n) { return in[n]; }
-__attribute__((noinline))
 int func_2(local int *in, int n) { return func_3(in, n); }
 __attribute__((noinline))
 int func_1(local int *in, int n) { return func_2(in, n); }

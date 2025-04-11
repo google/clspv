@@ -1,6 +1,6 @@
 // We use -O0 here because the compiler is smart enough to realise calling
 // a function that does nothing can be removed.
-// RUN: clspv %target -O0 %s -o %t.spv
+// RUN: clspv %target -O0 %s -o %t.spv -no-inline-single
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
