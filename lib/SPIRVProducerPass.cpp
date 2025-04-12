@@ -7191,7 +7191,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
     }
 
     uint32_t kernel_flags = reflection::ExtKernelPropertyFlags::None;
-    if (F.hasMetadata(clspv::PrintfKernelMetadataName())) {
+    if (module->getNamedMetadata(PrintfMetadataName())) {
       kernel_flags |= reflection::ExtKernelPropertyFlags::MayUsePrintf;
     }
 
