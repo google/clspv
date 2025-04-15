@@ -303,11 +303,6 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       F->setMetadata(name, nullptr);
     }
 
-    if (auto printf_kernel_md =
-            F->getMetadata(clspv::PrintfKernelMetadataName())) {
-      NewFunc->setMetadata(clspv::PrintfKernelMetadataName(), printf_kernel_md);
-    }
-
     IRBuilder<> Builder(BasicBlock::Create(Context, "entry", NewFunc));
 
     // Set kernel argument mapping metadata.

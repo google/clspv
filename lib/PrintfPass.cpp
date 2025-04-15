@@ -333,15 +333,6 @@ PreservedAnalyses clspv::PrintfPass::run(Module &M, ModuleAnalysisManager &) {
     DefinePrintfInstance(M, CI, PrintfCallID);
   }
 
-  for (auto &F : FunctionsUsingPrintf) {
-    if (F->getCallingConv() == CallingConv::SPIR_KERNEL) {
-      if (!F->getMetadata(clspv::PrintfKernelMetadataName())) {
-        F->addMetadata(clspv::PrintfKernelMetadataName(),
-                       *MDNode::get(M.getContext(), {}));
-      }
-    }
-  }
-
   // Tidy up metadata if there were no printfs
   if (PrintfMDs->getNumOperands() == 0) {
     PrintfMDs->eraseFromParent();
