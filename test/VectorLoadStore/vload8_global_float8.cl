@@ -35,45 +35,47 @@
 //
 // CHECK-NOT: DAG BARRIER
 //
-// CHECK-64: [[BASE_OFFSET:%[0-9]+]] = OpShiftLeftLogical [[ULONG]] {{%[0-9]+}} [[CST_3]]
-// CHECK-32: [[BASE_OFFSET:%[0-9]+]] = OpShiftLeftLogical [[UINT]] {{%[0-9]+}} [[CST_3]]
+// CHECK-64: [[BASE_OFFSET_:%[0-9]+]] = OpShiftLeftLogical [[ULONG]] {{%[0-9]+}} [[CST_5]]
+// CHECK-64: [[BASE_OFFSET:%[0-9]+]] = OpShiftRightLogical [[ULONG]] {{%[0-9]+}} [[CST_2_LONG]]
+// CHECK-32: [[BASE_OFFSET_:%[0-9]+]] = OpShiftLeftLogical [[UINT]] {{%[0-9]+}} [[CST_5]]
+// CHECK-32: [[BASE_OFFSET:%[0-9]+]] = OpShiftRightLogical [[UINT]] {{%[0-9]+}} [[CST_2]]
 //
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC:%[0-9a-zA-Z_]+]]
 // CHECK-SAME: [[CST_0]] [[BASE_OFFSET]]
 // CHECK: [[LOAD_0:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_1_LONG]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_1]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_1_LONG]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_1]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_1:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_2_LONG]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_2]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_2_LONG]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_2]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_2:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_3]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_3]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_3]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_3]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_3:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_4]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_4]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_4]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_4]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_4:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_5]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_5]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_5]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_5]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_5:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_6]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_6]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_6]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_6]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_6:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 //
-// CHECK-64: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[ULONG]] [[BASE_OFFSET]] [[CST_7]]
-// CHECK-32: [[OFFSET:%[0-9]+]] = OpBitwiseOr [[UINT]] [[BASE_OFFSET]] [[CST_7]]
+// CHECK-64: [[OFFSET:%[0-9]+]] = OpIAdd [[ULONG]] [[BASE_OFFSET]] [[CST_7]]
+// CHECK-32: [[OFFSET:%[0-9]+]] = OpIAdd [[UINT]] [[BASE_OFFSET]] [[CST_7]]
 // CHECK: [[PTR:%[0-9]+]]    = OpAccessChain [[FLOAT_PTR]] [[SRC]] [[CST_0]] [[OFFSET]]
 // CHECK: [[LOAD_7:%[0-9]+]] = OpLoad [[FLOAT]] [[PTR]]
 
