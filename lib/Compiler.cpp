@@ -548,7 +548,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   pb.registerPipelineStartEPCallback([](llvm::ModulePassManager &pm,
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::AnnotationToMetadataPass());
-    pm.addPass(clspv::WrapKernelPass());
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
     pm.addPass(clspv::KernelArgNamesToMetadataPass());
