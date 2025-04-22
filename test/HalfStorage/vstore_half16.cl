@@ -22,7 +22,11 @@ __kernel void test(__global half *a, float16 b, int c) {
 // CHECK-DAG: [[uint_15:%[^ ]+]] = OpConstant [[uint]] 15
 // CHECK-DAG: [[uint_1:%[^ ]+]] = OpConstant [[uint]] 1{{$}}
 // CHECK-DAG: [[uint_2:%[^ ]+]] = OpConstant [[uint]] 2
+// CHECK-32-DAG: [[uint_4:%[^ ]+]] = OpConstant [[uint]] 4{{$}}
+// CHECK-32-DAG: [[uint_5:%[^ ]+]] = OpConstant [[uint]] 5
 // CHECK-64-DAG: [[ulong_1:%[^ ]+]] = OpConstant [[ulong]] 1
+// CHECK-64-DAG: [[ulong_4:%[^ ]+]] = OpConstant [[ulong]] 4
+// CHECK-64-DAG: [[ulong_5:%[^ ]+]] = OpConstant [[ulong]] 5
 
 // CHECK: [[b01:%[^ ]+]] = OpCompositeConstruct [[float2]]
 // CHECK: [[b23:%[^ ]+]] = OpCompositeConstruct [[float2]]
@@ -45,13 +49,15 @@ __kernel void test(__global half *a, float16 b, int c) {
 // CHECK: [[val0:%[^ ]+]] = OpCompositeConstruct [[uint4]] [[b01f]] [[b23f]] [[b45f]] [[b67f]]
 // CHECK: [[val1:%[^ ]+]] = OpCompositeConstruct [[uint4]] [[b89f]] [[b1011f]] [[b1213f]] [[b1415f]]
 
-// CHECK-64: [[shl:%[^ ]+]] = OpShiftLeftLogical [[ulong]] {{.*}} [[ulong_1]]
-// CHECK-32: [[shl:%[^ ]+]] = OpShiftLeftLogical [[uint]] {{.*}} [[uint_1]]
+// CHECK-64: [[shl_:%[^ ]+]] = OpShiftLeftLogical [[ulong]] {{.*}} [[ulong_5]]
+// CHECK-64: [[shl:%[^ ]+]] = OpShiftRightLogical [[ulong]] {{.*}} [[ulong_4]]
+// CHECK-32: [[shl_:%[^ ]+]] = OpShiftLeftLogical [[uint]] {{.*}} [[uint_5]]
+// CHECK-32: [[shl:%[^ ]+]] = OpShiftRightLogical [[uint]] {{.*}} [[uint_4]]
 // CHECK: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[shl]]
 // CHECK: OpStore [[gep]] [[val0]]
 
-// CHECK-64: [[or:%[^ ]+]] = OpBitwiseOr [[ulong]] [[shl]] [[ulong_1]]
-// CHECK-32: [[or:%[^ ]+]] = OpBitwiseOr [[uint]] [[shl]] [[uint_1]]
+// CHECK-64: [[or:%[^ ]+]] = OpIAdd [[ulong]] [[shl]] [[ulong_1]]
+// CHECK-32: [[or:%[^ ]+]] = OpIAdd [[uint]] [[shl]] [[uint_1]]
 // CHECK: [[gep:%[^ ]+]] = OpAccessChain {{.*}} {{.*}} [[uint_0]] [[or]]
 // CHECK: OpStore [[gep]] [[val1]]
 

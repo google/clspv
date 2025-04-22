@@ -21,27 +21,32 @@ __kernel void test(__global half *a, float3 b, int c) {
 // CHECK-DAG: [[uint0:%[^ ]+]] = OpConstant [[uint]] 0
 // CHECK-DAG: [[uint1:%[^ ]+]] = OpConstant [[uint]] 1{{$}}
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpConstant [[uint]] 2{{$}}
+// CHECK-32-DAG: [[uint3:%[^ ]+]] = OpConstant [[uint]] 3{{$}}
 // CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1{{$}}
 // CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2{{$}}
-
-// CHECK-64: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[ulong]] {{.*}} [[ulong2]]
-// CHECK-32: [[cx4:%[^ ]+]] = OpShiftLeftLogical [[uint]] {{.*}} [[uint2]]
+// CHECK-64-DAG: [[ulong3:%[^ ]+]] = OpConstant [[ulong]] 3{{$}}
 
 // CHECK: [[val1i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val1i16:%[^ ]+]] = OpUConvert [[ushort]] [[val1i32]]
+
+// CHECK-64: [[cx4_:%[^ ]+]] = OpShiftLeftLogical [[ulong]] {{.*}} [[ulong3]]
+// CHECK-64: [[cx4:%[^ ]+]] = OpShiftRightLogical [[ulong]] {{.*}} [[ulong1]]
+// CHECK-32: [[cx4_:%[^ ]+]] = OpShiftLeftLogical [[uint]] {{.*}} [[uint3]]
+// CHECK-32: [[cx4:%[^ ]+]] = OpShiftRightLogical [[uint]] {{.*}} [[uint1]]
+
 // CHECK: [[addr1:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[cx4]]
 // CHECK: OpStore [[addr1]] [[val1i16]]
 
-// CHECK-64: [[idx1:%[^ ]+]] = OpBitwiseOr [[ulong]] [[cx4]] [[ulong1]]
-// CHECK-32: [[idx1:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx4]] [[uint1]]
 // CHECK: [[val2i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val2i16:%[^ ]+]] = OpUConvert [[ushort]] [[val2i32]]
+// CHECK-64: [[idx1:%[^ ]+]] = OpIAdd [[ulong]] [[cx4]] [[ulong1]]
+// CHECK-32: [[idx1:%[^ ]+]] = OpIAdd [[uint]] [[cx4]] [[uint1]]
 // CHECK: [[addr2:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx1]]
 // CHECK: OpStore [[addr2]] [[val2i16]]
 
-// CHECK-64: [[idx2:%[^ ]+]] = OpBitwiseOr [[ulong]] [[cx4]] [[ulong2]]
-// CHECK-32: [[idx2:%[^ ]+]] = OpBitwiseOr [[uint]] [[cx4]] [[uint2]]
 // CHECK: [[val3i32:%[^ ]+]] = OpExtInst [[uint]] {{.*}} PackHalf2x16
 // CHECK: [[val3i16:%[^ ]+]] = OpUConvert [[ushort]] [[val3i32]]
+// CHECK-64: [[idx2:%[^ ]+]] = OpIAdd [[ulong]] [[cx4]] [[ulong2]]
+// CHECK-32: [[idx2:%[^ ]+]] = OpIAdd [[uint]] [[cx4]] [[uint2]]
 // CHECK: [[addr3:%[^ ]+]] = OpAccessChain %{{.*}} %{{.*}} [[uint0]] [[idx2]]
 // CHECK: OpStore [[addr3]] [[val3i16]]
