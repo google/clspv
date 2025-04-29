@@ -39,7 +39,7 @@ fi
 if [ "$1" = "FULL" ]; then
   FILES_TO_CHECK=$(git diff --name-only HEAD~ | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
 else
-  FILES_TO_CHECK=$(git diff --name-only main | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
+  FILES_TO_CHECK=$(git diff --name-only $(git merge-base main HEAD) | grep -E ".*\.(cpp|cc|c\+\+|cxx|c|h|hpp)$")
 fi
 
 if [ -z "${FILES_TO_CHECK}" ]; then
