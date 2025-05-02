@@ -770,6 +770,13 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   if (func_info.getName().find("llvm.umin.") == 0) {
     return glsl::ExtInst::ExtInstUMin;
   }
+  if (func_info.getName().find("llvm.minnum.f") == 0) {
+    return glsl::ExtInst::ExtInstFMin;
+  }
+  if (func_info.getName().find("llvm.maxnum.f") == 0) {
+    return glsl::ExtInst::ExtInstFMax;
+  }
+
   return kGlslExtInstBad;
 }
 
