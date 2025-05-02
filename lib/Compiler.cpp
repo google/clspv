@@ -199,8 +199,7 @@ struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
 clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   // Create target info
   auto TargetInfo = clang::TargetInfo::CreateTargetInfo(
-      instance.getDiagnostics(),
-      std::make_shared<clang::TargetOptions>(instance.getTargetOpts()));
+      instance.getDiagnostics(), instance.getTargetOpts());
 
   // The SPIR target enables all possible options, disable the ones we don't
   // want
