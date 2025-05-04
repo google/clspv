@@ -271,6 +271,12 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
   };
   Function *EquivalentFunction = getEquivalentFunction();
   EquivalentFunction->copyAttributesFrom(F);
+
+  // When creating intrinsics equivalents (eg. llvm.memcpy.*), we must drop
+  // attributes that cannot be applied to non-intrinsics.
+  for (auto i = 0u; i < EquivalentFunction->arg_size(); ++i) {
+    EquivalentFunction->removeParamAttr(i, Attribute::ImmArg);
+  }
   EquivalentFunction->setCallingConv(F->getCallingConv());
 
   IRBuilder<> B(&I);
