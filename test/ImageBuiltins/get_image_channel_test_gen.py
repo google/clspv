@@ -73,8 +73,6 @@ TEMPLATE_LL=Template("""
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-${image_type} = type opaque
-
 declare spir_func i32 ${order_function}(ptr addrspace(1) %0)
 
 declare spir_func i32 ${data_type_function}(ptr addrspace(1) %0)
@@ -83,7 +81,7 @@ define spir_kernel void @order(ptr addrspace(1) writeonly align 4 %dst, ptr addr
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, ${image_type} zeroinitializer)
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, ${image_type} undef)
   %call = tail call spir_func i32 ${order_function}(ptr addrspace(1) %2)
   store i32 %call, ptr addrspace(1) %1, align 4
   ret void
@@ -93,7 +91,7 @@ define spir_kernel void @data_type(ptr addrspace(1) writeonly align 4 %dst, ptr 
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, ${image_type} zeroinitializer)
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, ${image_type} undef)
   %call = tail call spir_func i32 ${data_type_function}(ptr addrspace(1) %2)
   store i32 %call, ptr addrspace(1) %1, align 4
   ret void
@@ -123,10 +121,14 @@ ACCESS_RW="rw"
 
 ACCESS=[ACCESS_RO, ACCESS_WO, ACCESS_RW]
 ACCESS_STRING={ACCESS_RO: "read_only", ACCESS_WO: "write_only", ACCESS_RW: "read_write"}
-SAMPLED={ACCESS_RO: ".sampled", ACCESS_WO: "", ACCESS_RW: ""}
+SAMPLED={ACCESS_RO: "1", ACCESS_WO: "2", ACCESS_RW: "2"}
+SAMPLED_STRING={ACCESS_RO: ".sampled", ACCESS_WO: "", ACCESS_RW: ""}
 CLSPV_ADD_ARG={ACCESS_RO: "", ACCESS_WO: "", ACCESS_RW: " -cl-std=CL2.0 -inline-entry-points"}
 
 TYPES=["image1d", "image2d", "image3d", "image1d_buffer", "image1d_array", "image2d_array"]
+DIM={"image1d": "0", "image2d": "1", "image3d": "2", "image1d_buffer": "5", "image1d_array": "0", "image2d_array": "1"}
+ARRAYED={"image1d": "0", "image2d": "0", "image3d": "0", "image1d_buffer": "0", "image1d_array": "1", "image2d_array": "1"}
+
 
 def generate_one_cl(ty, acc):
     template = TEMPLATE_CL.substitute(test_gen_file = os.path.basename(__file__),
@@ -147,11 +149,12 @@ def generate_cl():
             generate_one_cl(ty, acc)
 
 def generate_one_ll(ty, acc):
-    image_ty = "opencl." + ty + "_" + acc + "_t.float" + SAMPLED[acc]
+    image_ty_str = "opencl." + ty + "_" + acc + "_t.float" + SAMPLED_STRING[acc]
+    image_ty = "target(\"spirv.Image\", " + DIM[ty] + ", 0, " + ARRAYED[ty] + ", 0, " + SAMPLED[acc] + ", 0, 0, 0)"
     template = TEMPLATE_LL.substitute(test_gen_file = os.path.basename(__file__),
-                                      image_type = "%" + image_ty,
-                                      order_function = "@_Z23get_image_channel_order" + str(len(image_ty)) + image_ty ,
-                                      data_type_function = "@_Z27get_image_channel_data_type" + str(len(image_ty)) + image_ty,
+                                      image_type = image_ty,
+                                      order_function = "@_Z23get_image_channel_order" + str(len(image_ty)) + image_ty_str ,
+                                      data_type_function = "@_Z27get_image_channel_data_type" + str(len(image_ty)) + image_ty_str,
                                       offset = "0")
     filename = "get_image_channel_" + ty + "_" + ACCESS_STRING[acc] + ".ll"
     with open(filename, "w") as file:

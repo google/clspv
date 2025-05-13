@@ -4,8 +4,6 @@
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"
 
-%opencl.image1d_ro_t.float.sampled = type opaque
-
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
 declare spir_func i32 @_Z23get_image_channel_order33opencl.image1d_ro_t.float.sampled(ptr addrspace(1) %0)
@@ -16,7 +14,7 @@ define spir_kernel void @fct0(ptr addrspace(1) writeonly align 4 %dst, ptr addrs
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_ro_t.float.sampled zeroinitializer)
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) undef)
   %3 = call ptr addrspace(9) @_Z14clspv.resource.2(i32 -1, i32 2, i32 5, i32 2, i32 2, i32 0, { { i32 } } zeroinitializer)
   %4 = getelementptr { { i32 } }, ptr addrspace(9) %3, i32 0, i32 0
   %5 = load { i32 }, ptr addrspace(9) %4, align 4
@@ -31,7 +29,7 @@ define spir_kernel void @fct1(ptr addrspace(1) writeonly align 4 %dst, ptr addrs
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_ro_t.float.sampled zeroinitializer)
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) undef)
   %3 = call ptr addrspace(9) @_Z14clspv.resource.2(i32 -1, i32 2, i32 5, i32 2, i32 2, i32 0, { { i32 } } zeroinitializer)
   %4 = getelementptr { { i32 } }, ptr addrspace(9) %3, i32 0, i32 0
   %5 = load { i32 }, ptr addrspace(9) %4, align 4
@@ -46,8 +44,8 @@ define spir_kernel void @fct2(ptr addrspace(1) writeonly align 4 %dst, ptr addrs
 entry:
   %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
   %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, %opencl.image1d_ro_t.float.sampled zeroinitializer)
-  %3 = call ptr addrspace(1) @_Z14clspv.resource.3(i32 0, i32 2, i32 6, i32 2, i32 3, i32 0, %opencl.image1d_ro_t.float.sampled zeroinitializer)
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 6, i32 1, i32 1, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) undef)
+  %3 = call ptr addrspace(1) @_Z14clspv.resource.3(i32 0, i32 2, i32 6, i32 2, i32 3, i32 0, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0) undef)
   %4 = call ptr addrspace(9) @_Z14clspv.resource.4(i32 -1, i32 3, i32 5, i32 3, i32 4, i32 0, { { i32 } } zeroinitializer)
   %5 = getelementptr { { i32 } }, ptr addrspace(9) %4, i32 0, i32 0
   %6 = load { i32 }, ptr addrspace(9) %5, align 4
@@ -66,11 +64,11 @@ entry:
 
 declare ptr addrspace(1) @_Z14clspv.resource.0(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, { [0 x i32] } %6)
 
-declare ptr addrspace(1) @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, %opencl.image1d_ro_t.float.sampled %6)
+declare ptr addrspace(1) @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
 
 declare ptr addrspace(9) @_Z14clspv.resource.2(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, { { i32 } } %6)
 
-declare ptr addrspace(1) @_Z14clspv.resource.3(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, %opencl.image1d_ro_t.float.sampled %6)
+declare ptr addrspace(1) @_Z14clspv.resource.3(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, target("spirv.Image", float, 0, 0, 0, 0, 1, 0, 0, 0))
 
 declare ptr addrspace(9) @_Z14clspv.resource.4(i32 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, { { i32 } } %6)
 
