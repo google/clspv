@@ -6,7 +6,7 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "7752e0a10b25da2f2eadbed10606bd5454dbca05"
+      "commit" : "2d287f51eff2a5fbf84458a33f7fb2493cf67965"
     },
     {
       "name" : "SPIRV-Headers",
