@@ -305,6 +305,10 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
 Type *InferUsersType(Value *v, LLVMContext &context,
                      DenseMap<Value *, Type *> *cache) {
   std::vector<std::pair<User *, unsigned>> worklist;
+  if (v->use_empty()) {
+    return nullptr;
+  }
+
   for (auto &use : v->uses()) {
     worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
   }
