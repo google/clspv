@@ -343,6 +343,8 @@ enum BuiltinType : unsigned int {
   kSubGroupBarrier,
   kSubGroupAll,
   kSubGroupAny,
+  kSubGroupShuffle,
+  kSubGroupShuffleXor,
   kSubGroupBroadcast,
   kSubGroupReduceAdd,
   kSubGroupReduceMin,
