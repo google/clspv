@@ -710,10 +710,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         return false;
       }
     } else {
-      // if gep contains dynamic indices, only consider i8 gep with and look for
-      // mul and shl composing the single indice.
-      if (gep->getSourceElementType() != Type::getInt8Ty(M.getContext()) &&
-          gep->getNumIndices() == 1) {
+      // if gep contains dynamic indices, only consider i8 gep width and look
+      // for mul and shl composing the single indice.
+      if (gep->getSourceElementType() != Type::getInt8Ty(M.getContext()) ||
+          gep->getNumIndices() != 1) {
         return false;
       }
       cstVal = 0;
