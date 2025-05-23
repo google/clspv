@@ -2437,7 +2437,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
     if (ConstExpr->getNumUses() == 1) {
       auto *User = *ConstExpr->user_begin();
       auto *EquivInstr = ConstExpr->getAsInstruction();
-      EquivInstr->insertBefore(dyn_cast<Instruction>(User));
+      EquivInstr->insertBefore(dyn_cast<Instruction>(User)->getIterator());
       GenerateInstruction(*EquivInstr);
       RID = VMap[EquivInstr];
     } else {
@@ -2598,7 +2598,8 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     case clspv::ArgKind::StorageImage:
     case clspv::ArgKind::StorageTexelBuffer:
     case clspv::ArgKind::UniformTexelBuffer:
-      type = PointerType::get(info->data_type, AddressSpace::UniformConstant);
+      type =
+          PointerType::get(module->getContext(), AddressSpace::UniformConstant);
       break;
     default:
       break;
@@ -3650,7 +3651,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
     addCapability(Cap);
 
     auto *data_ty = IntegerType::get(module->getContext(), 32);
-    auto *ptr_ty = PointerType::get(data_ty, AddressSpace::Input);
+    auto *ptr_ty = PointerType::get(module->getContext(), AddressSpace::Input);
     auto ptr_id = getSPIRVPointerType(ptr_ty, data_ty);
     RID = addSPIRVGlobalVariable(ptr_id, spv::StorageClassInput);
 
@@ -3764,7 +3765,8 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
 
     SPIRVOperandVec Ops;
     Ops << getSPIRVPointerType(
-               PointerType::get(i32, GV->getType()->getPointerAddressSpace()),
+               PointerType::get(module->getContext(),
+                                GV->getType()->getPointerAddressSpace()),
                i32)
         << getSPIRVValue(GV)
         << getSPIRVInt32Constant(GV->getValueType()->getStructNumElements() - 1)
@@ -4095,7 +4097,8 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 
     SPIRVOperandVec Ops;
     Ops << getSPIRVPointerType(
-               PointerType::get(i32, GV->getType()->getPointerAddressSpace()),
+               PointerType::get(module->getContext(),
+                                GV->getType()->getPointerAddressSpace()),
                i32)
         << getSPIRVValue(GV)
         << getSPIRVInt32Constant(GV->getValueType()->getStructNumElements() - 1)

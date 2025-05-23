@@ -65,12 +65,13 @@ bool clspv::UndoGetElementPtrConstantExprPass::replaceGetElementPtrConstantExpr(
       // block.
       for (unsigned i = 0; i < PHI->getNumIncomingValues(); i++) {
         if (PHI->getIncomingValue(i) == CE) {
-          NewI->insertBefore(PHI->getIncomingBlock(i)->getTerminator());
+          NewI->insertBefore(
+              PHI->getIncomingBlock(i)->getTerminator()->getIterator());
         }
       }
     } else {
       // Insert it just before the instruction that will use it.
-      NewI->insertBefore(I);
+      NewI->insertBefore(I->getIterator());
     }
 
     // Walk the operands of the instruction to find where the constant
