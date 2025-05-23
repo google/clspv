@@ -852,11 +852,11 @@ bool RemoveCstExprFromFunction(Function *F) {
     WorkList.pop_back();
 
     IRBuilder<> B(I);
-    auto InsertBefore = I;
+    auto InsertBefore = I->getIterator();
     if (auto phi = dyn_cast<PHINode>(I)) {
       InsertBefore =
           phi->getIncomingBlock(phi->getIncomingValueNumForOperand(OperandId))
-              ->getFirstNonPHI();
+              ->getFirstNonPHIIt();
     }
 
     if (auto CstArray = dyn_cast<ConstantArray>(I->getOperand(OperandId))) {
