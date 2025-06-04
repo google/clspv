@@ -407,7 +407,7 @@ int SetCompilerInstanceOptions(
   instance.createDiagnostics(
       *llvm::vfs::getRealFileSystem(),
       new clang::TextDiagnosticPrinter(*diagnosticsStream,
-                                       &instance.getDiagnosticOpts()),
+                                       instance.getDiagnosticOpts()),
       true);
   instance.getDiagnostics().setWarningsAsErrors(WarningsAsErrors);
   instance.getDiagnostics().setEnableAllWarnings(true);
