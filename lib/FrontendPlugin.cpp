@@ -245,7 +245,7 @@ private:
     // For function prototypes, recurse on return type and parameter types.
     if (auto *FT = llvm::dyn_cast<FunctionProtoType>(canonicalType)) {
       IsKernelParameter =
-          IsKernelParameter || (FT->getCallConv() == CC_OpenCLKernel);
+          IsKernelParameter || (FT->getCallConv() == CC_DeviceKernel);
       for (auto param : FT->getParamTypes()) {
         if (!IsSupportedType(param, SR, IsKernelParameter)) {
           return false;
@@ -754,7 +754,7 @@ public:
           bool is_opencl_kernel = false;
           if (FD->hasAttrs()) {
             for (auto *attr : FD->attrs()) {
-              if (attr->getKind() == attr::Kind::OpenCLKernel) {
+              if (attr->getKind() == attr::Kind::DeviceKernel) {
                 is_opencl_kernel = true;
               }
             }
