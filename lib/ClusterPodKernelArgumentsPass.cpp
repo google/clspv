@@ -238,7 +238,6 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
 
     // Create the new function and set key properties.
     auto NewFunc = Function::Create(NewFuncTy, F->getLinkage());
-    NewFunc->setIsNewDbgInfoFormat(true);
     // The new function adopts the real name so that linkage to the outside
     // world remains the same.
     NewFunc->setName(F->getName());

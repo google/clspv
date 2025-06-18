@@ -74,7 +74,6 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
 
         // Create new function.
         Function *NewFunc = Function::Create(NewFuncTy, F->getLinkage());
-        NewFunc->setIsNewDbgInfoFormat(true);
         NewFunc->takeName(F);
 
         // Insert the function just after the original to preserve the ordering

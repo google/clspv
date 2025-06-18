@@ -158,7 +158,6 @@ Function *createFunctionWithMappedTypes(Function &F,
   assert(!F.isVarArg() && "varargs not supported");
 
   auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
-  Wrapper->setIsNewDbgInfoFormat(F.IsNewDbgInfoFormat);
   Wrapper->takeName(&F);
   Wrapper->setCallingConv(F.getCallingConv());
   Wrapper->copyAttributesFrom(&F);
@@ -1127,7 +1126,6 @@ Value *clspv::ThreeElementVectorLoweringPass::convertSIMDBuiltinCall(
   Function *Fct =
       Function::Create(FunctionType::get(EquivalentReturnTy, ParamTys, false),
                        InitialFunction->getLinkage(), FunctionName);
-  Fct->setIsNewDbgInfoFormat(true);
 
   Fct->setCallingConv(InitialFunction->getCallingConv());
   Fct->copyAttributesFrom(InitialFunction);

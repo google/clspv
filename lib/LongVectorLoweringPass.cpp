@@ -314,7 +314,6 @@ Function *getBIFScalarVersion(Function &Builtin) {
 
   if (ScalarFn == nullptr) {
     ScalarFn = Function::Create(FunctionTy, Builtin.getLinkage(), ScalarName);
-    ScalarFn->setIsNewDbgInfoFormat(true);
     ScalarFn->setCallingConv(Builtin.getCallingConv());
     ScalarFn->copyAttributesFrom(&Builtin);
 
@@ -512,7 +511,6 @@ Function *createFunctionWithMappedTypes(Function &F,
   assert(!F.isVarArg() && "varargs not supported");
 
   auto *Wrapper = Function::Create(EquivalentFunctionTy, F.getLinkage());
-  Wrapper->setIsNewDbgInfoFormat(true);
   Wrapper->takeName(&F);
   Wrapper->setCallingConv(F.getCallingConv());
   Wrapper->copyAttributesFrom(&F);
@@ -595,7 +593,6 @@ Value *convertOpAnyOrAllOperation(CallInst &VectorCall,
         FunctionType::get(VectorCall.getFunctionType()->getReturnType(),
                           ParamTys, false),
         OpAnyOrAllInitialFunction->getLinkage(), OpAnyOrAllFunctionName);
-    OpAnyOrAllFunction->setIsNewDbgInfoFormat(true);
 
     OpAnyOrAllFunction->setCallingConv(
         OpAnyOrAllInitialFunction->getCallingConv());

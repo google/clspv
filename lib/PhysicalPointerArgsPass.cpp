@@ -73,7 +73,6 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
         FunctionType::get(F.getReturnType(), NewParamTypes, false);
 
     auto NewFunc = Function::Create(NewFuncTy, F.getLinkage());
-    NewFunc->setIsNewDbgInfoFormat(true);
     // The new function adopts the real name so that linkage to the outside
     // world remains the same.
     NewFunc->setName(F.getName());
