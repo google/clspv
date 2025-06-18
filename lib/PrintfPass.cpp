@@ -96,7 +96,6 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   auto FuncCallee = M.getOrInsertFunction(FuncName, FuncTy);
   auto *Func = dyn_cast<Function>(FuncCallee.getCallee());
   assert(Func);
-  Func->setIsNewDbgInfoFormat(true);
 
   auto *NewCI = CallInst::Create(Func, NewArgs, "", CI->getIterator());
   CI->replaceAllUsesWith(NewCI);
@@ -129,7 +128,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
         EntryBB, clspv::PushConstant::PrintfBufferPointer);
     auto *BufferAddress = IR.CreateLoad(IR.getInt64Ty(), BufferAddressPtr);
     Buffer = IR.CreateIntToPtr(
-        BufferAddress, PointerType::get(BufferTy, clspv::AddressSpace::Global));
+        BufferAddress, PointerType::get(Ctx, clspv::AddressSpace::Global));
   } else {
     Buffer = M.getNamedGlobal(clspv::PrintfBufferVariableName());
   }
@@ -206,8 +205,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
 
     // If the integer is now anything but i32, bitcast the pointer
     if (Arg->getType() != Int32Ty) {
-      auto *NewTy =
-          PointerType::get(Arg->getType(), clspv::AddressSpace::Global);
+      auto *NewTy = PointerType::get(Ctx, clspv::AddressSpace::Global);
       ArgStoreGEP = IR.CreatePointerCast(ArgStoreGEP, NewTy);
     }
 

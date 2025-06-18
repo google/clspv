@@ -79,7 +79,6 @@ Function *getFunctionIfNeeded(Module &M, StringRef Name,
     if (D) {
       // function must be inserted for use by dependent
       F = cast<Function>(M.getOrInsertFunction(Name, FType).getCallee());
-      F->setIsNewDbgInfoFormat(true);
       F->setCallingConv(CallingConv::SPIR_FUNC);
       return F;
     }

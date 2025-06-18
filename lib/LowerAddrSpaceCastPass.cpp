@@ -263,7 +263,6 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
       return eqF;
 
     eqF = Function::Create(FunctionTy, F->getLinkage(), Name);
-    eqF->setIsNewDbgInfoFormat(true);
     FunctionMap[F] = eqF;
     M->getFunctionList().push_front(eqF);
 

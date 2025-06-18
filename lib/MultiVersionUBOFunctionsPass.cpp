@@ -241,7 +241,6 @@ Function *clspv::MultiVersionUBOFunctionsPass::AddExtraArguments(
   auto pair =
       module->getOrInsertFunction(fn->getName(), new_type, fn->getAttributes());
   Function *new_function = cast<Function>(pair.getCallee());
-  new_function->setIsNewDbgInfoFormat(true);
   new_function->setCallingConv(fn->getCallingConv());
   new_function->copyMetadata(fn, 0);
 
