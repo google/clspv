@@ -356,8 +356,7 @@ int SetCompilerInstanceOptions(
     // https://github.com/llvm/llvm-project/blob/main/clang/include/clang/Basic/OpenCLExtensions.def
     instance.getPreprocessorOpts().addMacroDef(
         "cl_khr_subgroup_extended_types");
-    instance.getPreprocessorOpts().addMacroDef(
-        "cl_khr_subgroup_shuffle");
+    instance.getPreprocessorOpts().addMacroDef("cl_khr_subgroup_shuffle");
   }
 
   if (clspv::Option::ArmIntegerDotProduct()) {
