@@ -353,6 +353,8 @@ enum BuiltinType : unsigned int {
   kSubGroupScanInclusiveAdd,
   kSubGroupScanInclusiveMin,
   kSubGroupScanInclusiveMax,
+  kSubGroupShuffle,
+  kSubGroupShuffleXor,
   kSubGroupReserveReadPipe,
   kSubGroupReserveWritePipe,
   kSubGroupCommitReadPipe,

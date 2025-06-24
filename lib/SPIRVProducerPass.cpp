@@ -4201,6 +4201,14 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     }
     break;
   }
+  case Builtins::kSubGroupShuffle:
+    addCapability(spv::CapabilityGroupNonUniformShuffle);
+    op = spv::OpGroupNonUniformShuffle;
+    break;
+  case Builtins::kSubGroupShuffleXor:
+    addCapability(spv::CapabilityGroupNonUniformShuffle);
+    op = spv::OpGroupNonUniformShuffleXor;
+    break;
 
   case Builtins::kGetEnqueuedNumSubGroups:
   case Builtins::kGetMaxSubGroupSize:
@@ -6569,7 +6577,9 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpGroupNonUniformFMin:
     case spv::OpGroupNonUniformSMax:
     case spv::OpGroupNonUniformUMax:
-    case spv::OpGroupNonUniformFMax: {
+    case spv::OpGroupNonUniformFMax:
+    case spv::OpGroupNonUniformShuffle:
+    case spv::OpGroupNonUniformShuffleXor: {
       WriteWordCountAndOpcode(Inst);
       WriteOperand(Ops[0]);
       WriteResultID(Inst);
