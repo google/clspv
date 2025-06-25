@@ -246,7 +246,7 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   Changed = true;
   IRBuilder<> Builder(fn->getParent()->getContext());
   auto *zero = Builder.getInt32(0);
-  Builder.SetInsertPoint(fn->getEntryBlock().getFirstNonPHI());
+  Builder.SetInsertPoint(fn->getEntryBlock().getFirstNonPHIIt());
 
   Value *replacement = common.base;
   if (Function *function = dyn_cast<Function>(replacement)) {

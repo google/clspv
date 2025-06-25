@@ -2892,8 +2892,8 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
     //   // sequentially consistent atomics.
     //   // TODO(dneto): Use relaxed consistency.
     //   atomic_xor(target_ptr, xor_value)
-    auto IntPointerTy =
-        PointerType::get(IntTy, ptr->getType()->getPointerAddressSpace());
+    auto IntPointerTy = PointerType::get(
+        M.getContext(), ptr->getType()->getPointerAddressSpace());
 
     auto One =
         ConstantInt::get(clspv::PointersAre64Bit(M) ? Int64Ty : IntTy, 1);
