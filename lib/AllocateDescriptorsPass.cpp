@@ -456,7 +456,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
 
     // Prepare to insert arg remapping instructions at the start of the
     // function.
-    Builder.SetInsertPoint(f_ptr->getEntryBlock().getFirstNonPHI());
+    Builder.SetInsertPoint(f_ptr->getEntryBlock().getFirstNonPHIIt());
 
     int discriminant_index = 0;
     int arg_index = 0;
@@ -754,7 +754,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
 
     // Prepare to insert arg remapping instructions at the start of the
     // function.
-    Builder.SetInsertPoint(F.getEntryBlock().getFirstNonPHI());
+    Builder.SetInsertPoint(F.getEntryBlock().getFirstNonPHIIt());
 
     function_allocations.clear();
     function_spec_ids.clear();
