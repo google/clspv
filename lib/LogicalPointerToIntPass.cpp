@@ -139,10 +139,18 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
                              : IntegerType::get(M.getContext(), 32);
     IRBuilder<> B(ICmp);
     auto LHS = B.CreatePtrToInt(ICmp->getOperand(0), SizeT);
+    auto RHS = B.CreatePtrToInt(ICmp->getOperand(1), SizeT);
+
+    // The magic numbers from the nextBaseAddress are incorrectly compared with
+    // constant values. They are usually simplified as unequal values.
+    if (dyn_cast<ConstantInt>(LHS) != nullptr ||
+        dyn_cast<ConstantInt>(RHS) != nullptr) {
+      continue;
+    }
+
     if (auto *Cast = dyn_cast<CastInst>(LHS)) {
       InstrsToProcess.push_back(Cast);
     }
-    auto RHS = B.CreatePtrToInt(ICmp->getOperand(1), SizeT);
     if (auto *Cast = dyn_cast<CastInst>(RHS)) {
       InstrsToProcess.push_back(Cast);
     }
