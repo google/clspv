@@ -4164,6 +4164,10 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     addCapability(spv::CapabilityGroupNonUniformVote);
     op = spv::OpGroupNonUniformAny;
     break;
+  case Builtins::kSubGroupBallot:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBallot;
+    break;
   case Builtins::kSubGroupReduceAdd:
   case Builtins::kSubGroupScanExclusiveAdd:
   case Builtins::kSubGroupScanInclusiveAdd: {
@@ -4298,6 +4302,17 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
         << ConstantInt::get(Call->getType(), 0);
     RID = addSPIRVInst(spv::OpSelect, Ops);
+    break;
+  }
+  case Builtins::kSubGroupBallot: {
+    SPIRVOperandVec Ops;
+    Ops << getSPIRVType(Type::getInt1Ty(module->getContext()))
+        << Call->getArgOperand(0)
+        << ConstantInt::get(Call->getArgOperand(0)->getType(), 0);
+    auto cmp = addSPIRVInst(spv::OpINotEqual, Ops);
+    Ops.clear();
+    Operands << cmp;
+    RID = addSPIRVInst(op, Operands);
     break;
   }
   default:
@@ -6576,6 +6591,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpSUDotAccSat:
     case spv::OpGroupNonUniformAll:
     case spv::OpGroupNonUniformAny:
+    case spv::OpGroupNonUniformBallot:
     case spv::OpGroupNonUniformBroadcast:
     case spv::OpGroupNonUniformIAdd:
     case spv::OpGroupNonUniformFAdd:
