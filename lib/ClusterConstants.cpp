@@ -126,7 +126,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
 
     StructType *type = StructType::get(Context, types);
     PointerType *ptr_type =
-        PointerType::get(type, clspv::AddressSpace::Constant);
+        PointerType::get(Context, clspv::AddressSpace::Constant);
 
     Constant *clustered_initializer =
         ConstantStruct::get(type, initializers_as_vec);
@@ -152,7 +152,8 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
 
           auto getTypeAndPtr = [&clustered_gv, &M, &Builder, &type, &ptr_type,
                                 &zero](Type *&PointeeType, Value *&Ptr,
-                                       Instruction *InsertBefore) {
+                                       llvm::BranchInst::InstListType::iterator
+                                           InsertBefore) {
             if (clspv::Option::PhysicalStorageBuffers()) {
               auto *bb = InsertBefore->getParent();
               auto *clustered_ptr_ty = clspv::GetPushConstantType(
@@ -180,7 +181,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
               if (phi->getIncomingValue(i) != GV) {
                 continue;
               }
-              auto InsertBefore = phi->getIncomingBlock(i)->getFirstNonPHI();
+              auto InsertBefore = phi->getIncomingBlock(i)->getFirstNonPHIIt();
               Type *PointeeType;
               Value *Ptr;
               getTypeAndPtr(PointeeType, Ptr, InsertBefore);
@@ -192,7 +193,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
           } else {
             Type *PointeeType;
             Value *Ptr;
-            getTypeAndPtr(PointeeType, Ptr, inst);
+            getTypeAndPtr(PointeeType, Ptr, inst->getIterator());
             Instruction *gep = GetElementPtrInst::CreateInBounds(
                 PointeeType, Ptr, {zero, Builder.getInt32(index)}, "",
                 inst->getIterator());

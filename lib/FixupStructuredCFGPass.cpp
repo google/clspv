@@ -154,7 +154,7 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
       latch_terminator->setSuccessor(idx, new_latch);
 
       // Update phis to use the new basic block.
-      for (auto iter = BB->begin(); &*iter != BB->getFirstNonPHI(); ++iter) {
+      for (auto iter = BB->phis().begin(); iter != BB->phis().end(); iter++) {
         PHINode *phi = cast<PHINode>(&*iter);
         phi->replaceIncomingBlockWith(latch, new_latch);
       }

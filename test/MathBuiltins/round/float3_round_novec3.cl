@@ -18,11 +18,11 @@
 // CHECK-DAG: [[halfway:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 0.5
 // CHECK-DAG: [[halfway3:%[a-zA-Z0-9_]+]] = OpConstantComposite [[float4]] [[halfway]] [[halfway]] [[halfway]] [[halfway]]
 // CHECK: [[ld:%[a-zA-Z0-9_]*]] = OpLoad [[float4]]
-// CHECK: [[ld4:%[a-zA-Z0-9_]*]] = OpVectorShuffle [[float4]] [[ld]] [[undef4]] 0 1 2 4294967295
-// CHECK: [[fabs4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] FAbs [[ld4]]
+// CHECK: [[fabs4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] FAbs [[ld]]
+// CHECK: [[shuffle4:%[a-zA-Z0-9_]*]] = OpVectorShuffle [[float4]] [[fabs4]] [[undef4]] 0 1 2 4294967295
 // CHECK: [[ceil4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] Ceil [[fabs4]]
 // CHECK: [[floor4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] Floor [[fabs4]]
-// CHECK: [[fract4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] Fract [[fabs4]]
+// CHECK: [[fract4:%[a-zA-Z0-9_]+]] = OpExtInst [[float4]] [[ext_inst]] Fract [[shuffle4]]
 // CHECK: [[gte:%[a-zA-Z0-9_]+]] = OpFOrdGreaterThanEqual [[bool4]] [[fract4]] [[halfway3]]
 // CHECK: [[sel4:%[a-zA-Z0-9_]+]] = OpSelect [[float4]] [[gte]] [[ceil4]] [[floor4]]
 // CHECK: [[cast:%[a-zA-Z0-9_]+]] = OpBitcast [[int4]] [[ld]]
