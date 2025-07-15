@@ -57,7 +57,7 @@ Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
 
   // Cache the insertion location now. If we break down subtypes, we don't want
   // to insert uses before definitions.
-  Instruction *where = phi->getParent()->getFirstNonPHI();
+  auto where = phi->getParent()->getFirstNonPHIIt();
   const auto num_incoming_values = phi->getNumIncomingValues();
   unsigned type_index = 0;
   SmallVector<Value *, 16> replacements;
@@ -88,8 +88,8 @@ Value *clspv::ScalarizePass::ScalarizePhi(PHINode *phi) {
   // insertion location to aid RewriteInsertsPass.
   Value *prev = Constant::getNullValue(phi->getType());
   for (unsigned i = 0; i != replacements.size(); ++i) {
-    auto insert = InsertValueInst::Create(prev, replacements[i], {i}, "",
-                                          where->getIterator());
+    auto insert =
+        InsertValueInst::Create(prev, replacements[i], {i}, "", where);
     prev = insert;
   }
 
