@@ -357,6 +357,7 @@ int SetCompilerInstanceOptions(
     instance.getPreprocessorOpts().addMacroDef(
         "cl_khr_subgroup_extended_types");
     instance.getPreprocessorOpts().addMacroDef("cl_khr_subgroup_shuffle");
+    instance.getPreprocessorOpts().addMacroDef("cl_khr_subgroup_rotate");
   }
 
   if (clspv::Option::ArmIntegerDotProduct()) {

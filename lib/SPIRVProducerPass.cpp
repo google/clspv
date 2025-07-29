@@ -4209,6 +4209,13 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     addCapability(spv::CapabilityGroupNonUniformShuffle);
     op = spv::OpGroupNonUniformShuffleXor;
     break;
+  case Builtins::kSubGroupRotate:
+    addCapability(spv::CapabilityGroupNonUniformRotateKHR);
+    // OpGroupNonUniformRotateKHR is defined by the SPV_KHR_subgroup_rotate
+    // extension,thus it needs to be explicitly enabled.
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_subgroup_rotate");
+    op = spv::OpGroupNonUniformRotateKHR;
+    break;
 
   case Builtins::kGetEnqueuedNumSubGroups:
   case Builtins::kGetMaxSubGroupSize:
@@ -6579,7 +6586,8 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpGroupNonUniformUMax:
     case spv::OpGroupNonUniformFMax:
     case spv::OpGroupNonUniformShuffle:
-    case spv::OpGroupNonUniformShuffleXor: {
+    case spv::OpGroupNonUniformShuffleXor:
+    case spv::OpGroupNonUniformRotateKHR: {
       WriteWordCountAndOpcode(Inst);
       WriteOperand(Ops[0]);
       WriteResultID(Inst);
