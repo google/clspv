@@ -357,6 +357,7 @@ enum BuiltinType : unsigned int {
   kSubGroupShuffleXor,
   kSubGroupReserveReadPipe,
   kSubGroupReserveWritePipe,
+  kSubGroupRotate,
   kSubGroupCommitReadPipe,
   kSubGroupCommitWritePipe,
   kGetKernelSubGroupCountForNdrange,
