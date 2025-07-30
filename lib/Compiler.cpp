@@ -301,7 +301,6 @@ int SetCompilerInstanceOptions(
   instance.getLangOpts().RTTI = false;
   instance.getLangOpts().RTTIData = false;
   instance.getLangOpts().MathErrno = false;
-  instance.getLangOpts().Optimize = false;
   instance.getLangOpts().NoBuiltin = true;
   instance.getLangOpts().ModulesSearchAll = false;
   instance.getLangOpts().SinglePrecisionConstants = true;
