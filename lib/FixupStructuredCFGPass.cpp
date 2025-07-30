@@ -247,7 +247,7 @@ void clspv::FixupStructuredCFGPass::isolateContinue(
           // Split the phi nodes so that all predecessors from within the loop
           // are part of a new phi in the new exit block.
           for (auto iter = exit_block->begin();
-               &*iter != exit_block->getFirstNonPHI(); ++iter) {
+               iter != exit_block->getFirstNonPHIIt(); ++iter) {
             PHINode *phi = cast<PHINode>(&*iter);
             SmallVector<Value *, 4> phi_values;
             for (auto pred : loop_preds) {

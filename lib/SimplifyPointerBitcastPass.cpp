@@ -1113,9 +1113,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     for (int i = 0; i < Steps + 1; i++) {
       Idxs.push_back(B.getInt32(0));
     }
-    auto new_gep = GetElementPtrInst::Create(
-        gep->getResultElementType(), gep, Idxs, "",
-        gep->getNextNonDebugInstruction()->getIterator());
+    auto new_gep =
+        GetElementPtrInst::Create(gep->getResultElementType(), gep, Idxs, "",
+                                  gep->getNextNode()->getIterator());
     for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
       if (phi->getIncomingValue(i) != gep) {
         continue;
