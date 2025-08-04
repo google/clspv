@@ -11,6 +11,29 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "clspv/Compiler.h"
+
+#include <cassert>
+#include <fstream>
+#include <iostream>
+#include <numeric>
+#include <ostream>
+#include <sstream>
+#include <string>
+
+#include "Builtins.h"
+#include "BuiltinsEnum.h"
+#include "Constants.h"
+#include "FrontendPlugin.h"
+#include "Passes.h"
+#include "Types.h"
+#include "clspv/AddressSpace.h"
+#include "clspv/Option.h"
+#include "clspv/Passes.h"
+#include "clspv/Sampler.h"
+#include "clspv/clspv64_builtin_library.h"
+#include "clspv/clspv_builtin_library.h"
+#include "clspv/opencl_builtins_header.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenAction.h"
@@ -44,30 +67,6 @@
 #include "llvm/Transforms/Scalar/StructurizeCFG.h"
 #include "llvm/Transforms/Utils/LowerSwitch.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
-
-#include "clspv/AddressSpace.h"
-#include "clspv/Compiler.h"
-#include "clspv/Option.h"
-#include "clspv/Passes.h"
-#include "clspv/Sampler.h"
-#include "clspv/clspv64_builtin_library.h"
-#include "clspv/clspv_builtin_library.h"
-#include "clspv/opencl_builtins_header.h"
-
-#include "Builtins.h"
-#include "BuiltinsEnum.h"
-#include "Constants.h"
-#include "FrontendPlugin.h"
-#include "Passes.h"
-#include "Types.h"
-
-#include <cassert>
-#include <fstream>
-#include <iostream>
-#include <numeric>
-#include <ostream>
-#include <sstream>
-#include <string>
 
 using namespace clang;
 
@@ -214,7 +213,6 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   }
   // Enable/Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
-
     auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
     // overwrite feature macro list for certain options
     if (clspv::Option::FP64()) {
@@ -1107,7 +1105,6 @@ std::unique_ptr<llvm::Module>
 ProgramToModule(llvm::LLVMContext &context,
                 const llvm::StringRef &inputFilename,
                 const std::string &program, std::string *output_log, int *err) {
-
   clang::CompilerInstance instance;
   clang::FrontendInputFile kernelFile(inputFilename,
                                       clang::InputKind(InputLanguage));
@@ -1332,7 +1329,6 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::string *output_log) {
-
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
   llvm::StringSaver Saver(A);
