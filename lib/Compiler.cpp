@@ -245,7 +245,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
           enabled) {
         instance.getPreprocessorOpts().addMacroDef(str);
       }
-      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled) {
+      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled){
         instance.getPreprocessorOpts().addMacroUndef(str);
       }
     }
@@ -710,7 +710,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-
+  
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {
@@ -1204,6 +1204,7 @@ int CompilePrograms(const std::vector<std::string> &programs,
         ProgramToModule(context, "source", program, output_log, &error));
     if (error != 0)
       return error;
+
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
