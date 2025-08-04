@@ -4168,6 +4168,10 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     addCapability(spv::CapabilityGroupNonUniformBallot);
     op = spv::OpGroupNonUniformBallot;
     break;
+  case Builtins::kSubGroupElect:
+    addCapability(spv::CapabilityGroupNonUniformVote);
+    op = spv::OpGroupNonUniformElect;
+    break;
   case Builtins::kSubGroupReduceAdd:
   case Builtins::kSubGroupScanExclusiveAdd:
   case Builtins::kSubGroupScanInclusiveAdd: {
@@ -4252,7 +4256,8 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
   switch (FuncInfo.getType()) {
   case Builtins::kSubGroupAny:
   case Builtins::kSubGroupAll:
-    // SPIR-V needs a bool return type for any/all.
+  case Builtins::kSubGroupElect:
+    // SPIR-V needs a bool return type for any/all/elect.
     Operands << getSPIRVType(Type::getInt1Ty(module->getContext()));
     break;
   default:
@@ -4313,6 +4318,23 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     Ops.clear();
     Operands << cmp;
     RID = addSPIRVInst(op, Operands);
+    break;
+  }
+  case Builtins::kSubGroupElect: {
+    auto Int1Ty = Type::getInt1Ty(module->getContext());
+    auto Int32Ty = Type::getInt32Ty(module->getContext());
+
+    SPIRVOperandVec Ops;
+    Ops << getSPIRVType(Int1Ty)
+        << ConstantInt::get(Int32Ty, spv::ScopeSubgroup);
+
+    RID = addSPIRVInst(spv::OpGroupNonUniformElect, Ops);
+
+    SPIRVOperandVec SelectOps;
+    SelectOps << getSPIRVType(Int32Ty) << RID << ConstantInt::get(Int32Ty, 1)
+              << ConstantInt::get(Int32Ty, 0);
+
+    RID = addSPIRVInst(spv::OpSelect, SelectOps);
     break;
   }
   default:
@@ -6593,6 +6615,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpGroupNonUniformAny:
     case spv::OpGroupNonUniformBallot:
     case spv::OpGroupNonUniformBroadcast:
+    case spv::OpGroupNonUniformElect:
     case spv::OpGroupNonUniformIAdd:
     case spv::OpGroupNonUniformFAdd:
     case spv::OpGroupNonUniformSMin:
