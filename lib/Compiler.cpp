@@ -11,22 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "clspv/Compiler.h"
-
-#include <cassert>
-#include <fstream>
-#include <iostream>
-#include <numeric>
-#include <ostream>
-#include <sstream>
-#include <string>
-
-#include "Builtins.h"
-#include "BuiltinsEnum.h"
-#include "Constants.h"
-#include "FrontendPlugin.h"
-#include "Passes.h"
-#include "Types.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenAction.h"
@@ -34,13 +18,6 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/PreprocessorOptions.h"
-#include "clspv/AddressSpace.h"
-#include "clspv/Option.h"
-#include "clspv/Passes.h"
-#include "clspv/Sampler.h"
-#include "clspv/clspv64_builtin_library.h"
-#include "clspv/clspv_builtin_library.h"
-#include "clspv/opencl_builtins_header.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
@@ -68,6 +45,30 @@
 #include "llvm/Transforms/Utils/LowerSwitch.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 
+#include "clspv/AddressSpace.h"
+#include "clspv/Compiler.h"
+#include "clspv/Option.h"
+#include "clspv/Passes.h"
+#include "clspv/Sampler.h"
+#include "clspv/clspv64_builtin_library.h"
+#include "clspv/clspv_builtin_library.h"
+#include "clspv/opencl_builtins_header.h"
+
+#include "Builtins.h"
+#include "BuiltinsEnum.h"
+#include "Constants.h"
+#include "FrontendPlugin.h"
+#include "Passes.h"
+#include "Types.h"
+
+#include <cassert>
+#include <fstream>
+#include <iostream>
+#include <numeric>
+#include <ostream>
+#include <sstream>
+#include <string>
+
 using namespace clang;
 
 namespace {
@@ -78,11 +79,11 @@ enum class SPIRArch : uint32_t {
 
 // This registration must be located in the same file as the execution of the
 // action.
-static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction> X(
-    "extra-validation",
-    "Perform extra validation on OpenCL C when targeting Vulkan");
-static FrontendPluginRegistry::Add<clspv::EntryPointAttrsASTAction> Y(
-    "attr-information-getting", "get those attrs");
+static FrontendPluginRegistry::Add<clspv::ExtraValidationASTAction>
+    X("extra-validation",
+      "Perform extra validation on OpenCL C when targeting Vulkan");
+static FrontendPluginRegistry::Add<clspv::EntryPointAttrsASTAction>
+    Y("attr-information-getting", "get those attrs");
 
 static llvm::cl::opt<bool> cl_single_precision_constants(
     "cl-single-precision-constant", llvm::cl::init(false),
@@ -99,29 +100,30 @@ static llvm::cl::opt<bool> cl_fp32_correctly_rounded_divide_sqrt(
     llvm::cl::desc("Single precision floating-point divide (x/y and 1/x) and "
                    "sqrt used are correctly rounded."));
 
-static llvm::cl::opt<bool> cl_opt_disable(
-    "cl-opt-disable", llvm::cl::init(false),
-    llvm::cl::desc("This option disables all optimizations. The "
-                   "default is optimizations are enabled."));
+static llvm::cl::opt<bool>
+    cl_opt_disable("cl-opt-disable", llvm::cl::init(false),
+                   llvm::cl::desc("This option disables all optimizations. The "
+                                  "default is optimizations are enabled."));
 
 static llvm::cl::opt<bool> cl_no_signed_zeros(
     "cl-no-signed-zeros", llvm::cl::init(false),
     llvm::cl::desc("Allow optimizations for floating-point arithmetic that "
                    "ignore the signedness of zero."));
 
-static llvm::cl::list<std::string> Includes(
-    llvm::cl::Prefix, "I",
-    llvm::cl::desc("Add a directory to the list of directories "
-                   "to be searched for header files."),
-    llvm::cl::ZeroOrMore, llvm::cl::value_desc("include path"));
+static llvm::cl::list<std::string>
+    Includes(llvm::cl::Prefix, "I",
+             llvm::cl::desc("Add a directory to the list of directories "
+                            "to be searched for header files."),
+             llvm::cl::ZeroOrMore, llvm::cl::value_desc("include path"));
 
-static llvm::cl::list<std::string> Defines(
-    llvm::cl::Prefix, "D", llvm::cl::desc("Define a #define directive."),
-    llvm::cl::ZeroOrMore, llvm::cl::value_desc("define"));
+static llvm::cl::list<std::string>
+    Defines(llvm::cl::Prefix, "D",
+            llvm::cl::desc("Define a #define directive."), llvm::cl::ZeroOrMore,
+            llvm::cl::value_desc("define"));
 
-static llvm::cl::list<std::string> InputsFilename(
-    llvm::cl::Positional, llvm::cl::desc("<input files>"),
-    llvm::cl::ZeroOrMore);
+static llvm::cl::list<std::string>
+    InputsFilename(llvm::cl::Positional, llvm::cl::desc("<input files>"),
+                   llvm::cl::ZeroOrMore);
 
 static llvm::cl::opt<clang::Language> InputLanguage(
     "x", llvm::cl::desc("Select input type"),
@@ -129,23 +131,25 @@ static llvm::cl::opt<clang::Language> InputLanguage(
     llvm::cl::values(clEnumValN(clang::Language::OpenCL, "cl", "OpenCL source"),
                      clEnumValN(clang::Language::LLVM_IR, "ir", "LLVM IR")));
 
-static llvm::cl::opt<std::string> OutputFilename(
-    "o", llvm::cl::desc("Override output filename"),
-    llvm::cl::value_desc("filename"));
+static llvm::cl::opt<std::string>
+    OutputFilename("o", llvm::cl::desc("Override output filename"),
+                   llvm::cl::value_desc("filename"));
 
-static llvm::cl::opt<char> OptimizationLevel(
-    llvm::cl::Prefix, "O", llvm::cl::init('2'),
-    llvm::cl::desc("Optimization level to use"), llvm::cl::value_desc("level"));
+static llvm::cl::opt<char>
+    OptimizationLevel(llvm::cl::Prefix, "O", llvm::cl::init('2'),
+                      llvm::cl::desc("Optimization level to use"),
+                      llvm::cl::value_desc("level"));
 
 static llvm::cl::opt<bool> verify("verify", llvm::cl::init(false),
                                   llvm::cl::desc("Verify diagnostic outputs"));
 
-static llvm::cl::opt<bool> IgnoreWarnings(
-    "w", llvm::cl::init(false), llvm::cl::desc("Disable all warnings"));
+static llvm::cl::opt<bool>
+    IgnoreWarnings("w", llvm::cl::init(false),
+                   llvm::cl::desc("Disable all warnings"));
 
-static llvm::cl::opt<bool> WarningsAsErrors(
-    "Werror", llvm::cl::init(false),
-    llvm::cl::desc("Turn warnings into errors"));
+static llvm::cl::opt<bool>
+    WarningsAsErrors("Werror", llvm::cl::init(false),
+                     llvm::cl::desc("Turn warnings into errors"));
 
 enum OutputFormat {
   OutputFormatLLVMIR,
@@ -190,7 +194,7 @@ struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
 
   virtual ~OpenCLBuiltinMemoryBuffer() override {}
 };
-}  // namespace
+} // namespace
 
 clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   // Create target info
@@ -210,6 +214,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   }
   // Enable/Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
+
     auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
     // overwrite feature macro list for certain options
     if (clspv::Option::FP64()) {
@@ -267,29 +272,29 @@ int SetCompilerInstanceOptions(
 
   clang::LangStandard::Kind standard;
   switch (clspv::Option::Language()) {
-    case clspv::Option::SourceLanguage::OpenCL_C_10:
-      standard = clang::LangStandard::lang_opencl10;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_C_11:
-      standard = clang::LangStandard::lang_opencl11;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_C_12:
-      standard = clang::LangStandard::lang_opencl12;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_C_20:
-      standard = clang::LangStandard::lang_opencl20;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_C_30:
-      standard = clang::LangStandard::lang_opencl30;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_CPP:
-      standard = clang::LangStandard::lang_openclcpp10;
-      break;
-    case clspv::Option::SourceLanguage::OpenCL_CPP_2021:
-      standard = clang::LangStandard::lang_openclcpp2021;
-      break;
-    default:
-      llvm_unreachable("Unknown source language");
+  case clspv::Option::SourceLanguage::OpenCL_C_10:
+    standard = clang::LangStandard::lang_opencl10;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_11:
+    standard = clang::LangStandard::lang_opencl11;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_12:
+    standard = clang::LangStandard::lang_opencl12;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_20:
+    standard = clang::LangStandard::lang_opencl20;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_C_30:
+    standard = clang::LangStandard::lang_opencl30;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP:
+    standard = clang::LangStandard::lang_openclcpp10;
+    break;
+  case clspv::Option::SourceLanguage::OpenCL_CPP_2021:
+    standard = clang::LangStandard::lang_openclcpp2021;
+    break;
+  default:
+    llvm_unreachable("Unknown source language");
   }
 
   instance.getLangOpts().C99 = true;
@@ -503,41 +508,41 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   llvm::FunctionPassManager fpm;
 
   switch (OptimizationLevel) {
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case 's':
-    case 'z':
-      break;
-    default:
-      llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
-                   << " specified!\n";
-      return -1;
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case 's':
+  case 'z':
+    break;
+  default:
+    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
+                 << " specified!\n";
+    return -1;
   }
 
   llvm::OptimizationLevel level;
   switch (OptimizationLevel) {
-    case '0':
-      level = llvm::OptimizationLevel::O0;
-      break;
-    case '1':
-      level = llvm::OptimizationLevel::O1;
-      break;
-    case '2':
-      level = llvm::OptimizationLevel::O2;
-      break;
-    case '3':
-      level = llvm::OptimizationLevel::O3;
-      break;
-    case 's':
-      level = llvm::OptimizationLevel::Os;
-      break;
-    case 'z':
-      level = llvm::OptimizationLevel::Oz;
-      break;
-    default:
-      break;
+  case '0':
+    level = llvm::OptimizationLevel::O0;
+    break;
+  case '1':
+    level = llvm::OptimizationLevel::O1;
+    break;
+  case '2':
+    level = llvm::OptimizationLevel::O2;
+    break;
+  case '3':
+    level = llvm::OptimizationLevel::O3;
+    break;
+  case 's':
+    level = llvm::OptimizationLevel::Os;
+    break;
+  case 'z':
+    level = llvm::OptimizationLevel::Oz;
+    break;
+  default:
+    break;
   }
 
   // Run the following optimizations prior to the standard LLVM pass pipeline.
@@ -975,15 +980,15 @@ int GenerateIRFile(std::unique_ptr<llvm::Module> &module,
   std::string module_string;
   llvm::raw_string_ostream stream(module_string);
   switch (OutputFormat) {
-    case OutputFormatLLVMIRBinary:
-      llvm::WriteBitcodeToFile(*module, stream);
-      break;
-    case OutputFormatLLVMIR:
-      stream << *module;
-      stream.flush();
-      break;
-    default:
-      llvm_unreachable("unknown LLVM IR Format");
+  case OutputFormatLLVMIRBinary:
+    llvm::WriteBitcodeToFile(*module, stream);
+    break;
+  case OutputFormatLLVMIR:
+    stream << *module;
+    stream.flush();
+    break;
+  default:
+    llvm_unreachable("unknown LLVM IR Format");
   }
 
   return WriteOutput(module_string, output_binary);
@@ -1011,8 +1016,8 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
     };
     std::string str = get_fct_decl(F);
 
-    auto add_impl = [&found, &str, &stream_fct_decl, &stream_fct_list, &module](
-                        std::string mangling, std::string AS) {
+    auto add_impl = [&found, &str, &stream_fct_decl, &stream_fct_list,
+                     &module](std::string mangling, std::string AS) {
       auto substr = [&str](size_t start, size_t end) {
         return str.substr(start, end - start);
       };
@@ -1037,10 +1042,10 @@ bool GetEquivalentBuiltinsWithoutGenericPointer(llvm::Module *module,
                       << substr(mangling_end, str.find('(', mangling_end));
     };
 
-    add_impl("P", "");  // private
+    add_impl("P", ""); // private
     found = true;
-    add_impl("PU3AS1", " addrspace(1)");  // local
-    add_impl("PU3AS3", " addrspace(3)");  // global
+    add_impl("PU3AS1", " addrspace(1)"); // local
+    add_impl("PU3AS3", " addrspace(3)"); // global
   }
   if (found) {
     stream_fct_list.flush();
@@ -1098,9 +1103,11 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
   return true;
 }
 
-std::unique_ptr<llvm::Module> ProgramToModule(
-    llvm::LLVMContext &context, const llvm::StringRef &inputFilename,
-    const std::string &program, std::string *output_log, int *err) {
+std::unique_ptr<llvm::Module>
+ProgramToModule(llvm::LLVMContext &context,
+                const llvm::StringRef &inputFilename,
+                const std::string &program, std::string *output_log, int *err) {
+
   clang::CompilerInstance instance;
   clang::FrontendInputFile kernelFile(inputFilename,
                                       clang::InputKind(InputLanguage));
@@ -1195,7 +1202,9 @@ int CompilePrograms(const std::vector<std::string> &programs,
     int error;
     modules.push_back(
         ProgramToModule(context, "source", program, output_log, &error));
-    if (error != 0) return error;
+    if (error != 0)
+      return error;
+
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
@@ -1224,29 +1233,30 @@ int CompileProgram(const llvm::StringRef &input_filename,
   return CompileModule(input_filename, module, output_buffer, output_log);
 }
 
-}  // namespace
+} // namespace
 
 namespace clspv {
 
 int Compile(const int argc, const char *const argv[]) {
-  if (auto error = ParseOptions(argc, argv)) return error;
+  if (auto error = ParseOptions(argc, argv))
+    return error;
 
   if (OutputFilename.empty()) {
     switch (OutputFormat) {
-      case OutputFormatLLVMIR:
-        OutputFilename = "a.ll";
-        break;
-      case OutputFormatLLVMIRBinary:
-        OutputFilename = "a.bc";
-        break;
-      case OutputFormatC:
-        OutputFilename = "a.spvinc";
-        break;
-      case OutputFormatSPIRV:
-        OutputFilename = "a.spv";
-        break;
-      default:
-        llvm_unreachable("unknown output format");
+    case OutputFormatLLVMIR:
+      OutputFilename = "a.ll";
+      break;
+    case OutputFormatLLVMIRBinary:
+      OutputFilename = "a.bc";
+      break;
+    case OutputFormatC:
+      OutputFilename = "a.spvinc";
+      break;
+    case OutputFormatSPIRV:
+      OutputFilename = "a.spv";
+      break;
+    default:
+      llvm_unreachable("unknown output format");
     }
   }
 
@@ -1259,16 +1269,16 @@ int Compile(const int argc, const char *const argv[]) {
       (InputsFilename.size() == 1 && InputsFilename[0] == "-")) {
     llvm::StringRef inputFilename;
     switch (InputLanguage) {
-      case clang::Language::OpenCL:
-        inputFilename = "stdin.cl";
-        break;
-      case clang::Language::LLVM_IR:
-        inputFilename = "stdin.ll";
-        break;
-      default:
-        // Default to fix compiler warnings/errors. Option parsing will reject a
-        // bad enum value for the option so there is no need for a message.
-        return -1;
+    case clang::Language::OpenCL:
+      inputFilename = "stdin.cl";
+      break;
+    case clang::Language::LLVM_IR:
+      inputFilename = "stdin.ll";
+      break;
+    default:
+      // Default to fix compiler warnings/errors. Option parsing will reject a
+      // bad enum value for the option so there is no need for a message.
+      return -1;
     }
     std::string program((std::istreambuf_iterator<char>(std::cin)),
                         std::istreambuf_iterator<char>());
@@ -1311,7 +1321,8 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
   llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
 
-  if (auto error = ParseOptions(argc, &argv[0])) return error;
+  if (auto error = ParseOptions(argc, &argv[0]))
+    return error;
 
   return CompilePrograms(programs, output_buffer, output_log);
 }
@@ -1321,6 +1332,7 @@ int CompileFromSourceString(const std::string &program,
                             const std::string &options,
                             std::vector<uint32_t> *output_binary,
                             std::string *output_log) {
+
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
   llvm::StringSaver Saver(A);
@@ -1328,11 +1340,12 @@ int CompileFromSourceString(const std::string &program,
   llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
 
-  if (auto error = ParseOptions(argc, &argv[0])) return error;
+  if (auto error = ParseOptions(argc, &argv[0]))
+    return error;
 
   return CompileProgram("source", program, output_binary, output_log);
 }
-}  // namespace clspv
+} // namespace clspv
 
 // C API
 ClspvError clspvCompileFromSourcesString(
