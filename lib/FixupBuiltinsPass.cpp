@@ -29,7 +29,7 @@ using namespace llvm;
 
 namespace clspv_local {
 static double rsqrt(double input) { return 1.0 / sqrt(input); }
-} // namespace
+} // namespace clspv_local
 
 PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
