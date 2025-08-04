@@ -27,9 +27,9 @@
 using namespace clspv;
 using namespace llvm;
 
-namespace {
-double rsqrt(double input) { return 1.0 / sqrt(input); }
-} // namespace
+namespace clspv_local {
+static double rsqrt(double input) { return 1.0 / sqrt(input); }
+} // namespace clspv_local
 
 PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
@@ -45,7 +45,7 @@ bool FixupBuiltinsPass::runOnFunction(Function &F) {
   case Builtins::kSqrt:
     return fixupSqrt(F, sqrt);
   case Builtins::kRsqrt:
-    return fixupSqrt(F, rsqrt);
+    return fixupSqrt(F, clspv_local::rsqrt);
   case Builtins::kReadImagef:
   case Builtins::kReadImagei:
   case Builtins::kReadImageui:
