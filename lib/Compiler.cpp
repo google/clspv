@@ -245,7 +245,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
           enabled) {
         instance.getPreprocessorOpts().addMacroDef(str);
       }
-      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled){
+      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled) {
         instance.getPreprocessorOpts().addMacroUndef(str);
       }
     }
@@ -712,7 +712,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-  
+
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {
@@ -1206,7 +1206,6 @@ int CompilePrograms(const std::vector<std::string> &programs,
         ProgramToModule(context, "source", program, output_log, &error));
     if (error != 0)
       return error;
-
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
@@ -1352,7 +1351,7 @@ int CompileFromSourceString(const std::string &program,
 // C API
 ClspvError clspvCompileFromSourcesString(
     const size_t program_count, const size_t *program_sizes,
-    const char **programs, const char *options, char **output_binary,
+    const char *const *programs, const char *options, char **output_binary,
     size_t *output_binary_size, char **output_log) {
   if (programs == nullptr || program_count == 0 || output_binary == nullptr ||
       output_binary_size == nullptr) {
