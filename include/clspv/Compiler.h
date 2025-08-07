@@ -23,7 +23,6 @@
 #else
 #include <stdint.h>
 #include <stdlib.h>
-#include <stddef.h>
 #endif
 
 #ifdef __cplusplus
