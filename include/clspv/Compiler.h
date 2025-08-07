@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 #else
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <stddef.h>
 #endif
 
 #ifdef __cplusplus
