@@ -82,7 +82,8 @@ extern "C" {
 // |options|            - String of options to pass to Clspv compiler.
 // |output_binary|      - Handle to compiler output/result.
 // |output_binary_size| - Size of compiler output/result (in bytes).
-// |output_log|         - Handle to compiler build log.
+// |output_log|         - Handle to compiler build log. `output_log` can be NULL
+//                        in which case no log will be generated.
 EXPORT ClspvError clspvCompileFromSourcesString(
     const size_t program_count, const size_t *program_sizes,
     const char **programs, const char *options, char **output_binary,
