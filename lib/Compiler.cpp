@@ -1378,7 +1378,7 @@ ClspvError clspvCompileFromSourcesString(
   err =
       clspv::CompileFromSourcesString(vPrograms, sOptions, &binary, &buildLog);
 
-  if (output_log) {
+  if (output_log != NULL) {
     if (!buildLog.empty()) {
       // Alloc and copy backing mem for build log
       *output_log = static_cast<char *>(std::malloc(buildLog.size() + 1));
