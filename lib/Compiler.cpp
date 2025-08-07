@@ -1206,7 +1206,6 @@ int CompilePrograms(const std::vector<std::string> &programs,
         ProgramToModule(context, "source", program, output_log, &error));
     if (error != 0)
       return error;
-
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
