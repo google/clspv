@@ -1378,6 +1378,7 @@ ClspvError clspvCompileFromSourcesString(
   err =
       clspv::CompileFromSourcesString(vPrograms, sOptions, &binary, &buildLog);
 
+  if(output_log) {
   if (!buildLog.empty()) {
     // Alloc and copy backing mem for build log
     *output_log = static_cast<char *>(std::malloc(buildLog.size() + 1));
@@ -1386,6 +1387,9 @@ ClspvError clspvCompileFromSourcesString(
     }
     std::memcpy(static_cast<void *>(*output_log), buildLog.c_str(),
                 buildLog.size() + 1);
+  } else {
+	  *(output_log) = static_cast<char*>(NULL);
+  }
   }
 
   if (err != 0) {
@@ -1394,11 +1398,17 @@ ClspvError clspvCompileFromSourcesString(
 
   // Alloc and copy backing mem for spv output
   size_t spv_bytes = binary.size() * sizeof(uint32_t);
+  if(!spv_bytes) {
+	  /** Early return: when allocation is not needed. */
+	  *spv_bytes = static_cast<void*>(NULL);
+	  return CLSPV_SUCCESS; 
+  }
+
   *output_binary = static_cast<char *>(std::malloc(spv_bytes));
   if (*output_binary == NULL) {
     return CLSPV_OUT_OF_HOST_MEM;
   }
-  std::memcpy(static_cast<void *>(*output_binary), binary.data(), spv_bytes);
+  std::memcpy(static_cast<void*>(*output_binary), binary.data(), spv_bytes);
   *output_binary_size = spv_bytes;
 
   return CLSPV_SUCCESS;

@@ -15,11 +15,18 @@
 #ifndef CLSPV_INCLUDE_CLSPV_COMPILER_H_
 #define CLSPV_INCLUDE_CLSPV_COMPILER_H_
 
+#ifdef __cplusplus
 #include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
+#else
+#include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+#endif
 
+#ifdef __cplusplus
 namespace clspv {
 // DEPRECATED: This function will be replaced by an expanded API.
 int Compile(const int argc, const char *const argv[]);
@@ -44,6 +51,7 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
                              std::vector<uint32_t> *output_buffer,
                              std::string *output_log);
 } // namespace clspv
+#endif
 
 // C API
 typedef enum ClspvError {
