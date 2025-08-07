@@ -15,11 +15,18 @@
 #ifndef CLSPV_INCLUDE_CLSPV_COMPILER_H_
 #define CLSPV_INCLUDE_CLSPV_COMPILER_H_
 
+#ifdef __cplusplus
 #include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
+#else
+#include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+#endif
 
+#ifdef __cplusplus
 namespace clspv {
 // DEPRECATED: This function will be replaced by an expanded API.
 int Compile(const int argc, const char *const argv[]);
@@ -44,6 +51,7 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
                              std::vector<uint32_t> *output_buffer,
                              std::string *output_log);
 } // namespace clspv
+#endif
 
 // C API
 typedef enum ClspvError {
@@ -57,6 +65,14 @@ typedef enum ClspvError {
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT __attribute__((visibility("default")))
+#endif
+
+#ifndef clspv_restrict
+
+/** Optional restrict qualifier for given C API with C++ implementation where
+ * restrict is not the thing. */
+#define clspv_restrict
+
 #endif
 
 #ifdef __cplusplus
@@ -74,22 +90,27 @@ extern "C" {
 // |options|            - String of options to pass to Clspv compiler.
 // |output_binary|      - Handle to compiler output/result.
 // |output_binary_size| - Size of compiler output/result (in bytes).
-// |output_log|         - Handle to compiler build log.
+// |output_log|         - Handle to compiler build log,
+// 			  will assume log is not needed if param is NULL.
+// 			  its value will be NULL when no build log is empty.
 EXPORT ClspvError clspvCompileFromSourcesString(
-    const size_t program_count, const size_t *program_sizes,
-    const char **programs, const char *options, char **output_binary,
-    size_t *output_binary_size, char **output_log);
+    const size_t program_count, const size_t *clspv_restrict program_sizes,
+    const char *const clspv_restrict *clspv_restrict programs,
+    const char *clspv_restrict options,
+    char *clspv_restrict *clspv_restrict output_binary,
+    size_t *clspv_restrict output_binary_size,
+    char *clspv_restrict *clspv_restrict output_log_opt);
 
 // Frees the output memory from clspvCompileFromSourcesString
 //
 // |output_binary|      - Handle to spv
 // |output_log|         - Handle to compiler build log
-static inline void clspvFreeOutputBuildObjs(char *output_binary,
-                                            char *output_log) {
-  free(output_binary);
-  output_binary = NULL;
-  free(output_log);
-  output_log = NULL;
+static inline void clspvFreeOutputBuildObjs(char *clspv_restrict output_binary,
+                                            char *clspv_restrict output_log) {
+  if (output_binary)
+    free(output_binary);
+  if (output_log)
+    free(output_log);
 }
 
 #ifdef __cplusplus
