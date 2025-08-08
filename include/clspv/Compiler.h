@@ -15,11 +15,18 @@
 #ifndef CLSPV_INCLUDE_CLSPV_COMPILER_H_
 #define CLSPV_INCLUDE_CLSPV_COMPILER_H_
 
+#ifdef __cplusplus
 #include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
+#else
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#endif
 
+#ifdef __cplusplus
 namespace clspv {
 // DEPRECATED: This function will be replaced by an expanded API.
 int Compile(const int argc, const char *const argv[]);
@@ -44,6 +51,7 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
                              std::vector<uint32_t> *output_buffer,
                              std::string *output_log);
 } // namespace clspv
+#endif
 
 // C API
 typedef enum ClspvError {
@@ -74,7 +82,8 @@ extern "C" {
 // |options|            - String of options to pass to Clspv compiler.
 // |output_binary|      - Handle to compiler output/result.
 // |output_binary_size| - Size of compiler output/result (in bytes).
-// |output_log|         - Handle to compiler build log.
+// |output_log|         - Handle to compiler build log. `output_log` can be NULL
+//                        in which case no log will be generated.
 EXPORT ClspvError clspvCompileFromSourcesString(
     const size_t program_count, const size_t *program_sizes,
     const char **programs, const char *options, char **output_binary,
