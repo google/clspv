@@ -245,7 +245,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
           enabled) {
         instance.getPreprocessorOpts().addMacroDef(str);
       }
-      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled) {
+      if (feat == clspv::FeatureMacro::__opencl_c_int64 && !enabled){
         instance.getPreprocessorOpts().addMacroUndef(str);
       }
     }
@@ -712,7 +712,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     pm.addPass(clspv::SimplifyPointerBitcastPass());
     pm.addPass(clspv::ReplacePointerBitcastPass());
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));
-
+  
     pm.addPass(clspv::UndoTranslateSamplerFoldPass());
 
     if (clspv::Option::ModuleConstantsInStorageBuffer()) {
@@ -1206,6 +1206,7 @@ int CompilePrograms(const std::vector<std::string> &programs,
         ProgramToModule(context, "source", program, output_log, &error));
     if (error != 0)
       return error;
+
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
@@ -1351,7 +1352,7 @@ int CompileFromSourceString(const std::string &program,
 // C API
 ClspvError clspvCompileFromSourcesString(
     const size_t program_count, const size_t *program_sizes,
-    const char *const *programs, const char *options, char **output_binary,
+    const char **programs, const char *options, char **output_binary,
     size_t *output_binary_size, char **output_log) {
   if (programs == nullptr || program_count == 0 || output_binary == nullptr ||
       output_binary_size == nullptr) {
@@ -1377,14 +1378,18 @@ ClspvError clspvCompileFromSourcesString(
   err =
       clspv::CompileFromSourcesString(vPrograms, sOptions, &binary, &buildLog);
 
-  if (!buildLog.empty()) {
-    // Alloc and copy backing mem for build log
-    *output_log = static_cast<char *>(std::malloc(buildLog.size() + 1));
-    if (*output_log == NULL) {
-      return CLSPV_OUT_OF_HOST_MEM;
+  if (output_log != NULL) {
+    if (!buildLog.empty()) {
+      // Alloc and copy backing mem for build log
+      *output_log = static_cast<char *>(std::malloc(buildLog.size() + 1));
+      if (*output_log == NULL) {
+        return CLSPV_OUT_OF_HOST_MEM;
+      }
+      std::memcpy(static_cast<void *>(*output_log), buildLog.c_str(),
+                  buildLog.size() + 1);
+    } else {
+      *(output_log) = static_cast<char *>(NULL);
     }
-    std::memcpy(static_cast<void *>(*output_log), buildLog.c_str(),
-                buildLog.size() + 1);
   }
 
   if (err != 0) {
@@ -1393,6 +1398,12 @@ ClspvError clspvCompileFromSourcesString(
 
   // Alloc and copy backing mem for spv output
   size_t spv_bytes = binary.size() * sizeof(uint32_t);
+  if (spv_bytes == 0) {
+    /** Early return: when allocation is not needed. */
+    *output_binary = static_cast<char *>(NULL);
+    return CLSPV_SUCCESS;
+  }
+
   *output_binary = static_cast<char *>(std::malloc(spv_bytes));
   if (*output_binary == NULL) {
     return CLSPV_OUT_OF_HOST_MEM;
