@@ -18,5 +18,5 @@
 set SCRIPT_DIR=%~dp0
 
 :: Call with correct parameter
-call %SCRIPT_DIR%\..\scripts\windows\build.bat Release 2019
+call %SCRIPT_DIR%\..\scripts\windows\build.bat Release 2022
 
