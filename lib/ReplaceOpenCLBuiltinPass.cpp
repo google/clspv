@@ -3501,9 +3501,9 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
-    const auto ConstantMemorySemantics = ConstantInt::get(
-        IntTy, spv::MemorySemanticsUniformMemoryMask |
-                   spv::MemorySemanticsAcquireReleaseMask);
+    const auto ConstantMemorySemantics =
+        ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                    spv::MemorySemanticsAcquireReleaseMask);
 
     SmallVector<Value *, 5> Params;
 
