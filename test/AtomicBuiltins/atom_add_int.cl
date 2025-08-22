@@ -6,9 +6,9 @@
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
 // CHECK-DAG: %[[uint_1:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 1
-// CHECK-DAG: %[[uint_80:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 80
+// CHECK-DAG: %[[uint_72:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 72
 // CHECK-DAG: %[[uint_42:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 42
-// CHECK:     %[[__original_id_18:[0-9]+]] = OpAtomicIAdd %[[uint]] {{.*}} %[[uint_1]] %[[uint_80]] %[[uint_42]]
+// CHECK:     %[[__original_id_18:[0-9]+]] = OpAtomicIAdd %[[uint]] {{.*}} %[[uint_1]] %[[uint_72]] %[[uint_42]]
 // CHECK:     OpStore {{.*}} %[[__original_id_18]]
 
 

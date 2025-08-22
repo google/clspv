@@ -6052,9 +6052,10 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     const auto ConstantScopeDevice = getSPIRVInt32Constant(spv::ScopeDevice);
     Ops << ConstantScopeDevice;
 
+    // Vulkan disallows sequentially consistent.
     const auto ConstantMemorySemantics =
         getSPIRVInt32Constant(spv::MemorySemanticsUniformMemoryMask |
-                              spv::MemorySemanticsSequentiallyConsistentMask);
+                              spv::MemorySemanticsAcquireReleaseMask);
     Ops << ConstantMemorySemantics << AtomicRMW->getValOperand();
 
     RID = addSPIRVInst(opcode, Ops);

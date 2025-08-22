@@ -335,8 +335,9 @@ bool replaceCallsWithValue(Function &F,
   SmallVector<Instruction *, 4> ToRemoves;
 
   // Walk the users of the function.
-  for (auto &U : F.uses()) {
-    if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+  SmallVector<User *, 4> Uses(F.users());
+  for (auto &U : Uses) {
+    if (auto CI = dyn_cast<CallInst>(U)) {
 
       auto NewValue = Replacer(CI);
 
@@ -1435,7 +1436,7 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
 bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     Function &F, spv::MemorySemanticsMask semantics) {
 
-  return replaceCallsWithValue(F, [&](CallInst *CI) {
+  return replaceCallsWithValue(F, [&](CallInst *CI) -> Instruction * {
     auto Arg = CI->getOperand(0);
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
@@ -1490,6 +1491,14 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
                                       semantics, false);
       MemScope = MemoryScope(CI->getArgOperand(2), false, CI);
     }
+
+    // Vulkan disallows invocation memory barriers effectively.
+    if (MemScope && MemScope == ConstantInt::get(MemScope->getType(),
+                                                 spv::ScopeInvocation)) {
+      CI->eraseFromParent();
+      return nullptr;
+    }
+
     // Join the storage semantics and the order semantics.
     auto MemorySemantics1 =
         builder.CreateOr({MemorySemanticsWorkgroup, MemorySemanticsUniform});
@@ -2941,16 +2950,9 @@ llvm::Value *ReplaceOpenCLBuiltinPass::createVstoreHalf(llvm::Module &M,
     auto NewF = M.getOrInsertFunction("spirv.atomic_xor", NewFType);
 
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
-    // Assume the pointee is in OpenCL global (SPIR-V Uniform) or local
-    // (SPIR-V Workgroup).
-    const auto AddrSpaceSemanticsBits =
-        IntPointerTy->getPointerAddressSpace() == 1
-            ? spv::MemorySemanticsUniformMemoryMask
-            : spv::MemorySemanticsWorkgroupMemoryMask;
-
     // We're using relaxed consistency here.
-    const auto ConstantMemorySemantics = ConstantInt::get(
-        IntTy, spv::MemorySemanticsUniformMemoryMask | AddrSpaceSemanticsBits);
+    const auto ConstantMemorySemantics =
+        ConstantInt::get(IntTy, spv::MemorySemanticsMaskNone);
 
     SmallVector<Value *, 5> Params{OutPtr, ConstantScopeDevice,
                                    ConstantMemorySemantics, ValueToXor};
@@ -3501,7 +3503,7 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
     const auto ConstantMemorySemantics = ConstantInt::get(
         IntTy, spv::MemorySemanticsUniformMemoryMask |
-                   spv::MemorySemanticsSequentiallyConsistentMask);
+                   spv::MemorySemanticsAcquireReleaseMask);
 
     SmallVector<Value *, 5> Params;
 
@@ -3516,7 +3518,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
     if (2 < CI->arg_size()) {
       // The unequal memory semantics.
-      Params.push_back(ConstantMemorySemantics);
+      const auto ConstantUnequalSemantics =
+          ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
+                                      spv::MemorySemanticsAcquireMask);
+      Params.push_back(ConstantUnequalSemantics);
 
       // The value.
       Params.push_back(CI->getArgOperand(2));
