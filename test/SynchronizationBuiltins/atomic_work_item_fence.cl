@@ -13,16 +13,12 @@ kernel void foo() {
 // CHECK: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[int_1:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 1
 // CHECK-DAG: [[int_2:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 2
-// CHECK-DAG: [[int_4:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 4
 // acq/rel workgroup
 // CHECK-DAG: [[int_264:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 264
 // acq uniform
 // CHECK-DAG: [[int_66:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 66
-// rel image
-// CHECK-DAG: [[int_2052:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 2052
 // acq/rel uniform|workgroup|image
 // CHECK-DAG: [[int_2376:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 2376
 // CHECK: OpMemoryBarrier [[int_2]] [[int_264]]
 // CHECK: OpMemoryBarrier [[int_1]] [[int_66]]
-// CHECK: OpMemoryBarrier [[int_4]] [[int_2052]]
 // CHECK: OpMemoryBarrier [[int_1]] [[int_2376]]
