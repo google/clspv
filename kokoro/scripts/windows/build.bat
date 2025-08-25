@@ -26,7 +26,7 @@ set PATH=c:\cmake-3.31.2\bin;%PATH%
 set PATH=c:\Python312;%PATH%
 
 cd %SRC%
-python utils/fetch_sources.py
+python utils/fetch_sources.py --ci
 
 :: #########################################
 :: set up msvc build env
@@ -50,7 +50,7 @@ if "%KOKORO_GITHUB_COMMIT%." == "." (
   set BUILD_SHA=%KOKORO_GITHUB_COMMIT%
 )
 
-cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DLLVM_TARGETS_TO_BUILD="" .. -Thost=x64
+cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% .. -Thost=x64
 
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 
