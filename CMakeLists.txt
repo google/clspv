@@ -139,17 +139,22 @@ else()
     endif()
     use_component(${CLSPV_LIBCLC_SOURCE_DIR})
 
-    set(LLVM_ENABLE_PROJECTS "${LLVM_ENABLE_PROJECTS};libclc")
+    set(LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "Semicolon-separated list of runtimes to build, or \"all\".")
     set(LIBCLC_TARGETS_TO_BUILD clspv--;clspv64--)
-    set(LLVM_EXTERNAL_LIBCLC_SOURCE_DIR ${CLSPV_LIBCLC_SOURCE_DIR})
+
+    # Tell LLVM to build the native target (needed to build libclc).
+    set(CLSPV_LLVM_TARGETS_TO_BUILD "Native")
+
+    # Disabling zlib as build is failing on libclc when enabled
+    set(LLVM_ENABLE_ZLIB "OFF" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
   endif()
 
   # Tell LLVM not to build any targets.
-  set(LLVM_TARGETS_TO_BUILD ""
+  set(LLVM_TARGETS_TO_BUILD "${CLSPV_LLVM_TARGETS_TO_BUILD}"
       CACHE STRING "Semicolon-separated list of targets to build, or \"all\".")
 
   # Then pull in LLVM for building.
-  add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm EXCLUDE_FROM_ALL)
+  add_subdirectory(${CLSPV_LLVM_SOURCE_DIR} ${CLSPV_LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
 
   # Ensure clspv and LLVM use the same build options (e.g. -D_FILE_OFFSET_BITS=64).
   list(APPEND CMAKE_MODULE_PATH ${CLSPV_LLVM_SOURCE_DIR}/cmake/modules/)

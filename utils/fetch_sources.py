@@ -97,6 +97,7 @@ class GoodCommit(object):
         self.branch = json['branch']
         self.subdir = os.path.join(TOP_DIR, json['subdir']) if ('subdir' in json) else TOP_DIR
         self.commit = json['commit']
+        self.patches = json.get('patches', [])
 
     def GetUrl(self, style='https'):
         """Returns the URL for the repository."""
@@ -131,12 +132,18 @@ class GoodCommit(object):
         cmd.append(self.commit if shallow else self.branch)
         command_output(cmd, self.subdir)
 
-    def Checkout(self, shallow):
+    def Patch(self, patch, ci):
+        command_output(['git', 'apply' if ci else 'am', os.path.join(TOP_DIR, patch)], self.subdir)
+
+    def Checkout(self, shallow, ci):
         if not os.path.exists(os.path.join(self.subdir,'.git')):
             self.InitRepo(shallow)
         if not self.HasCommit():
             self.Fetch(shallow)
         command_output(['git', 'checkout', self.commit], self.subdir)
+        for patch in self.patches:
+            self.Patch(patch['patch'], ci)
+
 
 
 def GetGoodCommits():
@@ -162,6 +169,7 @@ def main():
     parser.add_argument('--deps', choices=all_deps, nargs='+', default=all_deps,
                         help='A list of dependencies to fetch sources for. '
                              'All is the default.')
+    parser.add_argument('--ci', action='store_true')
 
     args = parser.parse_args()
 
@@ -175,7 +183,7 @@ def main():
         if c.name not in args.deps:
             continue
         print('Get {n}\n'.format(n=c.name))
-        c.Checkout(args.shallow)
+        c.Checkout(args.shallow, args.ci)
     sys.exit(0)
 
 
