@@ -31,7 +31,7 @@ BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
 cd $SRC
-python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py --ci
 
 mkdir build && cd $SRC/build
 

@@ -1,0 +1,48 @@
+From e4916b6bbd1b4e89d67b6a65e89839942b0be804 Mon Sep 17 00:00:00 2001
+From: Romaric Jodin <rjodin@google.com>
+Date: Thu, 28 Aug 2025 16:22:17 +0200
+Subject: [PATCH 2/3] fix clang_cmake_builddir
+
+When building llvm from a subdirectory (like clspv does)
+`CMAKE_BINARY_DIR` is at the top of the build directory.
+
+When building runtimes (libclc for example), the build fails looking
+for clang (through `find_package` looking at `LLVM_BINARY_DIR` with
+`NO_DEFAULT_PATH` & `NO_CMAKE_FIND_ROOT_PATH`) because clang is not in
+`LLVM_BINARY_DIR`.
+
+Fix that issue by setting `clang_cmake_builddir` the same way we set
+`llvm_cmake_builddir` from `LLVM_BINARY_DIR`.
+
+For default llvm build (using llvm as the main cmake project), it
+should not change anything.
+---
+ clang/cmake/modules/CMakeLists.txt | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/clang/cmake/modules/CMakeLists.txt b/clang/cmake/modules/CMakeLists.txt
+index d2d68121371b..b3b4a74f6d47 100644
+--- a/clang/cmake/modules/CMakeLists.txt
++++ b/clang/cmake/modules/CMakeLists.txt
+@@ -8,15 +8,14 @@ include(FindPrefixFromConfig)
+ # the usual CMake convention seems to be ${Project}Targets.cmake.
+ set(CLANG_INSTALL_PACKAGE_DIR "${CMAKE_INSTALL_PACKAGEDIR}/clang" CACHE STRING
+   "Path for CMake subdirectory for Clang (defaults to '${CMAKE_INSTALL_PACKAGEDIR}/clang')")
+-# CMAKE_INSTALL_PACKAGEDIR might be absolute, so don't reuse below.
+-set(clang_cmake_builddir "${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/cmake/clang")
+ 
+ # Keep this in sync with llvm/cmake/CMakeLists.txt!
+ set(LLVM_INSTALL_PACKAGE_DIR "${CMAKE_INSTALL_PACKAGEDIR}/llvm" CACHE STRING
+   "Path for CMake subdirectory for LLVM (defaults to '${CMAKE_INSTALL_PACKAGEDIR}/llvm')")
+ # CMAKE_INSTALL_PACKAGEDIR might be absolute, so don't reuse below.
+-string(REPLACE "${CMAKE_CFG_INTDIR}" "." llvm_cmake_builddir "${LLVM_LIBRARY_DIR}")
+-set(llvm_cmake_builddir "${llvm_cmake_builddir}/cmake/llvm")
++string(REPLACE "${CMAKE_CFG_INTDIR}" "." llvm_builddir "${LLVM_LIBRARY_DIR}")
++set( llvm_cmake_builddir "${llvm_builddir}/cmake/llvm")
++set(clang_cmake_builddir "${llvm_builddir}/cmake/clang")
+ 
+ get_property(CLANG_EXPORTS GLOBAL PROPERTY CLANG_EXPORTS)
+ export(TARGETS ${CLANG_EXPORTS} FILE ${clang_cmake_builddir}/ClangTargets.cmake)
+-- 
+2.51.0.384.g4c02a37b29-goog
+

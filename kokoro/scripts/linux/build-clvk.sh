@@ -36,7 +36,7 @@ fi
 
 # Get Clspv dependencies.
 cd $SRC
-python3 utils/fetch_sources.py
+python3 utils/fetch_sources.py --ci
 
 VULKAN_VERSION=v1.3.243
 
