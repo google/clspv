@@ -6,8 +6,8 @@
 // CHECK-DAG: %[[uint:[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[uint_0:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 0
 // CHECK-DAG: %[[uint_1:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 1
-// CHECK-DAG: %[[uint_80:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 80
-// CHECK:     %[[__original_id_17:[0-9]+]] = OpAtomicIDecrement %[[uint]] {{.*}} %[[uint_1]] %[[uint_80]]
+// CHECK-DAG: %[[uint_72:[0-9a-zA-Z_]+]] = OpConstant %[[uint]] 72
+// CHECK:     %[[__original_id_17:[0-9]+]] = OpAtomicIDecrement %[[uint]] {{.*}} %[[uint_1]] %[[uint_72]]
 
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int* a, global int* b)

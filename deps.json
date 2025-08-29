@@ -14,7 +14,7 @@
       "subrepo" : "KhronosGroup/SPIRV-Headers",
       "branch" : "main",
       "subdir" : "third_party/SPIRV-Headers",
-      "commit" : "bf08186d8be01bf9aeb556eda6ebec2269a4bcae"
+      "commit" : "a8637796c28386c3cf3b4e8107020fbb52c46f3f"
     },
     {
       "name" : "SPIRV-Tools",
@@ -22,7 +22,7 @@
       "subrepo" : "KhronosGroup/SPIRV-Tools",
       "branch" : "main",
       "subdir" : "third_party/SPIRV-Tools",
-      "commit" : "bac6ca7568287e7b045129f34cc69ae0cdb7d4e0"
+      "commit" : "8a8bb6c89174ed753eb18a438092ee59356efc3c"
     }
   ]
 }

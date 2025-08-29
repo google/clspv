@@ -31,7 +31,7 @@ declare spir_func void @_Z13vstore_half_3Dv3_fjPU3AS1Dh(<3 x float>, i32, ptr ad
 ; CHECK:  [[and2:%[^ ]+]] = and i32 [[pack]], 65535
 ; CHECK:  [[shl3:%[^ ]+]] = shl i32 [[and2]], [[shl1]]
 ; CHECK:  [[zor:%[^ ]+]] = xor i32 [[and1]], [[shl3]]
-; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 64, i32 [[zor]])
+; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 0, i32 [[zor]])
 ; CHECK:  call void @llvm.donothing()
 
 ; CHECK:  [[add1:%[^ ]+]] = add i32 [[add0]], 1
@@ -47,7 +47,7 @@ declare spir_func void @_Z13vstore_half_3Dv3_fjPU3AS1Dh(<3 x float>, i32, ptr ad
 ; CHECK:  [[and2:%[^ ]+]] = and i32 [[pack]], 65535
 ; CHECK:  [[shl3:%[^ ]+]] = shl i32 [[and2]], [[shl1]]
 ; CHECK:  [[zor:%[^ ]+]] = xor i32 [[and1]], [[shl3]]
-; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 64, i32 [[zor]])
+; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 0, i32 [[zor]])
 ; CHECK:  call void @llvm.donothing()
 
 ; CHECK:  [[add2:%[^ ]+]] = add i32 [[add1]], 1
@@ -63,5 +63,5 @@ declare spir_func void @_Z13vstore_half_3Dv3_fjPU3AS1Dh(<3 x float>, i32, ptr ad
 ; CHECK:  [[and2:%[^ ]+]] = and i32 [[pack]], 65535
 ; CHECK:  [[shl3:%[^ ]+]] = shl i32 [[and2]], [[shl1]]
 ; CHECK:  [[zor:%[^ ]+]] = xor i32 [[and1]], [[shl3]]
-; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 64, i32 [[zor]])
+; CHECK:  call i32 @spirv.atomic_xor(ptr addrspace(1) [[gep]], i32 1, i32 0, i32 [[zor]])
 ; CHECK:  call void @llvm.donothing()

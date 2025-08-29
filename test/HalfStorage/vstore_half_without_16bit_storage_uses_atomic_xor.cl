@@ -19,7 +19,6 @@
 // CHECK-DAG: %[[CONSTANT_16_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 16{{$}}
 // CHECK-64-DAG: %[[CONSTANT_1_LONG_ID:[a-zA-Z0-9_]*]] = OpConstant %[[ULONG_TYPE_ID]] 1
 // CHECK-DAG: %[[CONSTANT_65535_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 65535
-// CHECK-DAG: %[[CONSTANT_64_ID:[a-zA-Z0-9_]*]] = OpConstant %[[UINT_TYPE_ID]] 64
 // CHECK: %[[INSERT_ID:[a-zA-Z0-9_]*]] = OpCompositeInsert %[[FLOAT2_TYPE_ID]] {{.*}} %[[UNDEF_ID]] 0
 // CHECK: %[[PACKED_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[UINT_TYPE_ID]] {{.*}} PackHalf2x16 %[[INSERT_ID]]
 // CHECK-64: %[[INDEX_INTO_UINT:[a-zA-Z0-9_]*]] = OpShiftRightLogical %[[ULONG_TYPE_ID]] {{.*}} %[[CONSTANT_1_LONG_ID]]
@@ -35,7 +34,7 @@
 // CHECK: %[[VALUE_TO_XOR:[a-zA-Z0-9_]*]] = OpBitwiseXor %[[UINT_TYPE_ID]] %[[MASKED_PREV_VALUE]] %[[NEW_BITS_TO_WRITE]]
 // The 64 here is Relaxed consistency on Uniform memory (a.k.a. OpenCL global memory)
 // TODO(dneto): Test vstore_half on local memory.
-// CHECK: %[[XOR_RESULT:[a-zA-Z0-9_]*]] = OpAtomicXor %[[UINT_TYPE_ID]] %[[OUT_PTR]] %[[CONSTANT_1_ID]] %[[CONSTANT_64_ID]] %[[VALUE_TO_XOR]]
+// CHECK: %[[XOR_RESULT:[a-zA-Z0-9_]*]] = OpAtomicXor %[[UINT_TYPE_ID]] %[[OUT_PTR]] %[[CONSTANT_1_ID]] %[[CONSTANT_0_ID]] %[[VALUE_TO_XOR]]
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global int* a, global float* b, int n)
 {

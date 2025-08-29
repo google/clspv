@@ -23,7 +23,6 @@
 
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[AcqRel_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[AcqRel_Uniform]] [[Rx]] [[value]] {{.*}}
-// CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Rel_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Rel_Uniform]] [[Rx]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Acq_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Acq_Uniform]] [[Rx]] [[value]] {{.*}}
@@ -31,7 +30,6 @@
 
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[AcqRel_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[AcqRel_Uniform]] [[Rx]] [[value]] {{.*}}
-// CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Rel_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Rel_Uniform]] [[Rx]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Acq_Uniform]] [[Acq_Uniform]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Acq_Uniform]] [[Rx]] [[value]] {{.*}}
@@ -41,7 +39,6 @@
 
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[AcqRel_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[AcqRel_Workgroup]] [[Rx]] [[value]] {{.*}}
-// CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Rel_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Rel_Workgroup]] [[Rx]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Acq_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[dv]] [[Acq_Workgroup]] [[Rx]] [[value]] {{.*}}
@@ -49,7 +46,6 @@
 
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[AcqRel_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[AcqRel_Workgroup]] [[Rx]] [[value]] {{.*}}
-// CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Rel_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Rel_Workgroup]] [[Rx]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Acq_Workgroup]] [[Acq_Workgroup]] [[value]] {{.*}}
 // CHECK: OpAtomicCompareExchange [[uint]] {{.*}} [[wg]] [[Acq_Workgroup]] [[Rx]] [[value]] {{.*}}
@@ -63,7 +59,6 @@ kernel void foo(global bool* out, global atomic_int* a, local atomic_int* b) {
 
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acq_rel, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acq_rel, memory_order_relaxed, memory_scope_device);
-    *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_release, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_release, memory_order_relaxed, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acquire, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acquire, memory_order_relaxed, memory_scope_device);
@@ -71,7 +66,6 @@ kernel void foo(global bool* out, global atomic_int* a, local atomic_int* b) {
 
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acq_rel, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acq_rel, memory_order_relaxed, memory_scope_work_group);
-    *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_release, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_release, memory_order_relaxed, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acquire, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(a, &expected, 7, memory_order_acquire, memory_order_relaxed, memory_scope_work_group);
@@ -81,7 +75,6 @@ kernel void foo(global bool* out, global atomic_int* a, local atomic_int* b) {
 
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acq_rel, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acq_rel, memory_order_relaxed, memory_scope_device);
-    *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_release, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_release, memory_order_relaxed, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acquire, memory_order_acquire, memory_scope_device);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acquire, memory_order_relaxed, memory_scope_device);
@@ -89,7 +82,6 @@ kernel void foo(global bool* out, global atomic_int* a, local atomic_int* b) {
 
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acq_rel, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acq_rel, memory_order_relaxed, memory_scope_work_group);
-    *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_release, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_release, memory_order_relaxed, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acquire, memory_order_acquire, memory_scope_work_group);
     *out = atomic_compare_exchange_weak_explicit(b, &expected, 7, memory_order_acquire, memory_order_relaxed, memory_scope_work_group);
