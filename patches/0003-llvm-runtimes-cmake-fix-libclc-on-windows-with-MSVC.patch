@@ -1,0 +1,48 @@
+From 0909fff922557250242e600b6c180e959ede70a4 Mon Sep 17 00:00:00 2001
+From: Romaric Jodin <rjodin@google.com>
+Date: Fri, 5 Sep 2025 08:21:06 +0200
+Subject: [PATCH 3/4] llvm: runtimes: cmake: fix libclc on windows with MSVC
+
+Builing libclc on windows with MSVC fails with the following message:
+```
+LINK : warning LNK4044: unrecognized option '/lpsapi'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/lshell32'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/lole32'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/luuid'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/ladvapi32'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/lws2_32'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/lntdll'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LINK : warning LNK4044: unrecognized option '/ldelayimp'; ignored [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+LLVMSupport.lib(ErrorHandling.obj) : error LNK2019: unresolved external symbol __imp_RtlGetLastNtStatus referenced in function "class std::error_code __cdecl llvm::mapLastWindowsError(void)" (?mapLastWindowsError@llvm@@YA?AVerror_code@std@@XZ) [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+shell32.lib(SHELL32.dll) : error LNK2001: unresolved external symbol __delayLoadHelper2 [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+ole32.lib(ole32.dll) : error LNK2001: unresolved external symbol __delayLoadHelper2 [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+T:\src\github\clspv\build\third_party\llvm\Release\bin\prepare_builtins.exe : fatal error LNK1120: 2 unresolved externals [T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj] [T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+```
+The reason is that the externalProject is called with USE_TOOLCHAIN
+to use the clang built by the main llvm project and its properties.
+
+Especially, it is prefixing libraries with `/l`. But when compiling
+`prepare-builtins.cpp` (which is a source for a host tool) it is using
+MSVC which does not handle such syntax, leading to the option being
+ignored and then unresolved symbols.
+---
+ llvm/runtimes/CMakeLists.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/llvm/runtimes/CMakeLists.txt b/llvm/runtimes/CMakeLists.txt
+index 94a43b96d218..7f129080bce1 100644
+--- a/llvm/runtimes/CMakeLists.txt
++++ b/llvm/runtimes/CMakeLists.txt
+@@ -518,6 +518,9 @@ if(build_runtimes)
+         list(APPEND extra_deps ${dep})
+       endif()
+     endforeach()
++    if (MSVC)
++      list(APPEND extra_cmake_args "-DCMAKE_CXX_LINK_LIBRARY_FLAG=\"\"")
++    endif()
+   endif()
+   if("openmp" IN_LIST LLVM_ENABLE_RUNTIMES OR "offload" IN_LIST LLVM_ENABLE_RUNTIMES)
+     if (${LLVM_TOOL_FLANG_BUILD})
+-- 
+2.51.0.355.g5224444f11-goog
+

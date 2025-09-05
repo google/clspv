@@ -40,7 +40,7 @@ export PATH="$PWD/cmake-$CMAKE_VER-macos-universal/CMake.app/Contents/bin:$PATH"
 
 # Get dependencies.
 cd $SRC
-python utils/fetch_sources.py
+python utils/fetch_sources.py --ci
 
 mkdir build && cd $SRC/build
 

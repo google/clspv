@@ -6,7 +6,12 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "e68a20e0b7623738d6af736d3aa02625cba6126a"
+      "commit" : "a6da68ed36d7ecb9edf00262d2a2c1129689399f",
+      "patches" : [
+          {"patch": "patches/0001-libclc-CMake-include-GetClangResourceDir-155836.patch"},
+          {"patch": "patches/0002-clang-fix-clang_cmake_builddir.patch"},
+          {"patch": "patches/0003-llvm-runtimes-cmake-fix-libclc-on-windows-with-MSVC.patch"}
+      ]
     },
     {
       "name" : "SPIRV-Headers",

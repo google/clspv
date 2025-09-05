@@ -1,0 +1,53 @@
+From 64c3d7acd59ef28b45929e66a39a6ac302ab544b Mon Sep 17 00:00:00 2001
+From: Romaric Jodin <rjodin@google.com>
+Date: Fri, 5 Sep 2025 10:59:44 +0200
+Subject: [PATCH 4/4] llvm: lib: Support: cmake: fix system libs when using
+ MSVC
+
+libclc builds a host tool (prepare_builtins) that depends on
+LLVMSupport.
+When compiling on windows with MSVC, we need to make sure that MSVC
+does not have to guess whether the libs are '.lib' or '.obj' file
+otherwise some systems end up with the following error:
+```
+LINK : fatal error LNK1104: cannot open file '\\psapi.obj'
+[T:\src\github\clspv\build\third_party\llvm\runtimes\runtimes-bins\libclc\utils\prepare_builtins.vcxproj]
+[T:\src\github\clspv\build\third_party\llvm\runtimes\libclc.vcxproj]
+```
+---
+ llvm/lib/Support/CMakeLists.txt | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/Support/CMakeLists.txt b/llvm/lib/Support/CMakeLists.txt
+index b7578dd58007..00dea6716462 100644
+--- a/llvm/lib/Support/CMakeLists.txt
++++ b/llvm/lib/Support/CMakeLists.txt
+@@ -41,7 +41,24 @@ if( WIN32 )
+   # libuuid required for FOLDERID_Profile usage in lib/Support/Windows/Path.inc.
+   # advapi32 required for CryptAcquireContextW in lib/Support/Windows/Path.inc.
+   # ntdll required for RtlGetLastNtStatus in lib/Support/ErrorHandling.cpp.
+-  set(system_libs ${system_libs} psapi shell32 ole32 uuid advapi32 ws2_32 ntdll)
++  if(MSVC)
++    # On Windows, we must find the full paths to system libraries to prevent
++    # LLVM's build scripts from incorrectly mangling the library names.
++    foreach(lib_name IN ITEMS psapi shell32 ole32 uuid advapi32 ws2_32 ntdll)
++      find_library(LIB_FULL_PATH
++        NAMES ${lib_name}
++        # The default search paths should be configured correctly by the VS Command Prompt
++        )
++      if(NOT LIB_FULL_PATH)
++        message(FATAL_ERROR "Failed to find required Windows system library: ${lib_name}.lib. Ensure you are running in a Visual Studio Command Prompt.")
++      endif()
++      list(APPEND system_libs ${LIB_FULL_PATH})
++      # Important: Unset the variable for the next loop iteration
++      unset(LIB_FULL_PATH CACHE)
++    endforeach()
++  else()
++    set(system_libs ${system_libs} psapi shell32 ole32 uuid advapi32 ws2_32 ntdll)
++  endif()
+ elseif( CMAKE_HOST_UNIX )
+   if( HAVE_LIBRT )
+     set(system_libs ${system_libs} rt)
+-- 
+2.51.0.355.g5224444f11-goog
+
