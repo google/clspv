@@ -4145,6 +4145,7 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     return loadBuiltin(spv::BuiltInSubgroupId);
   case Builtins::kGetSubGroupLocalId:
     return loadBuiltin(spv::BuiltInSubgroupLocalInvocationId);
+
   case Builtins::kSubGroupBroadcast:
     if (SpvVersion() < SPIRVVersion::SPIRV_1_5 &&
         !dyn_cast<ConstantInt>(Call->getOperand(1))) {

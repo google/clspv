@@ -838,6 +838,16 @@ constants as follows:
   `CapabilityGroupNonUniformVote` capability.
 - `sub_group_elect()` is mapped to `OpGroupNonUniformElect` operation. Requires
   `CapabilityGroupNonUniformVote` capability.
+- `get_sub_group_eq_mask()` is mapped to `BuiltInSubgroupEqMask` constant.
+  Requires `CapabilityGroupNonUniformBallot` capability.
+- `get_sub_group_ge_mask()` is mapped to `BuiltInSubgroupGeMask` constant.
+  Requires `CapabilityGroupNonUniformBallot` capability.
+- `get_sub_group_gt_mask()` is mapped to `BuiltInSubgroupGtMask` constant.
+  Requires `CapabilityGroupNonUniformBallot` capability.
+- `get_sub_group_le_mask()` is mapped to `BuiltInSubgroupLeMask` constant.
+  Requires `CapabilityGroupNonUniformBallot` capability.
+- `get_sub_group_lt_mask()` is mapped to `BuiltInSubgroupLtMask` constant.
+  Requires `CapabilityGroupNonUniformBallot` capability.
 - `sub_group_ballot()` is mapped to `OpGroupNonUniformBallot` operation.
   Requires `CapabilityGroupNonUniformBallot` capability.
 - `sub_group_shuffle()` is mapped to `OpGroupNonUniformShuffle` operation.
