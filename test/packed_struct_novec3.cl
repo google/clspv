@@ -1,3 +1,5 @@
+// b/445660270 https://github.com/google/clspv/issues/1524
+// XFAIL: *
 // RUN: clspv %target %s -o %t.spv -vec3-to-vec4 -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
