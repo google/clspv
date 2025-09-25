@@ -6,9 +6,8 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "5bca8f2f97d23c3562544e959702826eb20696af",
+      "commit" : "6e904e89cb97fa113c95f746942e04226a7d2207",
       "patches" : [
-          {"patch": "patches/0001-libclc-CMake-include-GetClangResourceDir-155836.patch"},
           {"patch": "patches/0002-fix-clang_cmake_builddir.patch"}
       ]
     },

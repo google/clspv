@@ -1,3 +1,5 @@
+// b/445660270 https://github.com/google/clspv/issues/1524
+// XFAIL: *
 // RUN: clspv %target %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm

@@ -408,11 +408,11 @@ int SetCompilerInstanceOptions(
   instance.getLangOpts().GNUInline = true;
 
   // Set up diagnostics
-  instance.createDiagnostics(
-      *llvm::vfs::getRealFileSystem(),
+  instance.setDiagnostics(CompilerInstance::createDiagnostics(
+      *llvm::vfs::getRealFileSystem(), instance.getDiagnosticOpts(),
       new clang::TextDiagnosticPrinter(*diagnosticsStream,
                                        instance.getDiagnosticOpts()),
-      true);
+      true));
   instance.getDiagnostics().setWarningsAsErrors(WarningsAsErrors);
   instance.getDiagnostics().setEnableAllWarnings(true);
 
@@ -463,6 +463,7 @@ int SetCompilerInstanceOptions(
 
   instance.setTarget(PrepareTargetInfo(instance));
 
+  instance.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   instance.createFileManager();
   instance.createSourceManager(instance.getFileManager());
 
