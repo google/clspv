@@ -840,6 +840,10 @@ constants as follows:
   `CapabilityGroupNonUniformVote` capability.
 - `sub_group_ballot()` is mapped to `OpGroupNonUniformBallot` operation.
   Requires `CapabilityGroupNonUniformBallot` capability.
+- `sub_group_ballot_find_lsb()` is mapped to `OpGroupNonUniformBallotFindLSB` operation.
+  Requires `CapabilityGroupNonUniformBallot` capability.
+- `sub_group_ballot_find_msb()` is mapped to `OpGroupNonUniformBallotFindMSB` operation.
+  Requires `CapabilityGroupNonUniformBallot` capability.
 - `sub_group_shuffle()` is mapped to `OpGroupNonUniformShuffle` operation.
   Requires `CapabilityGroupNonUniformShuffle` capability.
 - `sub_group_shuffle_xor()` is mapped to `OpGroupNonUniformShuffleXor` operation.

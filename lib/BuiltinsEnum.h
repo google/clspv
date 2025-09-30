@@ -344,6 +344,8 @@ enum BuiltinType : unsigned int {
   kSubGroupAll,
   kSubGroupAny,
   kSubGroupBallot,
+  kSubGroupBallotFindLSB,
+  kSubGroupBallotFindMSB,
   kSubGroupBroadcast,
   kSubGroupElect,
   kSubGroupReduceAdd,
