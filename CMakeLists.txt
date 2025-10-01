@@ -147,6 +147,10 @@ else()
 
     # Disabling zlib as build is failing on libclc when enabled
     set(LLVM_ENABLE_ZLIB "OFF" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
+
+    if (MSVC)
+      set(RUNTIMES_CMAKE_ARGS "-DCMAKE_ASM_COMPILER=cl")
+    endif()
   endif()
 
   # Tell LLVM not to build any targets.

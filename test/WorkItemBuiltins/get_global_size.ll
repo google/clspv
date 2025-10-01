@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll --passes=define-opencl-workitem-builtins,early-cse,instcombine
+; RUN: clspv-opt %s -o %t.ll --passes=define-opencl-workitem-builtins,early-cse
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: call spir_func i32 @_Z15get_global_sizej(i32 3)
