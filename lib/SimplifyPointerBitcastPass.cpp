@@ -304,7 +304,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       for (uint32_t i = 0; i < OtherGEP->getNumOperands() - 1; i++) {
         Value *op = OtherGEP->getOperand(i + 1);
         TyIdxs.push_back(op);
-        Type *idxTy = GetElementPtrInst::getIndexedType(OtherGEP->getSourceElementType(), TyIdxs);
+        Type *idxTy = GetElementPtrInst::getIndexedType(
+            OtherGEP->getSourceElementType(), TyIdxs);
         Types.push_back(idxTy);
         if (i > 0 && isa<StructType>(Types[i - 1])) {
           startIndex = i + 1;
@@ -324,7 +325,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
         if (CstSrcLastIdxOp && CstSrcLastIdxOp->isZero()) {
           Idxs.push_back(GEP->getOperand(1));
         } else {
-          Idxs.push_back(Builder.CreateAdd(GEPIdxOp, *(OtherGEP->op_end() - 1)));
+          Idxs.push_back(
+              Builder.CreateAdd(GEPIdxOp, *(OtherGEP->op_end() - 1)));
         }
       } else {
         uint64_t cstVal;
