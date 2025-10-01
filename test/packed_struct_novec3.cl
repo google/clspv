@@ -1,11 +1,9 @@
-// b/445660270 https://github.com/google/clspv/issues/1524
-// XFAIL: *
-// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 -arch=spir
+// RUN: clspv %s -o %t.spv -vec3-to-vec4 -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 -arch=spir64
+// RUN: clspv %s -o %t.spv -vec3-to-vec4 -arch=spir64
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
@@ -67,10 +65,12 @@ __kernel void test(__global int *a) {
 // CHECK-DAG: [[uint2:%[^ ]+]] = OpConstant [[uint]] 2
 // CHECK-32-DAG: [[uint3:%[^ ]+]] = OpConstant [[uint]] 3
 // CHECK-32-DAG: [[uint4:%[^ ]+]] = OpConstant [[uint]] 4
+// CHECK-32-DAG: [[uint5:%[^ ]+]] = OpConstant [[uint]] 5
 // CHECK-64-DAG: [[ulong1:%[^ ]+]] = OpConstant [[ulong]] 1
 // CHECK-64-DAG: [[ulong2:%[^ ]+]] = OpConstant [[ulong]] 2
 // CHECK-64-DAG: [[ulong3:%[^ ]+]] = OpConstant [[ulong]] 3
 // CHECK-64-DAG: [[ulong4:%[^ ]+]] = OpConstant [[ulong]] 4
+// CHECK-64-DAG: [[ulong5:%[^ ]+]] = OpConstant [[ulong]] 5
 // CHECK: [[s1:%[^ ]+]] = OpVariable [[S1arrayptr]] Workgroup
 // CHECK: [[s2:%[^ ]+]] = OpVariable [[S2arrayptr]] Workgroup
 // CHECK: [[gidptr:%[^ ]+]] = OpVariable [[uintv3input]] Input
@@ -80,22 +80,24 @@ __kernel void test(__global int *a) {
 // CHECK-64: [[gid_long:%[^ ]+]] = OpSConvert [[ulong]] [[gid]]
 // CHECK-64: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid_long]] [[uint0]]
 // CHECK-64: [[_1:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s1]] [[gid_long]] [[uint1]]
-// CHECK-64: [[gid_times_8:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[gid_long]] [[ulong3]]
-// CHECK-64: [[id:%[^ ]+]] = OpBitwiseOr [[ulong]] [[gid_times_8]] [[ulong1]]
-// CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
-// CHECK-64: [[id:%[^ ]+]] = OpBitwiseOr [[ulong]] [[gid_times_8]] [[ulong2]]
-// CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
+// CHECK-64: [[shl_5_long:%[^ ]+]] = OpShiftLeftLogical [[ulong]] [[gid_long]] [[ulong5]]
+// CHECK-64: [[gid_times_8:%[^ ]+]] = OpShiftRightLogical [[ulong]] [[shl_5_long]] [[ulong2]]
 // CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid_times_8]]
-// CHECK-64: [[id:%[^ ]+]] = OpBitwiseOr [[ulong]] [[gid_times_8]] [[ulong4]]
+// CHECK-64: [[id:%[^ ]+]] = OpIAdd [[ulong]] [[gid_times_8]] [[ulong1]]
+// CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
+// CHECK-64: [[id:%[^ ]+]] = OpIAdd [[ulong]] [[gid_times_8]] [[ulong2]]
+// CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
+// CHECK-64: [[id:%[^ ]+]] = OpIAdd [[ulong]] [[gid_times_8]] [[ulong4]]
 // CHECK-64: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
 
 // CHECK-32: [[_0:%[^ ]+]] = OpAccessChain [[uintv3workgroup]] [[s1]] [[gid]] [[uint0]]
 // CHECK-32: [[_1:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s1]] [[gid]] [[uint1]]
-// CHECK-32: [[gid_times_8:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[gid]] [[uint3]]
-// CHECK-32: [[id:%[^ ]+]] = OpBitwiseOr [[uint]] [[gid_times_8]] [[uint1]]
-// CHECK-32: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
-// CHECK-32: [[id:%[^ ]+]] = OpBitwiseOr [[uint]] [[gid_times_8]] [[uint2]]
+// CHECK-32: [[shl_5:%[^ ]+]] = OpShiftLeftLogical [[uint]] [[gid]] [[uint5]]
+// CHECK-32: [[gid_times_8:%[^ ]+]] = OpShiftRightLogical [[uint]] [[shl_5]] [[uint2]]
+// CHECK-32: [[_2:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid_times_8]]
+// CHECK-32: [[id:%[^ ]+]] = OpIAdd [[uint]] [[gid_times_8]] [[uint1]]
 // CHECK-32: [[_3:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
-// CHECK-32: [[_4:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[gid_times_8]]
-// CHECK-32: [[id:%[^ ]+]] = OpBitwiseOr [[uint]] [[gid_times_8]] [[uint4]]
+// CHECK-32: [[id:%[^ ]+]] = OpIAdd [[uint]] [[gid_times_8]] [[uint2]]
+// CHECK-32: [[_4:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]
+// CHECK-32: [[id:%[^ ]+]] = OpIAdd [[uint]] [[gid_times_8]] [[uint4]]
 // CHECK-32: [[_5:%[^ ]+]] = OpAccessChain [[uintworkgroup]] [[s2]] [[id]]

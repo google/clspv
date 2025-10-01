@@ -298,23 +298,53 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                                  *(OtherGEP->op_end() - 1)));
       }
     } else {
-      uint64_t cstVal;
-      Value *dynVal;
-      size_t smallerBitWidths;
-      ExtractOffsetFromGEP(M.getDataLayout(), Builder, OtherGEP, cstVal, dynVal,
-                           smallerBitWidths);
-      if (CstGEPIdxOp) {
-        cstVal += CstGEPIdxOp->getZExtValue();
-      } else if (dynVal) {
-        dynVal = CreateAdd(Builder, dynVal, GEPIdxOp);
-      } else {
-        dynVal = GEPIdxOp;
+      uint32_t startIndex = 0;
+      SmallVector<Value *, 8> TyIdxs;
+      SmallVector<Type *, 8> Types;
+      for (uint32_t i = 0; i < OtherGEP->getNumOperands() - 1; i++) {
+        Value *op = OtherGEP->getOperand(i + 1);
+        TyIdxs.push_back(op);
+        Type *idxTy = GetElementPtrInst::getIndexedType(OtherGEP->getSourceElementType(), TyIdxs);
+        Types.push_back(idxTy);
+        if (i > 0 && isa<StructType>(Types[i - 1])) {
+          startIndex = i + 1;
+        }
+        // If an unsized type appears due to a representation of a descriptor,
+        // skip the outer struct.
+        if (SizeInBits(M.getDataLayout(), idxTy) == 0) {
+          startIndex = 0;
+        }
       }
-      auto NewGEPIdxs = GetIdxsForTyFromOffset(
-          M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
-          OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          OtherGEP->getPointerOperand());
-      Idxs.append(NewGEPIdxs);
+
+      if (startIndex != 0) {
+        // We have to assume that these geps were simply split since we
+        // traversed a struct. We would not calculate an appropriate offset into
+        // a particular struct.
+        Idxs.append(OtherGEP->op_begin() + 1, OtherGEP->op_end() - 1);
+        if (CstSrcLastIdxOp && CstSrcLastIdxOp->isZero()) {
+          Idxs.push_back(GEP->getOperand(1));
+        } else {
+          Idxs.push_back(Builder.CreateAdd(GEPIdxOp, *(OtherGEP->op_end() - 1)));
+        }
+      } else {
+        uint64_t cstVal;
+        Value *dynVal;
+        size_t smallerBitWidths;
+        ExtractOffsetFromGEP(M.getDataLayout(), Builder, OtherGEP, cstVal,
+                             dynVal, smallerBitWidths);
+        if (CstGEPIdxOp) {
+          cstVal += CstGEPIdxOp->getZExtValue();
+        } else if (dynVal) {
+          dynVal = CreateAdd(Builder, dynVal, GEPIdxOp);
+        } else {
+          dynVal = GEPIdxOp;
+        }
+        auto NewGEPIdxs = GetIdxsForTyFromOffset(
+            M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
+            OtherGEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
+            OtherGEP->getPointerOperand());
+        Idxs.append(NewGEPIdxs);
+      }
     }
 
     Idxs.append(GEP->op_begin() + 2, GEP->op_end());
