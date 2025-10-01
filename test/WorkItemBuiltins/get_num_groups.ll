@@ -1,7 +1,5 @@
-; RUN: clspv-opt %s -o %t.ll --passes=define-opencl-workitem-builtins,early-cse,instcombine
+; RUN: clspv-opt %s -o %t.ll --passes=define-opencl-workitem-builtins,early-cse
 ; RUN: FileCheck %s < %t.ll
-; b/445660270 https://github.com/google/clspv/issues/1524
-;XFAIL: *
 
 ; CHECK: call spir_func i32 @_Z14get_num_groupsj(i32 3)
 ; CHECK: call spir_func i32 @_Z14get_num_groupsj(i32 %b)
