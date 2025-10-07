@@ -465,7 +465,7 @@ int SetCompilerInstanceOptions(
 
   instance.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
   instance.createFileManager();
-  instance.createSourceManager(instance.getFileManager());
+  instance.createSourceManager();
 
 #ifdef _MSC_VER
   std::string includePrefix("include\\");

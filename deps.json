@@ -6,7 +6,7 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "6e904e89cb97fa113c95f746942e04226a7d2207",
+      "commit" : "fd9a1dcc01766c71932898e9643ce28bf2801bad",
       "patches" : [
           {"patch": "patches/0002-fix-clang_cmake_builddir.patch"}
       ]
