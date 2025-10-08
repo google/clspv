@@ -449,7 +449,7 @@ struct SPIRVProducerPassImpl {
 
   bool PointerRequiresLayout(unsigned aspace);
 
-  SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, spv::Capability Cap);
+  SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, Type *Ty, spv::Capability Cap);
 
   void GenerateModuleInfo();
   void GenerateGlobalVar(GlobalVariable &GV);
@@ -3639,7 +3639,7 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVBinaryOpcode(Instruction &I) {
   return Map.at(I.getOpcode());
 }
 
-SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
+SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID, Type *Ty,
                                                spv::Capability Cap) {
   SPIRVID RID;
 
@@ -3650,9 +3650,8 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVBuiltin(spv::BuiltIn BID,
   } else {
     addCapability(Cap);
 
-    auto *data_ty = IntegerType::get(module->getContext(), 32);
     auto *ptr_ty = PointerType::get(module->getContext(), AddressSpace::Input);
-    auto ptr_id = getSPIRVPointerType(ptr_ty, data_ty);
+    auto ptr_id = getSPIRVPointerType(ptr_ty, Ty);
     RID = addSPIRVGlobalVariable(ptr_id, spv::StorageClassInput);
 
     BuiltinConstantMap[BID] = RID;
@@ -4130,7 +4129,8 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
                                   spv::Capability spvCap =
                                       spv::CapabilityGroupNonUniform) {
     SPIRVOperandVec Ops;
-    Ops << Call->getType() << this->getSPIRVBuiltin(spvBI, spvCap);
+    Ops << Call->getType()
+        << this->getSPIRVBuiltin(spvBI, Call->getType(), spvCap);
 
     return addSPIRVInst(spv::OpLoad, Ops);
   };
@@ -4172,6 +4172,21 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     addCapability(spv::CapabilityGroupNonUniformVote);
     op = spv::OpGroupNonUniformElect;
     break;
+  case Builtins::kGetSubGroupEqMask:
+    return loadBuiltin(spv::BuiltInSubgroupEqMask,
+                       spv::CapabilityGroupNonUniformBallot);
+  case Builtins::kGetSubGroupGeMask:
+    return loadBuiltin(spv::BuiltInSubgroupGeMask,
+                       spv::CapabilityGroupNonUniformBallot);
+  case Builtins::kGetSubGroupGtMask:
+    return loadBuiltin(spv::BuiltInSubgroupGtMask,
+                       spv::CapabilityGroupNonUniformBallot);
+  case Builtins::kGetSubGroupLeMask:
+    return loadBuiltin(spv::BuiltInSubgroupLeMask,
+                       spv::CapabilityGroupNonUniformBallot);
+  case Builtins::kGetSubGroupLtMask:
+    return loadBuiltin(spv::BuiltInSubgroupLtMask,
+                       spv::CapabilityGroupNonUniformBallot);
   case Builtins::kSubGroupReduceAdd:
   case Builtins::kSubGroupScanExclusiveAdd:
   case Builtins::kSubGroupScanInclusiveAdd: {
