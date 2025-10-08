@@ -25,6 +25,8 @@
 
 #include "NormalizeGlobalVariable.h"
 
+#define DEBUG_TYPE "NormalizeGlobalVariable"
+
 using namespace llvm;
 
 namespace {
@@ -227,5 +229,12 @@ void NormalizeGlobalVariables(Module &M) {
   for (auto *GV : globals) {
     NormalizeVariableUsers(GV);
   }
+}
+
+PreservedAnalyses NormalizeGlobalVariablesPass::run(Module &M,
+                                                    ModuleAnalysisManager &) {
+  PreservedAnalyses PA;
+  NormalizeGlobalVariables(M);
+  return PA;
 }
 } // namespace clspv

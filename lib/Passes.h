@@ -41,6 +41,7 @@
 #include "LowerPrivatePointerPHIPass.h"
 #include "MultiVersionUBOFunctionsPass.h"
 #include "NativeMathPass.h"
+#include "NormalizeGlobalVariable.h"
 #include "OpenCLInlinerPass.h"
 #include "PhysicalPointerArgsPass.h"
 #include "PrintfPass.h"
