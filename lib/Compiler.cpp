@@ -626,6 +626,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::LongVectorLoweringPass());
     }
 
+    // Early attempt to normalize global variables before optimizations make
+    // reconstructing type information more difficult.
+    pm.addPass(clspv::NormalizeGlobalVariablesPass());
+
     // Try to deal with pointer bitcasts early. This can prevent problems like
     // issue #409 where LLVM is looser about access chain addressing than
     // SPIR-V. This needs to happen before instcombine and after replacing

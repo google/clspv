@@ -13,6 +13,11 @@
 // limitations under the License.
 
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
+
+#ifndef _CLSPV_LIB_NORMALIZE_GLOBAL_VARIABLE_H
+#define _CLSPV_LIB_NORMALIZE_GLOBAL_VARIABLE_H
 
 namespace clspv {
 
@@ -22,4 +27,11 @@ namespace clspv {
 // Rewrites variable intializers.
 void NormalizeGlobalVariables(llvm::Module &M);
 
+struct NormalizeGlobalVariablesPass
+    : llvm::PassInfoMixin<NormalizeGlobalVariablesPass> {
+  llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
+};
+
 } // namespace clspv
+
+#endif // _CLSPV_LIB_NORMALIZE_GLOBAL_VARIABLE_H
