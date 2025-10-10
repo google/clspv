@@ -4168,6 +4168,14 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     addCapability(spv::CapabilityGroupNonUniformBallot);
     op = spv::OpGroupNonUniformBallot;
     break;
+  case Builtins::kSubGroupBallotFindLSB:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBallotFindLSB;
+    break;
+  case Builtins::kSubGroupBallotFindMSB:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBallotFindMSB;
+    break;
   case Builtins::kSubGroupElect:
     addCapability(spv::CapabilityGroupNonUniformVote);
     op = spv::OpGroupNonUniformElect;
@@ -6630,6 +6638,8 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpGroupNonUniformAll:
     case spv::OpGroupNonUniformAny:
     case spv::OpGroupNonUniformBallot:
+    case spv::OpGroupNonUniformBallotFindLSB:
+    case spv::OpGroupNonUniformBallotFindMSB:
     case spv::OpGroupNonUniformBroadcast:
     case spv::OpGroupNonUniformElect:
     case spv::OpGroupNonUniformIAdd:
