@@ -171,7 +171,8 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitAddrSpaceCastInst(
   // Returns a pointer that points to a region in the address space if
   // "to_addrspace" can cast ptr to the address space. Otherwise it returns
   // NULL.
-  if (ptr->getType() != I.getSrcTy() && ptr->getType() != I.getDestTy()) {
+  if (isa<ConstantPointerNull>(ptr) ||
+      (ptr->getType() != I.getSrcTy() && ptr->getType() != I.getDestTy())) {
     ptr = ConstantPointerNull::get(cast<PointerType>(I.getType()));
   }
   if (ptr->getType() == I.getDestTy()) {
