@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv
+// RUN: clspv %s -o %t.spv --cl-std=CL3.0 --inline-entry-points -enable-feature-macros=__opencl_c_generic_address_space
 // RUN: spirv-val %t.spv --target-env spv1.0
 // RUN: spirv-dis %t.spv -o %t.spvasm
 
