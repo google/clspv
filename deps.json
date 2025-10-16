@@ -8,7 +8,7 @@
       "subdir" : "third_party/llvm",
       "commit" : "891f002026df122b36813b9e1819769c94327503",
       "patches" : [
-          {"patch": "patches/0002-fix-clang_cmake_builddir.patch"}
+          {"patch": "patches/0001-fix-clang_cmake_builddir.patch"}
       ]
     },
     {
