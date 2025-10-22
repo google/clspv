@@ -116,7 +116,7 @@ private:
     } else if (auto *VT = dyn_cast<VectorType>(canonical)) {
       return ContainsSizedType(VT->getElementType(), width);
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
-      for (auto field_decl : RT->getOriginalDecl()->fields()) {
+      for (auto field_decl : RT->getDecl()->fields()) {
         if (ContainsSizedType(field_decl->getType(), width))
           return true;
       }
@@ -132,7 +132,7 @@ private:
     } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
       return ContainsPointerType(AT->getElementType());
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
-      for (auto field_decl : RT->getOriginalDecl()->fields()) {
+      for (auto field_decl : RT->getDecl()->fields()) {
         if (ContainsPointerType(field_decl->getType()))
           return true;
       }
@@ -148,7 +148,7 @@ private:
     } else if (isa<ArrayType>(canonical)) {
       return true;
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
-      for (auto field_decl : RT->getOriginalDecl()->fields()) {
+      for (auto field_decl : RT->getDecl()->fields()) {
         if (ContainsArrayType(field_decl->getType()))
           return true;
       }
@@ -169,7 +169,7 @@ private:
     } else if (auto *AT = dyn_cast<ArrayType>(canonical)) {
       return IsRecursiveType(AT->getElementType(), seen);
     } else if (auto *RT = dyn_cast<RecordType>(canonical)) {
-      for (auto field_decl : RT->getOriginalDecl()->fields()) {
+      for (auto field_decl : RT->getDecl()->fields()) {
         if (IsRecursiveType(field_decl->getType(), seen))
           return true;
       }
@@ -229,7 +229,7 @@ private:
 
       // To avoid infinite recursion, first verify that the record is not
       // recursive and then that its fields are supported.
-      for (auto *field_decl : RT->getOriginalDecl()->fields()) {
+      for (auto *field_decl : RT->getDecl()->fields()) {
         if (!IsSupportedType(field_decl->getType(), SR, IsKernelParameter)) {
           return false;
         }
@@ -462,10 +462,9 @@ private:
       return false;
     }
 
-    const auto &record_layout =
-        context.getASTRecordLayout(RT->getOriginalDecl());
+    const auto &record_layout = context.getASTRecordLayout(RT->getDecl());
     const FieldDecl *prev = nullptr;
-    for (auto field_decl : RT->getOriginalDecl()->fields()) {
+    for (auto field_decl : RT->getDecl()->fields()) {
       const auto field_type = field_decl->getType();
       const unsigned field_no = field_decl->getFieldIndex();
       const uint64_t field_offset =
