@@ -4776,6 +4776,20 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   case Intrinsic::fabs: {
     return GenerateFabs(Call->getOperand(0));
   }
+  case Intrinsic::minimumnum: {
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << getOpExtInstImportID()
+        << glsl::ExtInst::ExtInstFMin << Call->getArgOperand(0)
+        << Call->getArgOperand(1);
+    return addSPIRVInst(spv::OpExtInst, Ops);
+  }
+  case Intrinsic::maximumnum: {
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << getOpExtInstImportID()
+        << glsl::ExtInst::ExtInstFMax << Call->getArgOperand(0)
+        << Call->getArgOperand(1);
+    return addSPIRVInst(spv::OpExtInst, Ops);
+  }
 
   default:
     break;
