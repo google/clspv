@@ -380,6 +380,10 @@ static llvm::cl::opt<bool> uniform_workgroup_size(
     "uniform-workgroup-size", llvm::cl::init(false),
     llvm::cl::desc("Assume all workgroups are uniformly sized."));
 
+static llvm::cl::opt<bool> uniform_work_group_size(
+    "cl-uniform-work-group-size", llvm::cl::init(false),
+    llvm::cl::desc("Assume all workgroups are uniformly sized."));
+
 static llvm::cl::opt<bool>
     cl_kernel_arg_info("cl-kernel-arg-info", llvm::cl::init(false),
                        llvm::cl::desc("Produce kernel argument info."));
@@ -438,6 +442,11 @@ static llvm::cl::opt<bool> cl_mad_enable(
 static llvm::cl::opt<bool> cl_arm_integer_dot_product(
     "cl-arm-integer-dot-product", llvm::cl::init(false),
     llvm::cl::desc("Enable to cl_arm_integer_dot_product extension."));
+
+static llvm::cl::opt<bool> no_subgroup_ifp(
+    "cl-no-subgroup-ifp", llvm::cl::init(false),
+    llvm::cl::desc("Indicate that kernels in this program do not require "
+                   "sub-groups to make independent forward progress"));
 
 } // namespace
 
@@ -539,7 +548,9 @@ bool FP16() { return fp16; }
 bool FP64() { return fp64; }
 
 bool ArmNonUniformWorkGroupSize() { return cl_arm_non_uniform_work_group_size; }
-bool UniformWorkgroupSize() { return uniform_workgroup_size; }
+bool UniformWorkgroupSize() {
+  return uniform_workgroup_size || uniform_work_group_size;
+}
 
 bool KernelArgInfo() { return cl_kernel_arg_info; }
 
