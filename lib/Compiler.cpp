@@ -1240,6 +1240,16 @@ int CompileProgram(const llvm::StringRef &input_filename,
   return CompileModule(input_filename, module, output_buffer, output_log);
 }
 
+void TokenizeCommandLine(const std::string &Source, llvm::StringSaver &Saver,
+                         llvm::SmallVector<const char *, 20> &NewArgv) {
+  NewArgv.push_back(Saver.save("clspv").data());
+#ifdef _WIN32
+  llvm::cl::TokenizeWindowsCommandLine(Source, Saver, NewArgv);
+#else
+  llvm::cl::TokenizeGNUCommandLine(Source, Saver, NewArgv);
+#endif
+}
+
 } // namespace
 
 namespace clspv {
@@ -1324,8 +1334,7 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
   llvm::StringSaver Saver(A);
-  argv.push_back(Saver.save("clspv").data());
-  llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
+  TokenizeCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
 
   if (auto error = ParseOptions(argc, &argv[0]))
@@ -1343,8 +1352,7 @@ int CompileFromSourceString(const std::string &program,
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
   llvm::StringSaver Saver(A);
-  argv.push_back(Saver.save("clspv").data());
-  llvm::cl::TokenizeGNUCommandLine(options, Saver, argv);
+  TokenizeCommandLine(options, Saver, argv);
   int argc = static_cast<int>(argv.size());
 
   if (auto error = ParseOptions(argc, &argv[0]))
