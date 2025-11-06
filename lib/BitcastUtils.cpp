@@ -1325,7 +1325,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   }
 
   if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
-      DstTy != SrcTy) {
+      DstTy != SrcTy && DstTy != GetEleType(SrcTy)) {
     DstTy = SrcTy;
     auto ElDstTy = GetEleType(DstTy);
     while (DstTy != ElDstTy) {
