@@ -104,6 +104,20 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
   case Intrinsic::lifetime_start:
   case Intrinsic::lifetime_end:
     return removeIntrinsicDeclaration(F);
+  case Intrinsic::vector_reduce_add:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::Add, false);
+  case Intrinsic::vector_reduce_and:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::And, false);
+  case Intrinsic::vector_reduce_fadd:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::FAdd, true);
+  case Intrinsic::vector_reduce_fmul:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::FMul, true);
+  case Intrinsic::vector_reduce_mul:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::Mul, false);
+  case Intrinsic::vector_reduce_or:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::Or, false);
+  case Intrinsic::vector_reduce_xor:
+    return replaceVectorReduce(F, llvm::Instruction::BinaryOps::Xor, false);
   default:
     break;
   }
@@ -667,5 +681,32 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceAddSubSat(Function &F,
       auto cmp = builder.CreateICmpEQ(carry_borrow, Constant::getNullValue(ty));
       return builder.CreateSelect(cmp, add_sub, clamp_value);
     }
+  });
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceVectorReduce(
+    Function &F, Instruction::BinaryOps op, bool with_start_value) {
+  return replaceCallsWithValue(F, [&F, with_start_value, op](CallInst *CI) {
+    llvm::Value *Acc, *Vector;
+    uint32_t index;
+    IRBuilder<> Builder(CI);
+    auto int32 = Type::getInt32Ty(F.getContext());
+    if (with_start_value) {
+      Acc = CI->getOperand(0);
+      Vector = CI->getOperand(1);
+      index = 0;
+    } else {
+      index = 1;
+      Vector = CI->getOperand(0);
+      Acc = Builder.CreateExtractElement(Vector, ConstantInt::get(int32, 0));
+    }
+    for (uint32_t id = index;
+         id < cast<FixedVectorType>(Vector->getType())->getNumElements();
+         id++) {
+      Acc = Builder.CreateBinOp(
+          op, Acc,
+          Builder.CreateExtractElement(Vector, ConstantInt::get(int32, id)));
+    }
+    return Acc;
   });
 }
