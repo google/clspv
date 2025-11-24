@@ -449,9 +449,9 @@ static llvm::cl::opt<bool> no_subgroup_ifp(
     llvm::cl::desc("Indicate that kernels in this program do not require "
                    "sub-groups to make independent forward progress"));
 
-static llvm::cl::opt<bool> untyped_pointers(
-    "untyped-pointers", llvm::cl::init(false),
-    llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
+static llvm::cl::opt<bool>
+    untyped_pointers("untyped-pointers", llvm::cl::init(false),
+                     llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
 
 } // namespace
 
@@ -596,15 +596,15 @@ bool UntypedPointerAddressSpace(unsigned aspace) {
   }
 
   switch (aspace) {
-    case AddressSpace::Global:
-    case AddressSpace::PushConstant:
-    case AddressSpace::Uniform:
-    case AddressSpace::Constant:
-      return true;
-    case AddressSpace::Local:
-      return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
-    default:
-      break;
+  case AddressSpace::Global:
+  case AddressSpace::PushConstant:
+  case AddressSpace::Uniform:
+  case AddressSpace::Constant:
+    return true;
+  case AddressSpace::Local:
+    return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
+  default:
+    break;
   }
 
   return false;

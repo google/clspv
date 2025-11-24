@@ -1495,11 +1495,10 @@ void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
       //
       // Ops[0] : Result Type ID
       // Ops[1] : Storage Class
-      VariableID =
-          addSPIRVGlobalVariable(PtrTypeID, spv::StorageClassWorkgroup,
-                                 /* DataTypeID = */ SPIRVID(0),
-                                 /* InitID = */ SPIRVID(0),
-                                 /* add_interface = */ false);
+      VariableID = addSPIRVGlobalVariable(PtrTypeID, spv::StorageClassWorkgroup,
+                                          /* DataTypeID = */ SPIRVID(0),
+                                          /* InitID = */ SPIRVID(0),
+                                          /* add_interface = */ false);
     }
 
     Ops.clear();
@@ -1791,15 +1790,15 @@ bool SPIRVProducerPassImpl::UntypedPointerStorageClass(spv::StorageClass sc) {
   }
 
   switch (sc) {
-    case spv::StorageClassStorageBuffer:
-    case spv::StorageClassUniform:
-    case spv::StorageClassPushConstant:
-    case spv::StorageClassPhysicalStorageBuffer:
-      return true;
-    case spv::StorageClassWorkgroup:
-      return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
-    default:
-      break;
+  case spv::StorageClassStorageBuffer:
+  case spv::StorageClassUniform:
+  case spv::StorageClassPushConstant:
+  case spv::StorageClassPhysicalStorageBuffer:
+    return true;
+  case spv::StorageClassWorkgroup:
+    return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
+  default:
+    break;
   }
 
   return false;
@@ -3087,7 +3086,8 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   SPIRVID var_id;
   if (!(module_scope_constant_external_init &&
         clspv::Option::PhysicalStorageBuffers())) {
-    var_id = addSPIRVGlobalVariable(ptr_id, spvSC, data_ty_id, InitializerID, interface);
+    var_id = addSPIRVGlobalVariable(ptr_id, spvSC, data_ty_id, InitializerID,
+                                    interface);
     if (spvSC == spv::StorageClass::StorageClassWorkgroup) {
       WorkgroupVariableSizeMap.insert(std::make_pair(
           var_id.get(),
