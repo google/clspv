@@ -785,26 +785,38 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
             clspv::WorkgroupAccessorFunction() + "." + std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
         auto *zero = Builder.getInt32(0);
-        auto *array_ty = ArrayType::get(inferred_ty, 0);
+        Type *array_ty = ArrayType::get(inferred_ty, 0);
+        auto *data_ty = array_ty;
+        if (Option::UntypedPointerAddressSpace(
+                argTy->getPointerAddressSpace())) {
+          // Explicitly laid out workgroup variables must be Block-decorated
+          // structs.
+          data_ty = StructType::get(array_ty);
+        }
         PointerType *ptr_ty =
             PointerType::get(M.getContext(), argTy->getPointerAddressSpace());
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fn_ty = FunctionType::get(ptr_ty, {i32, array_ty}, false);
+          FunctionType *fn_ty = FunctionType::get(ptr_ty, {i32, data_ty}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fn_ty).getCallee());
         }
 
         // Generate an accessor call.
         auto *spec_id_arg = Builder.getInt32(spec_id);
-        auto *type_arg = Constant::getNullValue(array_ty);
+        auto *type_arg = Constant::getNullValue(data_ty);
         auto *call = Builder.CreateCall(var_fn, {spec_id_arg, type_arg});
-        assert(clspv::InferType(call, M.getContext(), &type_cache_) == array_ty);
+        assert(clspv::InferType(call, M.getContext(), &type_cache_) == data_ty);
 
         // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
         // addrspace(3)*, generate two zero indices for the gep.
-        auto *replacement = Builder.CreateGEP(array_ty, call, {zero, zero});
+        SmallVector<Value *, 3> zeroes(2, zero);
+        if (Option::UntypedPointerAddressSpace(
+                argTy->getPointerAddressSpace())) {
+          zeroes.push_back(zero);
+        }
+        auto *replacement = Builder.CreateGEP(data_ty, call, zeroes);
         Arg.replaceAllUsesWith(replacement);
 
         // We record the assignment of the spec id for this particular argument

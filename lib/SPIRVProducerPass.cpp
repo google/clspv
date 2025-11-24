@@ -448,6 +448,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID getSPIRVValue(Value *V);
 
   bool PointerRequiresLayout(unsigned aspace);
+  bool UntypedPointerStorageClass(spv::StorageClass sc);
 
   SPIRVID getSPIRVBuiltin(spv::BuiltIn BID, Type *Ty, spv::Capability Cap);
 
@@ -621,6 +622,7 @@ struct SPIRVProducerPassImpl {
   //
   // Add global variable and capture entry point interface
   SPIRVID addSPIRVGlobalVariable(const SPIRVID &TypeID, spv::StorageClass SC,
+                                 const SPIRVID &DataTypeID = SPIRVID(),
                                  const SPIRVID &InitID = SPIRVID(),
                                  bool add_interface = false);
 
@@ -1420,39 +1422,92 @@ void SPIRVProducerPassImpl::GenerateWorkgroupVars() {
     }
 
     auto *call = local_vars[spec_id];
-    auto *ArrayTy =
-        call->getArgOperand(ClspvOperand::kWorkgroupDataType)->getType();
-    auto *ElemTy = cast<ArrayType>(ArrayTy)->getElementType();
+
+    Type *ElemTy = nullptr;
+    SPIRVID ArrayTypeID;
+    SPIRVID PtrTypeID;
+    SPIRVID VariableID;
 
     // Generate the spec constant.
     SPIRVOperandVec Ops;
     Ops << Type::getInt32Ty(module->getContext()) << 1;
     SPIRVID ArraySizeID = addSPIRVInst<kConstants>(spv::OpSpecConstant, Ops);
 
-    // Generate the array type.
-    Ops.clear();
-    // The element type must have been created.
-    Ops << ElemTy << ArraySizeID;
+    if (Option::UntypedPointerAddressSpace(AddressSpace::Local)) {
+      auto *StructTy =
+          call->getArgOperand(ClspvOperand::kWorkgroupDataType)->getType();
+      auto *ArrayTy = cast<StructType>(StructTy)->getElementType(0);
+      ElemTy = cast<ArrayType>(ArrayTy)->getElementType();
 
-    SPIRVID ArrayTypeID = addSPIRVInst<kTypes>(spv::OpTypeArray, Ops);
+      // Generate the array type.
+      Ops.clear();
+      Ops << ElemTy << ArraySizeID;
+      ArrayTypeID = addSPIRVInst<kTypes>(spv::OpTypeArray, Ops);
 
-    Ops.clear();
-    Ops << spv::StorageClassWorkgroup << ArrayTypeID;
-    SPIRVID PtrArrayTypeID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
+      getTypesNeedingArrayStride().insert(
+          StrideType(static_cast<uint32_t>(
+                         GetTypeAllocSize(ElemTy, module->getDataLayout())),
+                     ArrayTypeID));
 
-    // Generate OpVariable.
-    //
-    // Ops[0] : Result Type ID
-    // Ops[1] : Storage Class
-    SPIRVID VariableID =
-        addSPIRVGlobalVariable(PtrArrayTypeID, spv::StorageClassWorkgroup);
+      // Generate the struct type.
+      Ops.clear();
+      Ops << ArrayTypeID;
+      SPIRVID StructTypeID = addSPIRVInst<kTypes>(spv::OpTypeStruct, Ops);
+
+      // Generate Block and Offset decorations for the struct.
+      Ops.clear();
+      Ops << StructTypeID << spv::DecorationBlock;
+      addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+
+      Ops.clear();
+      Ops << StructTypeID << 0 << spv::DecorationOffset << 0;
+      addSPIRVInst<kAnnotations>(spv::OpMemberDecorate, Ops);
+
+      PtrTypeID = getSPIRVPointerType(
+          PointerType::get(call->getContext(), AddressSpace::Local), nullptr);
+
+      // Generate the variable.
+      // TODO: should arguments be decorated with Aliased? This should be based
+      // on the input kernel, but we don't do this for any resource currently.
+      Ops.clear();
+      Ops << PtrTypeID << spv::StorageClassWorkgroup << StructTypeID;
+      VariableID = addSPIRVGlobalVariable(PtrTypeID, spv::StorageClassWorkgroup,
+                                          StructTypeID,
+                                          /* InitID = */ SPIRVID(0),
+                                          /* add_interface = */ false);
+    } else {
+      auto *ArrayTy =
+          call->getArgOperand(ClspvOperand::kWorkgroupDataType)->getType();
+      ElemTy = cast<ArrayType>(ArrayTy)->getElementType();
+
+      // Generate the array type.
+      Ops.clear();
+      // The element type must have been created.
+      Ops << ElemTy << ArraySizeID;
+
+      ArrayTypeID = addSPIRVInst<kTypes>(spv::OpTypeArray, Ops);
+
+      Ops.clear();
+      Ops << spv::StorageClassWorkgroup << ArrayTypeID;
+      PtrTypeID = addSPIRVInst<kTypes>(spv::OpTypePointer, Ops);
+
+      // Generate OpVariable.
+      //
+      // Ops[0] : Result Type ID
+      // Ops[1] : Storage Class
+      VariableID =
+          addSPIRVGlobalVariable(PtrTypeID, spv::StorageClassWorkgroup,
+                                 /* DataTypeID = */ SPIRVID(0),
+                                 /* InitID = */ SPIRVID(0),
+                                 /* add_interface = */ false);
+    }
 
     Ops.clear();
     Ops << ArraySizeID << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    LocalArgInfo info{VariableID,  ElemTy,         ArraySizeID,
-                      ArrayTypeID, PtrArrayTypeID, spec_id};
+    LocalArgInfo info{VariableID,  ElemTy,    ArraySizeID,
+                      ArrayTypeID, PtrTypeID, spec_id};
     LocalSpecIdInfoMap[spec_id] = info;
   }
 
@@ -1568,6 +1623,7 @@ SPIRVID SPIRVProducerPassImpl::getOpExtInstImportID() {
 
 SPIRVID SPIRVProducerPassImpl::addSPIRVGlobalVariable(const SPIRVID &TypeID,
                                                       spv::StorageClass SC,
+                                                      const SPIRVID &DataTypeID,
                                                       const SPIRVID &InitID,
                                                       bool add_interface) {
   // Generate OpVariable.
@@ -1576,13 +1632,25 @@ SPIRVID SPIRVProducerPassImpl::addSPIRVGlobalVariable(const SPIRVID &TypeID,
   // Ops[1] : Storage Class
   // Ops[2] : Initialization Value ID (optional)
 
+  const bool untyped = UntypedPointerStorageClass(SC);
   SPIRVOperandVec Ops;
   Ops << TypeID << SC;
+  if (untyped) {
+    Ops << DataTypeID;
+  }
   if (InitID.isValid()) {
     Ops << InitID;
   }
 
-  SPIRVID VID = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+  SPIRVID VID;
+  if (untyped) {
+    VID = addSPIRVInst<kGlobalVariables>(spv::OpUntypedVariableKHR, Ops);
+    if (SC == spv::StorageClassWorkgroup) {
+      addCapability(spv::CapabilityWorkgroupMemoryExplicitLayoutKHR);
+    }
+  } else {
+    VID = addSPIRVInst<kGlobalVariables>(spv::OpVariable, Ops);
+  }
 
   if (SC == spv::StorageClassInput ||
       (add_interface && SpvVersion() >= SPIRVVersion::SPIRV_1_4)) {
@@ -1709,9 +1777,31 @@ bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
   case AddressSpace::Global:
   case AddressSpace::Constant:
     return true;
+  case AddressSpace::Local:
+    return Option::UntypedPointerAddressSpace(aspace);
   default:
     break;
   }
+  return false;
+}
+
+bool SPIRVProducerPassImpl::UntypedPointerStorageClass(spv::StorageClass sc) {
+  if (!Option::UntypedPointers()) {
+    return false;
+  }
+
+  switch (sc) {
+    case spv::StorageClassStorageBuffer:
+    case spv::StorageClassUniform:
+    case spv::StorageClassPushConstant:
+    case spv::StorageClassPhysicalStorageBuffer:
+      return true;
+    case spv::StorageClassWorkgroup:
+      return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
+    default:
+      break;
+  }
+
   return false;
 }
 
@@ -1719,10 +1809,39 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
   if (!PtrTy->isPointerTy()) {
     return getSPIRVType(PtrTy);
   }
+
+  const auto aspace = PtrTy->getPointerAddressSpace();
+  auto canonical_aspace = aspace;
+  if (aspace == AddressSpace::Constant &&
+      !Option::ConstantArgsInUniformBuffer()) {
+    canonical_aspace = AddressSpace::Global;
+  }
+
+  if (Option::UntypedPointerAddressSpace(canonical_aspace)) {
+    auto &aspace_map = PointerTypeMap[canonical_aspace];
+    auto where = aspace_map.find(PtrTy);
+    if (where != aspace_map.end()) {
+      if (where->second[1].isValid()) {
+        return where->second[1];
+      }
+    }
+
+    addCapability(spv::CapabilityUntypedPointersKHR);
+    SPIRVOperandVec ops;
+    ops << GetStorageClass(canonical_aspace);
+    auto ptr_id = addSPIRVInst<kTypes>(spv::OpTypeUntypedPointerKHR, ops);
+
+    auto &entry = aspace_map[PtrTy];
+    if (entry.empty())
+      entry.resize(2);
+    entry[1] = ptr_id;
+
+    return ptr_id;
+  }
+
   if (!DataTy) {
     llvm_unreachable("Missing inferred type");
   }
-  const auto aspace = PtrTy->getPointerAddressSpace();
   const auto needs_layout = PointerRequiresLayout(aspace);
 
   // This might still be problematic for structures/arrays of pointers. Clspv
@@ -1737,12 +1856,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
     if (struct_ty->isOpaque() && aspace != AddressSpace::UniformConstant) {
       return data_id;
     }
-  }
-
-  auto canonical_aspace = aspace;
-  if (aspace == AddressSpace::Constant &&
-      !Option::ConstantArgsInUniformBuffer()) {
-    canonical_aspace = AddressSpace::Global;
   }
 
   const unsigned layout_index = needs_layout ? 1 : 0;
@@ -1797,9 +1910,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
     if (param_ty->isPointerTy()) {
       // Generate a representative type for the parameter type.
       unsigned aspace = param_ty->getPointerAddressSpace();
-      auto *inferred_ty = ParamTys[i];
-      auto *rep_ty = ArrayType::get(inferred_ty, aspace);
-      placeholder_param_tys.push_back(rep_ty);
+      if (Option::UntypedPointerAddressSpace(aspace)) {
+        auto *inferred_ty = ParamTys[i];
+        auto *rep_ty = ArrayType::get(inferred_ty, aspace);
+        placeholder_param_tys.push_back(rep_ty);
+      }
     }
     i++;
   }
@@ -1807,8 +1922,10 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
     // Generate a representative type for the return type.
     auto *ty = CanonicalType(ptr_ty);
     unsigned aspace = ty->getPointerAddressSpace();
-    auto *rep_ty = ArrayType::get(RetTy, aspace);
-    placeholder_param_tys.push_back(rep_ty);
+    if (Option::UntypedPointerAddressSpace(aspace)) {
+      auto *rep_ty = ArrayType::get(RetTy, aspace);
+      placeholder_param_tys.push_back(rep_ty);
+    }
   }
 
   auto *placeholder_ty =
@@ -2540,6 +2657,7 @@ void SPIRVProducerPassImpl::GenerateSamplers() {
     auto sampler_type_id = getSPIRVPointerType(SamplerPointerTy, SamplerDataTy);
     auto sampler_var_id = addSPIRVGlobalVariable(
         sampler_type_id, spv::StorageClassUniformConstant,
+        /* DataTypeID = */ SPIRVID(0),
         /* InitId = */ SPIRVID(0), /* add_interface = */ true);
 
     SamplerLiteralToIDMap[sampler_value] = sampler_var_id;
@@ -2608,7 +2726,11 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     const auto sc = GetStorageClassForArgKind(info->arg_kind);
 
     auto type_id = getSPIRVPointerType(type, info->data_type);
-    info->var_id = addSPIRVGlobalVariable(type_id, sc);
+    SPIRVID data_ty_id;
+    if (UntypedPointerStorageClass(sc)) {
+      data_ty_id = getSPIRVType(info->data_type, true);
+    }
+    info->var_id = addSPIRVGlobalVariable(type_id, sc, data_ty_id);
 
     // Map calls to the variable-builtin-function.
     for (auto &U : info->var_fn->uses()) {
@@ -2946,12 +3068,26 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
   const bool interface =
       (AS == AddressSpace::Private || AS == AddressSpace::ModuleScopePrivate ||
        AS == AddressSpace::Local);
+  SPIRVID data_ty_id;
+  if (Option::UntypedPointerAddressSpace(AS)) {
+    data_ty_id = getSPIRVType(GV.getValueType(), true);
+    if (AS == AddressSpace::Local) {
+      auto *StructTy = StructType::get(GV.getValueType());
+      TypesNeedingLayout.insert(StructTy);
+      data_ty_id = getSPIRVType(StructTy, true);
+
+      // Add block decoration
+      SPIRVOperandVec Ops;
+      Ops << data_ty_id << spv::DecorationBlock;
+      addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
+    }
+  }
   auto ptr_id = getSPIRVPointerType(Ty, GV.getValueType());
 
   SPIRVID var_id;
   if (!(module_scope_constant_external_init &&
         clspv::Option::PhysicalStorageBuffers())) {
-    var_id = addSPIRVGlobalVariable(ptr_id, spvSC, InitializerID, interface);
+    var_id = addSPIRVGlobalVariable(ptr_id, spvSC, data_ty_id, InitializerID, interface);
     if (spvSC == spv::StorageClass::StorageClassWorkgroup) {
       WorkgroupVariableSizeMap.insert(std::make_pair(
           var_id.get(),
@@ -3259,6 +3395,16 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
 
   if (SpvVersion() < SPIRVVersion::SPIRV_1_6 && hasIntegerDot()) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_integer_dot_product");
+  }
+
+  if (Option::UntypedPointers()) {
+    // Workgroup explicit layout is required for untyped pointers in workgroup
+    // memory.
+    if (CapabilitySet.count(spv::CapabilityWorkgroupMemoryExplicitLayoutKHR)) {
+      addSPIRVInst<kExtensions>(spv::OpExtension,
+                                "SPV_KHR_workgroup_memory_explicit_layout");
+    }
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_untyped_pointers");
   }
 
   //
@@ -4790,6 +4936,56 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
         << Call->getArgOperand(1);
     return addSPIRVInst(spv::OpExtInst, Ops);
   }
+  case Intrinsic::memcpy: {
+    // This should only appear if untyped pointers are enabled.
+    assert(Option::UntypedPointers());
+    auto Dst = Call->getArgOperand(0);
+    auto Src = Call->getArgOperand(1);
+    auto Volatile =
+        dyn_cast<ConstantInt>(Call->getArgOperand(3))->getZExtValue();
+
+    uint32_t DstAlign = 0;
+    uint32_t SrcAlign = 0;
+    if (Call->paramHasAttr(0, Attribute::AttrKind::Alignment)) {
+      DstAlign = static_cast<uint32_t>(
+          Call->getParamAttr(0, Attribute::AttrKind::Alignment)
+              .getValueAsInt());
+    }
+    if (Call->paramHasAttr(1, Attribute::AttrKind::Alignment)) {
+      SrcAlign = static_cast<uint32_t>(
+          Call->getParamAttr(1, Attribute::AttrKind::Alignment)
+              .getValueAsInt());
+    }
+
+    SPIRVOperandVec Ops;
+    Ops << Dst << Src << Call->getArgOperand(2);
+    if (Option::SpvVersion() < Option::SPIRVVersion::SPIRV_1_4) {
+      // Before 1.4, memory operands affected both Dst and Src so use the
+      // smaller alignment.
+      uint32_t align = std::min(DstAlign, SrcAlign);
+      uint32_t memOp = 0;
+      if (Volatile)
+        memOp |= 0x1;
+      if (align != 0)
+        memOp |= 0x2;
+      Ops << memOp << align;
+    } else {
+      uint32_t DstMemOp = 0;
+      if (Volatile)
+        DstMemOp |= 0x1;
+      if (DstAlign != 0)
+        DstMemOp |= 0x2;
+
+      uint32_t SrcMemOp = 0;
+      if (Volatile)
+        SrcMemOp |= 0x1;
+      if (SrcAlign != 0)
+        SrcMemOp |= 0x2;
+
+      Ops << DstMemOp << DstAlign << SrcMemOp << SrcAlign;
+    }
+    return addSPIRVInst(spv::OpCopyMemorySized, Ops);
+  }
 
   default:
     break;
@@ -5390,10 +5586,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
                                     AddressSpace::ModuleScopePrivate);
     }
 
-    Ops << getSPIRVPointerType(ResultType, GEP->getResultElementType());
-
-    // Generate the base pointer.
-    Ops << GEP->getPointerOperand();
+    const bool untyped =
+        Option::UntypedPointerAddressSpace(ResultType->getAddressSpace());
 
     // TODO(dneto): Simplify the following?
 
@@ -5421,6 +5615,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       Opcode = spv::OpPtrAccessChain;
     }
 
+    bool needs_array = false;
     if (Opcode == spv::OpPtrAccessChain) {
       // Shader validation in the SPIR-V spec requires that the base pointer to
       // OpPtrAccessChain (in StorageBuffer storage class) be decorated with
@@ -5430,16 +5625,26 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
       case spv::StorageClassPhysicalStorageBuffer:
-        // Save the type to generate an ArrayStride decoration later, but
-        // assume opaque pointers may be present so also cache the SPIRVID for
-        // the type and the stride value.
-        getTypesNeedingArrayStride().insert(StrideType(
-            static_cast<uint32_t>(GetTypeAllocSize(GEP->getSourceElementType(),
-                                                   module->getDataLayout())),
-            getSPIRVPointerType(GEP->getPointerOperand()->getType(),
-                                GEP->getSourceElementType())));
+        if (!untyped) {
+          // Save the type to generate an ArrayStride decoration later, but
+          // assume opaque pointers may be present so also cache the SPIRVID for
+          // the type and the stride value.
+          getTypesNeedingArrayStride().insert(StrideType(
+              static_cast<uint32_t>(GetTypeAllocSize(
+                  GEP->getSourceElementType(), module->getDataLayout())),
+              getSPIRVPointerType(GEP->getPointerOperand()->getType(),
+                                  GEP->getSourceElementType())));
+        } else {
+          // In order to avoid tracking multiple untyped pointers in the same
+          // storage class with different ArrayStride decorations, generate a
+          // normal access chain based on an arrayed source element type.
+          needs_array = true;
+        }
         break;
       case spv::StorageClassWorkgroup:
+        if (untyped) {
+          needs_array = true;
+        }
         break;
       default:
         llvm_unreachable(
@@ -5447,6 +5652,20 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         break;
       }
     }
+
+    Ops << getSPIRVPointerType(ResultType, GEP->getResultElementType());
+    if (untyped) {
+      Opcode = spv::OpUntypedAccessChainKHR;
+      SPIRVID base_type_id = getSPIRVType(GEP->getSourceElementType(), true);
+      if (needs_array) {
+        auto arrayTy = ArrayType::get(GEP->getSourceElementType(), 0);
+        base_type_id = getSPIRVType(arrayTy, true);
+      }
+      Ops << base_type_id;
+    }
+
+    // Generate the base pointer.
+    Ops << GEP->getPointerOperand();
 
     for (auto II = GEP->idx_begin() + offset; II != GEP->idx_end(); II++) {
       Ops << *II;
@@ -6496,6 +6715,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpReturn:
     case spv::OpFunctionEnd:
     case spv::OpCopyMemory:
+    case spv::OpCopyMemorySized:
     case spv::OpAtomicStore: {
       WriteWordCountAndOpcode(Inst);
       for (uint32_t i = 0; i < Ops.size(); i++) {
@@ -6518,6 +6738,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpTypeArray:
     case spv::OpTypeVector:
     case spv::OpTypeFunction:
+    case spv::OpTypeUntypedPointerKHR:
     case spv::OpString: {
       WriteWordCountAndOpcode(Inst);
       WriteResultID(Inst);
@@ -6529,8 +6750,11 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpFunction:
     case spv::OpFunctionParameter:
     case spv::OpAccessChain:
+    case spv::OpUntypedAccessChainKHR:
     case spv::OpPtrAccessChain:
+    case spv::OpUntypedPtrAccessChainKHR:
     case spv::OpInBoundsAccessChain:
+    case spv::OpUntypedInBoundsAccessChainKHR:
     case spv::OpUConvert:
     case spv::OpSConvert:
     case spv::OpConvertFToU:
@@ -6618,6 +6842,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpConstant:
     case spv::OpSpecConstant:
     case spv::OpVariable:
+    case spv::OpUntypedVariableKHR:
     case spv::OpFunctionCall:
     case spv::OpSampledImage:
     case spv::OpImageFetch:

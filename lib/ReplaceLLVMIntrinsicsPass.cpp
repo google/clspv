@@ -415,39 +415,48 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
 
         auto Dst = CI->getArgOperand(0);
         auto Src = CI->getArgOperand(1);
-        auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
-        auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
+        if (!Option::UntypedPointerAddressSpace(
+                Dst->getType()->getPointerAddressSpace()) ||
+            !Option::UntypedPointerAddressSpace(
+                Src->getType()->getPointerAddressSpace())) {
+          auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+          auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
-        auto Size = dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
+          auto Size =
+              dyn_cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
 
-        IRBuilder<> Builder(CI);
-        Type *ElemTy;
-        if (DstTy == SrcTy && SrcTy != nullptr &&
-            ((Size % (BitcastUtils::SizeInBits(Layout, SrcTy) / CHAR_BIT)) ==
-             0)) {
-          ElemTy = SrcTy;
-        } else {
-          ElemTy = UpdateTy(M.getContext(), Size);
+          Type *ElemTy;
+          if (DstTy == SrcTy && SrcTy != nullptr &&
+              ((Size % (BitcastUtils::SizeInBits(Layout, SrcTy) / CHAR_BIT)) ==
+               0)) {
+            ElemTy = SrcTy;
+          } else {
+            ElemTy = UpdateTy(M.getContext(), Size);
+          }
+          auto ElemSize = Layout.getTypeSizeInBits(ElemTy) / CHAR_BIT;
+
+          IRBuilder<> Builder(CI);
+          for (unsigned i = 0; i < Size / ElemSize; ++i) {
+            auto Index = ConstantInt::get(I32Ty, i);
+            SmallVector<Value *, 3> Indices = {Index};
+
+            // Avoid the builder for Src in order to prevent the folder from
+            // creating constant expressions for constant memcpys.
+            auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
+                ElemTy, Src, Indices, "", CI->getIterator());
+            auto Srci = Builder.CreateLoad(ElemTy, SrcElemPtr, Volatile);
+            auto DstElemPtr = Builder.CreateGEP(ElemTy, Dst, Indices);
+            Builder.CreateStore(Srci, DstElemPtr, Volatile);
+          }
+
+          // Erase the call.
+          CI->eraseFromParent();
         }
-        auto ElemSize = Layout.getTypeSizeInBits(ElemTy) / CHAR_BIT;
 
-        for (unsigned i = 0; i < Size / ElemSize; ++i) {
-          auto Index = ConstantInt::get(I32Ty, i);
-          SmallVector<Value *, 3> Indices = {Index};
-
-          // Avoid the builder for Src in order to prevent the folder from
-          // creating constant expressions for constant memcpys.
-          auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
-              ElemTy, Src, Indices, "", CI->getIterator());
-          auto Srci = Builder.CreateLoad(ElemTy, SrcElemPtr, Volatile);
-          auto DstElemPtr = Builder.CreateGEP(ElemTy, Dst, Indices);
-          Builder.CreateStore(Srci, DstElemPtr, Volatile);
-        }
-
-        // Erase the call.
-        CI->eraseFromParent();
       }
-      DeadFunctions.push_back(&F);
+
+      if (F.user_empty())
+        DeadFunctions.push_back(&F);
     }
   }
 

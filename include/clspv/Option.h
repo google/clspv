@@ -310,6 +310,12 @@ bool ClMadEnable();
 // Returns true if cl_arm_integer_dot_product is enabled
 bool ArmIntegerDotProduct();
 
+// Returns true if untyped pointers are enabled
+bool UntypedPointers();
+
+// Returns true if untyped pointers are supported in aspace.
+bool UntypedPointerAddressSpace(unsigned aspace);
+
 } // namespace Option
 } // namespace clspv
 
