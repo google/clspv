@@ -19,6 +19,7 @@
 #include "Builtins.h"
 #include "BuiltinsEnum.h"
 #include "Passes.h"
+#include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 
 #include <sstream>
@@ -448,6 +449,10 @@ static llvm::cl::opt<bool> no_subgroup_ifp(
     llvm::cl::desc("Indicate that kernels in this program do not require "
                    "sub-groups to make independent forward progress"));
 
+static llvm::cl::opt<bool> untyped_pointers(
+    "untyped-pointers", llvm::cl::init(false),
+    llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
+
 } // namespace
 
 namespace clspv {
@@ -582,6 +587,28 @@ uint32_t PrintfBufferSize() { return printf_buffer_size; }
 bool ClMadEnable() { return cl_mad_enable; }
 
 bool ArmIntegerDotProduct() { return cl_arm_integer_dot_product; }
+
+bool UntypedPointers() { return untyped_pointers; }
+
+bool UntypedPointerAddressSpace(unsigned aspace) {
+  if (!UntypedPointers()) {
+    return false;
+  }
+
+  switch (aspace) {
+    case AddressSpace::Global:
+    case AddressSpace::PushConstant:
+    case AddressSpace::Uniform:
+    case AddressSpace::Constant:
+      return true;
+    case AddressSpace::Local:
+      return Option::SpvVersion() >= Option::SPIRVVersion::SPIRV_1_4;
+    default:
+      break;
+  }
+
+  return false;
+}
 
 } // namespace Option
 } // namespace clspv
