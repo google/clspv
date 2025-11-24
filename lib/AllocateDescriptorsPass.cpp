@@ -798,7 +798,8 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         if (!var_fn) {
           // Generate the function.
           Type *i32 = Builder.getInt32Ty();
-          FunctionType *fn_ty = FunctionType::get(ptr_ty, {i32, data_ty}, false);
+          FunctionType *fn_ty =
+              FunctionType::get(ptr_ty, {i32, data_ty}, false);
           var_fn =
               cast<Function>(M.getOrInsertFunction(fn_name, fn_ty).getCallee());
         }

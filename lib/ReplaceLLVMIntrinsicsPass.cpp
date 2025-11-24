@@ -452,7 +452,6 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
           // Erase the call.
           CI->eraseFromParent();
         }
-
       }
 
       if (F.user_empty())
