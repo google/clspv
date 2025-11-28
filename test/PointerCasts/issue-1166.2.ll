@@ -3,6 +3,11 @@
 ; RUN: spirv-val %t.spv --target-env spv1.0
 ; RUN: FileCheck %s < %t.spvasm
 
+; RUN: clspv-opt %s -o %t.ll --passes=spirv-producer --producer-out-file=%t.spv -untyped-pointers
+; RUN: spirv-dis %t.spv -o %t.spvasm
+; RUN: spirv-val %t.spv --target-env spv1.0
+; RUN: FileCheck %s < %t.spvasm
+
 ; CHECK: [[uint:%[^ ]+]] = OpTypeInt 32 0
 ; CHECK: [[uint2:%[^ ]+]] = OpTypeVector [[uint]] 2
 ; CHECK: [[ulong:%[^ ]+]] = OpTypeInt 64 0

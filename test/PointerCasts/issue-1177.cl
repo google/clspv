@@ -2,6 +2,10 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 
+// RUN: clspv %s -o %t.spv -untyped-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: spirv-val %t.spv --target-env spv1.0
+
 struct E {
   int i1, i2, i3;
 };

@@ -1,9 +1,16 @@
 ; RUN: clspv-opt --passes=replace-pointer-bitcast %s -o %t
 ; RUN: FileCheck %s < %t
 
+; RUN: clspv-opt --passes=replace-pointer-bitcast %s -o %t -untyped-pointers
+; RUN: FileCheck --check-prefix=UNTYPED %s < %t
+
 ; CHECK:  [[load:%[^ ]+]] = load i32, ptr addrspace(1) %in, align 4
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %in, i32 8
 ; CHECK:  store i32 [[load]], ptr addrspace(1) [[gep]], align 4
+
+; UNTYPED: [[load:%[^ ]+]] = load i32, ptr addrspace(1) %in
+; UNTYPED: [[gep:%[^ ]+]] = getelementptr [16 x i8], ptr addrspace(1) %in
+; UNTYPED: store i32 [[load]], ptr addrspace(1) [[gep]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"

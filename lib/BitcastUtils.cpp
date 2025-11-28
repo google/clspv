@@ -937,17 +937,34 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
   // pointer (e.g. gep, alloca, or global variable).
   if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
     source = gep->getPointerOperand();
+    if (clspv::Option::UntypedPointerAddressSpace(
+            source->getType()->getPointerAddressSpace())) {
+      return false;
+    }
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = gep->getSourceElementType();
   } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
     source = ld->getPointerOperand();
+    if (clspv::Option::UntypedPointerAddressSpace(
+            source->getType()->getPointerAddressSpace())) {
+      return false;
+    }
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = ld->getType();
   } else if (auto *st = dyn_cast<StoreInst>(&I)) {
     source = st->getPointerOperand();
+    if (clspv::Option::UntypedPointerAddressSpace(
+            source->getType()->getPointerAddressSpace())) {
+      return false;
+    }
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = st->getValueOperand()->getType();
   } else if (auto *phi = dyn_cast<PHINode>(&I)) {
+    if (phi->getType()->isPointerTy() &&
+        clspv::Option::UntypedPointerAddressSpace(
+            phi->getType()->getPointerAddressSpace())) {
+      return false;
+    }
     auto RefTy = clspv::InferType(phi, M.getContext(), &type_cache);
     if (RefTy) {
       for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
@@ -963,12 +980,21 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     }
   } else if (auto *atomic = dyn_cast<AtomicRMWInst>(&I)) {
     source = atomic->getPointerOperand();
+    if (clspv::Option::UntypedPointerAddressSpace(
+            source->getType()->getPointerAddressSpace())) {
+      return false;
+    }
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = atomic->getType();
   } else if (auto *call = dyn_cast<CallInst>(&I)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
       source = call->getArgOperand(0);
+      if (source->getType()->isPointerTy() &&
+          clspv::Option::UntypedPointerAddressSpace(
+              source->getType()->getPointerAddressSpace())) {
+        return false;
+      }
       source_ty = clspv::InferType(source, M.getContext(), &type_cache);
       if (info.getType() == clspv::Builtins::kAtomicStore ||
           info.getType() == clspv::Builtins::kAtomicStoreExplicit) {
@@ -984,6 +1010,10 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor);
       if (atomic) {
         source = call->getArgOperand(1);
+        if (clspv::Option::UntypedPointerAddressSpace(
+                source->getType()->getPointerAddressSpace())) {
+          return false;
+        }
         source_ty = clspv::InferType(source, M.getContext(), &type_cache);
         if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
           dest_ty = call->getArgOperand(4)->getType();
@@ -998,6 +1028,12 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       // complicated issues.
       auto Dst = call->getArgOperand(0);
       auto Src = call->getArgOperand(1);
+      if (clspv::Option::UntypedPointerAddressSpace(
+              Dst->getType()->getPointerAddressSpace()) &&
+          clspv::Option::UntypedPointerAddressSpace(
+              Src->getType()->getPointerAddressSpace())) {
+        return false;
+      }
       auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
       auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
       if (DstTy && SrcTy && DstTy != SrcTy) {

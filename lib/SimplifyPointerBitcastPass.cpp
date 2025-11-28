@@ -184,6 +184,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       for (Instruction &I : BB) {
         // If we have a GEP instruction...
         if (auto GEP = dyn_cast<GetElementPtrInst>(&I)) {
+          if (Option::UntypedPointerAddressSpace(
+                  GEP->getType()->getPointerAddressSpace())) {
+            continue;
+          }
+
           // ... whose operand is also a GEP instruction...
           if (auto OtherGEP =
                   dyn_cast<GetElementPtrInst>(GEP->getPointerOperand())) {

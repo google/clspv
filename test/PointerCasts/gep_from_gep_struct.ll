@@ -1,8 +1,15 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast -untyped-pointers
+; RUN: FileCheck --check-prefix=UNTYPED %s < %t.ll
+
 ; CHECK: [[i:%[a-zA-Z0-9_.]+]] = phi i32
 ; CHECK: getelementptr %struct.work_item_data, ptr addrspace(1) %outData, i32 %{{.*}}, i32 1, i32 [[i]]
+
+; UNTYPED: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %struct.work_item_data, ptr addrspace(1) %outData, i32
+; UNTYPED: [[i:%[a-zA-Z0-9_.]+]] = phi i32
+; UNTYPED: getelementptr inbounds i32, ptr addrspace(1) [[gep]], i32 [[i]]
 
 source_filename = "work_item.cl"
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-G1"

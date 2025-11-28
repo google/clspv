@@ -1,6 +1,9 @@
 // RUN: clspv --cl-std=CLC++ --inline-entry-points %s -o %t.spv
 // RUN: spirv-val --target-env spv1.0 %t.spv
 
+// RUN: clspv --cl-std=CLC++ --inline-entry-points %s -o %t.spv -untyped-pointers
+// RUN: spirv-val --target-env spv1.0 %t.spv
+
 // type_test2.cl
 struct Storage
 {

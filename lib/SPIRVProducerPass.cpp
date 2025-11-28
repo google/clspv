@@ -5621,7 +5621,6 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       // OpPtrAccessChain (in StorageBuffer storage class) be decorated with
       // ArrayStride.
       auto address_space = ResultType->getAddressSpace();
-      setVariablePointersCapabilities(address_space);
       switch (GetStorageClass(address_space)) {
       case spv::StorageClassStorageBuffer:
       case spv::StorageClassPhysicalStorageBuffer:
@@ -5646,6 +5645,15 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
           needs_array = true;
         }
         break;
+      case spv::StorageClassUniform:
+      case spv::StorageClassPushConstant:
+        if (untyped) {
+          needs_array = true;
+        } else {
+          llvm_unreachable(
+              "OpPtrAccessChain is not supported for this storage class");
+        }
+        break;
       default:
         llvm_unreachable(
             "OpPtrAccessChain is not supported for this storage class");
@@ -5662,6 +5670,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         base_type_id = getSPIRVType(arrayTy, true);
       }
       Ops << base_type_id;
+    } else if (Opcode == spv::OpPtrAccessChain) {
+      auto address_space = ResultType->getAddressSpace();
+      setVariablePointersCapabilities(address_space);
     }
 
     // Generate the base pointer.

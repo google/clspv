@@ -2,6 +2,10 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv --long-vector %s -o %t.spv -untyped-pointers --spv-version=1.4
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: spirv-val --target-env vulkan1.4 %t.spv
+
 // This test used to involve an infinite loop
 
 __kernel void test(__global int8 *output)

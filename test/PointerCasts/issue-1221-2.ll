@@ -1,6 +1,9 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast -untyped-pointers
+; RUN: FileCheck %s < %t.ll
+
 ; CHECK:  [[gep:%[^ ]+]] = getelementptr inbounds i8, ptr addrspace(1) %source, i32 64
 ; CHECK:  load [124 x i16], ptr addrspace(1) [[gep]], align 4
 

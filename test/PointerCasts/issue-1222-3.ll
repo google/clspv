@@ -1,6 +1,9 @@
 ; RUN: clspv-opt --passes=simplify-pointer-bitcast %s -o %t
 ; RUN: FileCheck %s < %t
 
+; RUN: clspv-opt --passes=simplify-pointer-bitcast %s -o %t -untyped-pointers
+; RUN: FileCheck %s < %t
+
 ; Nothing should have changed
 ; CHECK: [[call:%[^ ]+]] = call ptr addrspace(2) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x i8] } zeroinitializer)
 ; CHECK: [[gep:%[^ ]+]] = getelementptr { [0 x i8] }, ptr addrspace(2) [[call]], i32 0

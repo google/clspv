@@ -21,6 +21,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "clspv/Option.h"
+
 #include "InlineFuncWithPointerBitCastArgPass.h"
 #include "Types.h"
 
@@ -109,6 +111,12 @@ bool clspv::InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
           // than the parameter's type.
           for (unsigned i = 0; i < call->arg_size(); i++) {
             if (call->getArgOperand(i)->getType()->isPointerTy()) {
+              if (clspv::Option::UntypedPointerAddressSpace(
+                      call->getArgOperand(i)
+                          ->getType()
+                          ->getPointerAddressSpace())) {
+                continue;
+              }
               auto *arg_ty = clspv::InferType(call->getArgOperand(i),
                                               M.getContext(), &type_cache);
               auto *param_ty = clspv::InferType(func->getArg(i), M.getContext(),

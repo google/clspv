@@ -2,6 +2,10 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 
+// RUN: clspv %s -o %t.spv -arch=spir64 -untyped-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: spirv-val %t.spv --target-env spv1.0
+
 #define ElementCount 100
 
 struct E {
