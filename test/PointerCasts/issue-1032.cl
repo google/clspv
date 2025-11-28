@@ -3,6 +3,11 @@
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
+// RUN: clspv --cl-std=CLC++ --inline-entry-points %s -o %t.spv -untyped-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm
+// RUN: spirv-val --target-env vulkan1.0 %t.spv
+
 // CHECK-COUNT-16: OpStore
 
 struct Data

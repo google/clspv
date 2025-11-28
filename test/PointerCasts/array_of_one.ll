@@ -1,5 +1,12 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
+
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast -untyped-pointers
+; RUN: FileCheck %s < %t.ll
+
+; RUN: clspv-opt %s -o %t.ll --passes=simplify-pointer-bitcast -untyped-pointers -spv-version=1.4
+; RUN: FileCheck --check-prefix=UNTYPED %s < %t.ll
+
 ; CHECK: [[gep:%[^ ]+]] = getelementptr [1 x [8 x float]], ptr addrspace(3) @gain_offset, i32 0, i32 %add151.i.i, i32 0
 ; CHECK: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 32
 ; CHECK: [[gep:%[^ ]+]] = getelementptr [1 x [8 x float]], ptr addrspace(3) @gain_offset, i32 0, i32 %add151.i.i, i32 1
@@ -8,6 +15,15 @@
 ; CHECK: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 8
 ; CHECK: [[gep:%[^ ]+]] = getelementptr [1 x [8 x float]], ptr addrspace(3) @gain_offset, i32 0, i32 %add151.i.i, i32 3
 ; CHECK: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 4
+
+; UNTYPED: [[gep1:%[^ ]+]] = getelementptr inbounds [8 x float], ptr addrspace(3) @gain_offset, i32 %add151.i.i
+; UNTYPED: store float 1.000000e+00, ptr addrspace(3) [[gep1]], align 32
+; UNTYPED: [[gep:%[^ ]+]] = getelementptr inbounds nuw i8, ptr addrspace(3) [[gep1]], i32 4
+; UNTYPED: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 4
+; UNTYPED: [[gep:%[^ ]+]] = getelementptr inbounds nuw i8, ptr addrspace(3) [[gep1]], i32 8
+; UNTYPED: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 8
+; UNTYPED: [[gep:%[^ ]+]] = getelementptr inbounds nuw i8, ptr addrspace(3) [[gep1]], i32 12
+; UNTYPED: store float 1.000000e+00, ptr addrspace(3) [[gep]], align 4
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-G1"
 target triple = "spir-unknown-unknown"

@@ -1,6 +1,9 @@
 ; RUN: clspv-opt --passes=replace-pointer-bitcast %s -o %t
 ; RUN: FileCheck %s < %t
 
+; RUN: clspv-opt --passes=replace-pointer-bitcast %s -o %t -untyped-pointers
+; RUN: FileCheck --check-prefix=UNTYPED %s < %t
+
 ; CHECK: [[call:%[^ ]+]] = call ptr addrspace(2) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x i8] } zeroinitializer)
 ; CHECK: [[gep:%[^ ]+]] = getelementptr { [0 x i8] }, ptr addrspace(2) [[call]], i32 0
 ; CHECK: [[gep0:%[^ ]+]] = getelementptr i8, ptr addrspace(2) [[gep]], i32 0
@@ -16,6 +19,10 @@
 ; CHECK: [[insert2:%[^ ]+]] = insertelement <4 x i8> [[insert1]], i8 [[load2]], i32 2
 ; CHECK: [[insert3:%[^ ]+]] = insertelement <4 x i8> [[insert2]], i8 [[load3]], i32 3
 ; CHECK: bitcast <4 x i8> [[insert3]] to i32
+
+; UNTYPED: [[call:%[^ ]+]] = call ptr addrspace(2) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x i8] } zeroinitializer)
+; UNTYPED: [[gep:%[^ ]+]] = getelementptr { [0 x i8] }, ptr addrspace(2) [[call]], i32 0
+; UNTYPED: load i32, ptr addrspace(2) [[gep]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spir-unknown-unknown"

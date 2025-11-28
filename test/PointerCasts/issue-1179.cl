@@ -2,6 +2,10 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv  --target-env spv1.0
 
+// RUN: clspv %s -o %t.spv -physical-storage-buffers -arch=spir64 -cl-kernel-arg-info -untyped-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: spirv-val %t.spv  --target-env spv1.0
+
 struct E {
   int i1, i2, i3, i4;
 };

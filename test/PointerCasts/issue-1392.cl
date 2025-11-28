@@ -2,6 +2,10 @@
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 
+// RUN: clspv %s -o %t.spv --cl-std=CL2.0 --inline-entry-points -untyped-pointers
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: spirv-val %t.spv --target-env spv1.0
+
 typedef struct PrefixState {
   uint agg;
   uint inclusive_prefix;
