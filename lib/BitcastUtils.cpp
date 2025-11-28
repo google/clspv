@@ -990,7 +990,8 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
       source = call->getArgOperand(0);
-      if (clspv::Option::UntypedPointerAddressSpace(
+      if (source->getType()->isPointerTy() &&
+          clspv::Option::UntypedPointerAddressSpace(
               source->getType()->getPointerAddressSpace())) {
         return false;
       }
