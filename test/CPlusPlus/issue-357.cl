@@ -62,6 +62,11 @@ __kernel void testCopyInstance2(__global InstanceTest* dst)
   __local InstanceTest instances[16];
 
   const size_t index = get_global_id(0);
+
+  if (index < 16) {
+    instances[index].init();
+  }
+
   if (index < 16) {
     dst[index] = instances[index];
   }
