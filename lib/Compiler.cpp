@@ -1105,7 +1105,7 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
     L.linkInModule(std::move(add_library), 0);
   }
 
-  L.linkInModule(std::move(library), 0);
+  L.linkInModule(std::move(library), Linker::LinkOnlyNeeded);
 
   return true;
 }
