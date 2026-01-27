@@ -106,7 +106,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   unsigned AllocSizeInts = AllocSize / 4;
   auto *ConstantZero = ConstantInt::get(Int32Ty, 0);
   auto *ConstantOne = ConstantInt::get(Int32Ty, 1);
-  auto *ConstantNegOne = ConstantInt::get(Int32Ty, -1);
+  auto *ConstantNegOne = Constant::getAllOnesValue(Int32Ty);
   auto *ConstantPrintfID = ConstantInt::get(Int32Ty, PrintfID);
   auto *ConstantAllocSize = ConstantInt::get(Int32Ty, AllocSizeInts);
   auto *ConstantBuffSize =
