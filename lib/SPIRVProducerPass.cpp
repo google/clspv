@@ -2443,6 +2443,9 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
       }
     } else {
       auto V = CI->getZExtValue();
+      if (bit_width == 16) {
+        V &= 0xFFFF;
+      }
       LiteralNum.push_back(V & 0xFFFFFFFF);
 
       if (bit_width > 32) {
