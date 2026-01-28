@@ -167,7 +167,7 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
     if (processValue(M.getDataLayout(), PtrOp, CstOffset, DynOffset, MemBase)) {
       auto BaseAddr = getMemBaseAddr(MemBase);
       Value *Replacement;
-      Replacement = ConstantInt::get(IntTy, BaseAddr + CstOffset);
+      Replacement = ConstantInt::get(IntTy, BaseAddr + CstOffset, false, true);
       if (DynOffset != nullptr) {
         IRBuilder<> B(Instr);
         Replacement = B.CreateAdd(Replacement, DynOffset);
