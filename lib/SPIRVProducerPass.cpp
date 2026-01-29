@@ -4989,6 +4989,14 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     }
     return addSPIRVInst(spv::OpCopyMemorySized, Ops);
   }
+  case Intrinsic::canonicalize: {
+    // According to LLVM langref, this is always implementable as x * 1.0
+    auto val = Call->getArgOperand(0);
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << val
+        << getSPIRVConstant(ConstantFP::get(Call->getType(), 1.0));
+    return addSPIRVInst(spv::OpFMul, Ops);
+  }
 
   default:
     break;
