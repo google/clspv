@@ -1,0 +1,16 @@
+; RUN: clspv-opt %s -o %t --passes=simplify-pointer-bitcast
+; RUN: FileCheck %s < %t
+
+target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
+target triple = "spir-unknown-unknown"
+
+; CHECK: [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %a, i32 -1
+; CHECK: store i32 {{.*}}, ptr addrspace(1) [[gep]], align 32
+
+define spir_kernel void @foo(ptr addrspace(1) %a, i32 %i) {
+entry:
+  %0 = load i32, ptr addrspace(1) %a, align 32
+  %1 = getelementptr i8, ptr addrspace(1) %a, i32 -4
+  store i32 %0, ptr addrspace(1) %1, align 32
+  ret void
+}

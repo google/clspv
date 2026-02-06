@@ -71,18 +71,18 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool StrictStruct = false);
 
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
-                          GetElementPtrInst *GEP, uint64_t &CstVal,
+                          GetElementPtrInst *GEP, int64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths);
 
-uint64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
-                               IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
-                               uint64_t Offset, SmallVector<Value *, 2> *Idxs);
+int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
+                              IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
+                              int64_t Offset, SmallVector<Value *, 2> *Idxs);
 
 bool IsClspvResourceOrLocal(Value *val);
 
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
-                       Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                       Type *SrcTy, Type *DstTy, int64_t CstVal, Value *DynVal,
                        size_t SmallerBitWidths, Value *Src);
 
 bool IsGVConstantGEP(GetElementPtrInst *GEP);

@@ -161,7 +161,7 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
     auto *PtrOp = Instr->getOperand(0);
     Value *MemBase = nullptr;
-    uint64_t CstOffset = 0;
+    int64_t CstOffset = 0;
     Value *DynOffset = nullptr;
 
     if (processValue(M.getDataLayout(), PtrOp, CstOffset, DynOffset, MemBase)) {
@@ -184,14 +184,14 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
 
 bool clspv::LogicalPointerToIntPass::processValue(const DataLayout &DL,
                                                   Value *Val,
-                                                  uint64_t &CstOffset,
+                                                  int64_t &CstOffset,
                                                   llvm::Value *&DynOffset,
                                                   Value *&MemBase) {
   if (auto *GEP = dyn_cast<GetElementPtrInst>(Val)) {
     // Convert GEP indices to byte offset
     IRBuilder<> B(GEP);
     size_t SmallerBitWidths;
-    uint64_t CstVal = 0;
+    int64_t CstVal = 0;
     Value *DynVal = nullptr;
     BitcastUtils::ExtractOffsetFromGEP(DL, B, GEP, CstVal, DynVal,
                                        SmallerBitWidths);

@@ -334,7 +334,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
               Builder.CreateAdd(GEPIdxOp, *(OtherGEP->op_end() - 1)));
         }
       } else {
-        uint64_t cstVal;
+        int64_t cstVal;
         Value *dynVal;
         size_t smallerBitWidths;
         ExtractOffsetFromGEP(M.getDataLayout(), Builder, OtherGEP, cstVal,
@@ -540,7 +540,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
         dyn_cast<GetElementPtrInst>(LoadInst->getPointerOperand());
     auto Ptr = initial_gep->getPointerOperand();
 
-    uint64_t cstVal;
+    int64_t cstVal;
     Value *dynVal;
     size_t smallerBitWidths;
     ExtractOffsetFromGEP(M.getDataLayout(), Builder, initial_gep, cstVal,
@@ -577,7 +577,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     auto ptr = gep->getPointerOperand();
     auto ty = InferType(ptr, M.getContext(), &type_cache);
     IRBuilder<> Builder{gep};
-    uint64_t cstVal;
+    int64_t cstVal;
     Value *dynVal;
     size_t smallerBitWidths;
     ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
@@ -597,7 +597,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     auto ptr = gep->getPointerOperand();
     auto ty = InferType(ptr, M.getContext(), &type_cache);
     IRBuilder<> Builder{gep};
-    uint64_t cstVal;
+    int64_t cstVal;
     Value *dynVal;
     size_t smallerBitWidths;
     ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
@@ -668,7 +668,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
     } else {
       src_ty = src_gep->getResultElementType();
       src = src_gep;
-      uint64_t CstVal;
+      int64_t CstVal;
       Value *DynVal;
       size_t SmallerBitWidths;
       ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
@@ -679,7 +679,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
                                 CstVal * SmallerBitWidths, nullptr) != 0) {
         src = src_gep->getPointerOperand();
         src_ty = inst_gep->getSourceElementType();
-        uint64_t srcCstVal;
+        int64_t srcCstVal;
         Value *srcDynVal;
         size_t srcSmallerBitWidths;
         ExtractOffsetFromGEP(DL, Builder, src_gep, srcCstVal, srcDynVal,
@@ -728,14 +728,14 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
   struct UpgradeInfo {
     Instruction *inst;
-    uint64_t cst;
+    int64_t cst;
     Value *val;
     size_t smallerBitWidth;
     Type *dest_ty;
     GetElementPtrInst *gep;
   };
   auto gepIndicesCanBeUpgradedTo = [&DL, &M](Type *ty, GetElementPtrInst *gep,
-                                             uint64_t &cstVal, Value *&dynVal,
+                                             int64_t &cstVal, Value *&dynVal,
                                              size_t &smallerBitWidths) {
     if (gep->hasAllConstantIndices()) {
       // should not be used as all indices are constant
@@ -826,7 +826,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           if (IsGVConstantGEP(gep))
             continue;
 
-          uint64_t cstVal;
+          int64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
 
@@ -904,7 +904,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
                 continue;
               }
               auto gep = dyn_cast<GetElementPtrInst>(value);
-              uint64_t cstVal;
+              int64_t cstVal;
               Value *dynVal;
               size_t smallerBitWidths;
               if (gep == nullptr ||
@@ -929,7 +929,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
   for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
     auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
-    uint64_t cst = GEPInfo.cst;
+    int64_t cst = GEPInfo.cst;
     Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
@@ -958,7 +958,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
   DenseSet<Instruction *> ToBeRemoved;
   for (auto GEPInfo : Worklist) {
     Instruction *I = GEPInfo.inst;
-    uint64_t cst = GEPInfo.cst;
+    int64_t cst = GEPInfo.cst;
     Value *val = GEPInfo.val;
     size_t smallerBitWidths = GEPInfo.smallerBitWidth;
     Type *dest_ty = GEPInfo.dest_ty;
@@ -1125,7 +1125,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
     Type *Ty = pair.second;
 
     IRBuilder<> Builder{gep};
-    uint64_t CstVal;
+    int64_t CstVal;
     Value *DynVal;
     size_t SmallerBitWidths;
     ExtractOffsetFromGEP(DL, Builder, gep, CstVal, DynVal, SmallerBitWidths);

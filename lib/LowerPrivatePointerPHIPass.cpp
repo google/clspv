@@ -46,7 +46,7 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
 }
 
 void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
-                             uint64_t CstVal, Value *DynVal) {
+                             int64_t CstVal, Value *DynVal) {
   IRBuilder<> B(Src);
   if (DynVal == nullptr) {
     DynVal = ConstantInt::get(new_phi->getType(), CstVal);
@@ -66,7 +66,7 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
 }
 
 Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
-                  Type *SrcTy, Type *DstTy, uint64_t CstVal, Value *DynVal,
+                  Type *SrcTy, Type *DstTy, int64_t CstVal, Value *DynVal,
                   size_t SmallerBitWidths) {
   if (isa<AllocaInst>(Src) && !SrcTy->isArrayTy()) {
     return Src;
@@ -150,7 +150,7 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
       alloca = new_alloca;
     }
 
-    SmallVector<std::tuple<Value *, Instruction *, uint64_t, Value *>> nodes;
+    SmallVector<std::tuple<Value *, Instruction *, int64_t, Value *>> nodes;
     for (auto use : alloca->users()) {
       nodes.push_back(std::make_tuple(use, alloca, 0, nullptr));
     }
@@ -160,7 +160,7 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
     while (!nodes.empty()) {
       Value *node;
       Instruction *Src;
-      uint64_t CstVal;
+      int64_t CstVal;
       Value *DynVal;
       std::tie(node, Src, CstVal, DynVal) = nodes.pop_back_val();
       if (seen.count(node) != 0) {
@@ -173,7 +173,7 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
       }
       if (auto gep = dyn_cast<GetElementPtrInst>(node)) {
         IRBuilder<> B(gep);
-        uint64_t gep_CstVal;
+        int64_t gep_CstVal;
         Value *gep_DynVal;
         size_t gep_SmallerBitWidths;
         BitcastUtils::ExtractOffsetFromGEP(DL, B, gep, gep_CstVal, gep_DynVal,

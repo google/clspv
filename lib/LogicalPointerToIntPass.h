@@ -27,7 +27,7 @@ struct LogicalPointerToIntPass : llvm::PassInfoMixin<LogicalPointerToIntPass> {
 private:
   bool isMemBase(llvm::Value *Val);
   bool processValue(const llvm::DataLayout &DL, llvm::Value *Value,
-                    uint64_t &CstOffset, llvm::Value *&DynOffset,
+                    int64_t &CstOffset, llvm::Value *&DynOffset,
                     llvm::Value *&MemBase);
   uint64_t getMemBaseAddr(llvm::Value *MemBase);
   bool InlineFunctions(llvm::Module &M);

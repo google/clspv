@@ -484,7 +484,7 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
   bool changed = false;
   while (auto gep = dyn_cast<GetElementPtrInst>(Src)) {
     IRBuilder<> B(gep);
-    uint64_t CstVal;
+    int64_t CstVal;
     Value *DynVal;
     size_t SmallerBitWidths;
     ExtractOffsetFromGEP(DL, B, gep, CstVal, DynVal, SmallerBitWidths);
@@ -561,7 +561,7 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
           UserWorkList.push_back(U);
         }
         IRBuilder<> B(gep);
-        uint64_t CstVal;
+        int64_t CstVal;
         Value *DynVal;
         size_t SmallerBitWidths;
         Type *RetTy = Ty;
@@ -728,7 +728,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     if (auto GEP = dyn_cast<GetElementPtrInst>(Inst)) {
       IRBuilder<> Builder(GEP);
 
-      uint64_t CstVal;
+      int64_t CstVal;
       Value *DynVal;
       size_t SmallerBitWidths;
       ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
