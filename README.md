@@ -1,5 +1,13 @@
 # clspv [![Discord Shield](https://discordapp.com/api/guilds/1002628585250631681/widget.png?style=shield)](https://discord.gg/xsVdjmhFM9)
 
+**NOTE:** This `llvm/release/22.x` branch of the Clspv repository will receive
+minimal attention and support.
+
+This branch was created to downstream projects to upgrade to LLVM `main` (now on version 23)
+on their own schedule. For example, a downstream project may depend on
+other components that are coupled to LLVM but have not yet upgraded to the
+new version on the LLVM `main` branch.
+
 **Clspv** is a compiler for OpenCL C targeting Vulkan compute shaders.
 
 It consists of:
