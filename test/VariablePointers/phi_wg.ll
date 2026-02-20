@@ -1,5 +1,3 @@
-; Issue #1488
-; XFAIL: *
 ; RUN: clspv-opt %s -o %t -producer-out-file %t.spv --passes=spirv-producer
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.0 %t.spv

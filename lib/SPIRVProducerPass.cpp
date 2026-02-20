@@ -441,11 +441,11 @@ struct SPIRVProducerPassImpl {
   // Returns SPIRVID once it has been created.
   SPIRVID getSPIRVType(Type *Ty, bool needs_layout);
   SPIRVID getSPIRVType(Type *Ty);
-  SPIRVID getSPIRVConstant(Constant *Cst);
+  SPIRVID getSPIRVConstant(Constant *Cst, Type *TyHint = nullptr);
   SPIRVID getSPIRVInt32Constant(uint32_t CstVal);
   SPIRVID getSPIRVInt64Constant(uint64_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
-  SPIRVID getSPIRVValue(Value *V);
+  SPIRVID getSPIRVValue(Value *V, Type *TyHint = nullptr);
 
   bool PointerRequiresLayout(unsigned aspace);
   bool UntypedPointerStorageClass(spv::StorageClass sc);
@@ -2387,7 +2387,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVInt32Constant(uint32_t CstVal) {
   return getSPIRVValue(Cst);
 }
 
-SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C, Type *TyHint) {
   ValueMapType &VMap = getValueMap();
   const bool hack_undef = clspv::Option::HackUndef();
 
@@ -2414,7 +2414,7 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
 
   if (Cst->getType()->isPointerTy()) {
     auto *inferred_ty =
-        clspv::InferType(Cst, Cst->getContext(), &InferredTypeCache);
+        clspv::InferType(Cst, Cst->getContext(), &InferredTypeCache, TyHint);
     Ops << getSPIRVPointerType(Cst->getType(), inferred_ty);
   } else {
     Ops << Cst->getType();
@@ -2581,14 +2581,14 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C) {
   return RID;
 }
 
-SPIRVID SPIRVProducerPassImpl::getSPIRVValue(Value *V) {
+SPIRVID SPIRVProducerPassImpl::getSPIRVValue(Value *V, Type *TyHint) {
   auto II = ValueMap.find(V);
   if (II != ValueMap.end()) {
     assert(II->second.isValid());
     return II->second;
   }
   if (Constant *Cst = dyn_cast<Constant>(V)) {
-    return getSPIRVConstant(Cst);
+    return getSPIRVConstant(Cst, TyHint);
   } else {
     llvm_unreachable("Variable not found");
   }
@@ -5754,15 +5754,17 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     }
 
     SPIRVID type_id;
+    Type *DataTy = Ty;
     if (Ty->isPointerTy()) {
-      auto *inferred_ty =
-          InferType(&I, module->getContext(), &InferredTypeCache);
-      type_id = getSPIRVPointerType(Ty, inferred_ty);
+      DataTy = InferType(&I, module->getContext(), &InferredTypeCache);
+      type_id = getSPIRVPointerType(Ty, DataTy);
     } else {
       type_id = getSPIRVType(Ty);
     }
 
-    Ops << type_id << I.getOperand(0) << I.getOperand(1) << I.getOperand(2);
+    Ops << type_id << getSPIRVValue(I.getOperand(0), DataTy)
+        << getSPIRVValue(I.getOperand(1), DataTy)
+        << getSPIRVValue(I.getOperand(2), DataTy);
 
     RID = addSPIRVInst(spv::OpSelect, Ops);
     break;
@@ -6178,7 +6180,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       setVariablePointersCapabilities(LD->getType()->getPointerAddressSpace());
     }
 
-    SPIRVID PointerID = getSPIRVValue(LD->getPointerOperand());
+    SPIRVID PointerID = getSPIRVValue(LD->getPointerOperand(), LD->getType());
     // This is a hack to work around what looks like a driver bug.
     // When we're loading from the special variable holding the WorkgroupSize
     // builtin value, use an OpBitWiseAnd of the value's ID rather than
@@ -6495,16 +6497,17 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       // Ops[1] ... Ops[n] = (Variable ID, Parent ID) pairs
       SPIRVOperandVec Ops;
 
+      Type *TyHint = PHI->getType();
       if (PHI->getType()->isPointerTy()) {
-        auto *inferred_ty =
-            InferType(PHI, module->getContext(), &InferredTypeCache);
-        Ops << getSPIRVPointerType(PHI->getType(), inferred_ty);
+        TyHint = InferType(PHI, module->getContext(), &InferredTypeCache);
+        Ops << getSPIRVPointerType(PHI->getType(), TyHint);
       } else {
         Ops << PHI->getType();
       }
 
       for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
-        Ops << PHI->getIncomingValue(j) << PHI->getIncomingBlock(j);
+        Ops << getSPIRVValue(PHI->getIncomingValue(j), TyHint)
+            << PHI->getIncomingBlock(j);
       }
 
       replaceSPIRVInst(Placeholder, spv::OpPhi, Ops);
