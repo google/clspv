@@ -366,7 +366,7 @@ Type *InferUsersType(Value *v, LLVMContext &context,
 } // namespace
 
 Type *clspv::InferType(Value *v, LLVMContext &context,
-                       DenseMap<Value *, Type *> *cache) {
+                       DenseMap<Value *, Type *> *cache, Type *TyHint) {
   // Non-pointer types are reflexive.
   if (!isa<PointerType>(v->getType()))
     return v->getType();
@@ -536,6 +536,10 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         }
       }
     }
+  }
+
+  if (TyHint) {
+    return CacheType(TyHint);
   }
   return nullptr;
 }

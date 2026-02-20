@@ -31,7 +31,8 @@ namespace clspv {
 // |v| to determine the appropriate type.
 // Returns nullptr if a type cannot be inferred.
 llvm::Type *InferType(llvm::Value *v, llvm::LLVMContext &context,
-                      llvm::DenseMap<llvm::Value *, llvm::Type *> *cache);
+                      llvm::DenseMap<llvm::Value *, llvm::Type *> *cache,
+                      llvm::Type *TyHint = nullptr);
 
 // Returns true if the given type is descriptor resource.
 // Slight nuance with physical storage buffers.
