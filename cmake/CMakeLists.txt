@@ -116,9 +116,9 @@ add_custom_target(clspv64_builtin_library
   DEPENDS ${CLSPV64_LIBRARY_OUTPUT_FILE})
 
 if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
-  if(MSVC)
-    set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/$(Configuration)/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir--/libclc.bc)
-    set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/$(Configuration)/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir64--/libclc.bc)
+  if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/$<CONFIG>/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir--/libclc.bc)
+    set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/$<CONFIG>/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir64--/libclc.bc)
   else()
     set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir--/libclc.bc)
     set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spir64--/libclc.bc)
