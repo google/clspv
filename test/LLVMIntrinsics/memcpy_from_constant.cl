@@ -16,6 +16,8 @@ void kernel memcpy_from_constant(global float* result) {
 // CHECK-DAG: [[ptr_ssbo_struct:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[struct]]
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[ptr_ssbo_float:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[float]]
+// CHECK-DAG: [[uint_5:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 5
+// CHECK-DAG: [[arr_float:%[a-zA-Z0-9_]+]] = OpTypeArray [[float]] [[uint_5]]
 // CHECK-DAG: [[uint_0:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 0
 // CHECK-DAG: [[uint_4:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 4
 // CHECK-DAG: [[uint_1:%[a-zA-Z0-9_]+]] = OpConstant [[uint]] 1
@@ -27,14 +29,26 @@ void kernel memcpy_from_constant(global float* result) {
 // CHECK-DAG: [[float_0:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 0
 // CHECK-DAG: [[float_1:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 1
 // CHECK-DAG: [[float_2:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 2
+// CHECK-DAG: [[arr_float_5:%[a-zA-Z0-9_]+]] = OpConstantComposite [[arr_float]] [[float_n2]] [[float_n1]] [[float_0]] [[float_1]] [[float_2]]
+
+
+// CHECK: [[gep0:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[float]] [[arr_float_5]] 0
+// CHECK: [[gep1:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[float]] [[arr_float_5]] 1
+// CHECK: [[gep2:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[float]] [[arr_float_5]] 2
+// CHECK: [[gep3:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[float]] [[arr_float_5]] 3
+// CHECK: [[gep4:%[a-zA-Z0-9_]+]] = OpCompositeExtract [[float]] [[arr_float_5]] 4
 
 // CHECK: [[ssbo_gep0:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_ssbo_float]] [[ssbo]] [[uint_0]] [[uint_0]]
-// CHECK: OpStore [[ssbo_gep0]] [[float_n2]]
+// CHECK: OpStore [[ssbo_gep0]] [[gep0]]
+
 // CHECK: [[ssbo_gep1:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_ssbo_float]] [[ssbo]] [[uint_0]] [[uint_1]]
-// CHECK: OpStore [[ssbo_gep1]] [[float_n1]]
+// CHECK: OpStore [[ssbo_gep1]] [[gep1]]
+
 // CHECK: [[ssbo_gep2:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_ssbo_float]] [[ssbo]] [[uint_0]] [[uint_2]]
-// CHECK: OpStore [[ssbo_gep2]] [[float_0]]
+// CHECK: OpStore [[ssbo_gep2]] [[gep2]]
+
 // CHECK: [[ssbo_gep3:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_ssbo_float]] [[ssbo]] [[uint_0]] [[uint_3]]
-// CHECK: OpStore [[ssbo_gep3]] [[float_1]]
+// CHECK: OpStore [[ssbo_gep3]] [[gep3]]
+
 // CHECK: [[ssbo_gep4:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr_ssbo_float]] [[ssbo]] [[uint_0]] [[uint_4]]
-// CHECK: OpStore [[ssbo_gep4]] [[float_2]]
+// CHECK: OpStore [[ssbo_gep4]] [[gep4]]
