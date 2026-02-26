@@ -372,7 +372,7 @@ Value *clspv::ThreeElementVectorLoweringPass::visitConstant(Constant &Cst) {
     return dyn_cast<Value>(&Cst);
   }
 
-  if (Cst.isZeroValue()) {
+  if (Cst.isNullValue()) {
     return Constant::getNullValue(EquivalentTy);
   }
 

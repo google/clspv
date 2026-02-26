@@ -714,7 +714,7 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
   auto *EquivalentTy = getEquivalentType(Cst.getType());
   assert(EquivalentTy && "Nothing to lower.");
 
-  if (Cst.isZeroValue()) {
+  if (Cst.isNullValue()) {
     return Constant::getNullValue(EquivalentTy);
   }
 

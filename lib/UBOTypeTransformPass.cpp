@@ -398,7 +398,7 @@ Constant *clspv::UBOTypeTransformPass::RebuildConstant(Constant *constant,
   if (iter != remapped_globals_.end())
     return iter->second;
 
-  if (constant->isZeroValue()) {
+  if (constant->isNullValue()) {
     Constant *null_constant = Constant::getNullValue(remapped_ty);
     remapped_globals_[constant] = null_constant;
     return null_constant;
