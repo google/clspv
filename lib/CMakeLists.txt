@@ -117,8 +117,17 @@ foreach(clspv_lib clspv_core clspv_passes)
 
   target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
 
-  target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
+  target_include_directories(
+	  ${clspv_lib} INTERFACE
+	  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
+	  $<INSTALL_INTERFACE:include/>
+  )
 
+  target_include_directories(
+	  ${clspv_lib} PRIVATE
+	  # ${CMAKE_CURRENT_SOURCE_DIR}/../include/
+	  ${CLSPV_INCLUDE_DIRS}
+  )
 endforeach(clspv_lib)
 
 # Dependencies of clspv_lib
