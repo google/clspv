@@ -1,5 +1,6 @@
-// RUN: clspv %target -cl-std=CLC++ -inline-entry-points %s -o %t.spv
+// RUN: clspv %target -O0 -cl-std=CLC++ -inline-entry-points %s -o %t.spv
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
+// RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: clspv-reflection %t.spv -o %t.map
 // RUN: FileCheck %s -check-prefix=MAP < %t.map
 

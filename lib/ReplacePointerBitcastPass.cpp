@@ -365,7 +365,7 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   SmallVector<Value *, 8> STValues;
   Value *STVal = ST->getValueOperand();
   auto cst = dyn_cast<Constant>(STVal);
-  if (cst && cst->isZeroValue()) {
+  if (cst && cst->isNullValue()) {
     for (uint32_t i = 0;
          i < (DstTyBitWidth + SrcTyBitWidth - 1) / SrcTyBitWidth; i++) {
       STValues.push_back(Constant::getNullValue(SrcTy));
@@ -521,14 +521,14 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
 
     auto initializer = GV->getInitializer();
     if (initializer && !initializer->isOneValue() &&
-        !initializer->isNullValue() && !initializer->isZeroValue() &&
+        !initializer->isNullValue() && !initializer->isNullValue() &&
         !isa<UndefValue>(initializer)) {
       // unsupported do nothing...
       return changed;
     } else if (initializer && initializer->isOneValue()) {
       initializer = Constant::getAllOnesValue(Ty);
     } else if (initializer &&
-               (initializer->isNullValue() || initializer->isZeroValue())) {
+               (initializer->isNullValue() || initializer->isNullValue())) {
       initializer = Constant::getNullValue(Ty);
     } else if (initializer && isa<UndefValue>(initializer)) {
       initializer = UndefValue::get(Ty);
