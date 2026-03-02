@@ -521,14 +521,12 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
 
     auto initializer = GV->getInitializer();
     if (initializer && !initializer->isOneValue() &&
-        !initializer->isNullValue() && !initializer->isNullValue() &&
-        !isa<UndefValue>(initializer)) {
+        !initializer->isNullValue() && !isa<UndefValue>(initializer)) {
       // unsupported do nothing...
       return changed;
     } else if (initializer && initializer->isOneValue()) {
       initializer = Constant::getAllOnesValue(Ty);
-    } else if (initializer &&
-               (initializer->isNullValue() || initializer->isNullValue())) {
+    } else if (initializer && initializer->isNullValue()) {
       initializer = Constant::getNullValue(Ty);
     } else if (initializer && isa<UndefValue>(initializer)) {
       initializer = UndefValue::get(Ty);
