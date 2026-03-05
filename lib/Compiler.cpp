@@ -1143,7 +1143,6 @@ ProgramToModule(llvm::LLVMContext &context,
 
   clang::DiagnosticConsumer *const consumer =
       instance.getDiagnostics().getClient();
-  consumer->finish();
 
   auto num_warnings = consumer->getNumWarnings();
   auto num_errors = consumer->getNumErrors();
