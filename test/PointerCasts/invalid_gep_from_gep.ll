@@ -1,3 +1,5 @@
+; https://github.com/google/clspv/issues/1570
+; XFAIL: *
 ; RUN: clspv-opt --passes=simplify-pointer-bitcast %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 

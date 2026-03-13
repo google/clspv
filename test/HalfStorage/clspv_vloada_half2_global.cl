@@ -19,14 +19,18 @@ kernel void foo(global float2* A, global uint* B, uint n) {
 // CHECK-64-DAG: [[_ulong:%[0-9a-zA-Z_]+]] = OpTypeInt 64 0
 // CHECK-DAG: [[_uint_0:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 0
 // CHECK-DAG: [[_uint_1:%[0-9a-zA-Z_]+]] = OpConstant [[_uint]] 1
-// CHECK: [[_32:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[B:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
+// CHECK-DAG: [[ruint:%[0-9a-zA-Z_]+]] = OpTypeRuntimeArray [[_uint]]
+// CHECK-DAG: [[struct:%[0-9a-zA-Z_]+]] = OpTypeStruct [[ruint]]
+// CHECK-DAG: [[ptr:%[0-9a-zA-Z_]+]] = OpTypePointer StorageBuffer [[struct]]
+// CHECK: [[B:%[0-9a-zA-Z_]+]] = OpVariable [[ptr]] StorageBuffer
+// CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
 // CHECK-64: [[_offset_long:%[0-9a-zA-Z_]+]] = OpUConvert [[_ulong]]
 // CHECK-64: [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[B]] [[_uint_0]] [[_offset_long]]
 // CHECK-32: [[_35:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[B]] [[_uint_0]]
 // CHECK: [[_36:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_35]]
 // CHECK: [[_37:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[_36]]
-// CHECK: [[_31:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A:%[0-9a-zA-Z_]+]] [[_uint_0]] [[_uint_0]]
 // CHECK: OpStore [[_31]] [[_37]]
+// CHECK: [[_32:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[B]] [[_uint_0]] [[_uint_0]]
 // CHECK: [[_38:%[0-9a-zA-Z_]+]] = OpLoad [[_uint]] [[_32]]
 // CHECK: [[_39:%[0-9a-zA-Z_]+]] = OpExtInst [[_v2float]] {{.*}} UnpackHalf2x16 [[_38]]
 // CHECK: [[_40:%[0-9a-zA-Z_]+]] = OpAccessChain {{.*}} [[A]] [[_uint_0]] [[_uint_1]]

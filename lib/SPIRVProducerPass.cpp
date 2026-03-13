@@ -6129,7 +6129,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     }
     break;
   }
-  case Instruction::Br: {
+  case Instruction::CondBr:
+  case Instruction::UncondBr: {
     // Branch instruction is deferred because it needs label's ID.
     BasicBlock *BrBB = I.getParent();
     if (ContinueBlocks.count(BrBB) || MergeBlocks.count(BrBB)) {

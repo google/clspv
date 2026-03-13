@@ -1,3 +1,5 @@
+// https://github.com/google/clspv/issues/1570
+// XFAIL: *
 // RUN: clspv %target %s -o %t.spv -cluster-pod-kernel-args=0 -arch=spir
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32

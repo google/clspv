@@ -47,6 +47,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/DeclarePushConstantsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DefineOpenCLWorkItemBuiltinsPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DescriptorCounter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/DestructurizeGEPPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/DirectResourceAccessPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FeatureMacro.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/FixupBuiltinsPass.cpp
@@ -95,6 +96,7 @@ add_library(clspv_passes OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatArgPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/SplatSelectCondition.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/StripFreezePass.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/StructurizeGEPPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/Types.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UBOTypeTransformPass.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/UndoBoolPass.cpp

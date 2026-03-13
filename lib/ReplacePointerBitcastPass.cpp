@@ -385,6 +385,11 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   // which will be handled correctly by this pass.
   IsVec3 &= !(SrcTy->isVectorTy() && GetNumEle(SrcTy) == 3 &&
               SrcEleTyBitWidth == DstEleTyBitWidth);
+
+  // If cst is null value, STValues already contains SrcTy elements, which do
+  // not need to be extracted.
+  IsVec3 &= !(cst && cst->isNullValue());
+
   if (IsVec3) {
     ExtractFromVector(Builder, STValues);
     DstTy = DstEleTy;

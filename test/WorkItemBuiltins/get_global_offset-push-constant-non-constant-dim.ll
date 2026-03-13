@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll -global-offset-push-constant --passes=define-opencl-workitem-builtins,early-cse,instcombine,simplify-pointer-bitcast
+; RUN: clspv-opt %s -o %t.ll -global-offset-push-constant --passes=define-opencl-workitem-builtins,early-cse,structurize-gep,instcombine,destructurize-gep,simplify-pointer-bitcast
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: [[type:%[0-9]+]] = type { <3 x i32> }

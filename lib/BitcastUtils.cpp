@@ -1293,7 +1293,9 @@ int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
   }
   while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
          (TargetTy == nullptr ||
-          SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy))) {
+          SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy) ||
+          (Ty != TargetTy &&
+           SizeInBits(DataLayout, Ty) == SizeInBits(DataLayout, TargetTy)))) {
     if (auto STy = dyn_cast<StructType>(Ty)) {
       auto SLayout = DataLayout.getStructLayout(STy);
       auto SId = SLayout->getElementContainingOffset(Offset / CHAR_BIT);
