@@ -654,7 +654,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID ChangeLayout(SPIRVID object, Type *type, bool removeLayout);
 
 private:
-  Module *module;
+  std::unique_ptr<Module> module;
 
   // Set of Capabilities required
   CapabilitySetType CapabilitySet;
@@ -880,7 +880,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   // yet create a new SPIRVProducer for every module.. For now only
   // allow 1 call.
   assert(module == nullptr);
-  module = &M;
+  module = CloneModule(M);
   if (ShowProducerIR) {
     llvm::outs() << *module << "\n";
   }
@@ -2914,7 +2914,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       // Ops[1] : Constant size for x/y/z dimension (Literal Number).
 
       // Allocate spec constants for workgroup size.
-      clspv::AddWorkgroupSpecConstants(module);
+      clspv::AddWorkgroupSpecConstants(module.get());
 
       SPIRVOperandVec Ops;
       SPIRVID result_type_id = getSPIRVType(
@@ -2973,7 +2973,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : target
     // Ops[1] : decoration
     // Ops[2] : SpecId
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kWorkDim);
+    auto spec_id = AllocateSpecConstant(module.get(), SpecConstant::kWorkDim);
     Ops.clear();
     Ops << InitializerID << spv::DecorationSpecId << spec_id;
 
@@ -3008,17 +3008,18 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[1] : decoration
     // Ops[2] : SpecId
     //
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetX);
+    auto spec_id =
+        AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetX);
     Ops.clear();
     Ops << x_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetY);
+    spec_id = AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetY);
     Ops.clear();
     Ops << y_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetZ);
+    spec_id = AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetZ);
     Ops.clear();
     Ops << z_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -3054,7 +3055,8 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : target
     // Ops[1] : decoration
     // Ops[2] : SpecId
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kSubgroupMaxSize);
+    auto spec_id =
+        AllocateSpecConstant(module.get(), SpecConstant::kSubgroupMaxSize);
     Ops.clear();
     Ops << InitializerID << spv::DecorationSpecId << spec_id;
 
@@ -3184,7 +3186,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     } else {
       // This module scope constant is initialized from a storage buffer with
       // data provided by the host at binding 0 of the next descriptor set.
-      const uint32_t descriptor_set = TakeDescriptorIndex(module);
+      const uint32_t descriptor_set = TakeDescriptorIndex(module.get());
 
       // Reflection instruction for constant data.
       Ops << getSPIRVType(Type::getVoidTy(module->getContext()))
@@ -3205,7 +3207,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
     }
   } else if (is_printf_buffer) {
-    const uint32_t descriptor_set = TakeDescriptorIndex(module);
+    const uint32_t descriptor_set = TakeDescriptorIndex(module.get());
     SPIRVOperandVec Ops;
     Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -7466,7 +7468,7 @@ void SPIRVProducerPassImpl::GenerateSpecConstantReflection() {
   uint32_t global_offset_id[3] = {kMax, kMax, kMax};
   uint32_t work_dim_id = kMax;
   uint32_t subgroup_max_size_id = kMax;
-  for (auto pair : clspv::GetSpecConstants(module)) {
+  for (auto pair : clspv::GetSpecConstants(module.get())) {
     auto kind = pair.first;
     auto id = pair.second;
 

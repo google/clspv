@@ -1,9 +1,7 @@
 ; RUN: clspv-opt -constant-args-ubo -pod-ubo %s -o %t -producer-out-file %t.spv --passes=ubo-type-transform,spirv-producer
 ; RUN: clspv-reflection %t.spv -o %t.map
-; RUN: FileCheck %s < %t.map
+; RUN: FileCheck %s -check-prefix=MAP < %t.map
 ; RUN: spirv-val --target-env vulkan1.0 %t.spv
-; TODO(#1303): invalid LLVM IR is produced in SPIRVProducer
-; XFAIL: *
 
 ; Just checking that the argument names are recorded correctly when clustering pod args.
 
