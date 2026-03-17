@@ -1219,6 +1219,19 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
   return false;
 }
 
+void ExtractOffsetFromStruct(const DataLayout &DataLayout, ConstantInt *Cst,
+                             StructType *STy, int64_t &CstVal,
+                             size_t &SmallerBitWidths) {
+  auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
+      Cst->getZExtValue());
+  if (offset % SmallerBitWidths != 0) {
+    CstVal = (CstVal * (int64_t)SmallerBitWidths + offset) / CHAR_BIT;
+    SmallerBitWidths = CHAR_BIT;
+  } else {
+    CstVal += offset / SmallerBitWidths;
+  }
+}
+
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, int64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths) {
@@ -1240,17 +1253,7 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
     if (STy && i != 0) {
       auto Cst = dyn_cast<ConstantInt>(Op);
       assert(Cst);
-      auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
-          Cst->getZExtValue());
-      if (offset % SmallerBitWidths != 0) {
-        CstVal = (CstVal * (int64_t)SmallerBitWidths + offset) / CHAR_BIT;
-        if (DynVal) {
-          DynVal = CreateMul(Builder, SmallerBitWidths / CHAR_BIT, DynVal);
-        }
-        SmallerBitWidths = CHAR_BIT;
-      } else {
-        CstVal += offset / SmallerBitWidths;
-      }
+      ExtractOffsetFromStruct(DataLayout, Cst, STy, CstVal, SmallerBitWidths);
     } else {
       auto size =
           SizeInBits(DataLayout, reworkUnsizedType(DataLayout, NextTy)) /

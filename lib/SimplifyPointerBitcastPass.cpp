@@ -291,9 +291,13 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                            smallerBitWidths);
       assert(dynVal == nullptr);
       cstVal *= smallerBitWidths;
+      int64_t cstVal2 = 0;
       size_t smallerBitWidths2 =
           SizeInBits(M.getDataLayout(), OtherGEP->getResultElementType());
-      cstVal += smallerBitWidths2 * OtherGEPLastIdx->getSExtValue();
+      ExtractOffsetFromStruct(M.getDataLayout(), OtherGEPLastIdx,
+                              dyn_cast<StructType>(OtherGEPPrevTy), cstVal2,
+                              smallerBitWidths2);
+      cstVal += smallerBitWidths2 * cstVal2;
       smallerBitWidths = std::min(smallerBitWidths, smallerBitWidths2);
       cstVal /= smallerBitWidths;
       auto newGEPIdxs = GetIdxsForTyFromOffset(

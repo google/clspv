@@ -70,6 +70,9 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool &PerfectMatch, const DataLayout &DL,
                                bool StrictStruct = false);
 
+void ExtractOffsetFromStruct(const DataLayout &DataLayout, ConstantInt *Cst,
+                             StructType *STy, int64_t &CstVal,
+                             size_t &SmallerBitWidths);
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, int64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths);

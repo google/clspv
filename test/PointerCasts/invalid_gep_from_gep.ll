@@ -1,5 +1,3 @@
-; https://github.com/google/clspv/issues/1570
-; XFAIL: *
 ; RUN: clspv-opt --passes=simplify-pointer-bitcast %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
@@ -8,13 +6,13 @@ target triple = "spir-unknown-unknown"
 
 ; CHECK: @fct1
 ; CHECK-NEXT: entry:
-; CHECK-NEXT:   [[gep:%[^ ]+]] = getelementptr { i16, i16, i32, i8, i8, i16, float }, ptr addrspace(1) %a, i32 0, i32 3
-; CHECK-NEXT:   getelementptr i8, ptr addrspace(1) [[gep]], i32 3
+; CHECK-NEXT:   [[gep:%[^ ]+]] = getelementptr { i16, i16, i32, i8, i8, i16, float }, ptr addrspace(1) %a, i32 0, i32 6
+; CHECK-NOT:   getelementptr i8, ptr addrspace(1) [[gep]], i32 4
 
 define spir_kernel void @fct1(ptr addrspace(1) %a) {
 entry:
   %0 = getelementptr {i16, i16, i32, i8, i8, i16, float}, ptr addrspace(1) %a, i32 0, i32 3
-  %1 = getelementptr i8, ptr addrspace(1) %0, i32 3
+  %1 = getelementptr i8, ptr addrspace(1) %0, i32 4
   ret void
 }
 
