@@ -78,8 +78,9 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           Value *&DynVal, size_t &SmallerBitWidths);
 
 int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
-                              IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
-                              int64_t Offset, SmallVector<Value *, 2> *Idxs);
+                              IRBuilder<> &Builder, Type *InitialTy, Type *Ty,
+                              Type *TargetTy, int64_t Offset,
+                              SmallVector<Value *, 2> *Idxs);
 
 bool IsClspvResourceOrLocal(Value *val);
 

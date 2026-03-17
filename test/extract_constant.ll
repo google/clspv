@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll --passes=spirv-producer --producer-out-file %t.spv
+; RUN: clspv-opt %s -o %t.ll --passes=inline-entry-points-pass
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: @array = global [8 x i8] zeroinitializer

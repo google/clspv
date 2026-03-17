@@ -1274,11 +1274,9 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
 }
 
 int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
-                              IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
-                              int64_t Offset, SmallVector<Value *, 2> *Idxs) {
-#ifndef NDEBUG
-  Type *SrcTy = Ty;
-#endif
+                              IRBuilder<> &Builder, Type *InitialTy, Type *Ty,
+                              Type *TargetTy, int64_t Offset,
+                              SmallVector<Value *, 2> *Idxs) {
   if (!(Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy())) {
     auto size = SizeInBits(DataLayout, Ty);
     if (Idxs) {
@@ -1319,7 +1317,7 @@ int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
       Offset %= (int64_t)size;
     }
     assert(Idxs == nullptr ||
-           GetElementPtrInst::getIndexedType(SrcTy, *Idxs) == Ty);
+           GetElementPtrInst::getIndexedType(InitialTy, *Idxs) == Ty);
   }
   return Offset;
 }
@@ -1359,6 +1357,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   }
 
   unsigned steps;
+  Type *InitialSrcTy = SrcTy;
   SrcTy = reworkUnsizedType(DataLayout, SrcTy, &steps);
   DstTy = reworkUnsizedType(DataLayout, DstTy);
   for (unsigned i = Idxs.size(); i < steps; i++) {
@@ -1383,8 +1382,8 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
       Idxs.push_back(Builder.getInt32(CstVal / (int64_t)size));
       CstVal %= (int64_t)size;
     }
-    CstVal =
-        GoThroughTypeAtOffset(DataLayout, Builder, Ty, DstTy, CstVal, &Idxs);
+    CstVal = GoThroughTypeAtOffset(DataLayout, Builder, InitialSrcTy, SrcTy,
+                                   DstTy, CstVal, &Idxs);
     if (CstVal != 0) {
       errs() << "Err: SrcTy = ";
       SrcTy->print(errs());

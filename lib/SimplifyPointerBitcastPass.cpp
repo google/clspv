@@ -747,7 +747,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
                            SmallerBitWidths);
 
       if (DynVal == nullptr &&
-          GoThroughTypeAtOffset(DL, Builder, src_ty, nullptr,
+          GoThroughTypeAtOffset(DL, Builder, src_ty, src_ty, nullptr,
                                 CstVal * SmallerBitWidths, nullptr) != 0) {
         src = src_gep->getPointerOperand();
         src_ty = inst_gep->getSourceElementType();
