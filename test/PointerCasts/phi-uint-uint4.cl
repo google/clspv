@@ -1,5 +1,3 @@
-// https://github.com/google/clspv/issues/1570
-// XFAIL: *
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0

@@ -531,7 +531,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
                    SizeInBits(DL, dest_ty) < SizeInBits(DL, source_ty)) {
           GEPBeforeLoadList.push_back(dyn_cast<LoadInst>(&I));
         } else if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
-          if (IsClspvResourceOrLocal(gep->getPointerOperand())) {
+          if (IsClspvResourceOrLocal(gep->getPointerOperand()) ||
+              gep->getResultElementType() == source_ty) {
             GEPCastList.push_back(dyn_cast<GetElementPtrInst>(&I));
           } else if (IsGVConstantGEP(gep)) {
             GEPGVList.push_back(dyn_cast<GetElementPtrInst>(&I));
