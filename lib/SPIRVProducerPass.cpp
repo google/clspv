@@ -420,6 +420,18 @@ struct SPIRVProducerPassImpl {
   // Lookup or create pointer type.
   //
   // Returns the SPIRVID of the pointer type.
+  // Return the pointer address space of |v|. If |v| is in
+  // GlobalConstArgumentSet, then the address space is ModuleScopePrivate.
+  unsigned GetPointerAddressSpace(Value *v) {
+    if (v->getType()->isPointerTy()) {
+      if (getGlobalConstArgSet().count(v)) {
+        return AddressSpace::ModuleScopePrivate;
+      }
+      return v->getType()->getPointerAddressSpace();
+    }
+    return 0;
+  }
+
   SPIRVID getSPIRVPointerType(Type *PtrTy, Type *DataTy);
 
   // Lookup or create function type.
@@ -5595,6 +5607,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       // Use pointer type with private address space for global constant.
       ResultType = PointerType::get(module->getContext(),
                                     AddressSpace::ModuleScopePrivate);
+      GlobalConstArgSet.insert(GEP);
     }
 
     const bool untyped =
@@ -5745,7 +5758,14 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     // Find SPIRV instruction for parameter type.
     auto Ty = I.getType();
+    auto &GlobalConstArgSet = getGlobalConstArgSet();
     if (Ty->isPointerTy()) {
+      if (GlobalConstArgSet.count(I.getOperand(1)) ||
+          GlobalConstArgSet.count(I.getOperand(2))) {
+        Ty = PointerType::get(module->getContext(),
+                              AddressSpace::ModuleScopePrivate);
+        GlobalConstArgSet.insert(&I);
+      }
       // Selecting between pointers requires variable pointers.
       setVariablePointersCapabilities(Ty->getPointerAddressSpace());
       if (!hasVariablePointers() && !selectFromSameObject(&I)) {
@@ -6178,7 +6198,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     if (LD->getType()->isPointerTy()) {
       // Loading a pointer requires variable pointers.
-      setVariablePointersCapabilities(LD->getType()->getPointerAddressSpace());
+      setVariablePointersCapabilities(GetPointerAddressSpace(LD));
     }
 
     SPIRVID PointerID = getSPIRVValue(LD->getPointerOperand(), LD->getType());
@@ -6210,12 +6230,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // TODO: Do we need to implement Optional Memory Access???
 
     auto ptr = LD->getPointerOperand();
-    auto ptr_ty = ptr->getType();
     SPIRVID result_type_id;
     if (LD->getType()->isPointerTy()) {
       result_type_id = getSPIRVType(LD->getType());
     } else {
-      auto layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
+      auto layout = PointerRequiresLayout(GetPointerAddressSpace(ptr));
       result_type_id = getSPIRVType(LD->getType(), layout);
     }
     SPIRVOperandVec Ops;
@@ -6243,15 +6262,14 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     if (ST->getValueOperand()->getType()->isPointerTy()) {
       // Storing a pointer requires variable pointers.
       setVariablePointersCapabilities(
-          ST->getValueOperand()->getType()->getPointerAddressSpace());
+          GetPointerAddressSpace(ST->getValueOperand()));
     }
 
     SPIRVOperandVec Ops;
     auto ptr = ST->getPointerOperand();
-    auto ptr_ty = ptr->getType();
     auto value = ST->getValueOperand();
     auto value_ty = value->getType();
-    auto needs_layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
+    auto needs_layout = PointerRequiresLayout(GetPointerAddressSpace(ptr));
     if (needs_layout && (value_ty->isArrayTy() || value_ty->isStructTy())) {
       RID = ChangeLayout(getSPIRVValue(value), value_ty,
                          /* removeLayout = */ false);
@@ -6482,10 +6500,19 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
-      if (PHI->getType()->isPointerTy()) {
+      auto PHITy = PHI->getType();
+      auto &GlobalConstArgSet = getGlobalConstArgSet();
+      if (PHITy->isPointerTy()) {
+        for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
+          if (GlobalConstArgSet.count(PHI->getIncomingValue(j))) {
+            PHITy = PointerType::get(module->getContext(),
+                                     AddressSpace::ModuleScopePrivate);
+            GlobalConstArgSet.insert(PHI);
+            break;
+          }
+        }
         // OpPhi on pointers requires variable pointers.
-        setVariablePointersCapabilities(
-            PHI->getType()->getPointerAddressSpace());
+        setVariablePointersCapabilities(PHITy->getPointerAddressSpace());
         if (!hasVariablePointers() && !selectFromSameObject(PHI)) {
           setVariablePointers();
         }
@@ -6499,11 +6526,11 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       SPIRVOperandVec Ops;
 
       Type *TyHint = PHI->getType();
-      if (PHI->getType()->isPointerTy()) {
+      if (PHITy->isPointerTy()) {
         TyHint = InferType(PHI, module->getContext(), &InferredTypeCache);
-        Ops << getSPIRVPointerType(PHI->getType(), TyHint);
+        Ops << getSPIRVPointerType(PHITy, TyHint);
       } else {
-        Ops << PHI->getType();
+        Ops << PHITy;
       }
 
       for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
@@ -6579,8 +6606,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
           // variable pointers.
           if (operand_type->isPointerTy() && !IsImageType(struct_ty) &&
               !IsSamplerType(struct_ty)) {
-            auto sc =
-                GetStorageClass(operand->getType()->getPointerAddressSpace());
+            auto sc = GetStorageClass(GetPointerAddressSpace(operand));
             if (sc == spv::StorageClassStorageBuffer) {
               // Passing SSBO by reference requires variable pointers storage
               // buffer.
