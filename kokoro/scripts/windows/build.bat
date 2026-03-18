@@ -18,6 +18,7 @@ set BUILD_ROOT=%cd%
 set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
 set VS_VERSION=%2
+set BUILD=%SRC%\build
 
 :: Use updated CMake
 set PATH=c:\cmake-3.31.2\bin;%PATH%
@@ -25,20 +26,33 @@ set PATH=c:\cmake-3.31.2\bin;%PATH%
 :: Use updated Python
 set PATH=c:\Python312;%PATH%
 
+:: Install LLVM
+choco install -y llvm
+set LLVM_BIN_PATH=c:\Program Files\LLVM\bin
+set "CC=%LLVM_BIN_PATH%\clang.exe"
+set "CXX=%LLVM_BIN_PATH%\clang++.exe"
+
+:: Upgrade ninja
+choco upgrade -y ninja
+ninja --version
+
+:: VcVarsAll call
+SET "VSWHERE_PATH=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+IF NOT EXIST "%VSWHERE_PATH%" (
+  ECHO "ERROR: vswhere.exe not found at %VSWHERE_PATH%"
+  EXIT /B 1
+)
+FOR /F "usebackq tokens=*" %%i IN (`"%VSWHERE_PATH%" -latest -property installationPath`) DO SET VS_INSTALL_PATH=%%i
+IF NOT DEFINED VS_INSTALL_PATH (
+  ECHO "ERROR: vswhere.exe did not find any Visual Studio installation."
+  EXIT /B 1
+)
+ECHO "Found Visual Studio at: %VS_INSTALL_PATH%"
+SET "VCVARSALL_PATH=%VS_INSTALL_PATH%\VC\Auxiliary\Build\vcvarsall.bat"
+CALL "%VCVARSALL_PATH%" x64
+
 cd %SRC%
 python utils/fetch_sources.py --ci
-
-:: #########################################
-:: set up msvc build env
-:: #########################################
-if %VS_VERSION% == 2022 (
-  set GENERATOR="Visual Studio 17 2022"
-  echo "Using VS 2022..."
-)
-
-cd %SRC%
-mkdir build
-cd build
 
 :: #########################################
 :: Start building.
@@ -50,24 +64,24 @@ if "%KOKORO_GITHUB_COMMIT%." == "." (
   set BUILD_SHA=%KOKORO_GITHUB_COMMIT%
 )
 
-cmake -G%GENERATOR% -DCMAKE_BUILD_TYPE=%BUILD_TYPE% .. -Thost=x64
+cmake -S %SRC% -B %BUILD% -G Ninja -DCMAKE_BUILD_TYPE=%BUILD_TYPE%
 
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 
 echo "Build everything... %DATE% %TIME%"
-cmake --build . --config %BUILD_TYPE%
+cmake --build %BUILD% --config %BUILD_TYPE%
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Build Completed %DATE% %TIME%"
 
 echo "Run tests... %DATE% %TIME%"
-cmake --build . --target check-spirv --config %BUILD_TYPE%
+cmake --build %BUILD% --target check-spirv --config %BUILD_TYPE%
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
-cmake --build . --target check-spirv-64 --config %BUILD_TYPE%
+cmake --build %BUILD% --target check-spirv-64 --config %BUILD_TYPE%
 if %ERRORLEVEL% GEQ 1 exit /b %ERRORLEVEL%
 echo "Tests Completed %DATE% %TIME%"
 
 :: Clean up some directories.
-rm -rf %SRC%\build
+rm -rf %BUILD%
 rm -rf %SRC%\third_party
 
 exit /b %ERRORLEVEL%
