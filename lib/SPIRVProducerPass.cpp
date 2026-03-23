@@ -420,6 +420,18 @@ struct SPIRVProducerPassImpl {
   // Lookup or create pointer type.
   //
   // Returns the SPIRVID of the pointer type.
+  // Return the pointer address space of |v|. If |v| is in
+  // GlobalConstArgumentSet, then the address space is ModuleScopePrivate.
+  unsigned GetPointerAddressSpace(Value *v) {
+    if (v->getType()->isPointerTy()) {
+      if (getGlobalConstArgSet().count(v)) {
+        return AddressSpace::ModuleScopePrivate;
+      }
+      return v->getType()->getPointerAddressSpace();
+    }
+    return 0;
+  }
+
   SPIRVID getSPIRVPointerType(Type *PtrTy, Type *DataTy);
 
   // Lookup or create function type.
@@ -642,7 +654,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID ChangeLayout(SPIRVID object, Type *type, bool removeLayout);
 
 private:
-  Module *module;
+  std::unique_ptr<Module> module;
 
   // Set of Capabilities required
   CapabilitySetType CapabilitySet;
@@ -868,7 +880,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   // yet create a new SPIRVProducer for every module.. For now only
   // allow 1 call.
   assert(module == nullptr);
-  module = &M;
+  module = CloneModule(M);
   if (ShowProducerIR) {
     llvm::outs() << *module << "\n";
   }
@@ -2902,7 +2914,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       // Ops[1] : Constant size for x/y/z dimension (Literal Number).
 
       // Allocate spec constants for workgroup size.
-      clspv::AddWorkgroupSpecConstants(module);
+      clspv::AddWorkgroupSpecConstants(module.get());
 
       SPIRVOperandVec Ops;
       SPIRVID result_type_id = getSPIRVType(
@@ -2961,7 +2973,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : target
     // Ops[1] : decoration
     // Ops[2] : SpecId
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kWorkDim);
+    auto spec_id = AllocateSpecConstant(module.get(), SpecConstant::kWorkDim);
     Ops.clear();
     Ops << InitializerID << spv::DecorationSpecId << spec_id;
 
@@ -2996,17 +3008,18 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[1] : decoration
     // Ops[2] : SpecId
     //
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetX);
+    auto spec_id =
+        AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetX);
     Ops.clear();
     Ops << x_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetY);
+    spec_id = AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetY);
     Ops.clear();
     Ops << y_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    spec_id = AllocateSpecConstant(module, SpecConstant::kGlobalOffsetZ);
+    spec_id = AllocateSpecConstant(module.get(), SpecConstant::kGlobalOffsetZ);
     Ops.clear();
     Ops << z_id << spv::DecorationSpecId << spec_id;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -3042,7 +3055,8 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     // Ops[0] : target
     // Ops[1] : decoration
     // Ops[2] : SpecId
-    auto spec_id = AllocateSpecConstant(module, SpecConstant::kSubgroupMaxSize);
+    auto spec_id =
+        AllocateSpecConstant(module.get(), SpecConstant::kSubgroupMaxSize);
     Ops.clear();
     Ops << InitializerID << spv::DecorationSpecId << spec_id;
 
@@ -3172,7 +3186,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
     } else {
       // This module scope constant is initialized from a storage buffer with
       // data provided by the host at binding 0 of the next descriptor set.
-      const uint32_t descriptor_set = TakeDescriptorIndex(module);
+      const uint32_t descriptor_set = TakeDescriptorIndex(module.get());
 
       // Reflection instruction for constant data.
       Ops << getSPIRVType(Type::getVoidTy(module->getContext()))
@@ -3193,7 +3207,7 @@ void SPIRVProducerPassImpl::GenerateGlobalVar(GlobalVariable &GV) {
       addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
     }
   } else if (is_printf_buffer) {
-    const uint32_t descriptor_set = TakeDescriptorIndex(module);
+    const uint32_t descriptor_set = TakeDescriptorIndex(module.get());
     SPIRVOperandVec Ops;
     Ops << var_id << spv::DecorationDescriptorSet << descriptor_set;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
@@ -5595,6 +5609,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       // Use pointer type with private address space for global constant.
       ResultType = PointerType::get(module->getContext(),
                                     AddressSpace::ModuleScopePrivate);
+      GlobalConstArgSet.insert(GEP);
     }
 
     const bool untyped =
@@ -5745,7 +5760,14 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     // Find SPIRV instruction for parameter type.
     auto Ty = I.getType();
+    auto &GlobalConstArgSet = getGlobalConstArgSet();
     if (Ty->isPointerTy()) {
+      if (GlobalConstArgSet.count(I.getOperand(1)) ||
+          GlobalConstArgSet.count(I.getOperand(2))) {
+        Ty = PointerType::get(module->getContext(),
+                              AddressSpace::ModuleScopePrivate);
+        GlobalConstArgSet.insert(&I);
+      }
       // Selecting between pointers requires variable pointers.
       setVariablePointersCapabilities(Ty->getPointerAddressSpace());
       if (!hasVariablePointers() && !selectFromSameObject(&I)) {
@@ -6129,7 +6151,8 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     }
     break;
   }
-  case Instruction::Br: {
+  case Instruction::CondBr:
+  case Instruction::UncondBr: {
     // Branch instruction is deferred because it needs label's ID.
     BasicBlock *BrBB = I.getParent();
     if (ContinueBlocks.count(BrBB) || MergeBlocks.count(BrBB)) {
@@ -6177,7 +6200,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     if (LD->getType()->isPointerTy()) {
       // Loading a pointer requires variable pointers.
-      setVariablePointersCapabilities(LD->getType()->getPointerAddressSpace());
+      setVariablePointersCapabilities(GetPointerAddressSpace(LD));
     }
 
     SPIRVID PointerID = getSPIRVValue(LD->getPointerOperand(), LD->getType());
@@ -6209,12 +6232,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // TODO: Do we need to implement Optional Memory Access???
 
     auto ptr = LD->getPointerOperand();
-    auto ptr_ty = ptr->getType();
     SPIRVID result_type_id;
     if (LD->getType()->isPointerTy()) {
       result_type_id = getSPIRVType(LD->getType());
     } else {
-      auto layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
+      auto layout = PointerRequiresLayout(GetPointerAddressSpace(ptr));
       result_type_id = getSPIRVType(LD->getType(), layout);
     }
     SPIRVOperandVec Ops;
@@ -6242,15 +6264,14 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     if (ST->getValueOperand()->getType()->isPointerTy()) {
       // Storing a pointer requires variable pointers.
       setVariablePointersCapabilities(
-          ST->getValueOperand()->getType()->getPointerAddressSpace());
+          GetPointerAddressSpace(ST->getValueOperand()));
     }
 
     SPIRVOperandVec Ops;
     auto ptr = ST->getPointerOperand();
-    auto ptr_ty = ptr->getType();
     auto value = ST->getValueOperand();
     auto value_ty = value->getType();
-    auto needs_layout = PointerRequiresLayout(ptr_ty->getPointerAddressSpace());
+    auto needs_layout = PointerRequiresLayout(GetPointerAddressSpace(ptr));
     if (needs_layout && (value_ty->isArrayTy() || value_ty->isStructTy())) {
       RID = ChangeLayout(getSPIRVValue(value), value_ty,
                          /* removeLayout = */ false);
@@ -6481,10 +6502,19 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
     } else if (PHINode *PHI = dyn_cast<PHINode>(Inst)) {
-      if (PHI->getType()->isPointerTy()) {
+      auto PHITy = PHI->getType();
+      auto &GlobalConstArgSet = getGlobalConstArgSet();
+      if (PHITy->isPointerTy()) {
+        for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
+          if (GlobalConstArgSet.count(PHI->getIncomingValue(j))) {
+            PHITy = PointerType::get(module->getContext(),
+                                     AddressSpace::ModuleScopePrivate);
+            GlobalConstArgSet.insert(PHI);
+            break;
+          }
+        }
         // OpPhi on pointers requires variable pointers.
-        setVariablePointersCapabilities(
-            PHI->getType()->getPointerAddressSpace());
+        setVariablePointersCapabilities(PHITy->getPointerAddressSpace());
         if (!hasVariablePointers() && !selectFromSameObject(PHI)) {
           setVariablePointers();
         }
@@ -6498,11 +6528,11 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       SPIRVOperandVec Ops;
 
       Type *TyHint = PHI->getType();
-      if (PHI->getType()->isPointerTy()) {
+      if (PHITy->isPointerTy()) {
         TyHint = InferType(PHI, module->getContext(), &InferredTypeCache);
-        Ops << getSPIRVPointerType(PHI->getType(), TyHint);
+        Ops << getSPIRVPointerType(PHITy, TyHint);
       } else {
-        Ops << PHI->getType();
+        Ops << PHITy;
       }
 
       for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
@@ -6578,8 +6608,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
           // variable pointers.
           if (operand_type->isPointerTy() && !IsImageType(struct_ty) &&
               !IsSamplerType(struct_ty)) {
-            auto sc =
-                GetStorageClass(operand->getType()->getPointerAddressSpace());
+            auto sc = GetStorageClass(GetPointerAddressSpace(operand));
             if (sc == spv::StorageClassStorageBuffer) {
               // Passing SSBO by reference requires variable pointers storage
               // buffer.
@@ -7439,7 +7468,7 @@ void SPIRVProducerPassImpl::GenerateSpecConstantReflection() {
   uint32_t global_offset_id[3] = {kMax, kMax, kMax};
   uint32_t work_dim_id = kMax;
   uint32_t subgroup_max_size_id = kMax;
-  for (auto pair : clspv::GetSpecConstants(module)) {
+  for (auto pair : clspv::GetSpecConstants(module.get())) {
     auto kind = pair.first;
     auto id = pair.second;
 

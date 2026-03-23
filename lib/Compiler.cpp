@@ -645,8 +645,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     // See https://github.com/google/clspv/issues/71
     pm.addPass(clspv::HideConstantLoadsPass());
 
+    pm.addPass(clspv::StructurizeGEPPass());
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
+    pm.addPass(clspv::DestructurizeGEPPass());
 
     pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
     pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
@@ -671,17 +673,21 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
 
     // InstructionCombining pass folds bitcast and gep instructions which are
     // not supported by Vulkan SPIR-V.
+    pm.addPass(clspv::StructurizeGEPPass());
     pm.addPass(
         llvm::createModuleToFunctionPassAdaptor(llvm::InstCombinePass()));
+    pm.addPass(clspv::DestructurizeGEPPass());
 
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(
         llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+    pm.addPass(clspv::StructurizeGEPPass());
   });
 
   // Run the following passes after the default LLVM pass pipeline.
   pb.registerOptimizerLastEPCallback([binaryStream](llvm::ModulePassManager &pm,
                                                     llvm::OptimizationLevel,
                                                     llvm::ThinOrFullLTOPhase) {
+    pm.addPass(clspv::DestructurizeGEPPass());
     // No point attempting to handle freeze currently so strip them from the
     // IR.
     pm.addPass(clspv::StripFreezePass());

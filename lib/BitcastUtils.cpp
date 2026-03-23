@@ -1219,6 +1219,19 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
   return false;
 }
 
+void ExtractOffsetFromStruct(const DataLayout &DataLayout, ConstantInt *Cst,
+                             StructType *STy, int64_t &CstVal,
+                             size_t &SmallerBitWidths) {
+  auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
+      Cst->getZExtValue());
+  if (offset % SmallerBitWidths != 0) {
+    CstVal = (CstVal * (int64_t)SmallerBitWidths + offset) / CHAR_BIT;
+    SmallerBitWidths = CHAR_BIT;
+  } else {
+    CstVal += offset / SmallerBitWidths;
+  }
+}
+
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, int64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths) {
@@ -1240,17 +1253,7 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
     if (STy && i != 0) {
       auto Cst = dyn_cast<ConstantInt>(Op);
       assert(Cst);
-      auto offset = DataLayout.getStructLayout(STy)->getElementOffsetInBits(
-          Cst->getZExtValue());
-      if (offset % SmallerBitWidths != 0) {
-        CstVal = (CstVal * (int64_t)SmallerBitWidths + offset) / CHAR_BIT;
-        if (DynVal) {
-          DynVal = CreateMul(Builder, SmallerBitWidths / CHAR_BIT, DynVal);
-        }
-        SmallerBitWidths = CHAR_BIT;
-      } else {
-        CstVal += offset / SmallerBitWidths;
-      }
+      ExtractOffsetFromStruct(DataLayout, Cst, STy, CstVal, SmallerBitWidths);
     } else {
       auto size =
           SizeInBits(DataLayout, reworkUnsizedType(DataLayout, NextTy)) /
@@ -1271,11 +1274,9 @@ void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
 }
 
 int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
-                              IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
-                              int64_t Offset, SmallVector<Value *, 2> *Idxs) {
-#ifndef NDEBUG
-  Type *SrcTy = Ty;
-#endif
+                              IRBuilder<> &Builder, Type *InitialTy, Type *Ty,
+                              Type *TargetTy, int64_t Offset,
+                              SmallVector<Value *, 2> *Idxs) {
   if (!(Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy())) {
     auto size = SizeInBits(DataLayout, Ty);
     if (Idxs) {
@@ -1293,7 +1294,9 @@ int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
   }
   while ((Ty->isVectorTy() || Ty->isArrayTy() || Ty->isStructTy()) &&
          (TargetTy == nullptr ||
-          SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy))) {
+          SizeInBits(DataLayout, Ty) > SizeInBits(DataLayout, TargetTy) ||
+          (Ty != TargetTy &&
+           SizeInBits(DataLayout, Ty) == SizeInBits(DataLayout, TargetTy)))) {
     if (auto STy = dyn_cast<StructType>(Ty)) {
       auto SLayout = DataLayout.getStructLayout(STy);
       auto SId = SLayout->getElementContainingOffset(Offset / CHAR_BIT);
@@ -1314,7 +1317,7 @@ int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
       Offset %= (int64_t)size;
     }
     assert(Idxs == nullptr ||
-           GetElementPtrInst::getIndexedType(SrcTy, *Idxs) == Ty);
+           GetElementPtrInst::getIndexedType(InitialTy, *Idxs) == Ty);
   }
   return Offset;
 }
@@ -1354,6 +1357,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
   }
 
   unsigned steps;
+  Type *InitialSrcTy = SrcTy;
   SrcTy = reworkUnsizedType(DataLayout, SrcTy, &steps);
   DstTy = reworkUnsizedType(DataLayout, DstTy);
   for (unsigned i = Idxs.size(); i < steps; i++) {
@@ -1378,8 +1382,8 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
       Idxs.push_back(Builder.getInt32(CstVal / (int64_t)size));
       CstVal %= (int64_t)size;
     }
-    CstVal =
-        GoThroughTypeAtOffset(DataLayout, Builder, Ty, DstTy, CstVal, &Idxs);
+    CstVal = GoThroughTypeAtOffset(DataLayout, Builder, InitialSrcTy, SrcTy,
+                                   DstTy, CstVal, &Idxs);
     if (CstVal != 0) {
       errs() << "Err: SrcTy = ";
       SrcTy->print(errs());

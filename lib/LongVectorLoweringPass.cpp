@@ -102,6 +102,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::fma:
   case Intrinsic::fmuladd:
   case Intrinsic::fshl:
+  case Intrinsic::fshr:
   case Intrinsic::log:
   case Intrinsic::smax:
   case Intrinsic::umax:

@@ -70,13 +70,17 @@ bool FindAliasingContainedType(Type *ContainingTy, Type *TargetTy, int &Steps,
                                bool &PerfectMatch, const DataLayout &DL,
                                bool StrictStruct = false);
 
+void ExtractOffsetFromStruct(const DataLayout &DataLayout, ConstantInt *Cst,
+                             StructType *STy, int64_t &CstVal,
+                             size_t &SmallerBitWidths);
 void ExtractOffsetFromGEP(const DataLayout &DataLayout, IRBuilder<> &Builder,
                           GetElementPtrInst *GEP, int64_t &CstVal,
                           Value *&DynVal, size_t &SmallerBitWidths);
 
 int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
-                              IRBuilder<> &Builder, Type *Ty, Type *TargetTy,
-                              int64_t Offset, SmallVector<Value *, 2> *Idxs);
+                              IRBuilder<> &Builder, Type *InitialTy, Type *Ty,
+                              Type *TargetTy, int64_t Offset,
+                              SmallVector<Value *, 2> *Idxs);
 
 bool IsClspvResourceOrLocal(Value *val);
 

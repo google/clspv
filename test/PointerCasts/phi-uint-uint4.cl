@@ -1,5 +1,3 @@
-// b/445660270 https://github.com/google/clspv/issues/1524
-// XFAIL: *
 // RUN: clspv %s -o %t.spv
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
@@ -18,7 +16,7 @@
 
 void kernel foo(__global uint* buf, uint cst) {
     size_t gid = get_global_id(0);
-    __global uint4* buf4 = buf + gid * 4 * cst;
+    __global uint4* buf4 = (__global uint4*)(buf + gid * 4 * cst);
     uint acc = 0;
     do {
         acc += buf4[0].x;

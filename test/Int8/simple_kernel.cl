@@ -23,19 +23,18 @@ kernel void foo(global char* in, global char* out, int idx) {
 // CHECK-DAG: [[ptr:%[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer [[char]]
 // CHECK-DAG: [[zero:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 0
 // CHECK-DAG: [[one:%[a-zA-Z0-9_]+]] = OpConstant [[int]] 1
-// CHECK-64-DAG: [[one_long:%[a-zA-Z0-9_]+]] = OpConstant [[long]] 1
 // CHECK: [[bar:%[a-zA-Z0-9_]+]] = OpFunction [[char]]
 // CHECK: [[a:%[a-zA-Z0-9_]+]] = OpFunctionParameter [[char]]
 // CHECK: [[b:%[a-zA-Z0-9_]+]] = OpFunctionParameter [[char]]
 // CHECK: [[add:%[a-zA-Z0-9_]+]] = OpIAdd [[char]] [[b]] [[a]]
 // CHECK: OpReturnValue [[add]]
 // CHECK: OpFunction
-// CHECK-64: [[idx_long:%[a-zA-Z0-9_]+]] = OpSConvert [[long]] [[idx:%[a-zA-Z0-9_]+]]
-// CHECK-32-DAG: [[idx1:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[idx:%[a-zA-Z0-9_]+]] [[one]]
+// CHECK-DAG: [[idx1:%[a-zA-Z0-9_]+]] = OpIAdd [[int]] [[idx:%[a-zA-Z0-9_]+]] [[one]]
+// CHECK-64-DAG: [[idx_long:%[a-zA-Z0-9_]+]] = OpSConvert [[long]] [[idx:%[a-zA-Z0-9_]+]]
+// CHECK-64-DAG: [[idx1_long:%[a-zA-Z0-9_]+]] = OpSConvert [[long]] [[idx1:%[a-zA-Z0-9_]+]]
 // CHECK-64-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx_long]]
-// CHECK-32-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx]]
-// CHECK-64-DAG: [[idx1_long:%[a-zA-Z0-9_]+]] = OpIAdd [[long]] [[idx_long]] [[one_long]]
 // CHECK-64-DAG: [[gepy:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx1_long]]
+// CHECK-32-DAG: [[gepx:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx]]
 // CHECK-32-DAG: [[gepy:%[a-zA-Z0-9_]+]] = OpAccessChain [[ptr]] {{.*}} [[zero]] [[idx1]]
 // CHECK-DAG: [[ldx:%[a-zA-Z0-9_]+]] = OpLoad [[char]] [[gepx]]
 // CHECK-DAG: [[ldy:%[a-zA-Z0-9_]+]] = OpLoad [[char]] [[gepy]]
