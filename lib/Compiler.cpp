@@ -18,6 +18,7 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
@@ -309,6 +310,8 @@ int SetCompilerInstanceOptions(
     instance.getLangOpts().NativeHalfType = true;
     instance.getLangOpts().NativeHalfArgsAndReturns = true;
   }
+  instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getDynamic();
+  instance.getCodeGenOpts().FP32DenormalMode = llvm::DenormalMode::getDynamic();
   instance.getCodeGenOpts().StackRealignment = true;
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;

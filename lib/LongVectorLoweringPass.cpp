@@ -91,6 +91,7 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     break;
 
   case Intrinsic::abs:
+  case Intrinsic::canonicalize:
   case Intrinsic::ceil:
   case Intrinsic::copysign:
   case Intrinsic::cos:
