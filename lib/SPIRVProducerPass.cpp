@@ -5004,12 +5004,69 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     return addSPIRVInst(spv::OpCopyMemorySized, Ops);
   }
   case Intrinsic::canonicalize: {
-    // According to LLVM langref, this is always implementable as x * 1.0
+    // canonicalize(x) {
+    //   if (fabs(x) < flt_min)
+    //     return copysign(0.0, x);
+    //   else
+    //      return x;
+    // }
     auto val = Call->getArgOperand(0);
+    Type *InputTy = Call->getType();
+
+    auto getSameSizeIntegerTy = [](Type *FpTy) {
+      return Type::getIntNTy(FpTy->getContext(), FpTy->getScalarSizeInBits());
+    };
+    Type *IntegerTy;
+    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+      IntegerTy =
+          FixedVectorType::get(getSameSizeIntegerTy(VecTy->getElementType()),
+                               VecTy->getNumElements());
+    } else {
+      IntegerTy = getSameSizeIntegerTy(InputTy);
+    }
+
     SPIRVOperandVec Ops;
-    Ops << Call->getType() << val
-        << getSPIRVConstant(ConstantFP::get(Call->getType(), 1.0));
-    return addSPIRVInst(spv::OpFMul, Ops);
+    Ops << IntegerTy << val;
+    auto bitcast_val = addSPIRVInst(spv::OpBitcast, Ops);
+
+    APInt sign_mask_val = APInt::getSignMask(InputTy->getScalarSizeInBits());
+    Constant *SignMask =
+        ConstantInt::get(IntegerTy->getScalarType(), sign_mask_val);
+    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+      SignMask = ConstantVector::getSplat(VecTy->getElementCount(), SignMask);
+    }
+
+    Ops.clear();
+    Ops << IntegerTy << bitcast_val << SignMask;
+    auto copysign_zero_int = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+
+    Ops.clear();
+    Ops << InputTy << copysign_zero_int;
+    auto copysign_zero = addSPIRVInst(spv::OpBitcast, Ops);
+
+    auto abs_val = GenerateFabs(val);
+
+    auto flt_min_ap = llvm::APFloat::getSmallestNormalized(
+        InputTy->getScalarType()->getFltSemantics());
+    Constant *flt_min_cnst =
+        ConstantFP::get(InputTy->getScalarType(), flt_min_ap);
+    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+      flt_min_cnst =
+          ConstantVector::getSplat(VecTy->getElementCount(), flt_min_cnst);
+    }
+
+    Type *BoolTy = Type::getInt1Ty(Context);
+    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+      BoolTy = FixedVectorType::get(BoolTy, VecTy->getNumElements());
+    }
+
+    Ops.clear();
+    Ops << BoolTy << abs_val << flt_min_cnst;
+    auto cmp = addSPIRVInst(spv::OpFOrdLessThan, Ops);
+
+    Ops.clear();
+    Ops << InputTy << cmp << copysign_zero << val;
+    return addSPIRVInst(spv::OpSelect, Ops);
   }
 
   default:
