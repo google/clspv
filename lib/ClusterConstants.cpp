@@ -152,7 +152,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
 
           auto getTypeAndPtr = [&clustered_gv, &M, &Builder, &type, &ptr_type,
                                 &zero](Type *&PointeeType, Value *&Ptr,
-                                       llvm::BranchInst::InstListType::iterator
+                                       llvm::Instruction::InstListType::iterator
                                            InsertBefore) {
             if (clspv::Option::PhysicalStorageBuffers()) {
               auto *bb = InsertBefore->getParent();
