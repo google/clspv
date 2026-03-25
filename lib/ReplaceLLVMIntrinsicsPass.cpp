@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/APFloat.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -148,17 +149,104 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCallsWithValue(
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
-  return replaceCallsWithValue(F, [](CallInst *call) {
-    auto mask = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-    Value *result = nullptr;
+  return replaceCallsWithValue(F, [](CallInst *call) -> Value * {
+    Value *val = call->getArgOperand(0);
+    uint64_t mask = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
+
+    Type *ty = val->getType();
+    Type *scalarTy = ty->getScalarType();
+    unsigned bitWidth = scalarTy->getPrimitiveSizeInBits();
+
     IRBuilder<> builder(call);
-    // TODO(#1307): handle other codes
-    if (mask & 0x40) {
-      return builder.CreateFCmpOEQ(
-          call->getArgOperand(0),
-          Constant::getNullValue(call->getArgOperand(0)->getType()));
+
+    // Setup Types and Constants for Bit-Manipulation
+    Type *intScalarTy = builder.getIntNTy(bitWidth);
+    Type *intTy = intScalarTy;
+    Value *result = ConstantInt::get(builder.getInt1Ty(), 0);
+    if (ty->isVectorTy()) {
+      intTy =
+          VectorType::get(intScalarTy, cast<VectorType>(ty)->getElementCount());
+      result = ConstantAggregateZero::get(VectorType::get(
+          builder.getInt1Ty(), cast<VectorType>(ty)->getElementCount()));
     }
-    assert(false);
+    Value *bitCast = builder.CreateBitCast(val, intTy);
+
+    // Extract Components
+    const fltSemantics &semantics = scalarTy->getFltSemantics();
+    unsigned sigWidth = APFloat::semanticsPrecision(semantics) - 1;
+    unsigned expWidth = bitWidth - sigWidth - 1;
+
+    Value *signBit =
+        builder.CreateLShr(bitCast, ConstantInt::get(intTy, bitWidth - 1));
+    Value *isNeg = builder.CreateICmpEQ(signBit, ConstantInt::get(intTy, 1));
+    Value *isPos = builder.CreateICmpEQ(signBit, ConstantInt::get(intTy, 0));
+
+    uint64_t expMaskVal = ((1ULL << expWidth) - 1) << sigWidth;
+    uint64_t sigMaskVal = (1ULL << sigWidth) - 1;
+
+    Value *exp =
+        builder.CreateAnd(bitCast, ConstantInt::get(intTy, expMaskVal));
+    Value *sig =
+        builder.CreateAnd(bitCast, ConstantInt::get(intTy, sigMaskVal));
+
+    Value *expAllOnes = ConstantInt::get(intTy, expMaskVal);
+    Value *expZero = ConstantInt::get(intTy, 0);
+    Value *sigZero = ConstantInt::get(intTy, 0);
+
+    // Classification Logic
+    auto addCheck = [&](Value *check) {
+      result = builder.CreateOr(result, check);
+    };
+
+    // NaN (0x01 | 0x02)
+    if (mask & 0x0003) {
+      addCheck(builder.CreateAnd(builder.CreateICmpEQ(exp, expAllOnes),
+                                 builder.CreateICmpNE(sig, sigZero)));
+    }
+    // Infinity (0x04 | 0x200)
+    if (mask & 0x0204) {
+      Value *isInf = builder.CreateAnd(builder.CreateICmpEQ(exp, expAllOnes),
+                                       builder.CreateICmpEQ(sig, sigZero));
+      if ((mask & 0x0004) && (mask & 0x0200))
+        addCheck(isInf);
+      else if (mask & 0x0004)
+        addCheck(builder.CreateAnd(isInf, isNeg));
+      else
+        addCheck(builder.CreateAnd(isInf, isPos));
+    }
+    // Zero (0x20 | 0x40)
+    if (mask & 0x0060) {
+      Value *isZero = builder.CreateAnd(builder.CreateICmpEQ(exp, expZero),
+                                        builder.CreateICmpEQ(sig, sigZero));
+      if ((mask & 0x0020) && (mask & 0x0040))
+        addCheck(isZero);
+      else if (mask & 0x0020)
+        addCheck(builder.CreateAnd(isZero, isNeg));
+      else
+        addCheck(builder.CreateAnd(isZero, isPos));
+    }
+    // Subnormal (0x10 | 0x80)
+    if (mask & 0x0090) {
+      Value *isSub = builder.CreateAnd(builder.CreateICmpEQ(exp, expZero),
+                                       builder.CreateICmpNE(sig, sigZero));
+      if ((mask & 0x0010) && (mask & 0x0080))
+        addCheck(isSub);
+      else if (mask & 0x0010)
+        addCheck(builder.CreateAnd(isSub, isNeg));
+      else
+        addCheck(builder.CreateAnd(isSub, isPos));
+    }
+    // Normal (0x08 | 0x100)
+    if (mask & 0x0108) {
+      Value *isNorm = builder.CreateAnd(builder.CreateICmpNE(exp, expZero),
+                                        builder.CreateICmpNE(exp, expAllOnes));
+      if ((mask & 0x0008) && (mask & 0x0100))
+        addCheck(isNorm);
+      else if (mask & 0x0008)
+        addCheck(builder.CreateAnd(isNorm, isNeg));
+      else
+        addCheck(builder.CreateAnd(isNorm, isPos));
+    }
     return result;
   });
 }
