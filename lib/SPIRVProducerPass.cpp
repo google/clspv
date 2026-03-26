@@ -6498,9 +6498,9 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       Placeholder = DeferredInsts[i].second;
     };
 
-    if (BranchInst *Br = dyn_cast<BranchInst>(Inst)) {
+    if (isa<CondBrInst>(Inst) || isa<UncondBrInst>(Inst)) {
       // Check whether this branch needs to be preceeded by merge instruction.
-      BasicBlock *BrBB = Br->getParent();
+      BasicBlock *BrBB = dyn_cast<Instruction>(Inst)->getParent();
       if (ContinueBlocks.count(BrBB)) {
         //
         // Generate OpLoopMerge.
@@ -6533,7 +6533,7 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         nextDeferred();
       }
 
-      if (Br->isConditional()) {
+      if (auto *CondBr = dyn_cast_or_null<CondBrInst>(Inst)) {
         //
         // Generate OpBranchConditional.
         //
@@ -6543,18 +6543,20 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         // Ops[3] ... Ops[n] = Branch weights (Literal Number)
         SPIRVOperandVec Ops;
 
-        Ops << Br->getCondition() << Br->getSuccessor(0) << Br->getSuccessor(1);
+        Ops << CondBr->getCondition() << CondBr->getSuccessor(0)
+            << CondBr->getSuccessor(1);
 
         replaceSPIRVInst(Placeholder, spv::OpBranchConditional, Ops);
 
       } else {
+        auto *UncondBr = dyn_cast<UncondBrInst>(Inst);
         //
         // Generate OpBranch.
         //
         // Ops[0] = Target Label ID
         SPIRVOperandVec Ops;
 
-        Ops << Br->getSuccessor(0);
+        Ops << UncondBr->getSuccessor(0);
 
         replaceSPIRVInst(Placeholder, spv::OpBranch, Ops);
       }
@@ -7347,7 +7349,6 @@ void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
 
     for (auto BB : order) {
       auto terminator = BB->getTerminator();
-      auto branch = dyn_cast<BranchInst>(terminator);
       if (LI.isLoopHeader(BB)) {
         auto L = LI.getLoopFor(BB);
         BasicBlock *ContinueBB = nullptr;
@@ -7392,7 +7393,7 @@ void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
         ContinueBlocks[BB] = ContinueBB;
         LoopMergesAndContinues.insert(MergeBB);
         LoopMergesAndContinues.insert(ContinueBB);
-      } else if (branch && branch->isConditional()) {
+      } else if (auto *cond_branch = dyn_cast_or_null<CondBrInst>(terminator)) {
         auto L = LI.getLoopFor(BB);
         bool HasBackedge = false;
         while (L && !HasBackedge) {
@@ -7405,8 +7406,8 @@ void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
         if (!HasBackedge) {
           // Only need a merge if the branch doesn't include a loop break or
           // continue.
-          auto true_bb = branch->getSuccessor(0);
-          auto false_bb = branch->getSuccessor(1);
+          auto true_bb = cond_branch->getSuccessor(0);
+          auto false_bb = cond_branch->getSuccessor(1);
           if (!LoopMergesAndContinues.count(true_bb) &&
               !LoopMergesAndContinues.count(false_bb)) {
             // StructurizeCFG pass already manipulated CFG. Just use false block

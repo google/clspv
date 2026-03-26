@@ -102,8 +102,8 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
     }
 
     // Header is a conditional branch.
-    auto header_terminator = dyn_cast_or_null<BranchInst>(BB->getTerminator());
-    if (!header_terminator || !header_terminator->isConditional()) {
+    auto header_terminator = dyn_cast_or_null<CondBrInst>(BB->getTerminator());
+    if (!header_terminator) {
       continue;
     }
 
@@ -127,15 +127,13 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
       continue;
     }
 
-    auto *latch_terminator =
-        dyn_cast_or_null<BranchInst>(latch->getTerminator());
-    if (!latch_terminator)
-      continue;
+    auto *latch_terminator = latch->getTerminator();
 
     // Break the latch such that it is a single-entry single-exit block.
     // This will force later transforms in this fixup to break the loop header
     // which puts the whole loop body as a selection.
-    if (latch_terminator->isConditional()) {
+    if (auto *cond_latch_terminator =
+            dyn_cast_or_null<CondBrInst>(latch_terminator)) {
       // Safety valve: if this is not an exiting block then the loop is not
       // structured as expected.
       if (!loop->isLoopExiting(latch)) {
@@ -147,20 +145,21 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
       // continue and thence to the header.
       auto new_latch =
           BasicBlock::Create(F.getContext(), "", &F, latch->getNextNode());
-      BranchInst::Create(BB, new_latch);
+      UncondBrInst::Create(BB, new_latch);
       loop->addBlockEntry(new_latch);
 
-      const auto idx = latch_terminator->getSuccessor(0) == BB ? 0 : 1;
-      latch_terminator->setSuccessor(idx, new_latch);
+      const auto idx = cond_latch_terminator->getSuccessor(0) == BB ? 0 : 1;
+      cond_latch_terminator->setSuccessor(idx, new_latch);
 
       // Update phis to use the new basic block.
       for (auto iter = BB->phis().begin(); iter != BB->phis().end(); iter++) {
         PHINode *phi = cast<PHINode>(&*iter);
         phi->replaceIncomingBlockWith(latch, new_latch);
       }
-    } else {
+    } else if (auto *uncond_latch_terminator =
+                   dyn_cast_or_null<UncondBrInst>(latch_terminator)) {
       // Simple case: just split the block.
-      auto new_block = latch->splitBasicBlockBefore(latch_terminator);
+      auto new_block = latch->splitBasicBlockBefore(uncond_latch_terminator);
       loop->addBlockEntry(new_block);
     }
   }
@@ -183,8 +182,8 @@ void clspv::FixupStructuredCFGPass::breakConditionalHeader(
     if (!LI.isLoopHeader(BB))
       continue;
 
-    auto *terminator = dyn_cast_or_null<BranchInst>(BB->getTerminator());
-    if (!terminator || !terminator->isConditional())
+    auto *terminator = dyn_cast_or_null<CondBrInst>(BB->getTerminator());
+    if (!terminator)
       continue;
 
     auto *loop = LI.getLoopFor(BB);
@@ -233,7 +232,7 @@ void clspv::FixupStructuredCFGPass::isolateContinue(
           // Create a new basic block to act as the merge of the loop.
           auto new_exit =
               BasicBlock::Create(F.getContext(), "", &F, exit_block);
-          BranchInst::Create(exit_block, new_exit);
+          UncondBrInst::Create(exit_block, new_exit);
           parent->addBlockEntry(new_exit);
 
           // Collect the exit's predecessors from within the loop.

@@ -1093,7 +1093,7 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto ExitBB = SplitBlock(BB, CI);
 
   // BB
-  auto BrCmpBB = BranchInst::Create(CmpBB);
+  auto BrCmpBB = UncondBrInst::Create(CmpBB);
   ReplaceInstWithInst(BB->getTerminator(), BrCmpBB);
 
   // CmpBB
