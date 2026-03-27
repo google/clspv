@@ -200,13 +200,15 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
 
     // NaN (0x01 | 0x02)
     if (mask & 0x0003) {
-      addCheck(builder.CreateAnd(builder.CreateICmpEQ(exp, expAllOnes),
-                                 builder.CreateICmpNE(sig, sigZero)));
+      auto LHS = builder.CreateICmpEQ(exp, expAllOnes);
+      auto RHS = builder.CreateICmpNE(sig, sigZero);
+      addCheck(builder.CreateAnd(LHS, RHS));
     }
     // Infinity (0x04 | 0x200)
     if (mask & 0x0204) {
-      Value *isInf = builder.CreateAnd(builder.CreateICmpEQ(exp, expAllOnes),
-                                       builder.CreateICmpEQ(sig, sigZero));
+      auto LHS = builder.CreateICmpEQ(exp, expAllOnes);
+      auto RHS = builder.CreateICmpEQ(sig, sigZero);
+      Value *isInf = builder.CreateAnd(LHS, RHS);
       if ((mask & 0x0004) && (mask & 0x0200))
         addCheck(isInf);
       else if (mask & 0x0004)
@@ -216,8 +218,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
     }
     // Zero (0x20 | 0x40)
     if (mask & 0x0060) {
-      Value *isZero = builder.CreateAnd(builder.CreateICmpEQ(exp, expZero),
-                                        builder.CreateICmpEQ(sig, sigZero));
+      auto LHS = builder.CreateICmpEQ(exp, expZero);
+      auto RHS = builder.CreateICmpEQ(sig, sigZero);
+      Value *isZero = builder.CreateAnd(LHS, RHS);
       if ((mask & 0x0020) && (mask & 0x0040))
         addCheck(isZero);
       else if (mask & 0x0020)
@@ -227,8 +230,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
     }
     // Subnormal (0x10 | 0x80)
     if (mask & 0x0090) {
-      Value *isSub = builder.CreateAnd(builder.CreateICmpEQ(exp, expZero),
-                                       builder.CreateICmpNE(sig, sigZero));
+      auto LHS = builder.CreateICmpEQ(exp, expZero);
+      auto RHS = builder.CreateICmpNE(sig, sigZero);
+      Value *isSub = builder.CreateAnd(LHS, RHS);
       if ((mask & 0x0010) && (mask & 0x0080))
         addCheck(isSub);
       else if (mask & 0x0010)
@@ -238,8 +242,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceIsFpClass(Function &F) {
     }
     // Normal (0x08 | 0x100)
     if (mask & 0x0108) {
-      Value *isNorm = builder.CreateAnd(builder.CreateICmpNE(exp, expZero),
-                                        builder.CreateICmpNE(exp, expAllOnes));
+      auto LHS = builder.CreateICmpNE(exp, expZero);
+      auto RHS = builder.CreateICmpNE(exp, expAllOnes);
+      Value *isNorm = builder.CreateAnd(LHS, RHS);
       if ((mask & 0x0008) && (mask & 0x0100))
         addCheck(isNorm);
       else if (mask & 0x0008)
