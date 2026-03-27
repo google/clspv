@@ -5343,6 +5343,29 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         }
 
         RID = addSPIRVInst(spv::OpSelect, Ops);
+      } else if (!clspv::Option::Int8Support() && Ty->isFPOrFPVectorTy() &&
+                 OpTy->isIntOrIntVectorTy(8) &&
+                 I.getOpcode() == Instruction::SIToFP) {
+        SPIRVOperandVec Ops;
+        Ops << OpTy << I.getOperand(0)
+            << getSPIRVConstant(ConstantInt::get(OpTy, 24));
+        RID = addSPIRVInst(spv::OpShiftLeftLogical, Ops);
+        Ops.clear();
+        Ops << OpTy << RID << getSPIRVConstant(ConstantInt::get(OpTy, 24));
+        RID = addSPIRVInst(spv::OpShiftRightArithmetic, Ops);
+        Ops.clear();
+        Ops << Ty << RID;
+        RID = addSPIRVInst(spv::OpConvertSToF, Ops);
+      } else if (!clspv::Option::Int8Support() && Ty->isIntOrIntVectorTy(32) &&
+                 OpTy->isIntOrIntVectorTy(8) &&
+                 I.getOpcode() == Instruction::SExt) {
+        SPIRVOperandVec Ops;
+        Ops << Ty << I.getOperand(0)
+            << getSPIRVConstant(ConstantInt::get(Ty, 24));
+        RID = addSPIRVInst(spv::OpShiftLeftLogical, Ops);
+        Ops.clear();
+        Ops << Ty << RID << getSPIRVConstant(ConstantInt::get(Ty, 24));
+        RID = addSPIRVInst(spv::OpShiftRightArithmetic, Ops);
       } else if (!clspv::Option::Int8Support() &&
                  I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
         // The SPIR-V target type is a 32-bit int.  Keep only the bottom
