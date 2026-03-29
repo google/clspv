@@ -144,17 +144,6 @@ else()
 
     # Tell LLVM to build the native target (needed to build libclc).
     set(CLSPV_LLVM_TARGETS_TO_BUILD "Native")
-
-    # Disabling zlib as build is failing on libclc when enabled
-    set(LLVM_ENABLE_ZLIB "OFF" CACHE STRING "Use zlib for compression/decompression if available. Can be ON, OFF, or FORCE_ON")
-
-    if (MSVC)
-      set(RUNTIME_CMAKE_ARGS_LIST)
-      list(APPEND RUNTIME_CMAKE_ARGS_LIST "-DCMAKE_CLC_COMPILER=${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm/$(Configuration)/bin/clang.exe")
-      list(APPEND RUNTIME_CMAKE_ARGS_LIST "-DCMAKE_AR=${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm/$(Configuration)/bin/llvm-ar.exe")
-      string(JOIN " " RUNTIMES_CMAKE_ARGS "${RUNTIME_CMAKE_ARGS_LIST}")
-      set(RUNTIMES_CMAKE_ARGS "${RUNTIMES_CMAKE_ARGS}")
-    endif()
   endif()
 
   # Tell LLVM not to build any targets.
