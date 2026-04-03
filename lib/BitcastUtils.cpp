@@ -1343,7 +1343,9 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
 
   unsigned startIdx = 0;
   if ((isa<GlobalVariable>(Src) || clspv_resource || isa<AllocaInst>(Src)) &&
-      SrcTy != DstTy) {
+      SrcTy != DstTy &&
+      (DstTy == nullptr ||
+       SizeInBits(DataLayout, DstTy) <= SizeInBits(DataLayout, SrcTy))) {
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
     // Unsized types will be removed in `reworkUnsizedType`, no need to bump
     // startIdx for them.
