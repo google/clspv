@@ -1,0 +1,715 @@
+From ab683ebb5e1e223adadf997811067fa861bd0b18 Mon Sep 17 00:00:00 2001
+From: Romaric Jodin <rjodin@google.com>
+Date: Mon, 6 Apr 2026 10:16:27 +0200
+Subject: [PATCH] [libclc] Enable LLVM_RUNTIME_TARGETS in build system
+
+---
+ .ci/compute_projects.py      |  17 +-
+ .ci/compute_projects_test.py |  23 +--
+ .ci/monolithic-linux.sh      |   3 +-
+ .ci/monolithic-windows.sh    |   3 +-
+ libclc/CMakeLists.txt        | 322 +++++++++++++++++------------------
+ libclc/README.md             |  81 +++++++--
+ libclc/test/CMakeLists.txt   |  21 +--
+ llvm/runtimes/CMakeLists.txt |  12 +-
+ 8 files changed, 273 insertions(+), 209 deletions(-)
+
+diff --git a/.ci/compute_projects.py b/.ci/compute_projects.py
+index 9c7ad73710ae..45e92fc023bf 100644
+--- a/.ci/compute_projects.py
++++ b/.ci/compute_projects.py
+@@ -98,6 +98,12 @@ EXCLUDE_LINUX = {
+     "openmp",  # https://github.com/google/llvm-premerge-checks/issues/410
+ }
+ 
++# Runtimes configured for cross-compilation using LLVM_RUNTIME_TARGETS
++# instead of LLVM_ENABLE_RUNTIMES.
++CROSS_COMPILATION_RUNTIMES = {
++    "libclc",
++}
++
+ EXCLUDE_WINDOWS = {
+     "cross-project-tests",  # TODO(issues/132797): Tests are failing.
+     "openmp",  # TODO(issues/132799): Does not detect perl installation.
+@@ -147,7 +153,7 @@ PROJECT_CHECK_TARGETS = {
+     "flang": "check-flang",
+     "flang-rt": "check-flang-rt",
+     "libc": "check-libc",
+-    "libclc": "check-libclc",
++    "libclc": "check-libclc-amdgcn-amd-amdhsa-llvm",
+     "lld": "check-lld",
+     "lldb": "check-lldb",
+     "mlir": "check-mlir",
+@@ -276,7 +282,9 @@ def _compute_runtimes_to_build(
+     for modified_project in modified_projects:
+         if modified_project in DEPENDENT_RUNTIMES_TO_BUILD:
+             runtimes_to_build.update(DEPENDENT_RUNTIMES_TO_BUILD[modified_project])
+-    return _exclude_projects(runtimes_to_build, platform)
++    runtimes_to_build = _exclude_projects(runtimes_to_build, platform)
++    runtimes_to_build -= CROSS_COMPILATION_RUNTIMES
++    return runtimes_to_build
+ 
+ 
+ def _path_matches(matcher: tuple[str], file_path: tuple[str]) -> bool:
+@@ -320,7 +328,10 @@ def get_env_variables(modified_files: list[str], platform: str) -> Set[str]:
+     runtimes_to_build = _compute_runtimes_to_build(
+         runtimes_to_test | runtimes_to_test_needs_reconfig, modified_projects, platform
+     )
+-    projects_to_build = _compute_projects_to_build(projects_to_test, runtimes_to_build)
++    cross_runtimes_to_test = runtimes_to_test & CROSS_COMPILATION_RUNTIMES
++    projects_to_build = _compute_projects_to_build(
++        projects_to_test, runtimes_to_build | cross_runtimes_to_test
++    )
+     projects_check_targets = _compute_project_check_targets(projects_to_test)
+     runtimes_check_targets = _compute_project_check_targets(runtimes_to_test)
+     runtimes_check_targets_needs_reconfig = _compute_project_check_targets(
+diff --git a/.ci/compute_projects_test.py b/.ci/compute_projects_test.py
+index 3069c66940c3..b8504a57b6dc 100644
+--- a/.ci/compute_projects_test.py
++++ b/.ci/compute_projects_test.py
+@@ -265,8 +265,11 @@ class TestComputeProjects(unittest.TestCase):
+         )
+         self.assertEqual(env_variables["projects_to_build"], "clang;llvm")
+         self.assertEqual(env_variables["project_check_targets"], "")
+-        self.assertEqual(env_variables["runtimes_to_build"], "libclc")
+-        self.assertEqual(env_variables["runtimes_check_targets"], "check-libclc")
++        self.assertEqual(env_variables["runtimes_to_build"], "")
++        self.assertEqual(
++            env_variables["runtimes_check_targets"],
++            "check-libclc-amdgcn-amd-amdhsa-llvm",
++        )
+         self.assertEqual(env_variables["runtimes_check_targets_needs_reconfig"], "")
+ 
+     def test_exclude_docs(self):
+@@ -303,11 +306,11 @@ class TestComputeProjects(unittest.TestCase):
+         )
+         self.assertEqual(
+             env_variables["runtimes_to_build"],
+-            "compiler-rt;flang-rt;libc;libclc;libcxx;libcxxabi;libunwind",
++            "compiler-rt;flang-rt;libc;libcxx;libcxxabi;libunwind",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets"],
+-            "check-compiler-rt check-flang-rt check-libc check-libclc",
++            "check-compiler-rt check-flang-rt check-libc check-libclc-amdgcn-amd-amdhsa-llvm",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets_needs_reconfig"],
+@@ -328,11 +331,11 @@ class TestComputeProjects(unittest.TestCase):
+         )
+         self.assertEqual(
+             env_variables["runtimes_to_build"],
+-            "compiler-rt;libclc",
++            "compiler-rt",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets"],
+-            "check-compiler-rt check-libclc",
++            "check-compiler-rt check-libclc-amdgcn-amd-amdhsa-llvm",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets_needs_reconfig"],
+@@ -377,11 +380,11 @@ class TestComputeProjects(unittest.TestCase):
+         )
+         self.assertEqual(
+             env_variables["runtimes_to_build"],
+-            "compiler-rt;flang-rt;libc;libclc;libcxx;libcxxabi;libunwind",
++            "compiler-rt;flang-rt;libc;libcxx;libcxxabi;libunwind",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets"],
+-            "check-compiler-rt check-flang-rt check-libc check-libclc",
++            "check-compiler-rt check-flang-rt check-libc check-libclc-amdgcn-amd-amdhsa-llvm",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets_needs_reconfig"],
+@@ -412,11 +415,11 @@ class TestComputeProjects(unittest.TestCase):
+         )
+         self.assertEqual(
+             env_variables["runtimes_to_build"],
+-            "compiler-rt;flang-rt;libc;libclc;libcxx;libcxxabi;libunwind",
++            "compiler-rt;flang-rt;libc;libcxx;libcxxabi;libunwind",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets"],
+-            "check-compiler-rt check-flang-rt check-libc check-libclc",
++            "check-compiler-rt check-flang-rt check-libc check-libclc-amdgcn-amd-amdhsa-llvm",
+         )
+         self.assertEqual(
+             env_variables["runtimes_check_targets_needs_reconfig"],
+diff --git a/.ci/monolithic-linux.sh b/.ci/monolithic-linux.sh
+index 79fc891b729d..587ef55b6e1e 100755
+--- a/.ci/monolithic-linux.sh
++++ b/.ci/monolithic-linux.sh
+@@ -56,7 +56,8 @@ cmake -S "${MONOREPO_ROOT}"/llvm -B "${BUILD_DIR}" \
+       -D CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+       -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+       -D LIBCXX_CXX_ABI=libcxxabi \
+-      -D LIBCLC_TARGETS_TO_BUILD="amdgcn-amd-amdhsa-llvm" \
++      -D RUNTIMES_amdgcn-amd-amdhsa-llvm_LLVM_ENABLE_RUNTIMES=libclc \
++      -D LLVM_RUNTIME_TARGETS="default;amdgcn-amd-amdhsa-llvm" \
+       -D MLIR_ENABLE_BINDINGS_PYTHON=ON \
+       -D LLDB_ENABLE_PYTHON=ON \
+       -D LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS=ON \
+diff --git a/.ci/monolithic-windows.sh b/.ci/monolithic-windows.sh
+index f35f17350022..8388835a5f97 100755
+--- a/.ci/monolithic-windows.sh
++++ b/.ci/monolithic-windows.sh
+@@ -45,7 +45,8 @@ cmake -S "${MONOREPO_ROOT}"/llvm -B "${BUILD_DIR}" \
+       -D CMAKE_CXX_COMPILER_LAUNCHER=sccache \
+       -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+       -D MLIR_ENABLE_BINDINGS_PYTHON=ON \
+-      -D LIBCLC_TARGETS_TO_BUILD="amdgcn-amd-amdhsa-llvm" \
++      -D RUNTIMES_amdgcn-amd-amdhsa-llvm_LLVM_ENABLE_RUNTIMES=libclc \
++      -D LLVM_RUNTIME_TARGETS="default;amdgcn-amd-amdhsa-llvm" \
+       -D CMAKE_EXE_LINKER_FLAGS="/MANIFEST:NO" \
+       -D CMAKE_MODULE_LINKER_FLAGS="/MANIFEST:NO" \
+       -D CMAKE_SHARED_LINKER_FLAGS="/MANIFEST:NO" \
+diff --git a/libclc/CMakeLists.txt b/libclc/CMakeLists.txt
+index 99235e32812b..685b9032aa92 100644
+--- a/libclc/CMakeLists.txt
++++ b/libclc/CMakeLists.txt
+@@ -18,14 +18,6 @@ include( GNUInstallDirs )
+ 
+ set( LIBCLC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} )
+ 
+-# A runtimes cross-build should only use the requested target.
+-set( LIBCLC_DEFAULT_TARGET "all" )
+-if( LLVM_RUNTIMES_BUILD AND LLVM_DEFAULT_TARGET_TRIPLE MATCHES "^nvptx|^amdgcn" )
+-  set( LIBCLC_DEFAULT_TARGET ${LLVM_DEFAULT_TARGET_TRIPLE} )
+-endif()
+-set( LIBCLC_TARGETS_TO_BUILD ${LIBCLC_DEFAULT_TARGET}
+-    CACHE STRING "Semicolon-separated list of libclc targets to build, or 'all'." )
+-
+ option(
+   LIBCLC_USE_SPIRV_BACKEND "Build SPIR-V targets with the SPIR-V backend." OFF
+ )
+@@ -38,8 +30,20 @@ set( LIBCLC_TARGETS_ALL
+   nvptx64--
+   nvptx64--nvidiacl
+   nvptx64-nvidia-cuda
++  spirv-mesa3d-
++  spirv64-mesa3d-
+ )
+ 
++set(LIBCLC_TARGET ${LLVM_RUNTIMES_TARGET})
++
++if(NOT LIBCLC_TARGET)
++  message(FATAL_ERROR "libclc target is empty\n")
++endif()
++if(NOT "${LIBCLC_TARGET}" IN_LIST LIBCLC_TARGETS_ALL)
++  message(FATAL_ERROR "Unknown libclc target: ${LIBCLC_TARGET}\n"
++    "Valid targets are: ${LIBCLC_TARGETS_ALL}\n")
++endif()
++
+ if( LIBCLC_STANDALONE_BUILD OR CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
+   set( LIBCLC_STANDALONE_BUILD TRUE )
+ 
+@@ -97,23 +101,17 @@ if( NOT LIBCLC_USE_SPIRV_BACKEND )
+   endif()
+ endif()
+ 
+-if( LIBCLC_USE_SPIRV_BACKEND OR llvm-spirv_exe )
+-  list( APPEND LIBCLC_TARGETS_ALL spirv-mesa3d- spirv64-mesa3d- )
+-endif()
++message(STATUS "libclc target '${LIBCLC_TARGET}' is enabled")
+ 
+-if( LIBCLC_TARGETS_TO_BUILD STREQUAL "all" )
+-  set( LIBCLC_TARGETS_TO_BUILD ${LIBCLC_TARGETS_ALL} )
+-else()
+-  foreach(TARGET_TO_BUILD ${LIBCLC_TARGETS_TO_BUILD})
+-    if (NOT ${TARGET_TO_BUILD} IN_LIST LIBCLC_TARGETS_ALL)
+-      message( FATAL_ERROR
+-        "Unknown target in LIBCLC_TARGETS_TO_BUILD: \"${TARGET_TO_BUILD}\"\n"
+-        "Valid targets are: ${LIBCLC_TARGETS_ALL}\n")
+-    endif()
+-  endforeach()
+-endif()
++string( REPLACE "-" ";" TRIPLE  ${LIBCLC_TARGET} )
++list(GET TRIPLE 0 ARCH)
++list(GET TRIPLE 2 OS)
+ 
+-list( SORT LIBCLC_TARGETS_TO_BUILD )
++if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  if(NOT LIBCLC_USE_SPIRV_BACKEND AND NOT llvm-spirv_exe)
++    message(FATAL_ERROR "SPIR-V backend or llvm-spirv is required for libclc ${LIBCLC_TARGET}")
++  endif()
++endif()
+ 
+ foreach( tool IN ITEMS opt llvm-link )
+   if( NOT EXISTS "${${tool}_exe}" AND "${${tool}_target}" STREQUAL "" )
+@@ -122,160 +120,156 @@ foreach( tool IN ITEMS opt llvm-link )
+ endforeach()
+ 
+ add_subdirectory(clc/lib/generic)
+-add_subdirectory(clc/lib/amdgpu)
+-add_subdirectory(clc/lib/ptx-nvidiacl)
+-add_subdirectory(clc/lib/spirv)
+-add_subdirectory(clc/lib/clspv)
+-
+ add_subdirectory(opencl/lib/generic)
+-add_subdirectory(opencl/lib/amdgpu)
+-add_subdirectory(opencl/lib/clspv)
+-add_subdirectory(opencl/lib/spirv)
++
++if(ARCH STREQUAL amdgcn)
++  add_subdirectory(clc/lib/amdgpu)
++  add_subdirectory(opencl/lib/amdgpu)
++elseif(ARCH STREQUAL nvptx64)
++  add_subdirectory(clc/lib/ptx-nvidiacl)
++elseif(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  add_subdirectory(clc/lib/spirv)
++  add_subdirectory(opencl/lib/spirv)
++elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
++  add_subdirectory(clc/lib/clspv)
++  add_subdirectory(opencl/lib/clspv)
++endif()
+ 
+ add_custom_target( libclc ALL )
+ 
+ add_custom_target( libclc-opencl-builtins COMMENT "Build libclc OpenCL builtins" )
+ add_dependencies( libclc libclc-opencl-builtins )
+ 
+-foreach( t ${LIBCLC_TARGETS_TO_BUILD} )
+-  message( STATUS "libclc target '${t}' is enabled" )
+-  string( REPLACE "-" ";" TRIPLE  ${t} )
+-  list( GET TRIPLE 0 ARCH )
+-  list( GET TRIPLE 1 VENDOR )
+-  list( GET TRIPLE 2 OS )
+-
+-  # Determine the clang target triple.
+-  set(clang_triple ${t})
+-  if(ARCH STREQUAL spirv AND LIBCLC_USE_SPIRV_BACKEND)
+-    set(clang_triple spirv32--)
+-  elseif(ARCH STREQUAL spirv64 AND LIBCLC_USE_SPIRV_BACKEND)
+-    set(clang_triple spirv64--)
+-  elseif(ARCH STREQUAL spirv OR ARCH STREQUAL clspv)
+-    set(clang_triple spir--)
+-  elseif(ARCH STREQUAL spirv64 OR ARCH STREQUAL clspv64)
+-    set(clang_triple spir64--)
+-  endif()
++# Determine the clang target triple.
++set(clang_triple ${LIBCLC_TARGET})
++if(ARCH STREQUAL spirv AND LIBCLC_USE_SPIRV_BACKEND)
++  set(clang_triple spirv32--)
++elseif(ARCH STREQUAL spirv64 AND LIBCLC_USE_SPIRV_BACKEND)
++  set(clang_triple spirv64--)
++elseif(ARCH STREQUAL spirv OR ARCH STREQUAL clspv)
++  set(clang_triple spir--)
++elseif(ARCH STREQUAL spirv64 OR ARCH STREQUAL clspv64)
++  set(clang_triple spir64--)
++endif()
+ 
+-  # Determine the preprocessor identifier for this target.
+-  set(MACRO_ARCH ${ARCH})
+-  if(ARCH STREQUAL spirv)
+-    set(MACRO_ARCH SPIRV32)
+-  elseif(ARCH STREQUAL spirv64)
+-    set(MACRO_ARCH SPIRV64)
+-  elseif(ARCH STREQUAL clspv)
+-    set(MACRO_ARCH CLSPV32)
+-  elseif(ARCH STREQUAL clspv64)
+-    set(MACRO_ARCH CLSPV64)
+-  endif()
+-  string(TOUPPER "CLC_${MACRO_ARCH}" target_define)
++# Determine the preprocessor identifier for this target.
++set(MACRO_ARCH ${ARCH})
++if(ARCH STREQUAL spirv)
++  set(MACRO_ARCH SPIRV32)
++elseif(ARCH STREQUAL spirv64)
++  set(MACRO_ARCH SPIRV64)
++elseif(ARCH STREQUAL clspv)
++  set(MACRO_ARCH CLSPV32)
++elseif(ARCH STREQUAL clspv64)
++  set(MACRO_ARCH CLSPV64)
++endif()
++string(TOUPPER "CLC_${MACRO_ARCH}" target_define)
+ 
+-  # Address space values.
+-  set(private_addrspace_val 0)
+-  set(generic_addrspace_val 0)
+-  if(ARCH STREQUAL amdgcn)
+-    set(private_addrspace_val 5)
+-  endif()
+-  if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
+-    set(generic_addrspace_val 4)
+-  endif()
++# Address space values.
++set(private_addrspace_val 0)
++set(generic_addrspace_val 0)
++if(ARCH STREQUAL amdgcn)
++  set(private_addrspace_val 5)
++endif()
++if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  set(generic_addrspace_val 4)
++endif()
+ 
+-  # Target-specific compile flags and defines.
+-  set(target_compile_flags)
+-  set(target_extra_defines)
+-  set(opt_flags -O3)
+-
+-  if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
+-    list(APPEND target_compile_flags -O0 -finline-hint-functions)
+-    list(APPEND target_extra_defines CLC_SPIRV)
+-    set(opt_flags)
+-  elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
+-    list(APPEND target_compile_flags -Wno-unknown-assumption
+-                                     -U__opencl_c_int64)
+-    list(APPEND target_extra_defines CLC_CLSPV)
+-  elseif(ARCH STREQUAL amdgcn)
+-    list(APPEND target_compile_flags "SHELL:-Xclang -mcode-object-version=none")
+-  endif()
++# Target-specific compile flags and defines.
++set(target_compile_flags)
++set(target_extra_defines)
++set(opt_flags -O3)
++
++if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  list(APPEND target_compile_flags -O0 -finline-hint-functions)
++  list(APPEND target_extra_defines CLC_SPIRV)
++  set(opt_flags)
++elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
++  list(APPEND target_compile_flags -Wno-unknown-assumption -U__opencl_c_int64)
++  list(APPEND target_extra_defines CLC_CLSPV)
++elseif(ARCH STREQUAL amdgcn)
++  list(APPEND target_compile_flags "SHELL:-Xclang -mcode-object-version=none")
++endif()
+ 
+-  # Collect CLC sources; target-specific sources override generic ones by basename.
+-  set(_clc_overrides)
++# Collect CLC sources; target-specific sources override generic ones by basename.
++set(_clc_overrides)
++if(ARCH STREQUAL amdgcn)
++  list(APPEND _clc_overrides ${CLC_AMDGPU_SOURCES})
++elseif(ARCH STREQUAL nvptx64 AND (OS STREQUAL nvidiacl OR OS STREQUAL cuda))
++  list(APPEND _clc_overrides ${CLC_PTX_NVIDIACL_SOURCES})
++elseif(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  list(APPEND _clc_overrides ${CLC_SPIRV_SOURCES})
++elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
++  list(APPEND _clc_overrides ${CLC_CLSPV_SOURCES})
++endif()
++libclc_merge_sources(clc_sources ${CLC_GENERIC_SOURCES} ${_clc_overrides})
++
++# Collect OpenCL sources. SPIR-V and Clspv targets use self-contained
++# subsets while others merge with target-specific overrides.
++if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
++  set(opencl_sources ${OPENCL_SPIRV_SOURCES})
++elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
++  set(opencl_sources ${OPENCL_CLSPV_SOURCES})
++else()
++  set(_opencl_overrides)
+   if(ARCH STREQUAL amdgcn)
+-    list(APPEND _clc_overrides ${CLC_AMDGPU_SOURCES})
+-  elseif(ARCH STREQUAL nvptx64 AND (OS STREQUAL nvidiacl OR OS STREQUAL cuda))
+-    list(APPEND _clc_overrides ${CLC_PTX_NVIDIACL_SOURCES})
+-  elseif(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
+-    list(APPEND _clc_overrides ${CLC_SPIRV_SOURCES})
+-  elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
+-    list(APPEND _clc_overrides ${CLC_CLSPV_SOURCES})
+-  endif()
+-  libclc_merge_sources(clc_sources ${CLC_GENERIC_SOURCES} ${_clc_overrides})
+-
+-  # Collect OpenCL sources. SPIR-V and Clspv targets use self-contained
+-  # subsets while others merge with target-specific overrides.
+-  if(ARCH STREQUAL spirv OR ARCH STREQUAL spirv64)
+-    set(opencl_sources ${OPENCL_SPIRV_SOURCES})
+-  elseif(ARCH STREQUAL clspv OR ARCH STREQUAL clspv64)
+-    set(opencl_sources ${OPENCL_CLSPV_SOURCES})
+-  else()
+-    set(_opencl_overrides)
+-    if(ARCH STREQUAL amdgcn)
+-      list(APPEND _opencl_overrides ${OPENCL_AMDGCN_SOURCES})
+-    endif()
+-    libclc_merge_sources(opencl_sources
+-      ${OPENCL_GENERIC_SOURCES} ${_opencl_overrides})
++    list(APPEND _opencl_overrides ${OPENCL_AMDGCN_SOURCES})
+   endif()
++  libclc_merge_sources(opencl_sources
++    ${OPENCL_GENERIC_SOURCES} ${_opencl_overrides})
++endif()
+ 
+-  # Common compile options shared by CLC and OpenCL libraries.
+-  set(compile_flags
+-    -flto
+-    --target=${clang_triple}
+-    -nostdlib
+-    -nostdlibinc
+-    -cl-no-stdinc
+-    -cl-std=CL3.0
+-    -include opencl-c-base.h
+-    -Werror=undef
+-    -Wall
+-    -Wextra
+-    -fdiscard-value-names
+-    -ffp-contract=fast-honor-pragmas
+-    -fdenormal-fp-math=dynamic
+-    ${target_compile_flags}
+-  )
+-
+-  set(_common_defs
+-    ${target_define}
+-    ${target_extra_defines}
+-    __CLC_PRIVATE_ADDRSPACE_VAL=${private_addrspace_val}
+-    __CLC_GENERIC_ADDRSPACE_VAL=${generic_addrspace_val}
+-  )
+-
+-  # Build the CLC internal builtins library.
+-  string(REPLACE "-" "_" lib_suffix ${t})
+-  set(clc_lib clc_builtins_${lib_suffix})
+-  add_libclc_builtin_library(${clc_lib}
+-    SOURCES ${clc_sources}
+-    COMPILE_OPTIONS ${compile_flags}
+-    INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/clc/include
+-    COMPILE_DEFINITIONS ${_common_defs}
+-    FOLDER "libclc/Device IR/CLC"
+-  )
+-
+-  # Build, link, and install the final OpenCL builtins library.
+-  add_libclc_library(libclc-${t}
+-    ARCH ${ARCH}
+-    TRIPLE ${clang_triple}
+-    TARGET_TRIPLE ${t}
+-    SOURCES ${opencl_sources}
+-    COMPILE_OPTIONS ${compile_flags} "SHELL:-Xclang -fdeclare-opencl-builtins"
+-    INCLUDE_DIRS
+-      ${CMAKE_CURRENT_SOURCE_DIR}/clc/include
+-      ${CMAKE_CURRENT_SOURCE_DIR}/opencl/include
+-    COMPILE_DEFINITIONS ${_common_defs}
+-    INTERNALIZE_LIBRARIES ${clc_lib}
+-    OPT_FLAGS ${opt_flags}
+-    OUTPUT_FILENAME libclc
+-    PARENT_TARGET libclc-opencl-builtins
+-  )
+-endforeach()
++# Common compile options shared by CLC and OpenCL libraries.
++set(compile_flags
++  -flto
++  --target=${clang_triple}
++  -nostdlib
++  -nostdlibinc
++  -cl-no-stdinc
++  -cl-std=CL3.0
++  -include opencl-c-base.h
++  -Werror=undef
++  -Wall
++  -Wextra
++  -fdiscard-value-names
++  -ffp-contract=fast-honor-pragmas
++  -fdenormal-fp-math=dynamic
++  ${target_compile_flags}
++)
++
++set(_common_defs
++  ${target_define}
++  ${target_extra_defines}
++  __CLC_PRIVATE_ADDRSPACE_VAL=${private_addrspace_val}
++  __CLC_GENERIC_ADDRSPACE_VAL=${generic_addrspace_val}
++)
++
++# Build the CLC internal builtins library.
++string(REPLACE "-" "_" lib_suffix ${LIBCLC_TARGET})
++set(clc_lib clc_builtins_${lib_suffix})
++add_libclc_builtin_library(${clc_lib}
++  SOURCES ${clc_sources}
++  COMPILE_OPTIONS ${compile_flags}
++  INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/clc/include
++  COMPILE_DEFINITIONS ${_common_defs}
++  FOLDER "libclc/Device IR/CLC"
++)
++
++# Build, link, and install the final OpenCL builtins library.
++add_libclc_library(libclc-${LIBCLC_TARGET}
++  ARCH ${ARCH}
++  TRIPLE ${clang_triple}
++  TARGET_TRIPLE ${LIBCLC_TARGET}
++  SOURCES ${opencl_sources}
++  COMPILE_OPTIONS ${compile_flags} "SHELL:-Xclang -fdeclare-opencl-builtins"
++  INCLUDE_DIRS
++    ${CMAKE_CURRENT_SOURCE_DIR}/clc/include
++    ${CMAKE_CURRENT_SOURCE_DIR}/opencl/include
++  COMPILE_DEFINITIONS ${_common_defs}
++  INTERNALIZE_LIBRARIES ${clc_lib}
++  OPT_FLAGS ${opt_flags}
++  OUTPUT_FILENAME libclc
++  PARENT_TARGET libclc-opencl-builtins
++)
+ 
+ add_subdirectory(test)
+diff --git a/libclc/README.md b/libclc/README.md
+index 4f14066425d2..f50a931a67f6 100644
+--- a/libclc/README.md
++++ b/libclc/README.md
+@@ -25,36 +25,87 @@ functions.
+ libclc currently supports PTX, AMDGPU, SPIRV and CLSPV targets, but support for
+ more targets is welcome.
+ 
+-## Compiling and installing
++## Configure, build, and install
+ 
+-(in the following instructions you can use `make` or `ninja`)
++libclc is built as part of an LLVM runtimes build.
+ 
+-For an in-tree build, Clang must also be built at the same time:
++Select the targets to build with `LLVM_RUNTIME_TARGETS`, and enable libclc for
++each selected target with the matching
++`RUNTIMES_<target-triple>_LLVM_ENABLE_RUNTIMES` cache entry.
++
++#### Configure for the AMDGPU target
+ ```
+-$ cmake <path-to>/llvm-project/llvm/CMakeLists.txt -DLLVM_ENABLE_PROJECTS="clang" \
+-    -DLLVM_ENABLE_RUNTIMES="libclc" -DCMAKE_BUILD_TYPE=Release -G Ninja
+-$ ninja
++cd llvm-project
++mkdir build
++cd build
++cmake ../llvm -G Ninja -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=Release \
++  -DRUNTIMES_amdgcn-amd-amdhsa-llvm_LLVM_ENABLE_RUNTIMES=libclc \
++  -DLLVM_RUNTIME_TARGETS="amdgcn-amd-amdhsa-llvm"
++```
++
++#### Configure for the NVPTX64 target
++```
++cmake ../llvm -G Ninja -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=Release \
++  -DRUNTIMES_nvptx64-nvidia-cuda_LLVM_ENABLE_RUNTIMES=libclc \
++  -DLLVM_RUNTIME_TARGETS="nvptx64-nvidia-cuda"
++```
++
++#### Configure for CLSPV targets
+ ```
+-Then install:
++cmake ../llvm -G Ninja -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=Release \
++  -DRUNTIMES_clspv--_LLVM_ENABLE_RUNTIMES=libclc \
++  -DRUNTIMES_clspv64--_LLVM_ENABLE_RUNTIMES=libclc \
++  -DLLVM_RUNTIME_TARGETS="clspv--;clspv64--"
++```
++
++#### Configure for SPIR-V targets
++```
++cmake ../llvm -G Ninja -DLLVM_ENABLE_PROJECTS="clang" -DCMAKE_BUILD_TYPE=Release \
++  -DRUNTIMES_spirv-mesa3d-_LLVM_ENABLE_RUNTIMES=libclc \
++  -DRUNTIMES_spirv64-mesa3d-_LLVM_ENABLE_RUNTIMES=libclc \
++  -DLLVM_RUNTIME_TARGETS="spirv-mesa3d-;spirv64-mesa3d-"
++```
++
++To build multiple targets, pass them as a semicolon-separated list in
++`LLVM_RUNTIME_TARGETS` and provide a matching
++`RUNTIMES_<target-triple>_LLVM_ENABLE_RUNTIMES=libclc` entry for each target.
++
++#### Build
+ ```
+-$ ninja install
++ninja
+ ```
++
++#### Install
++```
++ninja install
++```
++
+ Note you can use the `DESTDIR` Makefile variable to do staged installs.
+ ```
+-$ DESTDIR=/path/for/staged/install ninja install
++DESTDIR=/path/for/staged/install ninja install
++```
++
++## Run tests
++```
++ninja check-libclc-<target-triple>
++```
++or
++```
++ninja -C runtimes/runtimes-<target-triple>-bins check-libclc
+ ```
++
++## Out-of-tree build
++
+ To build out of tree, or in other words, against an existing LLVM build or install:
+ ```
+-$ cmake <path-to>/llvm-project/libclc/CMakeLists.txt -DCMAKE_BUILD_TYPE=Release \
+-  -G Ninja -DLLVM_DIR=$(<path-to>/llvm-config --cmakedir)
++CC=$(<path-to>/llvm-config --bindir)/clang cmake \
++  <path-to>/llvm-project/libclc/CMakeLists.txt -DCMAKE_BUILD_TYPE=Release \
++  -G Ninja -DLLVM_DIR=$(<path-to>/llvm-config --cmakedir) \
++  -DLLVM_RUNTIMES_TARGET=<target-triple>
+ $ ninja
+ ```
+ Then install as before.
+ 
+-In both cases this will include all supported targets. You can choose which
+-targets are enabled by passing `-DLIBCLC_TARGETS_TO_BUILD` to CMake. The default
+-is `all`.
+-
+ In both cases, the LLVM used must include the targets you want libclc support for
+ (`AMDGPU` and `NVPTX` are enabled in LLVM by default). Apart from `SPIRV` where you do
+ not need an LLVM target but you do need the
+diff --git a/libclc/test/CMakeLists.txt b/libclc/test/CMakeLists.txt
+index 4d8bb60b52b0..c65346ec893f 100644
+--- a/libclc/test/CMakeLists.txt
++++ b/libclc/test/CMakeLists.txt
+@@ -7,19 +7,12 @@ set(LIBCLC_TEST_DEPS
+ umbrella_lit_testsuite_begin(check-libclc)
+ 
+ # Testing unresolved symbols.
+-foreach(t ${LIBCLC_TARGETS_TO_BUILD})
+-  string(REPLACE "-" ";" TRIPLE ${t})
+-  list(GET TRIPLE 0 ARCH)
+-
+-  # Skip nvptx, clspv, spirv targets
+-  if(ARCH MATCHES "^(nvptx|clspv)(64)?$" OR ARCH MATCHES "^spirv(64)?$")
+-    continue()
+-  endif()
+-
++# Skip nvptx, clspv, spirv targets
++if(ARCH MATCHES amdgcn)
+   # Get the output file from the target property
+-  set(target_file "$<TARGET_PROPERTY:libclc-${t},TARGET_FILE>")
++  set(target_file "$<TARGET_PROPERTY:libclc-${LIBCLC_TARGET},TARGET_FILE>")
+ 
+-  set(LIBCLC_TARGET_TEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/${t})
++  set(LIBCLC_TARGET_TEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/${LIBCLC_TARGET})
+   file(MAKE_DIRECTORY ${LIBCLC_TARGET_TEST_DIR})
+   file(GENERATE OUTPUT ${LIBCLC_TARGET_TEST_DIR}/check-external-funcs.test
+     CONTENT "; RUN: llvm-nm -u \"${target_file}\" | FileCheck %s --allow-empty\n\n; CHECK-NOT: {{.+}}\n"
+@@ -32,11 +25,11 @@ foreach(t ${LIBCLC_TARGETS_TO_BUILD})
+       ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
+   )
+ 
+-  add_lit_testsuite(check-libclc-external-funcs-${t} "Running ${t} tests"
++  add_lit_testsuite(check-libclc-external-funcs-${LIBCLC_TARGET} "Running ${LIBCLC_TARGET} tests"
+     ${LIBCLC_TARGET_TEST_DIR}
+     DEPENDS ${LIBCLC_TEST_DEPS}
+   )
+-  set_target_properties(check-libclc-external-funcs-${t} PROPERTIES FOLDER "libclc tests")
+-endforeach()
++  set_target_properties(check-libclc-external-funcs-${LIBCLC_TARGET} PROPERTIES FOLDER "libclc tests")
++endif()
+ 
+ umbrella_lit_testsuite_end(check-libclc)
+diff --git a/llvm/runtimes/CMakeLists.txt b/llvm/runtimes/CMakeLists.txt
+index 20c79a2c2e2e..dfa8369bad7b 100644
+--- a/llvm/runtimes/CMakeLists.txt
++++ b/llvm/runtimes/CMakeLists.txt
+@@ -552,8 +552,18 @@ if(build_runtimes)
+     list(APPEND extra_cmake_args "-DCMAKE_PROGRAM_PATH=${CMAKE_PROGRAM_PATH}")
+   endif()
+ 
+-  # TODO: We need to consider passing it as '-DRUNTIMES_x86_64_LLVM_ENABLE_RUNTIMES'.
++  set(libclc_enabled FALSE)
+   if("libclc" IN_LIST LLVM_ENABLE_RUNTIMES)
++    set(libclc_enabled TRUE)
++  else()
++    foreach(target ${LLVM_RUNTIME_TARGETS})
++      if("libclc" IN_LIST RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES)
++        set(libclc_enabled TRUE)
++        break()
++      endif()
++    endforeach()
++  endif()
++  if(libclc_enabled)
+     foreach(dep clang llvm-link opt llvm-ar llvm-ranlib llvm-spirv)
+       if(TARGET ${dep})
+         list(APPEND extra_deps ${dep})
+-- 
+2.53.0.1213.gd9a14994de-goog
+

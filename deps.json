@@ -6,7 +6,10 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "3c8e9499ac4caefce53ef43b752223fc70b67f55"
+      "commit" : "1839b755ddf0993ab1fd962028b21986097e3ccd",
+      "patches" : [
+          {"patch" : "patches/0001-libclc-Enable-LLVM_RUNTIME_TARGETS-in-build-system.patch"}
+      ]
     },
     {
       "name" : "SPIRV-Headers",
