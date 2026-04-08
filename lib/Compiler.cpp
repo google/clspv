@@ -258,6 +258,7 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
 int SetCompilerInstanceOptions(
     CompilerInstance &instance, const llvm::StringRef &overiddenInputFilename,
     clang::FrontendInputFile &kernelFile, const std::string &program,
+    const std::vector<std::pair<std::string, std::string>> &headers,
     std::unique_ptr<llvm::MemoryBuffer> &file_memory_buffer,
     llvm::raw_string_ostream *diagnosticsStream) {
   if (program.empty()) {
@@ -381,6 +382,21 @@ int SetCompilerInstanceOptions(
     instance.getPreprocessorOpts().addMacroDef(define);
   }
 
+  // Add headers to virtual filesystem
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> VFS(
+      new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS(
+      new llvm::vfs::InMemoryFileSystem(true));
+  const auto VFS_prefix = "/virtual_clvk_includes/";
+  for (const auto &header : headers) {
+    auto header_name = VFS_prefix + header.first;
+    MemFS->addFile(
+        header_name, 0,
+        llvm::MemoryBuffer::getMemBuffer(header.second, header.first));
+  }
+  VFS->pushOverlay(MemFS);
+  Includes.push_back(VFS_prefix);
+
   // Header search options
   for (auto include : Includes) {
     instance.getHeaderSearchOpts().AddPath(include, clang::frontend::After,
@@ -466,7 +482,7 @@ int SetCompilerInstanceOptions(
 
   instance.setTarget(PrepareTargetInfo(instance));
 
-  instance.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
+  instance.setVirtualFileSystem(VFS);
   instance.createFileManager();
   instance.createSourceManager();
 
@@ -1122,8 +1138,9 @@ bool LinkBuiltinLibrary(llvm::Module *module) {
 std::unique_ptr<llvm::Module>
 ProgramToModule(llvm::LLVMContext &context,
                 const llvm::StringRef &inputFilename,
-                const std::string &program, std::string *output_log, int *err) {
-
+                const std::string &program,
+                const std::vector<std::pair<std::string, std::string>> &headers,
+                std::string *output_log, int *err) {
   clang::CompilerInstance instance;
   clang::FrontendInputFile kernelFile(inputFilename,
                                       clang::InputKind(InputLanguage));
@@ -1131,8 +1148,8 @@ ProgramToModule(llvm::LLVMContext &context,
   llvm::raw_string_ostream diagnosticsStream(log);
   std::unique_ptr<llvm::MemoryBuffer> file_memory_buffer;
   if (auto error = SetCompilerInstanceOptions(
-          instance, inputFilename, kernelFile, program, file_memory_buffer,
-          &diagnosticsStream)) {
+          instance, inputFilename, kernelFile, program, headers,
+          file_memory_buffer, &diagnosticsStream)) {
     *err = error;
     return nullptr;
   }
@@ -1206,20 +1223,20 @@ int CompileModule(const llvm::StringRef &input_filename,
   return WriteOutput(binaryStream.str().str(), output_buffer);
 }
 
-int CompilePrograms(const std::vector<std::string> &programs,
-                    std::vector<uint32_t> *output_buffer,
-                    std::string *output_log) {
+int CompilePrograms(
+    const std::vector<std::string> &programs,
+    const std::vector<std::pair<std::string, std::string>> &headers,
+    std::vector<uint32_t> *output_buffer, std::string *output_log) {
   std::vector<std::unique_ptr<llvm::Module>> modules;
   modules.reserve(programs.size());
 
   llvm::LLVMContext context;
   for (auto program : programs) {
     int error;
-    modules.push_back(
-        ProgramToModule(context, "source", program, output_log, &error));
+    modules.push_back(ProgramToModule(context, "source", program, headers,
+                                      output_log, &error));
     if (error != 0)
       return error;
-
   }
   assert(modules.size() > 0 && modules.back() != nullptr);
 
@@ -1239,8 +1256,9 @@ int CompileProgram(const llvm::StringRef &input_filename,
                    std::string *output_log) {
   int error;
   llvm::LLVMContext context;
-  std::unique_ptr<llvm::Module> module =
-      ProgramToModule(context, input_filename, program, output_log, &error);
+  const std::vector<std::pair<std::string, std::string>> headers;
+  std::unique_ptr<llvm::Module> module = ProgramToModule(
+      context, input_filename, program, headers, output_log, &error);
   if (module == nullptr) {
     return error;
   }
@@ -1331,14 +1349,16 @@ int Compile(const int argc, const char *const argv[]) {
                             std::istreambuf_iterator<char>());
     }
 
-    return CompilePrograms(programs, nullptr, nullptr);
+    const std::vector<std::pair<std::string, std::string>> headers;
+    return CompilePrograms(programs, headers, nullptr, nullptr);
   }
 }
 
-int CompileFromSourcesString(const std::vector<std::string> &programs,
-                             const std::string &options,
-                             std::vector<uint32_t> *output_buffer,
-                             std::string *output_log) {
+int CompileFromSourcesStringWithHeaders(
+    const std::vector<std::string> &programs,
+    const std::vector<std::pair<std::string, std::string>> &headers,
+    const std::string &options, std::vector<uint32_t> *output_buffer,
+    std::string *output_log) {
   llvm::SmallVector<const char *, 20> argv;
   llvm::BumpPtrAllocator A;
   llvm::StringSaver Saver(A);
@@ -1348,7 +1368,16 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
   if (auto error = ParseOptions(argc, &argv[0]))
     return error;
 
-  return CompilePrograms(programs, output_buffer, output_log);
+  return CompilePrograms(programs, headers, output_buffer, output_log);
+}
+
+int CompileFromSourcesString(const std::vector<std::string> &programs,
+                             const std::string &options,
+                             std::vector<uint32_t> *output_buffer,
+                             std::string *output_log) {
+  const std::vector<std::pair<std::string, std::string>> headers;
+  return CompileFromSourcesStringWithHeaders(programs, headers, options,
+                                             output_buffer, output_log);
 }
 
 int CompileFromSourceString(const std::string &program,
