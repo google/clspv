@@ -50,6 +50,17 @@ int CompileFromSourcesString(const std::vector<std::string> &programs,
                              const std::string &options,
                              std::vector<uint32_t> *output_buffer,
                              std::string *output_log);
+
+// Compile from multiple source strings, with additional headers
+//
+// 'headers' is a vector of pairs of '<header_path, header_content>'
+// Command line options to clspv are passed as |options|.
+int CompileFromSourcesStringWithHeaders(
+    const std::vector<std::string> &programs,
+    const std::vector<std::pair<std::string, std::string>> &headers,
+    const std::string &options, std::vector<uint32_t> *output_buffer,
+    std::string *output_log);
+
 } // namespace clspv
 #endif
 
