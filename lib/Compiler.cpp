@@ -34,7 +34,9 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
@@ -387,15 +389,18 @@ int SetCompilerInstanceOptions(
       new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
   llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS(
       new llvm::vfs::InMemoryFileSystem(true));
-  const auto VFS_prefix = "/virtual_clvk_includes/";
+  llvm::SmallString<128> VirtualRoot;
+  llvm::sys::fs::current_path(VirtualRoot);
+  llvm::sys::path::append(VirtualRoot, "virtual_clspv_includes");
   for (const auto &header : headers) {
-    auto header_name = VFS_prefix + header.first;
+    llvm::SmallString<128> Path = VirtualRoot;
+    llvm::sys::path::append(Path, header.first);
     MemFS->addFile(
-        header_name, 0,
+        Path.str(), 0,
         llvm::MemoryBuffer::getMemBuffer(header.second, header.first));
   }
   VFS->pushOverlay(MemFS);
-  Includes.push_back(VFS_prefix);
+  Includes.push_back(VirtualRoot.str().str());
 
   // Header search options
   for (auto include : Includes) {
