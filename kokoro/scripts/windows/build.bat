@@ -17,7 +17,6 @@
 set BUILD_ROOT=%cd%
 set SRC=%cd%\github\clspv
 set BUILD_TYPE=%1
-set VS_VERSION=%2
 set BUILD=%SRC%\build
 
 :: Use updated CMake
