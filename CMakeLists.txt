@@ -139,8 +139,9 @@ else()
     endif()
     use_component(${CLSPV_LIBCLC_SOURCE_DIR})
 
-    set(LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "Semicolon-separated list of runtimes to build, or \"all\".")
-    set(LIBCLC_TARGETS_TO_BUILD clspv--;clspv64--)
+    set(RUNTIMES_clspv--_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
+    set(RUNTIMES_clspv64--_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
+    set(LLVM_RUNTIME_TARGETS clspv--;clspv64-- CACHE STRING "")
 
     # Tell LLVM to build the native target (needed to build libclc).
     set(CLSPV_LLVM_TARGETS_TO_BUILD "Native")
