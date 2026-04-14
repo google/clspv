@@ -987,6 +987,23 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (clspv::Option::SupportsFmaKHR(16) && !clspv::Option::FP16()) {
+    llvm::errs()
+        << "error: Cannot set SpvKhrFma for fp16 if fp16 is not supported\n";
+    return -1;
+  }
+  if (clspv::Option::SupportsFmaKHR(64) && !clspv::Option::FP64()) {
+    llvm::errs()
+        << "error: Cannot set SpvKhrFma for fp64 if fp64 is not supported\n";
+    return -1;
+  }
+
+  if (clspv::Option::SupportsFmaKHR(32) &&
+      (clspv::Option::SupportsFmaKHR(16) || !clspv::Option::FP16()) &&
+      (clspv::Option::SupportsFmaKHR(64) || !clspv::Option::FP64())) {
+    clspv::Option::AddUseNativeBuiltins(clspv::Builtins::BuiltinType::kFma);
+  }
+
   return 0;
 }
 

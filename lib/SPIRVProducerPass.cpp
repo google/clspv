@@ -3424,6 +3424,10 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_untyped_pointers");
   }
 
+  if (CapabilitySet.count(spv::CapabilityFMAKHR)) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_fma");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -5120,12 +5124,18 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   default: {
     glsl::ExtInst EInst = Builtins::getDirectOrIndirectExtInstEnum(func_info);
 
-    // Do not replace functions with implementations.
     if (EInst && EInst == glsl::ExtInst::ExtInstFma &&
-        !clspv::Option::UnsafeMath() && !clspv::Option::ClMadEnable() &&
-        clspv::Option::UseNativeBuiltins().count(
-            clspv::Builtins::BuiltinType::kFma) == 0 &&
-        Call->getType()->getScalarType()->isHalfTy()) {
+        clspv::Option::SupportsFmaKHR(Call->getType()->getScalarSizeInBits())) {
+      addCapability(spv::CapabilityFMAKHR);
+      SPIRVOperandVec Ops;
+      Ops << Call->getType() << Call->getOperand(0) << Call->getOperand(1)
+          << Call->getOperand(2);
+      RID = addSPIRVInst(spv::OpFmaKHR, Ops);
+    } else if (EInst && EInst == glsl::ExtInst::ExtInstFma &&
+               !clspv::Option::UnsafeMath() && !clspv::Option::ClMadEnable() &&
+               clspv::Option::UseNativeBuiltins().count(
+                   clspv::Builtins::BuiltinType::kFma) == 0 &&
+               Call->getType()->getScalarType()->isHalfTy()) {
       Type *FP16Ty = Call->getType();
 
       Type *FP32Ty = Type::getFloatTy(Context);
@@ -5156,6 +5166,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
       Ops << FP16Ty << fma_f32;
       RID = addSPIRVInst(spv::OpFConvert, Ops);
 
+      // Do not replace functions with implementations.
     } else if (EInst && Call->getCalledFunction()->isDeclaration()) {
       SPIRVID ExtInstImportID = getOpExtInstImportID();
 
@@ -6883,6 +6894,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
       }
       break;
     }
+    case spv::OpFmaKHR:
     case spv::OpFunction:
     case spv::OpFunctionParameter:
     case spv::OpAccessChain:

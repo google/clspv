@@ -160,6 +160,9 @@ bool ImageSupport();
 // instruction) rather than using the builtin library implementation.
 std::set<clspv::Builtins::BuiltinType> UseNativeBuiltins();
 
+// Mark a builtin as native
+void AddUseNativeBuiltins(clspv::Builtins::BuiltinType builtin);
+
 // Returns the source language.
 enum class SourceLanguage {
   Unknown,
@@ -315,6 +318,14 @@ bool UntypedPointers();
 
 // Returns true if untyped pointers are supported in aspace.
 bool UntypedPointerAddressSpace(unsigned aspace);
+
+enum class SpvKhrFma : uint32_t {
+  fp16,
+  fp32,
+  fp64,
+};
+// Returns true if OpFmaKHR is supported for the type size.
+bool SupportsFmaKHR(uint32_t scalarSizeInBits);
 
 } // namespace Option
 } // namespace clspv
