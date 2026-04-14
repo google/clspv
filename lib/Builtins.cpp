@@ -794,7 +794,7 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   if (func_info.getName().find("llvm.maximumnum.v") == 0) {
     return glsl::ExtInst::ExtInstFMax;
   }
-  
+
   return kGlslExtInstBad;
 }
 
