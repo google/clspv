@@ -4300,8 +4300,57 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
 
   spv::Op op = spv::OpNop;
   switch (FuncInfo.getType()) {
-  case Builtins::kGetSubGroupSize:
-    return loadBuiltin(spv::BuiltInSubgroupSize);
+  case Builtins::kGetSubGroupSize: {
+    // To support partial subgroups correctly (when WorkgroupSize is not a
+    // multiple of SubgroupSize), OpenCL expects the true remaining invocations
+    // for the last subgroup. Since Vulkan's spv::BuiltInSubgroupSize always
+    // returns the max hardware warp size, we compute this manually using
+    // FlatWorkgroupSize.
+    auto Int32Ty = Type::getInt32Ty(module->getContext());
+    assert(WorkgroupSizeValueID.isValid());
+
+    // 2. Extract WGSize X, Y, Z
+    SPIRVOperandVec Ops;
+    Ops << Int32Ty << WorkgroupSizeValueID << 0;
+    SPIRVID WGSizeX = addSPIRVInst(spv::OpCompositeExtract, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << WorkgroupSizeValueID << 1;
+    SPIRVID WGSizeY = addSPIRVInst(spv::OpCompositeExtract, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << WorkgroupSizeValueID << 2;
+    SPIRVID WGSizeZ = addSPIRVInst(spv::OpCompositeExtract, Ops);
+
+    // 3. Multiply X, Y, Z to get FlatWorkgroupSize
+    Ops.clear();
+    Ops << Int32Ty << WGSizeX << WGSizeY;
+    SPIRVID FlatWGSizeXY = addSPIRVInst(spv::OpIMul, Ops);
+
+    Ops.clear();
+    Ops << Int32Ty << FlatWGSizeXY << WGSizeZ;
+    SPIRVID FlatWGSize = addSPIRVInst(spv::OpIMul, Ops);
+
+    // 4. Load SubgroupId and MaxSubgroupSize
+    SPIRVID SubgroupId = loadBuiltin(spv::BuiltInSubgroupId);
+    SPIRVID MaxSubgroupSize = loadBuiltin(spv::BuiltInSubgroupSize);
+
+    // 5. SubgroupStartId = SubgroupId * MaxSubgroupSize
+    Ops.clear();
+    Ops << Int32Ty << SubgroupId << MaxSubgroupSize;
+    SPIRVID SubgroupStartId = addSPIRVInst(spv::OpIMul, Ops);
+
+    // 6. Remaining = FlatWorkgroupSize - SubgroupStartId
+    Ops.clear();
+    Ops << Int32Ty << FlatWGSize << SubgroupStartId;
+    SPIRVID Remaining = addSPIRVInst(spv::OpISub, Ops);
+
+    // 7. ActualSize = ExtInstUMin(Remaining, MaxSubgroupSize)
+    Ops.clear();
+    Ops << Call->getType() << getOpExtInstImportID()
+        << glsl::ExtInst::ExtInstUMin << Remaining << MaxSubgroupSize;
+    return addSPIRVInst(spv::OpExtInst, Ops);
+  }
   case Builtins::kGetNumSubGroups:
     return loadBuiltin(spv::BuiltInNumSubgroups);
   case Builtins::kGetSubGroupId:
@@ -4310,6 +4359,7 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     return loadBuiltin(spv::BuiltInSubgroupLocalInvocationId);
 
   case Builtins::kSubGroupBroadcast:
+  case Builtins::kSubGroupNonUniformBroadcast:
     if (SpvVersion() < SPIRVVersion::SPIRV_1_5 &&
         !dyn_cast<ConstantInt>(Call->getOperand(1))) {
       llvm_unreachable("sub_group_broadcast requires constant lane Id for "
@@ -4317,6 +4367,10 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     }
     addCapability(spv::CapabilityGroupNonUniformBallot);
     op = spv::OpGroupNonUniformBroadcast;
+    break;
+  case Builtins::kSubGroupBroadcastFirst:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBroadcastFirst;
     break;
 
   case Builtins::kSubGroupAll:
@@ -4338,6 +4392,24 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
   case Builtins::kSubGroupBallotFindMSB:
     addCapability(spv::CapabilityGroupNonUniformBallot);
     op = spv::OpGroupNonUniformBallotFindMSB;
+    break;
+  case Builtins::kSubGroupAllEqual:
+    addCapability(spv::CapabilityGroupNonUniformVote);
+    op = spv::OpGroupNonUniformAllEqual;
+    break;
+  case Builtins::kSubGroupInverseBallot:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformInverseBallot;
+    break;
+  case Builtins::kSubGroupBallotBitExtract:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBallotBitExtract;
+    break;
+  case Builtins::kSubGroupBallotBitCount:
+  case Builtins::kSubGroupBallotInclusiveScan:
+  case Builtins::kSubGroupBallotExclusiveScan:
+    addCapability(spv::CapabilityGroupNonUniformBallot);
+    op = spv::OpGroupNonUniformBallotBitCount;
     break;
   case Builtins::kSubGroupElect:
     addCapability(spv::CapabilityGroupNonUniformVote);
@@ -4443,7 +4515,10 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
   case Builtins::kSubGroupAny:
   case Builtins::kSubGroupAll:
   case Builtins::kSubGroupElect:
-    // SPIR-V needs a bool return type for any/all/elect.
+  case Builtins::kSubGroupAllEqual:
+  case Builtins::kSubGroupInverseBallot:
+  case Builtins::kSubGroupBallotBitExtract:
+    // SPIR-V needs a bool return type for any/all/elect/all_equal.
     Operands << getSPIRVType(Type::getInt1Ty(module->getContext()));
     break;
   default:
@@ -4458,16 +4533,19 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
   case Builtins::kSubGroupReduceAdd:
   case Builtins::kSubGroupReduceMin:
   case Builtins::kSubGroupReduceMax:
+  case Builtins::kSubGroupBallotBitCount:
     Operands << spv::GroupOperationReduce;
     break;
   case Builtins::kSubGroupScanExclusiveAdd:
   case Builtins::kSubGroupScanExclusiveMin:
   case Builtins::kSubGroupScanExclusiveMax:
+  case Builtins::kSubGroupBallotExclusiveScan:
     Operands << spv::GroupOperationExclusiveScan;
     break;
   case Builtins::kSubGroupScanInclusiveAdd:
   case Builtins::kSubGroupScanInclusiveMin:
   case Builtins::kSubGroupScanInclusiveMax:
+  case Builtins::kSubGroupBallotInclusiveScan:
     Operands << spv::GroupOperationInclusiveScan;
     break;
   default:
@@ -4490,6 +4568,33 @@ SPIRVProducerPassImpl::GenerateSubgroupInstruction(
     Ops.clear();
     Operands << cmp;
     auto subgroup = addSPIRVInst(op, Operands);
+    Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
+        << ConstantInt::get(Call->getType(), 0);
+    RID = addSPIRVInst(spv::OpSelect, Ops);
+    break;
+  }
+  case Builtins::kSubGroupAllEqual: {
+    Operands << Call->getArgOperand(0);
+    auto subgroup = addSPIRVInst(op, Operands);
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
+        << ConstantInt::get(Call->getType(), 0);
+    RID = addSPIRVInst(spv::OpSelect, Ops);
+    break;
+  }
+  case Builtins::kSubGroupInverseBallot: {
+    Operands << Call->getArgOperand(0);
+    auto subgroup = addSPIRVInst(op, Operands);
+    SPIRVOperandVec Ops;
+    Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
+        << ConstantInt::get(Call->getType(), 0);
+    RID = addSPIRVInst(spv::OpSelect, Ops);
+    break;
+  }
+  case Builtins::kSubGroupBallotBitExtract: {
+    Operands << Call->getArgOperand(0) << Call->getArgOperand(1);
+    auto subgroup = addSPIRVInst(op, Operands);
+    SPIRVOperandVec Ops;
     Ops << Call->getType() << subgroup << ConstantInt::get(Call->getType(), 1)
         << ConstantInt::get(Call->getType(), 0);
     RID = addSPIRVInst(spv::OpSelect, Ops);
@@ -7012,10 +7117,15 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpSUDotAccSat:
     case spv::OpGroupNonUniformAll:
     case spv::OpGroupNonUniformAny:
+    case spv::OpGroupNonUniformAllEqual:
     case spv::OpGroupNonUniformBallot:
+    case spv::OpGroupNonUniformInverseBallot:
+    case spv::OpGroupNonUniformBallotBitExtract:
+    case spv::OpGroupNonUniformBallotBitCount:
     case spv::OpGroupNonUniformBallotFindLSB:
     case spv::OpGroupNonUniformBallotFindMSB:
     case spv::OpGroupNonUniformBroadcast:
+    case spv::OpGroupNonUniformBroadcastFirst:
     case spv::OpGroupNonUniformElect:
     case spv::OpGroupNonUniformIAdd:
     case spv::OpGroupNonUniformFAdd:

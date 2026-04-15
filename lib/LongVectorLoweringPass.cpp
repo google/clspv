@@ -270,6 +270,7 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kSpirvOp:
   case clspv::Builtins::kStep:
   case clspv::Builtins::kSqrt:
+  case clspv::Builtins::kSubGroupNonUniformBroadcast:
   case clspv::Builtins::kTan:
   case clspv::Builtins::kTanh:
   case clspv::Builtins::kTrunc: {
