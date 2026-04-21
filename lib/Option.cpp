@@ -453,6 +453,17 @@ static llvm::cl::opt<bool>
     untyped_pointers("untyped-pointers", llvm::cl::init(false),
                      llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
 
+static llvm::cl::list<clspv::Option::SpvKhrFma> spv_khr_fma(
+    "spv-khr-fma",
+    llvm::cl::desc("Enable SPV_KHR_fma for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp16, "16",
+                                "Enable SPV_KHR_fma for fp16")),
+    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp32, "32",
+                                "Enable SPV_KHR_fma for fp32")),
+    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp64, "64",
+                                "Enable SPV_KHR_fma for fp64")));
+
 } // namespace
 
 namespace clspv {
@@ -548,6 +559,9 @@ bool NativeMath() { return cl_native_math; }
 std::set<clspv::Builtins::BuiltinType> UseNativeBuiltins() {
   return use_native_builtins;
 }
+void AddUseNativeBuiltins(clspv::Builtins::BuiltinType builtin) {
+  use_native_builtins.insert(builtin);
+}
 
 bool FP16() { return fp16; }
 bool FP64() { return fp64; }
@@ -608,6 +622,26 @@ bool UntypedPointerAddressSpace(unsigned aspace) {
   }
 
   return false;
+}
+
+bool SupportsFmaKHR(uint32_t scalarSizeInBits) {
+  SpvKhrFma fma;
+  switch (scalarSizeInBits) {
+  case 16:
+    fma = clspv::Option::SpvKhrFma::fp16;
+    break;
+  case 32:
+    fma = clspv::Option::SpvKhrFma::fp32;
+    break;
+  case 64:
+    fma = clspv::Option::SpvKhrFma::fp64;
+    break;
+  default:
+    return false;
+  }
+  auto begin = spv_khr_fma.begin();
+  auto end = spv_khr_fma.end();
+  return std::find(begin, end, fma) != end;
 }
 
 } // namespace Option
