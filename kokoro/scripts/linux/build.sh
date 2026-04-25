@@ -36,7 +36,7 @@ python3 utils/fetch_sources.py --ci
 mkdir build && cd $SRC/build
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-13.0.1
+  using clang-18
 fi
 
 echo $(date): Starting build...

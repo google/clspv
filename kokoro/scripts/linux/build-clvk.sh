@@ -31,7 +31,7 @@ BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-13.0.1
+  using clang-18
 fi
 
 # Get Clspv dependencies.
