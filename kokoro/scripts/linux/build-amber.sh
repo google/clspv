@@ -42,7 +42,7 @@ python3 tools/git-sync-deps --with-swiftshader
 mkdir build && cd $BUILD_ROOT/github/amber/build
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-13.0.1
+  using clang-18
 fi
 
 # Invoke the build.
