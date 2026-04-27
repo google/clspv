@@ -539,8 +539,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   case '1':
   case '2':
   case '3':
-  case 's':
-  case 'z':
     break;
   default:
     llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
@@ -561,12 +559,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     break;
   case '3':
     level = llvm::OptimizationLevel::O3;
-    break;
-  case 's':
-    level = llvm::OptimizationLevel::Os;
-    break;
-  case 'z':
-    level = llvm::OptimizationLevel::Oz;
     break;
   default:
     break;
