@@ -49,6 +49,15 @@ PreservedAnalyses clspv::PhysicalPointerArgsPass::run(Module &M,
       if (auto *PtrTy = dyn_cast<PointerType>(Arg.getType())) {
         auto *ArgTy = clspv::InferType(&Arg, M.getContext(), &TypeCache);
 
+        // If we cannot infer the type, that Arg should not be used. Then just
+        // use the most common type for it. Removing the arg would be annoying
+        // when go through the arg indexes of the `NewFunc` later in the current
+        // function.
+        if (ArgTy == nullptr) {
+          assert(Arg.getNumUses() == 0);
+          ArgTy = Type::getInt32Ty(M.getContext());
+        }
+
         bool IsBuiltinStructTy = false;
         if (auto *ArgStructTy = dyn_cast<StructType>(ArgTy)) {
           IsBuiltinStructTy = clspv::IsImageType(ArgStructTy) ||
