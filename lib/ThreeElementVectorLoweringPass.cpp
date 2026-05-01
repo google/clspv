@@ -405,6 +405,11 @@ Value *clspv::ThreeElementVectorLoweringPass::visitConstant(Constant &Cst) {
     return ConstantVector::get(Elements);
   }
 
+  if (auto *CFP = dyn_cast<ConstantFP>(&Cst)) {
+    // Return a splat of the original value, but widened as needed.
+    return ConstantFP::get(EquivalentTy, CFP->getValueAPF());
+  }
+
   if (auto *Array = dyn_cast<ConstantArray>(&Cst)) {
     SmallVector<Constant *, 16> Elements;
     for (unsigned i = 0; i < Array->getNumOperands(); ++i) {

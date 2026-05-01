@@ -2471,21 +2471,34 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVConstant(Constant *C, Type *TyHint) {
   } else if (const ConstantFP *CFP = dyn_cast<ConstantFP>(Cst)) {
     uint64_t FPVal = CFP->getValueAPF().bitcastToAPInt().getZExtValue();
     Type *CFPTy = CFP->getType();
-    if (CFPTy->isFloatTy()) {
-      LiteralNum.push_back(FPVal & 0xFFFFFFFF);
-    } else if (CFPTy->isDoubleTy()) {
-      LiteralNum.push_back(FPVal & 0xFFFFFFFF);
-      LiteralNum.push_back(FPVal >> 32);
-    } else if (CFPTy->isHalfTy()) {
-      LiteralNum.push_back(FPVal & 0xFFFF);
+
+    if (auto *vecTy = dyn_cast<llvm::VectorType>(CFPTy)) {
+      // A splat over floats is represented as a ConstantFP.
+      Opcode = spv::OpConstantComposite;
+
+      Constant *scalar =
+          ConstantFP::get(vecTy->getElementType(), CFP->getValueAPF());
+      SPIRVID spirv_scalar = getSPIRVConstant(scalar);
+      auto num_elem = vecTy->getElementCount().getFixedValue();
+      while (num_elem-- > 0) {
+        Ops << spirv_scalar;
+      }
     } else {
-      CFPTy->print(errs());
-      llvm_unreachable("Implement this ConstantFP Type");
+      if (CFPTy->isFloatTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFFFFFF);
+      } else if (CFPTy->isDoubleTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFFFFFF);
+        LiteralNum.push_back(FPVal >> 32);
+      } else if (CFPTy->isHalfTy()) {
+        LiteralNum.push_back(FPVal & 0xFFFF);
+      } else {
+        CFPTy->print(errs());
+        llvm_unreachable("Implement this ConstantFP Type");
+      }
+
+      Opcode = spv::OpConstant;
+      Ops << LiteralNum;
     }
-
-    Opcode = spv::OpConstant;
-
-    Ops << LiteralNum;
   } else if (isa<ConstantDataSequential>(Cst) &&
              cast<ConstantDataSequential>(Cst)->isString()) {
 

@@ -754,6 +754,22 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
   }
 
+  if (auto *CFP = dyn_cast<ConstantFP>(&Cst)) {
+    assert(isa<ArrayType>(EquivalentTy));
+    // This occurs for splats of float constants. They have vector type.
+    auto *vecTy = cast<VectorType>(Cst.getType());
+    auto num_elems = vecTy->getElementCount().getFixedValue();
+    Type *scalarTy = vecTy->getElementType();
+    const auto floatVal = CFP->getValueAPF();
+
+    SmallVector<Constant *, 16> Scalars;
+    for (decltype(num_elems) i = 0; i < num_elems; ++i) {
+      Scalars.push_back(ConstantFP::get(scalarTy, floatVal));
+    }
+
+    return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
+  }
+
   // TODO(#874): this pass needs updated to handle constantexpr more robustly.
   if (auto *CE = dyn_cast<ConstantExpr>(&Cst)) {
     switch (CE->getOpcode()) {
