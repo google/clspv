@@ -10,9 +10,10 @@ kernel void foo(global float4* output, int4 x) {
 // CHECK: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
 // CHECK: [[float4:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 4
 // CHECK: [[bool:%[a-zA-Z0-9_]+]] = OpTypeBool
-// CHECK: [[bool4:%[a-zA-Z0-9_]+]] = OpTypeVector [[bool]] 4
-// CHECK: [[float_n1:%[a-zA-Z0-9_]+]] = OpConstant [[float]] -1
-// CHECK: [[float4_true:%[a-zA-Z0-9_]+]] = OpConstantComposite [[float4]] [[float_n1]] [[float_n1]] [[float_n1]] [[float_n1]]
-// CHECK: [[float4_false:%[a-zA-Z0-9_]+]] = OpConstantNull [[float4]]
+// CHECK-DAG: [[bool4:%[a-zA-Z0-9_]+]] = OpTypeVector [[bool]] 4
+// CHECK-DAG: [[float_n1:%[a-zA-Z0-9_]+]] = OpConstant [[float]] -1
+// CHECK-DAG: [[float_0:%[a-zA-Z0-9_]+]] = OpConstant [[float]] 0
+// CHECK-DAG: [[float4_true:%[a-zA-Z0-9_]+]] = OpConstantComposite [[float4]] [[float_n1]] [[float_n1]] [[float_n1]] [[float_n1]]
+// CHECK-DAG: [[float4_false:%[a-zA-Z0-9_]+]] = OpConstantComposite [[float4]] [[float_0]] [[float_0]] [[float_0]] [[float_0]]
 // CHECK: [[greater:%[a-zA-Z0-9_]+]] = OpSGreaterThan [[bool4]]
 // CHECK: [[select:%[a-zA-Z0-9_]+]] = OpSelect [[float4]] [[greater]] [[float4_true]] [[float4_false]]
