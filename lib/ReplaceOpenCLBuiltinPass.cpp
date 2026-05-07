@@ -3542,9 +3542,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F,
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     auto align = F.getParent()->getDataLayout().getABITypeAlign(
         CI->getArgOperand(1)->getType());
+    const bool ElementWise = false;
     return new AtomicRMWInst(Op, CI->getArgOperand(0), CI->getArgOperand(1),
                              align, AtomicOrdering::SequentiallyConsistent,
-                             SyncScope::System, CI->getIterator());
+                             SyncScope::System, ElementWise, CI->getIterator());
   });
 }
 
