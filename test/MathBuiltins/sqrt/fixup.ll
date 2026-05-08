@@ -7,7 +7,7 @@ target triple = "spir-unknown-unknown"
 @__spirv_WorkgroupSize = addrspace(8) global <3 x i32> zeroinitializer
 
 ; CHECK: spir_kernel void @k1
-; CHECK: store float {{0x[7F]FF8000000000000}}
+; CHECK: store float {{[+-]?}}qnan
 define dso_local spir_kernel void @k1(ptr addrspace(1) align 4 %out) #0 !kernel_arg_addr_space !5 !kernel_arg_access_qual !6 !kernel_arg_type !7 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 !clspv.pod_args_impl !9 {
 entry:
   %call = call spir_func float @_Z4sqrtf(float -1.000000e+00) #2
@@ -20,7 +20,7 @@ declare spir_func float @_Z4sqrtf(float) #1
 declare spir_func float @_Z5rsqrtf(float) #1
 
 ; CHECK: spir_kernel void @k2
-; CHECK: store float 0x3FF6A09E60000000
+; CHECK: store float f0x3FB504F3
 define dso_local spir_kernel void @k2(ptr addrspace(1) align 4 %out) #0 !kernel_arg_addr_space !5 !kernel_arg_access_qual !6 !kernel_arg_type !7 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 !clspv.pod_args_impl !9 {
 entry:
   %call = call spir_func float @_Z4sqrtf(float 2.000000e+00) #2
@@ -30,7 +30,7 @@ entry:
 }
 
 ; CHECK: spir_kernel void @kr2
-; CHECK: store float 0x3FE6A09E60000000
+; CHECK: store float f0x3F3504F3
 define dso_local spir_kernel void @kr2(ptr addrspace(1) align 4 %out) #0 !kernel_arg_addr_space !5 !kernel_arg_access_qual !6 !kernel_arg_type !7 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 !clspv.pod_args_impl !9 {
 entry:
   %call = call spir_func float @_Z5rsqrtf(float 2.000000e+00) #2
@@ -42,7 +42,7 @@ entry:
 ; CHECK: spir_kernel void @k3
 ; CHECK: [[fcmp:%[^ ]+]] = fcmp oge
 ; CHECK: [[sqrt:%[^ ]+]] = call spir_func float @_Z4sqrtf
-; CHECK: [[select:%[^ ]+]] = select i1 [[fcmp]], float [[sqrt]], float 0x7FF8000000000000
+; CHECK: [[select:%[^ ]+]] = select i1 [[fcmp]], float [[sqrt]], float +qnan
 ; CHECK: store float [[select]]
 define dso_local spir_kernel void @k3(ptr addrspace(1) align 4 %out) #0 !kernel_arg_addr_space !5 !kernel_arg_access_qual !6 !kernel_arg_type !7 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 !clspv.pod_args_impl !9 {
 entry:
@@ -55,7 +55,7 @@ entry:
 }
 
 ; CHECK: spir_kernel void @k4
-; CHECK: store <2 x float> <float 0x3FF6A09E60000000, float {{0x[7F]FF8000000000000}}>
+; CHECK: store <2 x float> <float f0x3FB504F3, float {{[+-]?}}qnan>
 define dso_local spir_kernel void @k4(ptr addrspace(1) align 8 %out) #0 !kernel_arg_addr_space !5 !kernel_arg_access_qual !6 !kernel_arg_type !7 !kernel_arg_base_type !7 !kernel_arg_type_qual !8 !clspv.pod_args_impl !9 {
 entry:
   %call = call spir_func <2 x float> @_Z4sqrtDv2_f(<2 x float> <float 2.000000e+00, float -1.000000e+00>) #2

@@ -12,6 +12,6 @@ entry:
 
 declare spir_func float @_Z5sinpif(float)
 
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul float %x, 0x400921FB60000000
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul float %x, f0x40490FDB
 ; CHECK: [[sin:%[a-zA-Z0-9_.]+]] = call float @llvm.sin.f32(float [[mul]])
 

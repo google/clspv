@@ -12,7 +12,7 @@ entry:
 
 declare spir_func half @_Z5tanpiDh(half)
 
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul half %x, 0xH4248
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul half %x, 3.140630e+00
 ; CHECK: [[sin:%[a-zA-Z0-9_.]+]] = call half @llvm.sin.f16(half [[mul]])
 ; CHECK: [[cos:%[a-zA-Z0-9_.]+]] = call half @llvm.cos.f16(half [[mul]])
 ; CHECK: [[div:%[a-zA-Z0-9_.]+]] = fdiv half [[sin]], [[cos]]

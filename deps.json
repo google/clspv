@@ -6,7 +6,7 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "87d42c13cd6b119240781f31e5869981d500a186",
+      "commit" : "9a4faee1068c09efbf837cfb7b0f5693b24635f4",
       "patches" : [
           {"patch": "patches/0001-SSAF-Fix-MSVC-template-parsing-error-in-Serializatio.patch"}
       ]

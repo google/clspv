@@ -13,6 +13,6 @@ entry:
 declare spir_func half @_Z5expm1Dh(half %x)
 
 ; CHECK: [[exp:%[a-zA-Z0-9_.]+]] = call half @llvm.exp.f16(half %x)
-; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = fsub half [[exp]], 0xH3C00
+; CHECK: [[sub:%[a-zA-Z0-9_.]+]] = fsub half [[exp]], 1.000000e+00
 ; CHECK: ret half [[sub]]
 
