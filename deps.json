@@ -6,7 +6,10 @@
       "subrepo" : "llvm/llvm-project",
       "branch" : "main",
       "subdir" : "third_party/llvm",
-      "commit" : "6a9dac29a1aa4f3702c93a2a6d7172219438c59f"
+      "commit" : "87d42c13cd6b119240781f31e5869981d500a186",
+      "patches" : [
+          {"patch": "patches/0001-SSAF-Fix-MSVC-template-parsing-error-in-Serializatio.patch"}
+      ]
     },
     {
       "name" : "SPIRV-Headers",

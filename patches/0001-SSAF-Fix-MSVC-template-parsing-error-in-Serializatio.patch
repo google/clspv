@@ -1,0 +1,72 @@
+From 7e40076d7cff79d8412d5b1f40c36b9f4aaa1f76 Mon Sep 17 00:00:00 2001
+From: Romaric Jodin <rjodin@google.com>
+Date: Fri, 8 May 2026 16:14:06 +0200
+Subject: [PATCH] [SSAF] Fix MSVC template parsing error in SerializationFormat
+
+This commit fixes a hard compilation error on Windows when building
+translation units that instantiate the `Add` registry template
+(such as `PointerFlowAnalysis.cpp`).
+
+**Root Cause:**
+When compiling on Windows, Clang defaults to MSVC compatibility mode
+(`-fms-compatibility`). Under this mode, Clang's two-phase template
+lookup struggles to resolve function-local static variables
+(`SavedSerialize` and `SavedDeserialize`) captured by a local class
+(`ConcreteCodec`) inside an uninstantiated template. During Phase 1
+parsing, Clang incorrectly falls back to assuming these variables must
+be members of a dependent base class, rewriting them to
+`this->SavedSerialize`. During Phase 2 instantiation, compilation
+fails because the base class (`Codec`) has no such members.
+
+**The Fix:**
+Hoisted `SavedSerialize` and `SavedDeserialize` out of the constructor
+scope, making them `static inline` members of the `Add` class template.
+This allows Clang's Phase 1 parser to perfectly resolve the symbols
+without relying on broken MSVC fallbacks.
+
+**Why this is safe (Addressing the `dlopen` comment):**
+The original author explicitly commented that they avoided `static inline`
+class members to prevent Linux symbol visibility issues across shared
+library boundaries (`dlopen` with `RTLD_LOCAL`).
+
+That concern is still honored by this fix. The visibility risk only applies
+if the `ConcreteCodec`'s *own* execution state relied directly on static
+members. By moving the static variables to the `Add` factory class,
+`ConcreteCodec` continues to store `SerFn` and `DesFn` as strictly
+**instance members**. The `ConcreteCodec` constructor safely snapshots
+the plugin's local copy of `Add::SavedSerialize` at the moment of
+instantiation. Since the virtual methods executed by the host still
+read exclusively from the isolated instance state, the runtime behavior
+remains completely identical and safe.
+---
+ .../Core/Serialization/SerializationFormat.h               | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/clang/include/clang/ScalableStaticAnalysisFramework/Core/Serialization/SerializationFormat.h b/clang/include/clang/ScalableStaticAnalysisFramework/Core/Serialization/SerializationFormat.h
+index fd261c6d9a72..9ab79dda3fc1 100644
+--- a/clang/include/clang/ScalableStaticAnalysisFramework/Core/Serialization/SerializationFormat.h
++++ b/clang/include/clang/ScalableStaticAnalysisFramework/Core/Serialization/SerializationFormat.h
+@@ -133,6 +133,9 @@ protected:
+       using TypedSerializerFn =
+           llvm::function_ref<SerRet(const AnalysisResultT &, SerArgs...)>;
+ 
++      static inline TypedSerializerFn SavedSerialize;
++      static inline DeserializerFn SavedDeserialize;
++
+       /// Takes the plugin's typed serializer and the deserializer, and
+       /// inserts them into \c llvm::Registry<Codec>.
+       Add(TypedSerializerFn TypedSerialize, DeserializerFn Deserialize) {
+@@ -154,8 +157,8 @@ protected:
+         /// visibility issues across shared library boundaries on Linux
+         /// (where \c dlopen with \c RTLD_LOCAL can give the host and
+         /// plugin separate copies of \c static \c inline members).
+-        static TypedSerializerFn SavedSerialize = TypedSerialize;
+-        static DeserializerFn SavedDeserialize = Deserialize;
++        SavedSerialize = TypedSerialize;
++        SavedDeserialize = Deserialize;
+ 
+         /// Concrete subclass of \c Codec for \c AnalysisResultT.
+         /// The \c serialize() override performs the downcast from
+-- 
+2.54.0.563.g4f69b47b94-goog
+
