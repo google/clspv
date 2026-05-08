@@ -6,9 +6,10 @@
 // CHECK: %[[EXT_INST:[a-zA-Z0-9_]*]] = OpExtInstImport "GLSL.std.450"
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
 // CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
-// CHECK-DAG: %[[COMPOSITE_FLOAT_0_ID:[a-zA-Z0-9_]*]] = OpConstantNull %[[FLOAT_VECTOR_TYPE_ID]]
+// CHECK-DAG: %[[CONSTANT_FLOAT_0_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 0
 // CHECK-DAG: %[[CONSTANT_FLOAT_1_ID:[a-zA-Z0-9_]*]] = OpConstant %[[FLOAT_TYPE_ID]] 1
 // CHECK-DAG: %[[COMPOSITE_FLOAT_1_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[FLOAT_VECTOR_TYPE_ID]] %[[CONSTANT_FLOAT_1_ID]] %[[CONSTANT_FLOAT_1_ID]] %[[CONSTANT_FLOAT_1_ID]]
+// CHECK-DAG: %[[COMPOSITE_FLOAT_0_ID:[a-zA-Z0-9_]*]] = OpConstantComposite %[[FLOAT_VECTOR_TYPE_ID]] %[[CONSTANT_FLOAT_0_ID]] %[[CONSTANT_FLOAT_0_ID]] %[[CONSTANT_FLOAT_0_ID]]
 // CHECK: %[[LOADB_ID:[a-zA-Z0-9_]*]] = OpLoad %[[FLOAT_VECTOR_TYPE_ID]]
 // CHECK: %[[OP_ID:[a-zA-Z0-9_]*]] = OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] NClamp %[[LOADB_ID]] %[[COMPOSITE_FLOAT_0_ID]] %[[COMPOSITE_FLOAT_1_ID]]
 // CHECK: OpStore {{.*}} %[[OP_ID]]
