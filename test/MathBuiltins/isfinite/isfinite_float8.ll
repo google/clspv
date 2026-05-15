@@ -36,14 +36,14 @@ entry:
 ; CHECK-DAG: [[ABS6:%[^ ]+]] = call float @llvm.fabs.f32(float [[V6]])
 ; CHECK-DAG: [[ABS7:%[^ ]+]] = call float @llvm.fabs.f32(float [[V7]])
 
-; CHECK-DAG: [[CMP0:%[^ ]+]] = fcmp one float [[ABS0]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP1:%[^ ]+]] = fcmp one float [[ABS1]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP2:%[^ ]+]] = fcmp one float [[ABS2]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP3:%[^ ]+]] = fcmp one float [[ABS3]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP4:%[^ ]+]] = fcmp one float [[ABS4]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP5:%[^ ]+]] = fcmp one float [[ABS5]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP6:%[^ ]+]] = fcmp one float [[ABS6]], 0x7FF0000000000000
-; CHECK-DAG: [[CMP7:%[^ ]+]] = fcmp one float [[ABS7]], 0x7FF0000000000000
+; CHECK-DAG: [[CMP0:%[^ ]+]] = fcmp one float [[ABS0]], +inf
+; CHECK-DAG: [[CMP1:%[^ ]+]] = fcmp one float [[ABS1]], +inf
+; CHECK-DAG: [[CMP2:%[^ ]+]] = fcmp one float [[ABS2]], +inf
+; CHECK-DAG: [[CMP3:%[^ ]+]] = fcmp one float [[ABS3]], +inf
+; CHECK-DAG: [[CMP4:%[^ ]+]] = fcmp one float [[ABS4]], +inf
+; CHECK-DAG: [[CMP5:%[^ ]+]] = fcmp one float [[ABS5]], +inf
+; CHECK-DAG: [[CMP6:%[^ ]+]] = fcmp one float [[ABS6]], +inf
+; CHECK-DAG: [[CMP7:%[^ ]+]] = fcmp one float [[ABS7]], +inf
 
 ; CHECK-DAG: [[D0:%[^ ]+]] = sext i1 [[CMP0]] to i32
 ; CHECK-DAG: [[D1:%[^ ]+]] = sext i1 [[CMP1]] to i32

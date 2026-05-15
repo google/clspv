@@ -139,9 +139,9 @@ else()
     endif()
     use_component(${CLSPV_LIBCLC_SOURCE_DIR})
 
-    set(RUNTIMES_clspv-unknown-unknown_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
-    set(RUNTIMES_clspv64-unknown-unknown_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
-    set(LLVM_RUNTIME_TARGETS clspv-unknown-unknown;clspv64-unknown-unknown CACHE STRING "")
+    set(RUNTIMES_spirv32-unknown-vulkan_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
+    set(RUNTIMES_spirv64-unknown-vulkan_LLVM_ENABLE_RUNTIMES "libclc" CACHE STRING "")
+    set(LLVM_RUNTIME_TARGETS spirv32-unknown-vulkan;spirv64-unknown-vulkan CACHE STRING "")
 
     # Tell LLVM to build the native target (needed to build libclc).
     set(CLSPV_LLVM_TARGETS_TO_BUILD "Native")

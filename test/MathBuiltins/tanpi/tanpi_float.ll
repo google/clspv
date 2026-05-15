@@ -12,7 +12,7 @@ entry:
 
 declare spir_func float @_Z5tanpif(float)
 
-; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul float %x, 0x400921FB60000000
+; CHECK: [[mul:%[a-zA-Z0-9_.]+]] = fmul float %x, f0x40490FDB
 ; CHECK: [[sin:%[a-zA-Z0-9_.]+]] = call float @llvm.sin.f32(float [[mul]])
 ; CHECK: [[cos:%[a-zA-Z0-9_.]+]] = call float @llvm.cos.f32(float [[mul]])
 ; CHECK: [[div:%[a-zA-Z0-9_.]+]] = fdiv float [[sin]], [[cos]]

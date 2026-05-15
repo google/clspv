@@ -841,7 +841,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
   // ParseCommandLineOptions with the specific options.
   bool has_pre = false;
   bool has_load_pre = false;
-  const std::string pre = "-enable-pre";
+  const std::string pre = "-enable-scalar-pre";
   const std::string load_pre = "-enable-load-pre";
   for (int i = 1; i < argc; ++i) {
     std::string option(argv[i]);
@@ -861,7 +861,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
   // TODO(#738): find a better solution to this.
   llvmArgv[2] = "-disable-vector-combine";
   if (!has_pre) {
-    llvmArgv[llvmArgc++] = "-enable-pre=0";
+    llvmArgv[llvmArgc++] = "-enable-scalar-pre=0";
   }
   if (!has_load_pre) {
     llvmArgv[llvmArgc++] = "-enable-load-pre=0";
