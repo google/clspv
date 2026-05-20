@@ -9,7 +9,7 @@
 ; CHECK:  getelementptr [32 x [4 x <2 x float>]], ptr addrspace(3) @main_function.loc_mem, i32 0, i32 [[lshr]], i32 [[lshr2]], i32 [[and2]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 @main_function.loc_mem = internal addrspace(3) global [32 x [4 x <2 x float>]] undef, align 8
 

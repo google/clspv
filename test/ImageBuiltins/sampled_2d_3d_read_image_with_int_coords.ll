@@ -15,7 +15,7 @@
 ; CHECK: call <4 x i32> @_Z12read_imageui14ocl_image3d_ro11ocl_samplerDv4_f(ptr addrspace(1) %im3d, ptr addrspace(2) %sampler, <4 x float> %10)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 %opencl.sampler_t = type opaque
 %opencl.image2d_ro_t = type opaque

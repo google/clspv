@@ -7,7 +7,7 @@
 ; Please modify the that file and regenerate the tests to make changes.
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 define <4 x i16> @sub_sat_short4(<4 x i16> %a, <4 x i16> %b) {
 entry:

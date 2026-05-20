@@ -5,7 +5,7 @@
 ; CHECK: [[id]] = !{!"A", !"SEC", !"TER", !"QUA", !"im0", !"im1", !"ptr"}
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir64-unknown-unknown"
+target triple = "spirv64-unknown-vulkan"
 
 @.str = private unnamed_addr addrspace(2) constant [8 x i8] c" kernel\00", section "llvm.metadata"
 @.str.1 = private unnamed_addr addrspace(2) constant [118 x i8] c"/usr/local/google/home/rjodin/work/clvk/external/clspv/test/KernelArgInfo/kernel-arg-info-physical-storage-buffers.cl\00", section "llvm.metadata"

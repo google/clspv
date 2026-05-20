@@ -1,4 +1,4 @@
-// RUN: clspv --arch=spir64 %s -o %t.spv --spv-version=1.5 --decorate-nonuniform --physical-storage-buffers
+// RUN: clspv --arch=spirv64 %s -o %t.spv --spv-version=1.5 --decorate-nonuniform --physical-storage-buffers
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.2spv1.5 %t.spv

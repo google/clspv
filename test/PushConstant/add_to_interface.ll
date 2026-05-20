@@ -2,7 +2,7 @@
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: spirv-val --target-env vulkan1.1spv1.4 %t.spv
 
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 %0 = type { <3 x i32> }
 

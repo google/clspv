@@ -3,7 +3,7 @@
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -no-dra -no-inline-single -arch=spir
+// RUN: clspv %target %s -o %t.spv -no-dra -no-inline-single -arch=spirv32
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm -check-prefix=NODRA
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

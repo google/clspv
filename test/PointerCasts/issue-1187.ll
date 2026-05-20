@@ -1,13 +1,13 @@
-; RUN: clspv %s -o %t.spv -cl-std=CLC++ -inline-entry-points -physical-storage-buffers -arch=spir64 -cl-kernel-arg-info -x=ir
+; RUN: clspv %s -o %t.spv -cl-std=CLC++ -inline-entry-points -physical-storage-buffers -arch=spirv64 -cl-kernel-arg-info -x=ir
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: spirv-val %t.spv --target-env spv1.0
 
-; RUN: clspv %s -o %t.spv -cl-std=CLC++ -inline-entry-points -physical-storage-buffers -arch=spir64 -cl-kernel-arg-info -x=ir -untyped-pointers
+; RUN: clspv %s -o %t.spv -cl-std=CLC++ -inline-entry-points -physical-storage-buffers -arch=spirv64 -cl-kernel-arg-info -x=ir -untyped-pointers
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: spirv-val %t.spv --target-env spv1.0
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir64-unknown-unknown"
+target triple = "spirv64-unknown-vulkan"
 
 ; Function Attrs: convergent nofree norecurse nounwind memory(readwrite, inaccessiblemem: none)
 define dso_local spir_kernel void @BeamMeUp(ptr addrspace(1) noundef %0, target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 1) %1) local_unnamed_addr #0 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_base_type !6 !kernel_arg_type_qual !7 !reqd_work_group_size !8 {

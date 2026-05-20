@@ -3,7 +3,7 @@
 ; RUN: FileCheck --check-prefixes TYPE,DECLARE %s < %t
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 ; TYPE-DAG: [[DATA_TYPE:%[a-zA-Z0-9_.]+]] = type { i32, i32 }
 ; TYPE-DAG: [[DATA_TYPE_ARR:%[a-zA-Z0-9_.]+]] = type { [0 x [[DATA_TYPE]]] }

@@ -1,9 +1,9 @@
-// RUN: clspv %target %s -o %t.spv -arch=spir -spv-version=1.4
+// RUN: clspv %target %s -o %t.spv -arch=spirv32 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -arch=spir64 -spv-version=1.4
+// RUN: clspv %target %s -o %t.spv -arch=spirv64 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: spirv-val --target-env vulkan1.2 %t.spv

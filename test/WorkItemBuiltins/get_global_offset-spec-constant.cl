@@ -1,4 +1,4 @@
-// RUN: clspv %target -global-offset %s -o %t.spv -arch=spir
+// RUN: clspv %target -global-offset %s -o %t.spv -arch=spirv32
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: clspv-reflection %t.spv -o %t.dmap
