@@ -182,7 +182,10 @@ static llvm::cl::opt<SPIRVArch> target_arch(
         clEnumValN(SPIRVArch::SPIRV32, "spirv32",
                    "spirv32-unknown-vulkan target (pointers are 32-bit)"),
         clEnumValN(SPIRVArch::SPIRV64, "spirv64",
-                   "spirv64-unknown-vulkan target (pointers are 64-bit)")));
+                   "spirv64-unknown-vulkan target (pointers are 64-bit)"),
+        // Legacy options: kept for compatibility, omitted from standard help text
+        clEnumValN(SPIRVArch::SPIRV32, "spir", ""),
+        clEnumValN(SPIRVArch::SPIRV64, "spir64", "")));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
