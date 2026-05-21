@@ -1,4 +1,4 @@
-// RUN: clspv %s -o %t.spv --arch=spir64 --physical-storage-buffers
+// RUN: clspv %s -o %t.spv --arch=spirv64 --physical-storage-buffers
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 

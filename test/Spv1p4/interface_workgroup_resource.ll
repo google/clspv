@@ -9,7 +9,7 @@
 ; CHECK-DAG: [[bar_wg]] = OpVariable {{.*}} Workgroup
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 define spir_kernel void @foo(i32 addrspace(3)* %data) !clspv.pod_args_impl !1 !reqd_work_group_size !2 {
 entry:

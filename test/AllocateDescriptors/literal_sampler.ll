@@ -4,7 +4,7 @@
 ; CHECK: call target("spirv.Sampler") @_Z25clspv.sampler_var_literal(i32 0, i32 0, i32 21, target("spirv.Sampler") zeroinitializer)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 define dso_local spir_kernel void @test(target("spirv.Image", void, 1, 0, 0, 0, 0, 0, 0) %t, <2 x float> %coords, ptr addrspace(1) align 16 %out) !clspv.pod_args_impl !8 {
 entry:

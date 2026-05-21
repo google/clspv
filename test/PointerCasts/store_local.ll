@@ -15,7 +15,7 @@
 ; CHECK:  store i8 {{.*}}, ptr addrspace(3) [[gep_hi]], align 1
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 %0 = type { <3 x i32>, <3 x i32>, %1 }
 %1 = type { i32 }

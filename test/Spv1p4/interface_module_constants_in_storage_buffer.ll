@@ -13,7 +13,7 @@
 
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 @clspv.clustered_constants = internal addrspace(2) constant { [16 x i32] } { [16 x i32] [i32 17, i32 1, i32 11, i32 12, i32 1955, i32 11, i32 5, i32 1985, i32 113, i32 1, i32 24, i32 1984, i32 7, i32 23, i32 1979, i32 97] }

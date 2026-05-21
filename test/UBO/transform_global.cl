@@ -1,11 +1,11 @@
-// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir -spv-version=1.4
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spirv32 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: clspv-reflection %t.spv -o %t2.map --target-env vulkan1.2
 // RUN: FileCheck -check-prefix=MAP %s < %t2.map
 // RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spir64 -spv-version=1.4
+// RUN: clspv %target -constant-args-ubo -inline-entry-points %s -o %t.spv -int8=0 -pod-ubo -arch=spirv64 -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-64
 // RUN: clspv-reflection %t.spv -o %t2.map --target-env vulkan1.2

@@ -4,7 +4,7 @@
 // RUN: FileCheck --check-prefix=NO-OFFSET %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target -cl-std=CL2.0 -inline-entry-points -global-offset=1 %s -o %t.spv -arch=spir
+// RUN: clspv %target -cl-std=CL2.0 -inline-entry-points -global-offset=1 %s -o %t.spv -arch=spirv32
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK
 // RUN: FileCheck --check-prefix=CHECK-OFFSET %s < %t2.spvasm

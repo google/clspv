@@ -9,7 +9,7 @@
 ; CHECK: ![[LITERAL]] = !{i32 1, !"\00\00\00\00",
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-G1"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 @.str = private unnamed_addr addrspace(2) constant [1 x i8] zeroinitializer, align 1
 @.str.1 = private unnamed_addr addrspace(2) constant [4 x i8] zeroinitializer, align 1

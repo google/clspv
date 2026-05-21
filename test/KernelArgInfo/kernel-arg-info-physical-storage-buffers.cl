@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -cl-kernel-arg-info -o %t.spv -physical-storage-buffers -arch=spir64 --print-after-all &> %t.ll
+// RUN: clspv %target %s -cl-kernel-arg-info -o %t.spv -physical-storage-buffers -arch=spirv64 --print-after-all &> %t.ll
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

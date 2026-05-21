@@ -1,7 +1,7 @@
 ; RUN: clspv-opt --passes=three-element-vector-lowering %s -o %t.ll -vec3-to-vec4
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 define spir_kernel void @test(ptr addrspace(1) align 16 %f3, ptr addrspace(1) %image, { <2 x float> } %podargs) !clspv.pod_args_impl !9 !kernel_arg_map !10 {
 entry:

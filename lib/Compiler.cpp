@@ -75,9 +75,9 @@
 using namespace clang;
 
 namespace {
-enum class SPIRArch : uint32_t {
-  SPIR = 0,
-  SPIR64,
+enum class SPIRVArch : uint32_t {
+  SPIRV32 = 0,
+  SPIRV64,
 };
 
 // This registration must be located in the same file as the execution of the
@@ -175,14 +175,18 @@ static llvm::cl::opt<enum OutputFormat> OutputFormat(
         clEnumValN(OutputFormatC, "c",
                    "C initializer list (of Vulkan SPIR-V)")));
 
-static llvm::cl::opt<SPIRArch> target_arch(
-    "arch", llvm::cl::desc("Specify the target SPIR architecture"),
-    llvm::cl::init(SPIRArch::SPIR),
+static llvm::cl::opt<SPIRVArch> target_arch(
+    "arch", llvm::cl::desc("Specify the target SPIRV architecture"),
+    llvm::cl::init(SPIRVArch::SPIRV32),
     llvm::cl::values(
-        clEnumValN(SPIRArch::SPIR, "spir",
-                   "spir-unknown-unknown target (pointers are 32-bit)"),
-        clEnumValN(SPIRArch::SPIR64, "spir64",
-                   "spir64-unknown-unknown target (pointers are 64-bit)")));
+        clEnumValN(SPIRVArch::SPIRV32, "spirv32",
+                   "spirv32-unknown-vulkan target (pointers are 32-bit)"),
+        clEnumValN(SPIRVArch::SPIRV64, "spirv64",
+                   "spirv64-unknown-vulkan target (pointers are 64-bit)"),
+        // Legacy options: kept for compatibility, omitted from standard help
+        // text
+        clEnumValN(SPIRVArch::SPIRV32, "spir", ""),
+        clEnumValN(SPIRVArch::SPIRV64, "spir64", "")));
 
 namespace {
 struct OpenCLBuiltinMemoryBuffer final : public llvm::MemoryBuffer {
@@ -418,8 +422,9 @@ int SetCompilerInstanceOptions(
   }
 
   // Select the correct SPIR triple
-  llvm::Triple triple{target_arch == SPIRArch::SPIR64 ? "spir64-unknown-unknown"
-                                                      : "spir-unknown-unknown"};
+  llvm::Triple triple{target_arch == SPIRVArch::SPIRV64
+                          ? "spirv64-unknown-vulkan"
+                          : "spirv32-unknown-vulkan"};
 
   // We manually include the OpenCL headers below, so this vector is unused.
   std::vector<std::string> includes;
@@ -945,9 +950,9 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
 
   if (clspv::Option::PhysicalStorageBuffers() &&
-      target_arch != SPIRArch::SPIR64) {
+      target_arch != SPIRVArch::SPIRV64) {
     llvm::errs() << "error: -physical-storage-buffers can only be used with "
-                    "the spir64 target\n";
+                    "the spirv64 target\n";
     return -1;
   }
 

@@ -13,7 +13,7 @@
 ; CHECK: ret i32 [[sel]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 ; Function Attrs: convergent norecurse nounwind
 define dso_local spir_kernel void @foo(ptr addrspace(1) align 4 %a, i32 %b) #0 !kernel_arg_addr_space !4 !kernel_arg_access_qual !5 !kernel_arg_type !6 !kernel_arg_base_type !6 !kernel_arg_type_qual !7 !reqd_work_group_size !8 !clspv.pod_args_impl !9 {

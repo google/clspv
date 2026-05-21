@@ -6,7 +6,7 @@
 ; CHECK: store i32 [[ptrtoint]]
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 @.str = private unnamed_addr addrspace(2) constant [3 x i8] c"%p\00", align 1
 @__spirv_WorkgroupSize = addrspace(8) global <3 x i32> zeroinitializer

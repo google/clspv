@@ -1,9 +1,9 @@
-// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-pushconstant -spv-version=1.4
+// RUN: clspv %s -o %t.spv -arch=spirv64 -physical-storage-buffers -pod-pushconstant -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-PC
 // RUN: spirv-val --target-env vulkan1.2 %t.spv
 
-// RUN: clspv %s -o %t.spv -arch=spir64 -physical-storage-buffers -pod-ubo -spv-version=1.4
+// RUN: clspv %s -o %t.spv -arch=spirv64 -physical-storage-buffers -pod-ubo -spv-version=1.4
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm --check-prefixes=CHECK,CHECK-UBO
 // RUN: spirv-val --target-env vulkan1.2 %t.spv

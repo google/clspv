@@ -7,7 +7,7 @@
 ; Please modify that file and regenate the tests to make changes.
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 declare spir_func i32 @_Z23get_image_channel_order45opencl.image3d_wo_t.float(ptr addrspace(1) %0)
 

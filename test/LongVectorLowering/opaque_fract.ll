@@ -11,7 +11,7 @@
 ; CHECK: call spir_func float @_Z5fractff(float 0.000000e+00, ptr addrspace(3) getelementptr inbounds ([16 x float], ptr addrspace(3) @gv, i32 0, i32 7)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
-target triple = "spir-unknown-unknown"
+target triple = "spirv32-unknown-vulkan"
 
 @gv = internal addrspace(3) global <16 x float> zeroinitializer, align 32
 

@@ -44,7 +44,7 @@ set(SPIRV_TOOLS_BINARY_DIR "$<TARGET_FILE_DIR:spirv-dis>")
 
 add_custom_target(check-spirv
   COMMAND ${Python3_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
-    -DCLSPV_TARGET="-arch=spir"
+    -DCLSPV_TARGET="-arch=spirv32"
     --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"
@@ -56,7 +56,7 @@ add_custom_target(check-spirv
 
 add_custom_target(check-spirv-64
   COMMAND ${Python3_EXECUTABLE} ${LIT_PATH} --verbose ${CMAKE_CURRENT_BINARY_DIR}
-    -DCLSPV_TARGET="-arch=spir64"
+    -DCLSPV_TARGET="-arch=spirv64"
     --path ${FILECHECK_PATH}
     --path ${SPIRV_TOOLS_BINARY_DIR}/
     --path "$<TARGET_FILE_DIR:clspv>"

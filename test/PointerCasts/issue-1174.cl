@@ -1,8 +1,8 @@
-// RUN: clspv %s -o %t.spv -arch=spir64
+// RUN: clspv %s -o %t.spv -arch=spirv64
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 
-// RUN: clspv %s -o %t.spv -arch=spir64 -untyped-pointers
+// RUN: clspv %s -o %t.spv -arch=spirv64 -untyped-pointers
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: spirv-val %t.spv --target-env spv1.0
 

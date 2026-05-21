@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: clspv %target %s -o %t.spv -arch=spir
+// RUN: clspv %target %s -o %t.spv -arch=spirv32
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK,CHECK-32
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
 
-// RUN: clspv %target %s -o %t.spv -arch=spir64
+// RUN: clspv %target %s -o %t.spv -arch=spirv64
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm --check-prefixes=CHECK
 // RUN: spirv-val --target-env vulkan1.0 %t.spv
