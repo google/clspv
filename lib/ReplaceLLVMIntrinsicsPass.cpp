@@ -392,96 +392,222 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceFshl(Function &F) {
   });
 }
 
+static Value *buildPattern(Type *Ty, Value *Pattern, IRBuilder<> &Builder) {
+  if (Pattern->getType() != Builder.getInt8Ty()) {
+    Pattern = Builder.CreateIntCast(Pattern, Builder.getInt8Ty(), false);
+  }
+  auto build = [&](Type *T, Value *P, auto &self) {
+    if (T->isIntegerTy()) {
+      unsigned bitwidth = T->getIntegerBitWidth();
+      if (bitwidth == 8)
+        return P;
+
+      Value *V = Builder.CreateZExt(P, T);
+      Value *Res = V;
+      for (unsigned i = 1; i < bitwidth / 8; ++i) {
+        Res = Builder.CreateOr(Res, Builder.CreateShl(V, i * 8));
+      }
+      return Res;
+    } else if (T->isFloatingPointTy()) {
+      unsigned bitwidth = T->getPrimitiveSizeInBits();
+      Type *IntTy = Type::getIntNTy(T->getContext(), bitwidth);
+      return Builder.CreateBitCast(self(IntTy, P, self), T);
+    } else if (auto *VecTy = dyn_cast<FixedVectorType>(T)) {
+      Value *Scalar = self(VecTy->getElementType(), P, self);
+      Value *Vec = UndefValue::get(VecTy);
+      for (unsigned i = 0; i < VecTy->getNumElements(); ++i) {
+        Vec = Builder.CreateInsertElement(Vec, Scalar, i);
+      }
+      return Vec;
+    } else if (auto *ArrTy = dyn_cast<ArrayType>(T)) {
+      Value *Elem = self(ArrTy->getElementType(), P, self);
+      Value *Arr = UndefValue::get(ArrTy);
+      for (unsigned i = 0; i < ArrTy->getNumElements(); ++i) {
+        Arr = Builder.CreateInsertValue(Arr, Elem, {i});
+      }
+      return Arr;
+    } else if (auto *StructTy = dyn_cast<StructType>(T)) {
+      Value *Str = UndefValue::get(StructTy);
+      for (unsigned i = 0; i < StructTy->getNumElements(); ++i) {
+        Value *Elem = self(StructTy->getElementType(i), P, self);
+        Str = Builder.CreateInsertValue(Str, Elem, {i});
+      }
+      return Str;
+    }
+    llvm_unreachable("Unsupported type for memset pattern");
+  };
+  return build(Ty, Pattern, build);
+}
+
+static Type *unpackTy(uint64_t Size, Type *Ty, unsigned &NumUnpackings,
+                      const DataLayout &Layout) {
+  auto ElemSize = Layout.getTypeSizeInBits(Ty) / 8;
+  while (Size < ElemSize) {
+    auto EleTy = BitcastUtils::GetEleType(Ty);
+    assert(EleTy != Ty);
+    Ty = EleTy;
+    NumUnpackings++;
+    ElemSize = Layout.getTypeSizeInBits(Ty) / 8;
+  }
+  return Ty;
+}
+
+static void replaceMemsetStatic(CallInst *CI, Module &M,
+                                const DataLayout &Layout,
+                                DenseMap<Value *, Type *> &type_cache) {
+  auto ConstantNumBytes = cast<ConstantInt>(CI->getArgOperand(2));
+  auto Initializer = CI->getArgOperand(1);
+  auto NewArg = CI->getArgOperand(0);
+  auto Bitcast = dyn_cast<BitCastInst>(NewArg);
+  if (Bitcast != nullptr) {
+    NewArg = Bitcast->getOperand(0);
+  }
+
+  auto I32Ty = Type::getInt32Ty(M.getContext());
+  auto NumBytes = ConstantNumBytes->getZExtValue();
+  auto PointeeTy = clspv::InferType(NewArg, M.getContext(), &type_cache);
+  if (PointeeTy == nullptr) {
+    PointeeTy = UpdateTy(M.getContext(), NumBytes);
+    NewArg = GetElementPtrInst::Create(
+        PointeeTy, NewArg, {ConstantInt::get(I32Ty, 0)}, "", CI->getIterator());
+  }
+
+  Type *NewArgTy = PointeeTy;
+  unsigned Unpacking = 0;
+  PointeeTy = unpackTy(NumBytes, PointeeTy, Unpacking, Layout);
+
+  IRBuilder<> Builder(CI);
+
+  // Construct the broadcasted payload dynamically based on the final packed
+  // type
+  Value *PatternValue = buildPattern(PointeeTy, Initializer, Builder);
+
+  auto Zero = ConstantInt::get(I32Ty, 0);
+  SmallVector<Value *, 3> Indices;
+  for (unsigned i = 0; i < Unpacking; i++) {
+    Indices.push_back(Zero);
+  }
+  Indices.push_back(Zero);
+
+  const auto num_stores = NumBytes / Layout.getTypeAllocSize(PointeeTy);
+  bool IsVolatile = cast<ConstantInt>(CI->getArgOperand(3))->isOneValue();
+
+  for (uint32_t i = 0; i < num_stores; i++) {
+    Indices.back() = ConstantInt::get(I32Ty, i);
+    auto Ptr = GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "",
+                                         CI->getIterator());
+    auto *St = new StoreInst(PatternValue, Ptr, CI->getIterator());
+    St->setVolatile(IsVolatile);
+  }
+
+  CI->eraseFromParent();
+  if (Bitcast != nullptr) {
+    Bitcast->eraseFromParent();
+  }
+}
+
+static void replaceMemsetDynamic(CallInst *CI, Module &M, Value *Dst,
+                                 Value *Val, Value *Len, bool IsVolatile) {
+  IRBuilder<> Builder(CI);
+  auto *I8Ty = Builder.getInt8Ty();
+  Type *SizeTy = Len->getType();
+
+  // Build Pattern Payload (Broadcast Val to PointeeTy)
+  Value *ValCast = Builder.CreateIntCast(Val, I8Ty, false);
+
+  // Bulk Loop
+  BasicBlock *PreheaderBB = CI->getParent();
+  Function *Func = PreheaderBB->getParent();
+  BasicBlock *PostBB = PreheaderBB->splitBasicBlock(CI, "");
+  BasicBlock *HeaderBB = BasicBlock::Create(M.getContext(), "", Func);
+  BasicBlock *LoopBB = BasicBlock::Create(M.getContext(), "", Func);
+
+  PreheaderBB->getTerminator()->eraseFromParent();
+  Builder.SetInsertPoint(PreheaderBB);
+  Builder.CreateBr(HeaderBB);
+
+  Builder.SetInsertPoint(HeaderBB);
+  PHINode *Idx = Builder.CreatePHI(SizeTy, 2);
+  Idx->addIncoming(ConstantInt::get(SizeTy, 0), PreheaderBB);
+  Builder.CreateCondBr(Builder.CreateICmpULT(Idx, Len), LoopBB, PostBB);
+
+  Builder.SetInsertPoint(LoopBB);
+  Value *GEP = Builder.CreateGEP(I8Ty, Dst, Idx);
+  Builder.CreateStore(ValCast, GEP)->setVolatile(IsVolatile);
+  Value *NextIdx = Builder.CreateAdd(Idx, ConstantInt::get(SizeTy, 1));
+  Idx->addIncoming(NextIdx, LoopBB);
+  Builder.CreateBr(HeaderBB);
+
+  Builder.SetInsertPoint(PostBB);
+  CI->eraseFromParent();
+}
+
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
   bool Changed = false;
   auto Layout = M.getDataLayout();
-
   DenseMap<Value *, Type *> type_cache;
-
-  auto unpack = [&Layout](CallInst &CI, uint64_t Size, Type **Ty,
-                          unsigned *NumUnpackings) {
-    auto ElemSize = Layout.getTypeSizeInBits(*Ty) / 8;
-    while (Size < ElemSize) {
-      auto EleTy = BitcastUtils::GetEleType(*Ty);
-      assert(EleTy != *Ty);
-      *Ty = EleTy;
-      (*NumUnpackings)++;
-      ElemSize = Layout.getTypeSizeInBits(*Ty) / 8;
-    }
-  };
 
   for (auto &F : M) {
     if (F.getName().contains("llvm.memset")) {
-      SmallVector<CallInst *, 8> CallsToReplace;
-
+      SmallVector<CallInst *, 8> StaticToReplace;
+      struct dynamicMemsetInfo {
+        CallInst *CI;
+        Value *Dst;
+        Value *Val;
+        Value *Len;
+        bool IsVolatile;
+      };
+      SmallVector<dynamicMemsetInfo, 8> DynamicToReplace;
       for (auto U : F.users()) {
-        if (auto CI = dyn_cast<CallInst>(U)) {
-          auto Initializer = dyn_cast<ConstantInt>(CI->getArgOperand(1));
+        auto *CI = cast<CallInst>(U);
+        auto ConstantNumBytes = dyn_cast<ConstantInt>(CI->getArgOperand(2));
+        auto Dst = CI->getArgOperand(0);
+        auto Val = CI->getArgOperand(1);
+        bool IsVolatile =
+            cast<ConstantInt>(CI->getArgOperand(3))->getZExtValue();
 
-          // We only handle cases where the initializer is a constant int that
-          // is 0.
-          if (!Initializer || (0 != Initializer->getZExtValue())) {
-            Initializer->print(errs());
-            llvm_unreachable("Unhandled llvm.memset.* instruction that had a "
-                             "non-0 initializer!");
+        Type *PointeeTy = clspv::InferType(Dst, M.getContext(), &type_cache);
+        if (!PointeeTy)
+          PointeeTy =
+              UpdateTy(M.getContext(),
+                       ConstantNumBytes ? ConstantNumBytes->getZExtValue() : 1);
+
+        // Can we safely unroll? (Only if exactly divisible)
+        bool CanUnroll = false;
+        if (ConstantNumBytes) {
+          unsigned int unused;
+          PointeeTy = unpackTy(ConstantNumBytes->getZExtValue(), PointeeTy,
+                               unused, Layout);
+          CanUnroll = ConstantNumBytes->getZExtValue() %
+                          Layout.getTypeAllocSize(PointeeTy) ==
+                      0;
+        }
+
+        if (CanUnroll) {
+          StaticToReplace.push_back(CI);
+        } else {
+          if (!clspv::Option::Int8Support()) {
+            llvm_unreachable(
+                "Dynamic/Unaligned memset requires Int8 capability!");
           }
-
-          CallsToReplace.push_back(CI);
+          DynamicToReplace.push_back({CI, Dst, Val,
+                                      ConstantNumBytes
+                                          ? (Value *)ConstantNumBytes
+                                          : CI->getArgOperand(2),
+                                      IsVolatile});
         }
+        Changed = true;
       }
-
-      for (auto CI : CallsToReplace) {
-        auto NewArg = CI->getArgOperand(0);
-        auto Bitcast = dyn_cast<BitCastInst>(NewArg);
-        if (Bitcast != nullptr) {
-          NewArg = Bitcast->getOperand(0);
-        }
-
-        auto I32Ty = Type::getInt32Ty(M.getContext());
-        auto NumBytes = cast<ConstantInt>(CI->getArgOperand(2))->getZExtValue();
-        auto PointeeTy = clspv::InferType(NewArg, M.getContext(), &type_cache);
-        if (PointeeTy == nullptr) {
-          PointeeTy = UpdateTy(M.getContext(), NumBytes);
-          NewArg = GetElementPtrInst::Create(PointeeTy, NewArg,
-                                             {ConstantInt::get(I32Ty, 0)}, "",
-                                             CI->getIterator());
-        }
-        Type *NewArgTy = PointeeTy;
-        unsigned Unpacking = 0;
-        unpack(*CI, NumBytes, &PointeeTy, &Unpacking);
-
-        auto NullValue = Constant::getNullValue(PointeeTy);
-        auto Zero = ConstantInt::get(I32Ty, 0);
-
-        SmallVector<Value *, 3> Indices;
-        for (unsigned i = 0; i < Unpacking; i++) {
-          Indices.push_back(Zero);
-        }
-        // Add a placeholder for the final index.
-        Indices.push_back(Zero);
-
-        const auto num_stores = NumBytes / Layout.getTypeAllocSize(PointeeTy);
-        assert((NumBytes == num_stores * Layout.getTypeAllocSize(PointeeTy)) &&
-               "Null memset can't be divided evenly across multiple stores.");
-        assert((num_stores & 0xFFFFFFFF) == num_stores);
-
-        for (uint32_t i = 0; i < num_stores; i++) {
-          Indices.back() = ConstantInt::get(I32Ty, i);
-          auto Ptr = GetElementPtrInst::Create(NewArgTy, NewArg, Indices, "",
-                                               CI->getIterator());
-          new StoreInst(NullValue, Ptr, CI->getIterator());
-        }
-
-        CI->eraseFromParent();
-
-        if (Bitcast != nullptr) {
-          Bitcast->eraseFromParent();
-        }
+      for (auto CI : StaticToReplace) {
+        replaceMemsetStatic(CI, M, Layout, type_cache);
+      }
+      for (auto info : DynamicToReplace) {
+        replaceMemsetDynamic(info.CI, M, info.Dst, info.Val, info.Len,
+                             info.IsVolatile);
       }
       DeadFunctions.push_back(&F);
     }
   }
-
   return Changed;
 }
 
