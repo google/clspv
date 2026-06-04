@@ -743,17 +743,47 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   if (func_info.getName().find("llvm.floor.") == 0) {
     return glsl::ExtInst::ExtInstFloor;
   }
+  if (func_info.getName().find("llvm.asin.") == 0) {
+    return glsl::ExtInst::ExtInstAsin;
+  }
   if (func_info.getName().find("llvm.sin.") == 0) {
     return glsl::ExtInst::ExtInstSin;
+  }
+  if (func_info.getName().find("llvm.sinh.") == 0) {
+    return glsl::ExtInst::ExtInstSinh;
+  }
+  if (func_info.getName().find("llvm.acos.") == 0) {
+    return glsl::ExtInst::ExtInstAcos;
   }
   if (func_info.getName().find("llvm.cos.") == 0) {
     return glsl::ExtInst::ExtInstCos;
   }
+  if (func_info.getName().find("llvm.cosh.") == 0) {
+    return glsl::ExtInst::ExtInstCosh;
+  }
+  if (func_info.getName().find("llvm.atan.") == 0) {
+    return glsl::ExtInst::ExtInstAtan;
+  }
+  if (func_info.getName().find("llvm.atan2.") == 0) {
+    return glsl::ExtInst::ExtInstAtan2;
+  }
+  if (func_info.getName().find("llvm.tan.") == 0) {
+    return glsl::ExtInst::ExtInstTan;
+  }
+  if (func_info.getName().find("llvm.tanh.") == 0) {
+    return glsl::ExtInst::ExtInstTanh;
+  }
   if (func_info.getName().find("llvm.exp.") == 0) {
     return glsl::ExtInst::ExtInstExp;
   }
+  if (func_info.getName().find("llvm.exp2.") == 0) {
+    return glsl::ExtInst::ExtInstExp2;
+  }
   if (func_info.getName().find("llvm.log.") == 0) {
     return glsl::ExtInst::ExtInstLog;
+  }
+  if (func_info.getName().find("llvm.log2.") == 0) {
+    return glsl::ExtInst::ExtInstLog2;
   }
   if (func_info.getName().find("llvm.pow.") == 0) {
     return glsl::ExtInst::ExtInstPow;
@@ -793,6 +823,9 @@ Builtins::getExtInstEnum(const Builtins::FunctionInfo &func_info) {
   }
   if (func_info.getName().find("llvm.maximumnum.v") == 0) {
     return glsl::ExtInst::ExtInstFMax;
+  }
+  if (func_info.getName().find("llvm.ldexp") == 0) {
+    return glsl::ExtInst::ExtInstLdexp;
   }
 
   return kGlslExtInstBad;
