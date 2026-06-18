@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -21,6 +22,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/LowerMemIntrinsics.h"
 
 #include "BitcastUtils.h"
 #include "clspv/Option.h"
@@ -62,6 +64,7 @@ clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
 
   // Remove lifetime annotations first.  They could be using memset
   // and memcpy calls.
+  replaceMemmove(M);
   replaceMemset(M);
   replaceMemcpy(M);
 
@@ -540,6 +543,70 @@ static void replaceMemsetDynamic(CallInst *CI, Module &M, Value *Dst,
 
   Builder.SetInsertPoint(PostBB);
   CI->eraseFromParent();
+}
+
+static void replaceMemmoveStatic(Module &M, MemMoveInst *MMI) {
+  auto *Length = cast<ConstantInt>(MMI->getLength());
+  auto NumBytes = Length->getZExtValue();
+  auto *AllocaTy =
+      ArrayType::get(IntegerType::getInt8Ty(M.getContext()), NumBytes);
+
+  IRBuilder<> Builder(MMI);
+  Builder.SetInsertPointPastAllocas(MMI->getFunction());
+  auto Alloca = Builder.CreateAlloca(AllocaTy);
+  MaybeAlign SrcAlign = MMI->getSourceAlign();
+  if (SrcAlign.has_value())
+    Alloca->setAlignment(SrcAlign.value());
+
+  Builder.SetInsertPoint(MMI);
+  Builder.CreateMemCpy(Alloca, SrcAlign, MMI->getRawSource(), SrcAlign, Length,
+                       MMI->isVolatile());
+
+  auto *SecondCpy =
+      Builder.CreateMemCpy(MMI->getRawDest(), MMI->getDestAlign(), Alloca,
+                           SrcAlign, Length, MMI->isVolatile());
+
+  MMI->replaceAllUsesWith(SecondCpy);
+  MMI->eraseFromParent();
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemmove(Module &M) {
+  bool Changed = false;
+  for (auto &F : M) {
+    if (F.getName().contains("llvm.memmove")) {
+      SmallVector<MemMoveInst *, 8> CallsToReplace;
+
+      for (auto U : F.users()) {
+        if (auto MMI = dyn_cast<MemMoveInst>(U)) {
+          CallsToReplace.push_back(MMI);
+        }
+      }
+
+      for (auto MMI : CallsToReplace) {
+        if (!isa<ConstantInt>(MMI->getLength())) {
+          // Use LLVM utility to expand memmove intrinsic as a loop of byte
+          // sized copies, requiring the Int8 capability. This expansion also
+          // requires SPIRV 1.4 and later due to use of pointer comparison
+          // semantics in implementation to decide whether to copy front to
+          // back, or back to front.
+          expandMemMoveAsLoop(MMI, TargetTransformInfo(M.getDataLayout()));
+          MMI->eraseFromParent();
+        } else {
+          // Creates an intermediate alloca byte array of a known size, then
+          // memcpy the src operand ptr into the alloca, followed by a memcpy of
+          // the alloca to the dst operand ptr. Requires Int8 capability.
+          replaceMemmoveStatic(M, MMI);
+        }
+        Changed = true;
+      }
+
+      if (F.user_empty()) {
+        DeadFunctions.push_back(&F);
+      }
+    }
+  }
+
+  return Changed;
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
