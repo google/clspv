@@ -41,7 +41,7 @@ PreservedAnalyses clspv::StructurizeGEPPass::run(Module &M,
   for (GetElementPtrInst *GEP : Worklist) {
     IRBuilder<> Builder(GEP);
     SmallVector<Value *, 8> Indices(GEP->indices());
-    CallInst *SGEP = Builder.CreateStructuredGEP(
+    Value *SGEP = Builder.CreateStructuredGEP(
         GEP->getSourceElementType(), GEP->getPointerOperand(), Indices);
 
     // CreateStructuredGEP might not set name, do it manually
