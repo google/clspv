@@ -4,3 +4,4 @@ TAGS
 cscope.*
 .DS_Store
 third_party/
+.venv
