@@ -545,9 +545,64 @@ static void replaceMemsetDynamic(CallInst *CI, Module &M, Value *Dst,
   CI->eraseFromParent();
 }
 
-static void replaceMemmoveStatic(Module &M, MemMoveInst *MMI) {
+static bool replaceMemmoveDynamic(Module &M, MemMoveInst *MMI) {
+  // Use LLVM utility to expand memmove intrinsic as a loop of byte
+  // copies.
+  auto BB = MMI->getParent(); // Record original basic block
+  if (!expandMemMoveAsLoop(MMI, TargetTransformInfo(M.getDataLayout()))) {
+    return false;
+  }
+
+  if (clspv::Option::PhysicalStorageBuffers()) {
+    // expandMemMoveAsLoop creates a 'icmp ptr' instruction that is converted
+    // into an int comparison to avoid lowering the icmp to OpPtrDiff which
+    // isn't supported for PhysicalStorageBuffer
+    ICmpInst *ICmpToProcess = nullptr;
+
+    for (auto &I : *BB) {
+      if (auto ICmp = dyn_cast<ICmpInst>(&I)) {
+        if (ICmp->getOperand(0) == MMI->getSource() &&
+            ICmp->getOperand(1) == MMI->getDest()) {
+          ICmpToProcess = ICmp;
+          break;
+        }
+      }
+    }
+
+    if (ICmpToProcess) {
+      IntegerType *SizeT = clspv::PointersAre64Bit(M)
+                               ? IntegerType::get(M.getContext(), 64)
+                               : IntegerType::get(M.getContext(), 32);
+      IRBuilder<> B(ICmpToProcess);
+      auto LHS = B.CreatePtrToInt(ICmpToProcess->getOperand(0), SizeT);
+      auto RHS = B.CreatePtrToInt(ICmpToProcess->getOperand(1), SizeT);
+      ICmpToProcess->replaceAllUsesWith(
+          B.CreateICmp(ICmpToProcess->getPredicate(), LHS, RHS));
+      ICmpToProcess->eraseFromParent();
+    }
+  } else if (clspv::Option::SpvVersion() <
+             clspv::Option::SPIRVVersion::SPIRV_1_4) {
+    llvm_unreachable(
+        "Using OpPtrDiff to implement memmove requires SPIR-V version 1.4 or later");
+  }
+
+  MMI->eraseFromParent();
+  return true;
+}
+
+static bool replaceMemmoveStatic(Module &M, MemMoveInst *MMI) {
+  // Creates an intermediate alloca byte array of a known size, then
+  // memcpy the src operand ptr into the alloca, followed by a memcpy of
+  // the alloca to the dst operand ptr.
   auto *Length = cast<ConstantInt>(MMI->getLength());
   auto NumBytes = Length->getZExtValue();
+
+  if (NumBytes > clspv::Option::MemmoveAllocaLimit()) {
+    // If limit on maximum size of alloca exceeded, then fall back to
+    // dynamic implementation
+    return replaceMemmoveDynamic(M, MMI);
+  }
+
   auto *AllocaTy =
       ArrayType::get(IntegerType::getInt8Ty(M.getContext()), NumBytes);
 
@@ -568,6 +623,7 @@ static void replaceMemmoveStatic(Module &M, MemMoveInst *MMI) {
 
   MMI->replaceAllUsesWith(SecondCpy);
   MMI->eraseFromParent();
+  return true;
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemmove(Module &M) {
@@ -582,22 +638,17 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemmove(Module &M) {
         }
       }
 
+      if (!CallsToReplace.empty() && !clspv::Option::Int8Support()) {
+        llvm_unreachable("Lowering memmove intrinsic requires Int8 Capability");
+      }
+
       for (auto MMI : CallsToReplace) {
-        if (!isa<ConstantInt>(MMI->getLength())) {
-          // Use LLVM utility to expand memmove intrinsic as a loop of byte
-          // sized copies, requiring the Int8 capability. This expansion also
-          // requires SPIRV 1.4 and later due to use of pointer comparison
-          // semantics in implementation to decide whether to copy front to
-          // back, or back to front.
-          expandMemMoveAsLoop(MMI, TargetTransformInfo(M.getDataLayout()));
-          MMI->eraseFromParent();
-        } else {
-          // Creates an intermediate alloca byte array of a known size, then
-          // memcpy the src operand ptr into the alloca, followed by a memcpy of
-          // the alloca to the dst operand ptr. Requires Int8 capability.
-          replaceMemmoveStatic(M, MMI);
+        bool DidTransform = isa<ConstantInt>(MMI->getLength())
+                                ? replaceMemmoveStatic(M, MMI)
+                                : replaceMemmoveDynamic(M, MMI);
+        if (DidTransform) {
+          Changed = true;
         }
-        Changed = true;
       }
 
       if (F.user_empty()) {
