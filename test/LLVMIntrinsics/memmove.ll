@@ -1,5 +1,8 @@
-; RUN: clspv --physical-storage-buffers --arch=spir64 -x=ir %s -o %t.spv
+; RUN: clspv --spv-version=1.4 -x=ir %s -o %t.spv
 ; RUN: spirv-val %t.spv
+
+; RUN: clspv --physical-storage-buffers --arch=spir64 -x=ir %s -o %t_phys.spv
+; RUN: spirv-val %t_phys.spv
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64-G1"
 target triple = "spirv64-unknown-vulkan"
@@ -24,6 +27,15 @@ define dso_local spir_kernel void @static_private_ptr(ptr addrspace(1) %dst, ptr
   call void @llvm.memcpy.p0.p1.i64(ptr align 16 %a, ptr addrspace(1) %src, i64 16, i1 false)
   %gep = getelementptr inbounds i8, ptr %a, i64 4
   call void @llvm.memmove.p0.p0.i64(ptr align 16 %a, ptr align 4 %gep, i64 12, i1 false)
+  call void @llvm.memcpy.p1.p0.i64(ptr addrspace(1) %dst, ptr align 4 %gep, i64 16, i1 false)
+  ret void
+}
+
+define dso_local spir_kernel void @static_dynamic_ptr(ptr addrspace(1) %dst, ptr addrspace(1) %src, i64 %len) {
+  %a = alloca [4 x i32], align 16
+  call void @llvm.memcpy.p0.p1.i64(ptr align 16 %a, ptr addrspace(1) %src, i64 16, i1 false)
+  %gep = getelementptr inbounds i8, ptr %a, i64 4
+  call void @llvm.memmove.p0.p0.i64(ptr align 16 %a, ptr align 4 %gep, i64 %len, i1 false)
   call void @llvm.memcpy.p1.p0.i64(ptr addrspace(1) %dst, ptr align 4 %gep, i64 16, i1 false)
   ret void
 }

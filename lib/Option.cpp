@@ -468,7 +468,7 @@ static llvm::cl::opt<uint32_t> memmove_alloca_limit(
     "memmove-alloca-limit",
     llvm::cl::desc(
         "Max size of the alloca used to implement memmove intrinsic"),
-    llvm::cl::init(128));
+    llvm::cl::init(16));
 
 } // namespace
 
