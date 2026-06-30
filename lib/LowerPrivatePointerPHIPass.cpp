@@ -45,14 +45,20 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
   }
 }
 
+Value *getOffsetValue(IRBuilder<> &B, Type *intTy, int64_t CstVal,
+                      Value *DynVal) {
+  if (DynVal == nullptr) {
+    return ConstantInt::get(intTy, CstVal);
+  } else if (CstVal != 0) {
+    return B.CreateAdd(ConstantInt::get(intTy, CstVal), DynVal);
+  }
+  return DynVal;
+}
+
 void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
                              int64_t CstVal, Value *DynVal) {
   IRBuilder<> B(Src);
-  if (DynVal == nullptr) {
-    DynVal = ConstantInt::get(new_phi->getType(), CstVal);
-  } else if (CstVal != 0) {
-    DynVal = B.CreateAdd(ConstantInt::get(new_phi->getType(), CstVal), DynVal);
-  }
+  Value *DynValOffset = getOffsetValue(B, new_phi->getType(), CstVal, DynVal);
   BasicBlock *BB = nullptr;
   for (auto &incoming : phi->incoming_values()) {
     if (incoming == Src) {
@@ -61,7 +67,7 @@ void replacePHIIncomingValue(PHINode *phi, PHINode *new_phi, Instruction *Src,
     }
   }
   assert(BB);
-  new_phi->addIncoming(DynVal, BB);
+  new_phi->addIncoming(DynValOffset, BB);
   phi->removeIncomingValue(BB, false);
 }
 
@@ -110,7 +116,7 @@ clspv::LowerPrivatePointerPHIPass::run(Module &M,
 void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
   auto DL = F.getParent()->getDataLayout();
 
-  bool PrivatePointerPHI = false;
+  bool PrivatePointerPHIOrSelect = false;
   SmallVector<AllocaInst *> worklist;
   for (auto &BB : F) {
     for (auto &I : BB) {
@@ -120,19 +126,28 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         Type *Ty = phi->getType();
         if (Ty->isPointerTy() &&
             Ty->getPointerAddressSpace() == clspv::AddressSpace::Private) {
-          PrivatePointerPHI = true;
+          PrivatePointerPHIOrSelect = true;
+        }
+      } else if (auto select = dyn_cast<SelectInst>(&I)) {
+        Type *Ty = select->getType();
+        if (Ty->isPointerTy() &&
+            Ty->getPointerAddressSpace() == clspv::AddressSpace::Private) {
+          PrivatePointerPHIOrSelect = true;
         }
       }
     }
   }
 
-  if (!PrivatePointerPHI) {
+  if (!PrivatePointerPHIOrSelect) {
     return;
   }
 
   DenseSet<Value *> seen;
   WeakInstructions ToBeErased;
   DenseMap<PHINode *, PHINode *> PHIMap;
+  DenseMap<SelectInst *, SelectInst *> SelectMap;
+  DenseMap<PHINode *, AllocaInst *> PHIToBaseAlloca;
+  DenseMap<SelectInst *, AllocaInst *> SelectToBaseAlloca;
   for (auto alloca : worklist) {
     auto allocaSTy = dyn_cast<StructType>(alloca->getAllocatedType());
     if (allocaSTy && BitcastUtils::IsComplexStruct(DL, allocaSTy)) {
@@ -167,7 +182,23 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         if (auto phi = dyn_cast<PHINode>(node)) {
           auto new_phi = PHIMap[phi];
           assert(new_phi);
+          assert(PHIToBaseAlloca[phi] == alloca &&
+                 "PHI of pointers from different allocas not supported!");
           replacePHIIncomingValue(phi, new_phi, Src, CstVal, DynVal);
+        } else if (auto select = dyn_cast<SelectInst>(node)) {
+          auto new_select = SelectMap[select];
+          assert(new_select);
+          assert(SelectToBaseAlloca[select] == alloca &&
+                 "Select of pointers from different allocas not supported!");
+          IRBuilder<> B(select);
+          Type *intTy = new_select->getType();
+          Value *offset_val = getOffsetValue(B, intTy, CstVal, DynVal);
+          if (Src == select->getTrueValue()) {
+            new_select->setOperand(1, offset_val);
+          }
+          if (Src == select->getFalseValue()) {
+            new_select->setOperand(2, offset_val);
+          }
         }
         continue;
       }
@@ -207,6 +238,7 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         auto new_phi = B.CreatePHI(intTy, phi->getNumIncomingValues());
         replacePHIIncomingValue(phi, new_phi, Src, CstVal, DynVal);
         PHIMap[phi] = new_phi;
+        PHIToBaseAlloca[phi] = alloca;
         ToBeErased.push_back(phi);
         for (auto &incoming : phi->incoming_values()) {
           if (isa<UndefValue>(incoming)) {
@@ -216,6 +248,56 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         }
         for (auto use : phi->users()) {
           nodes.push_back(std::make_tuple(use, phi, 0, new_phi));
+        }
+      } else if (auto select = dyn_cast<SelectInst>(node)) {
+        IRBuilder<> B(select);
+        Type *intTy = clspv::PointersAre64Bit(*(F.getParent()))
+                          ? B.getInt64Ty()
+                          : B.getInt32Ty();
+
+        Value *true_val = select->getTrueValue();
+        Value *false_val = select->getFalseValue();
+        Value *new_true_val = nullptr;
+        Value *new_false_val = nullptr;
+
+        if (true_val == false_val) {
+          Value *offset_val = getOffsetValue(B, intTy, CstVal, DynVal);
+          new_true_val = offset_val;
+          new_false_val = offset_val;
+        } else {
+          if (isa<ConstantPointerNull>(true_val)) {
+            new_true_val = ConstantInt::get(intTy, 0);
+          } else if (isa<UndefValue>(true_val)) {
+            new_true_val = UndefValue::get(intTy);
+          }
+          if (isa<ConstantPointerNull>(false_val)) {
+            new_false_val = ConstantInt::get(intTy, 0);
+          } else if (isa<UndefValue>(false_val)) {
+            new_false_val = UndefValue::get(intTy);
+          }
+
+          Value *offset_val = getOffsetValue(B, intTy, CstVal, DynVal);
+          if (Src == true_val) {
+            new_true_val = offset_val;
+            if (new_false_val == nullptr) {
+              new_false_val = ConstantInt::get(intTy, 0);
+            }
+          } else {
+            assert(Src == false_val);
+            new_false_val = offset_val;
+            if (new_true_val == nullptr) {
+              new_true_val = ConstantInt::get(intTy, 0);
+            }
+          }
+        }
+
+        auto new_select = cast<SelectInst>(B.CreateSelect(
+            select->getCondition(), new_true_val, new_false_val));
+        SelectMap[select] = new_select;
+        SelectToBaseAlloca[select] = alloca;
+        ToBeErased.push_back(select);
+        for (auto use : select->users()) {
+          nodes.push_back(std::make_tuple(use, select, 0, new_select));
         }
       } else if (auto load = dyn_cast<LoadInst>(node)) {
         IRBuilder<> B(load);
