@@ -93,10 +93,6 @@ static llvm::cl::opt<bool> cl_single_precision_constants(
     llvm::cl::desc("Treat double precision floating-point constant as single "
                    "precision constant."));
 
-static llvm::cl::opt<bool> cl_denorms_are_zero(
-    "cl-denorms-are-zero", llvm::cl::init(false),
-    llvm::cl::desc("If specified, denormalized floating point numbers may be "
-                   "flushed to zero."));
 
 static llvm::cl::opt<bool> cl_fp32_correctly_rounded_divide_sqrt(
     "cl-fp32-correctly-rounded-divide-sqrt", llvm::cl::init(false),
@@ -317,8 +313,35 @@ int SetCompilerInstanceOptions(
     instance.getLangOpts().NativeHalfType = true;
     instance.getLangOpts().NativeHalfArgsAndReturns = true;
   }
-  instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getDynamic();
-  instance.getCodeGenOpts().FP32DenormalMode = llvm::DenormalMode::getDynamic();
+  // FP32 denormal mode
+  if (clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp32)) {
+    instance.getCodeGenOpts().FP32DenormalMode = llvm::DenormalMode::getIEEE();
+  } else if (clspv::Option::ExecutionModeDenormFlushToZero(
+                 clspv::Option::DenormMode::fp32)) {
+    instance.getCodeGenOpts().FP32DenormalMode =
+        llvm::DenormalMode::getPreserveSign();
+  } else {
+    instance.getCodeGenOpts().FP32DenormalMode =
+        llvm::DenormalMode::getDynamic();
+  }
+
+  // FPDenormalMode (for 16 and 64)
+  if (clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp16) ||
+      clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp64)) {
+    instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getIEEE();
+  } else if (clspv::Option::ExecutionModeDenormFlushToZero(
+                 clspv::Option::DenormMode::fp16) ||
+             clspv::Option::ExecutionModeDenormFlushToZero(
+                 clspv::Option::DenormMode::fp64)) {
+    instance.getCodeGenOpts().FPDenormalMode =
+        llvm::DenormalMode::getPreserveSign();
+  } else {
+    instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getDynamic();
+  }
+
   instance.getCodeGenOpts().StackRealignment = true;
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
@@ -341,7 +364,6 @@ int SetCompilerInstanceOptions(
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
-  // cl_denorms_are_zero ignored for now!
   // cl_fp32_correctly_rounded_divide_sqrt ignored for now!
   instance.getCodeGenOpts().LessPreciseFPMAD =
       clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath();
@@ -999,6 +1021,15 @@ int ParseOptions(const int argc, const char *const argv[]) {
       (clspv::Option::SupportsFmaKHR(16) || !clspv::Option::FP16()) &&
       (clspv::Option::SupportsFmaKHR(64) || !clspv::Option::FP64())) {
     clspv::Option::AddUseNativeBuiltins(clspv::Builtins::BuiltinType::kFma);
+  }
+
+  if (clspv::Option::FP16() && clspv::Option::FP64() &&
+      ((ExecutionModeDenormPreserve(clspv::Option::DenormMode::fp16) ^
+        ExecutionModeDenormPreserve(clspv::Option::DenormMode::fp64)) ||
+       (ExecutionModeDenormFlushToZero(clspv::Option::DenormMode::fp16) ^
+        ExecutionModeDenormFlushToZero(clspv::Option::DenormMode::fp64)))) {
+    llvm::errs() << "error: fp16 & fp64 needs to share the same DenormMode";
+    return -1;
   }
 
   return 0;
