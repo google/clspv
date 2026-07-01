@@ -199,6 +199,20 @@ enum class RoundingModeRTE : uint32_t {
 // floating point type.
 bool ExecutionModeRoundingModeRTE(RoundingModeRTE rm);
 
+enum class DenormMode : uint32_t {
+  fp16,
+  fp32,
+  fp64,
+};
+
+// Returns true when the execution mode DenormPreserve should be set for a
+// floating point type.
+bool ExecutionModeDenormPreserve(DenormMode dm);
+
+// Returns true when the execution mode DenormFlushToZero should be set for a
+// floating point type.
+bool ExecutionModeDenormFlushToZero(DenormMode dm);
+
 // Return the SPIR-V binary version
 enum class SPIRVVersion : uint32_t {
   SPIRV_1_0 = 0,

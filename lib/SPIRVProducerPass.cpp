@@ -3377,6 +3377,24 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
   auto &EntryPointInterfaces = getEntryPointInterfacesList();
   std::vector<SPIRVID> &BuiltinDimVec = getBuiltinDimVec();
 
+  // Add denorm capabilities if needed
+  if (clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp16) ||
+      clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp32) ||
+      clspv::Option::ExecutionModeDenormPreserve(
+          clspv::Option::DenormMode::fp64)) {
+    addCapability(spv::CapabilityDenormPreserve);
+  }
+  if (clspv::Option::ExecutionModeDenormFlushToZero(
+          clspv::Option::DenormMode::fp16) ||
+      clspv::Option::ExecutionModeDenormFlushToZero(
+          clspv::Option::DenormMode::fp32) ||
+      clspv::Option::ExecutionModeDenormFlushToZero(
+          clspv::Option::DenormMode::fp64)) {
+    addCapability(spv::CapabilityDenormFlushToZero);
+  }
+
   SPIRVOperandVec Ops;
 
   for (auto Capability : CapabilitySet) {
@@ -3408,7 +3426,21 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     }
   }
 
-  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 && hasConvertToF()) {
+  bool hasDenorms = clspv::Option::ExecutionModeDenormPreserve(
+                        clspv::Option::DenormMode::fp16) ||
+                    clspv::Option::ExecutionModeDenormPreserve(
+                        clspv::Option::DenormMode::fp32) ||
+                    clspv::Option::ExecutionModeDenormPreserve(
+                        clspv::Option::DenormMode::fp64) ||
+                    clspv::Option::ExecutionModeDenormFlushToZero(
+                        clspv::Option::DenormMode::fp16) ||
+                    clspv::Option::ExecutionModeDenormFlushToZero(
+                        clspv::Option::DenormMode::fp32) ||
+                    clspv::Option::ExecutionModeDenormFlushToZero(
+                        clspv::Option::DenormMode::fp64);
+
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 &&
+      (hasConvertToF() || hasDenorms)) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_float_controls");
   }
 
@@ -3583,6 +3615,45 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
         Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 64;
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
+    }
+  }
+
+  // Emit denorm execution modes
+  for (auto EntryPoint : EntryPoints) {
+    if (clspv::Option::FP16() && clspv::Option::ExecutionModeDenormPreserve(
+                                     clspv::Option::DenormMode::fp16)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 16;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (clspv::Option::FP16() &&
+               clspv::Option::ExecutionModeDenormFlushToZero(
+                   clspv::Option::DenormMode::fp16)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 16;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    if (clspv::Option::ExecutionModeDenormPreserve(
+            clspv::Option::DenormMode::fp32)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 32;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (clspv::Option::ExecutionModeDenormFlushToZero(
+                   clspv::Option::DenormMode::fp32)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 32;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    if (clspv::Option::FP64() && clspv::Option::ExecutionModeDenormPreserve(
+                                     clspv::Option::DenormMode::fp64)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 64;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (clspv::Option::FP64() &&
+               clspv::Option::ExecutionModeDenormFlushToZero(
+                   clspv::Option::DenormMode::fp64)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 64;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
     }
   }
 

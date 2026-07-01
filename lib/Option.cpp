@@ -309,6 +309,33 @@ static llvm::cl::list<clspv::Option::RoundingModeRTE> rounding_mode_rte(
         clEnumValN(clspv::Option::RoundingModeRTE::fp64, "64",
                    "Set execution mode RoundingModeRTE for fp64")));
 
+static llvm::cl::list<clspv::Option::DenormMode> denorm_preserve(
+    "denorm-preserve",
+    llvm::cl::desc(
+        "Set execution mode DenormPreserve for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(clEnumValN(clspv::Option::DenormMode::fp16, "16",
+                                "Set execution mode DenormPreserve for fp16")),
+    llvm::cl::values(clEnumValN(clspv::Option::DenormMode::fp32, "32",
+                                "Set execution mode DenormPreserve for fp32")),
+    llvm::cl::values(clEnumValN(clspv::Option::DenormMode::fp64, "64",
+                                "Set execution mode DenormPreserve for fp64")));
+
+static llvm::cl::list<clspv::Option::DenormMode> denorm_flush_to_zero(
+    "denorm-flush-to-zero",
+    llvm::cl::desc(
+        "Set execution mode DenormFlushToZero for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(
+        clEnumValN(clspv::Option::DenormMode::fp16, "16",
+                   "Set execution mode DenormFlushToZero for fp16")),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::DenormMode::fp32, "32",
+                   "Set execution mode DenormFlushToZero for fp32")),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::DenormMode::fp64, "64",
+                   "Set execution mode DenormFlushToZero for fp64")));
+
 static llvm::cl::list<clspv::Option::StorageClass> no_16bit_storage(
     "no-16bit-storage",
     llvm::cl::desc("Disable fine-grained 16-bit storage capabilities."),
@@ -521,6 +548,24 @@ bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 bool ExecutionModeRoundingModeRTE(RoundingModeRTE fp) {
   for (auto type : rounding_mode_rte) {
     if (type == fp) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ExecutionModeDenormPreserve(clspv::Option::DenormMode dm) {
+  for (auto type : denorm_preserve) {
+    if (type == dm) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ExecutionModeDenormFlushToZero(clspv::Option::DenormMode dm) {
+  for (auto type : denorm_flush_to_zero) {
+    if (type == dm) {
       return true;
     }
   }
