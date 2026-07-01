@@ -26,6 +26,7 @@ struct ReplaceLLVMIntrinsicsPass
   // TODO: update module-based funtions to work like function-based ones.
   // Except maybe lifetime intrinsics.
   bool runOnFunction(llvm::Function &F);
+  bool replaceMemmove(llvm::Module &M);
   bool replaceMemset(llvm::Module &M);
   bool replaceMemcpy(llvm::Module &M);
   bool removeIntrinsicDeclaration(llvm::Function &F);

@@ -464,6 +464,12 @@ static llvm::cl::list<clspv::Option::SpvKhrFma> spv_khr_fma(
     llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp64, "64",
                                 "Enable SPV_KHR_fma for fp64")));
 
+static llvm::cl::opt<uint32_t> memmove_alloca_limit(
+    "memmove-alloca-limit",
+    llvm::cl::desc(
+        "Max size of the alloca used to implement memmove intrinsic"),
+    llvm::cl::init(16));
+
 } // namespace
 
 namespace clspv {
@@ -643,6 +649,8 @@ bool SupportsFmaKHR(uint32_t scalarSizeInBits) {
   auto end = spv_khr_fma.end();
   return std::find(begin, end, fma) != end;
 }
+
+uint32_t MemmoveAllocaLimit() { return memmove_alloca_limit; }
 
 } // namespace Option
 } // namespace clspv

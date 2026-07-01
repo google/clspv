@@ -327,6 +327,10 @@ enum class SpvKhrFma : uint32_t {
 // Returns true if OpFmaKHR is supported for the type size.
 bool SupportsFmaKHR(uint32_t scalarSizeInBits);
 
+// Return maximum compile time known size to llvm memmove intrinsic, such
+// that it can be implemented with an alloca
+uint32_t MemmoveAllocaLimit();
+
 } // namespace Option
 } // namespace clspv
 

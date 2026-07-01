@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -21,6 +22,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/LowerMemIntrinsics.h"
 
 #include "BitcastUtils.h"
 #include "clspv/Option.h"
@@ -62,6 +64,7 @@ clspv::ReplaceLLVMIntrinsicsPass::run(Module &M, ModuleAnalysisManager &) {
 
   // Remove lifetime annotations first.  They could be using memset
   // and memcpy calls.
+  replaceMemmove(M);
   replaceMemset(M);
   replaceMemcpy(M);
 
@@ -540,6 +543,193 @@ static void replaceMemsetDynamic(CallInst *CI, Module &M, Value *Dst,
 
   Builder.SetInsertPoint(PostBB);
   CI->eraseFromParent();
+}
+
+static bool replaceMemmoveDynamic(Module &M, MemMoveInst *MMI) {
+  // Use LLVM utility to expand memmove intrinsic as a loop of byte
+  // copies.
+  auto BB = MMI->getParent(); // Record original basic block
+  if (!expandMemMoveAsLoop(MMI, TargetTransformInfo(M.getDataLayout()))) {
+    return false;
+  }
+
+  // expandMemMoveAsLoop creates a 'icmp ptr' instruction that we try to
+  // transform to avoid lowering to OpPtrDiff which isn't supported for
+  // PhysicalStorageBuffer or Function storage classes.
+  ICmpInst *ICmpToProcess = nullptr;
+  for (auto &I : *BB) {
+    if (auto ICmp = dyn_cast<ICmpInst>(&I)) {
+      if (ICmp->getOperand(0) == MMI->getSource() &&
+          ICmp->getOperand(1) == MMI->getDest()) {
+        ICmpToProcess = ICmp;
+        break;
+      }
+    }
+  }
+
+  bool TransformedICMP = false;
+  if (ICmpToProcess) {
+    // Try to constant fold the icmp if the operands point to the same alloca
+    // in the private address space at compile time known offsets
+    Value *LHS = ICmpToProcess->getOperand(0);
+    Value *RHS = ICmpToProcess->getOperand(1);
+    auto Pred = ICmpToProcess->getPredicate();
+
+    // APInts to accumulate base offsets (relative to the alloca pointer in
+    // bits/bytes)
+    APInt LHSOffset(64, 0);
+    APInt RHSOffset(64, 0);
+
+    // Strip away GEPs/Bitcasts and extract the root pointer base allocation
+    auto DL = M.getDataLayout();
+    Value *LHSBase = LHS->stripAndAccumulateConstantOffsets(
+        DL, LHSOffset, /*AllowNonInbounds=*/true);
+    Value *RHSBase = RHS->stripAndAccumulateConstantOffsets(
+        DL, RHSOffset, /*AllowNonInbounds=*/true);
+
+    // Check if both pointers safely root back to the exact same alloca
+    // instruction
+    if (LHSBase && RHSBase && isa<AllocaInst>(LHSBase) && LHSBase == RHSBase) {
+      bool Result = false;
+
+      // Evaluate the ICmp predicate natively at compile time
+      switch (Pred) {
+      case ICmpInst::ICMP_EQ:
+        Result = (LHSOffset == RHSOffset);
+        break;
+      case ICmpInst::ICMP_NE:
+        Result = (LHSOffset != RHSOffset);
+        break;
+      case ICmpInst::ICMP_SLT:
+        Result = LHSOffset.slt(RHSOffset);
+        break;
+      case ICmpInst::ICMP_SLE:
+        Result = LHSOffset.sle(RHSOffset);
+        break;
+      case ICmpInst::ICMP_SGT:
+        Result = LHSOffset.sgt(RHSOffset);
+        break;
+      case ICmpInst::ICMP_SGE:
+        Result = LHSOffset.sge(RHSOffset);
+        break;
+      case ICmpInst::ICMP_ULT:
+        Result = LHSOffset.ult(RHSOffset);
+        break;
+      case ICmpInst::ICMP_ULE:
+        Result = LHSOffset.ule(RHSOffset);
+        break;
+      case ICmpInst::ICMP_UGT:
+        Result = LHSOffset.ugt(RHSOffset);
+        break;
+      case ICmpInst::ICMP_UGE:
+        Result = LHSOffset.uge(RHSOffset);
+        break;
+      default:
+        llvm_unreachable("Unhandled ICMP predicate in memmove lowering");
+        break;
+      }
+
+      // Replace all dynamic uses of the comparison with our constant factor
+      Value *FoldedConstant =
+          ConstantInt::get(Type::getInt1Ty(M.getContext()), Result);
+      ICmpToProcess->replaceAllUsesWith(FoldedConstant);
+      ICmpToProcess->eraseFromParent();
+      TransformedICMP = true;
+    } else if (clspv::Option::PhysicalStorageBuffers()) {
+      // If we are using physical storage buffers then we can use
+      // OpConvertPtrToU and compare the integer representation
+      IntegerType *SizeT = clspv::PointersAre64Bit(M)
+                               ? IntegerType::get(M.getContext(), 64)
+                               : IntegerType::get(M.getContext(), 32);
+      IRBuilder<> B(ICmpToProcess);
+      auto LHSToInt = B.CreatePtrToInt(ICmpToProcess->getOperand(0), SizeT);
+      auto RHSToInt = B.CreatePtrToInt(ICmpToProcess->getOperand(1), SizeT);
+      ICmpToProcess->replaceAllUsesWith(B.CreateICmp(Pred, LHSToInt, RHSToInt));
+      ICmpToProcess->eraseFromParent();
+      TransformedICMP = true;
+    }
+  }
+
+  // If we couldn't modify the generated icmp instruction rely on OpPtrDiff in
+  // SPIR-V which is only available after version 1.4
+  if (!TransformedICMP &&
+      (clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_4)) {
+    llvm_unreachable("Using OpPtrDiff to implement memmove requires SPIR-V "
+                     "version 1.4 or later");
+  }
+
+  MMI->eraseFromParent();
+  return true;
+}
+
+static bool replaceMemmoveStatic(Module &M, MemMoveInst *MMI) {
+  // Creates an intermediate alloca byte array of a known size, then
+  // memcpy the src operand ptr into the alloca, followed by a memcpy of
+  // the alloca to the dst operand ptr.
+  auto *Length = cast<ConstantInt>(MMI->getLength());
+  auto NumBytes = Length->getZExtValue();
+
+  if (NumBytes > clspv::Option::MemmoveAllocaLimit()) {
+    // If limit on maximum size of alloca exceeded, then fall back to
+    // dynamic implementation
+    return replaceMemmoveDynamic(M, MMI);
+  }
+
+  auto *AllocaTy =
+      ArrayType::get(IntegerType::getInt8Ty(M.getContext()), NumBytes);
+
+  IRBuilder<> Builder(MMI);
+  Builder.SetInsertPointPastAllocas(MMI->getFunction());
+  auto Alloca = Builder.CreateAlloca(AllocaTy);
+  MaybeAlign SrcAlign = MMI->getSourceAlign();
+  if (SrcAlign.has_value())
+    Alloca->setAlignment(SrcAlign.value());
+
+  Builder.SetInsertPoint(MMI);
+  Builder.CreateMemCpy(Alloca, SrcAlign, MMI->getRawSource(), SrcAlign, Length,
+                       MMI->isVolatile());
+
+  auto *SecondCpy =
+      Builder.CreateMemCpy(MMI->getRawDest(), MMI->getDestAlign(), Alloca,
+                           SrcAlign, Length, MMI->isVolatile());
+
+  MMI->replaceAllUsesWith(SecondCpy);
+  MMI->eraseFromParent();
+  return true;
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemmove(Module &M) {
+  bool Changed = false;
+  for (auto &F : M) {
+    if (F.getName().contains("llvm.memmove")) {
+      SmallVector<MemMoveInst *, 8> CallsToReplace;
+
+      for (auto U : F.users()) {
+        if (auto MMI = dyn_cast<MemMoveInst>(U)) {
+          CallsToReplace.push_back(MMI);
+        }
+      }
+
+      if (!CallsToReplace.empty() && !clspv::Option::Int8Support()) {
+        llvm_unreachable("Lowering memmove intrinsic requires Int8 Capability");
+      }
+
+      for (auto MMI : CallsToReplace) {
+        bool DidTransform = isa<ConstantInt>(MMI->getLength())
+                                ? replaceMemmoveStatic(M, MMI)
+                                : replaceMemmoveDynamic(M, MMI);
+        if (DidTransform) {
+          Changed = true;
+        }
+      }
+
+      if (F.user_empty()) {
+        DeadFunctions.push_back(&F);
+      }
+    }
+  }
+
+  return Changed;
 }
 
 bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemset(Module &M) {
