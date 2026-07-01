@@ -296,18 +296,45 @@ static llvm::cl::opt<bool> cluster_non_pointer_kernel_args(
                    "other arguments. Use this to reduce storage buffer "
                    "descriptors."));
 
-static llvm::cl::list<clspv::Option::RoundingModeRTE> rounding_mode_rte(
+static llvm::cl::list<clspv::Option::FloatingPointType> rounding_mode_rte(
     "rounding-mode-rte",
     llvm::cl::desc(
         "Set execution mode RoundingModeRTE for a floating point type"),
     llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
-    llvm::cl::values(clEnumValN(clspv::Option::RoundingModeRTE::fp16, "16",
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
                                 "Set execution mode RoundingModeRTE for fp16")),
-    llvm::cl::values(clEnumValN(clspv::Option::RoundingModeRTE::fp32, "32",
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
                                 "Set execution mode RoundingModeRTE for fp32")),
     llvm::cl::values(
-        clEnumValN(clspv::Option::RoundingModeRTE::fp64, "64",
+        clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
                    "Set execution mode RoundingModeRTE for fp64")));
+
+static llvm::cl::list<clspv::Option::FloatingPointType> denorm_preserve(
+    "denorm-preserve",
+    llvm::cl::desc(
+        "Set execution mode DenormPreserve for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
+                                "Set execution mode DenormPreserve for fp16")),
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
+                                "Set execution mode DenormPreserve for fp32")),
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
+                                "Set execution mode DenormPreserve for fp64")));
+
+static llvm::cl::list<clspv::Option::FloatingPointType> denorm_flush_to_zero(
+    "denorm-flush-to-zero",
+    llvm::cl::desc(
+        "Set execution mode DenormFlushToZero for a floating point type"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(
+        clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
+                   "Set execution mode DenormFlushToZero for fp16")),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
+                   "Set execution mode DenormFlushToZero for fp32")),
+    llvm::cl::values(
+        clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
+                   "Set execution mode DenormFlushToZero for fp64")));
 
 static llvm::cl::list<clspv::Option::StorageClass> no_16bit_storage(
     "no-16bit-storage",
@@ -453,15 +480,15 @@ static llvm::cl::opt<bool>
     untyped_pointers("untyped-pointers", llvm::cl::init(false),
                      llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
 
-static llvm::cl::list<clspv::Option::SpvKhrFma> spv_khr_fma(
+static llvm::cl::list<clspv::Option::FloatingPointType> spv_khr_fma(
     "spv-khr-fma",
     llvm::cl::desc("Enable SPV_KHR_fma for a floating point type"),
     llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
-    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp16, "16",
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
                                 "Enable SPV_KHR_fma for fp16")),
-    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp32, "32",
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
                                 "Enable SPV_KHR_fma for fp32")),
-    llvm::cl::values(clEnumValN(clspv::Option::SpvKhrFma::fp64, "64",
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
                                 "Enable SPV_KHR_fma for fp64")));
 
 } // namespace
@@ -518,13 +545,39 @@ bool NonUniformNDRangeSupported() {
 }
 bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
-bool ExecutionModeRoundingModeRTE(RoundingModeRTE fp) {
+bool ExecutionModeRoundingModeRTE(FloatingPointType fp) {
   for (auto type : rounding_mode_rte) {
     if (type == fp) {
       return true;
     }
   }
   return false;
+}
+
+DenormMode ExecutionModeDenorm(FloatingPointType fpty) {
+  static std::unordered_map<FloatingPointType, DenormMode> modes;
+  auto mode = modes.find(fpty);
+  if (mode != modes.end()) {
+    return modes[fpty];
+  }
+
+  for (auto type : denorm_preserve) {
+    modes[type] = DenormMode::preserve;
+  }
+  for (auto type : denorm_flush_to_zero) {
+    if (modes.find(type) != modes.end()) {
+      modes[type] = DenormMode::error;
+    } else {
+      modes[type] = DenormMode::flush_to_zero;
+    }
+  }
+  for (auto type : {FloatingPointType::fp16, FloatingPointType::fp32,
+                    FloatingPointType::fp64}) {
+    if (modes.find(type) == modes.end()) {
+      modes[type] = DenormMode::unspecified;
+    }
+  }
+  return modes[fpty];
 }
 
 bool Supports16BitStorageClass(StorageClass sc) {
@@ -625,16 +678,16 @@ bool UntypedPointerAddressSpace(unsigned aspace) {
 }
 
 bool SupportsFmaKHR(uint32_t scalarSizeInBits) {
-  SpvKhrFma fma;
+  FloatingPointType fma;
   switch (scalarSizeInBits) {
   case 16:
-    fma = clspv::Option::SpvKhrFma::fp16;
+    fma = clspv::Option::FloatingPointType::fp16;
     break;
   case 32:
-    fma = clspv::Option::SpvKhrFma::fp32;
+    fma = clspv::Option::FloatingPointType::fp32;
     break;
   case 64:
-    fma = clspv::Option::SpvKhrFma::fp64;
+    fma = clspv::Option::FloatingPointType::fp64;
     break;
   default:
     return false;

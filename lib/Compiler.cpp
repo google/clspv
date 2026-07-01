@@ -93,6 +93,8 @@ static llvm::cl::opt<bool> cl_single_precision_constants(
     llvm::cl::desc("Treat double precision floating-point constant as single "
                    "precision constant."));
 
+// This option has not effect. Mainly because of lack of expresiveness. Instead
+// use `-denorm-preserve` and `-denorm-flush-to-zero`.
 static llvm::cl::opt<bool> cl_denorms_are_zero(
     "cl-denorms-are-zero", llvm::cl::init(false),
     llvm::cl::desc("If specified, denormalized floating point numbers may be "
@@ -317,8 +319,52 @@ int SetCompilerInstanceOptions(
     instance.getLangOpts().NativeHalfType = true;
     instance.getLangOpts().NativeHalfArgsAndReturns = true;
   }
-  instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getDynamic();
-  instance.getCodeGenOpts().FP32DenormalMode = llvm::DenormalMode::getDynamic();
+  // FP32 denormal mode
+  switch (clspv::Option::ExecutionModeDenorm(
+      clspv::Option::FloatingPointType::fp32)) {
+  case clspv::Option::DenormMode::preserve:
+    instance.getCodeGenOpts().FP32DenormalMode = llvm::DenormalMode::getIEEE();
+    break;
+  case clspv::Option::DenormMode::flush_to_zero:
+    instance.getCodeGenOpts().FP32DenormalMode =
+        llvm::DenormalMode::getPreserveSign();
+    break;
+  case clspv::Option::DenormMode::unspecified:
+    instance.getCodeGenOpts().FP32DenormalMode =
+        llvm::DenormalMode::getDynamic();
+    break;
+  case clspv::Option::DenormMode::error:
+    llvm_unreachable("Invalid DenormMode");
+  }
+
+  // FPDenormalMode (for 16 and 64)
+  clspv::Option::DenormMode mode = clspv::Option::DenormMode::error;
+  auto modefp16 = clspv::Option::ExecutionModeDenorm(
+      clspv::Option::FloatingPointType::fp16);
+  auto modefp64 = clspv::Option::ExecutionModeDenorm(
+      clspv::Option::FloatingPointType::fp64);
+  if (modefp16 == modefp64) {
+    mode = modefp16;
+  } else if (modefp16 == clspv::Option::DenormMode::unspecified) {
+    mode = modefp64;
+  } else if (modefp64 == clspv::Option::DenormMode::unspecified) {
+    mode = modefp16;
+  }
+  switch (mode) {
+  case clspv::Option::DenormMode::preserve:
+    instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getIEEE();
+    break;
+  case clspv::Option::DenormMode::flush_to_zero:
+    instance.getCodeGenOpts().FPDenormalMode =
+        llvm::DenormalMode::getPreserveSign();
+    break;
+  case clspv::Option::DenormMode::unspecified:
+    instance.getCodeGenOpts().FPDenormalMode = llvm::DenormalMode::getDynamic();
+    break;
+  case clspv::Option::DenormMode::error:
+    llvm_unreachable("Invalid DenormMode");
+  }
+
   instance.getCodeGenOpts().StackRealignment = true;
   instance.getCodeGenOpts().SimplifyLibCalls = false;
   instance.getCodeGenOpts().EmitOpenCLArgMetadata = false;
@@ -341,7 +387,6 @@ int SetCompilerInstanceOptions(
 
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
-  // cl_denorms_are_zero ignored for now!
   // cl_fp32_correctly_rounded_divide_sqrt ignored for now!
   instance.getCodeGenOpts().LessPreciseFPMAD =
       clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath();
@@ -965,13 +1010,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
 
   if (!clspv::Option::FP16() &&
-      ExecutionModeRoundingModeRTE(clspv::Option::RoundingModeRTE::fp16)) {
+      ExecutionModeRoundingModeRTE(clspv::Option::FloatingPointType::fp16)) {
     llvm::errs() << "error: Cannot set RoundingModeRTE for fp16 if fp16 is not "
                     "supported\n";
     return -1;
   }
   if (!clspv::Option::FP64() &&
-      ExecutionModeRoundingModeRTE(clspv::Option::RoundingModeRTE::fp64)) {
+      ExecutionModeRoundingModeRTE(clspv::Option::FloatingPointType::fp64)) {
     llvm::errs() << "error: Cannot set RoundingModeRTE for fp64 if fp64 is not "
                     "supported\n";
     return -1;
@@ -999,6 +1044,33 @@ int ParseOptions(const int argc, const char *const argv[]) {
       (clspv::Option::SupportsFmaKHR(16) || !clspv::Option::FP16()) &&
       (clspv::Option::SupportsFmaKHR(64) || !clspv::Option::FP64())) {
     clspv::Option::AddUseNativeBuiltins(clspv::Builtins::BuiltinType::kFma);
+  }
+
+  if (clspv::Option::FP16() &&
+      ExecutionModeDenorm(clspv::Option::FloatingPointType::fp16) ==
+          clspv::Option::DenormMode::error) {
+    llvm::errs()
+        << "error: denorm preserve & flush to zero mode are exclusive (fp16)";
+    return -1;
+  }
+  if (ExecutionModeDenorm(clspv::Option::FloatingPointType::fp32) ==
+      clspv::Option::DenormMode::error) {
+    llvm::errs()
+        << "error: denorm preserve & flush to zero mode are exclusive (fp32)";
+    return -1;
+  }
+  if (clspv::Option::FP64() &&
+      ExecutionModeDenorm(clspv::Option::FloatingPointType::fp64) ==
+          clspv::Option::DenormMode::error) {
+    llvm::errs()
+        << "error: denorm preserve & flush to zero mode are exclusive (fp64)";
+    return -1;
+  }
+  if (clspv::Option::FP16() && clspv::Option::FP64() &&
+      (ExecutionModeDenorm(clspv::Option::FloatingPointType::fp16) !=
+       ExecutionModeDenorm(clspv::Option::FloatingPointType::fp64))) {
+    llvm::errs() << "error: fp16 & fp64 needs to share the same DenormMode";
+    return -1;
   }
 
   return 0;

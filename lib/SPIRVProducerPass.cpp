@@ -387,9 +387,9 @@ struct SPIRVProducerPassImpl {
   bool hasConvertToF() { return HasConvertToF; }
   void setConvertToF() {
     if (!HasConvertToF &&
-        (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16) ||
-         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32) ||
-         ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64))) {
+        (ExecutionModeRoundingModeRTE(FloatingPointType::fp16) ||
+         ExecutionModeRoundingModeRTE(FloatingPointType::fp32) ||
+         ExecutionModeRoundingModeRTE(FloatingPointType::fp64))) {
       addCapability(spv::CapabilityRoundingModeRTE);
       HasConvertToF = true;
     }
@@ -3377,6 +3377,21 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
   auto &EntryPointInterfaces = getEntryPointInterfacesList();
   std::vector<SPIRVID> &BuiltinDimVec = getBuiltinDimVec();
 
+  // Add denorm capabilities if needed
+  if ((ExecutionModeDenorm(FloatingPointType::fp16) == DenormMode::preserve) ||
+      (ExecutionModeDenorm(FloatingPointType::fp32) == DenormMode::preserve) ||
+      (ExecutionModeDenorm(FloatingPointType::fp64) == DenormMode::preserve)) {
+    addCapability(spv::CapabilityDenormPreserve);
+  }
+  if ((ExecutionModeDenorm(FloatingPointType::fp16) ==
+       DenormMode::flush_to_zero) ||
+      (ExecutionModeDenorm(FloatingPointType::fp32) ==
+       DenormMode::flush_to_zero) ||
+      (ExecutionModeDenorm(FloatingPointType::fp64) ==
+       DenormMode::flush_to_zero)) {
+    addCapability(spv::CapabilityDenormFlushToZero);
+  }
+
   SPIRVOperandVec Ops;
 
   for (auto Capability : CapabilitySet) {
@@ -3408,7 +3423,16 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     }
   }
 
-  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 && hasConvertToF()) {
+  bool hasDenorms =
+      (clspv::Option::ExecutionModeDenorm(FloatingPointType::fp16) !=
+       DenormMode::unspecified) ||
+      (clspv::Option::ExecutionModeDenorm(FloatingPointType::fp32) !=
+       DenormMode::unspecified) ||
+      (clspv::Option::ExecutionModeDenorm(FloatingPointType::fp64) !=
+       DenormMode::unspecified);
+
+  if (SpvVersion() < SPIRVVersion::SPIRV_1_4 &&
+      (hasConvertToF() || hasDenorms)) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_float_controls");
   }
 
@@ -3567,22 +3591,56 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
   if (hasConvertToF()) {
     for (auto EntryPoint : EntryPoints) {
       if (clspv::Option::FP16() &&
-          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp16)) {
+          ExecutionModeRoundingModeRTE(FloatingPointType::fp16)) {
         Ops.clear();
         Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 16;
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
-      if (ExecutionModeRoundingModeRTE(RoundingModeRTE::fp32)) {
+      if (ExecutionModeRoundingModeRTE(FloatingPointType::fp32)) {
         Ops.clear();
         Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 32;
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
       if (clspv::Option::FP64() &&
-          ExecutionModeRoundingModeRTE(RoundingModeRTE::fp64)) {
+          ExecutionModeRoundingModeRTE(FloatingPointType::fp64)) {
         Ops.clear();
         Ops << EntryPoint.second << spv::ExecutionModeRoundingModeRTE << 64;
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
+    }
+  }
+
+  // Emit denorm execution modes
+  for (auto EntryPoint : EntryPoints) {
+    auto mode = ExecutionModeDenorm(FloatingPointType::fp16);
+    if (FP16() && mode == DenormMode::preserve) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 16;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (FP16() && mode == DenormMode::flush_to_zero) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 16;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    mode = ExecutionModeDenorm(FloatingPointType::fp32);
+    if (mode == DenormMode::preserve) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 32;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (mode == DenormMode::flush_to_zero) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 32;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    mode = ExecutionModeDenorm(FloatingPointType::fp64);
+    if (FP64() && mode == DenormMode::preserve) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormPreserve << 64;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    } else if (FP64() && mode == DenormMode::flush_to_zero) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 64;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
     }
   }
 

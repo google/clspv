@@ -189,7 +189,7 @@ inline bool LanguageUsesGenericAddressSpace() {
               clspv::FeatureMacro::__opencl_c_generic_address_space) > 0);
 }
 
-enum class RoundingModeRTE : uint32_t {
+enum class FloatingPointType : uint32_t {
   fp16,
   fp32,
   fp64,
@@ -197,7 +197,17 @@ enum class RoundingModeRTE : uint32_t {
 
 // Returns true when the execution mode RoundingModeRTE should be set for a
 // floating point type.
-bool ExecutionModeRoundingModeRTE(RoundingModeRTE rm);
+bool ExecutionModeRoundingModeRTE(FloatingPointType rm);
+
+enum class DenormMode : uint32_t {
+  error,
+  preserve,
+  flush_to_zero,
+  unspecified,
+};
+
+// Returns the execution mode for a floating point type.
+DenormMode ExecutionModeDenorm(FloatingPointType fpty);
 
 // Return the SPIR-V binary version
 enum class SPIRVVersion : uint32_t {
@@ -319,11 +329,6 @@ bool UntypedPointers();
 // Returns true if untyped pointers are supported in aspace.
 bool UntypedPointerAddressSpace(unsigned aspace);
 
-enum class SpvKhrFma : uint32_t {
-  fp16,
-  fp32,
-  fp64,
-};
 // Returns true if OpFmaKHR is supported for the type size.
 bool SupportsFmaKHR(uint32_t scalarSizeInBits);
 
