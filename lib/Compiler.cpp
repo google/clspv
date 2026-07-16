@@ -584,18 +584,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   llvm::ModulePassManager pm;
   llvm::FunctionPassManager fpm;
 
-  switch (OptimizationLevel) {
-  case '0':
-  case '1':
-  case '2':
-  case '3':
-    break;
-  default:
-    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
-                 << " specified!\n";
-    return -1;
-  }
-
   llvm::OptimizationLevel level;
   switch (OptimizationLevel) {
   case '0':
@@ -611,7 +599,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     level = llvm::OptimizationLevel::O3;
     break;
   default:
-    break;
+    llvm::errs() << "Unknown optimization level -O" << OptimizationLevel
+                 << " specified!\n";
+    return -1;
   }
 
   // Run the following optimizations prior to the standard LLVM pass pipeline.
@@ -647,7 +637,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::PrintfPass());
     }
 
-    if (level.getSpeedupLevel() > 0) {
+    if (level != llvm::OptimizationLevel::O0) {
       pm.addPass(clspv::OpenCLInlinerPass());
     }
 
@@ -875,7 +865,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   });
 
   // Add the default optimizations for the requested optimization level.
-  if (level.getSpeedupLevel() > 0) {
+  if (level != llvm::OptimizationLevel::O0) {
     auto mpm = pb.buildPerModuleDefaultPipeline(level);
     mpm.run(M, mam);
   } else {

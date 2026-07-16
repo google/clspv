@@ -38,6 +38,13 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
+if (WIN32)
+  # Increase stack size for executables to 10MB to prevent stack overflow
+  # during recursive compiler passes in debug builds.
+  set(_is_exe "$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>")
+  add_link_options("$<$<AND:$<CONFIG:Debug>,${_is_exe}>:LINKER:/STACK:10000000>")
+endif()
+
 # Make sure CMAKE_BUILD_TYPE gets a value because we rely on it for
 # running unit tests correctly on Windows.
 if (NOT DEFINED CMAKE_BUILD_TYPE)
