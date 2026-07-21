@@ -171,6 +171,7 @@ enum class SourceLanguage {
   OpenCL_C_12,
   OpenCL_C_20,
   OpenCL_C_30,
+  OpenCL_C_31,
   OpenCL_CPP,
   OpenCL_CPP_2021
 };
@@ -184,7 +185,8 @@ inline bool LanguageUsesGenericAddressSpace() {
   return (Language() == SourceLanguage::OpenCL_CPP) ||
          (Language() == SourceLanguage::OpenCL_CPP_2021) ||
          (Language() == SourceLanguage::OpenCL_C_20) ||
-         (Language() == SourceLanguage::OpenCL_C_30 &&
+         ((Language() == SourceLanguage::OpenCL_C_30 ||
+           Language() == SourceLanguage::OpenCL_C_31) &&
           EnabledFeatureMacros().count(
               clspv::FeatureMacro::__opencl_c_generic_address_space) > 0);
 }

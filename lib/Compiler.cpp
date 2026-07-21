@@ -297,6 +297,9 @@ int SetCompilerInstanceOptions(
   case clspv::Option::SourceLanguage::OpenCL_C_30:
     standard = clang::LangStandard::lang_opencl30;
     break;
+  case clspv::Option::SourceLanguage::OpenCL_C_31:
+    standard = clang::LangStandard::lang_opencl31;
+    break;
   case clspv::Option::SourceLanguage::OpenCL_CPP:
     standard = clang::LangStandard::lang_openclcpp10;
     break;

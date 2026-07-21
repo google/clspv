@@ -241,6 +241,8 @@ llvm::cl::opt<clspv::Option::SourceLanguage> cl_std(
                                 "CL2.0", "OpenCL C 2.0"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_30,
                                 "CL3.0", "OpenCL C 3.0"),
+                     clEnumValN(clspv::Option::SourceLanguage::OpenCL_C_31,
+                                "CL3.1", "OpenCL C 3.1"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP,
                                 "CLC++", "C++ for OpenCL"),
                      clEnumValN(clspv::Option::SourceLanguage::OpenCL_CPP_2021,
@@ -546,6 +548,7 @@ bool NonUniformNDRangeSupported() {
           (Language() == SourceLanguage::OpenCL_CPP_2021) ||
           (Language() == SourceLanguage::OpenCL_C_20) ||
           (Language() == SourceLanguage::OpenCL_C_30) ||
+          (Language() == SourceLanguage::OpenCL_C_31) ||
           ArmNonUniformWorkGroupSize()) &&
          !UniformWorkgroupSize();
 }
