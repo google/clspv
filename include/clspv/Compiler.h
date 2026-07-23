@@ -104,13 +104,7 @@ EXPORT ClspvError clspvCompileFromSourcesString(
 //
 // |output_binary|      - Handle to spv
 // |output_log|         - Handle to compiler build log
-static inline void clspvFreeOutputBuildObjs(char *output_binary,
-                                            char *output_log) {
-  free(output_binary);
-  output_binary = NULL;
-  free(output_log);
-  output_log = NULL;
-}
+EXPORT void clspvFreeOutputBuildObjs(char *output_binary, char *output_log);
 
 #ifdef __cplusplus
 }
