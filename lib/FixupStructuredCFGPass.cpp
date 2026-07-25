@@ -239,7 +239,7 @@ void clspv::FixupStructuredCFGPass::isolateContinue(
           SmallVector<BasicBlock *, 4> loop_preds;
           for (auto iter = pred_begin(exit_block); iter != pred_end(exit_block);
                ++iter) {
-            if (loop->getBlocksSet().count(*iter)) {
+            if (loop->contains(*iter)) {
               loop_preds.push_back(*iter);
             }
           }
