@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_UNDO_INST_COMBINE_PASS_H
 
 namespace clspv {
-struct UndoInstCombinePass : llvm::PassInfoMixin<UndoInstCombinePass> {
+struct UndoInstCombinePass : llvm::OptionalPassInfoMixin<UndoInstCombinePass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

@@ -27,7 +27,7 @@
 
 namespace clspv {
 struct LowerPrivatePointerPHIPass
-    : llvm::PassInfoMixin<LowerPrivatePointerPHIPass> {
+    : llvm::OptionalPassInfoMixin<LowerPrivatePointerPHIPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

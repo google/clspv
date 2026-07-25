@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct KernelArgNamesToMetadataPass
-    : llvm::PassInfoMixin<KernelArgNamesToMetadataPass> {
+    : llvm::OptionalPassInfoMixin<KernelArgNamesToMetadataPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

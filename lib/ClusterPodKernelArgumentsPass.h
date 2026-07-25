@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct ClusterPodKernelArgumentsPass
-    : llvm::PassInfoMixin<ClusterPodKernelArgumentsPass> {
+    : llvm::OptionalPassInfoMixin<ClusterPodKernelArgumentsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:
@@ -30,7 +30,6 @@ private:
   // packed structs propoerly. AutoPodArgsPass would also need updates to
   // support packed structs.
   llvm::StructType *GetTypeMangledPodArgsStruct(llvm::Module &M);
-
 };
 } // namespace clspv
 

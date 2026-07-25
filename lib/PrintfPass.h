@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_PRINTF_PASS_H
 
 namespace clspv {
-struct PrintfPass : llvm::PassInfoMixin<PrintfPass> {
+struct PrintfPass : llvm::OptionalPassInfoMixin<PrintfPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

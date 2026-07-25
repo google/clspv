@@ -22,7 +22,8 @@
 namespace clspv {
 
 struct InlineFuncWithReadImage3DNonLiteralSamplerPass
-    : llvm::PassInfoMixin<InlineFuncWithReadImage3DNonLiteralSamplerPass> {
+    : llvm::OptionalPassInfoMixin<
+          InlineFuncWithReadImage3DNonLiteralSamplerPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   bool InlineFunctions(llvm::Module &M);

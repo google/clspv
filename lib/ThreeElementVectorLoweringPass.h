@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct ThreeElementVectorLoweringPass
-    : llvm::PassInfoMixin<ThreeElementVectorLoweringPass>,
+    : llvm::OptionalPassInfoMixin<ThreeElementVectorLoweringPass>,
       llvm::InstVisitor<ThreeElementVectorLoweringPass, llvm::Value *> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 

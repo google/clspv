@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_UNDO_BYVAL_PASS_H
 
 namespace clspv {
-struct UndoByvalPass : llvm::PassInfoMixin<UndoByvalPass> {
+struct UndoByvalPass : llvm::OptionalPassInfoMixin<UndoByvalPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

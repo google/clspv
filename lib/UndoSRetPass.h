@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_UNDO_SRET_PASS_H
 
 namespace clspv {
-struct UndoSRetPass : llvm::PassInfoMixin<UndoSRetPass> {
+struct UndoSRetPass : llvm::OptionalPassInfoMixin<UndoSRetPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct LongVectorLoweringPass
-    : llvm::PassInfoMixin<LongVectorLoweringPass>,
+    : llvm::OptionalPassInfoMixin<LongVectorLoweringPass>,
       llvm::InstVisitor<LongVectorLoweringPass, llvm::Value *> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 

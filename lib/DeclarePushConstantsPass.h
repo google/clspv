@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct DeclarePushConstantsPass
-    : llvm::PassInfoMixin<DeclarePushConstantsPass> {
+    : llvm::OptionalPassInfoMixin<DeclarePushConstantsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

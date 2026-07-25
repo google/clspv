@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct InlineFuncWithPointerToFunctionArgPass
-    : llvm::PassInfoMixin<InlineFuncWithPointerToFunctionArgPass> {
+    : llvm::OptionalPassInfoMixin<InlineFuncWithPointerToFunctionArgPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   bool InlineFunctions(llvm::Module &M);

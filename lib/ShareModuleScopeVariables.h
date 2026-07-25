@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct ShareModuleScopeVariablesPass
-    : llvm::PassInfoMixin<ShareModuleScopeVariablesPass> {
+    : llvm::OptionalPassInfoMixin<ShareModuleScopeVariablesPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   typedef llvm::DenseMap<llvm::Function *, llvm::UniqueVector<llvm::Function *>>

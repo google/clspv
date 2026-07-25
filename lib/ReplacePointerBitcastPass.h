@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct ReplacePointerBitcastPass
-    : llvm::PassInfoMixin<ReplacePointerBitcastPass> {
+    : llvm::OptionalPassInfoMixin<ReplacePointerBitcastPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct ClusterModuleScopeConstantVars
-    : llvm::PassInfoMixin<ClusterModuleScopeConstantVars> {
+    : llvm::OptionalPassInfoMixin<ClusterModuleScopeConstantVars> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

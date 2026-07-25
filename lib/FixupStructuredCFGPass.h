@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_FIXUP_STRUCTURED_CFG_PASS_H
 
 namespace clspv {
-struct FixupStructuredCFGPass : llvm::PassInfoMixin<FixupStructuredCFGPass> {
+struct FixupStructuredCFGPass
+    : llvm::OptionalPassInfoMixin<FixupStructuredCFGPass> {
   llvm::PreservedAnalyses run(llvm::Function &F,
                               llvm::FunctionAnalysisManager &FAM);
 

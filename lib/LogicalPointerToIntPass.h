@@ -21,7 +21,8 @@
 #define _CLSPV_LIB_LOGICAL_POINTER_TO_INT_PASS_H
 
 namespace clspv {
-struct LogicalPointerToIntPass : llvm::PassInfoMixin<LogicalPointerToIntPass> {
+struct LogicalPointerToIntPass
+    : llvm::OptionalPassInfoMixin<LogicalPointerToIntPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

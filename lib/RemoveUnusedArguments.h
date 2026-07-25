@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_REMOVE_UNUSED_ARGUMENTS_PASS_H
 
 namespace clspv {
-struct RemoveUnusedArguments : llvm::PassInfoMixin<RemoveUnusedArguments> {
+struct RemoveUnusedArguments
+    : llvm::OptionalPassInfoMixin<RemoveUnusedArguments> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct UndoTranslateSamplerFoldPass
-    : llvm::PassInfoMixin<UndoTranslateSamplerFoldPass> {
+    : llvm::OptionalPassInfoMixin<UndoTranslateSamplerFoldPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

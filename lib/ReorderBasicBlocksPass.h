@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_REORDER_BASIC_BLOCKS_PASS_H
 
 namespace clspv {
-struct ReorderBasicBlocksPass : llvm::PassInfoMixin<ReorderBasicBlocksPass> {
+struct ReorderBasicBlocksPass
+    : llvm::OptionalPassInfoMixin<ReorderBasicBlocksPass> {
   llvm::PreservedAnalyses run(llvm::Function &F,
                               llvm::FunctionAnalysisManager &);
 };

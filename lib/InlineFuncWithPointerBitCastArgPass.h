@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct InlineFuncWithPointerBitCastArgPass
-    : llvm::PassInfoMixin<InlineFuncWithPointerBitCastArgPass> {
+    : llvm::OptionalPassInfoMixin<InlineFuncWithPointerBitCastArgPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   bool InlineFunctions(llvm::Module &M);

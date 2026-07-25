@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct InlineFuncWithSingleCallSitePass
-    : llvm::PassInfoMixin<InlineFuncWithSingleCallSitePass> {
+    : llvm::OptionalPassInfoMixin<InlineFuncWithSingleCallSitePass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

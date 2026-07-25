@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_REWRITE_INSERTS_PASS_H
 
 namespace clspv {
-struct RewriteInsertsPass : llvm::PassInfoMixin<RewriteInsertsPass> {
+struct RewriteInsertsPass : llvm::OptionalPassInfoMixin<RewriteInsertsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

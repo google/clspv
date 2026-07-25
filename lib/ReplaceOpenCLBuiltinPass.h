@@ -29,7 +29,7 @@
 
 namespace clspv {
 struct ReplaceOpenCLBuiltinPass
-    : llvm::PassInfoMixin<ReplaceOpenCLBuiltinPass> {
+    : llvm::OptionalPassInfoMixin<ReplaceOpenCLBuiltinPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:
