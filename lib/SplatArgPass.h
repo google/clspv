@@ -21,7 +21,7 @@
 #define _CLSPV_LIB_SPLAT_ARG_PASS_PASS_H
 
 namespace clspv {
-struct SplatArgPass : llvm::PassInfoMixin<SplatArgPass> {
+struct SplatArgPass : llvm::OptionalPassInfoMixin<SplatArgPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   std::string getSplatName(const Builtins::FunctionInfo &func_info,

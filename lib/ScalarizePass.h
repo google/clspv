@@ -19,7 +19,7 @@
 #define _CLSPV_LIB_SCALARIZE_PASS_H
 
 namespace clspv {
-struct ScalarizePass : llvm::PassInfoMixin<ScalarizePass> {
+struct ScalarizePass : llvm::OptionalPassInfoMixin<ScalarizePass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

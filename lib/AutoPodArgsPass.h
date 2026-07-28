@@ -21,7 +21,7 @@
 #define _CLSPV_LIB_AUTO_POD_ARGS_PASS_H
 
 namespace clspv {
-struct AutoPodArgsPass : llvm::PassInfoMixin<AutoPodArgsPass> {
+struct AutoPodArgsPass : llvm::OptionalPassInfoMixin<AutoPodArgsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

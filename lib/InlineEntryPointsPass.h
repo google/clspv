@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_INLINE_ENTRY_POINTS_PASS_H
 
 namespace clspv {
-struct InlineEntryPointsPass : llvm::PassInfoMixin<InlineEntryPointsPass> {
+struct InlineEntryPointsPass
+    : llvm::OptionalPassInfoMixin<InlineEntryPointsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

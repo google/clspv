@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct DirectResourceAccessPass
-    : llvm::PassInfoMixin<DirectResourceAccessPass> {
+    : llvm::OptionalPassInfoMixin<DirectResourceAccessPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

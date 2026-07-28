@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct AddFunctionAttributesPass
-    : llvm::PassInfoMixin<AddFunctionAttributesPass> {
+    : llvm::OptionalPassInfoMixin<AddFunctionAttributesPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

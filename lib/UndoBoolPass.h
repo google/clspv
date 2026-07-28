@@ -19,7 +19,7 @@
 #define _CLSPV_LIB_UNDO_BOOL_PASS_H
 
 namespace clspv {
-struct UndoBoolPass : llvm::PassInfoMixin<UndoBoolPass> {
+struct UndoBoolPass : llvm::OptionalPassInfoMixin<UndoBoolPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

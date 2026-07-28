@@ -28,7 +28,7 @@ namespace clspv {
 void NormalizeGlobalVariables(llvm::Module &M);
 
 struct NormalizeGlobalVariablesPass
-    : llvm::PassInfoMixin<NormalizeGlobalVariablesPass> {
+    : llvm::OptionalPassInfoMixin<NormalizeGlobalVariablesPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 

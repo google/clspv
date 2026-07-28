@@ -21,7 +21,7 @@
 namespace clspv {
 // This pass performs transformations on calls to builtin functions without
 // erasing them from the module.
-struct FixupBuiltinsPass : llvm::PassInfoMixin<FixupBuiltinsPass> {
+struct FixupBuiltinsPass : llvm::OptionalPassInfoMixin<FixupBuiltinsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

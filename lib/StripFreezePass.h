@@ -19,7 +19,7 @@
 #define _CLSPV_LIB_STRIP_FREEZE_PASS_H
 
 namespace clspv {
-struct StripFreezePass : llvm::PassInfoMixin<StripFreezePass> {
+struct StripFreezePass : llvm::OptionalPassInfoMixin<StripFreezePass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

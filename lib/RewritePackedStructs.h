@@ -20,7 +20,8 @@
 #define _CLSPV_LIB_RewritePackedStructs_PASS_H
 
 namespace clspv {
-struct RewritePackedStructs : llvm::PassInfoMixin<RewritePackedStructs> {
+struct RewritePackedStructs
+    : llvm::OptionalPassInfoMixin<RewritePackedStructs> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct DefineOpenCLWorkItemBuiltinsPass
-    : llvm::PassInfoMixin<DefineOpenCLWorkItemBuiltinsPass> {
+    : llvm::OptionalPassInfoMixin<DefineOpenCLWorkItemBuiltinsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   llvm::GlobalVariable *createGlobalVariable(llvm::Module &M,

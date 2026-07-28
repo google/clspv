@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct SimplifyPointerBitcastPass
-    : llvm::PassInfoMixin<SimplifyPointerBitcastPass> {
+    : llvm::OptionalPassInfoMixin<SimplifyPointerBitcastPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   void runOnInstFromCstExpr(llvm::Module &M) const;

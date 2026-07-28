@@ -24,7 +24,7 @@
 
 namespace clspv {
 struct LowerAddrSpaceCastPass
-    : llvm::PassInfoMixin<LowerAddrSpaceCastPass>,
+    : llvm::OptionalPassInfoMixin<LowerAddrSpaceCastPass>,
       llvm::InstVisitor<LowerAddrSpaceCastPass, llvm::Value *> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 

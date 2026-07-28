@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct ReplaceLLVMIntrinsicsPass
-    : llvm::PassInfoMixin<ReplaceLLVMIntrinsicsPass> {
+    : llvm::OptionalPassInfoMixin<ReplaceLLVMIntrinsicsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   // TODO: update module-based funtions to work like function-based ones.

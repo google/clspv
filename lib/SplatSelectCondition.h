@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct SplatSelectConditionPass
-    : llvm::PassInfoMixin<SplatSelectConditionPass> {
+    : llvm::OptionalPassInfoMixin<SplatSelectConditionPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

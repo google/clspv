@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct InlineFuncWithImageMetadataGetterPass
-    : llvm::PassInfoMixin<InlineFuncWithImageMetadataGetterPass> {
+    : llvm::OptionalPassInfoMixin<InlineFuncWithImageMetadataGetterPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   bool InlineFunctions(llvm::Module &M);

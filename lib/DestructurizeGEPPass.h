@@ -19,7 +19,8 @@
 #include "llvm/IR/PassManager.h"
 
 namespace clspv {
-struct DestructurizeGEPPass : llvm::PassInfoMixin<DestructurizeGEPPass> {
+struct DestructurizeGEPPass
+    : llvm::OptionalPassInfoMixin<DestructurizeGEPPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

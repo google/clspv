@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct AnnotationToMetadataPass
-    : llvm::PassInfoMixin<AnnotationToMetadataPass> {
+    : llvm::OptionalPassInfoMixin<AnnotationToMetadataPass> {
   // read the annotations produced by the PrintAttrsConsumer and store in the
   // entry point annotations in metadata
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);

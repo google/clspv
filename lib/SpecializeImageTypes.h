@@ -24,7 +24,7 @@
 
 namespace clspv {
 struct SpecializeImageTypesPass
-    : llvm::PassInfoMixin<SpecializeImageTypesPass> {
+    : llvm::OptionalPassInfoMixin<SpecializeImageTypesPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   enum ResultType { kNotImage, kNotSpecialized, kSpecialized };

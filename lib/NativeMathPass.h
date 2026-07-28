@@ -19,7 +19,7 @@
 #define _CLSPV_LIB_NATIVE_MATH_PASS_H
 
 namespace clspv {
-struct NativeMathPass : llvm::PassInfoMixin<NativeMathPass> {
+struct NativeMathPass : llvm::OptionalPassInfoMixin<NativeMathPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

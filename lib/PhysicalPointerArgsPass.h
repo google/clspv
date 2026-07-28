@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_PHYSICAL_POINTER_ARGS_PASS_H
 
 namespace clspv {
-struct PhysicalPointerArgsPass : llvm::PassInfoMixin<PhysicalPointerArgsPass> {
+struct PhysicalPointerArgsPass
+    : llvm::OptionalPassInfoMixin<PhysicalPointerArgsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

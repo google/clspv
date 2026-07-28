@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_HIDE_CONSTANT_LOADS_PASS_H
 
 namespace clspv {
-struct HideConstantLoadsPass : llvm::PassInfoMixin<HideConstantLoadsPass> {
+struct HideConstantLoadsPass
+    : llvm::OptionalPassInfoMixin<HideConstantLoadsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:
@@ -29,7 +30,8 @@ private:
   llvm::DenseMap<llvm::Type *, std::string> function_for_type_;
 };
 
-struct UnhideConstantLoadsPass : llvm::PassInfoMixin<UnhideConstantLoadsPass> {
+struct UnhideConstantLoadsPass
+    : llvm::OptionalPassInfoMixin<UnhideConstantLoadsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

@@ -20,7 +20,7 @@
 #define _CLSPV_LIB_SPIRV_PRODUCER_PASS_H
 
 namespace clspv {
-struct SPIRVProducerPass : llvm::PassInfoMixin<SPIRVProducerPass> {
+struct SPIRVProducerPass : llvm::OptionalPassInfoMixin<SPIRVProducerPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   SPIRVProducerPass(llvm::raw_pwrite_stream *out, bool outputCInitList)

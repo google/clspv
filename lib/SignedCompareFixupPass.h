@@ -22,7 +22,8 @@
 #define _CLSPV_LIB_SIGNED_COMPARE_FIXUP_PASS_H
 
 namespace clspv {
-struct SignedCompareFixupPass : llvm::PassInfoMixin<SignedCompareFixupPass> {
+struct SignedCompareFixupPass
+    : llvm::OptionalPassInfoMixin<SignedCompareFixupPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

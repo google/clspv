@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct UndoGetElementPtrConstantExprPass
-    : llvm::PassInfoMixin<UndoGetElementPtrConstantExprPass> {
+    : llvm::OptionalPassInfoMixin<UndoGetElementPtrConstantExprPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   bool replaceGetElementPtrConstantExpr(llvm::ConstantExpr *CE);

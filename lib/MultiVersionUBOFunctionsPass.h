@@ -22,7 +22,7 @@
 
 namespace clspv {
 struct MultiVersionUBOFunctionsPass
-    : llvm::PassInfoMixin<MultiVersionUBOFunctionsPass> {
+    : llvm::OptionalPassInfoMixin<MultiVersionUBOFunctionsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

@@ -21,7 +21,8 @@
 #define _CLSPV_LIB_ALLOCATE_DESCRIPTORS_PASS_H
 
 namespace clspv {
-struct AllocateDescriptorsPass : llvm::PassInfoMixin<AllocateDescriptorsPass> {
+struct AllocateDescriptorsPass
+    : llvm::OptionalPassInfoMixin<AllocateDescriptorsPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
   using SamplerMapType = llvm::ArrayRef<std::pair<unsigned, std::string>>;

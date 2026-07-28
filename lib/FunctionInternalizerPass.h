@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct FunctionInternalizerPass
-    : llvm::PassInfoMixin<FunctionInternalizerPass> {
+    : llvm::OptionalPassInfoMixin<FunctionInternalizerPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv

@@ -21,7 +21,7 @@
 
 namespace clspv {
 struct UndoTruncateToOddIntegerPass
-    : llvm::PassInfoMixin<UndoTruncateToOddIntegerPass> {
+    : llvm::OptionalPassInfoMixin<UndoTruncateToOddIntegerPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

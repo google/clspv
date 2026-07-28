@@ -19,7 +19,8 @@
 #define _CLSPV_LIB_UBO_TYPE_TRANSFORM_PASS_H
 
 namespace clspv {
-struct UBOTypeTransformPass : llvm::PassInfoMixin<UBOTypeTransformPass> {
+struct UBOTypeTransformPass
+    : llvm::OptionalPassInfoMixin<UBOTypeTransformPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
 private:

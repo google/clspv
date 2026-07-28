@@ -20,7 +20,7 @@
 
 namespace clspv {
 struct ZeroInitializeAllocasPass
-    : llvm::PassInfoMixin<ZeroInitializeAllocasPass> {
+    : llvm::OptionalPassInfoMixin<ZeroInitializeAllocasPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 };
 } // namespace clspv
