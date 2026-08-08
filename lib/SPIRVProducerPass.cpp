@@ -1301,6 +1301,7 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
       break;
     case clspv::ArgKind::Pod:
     case clspv::ArgKind::PodUBO:
+    case clspv::ArgKind::PointerUBO:
     case clspv::ArgKind::PodPushConstant:
       if (auto *sty = dyn_cast<StructType>(info->data_type)) {
         StructTypesNeedingBlock.insert(sty);
@@ -1590,6 +1591,7 @@ spv::StorageClass SPIRVProducerPassImpl::GetStorageClassForArgKind(
   case clspv::ArgKind::Pod:
     return spv::StorageClassStorageBuffer;
   case clspv::ArgKind::PodUBO:
+  case clspv::ArgKind::PointerUBO:
     return spv::StorageClassUniform;
   case clspv::ArgKind::PodPushConstant:
     return spv::StorageClassPushConstant;
@@ -2772,6 +2774,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
           case clspv::ArgKind::BufferUBO:
           case clspv::ArgKind::Pod:
           case clspv::ArgKind::PodUBO:
+          case clspv::ArgKind::PointerUBO:
           case clspv::ArgKind::PodPushConstant:
             // The call maps to the variable directly.
             VMap[call] = info->var_id;
@@ -7919,6 +7922,7 @@ void SPIRVProducerPassImpl::GenerateKernelReflection() {
           unsigned arg_size = 0;
           if (info->arg_kind == clspv::ArgKind::Pod ||
               info->arg_kind == clspv::ArgKind::PodUBO ||
+              info->arg_kind == clspv::ArgKind::PointerUBO ||
               info->arg_kind == clspv::ArgKind::PodPushConstant) {
             arg_size =
                 static_cast<uint32_t>(DL.getTypeStoreSize(arg->getType()));
