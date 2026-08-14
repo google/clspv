@@ -5831,6 +5831,32 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
           Ops << Ty << RID << c;
           RID = addSPIRVInst(spv::OpFMul, Ops);
         }
+      } else if (I.getOpcode() == Instruction::FDiv &&
+                 I.getType()->getScalarType()->isHalfTy() &&
+                 !clspv::Option::UnsafeMath()) {
+        Type *FP16Ty = I.getType();
+        Type *FP32Ty = Type::getFloatTy(Context);
+        if (FP16Ty->isVectorTy()) {
+          FP32Ty = FixedVectorType::get(
+              FP32Ty, dyn_cast<FixedVectorType>(FP16Ty)->getNumElements());
+        }
+
+        SPIRVOperandVec Ops;
+        Ops.clear();
+        Ops << FP32Ty << I.getOperand(0);
+        auto a_f32 = addSPIRVInst(spv::OpFConvert, Ops);
+
+        Ops.clear();
+        Ops << FP32Ty << I.getOperand(1);
+        auto b_f32 = addSPIRVInst(spv::OpFConvert, Ops);
+
+        Ops.clear();
+        Ops << FP32Ty << a_f32 << b_f32;
+        auto div_f32 = addSPIRVInst(spv::OpFDiv, Ops);
+
+        Ops.clear();
+        Ops << FP16Ty << div_f32;
+        RID = addSPIRVInst(spv::OpFConvert, Ops);
       } else {
         // Ops[0] = Result Type ID
         // Ops[1] = Operand 0
