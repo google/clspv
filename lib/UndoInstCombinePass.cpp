@@ -63,6 +63,7 @@ bool clspv::UndoInstCombinePass::runOnFunction(Function &F) {
     for (auto &I : BB) {
       changed |= UndoWideVectorExtractCast(&I);
       changed |= UndoWideVectorShuffleCast(&I);
+      changed |= UndoNarrowedIntDiv(&I);
     }
   }
 
@@ -248,6 +249,72 @@ bool clspv::UndoInstCombinePass::UndoWideVectorShuffleCast(Instruction *inst) {
   dead_.push_back(shuffle);
   if (in1_cast)
     potentially_dead_.insert(in1_cast);
+
+  return true;
+}
+
+bool clspv::UndoInstCombinePass::UndoNarrowedIntDiv(Instruction *inst) {
+  auto cast = dyn_cast<CastInst>(inst);
+  if (!cast)
+    return false;
+
+  auto opcode = cast->getOpcode();
+  if (opcode != Instruction::SExt && opcode != Instruction::ZExt)
+    return false;
+
+  auto src = cast->getOperand(0);
+  auto binop = dyn_cast<BinaryOperator>(src);
+  if (!binop)
+    return false;
+
+  auto binop_code = binop->getOpcode();
+  bool is_signed = (opcode == Instruction::SExt);
+  if (is_signed) {
+    if (binop_code != Instruction::SDiv && binop_code != Instruction::SRem)
+      return false;
+  } else {
+    if (binop_code != Instruction::UDiv && binop_code != Instruction::URem)
+      return false;
+  }
+
+  auto dst_ty = cast->getType();
+  auto src_ty = binop->getType();
+  if (dst_ty == src_ty)
+    return false;
+
+  auto dst_elem_ty = dst_ty->getScalarType();
+  auto src_elem_ty = src_ty->getScalarType();
+  if (!dst_elem_ty->isIntegerTy() || !src_elem_ty->isIntegerTy())
+    return false;
+
+  if (dst_elem_ty->getIntegerBitWidth() <= src_elem_ty->getIntegerBitWidth())
+    return false;
+
+  IRBuilder<> builder(cast);
+  Value *lhs = binop->getOperand(0);
+  Value *rhs = binop->getOperand(1);
+
+  auto get_widened_operand = [&](Value *val) -> Value * {
+    if (auto *trunc = dyn_cast<TruncInst>(val)) {
+      if (trunc->getOperand(0)->getType() == dst_ty) {
+        if ((is_signed && trunc->hasNoSignedWrap()) ||
+            (!is_signed && trunc->hasNoUnsignedWrap())) {
+          potentially_dead_.insert(trunc);
+          return trunc->getOperand(0);
+        }
+      }
+    }
+    return is_signed ? builder.CreateSExt(val, dst_ty)
+                     : builder.CreateZExt(val, dst_ty);
+  };
+
+  Value *new_lhs = get_widened_operand(lhs);
+  Value *new_rhs = get_widened_operand(rhs);
+  Value *new_binop = builder.CreateBinOp(binop_code, new_lhs, new_rhs);
+
+  cast->replaceAllUsesWith(new_binop);
+  dead_.push_back(cast);
+  potentially_dead_.insert(binop);
 
   return true;
 }

@@ -74,6 +74,16 @@ private:
   //  %in1 = insertelement <2 x i16> %in0, i16 %trunc1, i32 1
   bool UndoWideVectorShuffleCast(llvm::Instruction *inst);
 
+  // Undoes narrowed integer divisions and remainders that are extended back,
+  // for example:
+  //  %1 = trunc nsw i32 %a to i16
+  //  %2 = sdiv i16 %1, 3
+  //  %3 = sext i16 %2 to i32
+  //
+  // With:
+  //  %3 = sdiv i32 %a, 3
+  bool UndoNarrowedIntDiv(llvm::Instruction *inst);
+
   llvm::UniqueVector<llvm::Value *> potentially_dead_;
   std::vector<llvm::Instruction *> dead_;
 };
