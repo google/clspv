@@ -2132,9 +2132,17 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
 
 bool ReplaceOpenCLBuiltinPass::replaceMul(Function &F, bool is_float,
                                           bool is_mad) {
+  // libclc defines __clc_mad with '#pragma OPENCL FP_CONTRACT ON', so functions
+  // originating from libclc (identified by "__clc_" or "clspv_libclc_builtin")
+  // should also preserve the fused operation instead of being decomposed into
+  // separate fmul + fadd.
+  bool libclc_function =
+      F.getName().contains("__clc_") || F.getMetadata("clspv_libclc_builtin");
+
   // floating-point fma can be handle later in the flow if they are allowed
   if (is_float && is_mad &&
-      (clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath())) {
+      (clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath() ||
+       libclc_function)) {
     return false;
   }
   return replaceCallsWithValue(F, [&](CallInst *CI) -> llvm::Value * {
