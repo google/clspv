@@ -64,7 +64,8 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
       } else {
         global_constants.push_back(&GV);
         initializers.insert(GV.getInitializer());
-        initializers_alignment[GV.getInitializer()] = GV.getAlignment();
+        initializers_alignment[GV.getInitializer()] =
+            GV.getAlign().valueOrOne().value();
       }
     }
   }
