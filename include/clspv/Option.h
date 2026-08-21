@@ -201,6 +201,10 @@ enum class FloatingPointType : uint32_t {
 // floating point type.
 bool ExecutionModeRoundingModeRTE(FloatingPointType rm);
 
+// Returns true when the execution mode SignedZeroInfNanPreserve should be set
+// for a floating point type.
+bool ExecutionModeSignedZeroInfNanPreserve(FloatingPointType fpty);
+
 enum class DenormMode : uint32_t {
   error,
   preserve,

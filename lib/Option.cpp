@@ -311,6 +311,22 @@ static llvm::cl::list<clspv::Option::FloatingPointType> rounding_mode_rte(
         clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
                    "Set execution mode RoundingModeRTE for fp64")));
 
+static llvm::cl::list<clspv::Option::FloatingPointType>
+    signed_zero_inf_nan_preserve(
+        "signed-zero-inf-nan-preserve",
+        llvm::cl::desc("Set execution mode SignedZeroInfNanPreserve for a "
+                       "floating point type"),
+        llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+        llvm::cl::values(
+            clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
+                       "Set execution mode SignedZeroInfNanPreserve for fp16")),
+        llvm::cl::values(
+            clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
+                       "Set execution mode SignedZeroInfNanPreserve for fp32")),
+        llvm::cl::values(clEnumValN(
+            clspv::Option::FloatingPointType::fp64, "64",
+            "Set execution mode SignedZeroInfNanPreserve for fp64")));
+
 static llvm::cl::list<clspv::Option::FloatingPointType> denorm_preserve(
     "denorm-preserve",
     llvm::cl::desc(
@@ -556,6 +572,15 @@ bool ClusterPodKernelArgs() { return cluster_non_pointer_kernel_args; }
 
 bool ExecutionModeRoundingModeRTE(FloatingPointType fp) {
   for (auto type : rounding_mode_rte) {
+    if (type == fp) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ExecutionModeSignedZeroInfNanPreserve(FloatingPointType fp) {
+  for (auto type : signed_zero_inf_nan_preserve) {
     if (type == fp) {
       return true;
     }
