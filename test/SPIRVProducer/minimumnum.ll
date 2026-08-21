@@ -1,4 +1,4 @@
-; RUN: clspv-opt %s -o %t.ll --passes=spirv-producer -producer-out-file %t.spv
+; RUN: clspv-opt %s -o %t.ll --passes=spirv-producer -producer-out-file %t.spv -denorm-preserve=32
 ; RUN: spirv-dis %t.spv -o %t.spvasm
 ; RUN: FileCheck %s < %t.spvasm
 ; RUN: spirv-val %t.spv

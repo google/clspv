@@ -490,6 +490,8 @@ struct SPIRVProducerPassImpl {
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   SPIRVID GenerateFabs(Value *Input);
+  SPIRVID GenerateCanonicalize(Value *val);
+  bool ShouldFlushDenorms(Type *Ty) const;
   SPIRVID GenerateIntegerDot(CallInst *Call, const FunctionInfo &func_info);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
@@ -4900,6 +4902,83 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
   return addSPIRVInst(spv::OpBitcast, Ops);
 }
 
+bool SPIRVProducerPassImpl::ShouldFlushDenorms(Type *Ty) const {
+  Type *ScalarTy = Ty->getScalarType();
+  if (ScalarTy->isHalfTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp16) ==
+           clspv::Option::DenormMode::flush_to_zero;
+  } else if (ScalarTy->isFloatTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp32) !=
+           clspv::Option::DenormMode::preserve;
+  } else if (ScalarTy->isDoubleTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp64) !=
+           clspv::Option::DenormMode::preserve;
+  }
+  return false;
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(Value *val) {
+  Type *InputTy = val->getType();
+  auto getSameSizeIntegerTy = [](Type *FpTy) {
+    return Type::getIntNTy(FpTy->getContext(), FpTy->getScalarSizeInBits());
+  };
+  Type *IntegerTy;
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    IntegerTy =
+        FixedVectorType::get(getSameSizeIntegerTy(VecTy->getElementType()),
+                             VecTy->getNumElements());
+  } else {
+    IntegerTy = getSameSizeIntegerTy(InputTy);
+  }
+
+  SPIRVOperandVec Ops;
+  Ops << IntegerTy << val;
+  auto bitcast_val = addSPIRVInst(spv::OpBitcast, Ops);
+
+  APInt sign_mask_val = APInt::getSignMask(InputTy->getScalarSizeInBits());
+  Constant *SignMask =
+      ConstantInt::get(IntegerTy->getScalarType(), sign_mask_val);
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    SignMask = ConstantVector::getSplat(VecTy->getElementCount(), SignMask);
+  }
+
+  Ops.clear();
+  Ops << IntegerTy << bitcast_val << SignMask;
+  auto copysign_zero_int = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+
+  Ops.clear();
+  Ops << InputTy << copysign_zero_int;
+  auto copysign_zero = addSPIRVInst(spv::OpBitcast, Ops);
+
+  auto abs_val = GenerateFabs(val);
+
+  auto flt_min_ap = llvm::APFloat::getSmallestNormalized(
+      InputTy->getScalarType()->getFltSemantics());
+  Constant *flt_min_cnst =
+      ConstantFP::get(InputTy->getScalarType(), flt_min_ap);
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    flt_min_cnst =
+        ConstantVector::getSplat(VecTy->getElementCount(), flt_min_cnst);
+  }
+
+  LLVMContext &Context = val->getContext();
+  Type *BoolTy = Type::getInt1Ty(Context);
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    BoolTy = FixedVectorType::get(BoolTy, VecTy->getNumElements());
+  }
+
+  Ops.clear();
+  Ops << BoolTy << abs_val << flt_min_cnst;
+  auto cmp = addSPIRVInst(spv::OpFOrdLessThan, Ops);
+
+  Ops.clear();
+  Ops << InputTy << cmp << copysign_zero << val;
+  return addSPIRVInst(spv::OpSelect, Ops);
+}
+
 SPIRVID
 SPIRVProducerPassImpl::GenerateIntegerDot(CallInst *Call,
                                           const FunctionInfo &func_info) {
@@ -5129,15 +5208,25 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   case Intrinsic::minimumnum: {
     SPIRVOperandVec Ops;
     Ops << Call->getType() << getOpExtInstImportID()
-        << glsl::ExtInst::ExtInstFMin << Call->getArgOperand(0)
-        << Call->getArgOperand(1);
+        << glsl::ExtInst::ExtInstFMin;
+    if (ShouldFlushDenorms(Call->getType())) {
+      Ops << GenerateCanonicalize(Call->getArgOperand(0))
+          << GenerateCanonicalize(Call->getArgOperand(1));
+    } else {
+      Ops << Call->getArgOperand(0) << Call->getArgOperand(1);
+    }
     return addSPIRVInst(spv::OpExtInst, Ops);
   }
   case Intrinsic::maximumnum: {
     SPIRVOperandVec Ops;
     Ops << Call->getType() << getOpExtInstImportID()
-        << glsl::ExtInst::ExtInstFMax << Call->getArgOperand(0)
-        << Call->getArgOperand(1);
+        << glsl::ExtInst::ExtInstFMax;
+    if (ShouldFlushDenorms(Call->getType())) {
+      Ops << GenerateCanonicalize(Call->getArgOperand(0))
+          << GenerateCanonicalize(Call->getArgOperand(1));
+    } else {
+      Ops << Call->getArgOperand(0) << Call->getArgOperand(1);
+    }
     return addSPIRVInst(spv::OpExtInst, Ops);
   }
   case Intrinsic::memcpy: {
@@ -5191,69 +5280,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     return addSPIRVInst(spv::OpCopyMemorySized, Ops);
   }
   case Intrinsic::canonicalize: {
-    // canonicalize(x) {
-    //   if (fabs(x) < flt_min)
-    //     return copysign(0.0, x);
-    //   else
-    //      return x;
-    // }
-    auto val = Call->getArgOperand(0);
-    Type *InputTy = Call->getType();
-
-    auto getSameSizeIntegerTy = [](Type *FpTy) {
-      return Type::getIntNTy(FpTy->getContext(), FpTy->getScalarSizeInBits());
-    };
-    Type *IntegerTy;
-    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
-      IntegerTy =
-          FixedVectorType::get(getSameSizeIntegerTy(VecTy->getElementType()),
-                               VecTy->getNumElements());
-    } else {
-      IntegerTy = getSameSizeIntegerTy(InputTy);
-    }
-
-    SPIRVOperandVec Ops;
-    Ops << IntegerTy << val;
-    auto bitcast_val = addSPIRVInst(spv::OpBitcast, Ops);
-
-    APInt sign_mask_val = APInt::getSignMask(InputTy->getScalarSizeInBits());
-    Constant *SignMask =
-        ConstantInt::get(IntegerTy->getScalarType(), sign_mask_val);
-    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
-      SignMask = ConstantVector::getSplat(VecTy->getElementCount(), SignMask);
-    }
-
-    Ops.clear();
-    Ops << IntegerTy << bitcast_val << SignMask;
-    auto copysign_zero_int = addSPIRVInst(spv::OpBitwiseAnd, Ops);
-
-    Ops.clear();
-    Ops << InputTy << copysign_zero_int;
-    auto copysign_zero = addSPIRVInst(spv::OpBitcast, Ops);
-
-    auto abs_val = GenerateFabs(val);
-
-    auto flt_min_ap = llvm::APFloat::getSmallestNormalized(
-        InputTy->getScalarType()->getFltSemantics());
-    Constant *flt_min_cnst =
-        ConstantFP::get(InputTy->getScalarType(), flt_min_ap);
-    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
-      flt_min_cnst =
-          ConstantVector::getSplat(VecTy->getElementCount(), flt_min_cnst);
-    }
-
-    Type *BoolTy = Type::getInt1Ty(Context);
-    if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
-      BoolTy = FixedVectorType::get(BoolTy, VecTy->getNumElements());
-    }
-
-    Ops.clear();
-    Ops << BoolTy << abs_val << flt_min_cnst;
-    auto cmp = addSPIRVInst(spv::OpFOrdLessThan, Ops);
-
-    Ops.clear();
-    Ops << InputTy << cmp << copysign_zero << val;
-    return addSPIRVInst(spv::OpSelect, Ops);
+    return GenerateCanonicalize(Call->getArgOperand(0));
   }
 
   default:
@@ -5371,6 +5398,21 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
         // code.
         Ops << Call->getOperand(0);
         break;
+      case glsl::ExtInst::ExtInstFMin:
+      case glsl::ExtInst::ExtInstFMax:
+      case glsl::ExtInst::ExtInstNMin:
+      case glsl::ExtInst::ExtInstNMax: {
+        if (ShouldFlushDenorms(Call->getType())) {
+          for (auto &use : Call->args()) {
+            Ops << GenerateCanonicalize(use.get());
+          }
+          break;
+        }
+        for (auto &use : Call->args()) {
+          Ops << use.get();
+        }
+        break;
+      }
       default:
         for (auto &use : Call->args()) {
           Ops << use.get();
