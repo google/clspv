@@ -3394,6 +3394,11 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
        DenormMode::flush_to_zero)) {
     addCapability(spv::CapabilityDenormFlushToZero);
   }
+  if (ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp16) ||
+      ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp32) ||
+      ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp64)) {
+    addCapability(spv::CapabilitySignedZeroInfNanPreserve);
+  }
 
   SPIRVOperandVec Ops;
 
@@ -3434,8 +3439,13 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
       (clspv::Option::ExecutionModeDenorm(FloatingPointType::fp64) !=
        DenormMode::unspecified);
 
+  bool hasSignedZero =
+      ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp16) ||
+      ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp32) ||
+      ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp64);
+
   if (SpvVersion() < SPIRVVersion::SPIRV_1_4 &&
-      (hasConvertToF() || hasDenorms)) {
+      (hasConvertToF() || hasDenorms || hasSignedZero)) {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_float_controls");
   }
 
@@ -3643,6 +3653,28 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     } else if (FP64() && mode == DenormMode::flush_to_zero) {
       Ops.clear();
       Ops << EntryPoint.second << spv::ExecutionModeDenormFlushToZero << 64;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+
+    // Emit SignedZeroInfNanPreserve execution modes
+    if (FP16() &&
+        ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp16)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeSignedZeroInfNanPreserve
+          << 16;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    if (ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp32)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeSignedZeroInfNanPreserve
+          << 32;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
+    }
+    if (FP64() &&
+        ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp64)) {
+      Ops.clear();
+      Ops << EntryPoint.second << spv::ExecutionModeSignedZeroInfNanPreserve
+          << 64;
       addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
     }
   }
