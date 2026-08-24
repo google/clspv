@@ -4927,9 +4927,8 @@ SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(Value *val) {
   };
   Type *IntegerTy;
   if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
-    IntegerTy =
-        FixedVectorType::get(getSameSizeIntegerTy(VecTy->getElementType()),
-                             VecTy->getNumElements());
+    IntegerTy = FixedVectorType::get(
+        getSameSizeIntegerTy(VecTy->getElementType()), VecTy->getNumElements());
   } else {
     IntegerTy = getSameSizeIntegerTy(InputTy);
   }
