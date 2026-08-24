@@ -102,10 +102,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ENABLE_CLSPV_OPT "Enable the clspv-opt driver." ON)
 
-if (NOT DEFINED EXTERNAL_LLVM)
-  set(EXTERNAL_LLVM 0)
-endif()
-if (${EXTERNAL_LLVM} EQUAL 1)
+option(EXTERNAL_LLVM "Use an externally built LLVM instead of the LLVM monorepo" OFF)
+if (${EXTERNAL_LLVM})
   if (NOT DEFINED CLSPV_LLVM_SOURCE_DIR)
     message(FATAL_ERROR "External LLVM requires CLSPV_LLVM_SOURCE_DIR to be specified")
   endif()
