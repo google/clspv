@@ -915,15 +915,14 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
             }
             size_t dest_ty_size = SizeInBits(DL, dest_ty);
             dest_ty_size /= 2;
-            dest_ty = Type::getIntNTy(context, dest_ty_size);
 
-            while (dest_ty != source_ty) {
+            while (dest_ty_size > SizeInBits(DL, source_ty)) {
+              dest_ty = Type::getIntNTy(context, dest_ty_size);
               if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
                                             smallerBitWidths)) {
                 return dest_ty;
               }
               dest_ty_size /= 2;
-              dest_ty = Type::getIntNTy(context, dest_ty_size);
             }
 
             return source_ty;
