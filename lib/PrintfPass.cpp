@@ -154,7 +154,7 @@ void clspv::PrintfPass::DefinePrintfInstance(Module &M, CallInst *CI,
   //
   IR.SetInsertPoint(CopyPrintfIdBB);
   auto *ReturnValue = IR.CreatePHI(Int32Ty, 2);
-  ReturnValue->addIncoming(ConstantOne, CopyArgsBB);
+  ReturnValue->addIncoming(ConstantZero, CopyArgsBB);
   ReturnValue->addIncoming(ConstantNegOne, TestPrintfIdBB);
   // Store the printf ID
   auto *PrintfIDGEP = GetElementPtrInst::Create(

@@ -22,7 +22,7 @@
 ; CHECK-NEXT:   br label %[[CopyPrintfIdBB:.*]]
 
 ; CHECK: [[CopyPrintfIdBB]]:
-; CHECK-NEXT:   [[phi:%[^ ]+]] = phi i32 [ 1, %[[CopyArgsBB]] ], [ -1, %[[TestPrintfIdBB]] ]
+; CHECK-NEXT:   [[phi:%[^ ]+]] = phi i32 [ 0, %[[CopyArgsBB]] ], [ -1, %[[TestPrintfIdBB]] ]
 ; CHECK-NEXT:   [[gep:%[^ ]+]] = getelementptr { [0 x i32] }, ptr addrspace(1) @__clspv_printf_buffer, i32 0, i32 0, i32 [[offset]]
 ; CHECK-NEXT:   store i32 0, ptr addrspace(1) [[gep]], align 4
 ; '0' is the printf id as we have only 1 printf in this test
