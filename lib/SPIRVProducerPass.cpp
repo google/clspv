@@ -3872,8 +3872,9 @@ spv::Op SPIRVProducerPassImpl::GetSPIRVCastOpcode(Instruction &I) {
       {Instruction::FPExt, spv::OpFConvert},
       {Instruction::BitCast, spv::OpBitcast},
       {Instruction::PtrToInt, spv::OpConvertPtrToU},
+      {Instruction::PtrToAddr, spv::OpConvertPtrToU},
       {Instruction::IntToPtr, spv::OpConvertUToPtr},
-      };
+  };
 
   assert(0 != Map.count(I.getOpcode()));
 
