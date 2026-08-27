@@ -322,6 +322,14 @@ void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
         auto newPtrToInt = B.CreatePtrToInt(gep, ptrtoint->getDestTy());
         ptrtoint->replaceAllUsesWith(newPtrToInt);
         ToBeErased.push_back(ptrtoint);
+      } else if (auto ptrtoaddr = dyn_cast<PtrToAddrInst>(node)) {
+        IRBuilder<> B(ptrtoaddr);
+        auto gep = makeNewGEP(DL, B, alloca, alloca->getAllocatedType(),
+                              B.getIntNTy(SmallerBitWidths), CstVal, DynVal,
+                              SmallerBitWidths);
+        auto newPtrToAddr = B.CreatePtrToAddr(gep);
+        ptrtoaddr->replaceAllUsesWith(newPtrToAddr);
+        ToBeErased.push_back(ptrtoaddr);
       } else if (auto icmp = dyn_cast<ICmpInst>(node)) {
         int opId = -1;
         int otherOpIsIntToPtr = -1;

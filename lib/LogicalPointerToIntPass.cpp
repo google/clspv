@@ -53,7 +53,8 @@ static bool IsTargetAddrSpace(unsigned AS) {
 static bool FunctionShouldBeInlined(Function &F) {
   for (BasicBlock &BB : F) {
     for (Instruction &I : BB) {
-      if (isa<IntToPtrInst>(I) || isa<PtrToIntInst>(I)) {
+      if (isa<IntToPtrInst>(I) || isa<PtrToIntInst>(I) ||
+          isa<PtrToAddrInst>(I)) {
         return true;
       }
     }
@@ -106,7 +107,8 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         if (auto *Cast = dyn_cast<CastInst>(&I)) {
-          if (Cast->getOpcode() == Instruction::PtrToInt) {
+          if (Cast->getOpcode() == Instruction::PtrToInt ||
+              Cast->getOpcode() == Instruction::PtrToAddr) {
             if (auto *PtrTy =
                     cast<PointerType>(Cast->getOperand(0)->getType())) {
               if (IsTargetAddrSpace(PtrTy->getAddressSpace())) {

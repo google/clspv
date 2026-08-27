@@ -338,6 +338,18 @@ Value *clspv::LowerAddrSpaceCastPass::visitPtrToIntInst(PtrToIntInst &I) {
   return ptrToInt;
 }
 
+Value *clspv::LowerAddrSpaceCastPass::visitPtrToAddrInst(PtrToAddrInst &I) {
+  auto ptr = visit(I.getPointerOperand());
+
+  IRBuilder<> B(&I);
+  auto ptrToAddr = B.CreatePtrToAddr(ptr);
+
+  registerReplacement(&I, ptrToAddr);
+  I.replaceAllUsesWith(ptrToAddr);
+
+  return ptrToAddr;
+}
+
 static bool DependsOnPhiNode(const Value *V, const PHINode *PhiNode) {
   DenseSet<const llvm::Value *> Visited;
   if (!isa<Instruction>(V)) {

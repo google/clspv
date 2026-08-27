@@ -949,6 +949,11 @@ Value *clspv::LongVectorLoweringPass::visitCastInst(CastInst &I) {
     V = B.CreatePtrToInt(EquivalentValue, EquivalentDestTy, I.getName());
     break;
   }
+  case Instruction::PtrToAddr: {
+    IRBuilder<> B(&I);
+    V = B.CreatePtrToAddr(EquivalentValue, I.getName());
+    break;
+  }
   case Instruction::IntToPtr: {
     IRBuilder<> B(&I);
     V = B.CreateIntToPtr(EquivalentValue, EquivalentDestTy, I.getName());
@@ -1381,6 +1386,9 @@ bool clspv::LongVectorLoweringPass::handlingRequired(User &U) {
     if (getEquivalentType(gep->getSourceElementType()) != nullptr)
       return true;
   } else if (auto *ptr = dyn_cast<PtrToIntInst>(&U)) {
+    if (visit(ptr->getPointerOperand()) != nullptr)
+      return true;
+  } else if (auto *ptr = dyn_cast<PtrToAddrInst>(&U)) {
     if (visit(ptr->getPointerOperand()) != nullptr)
       return true;
   }
