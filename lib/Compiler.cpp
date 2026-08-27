@@ -567,7 +567,8 @@ int SetCompilerInstanceOptions(
   return 0;
 }
 
-int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
+int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
+                    std::string *output_log) {
   llvm::LoopAnalysisManager lam;
   llvm::FunctionAnalysisManager fam;
   llvm::CGSCCAnalysisManager cgam;
@@ -607,6 +608,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     return -1;
   }
 
+  bool has_error = false;
   // Run the following optimizations prior to the standard LLVM pass pipeline.
   pb.registerPipelineStartEPCallback([](llvm::ModulePassManager &pm,
                                         llvm::OptimizationLevel level) {
@@ -743,9 +745,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
   });
 
   // Run the following passes after the default LLVM pass pipeline.
-  pb.registerOptimizerLastEPCallback([binaryStream](llvm::ModulePassManager &pm,
-                                                    llvm::OptimizationLevel,
-                                                    llvm::ThinOrFullLTOPhase) {
+  pb.registerOptimizerLastEPCallback([binaryStream, &has_error,
+                                      output_log](llvm::ModulePassManager &pm,
+                                                  llvm::OptimizationLevel,
+                                                  llvm::ThinOrFullLTOPhase) {
     pm.addPass(clspv::DestructurizeGEPPass());
     // No point attempting to handle freeze currently so strip them from the
     // IR.
@@ -863,8 +866,8 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
       pm.addPass(clspv::LongVectorLoweringPass());
     }
 
-    pm.addPass(
-        clspv::SPIRVProducerPass(binaryStream, OutputFormat == OutputFormatC));
+    pm.addPass(clspv::SPIRVProducerPass(
+        binaryStream, OutputFormat == OutputFormatC, &has_error, output_log));
   });
 
   // Add the default optimizations for the requested optimization level.
@@ -876,7 +879,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream) {
     mpm.run(M, mam);
   }
 
-  return 0;
+  return has_error ? -1 : 0;
 }
 
 int ParseOptions(const int argc, const char *const argv[]) {
@@ -1298,7 +1301,7 @@ int CompileModule(const llvm::StringRef &input_filename,
   }
 
   // Run the passes to produce SPIR-V.
-  if (RunPassPipeline(*module, &binaryStream) != 0) {
+  if (RunPassPipeline(*module, &binaryStream, output_log) != 0) {
     return -1;
   }
 
