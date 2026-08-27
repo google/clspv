@@ -23,14 +23,20 @@ namespace clspv {
 struct SPIRVProducerPass : llvm::OptionalPassInfoMixin<SPIRVProducerPass> {
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &);
 
-  SPIRVProducerPass(llvm::raw_pwrite_stream *out, bool outputCInitList)
-      : out(out), outputCInitList(outputCInitList) {}
+  SPIRVProducerPass(llvm::raw_pwrite_stream *out, bool outputCInitList,
+                    bool *has_error, std::string *output_log)
+      : out(out), outputCInitList(outputCInitList), has_error(has_error),
+        output_log(output_log) {}
 
-  SPIRVProducerPass() : out(nullptr), outputCInitList(false) {}
+  SPIRVProducerPass()
+      : out(nullptr), outputCInitList(false), has_error(nullptr),
+        output_log(nullptr) {}
 
 private:
   llvm::raw_pwrite_stream *out;
   bool outputCInitList;
+  bool *has_error;
+  std::string *output_log;
 };
 } // namespace clspv
 

@@ -307,7 +307,8 @@ struct SPIRVProducerPassImpl {
       GlobalConstFuncMapType;
 
   SPIRVProducerPassImpl(raw_pwrite_stream *out, bool outputCInitList,
-                        ModuleAnalysisManager &MAM)
+                        ModuleAnalysisManager &MAM, bool *HasErrorOut,
+                        std::string *OutputLog)
       : module(nullptr), MAM(&MAM), out(out),
         binaryTempOut(binaryTempUnderlyingVector), binaryOut(out),
         outputCInitList(outputCInitList), patchBoundOffset(0), nextID(1),
@@ -315,25 +316,11 @@ struct SPIRVProducerPassImpl {
         HasVariablePointers(false), HasNonUniformPointers(false),
         HasConvertToF(false), HasIntegerDot(false), SamplerPointerTy(nullptr),
         SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        TestOutput(out == nullptr) {
+        TestOutput(out == nullptr), HasErrorOut(HasErrorOut),
+        OutputLog(OutputLog), HasError(false) {
     addCapability(spv::CapabilityShader);
     if (clspv::Option::PhysicalStorageBuffers())
       addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
-    Ptr = this;
-  }
-
-  SPIRVProducerPassImpl()
-      : module(nullptr), out(nullptr),
-        binaryTempOut(binaryTempUnderlyingVector), binaryOut(nullptr),
-        outputCInitList(false), patchBoundOffset(0), nextID(1),
-        OpExtInstImportID(0), HasVariablePointersStorageBuffer(false),
-        HasVariablePointers(false), HasNonUniformPointers(false),
-        HasConvertToF(false), HasIntegerDot(false), SamplerPointerTy(nullptr),
-        SamplerDataTy(nullptr), WorkgroupSizeValueID(0), WorkgroupSizeVarID(0),
-        TestOutput(true) {
-    if (clspv::Option::PhysicalStorageBuffers())
-      addCapability(spv::CapabilityPhysicalStorageBufferAddresses);
-    addCapability(spv::CapabilityShader);
     Ptr = this;
   }
 
@@ -748,6 +735,9 @@ private:
   SPIRVID WorkgroupSizeVarID;
 
   bool TestOutput;
+  bool *HasErrorOut;
+  std::string *OutputLog;
+  bool HasError;
 
   // Bookkeeping for mapping kernel arguments to resource variables.
   struct ResourceVarInfo {
@@ -871,7 +861,7 @@ void SPIRVProducerPassImpl::ReadFunctionAttributes() {
 
 PreservedAnalyses SPIRVProducerPass::run(Module &M,
                                          ModuleAnalysisManager &MAM) {
-  SPIRVProducerPassImpl impl(out, outputCInitList, MAM);
+  SPIRVProducerPassImpl impl(out, outputCInitList, MAM, has_error, output_log);
   impl.runOnModule(M);
   PreservedAnalyses PA;
   return PA;
@@ -946,6 +936,10 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   }
 
   HandleDeferredInstruction();
+  if (HasError) {
+    *HasErrorOut = true;
+    return false;
+  }
   HandleDeferredDecorations();
 
   // Generate SPIRV module information.
@@ -2615,6 +2609,9 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVValue(Value *V, Type *TyHint) {
   if (II != ValueMap.end()) {
     assert(II->second.isValid());
     return II->second;
+  }
+  if (isa<Function>(V)) {
+    return SPIRVID();
   }
   if (Constant *Cst = dyn_cast<Constant>(V)) {
     return getSPIRVConstant(Cst, TyHint);
@@ -6965,12 +6962,15 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
 
         SPIRVID CalleeID = getSPIRVValue(Callee);
         if (!CalleeID.isValid()) {
-          errs() << "Can't translate function call.  Missing builtin? "
-                 << callee_name << " in: " << *Call << "\n";
-          // TODO(dneto): Can we error out?  Enabling this llvm_unreachable
-          // causes an infinite loop.  Instead, go ahead and generate
-          // the bad function call.  A validator will catch the 0-Id.
-          // llvm_unreachable("Can't translate function call");
+          std::string err_msg =
+              "error: undefined reference to '" + callee_name.str() + "'\n";
+          if (OutputLog) {
+            OutputLog->append(err_msg);
+          } else {
+            errs() << err_msg;
+          }
+          HasError = true;
+          return;
         }
 
         Ops << CalleeID;
