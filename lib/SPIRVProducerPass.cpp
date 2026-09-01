@@ -141,6 +141,7 @@ public:
   uint32_t get() const { return id; }
   bool isValid() const { return id != 0; }
   bool operator==(const SPIRVID &that) const { return id == that.id; }
+  bool operator!=(const SPIRVID &that) const { return id != that.id; }
   bool operator<(const SPIRVID &that) const { return id < that.id; }
 };
 
@@ -445,6 +446,7 @@ struct SPIRVProducerPassImpl {
   SPIRVID getSPIRVInt64Constant(uint64_t CstVal);
   // Lookup SPIRVID of llvm::Value, may create Constant.
   SPIRVID getSPIRVValue(Value *V, Type *TyHint = nullptr);
+  SPIRVID getSPIRVPointerOperand(Value *PtrVal, Type *ExpectedPointeeTy);
 
   bool PointerRequiresLayout(unsigned aspace);
   bool UntypedPointerStorageClass(spv::StorageClass sc);
@@ -572,6 +574,10 @@ struct SPIRVProducerPassImpl {
     bool has_result, has_result_type;
     spv::HasResultAndType(Opcode, &has_result, &has_result_type);
     SPIRVID RID = has_result ? incrNextID() : 0;
+    if (has_result && has_result_type && !Operands.empty() &&
+        Operands[0].getType() == NUMBERID) {
+      IDTypeMap[RID.get()] = SPIRVID(Operands[0].getNumID());
+    }
     SPIRVSections[TSection].emplace_back(Opcode, RID, Operands);
 
     if (NeedDecorationNoContraction(Opcode) && !Option::UnsafeMath()) {
@@ -616,6 +622,10 @@ struct SPIRVProducerPassImpl {
     bool has_result, has_result_type;
     spv::HasResultAndType(Opcode, &has_result, &has_result_type);
     SPIRVID RID = has_result ? I->getResultID() : 0;
+    if (has_result && has_result_type && !Operands.empty() &&
+        Operands[0].getType() == NUMBERID) {
+      IDTypeMap[RID.get()] = SPIRVID(Operands[0].getNumID());
+    }
     *I = SPIRVInstruction(Opcode, RID, Operands);
     return RID;
   }
@@ -678,6 +688,7 @@ private:
   SPIRVID v4int32ID;
 
   DenseMap<Value *, Type *> InferredTypeCache;
+  DenseMap<unsigned, SPIRVID> IDTypeMap;
   std::unordered_map<unsigned, LayoutTypeMapType> PointerTypeMap;
   TypeMapType FunctionTypeMap;
 
@@ -1355,16 +1366,85 @@ void SPIRVProducerPassImpl::FindTypesForResourceVars() {
   // Physical storage buffer types need layout, but the types can't be found via
   // resource variables. Traverse the module to find the necessary types.
   if (clspv::Option::PhysicalStorageBuffers()) {
+    auto add_physical_type = [&](Type *type) {
+      if (!type)
+        return;
+      work_list.push_back(type);
+    };
+
+    for (auto &GV : module->globals()) {
+      if (GetStorageClass(GV.getAddressSpace()) ==
+          spv::StorageClassPhysicalStorageBuffer) {
+        add_physical_type(GV.getValueType());
+      }
+    }
+
     for (auto &F : *module) {
+      for (auto &arg : F.args()) {
+        if (arg.getType()->isPointerTy() &&
+            GetStorageClass(arg.getType()->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+          auto *inferred_ty =
+              clspv::InferType(&arg, module->getContext(), &InferredTypeCache);
+          add_physical_type(inferred_ty);
+        }
+      }
       for (auto &BB : F) {
         for (auto &I : BB) {
-          if (isa<IntToPtrInst>(&I) &&
-              GetStorageClass(I.getType()->getPointerAddressSpace()) ==
-                  spv::StorageClassPhysicalStorageBuffer) {
-            auto *inferred_ty =
-                clspv::InferType(&I, module->getContext(), &InferredTypeCache);
-            if (inferred_ty)
-              work_list.push_back(inferred_ty);
+          if (auto *gep = dyn_cast<GetElementPtrInst>(&I)) {
+            if (GetStorageClass(gep->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              add_physical_type(gep->getSourceElementType());
+              add_physical_type(gep->getResultElementType());
+            }
+          } else if (auto *ld = dyn_cast<LoadInst>(&I)) {
+            if (GetStorageClass(ld->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              add_physical_type(ld->getType());
+            }
+          } else if (auto *st = dyn_cast<StoreInst>(&I)) {
+            if (GetStorageClass(st->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              add_physical_type(st->getValueOperand()->getType());
+            }
+          } else if (auto *atomic = dyn_cast<AtomicRMWInst>(&I)) {
+            if (GetStorageClass(atomic->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              add_physical_type(atomic->getValOperand()->getType());
+            }
+          } else if (auto *cmpxchg = dyn_cast<AtomicCmpXchgInst>(&I)) {
+            if (GetStorageClass(cmpxchg->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              add_physical_type(cmpxchg->getNewValOperand()->getType());
+            }
+          } else if (auto *i2p = dyn_cast<IntToPtrInst>(&I)) {
+            if (GetStorageClass(i2p->getType()->getPointerAddressSpace()) ==
+                spv::StorageClassPhysicalStorageBuffer) {
+              auto *inferred_ty = clspv::InferType(&I, module->getContext(),
+                                                   &InferredTypeCache);
+              add_physical_type(inferred_ty);
+            }
+          } else if (auto *cast = dyn_cast<AddrSpaceCastInst>(&I)) {
+            if (GetStorageClass(cast->getType()->getPointerAddressSpace()) ==
+                    spv::StorageClassPhysicalStorageBuffer ||
+                GetStorageClass(cast->getPointerOperand()
+                                    ->getType()
+                                    ->getPointerAddressSpace()) ==
+                    spv::StorageClassPhysicalStorageBuffer) {
+              auto *inferred_ty = clspv::InferType(&I, module->getContext(),
+                                                   &InferredTypeCache);
+              add_physical_type(inferred_ty);
+            }
+          } else if (auto *call = dyn_cast<CallInst>(&I)) {
+            for (auto &arg : call->args()) {
+              if (arg->getType()->isPointerTy() &&
+                  GetStorageClass(arg->getType()->getPointerAddressSpace()) ==
+                      spv::StorageClassPhysicalStorageBuffer) {
+                auto *inferred_ty = clspv::InferType(
+                    arg.get(), module->getContext(), &InferredTypeCache);
+                add_physical_type(inferred_ty);
+              }
+            }
           }
         }
       }
@@ -2618,6 +2698,33 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVValue(Value *V, Type *TyHint) {
   } else {
     llvm_unreachable("Variable not found");
   }
+}
+
+SPIRVID
+SPIRVProducerPassImpl::getSPIRVPointerOperand(Value *PtrVal,
+                                              Type *ExpectedPointeeTy) {
+  SPIRVID PtrID = getSPIRVValue(PtrVal);
+  if (!PtrVal->getType()->isPointerTy()) {
+    return PtrID;
+  }
+  if (Option::UntypedPointerAddressSpace(
+          PtrVal->getType()->getPointerAddressSpace())) {
+    return PtrID;
+  }
+  SPIRVID ExpectedPtrTypeID =
+      getSPIRVPointerType(PtrVal->getType(), ExpectedPointeeTy);
+  auto it = IDTypeMap.find(PtrID.get());
+  if (it != IDTypeMap.end() && it->second.isValid() &&
+      it->second != ExpectedPtrTypeID) {
+    auto storage_class =
+        GetStorageClass(PtrVal->getType()->getPointerAddressSpace());
+    if (storage_class == spv::StorageClassPhysicalStorageBuffer) {
+      SPIRVOperandVec Ops;
+      Ops << ExpectedPtrTypeID << PtrID;
+      return addSPIRVInst(spv::OpBitcast, Ops);
+    }
+  }
+  return PtrID;
 }
 
 void SPIRVProducerPassImpl::GenerateSamplers() {
@@ -6075,7 +6182,12 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     }
 
     // Generate the base pointer.
-    Ops << GEP->getPointerOperand();
+    if (untyped) {
+      Ops << GEP->getPointerOperand();
+    } else {
+      Ops << getSPIRVPointerOperand(GEP->getPointerOperand(),
+                                    GEP->getSourceElementType());
+    }
 
     for (auto II = GEP->idx_begin() + offset; II != GEP->idx_end(); II++) {
       Ops << *II;
@@ -6613,7 +6725,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       result_type_id = getSPIRVType(LD->getType(), layout);
     }
     SPIRVOperandVec Ops;
-    Ops << result_type_id << ptr;
+    Ops << result_type_id << getSPIRVPointerOperand(ptr, LD->getType());
 
     // Align MemoryOperand helps load vectorization and is required for
     // PhysicalStorageBuffer
@@ -6655,7 +6767,7 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     // Ops[2] ... Ops[n] = Optional Memory Access (later???)
     //
     // TODO: Do we need to implement Optional Memory Access???
-    Ops << ST->getPointerOperand();
+    Ops << getSPIRVPointerOperand(ptr, value_ty);
     if (RID.isValid()) {
       Ops << RID;
     } else {
@@ -6721,7 +6833,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     //
     SPIRVOperandVec Ops;
 
-    Ops << I.getType() << AtomicRMW->getPointerOperand();
+    Ops << I.getType()
+        << getSPIRVPointerOperand(AtomicRMW->getPointerOperand(),
+                                  AtomicRMW->getValOperand()->getType());
 
     const auto ConstantScopeDevice = getSPIRVInt32Constant(spv::ScopeDevice);
     Ops << ConstantScopeDevice;
