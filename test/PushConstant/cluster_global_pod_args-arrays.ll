@@ -208,9 +208,9 @@ entry:
   ret void
 }
 
-; CHECK: [[pc_md]] = !{i32 7}
-; CHECK: [[pod_args_md]] = !{i32 3}
-; CHECK: [[map_md]] = !{[[arg_md:![0-9]+]]}
-; CHECK: [[arg_md]] = !{!"arg", i32 0, i32 -1, i32 0, i32 16, !"pod_pushconstant"}
+; CHECK-DAG: [[pc_md]] = !{i32 7}
+; CHECK-DAG: [[pod_args_md]] = !{i32 3}
+; CHECK-DAG: [[map_md]] = !{[[arg_md:![0-9]+]]}
+; CHECK-DAG: [[arg_md]] = !{!"arg", i32 0, i32 -1, i32 0, i32 16, !"pod_pushconstant"}
 
 !0 = !{i32 3}

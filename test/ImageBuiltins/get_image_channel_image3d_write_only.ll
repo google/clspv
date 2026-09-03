@@ -45,7 +45,7 @@ declare ptr addrspace(1) @_Z14clspv.resource.1(i32 %0, i32 %1, i32 %2, i32 %3, i
 ; CHECK: define spir_kernel void @data_type(ptr addrspace(1) writeonly align 4 {{.*}}, ptr addrspace(1) {{.*}}) !push_constants_image_channel [[data_type_kernel:![^ ]+]]
 ; CHECK: tail call spir_func i32 @_Z27get_image_channel_data_type45opencl.image3d_wo_t.float(ptr addrspace(1) {{.*}}), !image_getter_push_constant_offset [[call:![^ ]+]]
 
-; CHECK: [[pc]] = !{i32 {{.*}}}
-; CHECK: [[order_kernel]] = !{i32 [[ordinal:[^ ]+]], i32 [[order_offset:[^ ]+]], i32 [[order_pc:[^ ]+]]}
-; CHECK: [[call]] = !{i32 0}
-; CHECK: [[data_type_kernel]] = !{i32 [[ordinal:[^ ]+]], i32 0, i32 [[data_type_pc:[^ ]+]]}
+; CHECK-DAG: [[pc]] = !{i32 {{.*}}}
+; CHECK-DAG: [[order_kernel]] = !{i32 [[ordinal:[^ ]+]], i32 [[order_offset:[^ ]+]], i32 [[order_pc:[^ ]+]]}
+; CHECK-DAG: [[call]] = !{i32 0}
+; CHECK-DAG: [[data_type_kernel]] = !{i32 [[ordinal:[^ ]+]], i32 0, i32 [[data_type_pc:[^ ]+]]}
