@@ -37,17 +37,17 @@
 ; CHECK: [[or:%[a-zA-Z0-9_.]+]] = or i64 [[zext0]], [[shl]]
 ; CHECK: bitcast i64 [[or]] to double
 
-; CHECK: [[pc_md]] = !{i32 1, i32 4, i32 7}
-; CHECK: [[pod_args_md]] = !{i32 3}
-; CHECK: [[arg_map_md]] = !{[[out_md:![0-9]+]], [[char_arg_md:![0-9]+]], [[short_arg_md:![0-9]+]], [[int_arg_md:![0-9]+]], [[long_arg_md:![0-9]+]], [[float_arg_md:![0-9]+]], [[half_arg_md:![0-9]+]], [[double_arg_md:![0-9]+]]}
-; CHECK: [[out_md]] = !{!"out", i32 0, i32 0
-; CHECK: [[char_arg_md]] = !{!"char_arg", i32 1, i32 -1, i32 32, i32 1, !"pod_pushconstant"}
-; CHECK: [[short_arg_md]] = !{!"short_arg", i32 2, i32 -1, i32 34, i32 2, !"pod_pushconstant"}
-; CHECK: [[int_arg_md]] = !{!"int_arg", i32 3, i32 -1, i32 36, i32 4, !"pod_pushconstant"}
-; CHECK: [[long_arg_md]] = !{!"long_arg", i32 4, i32 -1, i32 40, i32 8, !"pod_pushconstant"}
-; CHECK: [[float_arg_md]] = !{!"float_arg", i32 5, i32 -1, i32 48, i32 4, !"pod_pushconstant"}
-; CHECK: [[half_arg_md]] = !{!"half_arg", i32 6, i32 -1, i32 52, i32 2, !"pod_pushconstant"}
-; CHECK: [[double_arg_md]] = !{!"double_arg", i32 7, i32 -1, i32 56, i32 8, !"pod_pushconstant"}
+; CHECK-DAG: [[pc_md]] = !{i32 1, i32 4, i32 7}
+; CHECK-DAG: [[pod_args_md]] = !{i32 3}
+; CHECK-DAG: [[arg_map_md]] = !{[[out_md:![0-9]+]], [[char_arg_md:![0-9]+]], [[short_arg_md:![0-9]+]], [[int_arg_md:![0-9]+]], [[long_arg_md:![0-9]+]], [[float_arg_md:![0-9]+]], [[half_arg_md:![0-9]+]], [[double_arg_md:![0-9]+]]}
+; CHECK-DAG: [[out_md]] = !{!"out", i32 0, i32 0
+; CHECK-DAG: [[char_arg_md]] = !{!"char_arg", i32 1, i32 -1, i32 32, i32 1, !"pod_pushconstant"}
+; CHECK-DAG: [[short_arg_md]] = !{!"short_arg", i32 2, i32 -1, i32 34, i32 2, !"pod_pushconstant"}
+; CHECK-DAG: [[int_arg_md]] = !{!"int_arg", i32 3, i32 -1, i32 36, i32 4, !"pod_pushconstant"}
+; CHECK-DAG: [[long_arg_md]] = !{!"long_arg", i32 4, i32 -1, i32 40, i32 8, !"pod_pushconstant"}
+; CHECK-DAG: [[float_arg_md]] = !{!"float_arg", i32 5, i32 -1, i32 48, i32 4, !"pod_pushconstant"}
+; CHECK-DAG: [[half_arg_md]] = !{!"half_arg", i32 6, i32 -1, i32 52, i32 2, !"pod_pushconstant"}
+; CHECK-DAG: [[double_arg_md]] = !{!"double_arg", i32 7, i32 -1, i32 56, i32 8, !"pod_pushconstant"}
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-vulkan"

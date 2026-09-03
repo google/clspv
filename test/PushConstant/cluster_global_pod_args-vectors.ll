@@ -14,7 +14,7 @@ target triple = "spirv32-unknown-vulkan"
 
 define spir_kernel void @chars(<2 x i8> %v2, <3 x i8> %v3, <4 x i8> %v4, <8 x i8> %v8, <16 x i8> %v16) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @chars() !clspv.pod_args_impl !1 !kernel_arg_map [[char_args:![0-9]+]]
+  ; CHECK: define spir_kernel void @chars() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[char_args:![0-9]+]]
 
   ; <2 x i8>
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -54,7 +54,7 @@ entry:
 
 define spir_kernel void @shorts(<2 x i16> %v2, <3 x i16> %v3, <4 x i16> %v4, <8 x i16> %v8, <16 x i16> %v16) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @shorts() !clspv.pod_args_impl !1 !kernel_arg_map [[short_args:![0-9]+]]
+  ; CHECK: define spir_kernel void @shorts() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[short_args:![0-9]+]]
 
   ; <2 x i16>
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -116,7 +116,7 @@ entry:
 
 define spir_kernel void @ints(<2 x i32> %v2, <3 x i32> %v3, <4 x i32> %v4) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @ints() !clspv.pod_args_impl !1 !kernel_arg_map [[int_args:![0-9]+]]
+  ; CHECK: define spir_kernel void @ints() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[int_args:![0-9]+]]
 
   ; <2 x i32>
   ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -146,7 +146,7 @@ entry:
 
 define spir_kernel void @longs(<2 x i64> %v2, <3 x i64> %v3, <4 x i64> %v4) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @longs() !clspv.pod_args_impl !1 !kernel_arg_map [[long_args:![0-9]+]]
+  ; CHECK: define spir_kernel void @longs() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[long_args:![0-9]+]]
 
   ; <2 x i64>
   ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -221,7 +221,7 @@ entry:
 
 define spir_kernel void @halfs(<2 x half> %v2, <3 x half> %v3, <4 x half> %v4, <8 x half> %v8, <16 x half> %v16) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @halfs() !clspv.pod_args_impl !1 !kernel_arg_map [[short_args]]
+  ; CHECK: define spir_kernel void @halfs() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[short_args]]
 
   ; <2 x half>
   ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -283,7 +283,7 @@ entry:
 
 define spir_kernel void @floats(<2 x float> %v2, <3 x float> %v3, <4 x float> %v4) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @floats() !clspv.pod_args_impl !1 !kernel_arg_map [[int_args]]
+  ; CHECK: define spir_kernel void @floats() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[int_args]]
 
   ; <2 x float>
   ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -322,7 +322,7 @@ entry:
 
 define spir_kernel void @doubles(<2 x double> %v2, <3 x double> %v3, <4 x double> %v4) !clspv.pod_args_impl !1 {
 entry:
-  ; CHECK: define spir_kernel void @doubles() !clspv.pod_args_impl !1 !kernel_arg_map [[long_args]]
+  ; CHECK: define spir_kernel void @doubles() !clspv.pod_args_impl !{{[0-9]+}} !kernel_arg_map [[long_args]]
 
   ; <2 x double>
   ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds ([[outer]], ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
@@ -404,26 +404,26 @@ entry:
   ret void
 }
 
-; CHECK: [[char_args]] = !{[[v2:![0-9]+]], [[v3:![0-9]+]], [[v4:![0-9]+]], [[v8:![0-9]+]], [[v16:![0-9]+]]}
-; CHECK: [[v2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 2, !"pod_pushconstant"}
-; CHECK: [[v3]] = !{!"v3", i32 1, i32 -1, i32 36, i32 3, !"pod_pushconstant"}
-; CHECK: [[v4]] = !{!"v4", i32 2, i32 -1, i32 40, i32 4, !"pod_pushconstant"}
-; CHECK: [[v8]] = !{!"v8", i32 3, i32 -1, i32 48, i32 8, !"pod_pushconstant"}
-; CHECK: [[v16]] = !{!"v16", i32 4, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
-; CHECK: [[short_args]] = !{[[v2:![0-9]+]], [[v3:![0-9]+]], [[v4:![0-9]+]], [[v8:![0-9]+]], [[v16:![0-9]+]]}
-; CHECK: [[v2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 4, !"pod_pushconstant"}
-; CHECK: [[v3]] = !{!"v3", i32 1, i32 -1, i32 40, i32 6, !"pod_pushconstant"}
-; CHECK: [[v4]] = !{!"v4", i32 2, i32 -1, i32 48, i32 8, !"pod_pushconstant"}
-; CHECK: [[v8]] = !{!"v8", i32 3, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
-; CHECK: [[v16]] = !{!"v16", i32 4, i32 -1, i32 96, i32 32, !"pod_pushconstant"}
-; CHECK: [[int_args]] = !{[[v2:![0-9]+]], [[v3:![0-9]+]], [[v4:![0-9]+]]}
-; CHECK: [[v2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 8, !"pod_pushconstant"}
-; CHECK: [[v3]] = !{!"v3", i32 1, i32 -1, i32 48, i32 12, !"pod_pushconstant"}
-; CHECK: [[v4]] = !{!"v4", i32 2, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
-; CHECK: [[long_args]] = !{[[v2:![0-9]+]], [[v3:![0-9]+]], [[v4:![0-9]+]]}
-; CHECK: [[v2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 16, !"pod_pushconstant"}
-; CHECK: [[v3]] = !{!"v3", i32 1, i32 -1, i32 64, i32 24, !"pod_pushconstant"}
-; CHECK: [[v4]] = !{!"v4", i32 2, i32 -1, i32 96, i32 32, !"pod_pushconstant"}
+; CHECK-DAG: [[char_args]] = !{[[v2:![0-9]+]], [[v3:![0-9]+]], [[v4:![0-9]+]], [[v8:![0-9]+]], [[v16:![0-9]+]]}
+; CHECK-DAG: [[v2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 2, !"pod_pushconstant"}
+; CHECK-DAG: [[v3]] = !{!"v3", i32 1, i32 -1, i32 36, i32 3, !"pod_pushconstant"}
+; CHECK-DAG: [[v4]] = !{!"v4", i32 2, i32 -1, i32 40, i32 4, !"pod_pushconstant"}
+; CHECK-DAG: [[v8]] = !{!"v8", i32 3, i32 -1, i32 48, i32 8, !"pod_pushconstant"}
+; CHECK-DAG: [[v16]] = !{!"v16", i32 4, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
+; CHECK-DAG: [[short_args]] = !{[[v2_1:![0-9]+]], [[v3_1:![0-9]+]], [[v4_1:![0-9]+]], [[v8_1:![0-9]+]], [[v16_1:![0-9]+]]}
+; CHECK-DAG: [[v2_1]] = !{!"v2", i32 0, i32 -1, i32 32, i32 4, !"pod_pushconstant"}
+; CHECK-DAG: [[v3_1]] = !{!"v3", i32 1, i32 -1, i32 40, i32 6, !"pod_pushconstant"}
+; CHECK-DAG: [[v4_1]] = !{!"v4", i32 2, i32 -1, i32 48, i32 8, !"pod_pushconstant"}
+; CHECK-DAG: [[v8_1]] = !{!"v8", i32 3, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
+; CHECK-DAG: [[v16_1]] = !{!"v16", i32 4, i32 -1, i32 96, i32 32, !"pod_pushconstant"}
+; CHECK-DAG: [[int_args]] = !{[[v2_2:![0-9]+]], [[v3_2:![0-9]+]], [[v4_2:![0-9]+]]}
+; CHECK-DAG: [[v2_2]] = !{!"v2", i32 0, i32 -1, i32 32, i32 8, !"pod_pushconstant"}
+; CHECK-DAG: [[v3_2]] = !{!"v3", i32 1, i32 -1, i32 48, i32 12, !"pod_pushconstant"}
+; CHECK-DAG: [[v4_2]] = !{!"v4", i32 2, i32 -1, i32 64, i32 16, !"pod_pushconstant"}
+; CHECK-DAG: [[long_args]] = !{[[v2_3:![0-9]+]], [[v3_3:![0-9]+]], [[v4_3:![0-9]+]]}
+; CHECK-DAG: [[v2_3]] = !{!"v2", i32 0, i32 -1, i32 32, i32 16, !"pod_pushconstant"}
+; CHECK-DAG: [[v3_3]] = !{!"v3", i32 1, i32 -1, i32 64, i32 24, !"pod_pushconstant"}
+; CHECK-DAG: [[v4_3]] = !{!"v4", i32 2, i32 -1, i32 96, i32 32, !"pod_pushconstant"}
 
 !0 = !{i32 1, i32 4}
 !1 = !{i32 3}

@@ -64,11 +64,11 @@ entry:
   ret void
 }
 
-; CHECK: [[pc_md]] = !{i32 7}
-; CHECK: [[pod_arg_md]] = !{i32 3}
-; CHECK: [[chars_map]] = !{[[arg_md:![0-9]+]]}
-; CHECK: [[arg_md]] = !{!"arg", i32 0, i32 -1, i32 0, i32 4, !"pod_pushconstant"}
-; CHECK: [[aligns_map]] = !{[[arg_md:![0-9]+]]}
-; CHECK: [[arg_md]] = !{!"arg", i32 0, i32 -1, i32 0, i32 24, !"pod_pushconstant"}
+; CHECK-DAG: [[pc_md]] = !{i32 7}
+; CHECK-DAG: [[pod_arg_md]] = !{i32 3}
+; CHECK-DAG: [[chars_map]] = !{[[arg_md0:![0-9]+]]}
+; CHECK-DAG: [[arg_md0]] = !{!"arg", i32 0, i32 -1, i32 0, i32 4, !"pod_pushconstant"}
+; CHECK-DAG: [[aligns_map]] = !{[[arg_md1:![0-9]+]]}
+; CHECK-DAG: [[arg_md1]] = !{!"arg", i32 0, i32 -1, i32 0, i32 24, !"pod_pushconstant"}
 
 !0 = !{i32 3}

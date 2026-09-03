@@ -8,7 +8,7 @@
 ; CHECK:  [[fadd:%[^ ]+]] = fadd <4 x float> [[floor]], splat (float 5.000000e-01)
 ; CHECK:  [[fdiv_nearest:%[^ ]+]] = fdiv <4 x float> [[fadd]], [[convert]]
 ; CHECK:  [[fdiv_linear:%[^ ]+]] = fdiv <4 x float> [[coord]], [[convert]]
-; CHECK:  [[sampler_mask:%[^ ]+]] = call i32 @clspv.get_normalized_sampler_mask(), !sampler_mask_push_constant_offset !29
+; CHECK:  [[sampler_mask:%[^ ]+]] = call i32 @clspv.get_normalized_sampler_mask(), !sampler_mask_push_constant_offset !{{[0-9]+}}
 ; CHECK:  [[and:%[^ ]+]] = and i32 [[sampler_mask]], 48
 ; CHECK:  [[cmp:%[^ ]+]] = icmp eq i32 [[and]], 16
 ; CHECK:  [[insert:%[^ ]+]] = insertelement <4 x i1> poison, i1 [[cmp]], i64 0
