@@ -784,8 +784,11 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
         auto fn_name =
             clspv::WorkgroupAccessorFunction() + "." + std::to_string(spec_id);
         Function *var_fn = M.getFunction(fn_name);
-        auto *zero = Builder.getInt32(0);
-        Type *array_ty = ArrayType::get(inferred_ty, 0);
+        Type *elem_ty = inferred_ty;
+        while (auto *array_type = dyn_cast<ArrayType>(elem_ty)) {
+          elem_ty = array_type->getElementType();
+        }
+        Type *array_ty = ArrayType::get(elem_ty, 0);
         auto *data_ty = array_ty;
         if (Option::UntypedPointerAddressSpace(
                 argTy->getPointerAddressSpace())) {
@@ -812,12 +815,17 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
 
         // Add the correct gep. Since the workgroup variable is [ <type> x 0 ]
         // addrspace(3)*, generate two zero indices for the gep.
+        auto *zero = Builder.getInt32(0);
         SmallVector<Value *, 3> zeroes(2, zero);
         if (Option::UntypedPointerAddressSpace(
                 argTy->getPointerAddressSpace())) {
           zeroes.push_back(zero);
         }
-        auto *replacement = Builder.CreateGEP(data_ty, call, zeroes);
+        Value *replacement = Builder.CreateGEP(data_ty, call, zeroes);
+        if (replacement->getType() != Arg.getType()) {
+          replacement = Builder.CreatePointerBitCastOrAddrSpaceCast(
+              replacement, Arg.getType());
+        }
         Arg.replaceAllUsesWith(replacement);
 
         // We record the assignment of the spec id for this particular argument
