@@ -46,6 +46,8 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
   };
   if (auto *GEP = dyn_cast<GEPOperator>(user)) {
     return GEP->getSourceElementType();
+  } else if (dyn_cast<AddrSpaceCastOperator>(user)) {
+    isPointerTy = true;
   } else if (auto *load = dyn_cast<LoadInst>(user)) {
     if (!load->getType()->isPointerTy()) {
       return load->getType();
@@ -395,6 +397,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     auto false_ty = InferType(select->getFalseValue(), context, cache);
     auto true_ty = InferType(select->getTrueValue(), context, cache);
     return CacheType(SmallerTypeNotAliasing(DL, false_ty, true_ty));
+  } else if (auto *asc = dyn_cast<AddrSpaceCastOperator>(v)) {
+    CacheType(nullptr);
+    return CacheType(InferType(asc->getPointerOperand(), context, cache));
   }
 
   // Special resource-related functions. The last parameter of each function
