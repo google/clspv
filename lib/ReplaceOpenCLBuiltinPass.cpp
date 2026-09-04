@@ -1086,6 +1086,13 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   auto tmp3 = Builder.CreateMul(LocalSize0, LocalSize1);
   auto Incr = Builder.CreateMul(tmp3, LocalSize2);
 
+  if (NumGentypes->getType() != IndexT) {
+    NumGentypes = Builder.CreateZExtOrTrunc(NumGentypes, IndexT);
+  }
+  if (Stride != nullptr && Stride->getType() != IndexT) {
+    Stride = Builder.CreateZExtOrTrunc(Stride, IndexT);
+  }
+
   // Create BasicBlocks
   auto BB = CI->getParent();
   auto CmpBB = BasicBlock::Create(BB->getContext(), "", BB->getParent());
