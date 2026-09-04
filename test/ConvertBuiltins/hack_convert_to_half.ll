@@ -3,12 +3,13 @@
 ; RUN: spirv-val --target-env spv1.0 %t.spv
 ; RUN: FileCheck %s < %t.spvasm
 
-; CHECK: OpConvertSToF
+; CHECK: OpCapability Float16
+; CHECK: OpFConvert
 ; CHECK-NEXT: OpBitcast
 ; CHECK-NEXT: OpBitwiseAnd
 ; CHECK-NEXT: OpBitcast
 ; CHECK-NEXT: OpFAdd
-; CHECK-NEXT: OpConvertFToS
+; CHECK-NEXT: OpStore
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-vulkan"
@@ -16,22 +17,21 @@ target triple = "spirv32-unknown-vulkan"
 @__spirv_WorkgroupSize = local_unnamed_addr addrspace(8) global <3 x i32> zeroinitializer
 
 ; Function Attrs: nofree norecurse nosync nounwind memory(argmem: readwrite)
-define dso_local spir_kernel void @foo(ptr addrspace(1) nocapture readonly align 4 %src, ptr addrspace(1) nocapture writeonly align 4 %dest) local_unnamed_addr #0 !kernel_arg_addr_space !7 !kernel_arg_access_qual !8 !kernel_arg_type !9 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 {
+define dso_local spir_kernel void @foo(ptr addrspace(1) nocapture readonly align 4 %src, ptr addrspace(1) nocapture writeonly align 2 %dest) local_unnamed_addr #0 !kernel_arg_addr_space !7 !kernel_arg_access_qual !8 !kernel_arg_type !9 !kernel_arg_base_type !9 !kernel_arg_type_qual !10 !clspv.pod_args_impl !11 {
 entry:
-  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-  %1 = getelementptr { [0 x i32] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
-  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x i32] } zeroinitializer)
-  %3 = getelementptr { [0 x i32] }, ptr addrspace(1) %2, i32 0, i32 0, i32 0
-  %4 = load i32, ptr addrspace(1) %1, align 4
-  %5 = sitofp i32 %4 to float
-  %6 = fptosi float %5 to i32
-  store i32 %6, ptr addrspace(1) %3, align 4
+  %0 = call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x float] } zeroinitializer)
+  %1 = getelementptr { [0 x float] }, ptr addrspace(1) %0, i32 0, i32 0, i32 0
+  %2 = call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x half] } zeroinitializer)
+  %3 = getelementptr { [0 x half] }, ptr addrspace(1) %2, i32 0, i32 0, i32 0
+  %4 = load float, ptr addrspace(1) %1, align 4
+  %5 = fptrunc float %4 to half
+  store half %5, ptr addrspace(1) %3, align 2
   ret void
 }
 
-declare ptr addrspace(1) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x i32] })
+declare ptr addrspace(1) @_Z14clspv.resource.0(i32, i32, i32, i32, i32, i32, { [0 x float] })
 
-declare ptr addrspace(1) @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, { [0 x i32] })
+declare ptr addrspace(1) @_Z14clspv.resource.1(i32, i32, i32, i32, i32, i32, { [0 x half] })
 
 attributes #0 = { nofree norecurse nosync nounwind memory(argmem: readwrite) "no-builtins" "no-trapping-math"="true" "stack-protector-buffer-size"="0" "stackrealign" "uniform-work-group-size"="true" }
 attributes #1 = { nofree nosync memory(none) }
@@ -52,7 +52,6 @@ attributes #2 = { nounwind }
 !6 = !{i32 1}
 !7 = !{i32 1, i32 1}
 !8 = !{!"none", !"none"}
-!9 = !{!"int*", !"float*"}
+!9 = !{!"float*", !"half*"}
 !10 = !{!"", !""}
 !11 = !{i32 2}
-
