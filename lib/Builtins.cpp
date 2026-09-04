@@ -45,6 +45,20 @@ Builtins::LookupBuiltinType(const std::string &builtin_name) {
   if (ii != s_func_map.end()) {
     return (*ii).second;
   }
+
+  // Cooperative matrix builtins carry a typed suffix appended by the Clang
+  // frontend, e.g.:__spirv_CooperativeMatrixLoadKHR_global_f16_sc3_16x16_u0
+  if (name.rfind("__spirv_", 0) == 0) {
+    size_t pos = name.find('_', strlen("__spirv_"));
+    if (pos != std::string::npos) {
+      std::string base = name.substr(0, pos);
+      auto jj = s_func_map.find(base.c_str());
+      if (jj != s_func_map.end()) {
+        return (*jj).second;
+      }
+    }
+  }
+
   return Builtins::kBuiltinNone;
 }
 

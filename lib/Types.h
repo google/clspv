@@ -89,6 +89,14 @@ bool PointersAre64Bit(llvm::Module &m);
 // otherwise returns the undef value.
 llvm::Constant *GetPlaceholderValue(llvm::Type *type);
 
+// Returns the element type (first type parameter) of a
+// spirv.CooperativeMatrixKHR TargetExtType, or nullptr if not a cooperative
+// matrix type.
+llvm::Type *GetCoopMatrixElementType(llvm::Type *type);
+
+// Returns true if type is a spirv.CooperativeMatrixKHR TargetExtType
+bool IsCooperativeMatrixType(llvm::Type *type);
+
 } // namespace clspv
 
 #endif
