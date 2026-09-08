@@ -354,6 +354,18 @@ static llvm::cl::list<clspv::Option::FloatingPointType> denorm_flush_to_zero(
         clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
                    "Set execution mode DenormFlushToZero for fp64")));
 
+static llvm::cl::list<clspv::Option::FloatingPointType> hack_fmul_flush_to_zero(
+    "hack-fmul-flush-to-zero",
+    llvm::cl::desc("Flush subnormal floating point values to zero to "
+                   "workaround driver bugs"),
+    llvm::cl::CommaSeparated, llvm::cl::ZeroOrMore,
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp16, "16",
+                                "Enable hack-fmul-flush-to-zero for fp16")),
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp32, "32",
+                                "Enable hack-fmul-flush-to-zero for fp32")),
+    llvm::cl::values(clEnumValN(clspv::Option::FloatingPointType::fp64, "64",
+                                "Enable hack-fmul-flush-to-zero for fp64")));
+
 static llvm::cl::list<clspv::Option::StorageClass> no_16bit_storage(
     "no-16bit-storage",
     llvm::cl::desc("Disable fine-grained 16-bit storage capabilities."),
@@ -612,6 +624,15 @@ DenormMode ExecutionModeDenorm(FloatingPointType fpty) {
     }
   }
   return modes[fpty];
+}
+
+bool HackFMulFlushToZero(FloatingPointType fpty) {
+  for (auto type : hack_fmul_flush_to_zero) {
+    if (type == fpty) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool Supports16BitStorageClass(StorageClass sc) {

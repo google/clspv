@@ -479,9 +479,12 @@ struct SPIRVProducerPassImpl {
                                    Value *Mask);
   SPIRVID GeneratePopcount(Type *Ty, Value *BaseValue, LLVMContext &Context);
   SPIRVID GenerateFabs(Value *Input);
+  SPIRVID GenerateFabs(SPIRVID Input, Type *InputTy);
   SPIRVID GenerateCanonicalize(Value *val);
+  SPIRVID GenerateCanonicalize(SPIRVID val, Type *InputTy);
   SPIRVID GenerateCopySignZero(SPIRVID val, Type *InputTy);
   bool ShouldFlushDenorms(Type *Ty) const;
+  bool ShouldHackFMulFlushToZero(Type *Ty) const;
   SPIRVID GenerateIntegerDot(CallInst *Call, const FunctionInfo &func_info);
   void GenerateInstruction(Instruction &I);
   void GenerateFuncEpilogue();
@@ -5006,8 +5009,7 @@ SPIRVID SPIRVProducerPassImpl::GeneratePopcount(Type *Ty, Value *BaseValue,
   return RID;
 }
 
-SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
-  Type *InputTy = Input->getType();
+SPIRVID SPIRVProducerPassImpl::GenerateFabs(SPIRVID Input, Type *InputTy) {
   SPIRVOperandVec Ops;
 
   auto nativeBuiltins = clspv::Option::UseNativeBuiltins();
@@ -5030,14 +5032,20 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
   Ops << IntegerTy << Input;
   auto bitcast = addSPIRVInst(spv::OpBitcast, Ops);
   Ops.clear();
-  Constant *Mask = InputTy->getScalarType()->isHalfTy()
-                       ? ConstantInt::get(IntegerTy, 0x7fff)
-                       : ConstantInt::get(IntegerTy, 0x7fffffff);
+  APInt abs_mask_val = ~APInt::getSignMask(InputTy->getScalarSizeInBits());
+  Constant *Mask = ConstantInt::get(IntegerTy->getScalarType(), abs_mask_val);
+  if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
+    Mask = ConstantVector::getSplat(VecTy->getElementCount(), Mask);
+  }
   Ops << IntegerTy << bitcast << Mask;
   auto bitwiseand = addSPIRVInst(spv::OpBitwiseAnd, Ops);
   Ops.clear();
   Ops << InputTy << bitwiseand;
   return addSPIRVInst(spv::OpBitcast, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
+  return GenerateFabs(getSPIRVValue(Input), Input->getType());
 }
 
 bool SPIRVProducerPassImpl::ShouldFlushDenorms(Type *Ty) const {
@@ -5091,10 +5099,11 @@ SPIRVID SPIRVProducerPassImpl::GenerateCopySignZero(SPIRVID val,
   return addSPIRVInst(spv::OpBitcast, Ops);
 }
 
-SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(Value *val) {
-  Type *InputTy = val->getType();
-  auto copysign_zero = GenerateCopySignZero(getSPIRVValue(val), InputTy);
-  auto abs_val = GenerateFabs(val);
+SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(SPIRVID val,
+                                                    Type *InputTy) {
+  auto &Context = InputTy->getContext();
+  auto copysign_zero = GenerateCopySignZero(val, InputTy);
+  auto abs_val = GenerateFabs(val, InputTy);
 
   auto flt_min_ap = llvm::APFloat::getSmallestNormalized(
       InputTy->getScalarType()->getFltSemantics());
@@ -5105,20 +5114,22 @@ SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(Value *val) {
         ConstantVector::getSplat(VecTy->getElementCount(), flt_min_cnst);
   }
 
-  LLVMContext &Context = val->getContext();
   Type *BoolTy = Type::getInt1Ty(Context);
   if (auto VecTy = dyn_cast<FixedVectorType>(InputTy)) {
     BoolTy = FixedVectorType::get(BoolTy, VecTy->getNumElements());
   }
 
   SPIRVOperandVec Ops;
-  Ops.clear();
   Ops << BoolTy << abs_val << flt_min_cnst;
   auto cmp = addSPIRVInst(spv::OpFOrdLessThan, Ops);
 
   Ops.clear();
   Ops << InputTy << cmp << copysign_zero << val;
   return addSPIRVInst(spv::OpSelect, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCanonicalize(Value *val) {
+  return GenerateCanonicalize(getSPIRVValue(val), val->getType());
 }
 
 SPIRVID
@@ -5626,6 +5637,48 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
   return RID;
 }
 
+static bool isPowerOfTwo(Value *v) {
+  auto isScalarPowerOfTwo = [](Value *val) -> bool {
+    if (auto *CFP = dyn_cast<ConstantFP>(val)) {
+      const auto &APF = CFP->getValueAPF();
+      return APF.isNormal() && APF.getExactLog2Abs() != INT_MIN;
+    }
+    return false;
+  };
+  if (!v) {
+    return false;
+  }
+  if (auto *VecTy = dyn_cast<FixedVectorType>(v->getType())) {
+    auto *C = dyn_cast<Constant>(v);
+    if (!C) {
+      return false;
+    }
+    for (unsigned i = 0; i < VecTy->getNumElements(); ++i) {
+      Constant *Elt = C->getAggregateElement(i);
+      if (!Elt || !isScalarPowerOfTwo(Elt)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return isScalarPowerOfTwo(v);
+}
+
+bool SPIRVProducerPassImpl::ShouldHackFMulFlushToZero(Type *Ty) const {
+  Type *ScalarTy = Ty->getScalarType();
+  if (ScalarTy->isHalfTy()) {
+    return clspv::Option::HackFMulFlushToZero(
+        clspv::Option::FloatingPointType::fp16);
+  } else if (ScalarTy->isFloatTy()) {
+    return clspv::Option::HackFMulFlushToZero(
+        clspv::Option::FloatingPointType::fp32);
+  } else if (ScalarTy->isDoubleTy()) {
+    return clspv::Option::HackFMulFlushToZero(
+        clspv::Option::FloatingPointType::fp64);
+  }
+  return false;
+}
+
 void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
   ValueMapType &VMap = getValueMap();
   DIFileMap &DbgDIFileMap = getDebugDIFileMap();
@@ -6051,10 +6104,22 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         // Ops[2] = Operand 1
         SPIRVOperandVec Ops;
 
-        Ops << I.getType() << I.getOperand(0) << I.getOperand(1);
-
         auto opcode = GetSPIRVBinaryOpcode(I);
+        auto a = getSPIRVValue(I.getOperand(0));
+        auto b = getSPIRVValue(I.getOperand(1));
+        bool shouldCanonicalize =
+            opcode == spv::OpFMul && ShouldHackFMulFlushToZero(I.getType()) &&
+            !isPowerOfTwo(I.getOperand(0)) && !isPowerOfTwo(I.getOperand(1));
+        if (shouldCanonicalize) {
+          a = GenerateCanonicalize(a, I.getType());
+          b = GenerateCanonicalize(b, I.getType());
+        }
+
+        Ops << I.getType() << a << b;
         RID = addSPIRVInst(opcode, Ops);
+        if (shouldCanonicalize) {
+          RID = GenerateCanonicalize(RID, I.getType());
+        }
       }
     } else if (I.getOpcode() == Instruction::FNeg) {
       // The only unary operator.

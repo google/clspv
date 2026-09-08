@@ -197,6 +197,10 @@ enum class FloatingPointType : uint32_t {
   fp64,
 };
 
+// Returns true if subnormal floating point values should be flushed to zero to
+// workaround driver bugs.
+bool HackFMulFlushToZero(FloatingPointType fpty);
+
 // Returns true when the execution mode RoundingModeRTE should be set for a
 // floating point type.
 bool ExecutionModeRoundingModeRTE(FloatingPointType rm);
