@@ -6262,7 +6262,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       }
       // Selecting between pointers requires variable pointers.
       setVariablePointersCapabilities(Ty->getPointerAddressSpace());
-      if (!hasVariablePointers() && !selectFromSameObject(&I)) {
+      if (GetStorageClass(Ty->getPointerAddressSpace()) !=
+              spv::StorageClassPhysicalStorageBuffer &&
+          !hasVariablePointers() && !selectFromSameObject(&I)) {
         setVariablePointers();
       }
     }
@@ -7011,7 +7013,9 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
         }
         // OpPhi on pointers requires variable pointers.
         setVariablePointersCapabilities(PHITy->getPointerAddressSpace());
-        if (!hasVariablePointers() && !selectFromSameObject(PHI)) {
+        if (GetStorageClass(PHITy->getPointerAddressSpace()) !=
+                spv::StorageClassPhysicalStorageBuffer &&
+            !hasVariablePointers() && !selectFromSameObject(PHI)) {
           setVariablePointers();
         }
       }
@@ -7584,6 +7588,10 @@ uint32_t SPIRVProducerPassImpl::GetExplicitLayoutStructMemberOffset(
 
 void SPIRVProducerPassImpl::setVariablePointersCapabilities(
     unsigned address_space) {
+  if (GetStorageClass(address_space) ==
+      spv::StorageClassPhysicalStorageBuffer) {
+    return;
+  }
   if (GetStorageClass(address_space) == spv::StorageClassStorageBuffer) {
     setVariablePointersStorageBuffer();
   } else {
@@ -7630,8 +7638,11 @@ bool SPIRVProducerPassImpl::sameResource(Value *lhs, Value *rhs) const {
 
 bool SPIRVProducerPassImpl::selectFromSameObject(Instruction *inst) {
   assert(inst->getType()->isPointerTy());
-  assert(GetStorageClass(inst->getType()->getPointerAddressSpace()) ==
-         spv::StorageClassStorageBuffer);
+  auto sc = GetStorageClass(inst->getType()->getPointerAddressSpace());
+  if (sc == spv::StorageClassPhysicalStorageBuffer) {
+    return true;
+  }
+  assert(sc == spv::StorageClassStorageBuffer);
   const bool hack_undef = clspv::Option::HackUndef();
   if (auto *select = dyn_cast<SelectInst>(inst)) {
     auto *true_base = GetBasePointer(select->getTrueValue());
