@@ -393,6 +393,22 @@ enum BuiltinType : unsigned int {
   kIDotPackedSUS,
   kArmDotAcc,
   kType_Dot_End,
+
+  // Cooperative Matrix builtins Correspond to operations emitted
+  // by the Clang frontend for the __spirv_CooperativeMatrix*KHR.
+  kType_CooperativeMatrix_Start,
+  kCoopMatLoad,      // __spirv_CooperativeMatrixLoadKHR
+  kCoopMatStore,     // __spirv_CooperativeMatrixStoreKHR
+  kCoopMatMulAdd,    // __spirv_CooperativeMatrixMulAddKHR
+  kCoopMatBinaryAdd, // __spirv_CooperativeMatrixFAdd
+  kCoopMatBinarySub, // __spirv_CooperativeMatrixFSub
+  kCoopMatBinaryMul, // __spirv_CooperativeMatrixFMul
+  kCoopMatBinaryDiv, // __spirv_CooperativeMatrixFDiv
+  kCoopMatScalarMul, // __spirv_CooperativeMatrixScalarMulKHR
+  kCoopMatScalarNeg, // __spirv_CooperativeMatrixScalarNeg
+  kCoopMatInit,      // __spirv_CompositeConstruct
+  kCoopMatLength,    // __spirv_CooperativeMatrixLengthKHR
+  kType_CooperativeMatrix_End,
 }; // enum BuiltinType
 
 } // namespace Builtins

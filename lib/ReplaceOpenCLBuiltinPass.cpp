@@ -757,6 +757,21 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kWaitGroupEvents:
     return replaceWaitGroupEvents(F);
 
+  // Cooperative matrix builtins are __spirv_* intrinsics handled directly by
+  // the SPIR-V producer pass, not transformed here.
+  case Builtins::kCoopMatLoad:
+  case Builtins::kCoopMatStore:
+  case Builtins::kCoopMatMulAdd:
+  case Builtins::kCoopMatBinaryAdd:
+  case Builtins::kCoopMatBinarySub:
+  case Builtins::kCoopMatBinaryMul:
+  case Builtins::kCoopMatBinaryDiv:
+  case Builtins::kCoopMatScalarMul:
+  case Builtins::kCoopMatScalarNeg:
+  case Builtins::kCoopMatInit:
+  case Builtins::kCoopMatLength:
+    return false;
+
   default:
     break;
   }

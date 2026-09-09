@@ -164,6 +164,28 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
       }
       break;
     }
+    case clspv::Builtins::kCoopMatLoad: {
+      // coop_mat_load(ptr, layout, stride) -> matrix
+      if (auto *ElemTy = GetCoopMatrixElementType(call->getType())) {
+        return ElemTy;
+      }
+      return nullptr;
+    }
+    case clspv::Builtins::kCoopMatStore: {
+      // coop_mat_store(ptr, matrix, layout, stride) -> void
+      if (call->arg_size() > 1) {
+        if (auto *ElemTy =
+                GetCoopMatrixElementType(call->getArgOperand(1)->getType())) {
+          return ElemTy;
+        }
+        return nullptr;
+      }
+      break;
+    }
+    case clspv::Builtins::kCoopMatLength: {
+      // coop_mat_length(matrix) -> uint32_t
+      return call->getType();
+    }
     case clspv::Builtins::kBuiltinNone:
       if (!call->getCalledFunction()->isDeclaration()) {
         // See if the type can be inferred from the use in the called
@@ -702,6 +724,29 @@ bool clspv::IsWriteOnlyImageType(llvm::Type *type) {
   }
 
   return false;
+}
+
+bool clspv::IsCooperativeMatrixType(llvm::Type *type) {
+  if (!type)
+    return false;
+
+  // Check for spirv.CooperativeMatrixKHR TargetExtType.
+  if (auto *ext_ty = dyn_cast<TargetExtType>(type)) {
+    if (ext_ty->getName() == "spirv.CooperativeMatrixKHR")
+      return true;
+  }
+  return false;
+}
+
+llvm::Type *clspv::GetCoopMatrixElementType(llvm::Type *type) {
+  // Return the first type parameter (element type) of a cooperative matrix.
+  if (auto *targetExtTy = llvm::dyn_cast<llvm::TargetExtType>(type)) {
+    if (targetExtTy->getName() == "spirv.CooperativeMatrixKHR" &&
+        targetExtTy->getNumTypeParameters() > 0) {
+      return targetExtTy->getTypeParameter(0);
+    }
+  }
+  return nullptr;
 }
 
 Constant *clspv::GetPlaceholderValue(Type *type) {

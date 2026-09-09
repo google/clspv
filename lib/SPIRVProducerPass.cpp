@@ -474,6 +474,20 @@ struct SPIRVProducerPassImpl {
                                    const FunctionInfo &FuncInfo);
   SPIRVID GenerateSubgroupInstruction(CallInst *Call,
                                       const FunctionInfo &FuncInfo);
+  SPIRVID GenerateCooperativeMatrixInstruction(CallInst *Call,
+                                               const FunctionInfo &FuncInfo);
+  SPIRVID GenerateCoopMatLoad(CallInst *Call);
+  SPIRVID GenerateCoopMatStore(CallInst *Call);
+  SPIRVID GenerateCoopMatMulAdd(CallInst *Call);
+  SPIRVID GenerateCoopMatBinaryOp(CallInst *Call, Builtins::BuiltinType OpType);
+  SPIRVID GenerateCoopMatScalarMul(CallInst *Call);
+  SPIRVID GenerateCoopMatUnaryNeg(CallInst *Call);
+  SPIRVID GenerateCoopMatInit(CallInst *Call);
+  SPIRVID GenerateCoopMatLength(CallInst *Call);
+  SPIRVID GetCoopMatPointerOperand(Value *Ptr);
+  void AppendCoopMatMemoryOperand(SPIRVOperandVec &Ops, Value *Ptr,
+                                  Type *CoopTy, bool IsStore);
+  SPIRVID getCooperativeMatrixType(llvm::TargetExtType *Ty);
   SPIRVID GenerateInstructionFromCall(CallInst *Call);
   SPIRVID GenerateShuffle2FromCall(Type *Ty, Value *SrcA, Value *SrcB,
                                    Value *Mask);
@@ -702,6 +716,9 @@ private:
   TypeMapType ImageTypeMap;
   // A unique-vector of LLVM types that map to a SPIR-V type.
   TypeList Types;
+  // Maps for caching cooperative matrix types.
+  std::map<llvm::TargetExtType *, SPIRVID> CoopMatTypeMap;
+  std::map<unsigned, SPIRVID> CoopMatSignedIntTypes;
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
   ValueMapType ValueMap;
   DIFileMap DebugDIFileMap;
@@ -2121,6 +2138,11 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
   }
   case Type::TargetExtTyID: {
     auto *ext_ty = cast<TargetExtType>(Canonical);
+    if (IsCooperativeMatrixType(ext_ty)) {
+      RID = getCooperativeMatrixType(ext_ty);
+      break;
+    }
+
     if (IsImageType(ext_ty)) {
       const auto dim = ImageDimensionality(ext_ty);
       const auto sampled = IsSampledImageType(ext_ty);
@@ -3574,6 +3596,17 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_integer_dot_product");
   }
 
+  // Add extension for VulkanMemoryModel
+  if (CapabilitySet.count(spv::CapabilityVulkanMemoryModel)) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_vulkan_memory_model");
+  }
+
+  // SPV_KHR_cooperative_matrix extension is required for cooperative matrix
+  // operations. Added when CapabilityCooperativeMatrixKHR is present.
+  if (CapabilitySet.count(spv::CapabilityCooperativeMatrixKHR)) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_cooperative_matrix");
+  }
+
   if (Option::UntypedPointers()) {
     // Workgroup explicit layout is required for untyped pointers in workgroup
     // memory.
@@ -3598,8 +3631,14 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
   Ops.clear();
   Ops << (clspv::Option::PhysicalStorageBuffers()
               ? spv::AddressingModelPhysicalStorageBuffer64
-              : spv::AddressingModelLogical)
-      << spv::MemoryModelGLSL450;
+              : spv::AddressingModelLogical);
+
+  // Use Vulkan memory model if CooperativeMatrixKHR is used
+  if (CapabilitySet.count(spv::CapabilityVulkanMemoryModel)) {
+    Ops << spv::MemoryModelVulkan;
+  } else {
+    Ops << spv::MemoryModelGLSL450;
+  }
 
   addSPIRVInst<kMemoryModel>(spv::OpMemoryModel, Ops);
 
@@ -5299,6 +5338,11 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
     return GenerateImageInstruction(Call, func_info);
   } else if (BUILTIN_IN_GROUP(func_type, SubgroupsKHR)) {
     return GenerateSubgroupInstruction(Call, func_info);
+  } else if (BUILTIN_IN_GROUP(func_type, CooperativeMatrix)) {
+    // Dispatch to cooperative matrix instruction generator.
+    // Clang frontend emits __spirv_CooperativeMatrix*KHR intrinsic calls
+    // that are mapped to builtin types via BuiltinsMap.inc.
+    return GenerateCooperativeMatrixInstruction(Call, func_info);
   }
 
   SPIRVID RID;
@@ -7331,6 +7375,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpLoopMerge:
     case spv::OpStore:
     case spv::OpImageWrite:
+    case spv::OpCooperativeMatrixStoreKHR:
     case spv::OpReturnValue:
     case spv::OpControlBarrier:
     case spv::OpMemoryBarrier:
@@ -7361,6 +7406,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpTypeVector:
     case spv::OpTypeFunction:
     case spv::OpTypeUntypedPointerKHR:
+    case spv::OpTypeCooperativeMatrixKHR:
     case spv::OpString: {
       WriteWordCountAndOpcode(Inst);
       WriteResultID(Inst);
@@ -7519,7 +7565,9 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpGroupNonUniformFMax:
     case spv::OpGroupNonUniformShuffle:
     case spv::OpGroupNonUniformShuffleXor:
-    case spv::OpGroupNonUniformRotateKHR: {
+    case spv::OpGroupNonUniformRotateKHR:
+    case spv::OpCooperativeMatrixLoadKHR:
+    case spv::OpCooperativeMatrixMulAddKHR: {
       WriteWordCountAndOpcode(Inst);
       WriteOperand(Ops[0]);
       WriteResultID(Inst);
@@ -8618,4 +8666,313 @@ void SPIRVProducerPassImpl::GeneratePrintfReflection() {
     }
     addSPIRVInst<kReflection>(spv::OpExtInst, Ops);
   }
+}
+
+SPIRVID
+SPIRVProducerPassImpl::getCooperativeMatrixType(TargetExtType *CoopMatTy) {
+  // Cooperative matrix type generation and instruction emission.
+  auto it = CoopMatTypeMap.find(CoopMatTy);
+  if (it != CoopMatTypeMap.end()) {
+    return it->second;
+  }
+
+  // SPV_KHR_cooperative_matrix requires VulkanMemoryModel capability.
+  addCapability(spv::CapabilityCooperativeMatrixKHR);
+  addCapability(spv::CapabilityVulkanMemoryModel);
+
+  Type *ElemTy = CoopMatTy->getTypeParameter(0);
+  uint32_t Scope = CoopMatTy->getIntParameter(0);
+  uint32_t Rows = CoopMatTy->getIntParameter(1);
+  uint32_t Cols = CoopMatTy->getIntParameter(2);
+  unsigned Use = CoopMatTy->getIntParameter(3);
+
+  const unsigned kUseAccumulator = 2;
+  SPIRVID ComponentType;
+  if (ElemTy->isIntegerTy() && ElemTy->getIntegerBitWidth() == 32) {
+    // For 32bit integers, we must ensure the Accumulator is SIGNED
+    // to satisfy Vulkan hardware requirements (SINT32).
+    bool forceSigned = (Use == kUseAccumulator);
+    uint32_t signedness = forceSigned ? 1u : 0u;
+
+    uint32_t cacheKey = (32 << 1) | signedness;
+    auto typeIt = CoopMatSignedIntTypes.find(cacheKey);
+
+    if (typeIt != CoopMatSignedIntTypes.end()) {
+      ComponentType = typeIt->second;
+    } else {
+      SPIRVOperandVec IntOps;
+      IntOps << 32u << signedness;
+      ComponentType = addSPIRVInst<kTypes>(spv::OpTypeInt, IntOps);
+      CoopMatSignedIntTypes[cacheKey] = ComponentType;
+    }
+  } else {
+    // Fallback for non 32bit integers or floating point types
+    ComponentType = getSPIRVType(ElemTy);
+  }
+
+  SPIRVID ScopeID = getSPIRVInt32Constant(Scope);
+  SPIRVID RowsID = getSPIRVInt32Constant(Rows);
+  SPIRVID ColsID = getSPIRVInt32Constant(Cols);
+  SPIRVID UseID = getSPIRVInt32Constant(Use);
+  SPIRVOperandVec Ops;
+  Ops << ComponentType << ScopeID << RowsID << ColsID << UseID;
+  SPIRVID RID = addSPIRVInst<kTypes>(spv::OpTypeCooperativeMatrixKHR, Ops);
+  CoopMatTypeMap[CoopMatTy] = RID;
+  return RID;
+}
+
+SPIRVID
+SPIRVProducerPassImpl::GenerateCooperativeMatrixInstruction(
+    CallInst *Call, const FunctionInfo &FuncInfo) {
+  switch (FuncInfo.getType()) {
+  case Builtins::kCoopMatLoad:
+    return GenerateCoopMatLoad(Call);
+  case Builtins::kCoopMatStore:
+    return GenerateCoopMatStore(Call);
+  case Builtins::kCoopMatMulAdd:
+    return GenerateCoopMatMulAdd(Call);
+  case Builtins::kCoopMatBinaryAdd:
+    return GenerateCoopMatBinaryOp(Call, Builtins::kCoopMatBinaryAdd);
+  case Builtins::kCoopMatBinarySub:
+    return GenerateCoopMatBinaryOp(Call, Builtins::kCoopMatBinarySub);
+  case Builtins::kCoopMatBinaryMul:
+    return GenerateCoopMatBinaryOp(Call, Builtins::kCoopMatBinaryMul);
+  case Builtins::kCoopMatBinaryDiv:
+    return GenerateCoopMatBinaryOp(Call, Builtins::kCoopMatBinaryDiv);
+  case Builtins::kCoopMatScalarMul:
+    return GenerateCoopMatScalarMul(Call);
+  case Builtins::kCoopMatInit:
+    return GenerateCoopMatInit(Call);
+  case Builtins::kCoopMatScalarNeg:
+    return GenerateCoopMatUnaryNeg(Call);
+  case Builtins::kCoopMatLength:
+    return GenerateCoopMatLength(Call);
+  default: {
+    llvm_unreachable("Unknown cooperative matrix operation");
+    break;
+  }
+  }
+  return SPIRVID();
+}
+
+SPIRVID SPIRVProducerPassImpl::GetCoopMatPointerOperand(Value *Ptr) {
+  const spv::StorageClass sc = GetStorageClass(GetPointerAddressSpace(Ptr));
+
+  switch (sc) {
+  case spv::StorageClassStorageBuffer:
+  case spv::StorageClassPhysicalStorageBuffer:
+  case spv::StorageClassWorkgroup:
+  case spv::StorageClassCrossWorkgroup:
+    break;
+  default:
+    llvm_unreachable("cooperative matrix load/store requires a StorageBuffer, "
+                     "PhysicalStorageBuffer, Workgroup or CrossWorkgroup "
+                     "pointer");
+  }
+  return getSPIRVValue(Ptr);
+}
+
+void SPIRVProducerPassImpl::AppendCoopMatMemoryOperand(SPIRVOperandVec &Ops,
+                                                       Value *Ptr, Type *CoopTy,
+                                                       bool IsStore) {
+  const spv::StorageClass sc = GetStorageClass(GetPointerAddressSpace(Ptr));
+
+  if (sc == spv::StorageClassWorkgroup) {
+    Ops << static_cast<uint32_t>(
+               spv::MemoryAccessNonPrivatePointerMask |
+               (IsStore ? spv::MemoryAccessMakePointerAvailableMask
+                        : spv::MemoryAccessMakePointerVisibleMask))
+        << getSPIRVInt32Constant(spv::ScopeWorkgroup);
+    return;
+  }
+
+  if (sc == spv::StorageClassStorageBuffer ||
+      sc == spv::StorageClassPhysicalStorageBuffer ||
+      sc == spv::StorageClassCrossWorkgroup) {
+    Type *Component = cast<TargetExtType>(CoopTy)->getTypeParameter(0);
+    const DataLayout &DL = module->getDataLayout();
+    uint64_t align = DL.getABITypeAlign(Component).value();
+    align = std::max<uint64_t>(align, Ptr->getPointerAlignment(DL).value());
+
+    Ops << static_cast<uint32_t>(spv::MemoryAccessNonPrivatePointerMask |
+                                 spv::MemoryAccessAlignedMask)
+        << static_cast<uint32_t>(align);
+    return;
+  }
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatLoad(CallInst *Call) {
+  // OpCooperativeMatrixLoadKHR: (ResultType, Pointer, Layout, Stride,
+  // MemoryAccess)
+  Value *Ptr = Call->getArgOperand(0);
+  Type *CoopTy = Call->getType();
+
+  SPIRVOperandVec Ops;
+  Ops << getSPIRVType(CoopTy)          // Result Type
+      << GetCoopMatPointerOperand(Ptr) // Pointer
+      << Call->getArgOperand(1)        // Memory Layout <id>
+      << Call->getArgOperand(2);       // Stride <id>, in ELEMENTS
+
+  AppendCoopMatMemoryOperand(Ops, Ptr, CoopTy, /*IsStore=*/false);
+  return addSPIRVInst(spv::OpCooperativeMatrixLoadKHR, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatStore(CallInst *Call) {
+  // coop_mat_store(ptr, obj, layout, stride) -> OpCooperativeMatrixStoreKHR
+  Value *Ptr = Call->getArgOperand(0);
+  Value *Obj = Call->getArgOperand(1);
+
+  SPIRVOperandVec Ops;
+  Ops << GetCoopMatPointerOperand(Ptr) // Pointer
+      << Obj                           // Object (the matrix)
+      << Call->getArgOperand(2)        // Memory Layout <id>
+      << Call->getArgOperand(3);       // Stride <id>, in ELEMENTS
+
+  AppendCoopMatMemoryOperand(Ops, Ptr, Obj->getType(), /*IsStore=*/true);
+  return addSPIRVInst(spv::OpCooperativeMatrixStoreKHR, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatMulAdd(CallInst *Call) {
+  // coop_mat_mulAdd(a, b, c, is_signed) -> OpCooperativeMatrixMulAddKHR
+  auto *RetTy = dyn_cast<TargetExtType>(Call->getType());
+  if (!RetTy || !IsCooperativeMatrixType(RetTy)) {
+    Call->print(errs());
+    llvm_unreachable("coop_mat_mulAdd must return cooperative matrix type");
+  }
+  SPIRVID ResultType = getSPIRVType(RetTy);
+  Value *MatA = Call->getArgOperand(0);
+  Value *MatB = Call->getArgOperand(1);
+  Value *MatC = Call->getArgOperand(2);
+  SPIRVOperandVec Ops;
+  Ops << ResultType << MatA << MatB << MatC;
+
+  // Helper to check if a Value's type is an integer cooperative matrix
+  auto isIntMat = [&](Value *V) {
+    auto *T = dyn_cast<TargetExtType>(V->getType());
+    return T && T->getTypeParameter(0)->isIntegerTy();
+  };
+  auto *SignedFlag = dyn_cast<ConstantInt>(Call->getArgOperand(3));
+  const bool DataSigned = SignedFlag && SignedFlag->isOne();
+
+  uint32_t operands = 0;
+  if (DataSigned) {
+    if (isIntMat(MatA))
+      operands |= spv::CooperativeMatrixOperandsMatrixASignedComponentsKHRMask;
+    if (isIntMat(MatB))
+      operands |= spv::CooperativeMatrixOperandsMatrixBSignedComponentsKHRMask;
+  }
+  if (isIntMat(MatC))
+    operands |= spv::CooperativeMatrixOperandsMatrixCSignedComponentsKHRMask;
+
+  // Use RetTy directly since we already know it's a TargetExtType
+  if (RetTy->getTypeParameter(0)->isIntegerTy()) {
+    operands |=
+        spv::CooperativeMatrixOperandsMatrixResultSignedComponentsKHRMask;
+  }
+
+  if (operands != 0)
+    Ops << operands;
+  return addSPIRVInst(spv::OpCooperativeMatrixMulAddKHR, Ops);
+}
+
+SPIRVID
+SPIRVProducerPassImpl::GenerateCoopMatBinaryOp(CallInst *Call,
+                                               Builtins::BuiltinType OpType) {
+  // coop_mat_binary_add/sub/mul/div(A, B, is_signed) -> OpIAdd/OpFAdd/etc.
+  auto *RetTy = dyn_cast<TargetExtType>(Call->getType());
+  if (!RetTy || !IsCooperativeMatrixType(RetTy)) {
+    Call->print(errs());
+    llvm_unreachable("coop_mat_binary_* must return cooperative matrix type");
+  }
+  SPIRVID ResultType = getSPIRVType(RetTy);
+  Value *MatA = Call->getArgOperand(0);
+  Value *MatB = Call->getArgOperand(1);
+  Value *IsSigned = Call->getArgOperand(2);
+  llvm::Type *ElemTy = RetTy->getTypeParameter(0);
+  bool IsFloat = ElemTy->isFloatingPointTy();
+  bool Signed = false;
+  if (auto *CI = dyn_cast<ConstantInt>(IsSigned))
+    Signed = CI->getZExtValue() != 0;
+  spv::Op Opcode;
+  switch (OpType) {
+  case Builtins::kCoopMatBinaryAdd:
+    Opcode = IsFloat ? spv::OpFAdd : spv::OpIAdd;
+    break;
+  case Builtins::kCoopMatBinarySub:
+    Opcode = IsFloat ? spv::OpFSub : spv::OpISub;
+    break;
+  case Builtins::kCoopMatBinaryMul:
+    Opcode = IsFloat ? spv::OpFMul : spv::OpIMul;
+    break;
+  case Builtins::kCoopMatBinaryDiv:
+    Opcode = IsFloat ? spv::OpFDiv : (Signed ? spv::OpSDiv : spv::OpUDiv);
+    break;
+  default:
+    llvm_unreachable("Invalid binary operation type");
+  }
+  SPIRVOperandVec Ops;
+  Ops << ResultType << MatA << MatB;
+  return addSPIRVInst(Opcode, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatScalarMul(CallInst *Call) {
+  // coop_mat_scalar_mul(matrix, scalar, is_signed) -> OpIMul/OpFMul
+  auto *RetTy = dyn_cast<TargetExtType>(Call->getType());
+  SPIRVID ResultType = getSPIRVType(RetTy);
+  Value *Matrix = Call->getArgOperand(0);
+  Value *Scalar = Call->getArgOperand(1);
+  llvm::Type *ElemTy = RetTy->getTypeParameter(0);
+  bool IsFloat = ElemTy->isFloatingPointTy();
+  SPIRVOperandVec ConstructOps;
+  ConstructOps << ResultType << Scalar;
+  SPIRVID ScalarMatrix = addSPIRVInst(spv::OpCompositeConstruct, ConstructOps);
+  SPIRVOperandVec MulOps;
+  MulOps << ResultType << Matrix << ScalarMatrix;
+  return addSPIRVInst(IsFloat ? spv::OpFMul : spv::OpIMul, MulOps);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatUnaryNeg(CallInst *Call) {
+  // coop_mat_scalar_neg(matrix, is_signed) -> OpSNegate/OpFNegate
+  auto *RetTy = dyn_cast<TargetExtType>(Call->getType());
+  SPIRVID ResultType = getSPIRVType(RetTy);
+  Value *Matrix = Call->getArgOperand(0);
+  llvm::Type *ElemTy = RetTy->getTypeParameter(0);
+  bool IsFloat = ElemTy->isFloatingPointTy();
+  SPIRVOperandVec Ops;
+  Ops << ResultType << Matrix;
+  return addSPIRVInst(IsFloat ? spv::OpFNegate : spv::OpSNegate, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatInit(CallInst *Call) {
+  // coop_mat_init(scalar) -> OpConstantComposite / OpConstantNull /
+  // OpCompositeConstruct
+  SPIRVOperandVec Ops;
+  Ops << getSPIRVType(Call->getType());
+
+  if (auto *C = dyn_cast<Constant>(Call->getArgOperand(0))) {
+    if (C->isNullValue())
+      return addSPIRVInst<kConstants>(spv::OpConstantNull, Ops);
+    Ops << Call->getArgOperand(0);
+    return addSPIRVInst<kConstants>(spv::OpConstantComposite, Ops);
+  }
+
+  Ops << Call->getArgOperand(0);
+  return addSPIRVInst(spv::OpCompositeConstruct, Ops);
+}
+
+SPIRVID SPIRVProducerPassImpl::GenerateCoopMatLength(CallInst *Call) {
+  // coop_mat_length(matrix) -> OpCooperativeMatrixLengthKHR, Returns Rows *
+  // Cols
+  SPIRVID ResultType = getSPIRVType(Call->getType());
+  Value *Matrix = Call->getArgOperand(0);
+  auto *RetTy = dyn_cast<TargetExtType>(Matrix->getType());
+  if (!RetTy) {
+    Call->print(errs());
+    llvm_unreachable(
+        "coop_mat_length argument must be cooperative matrix type");
+  }
+  SPIRVID CoopMatTypeID = getCooperativeMatrixType(RetTy);
+  SPIRVOperandVec Ops;
+  Ops << ResultType << CoopMatTypeID;
+  return addSPIRVInst(spv::OpCooperativeMatrixLengthKHR, Ops);
 }
