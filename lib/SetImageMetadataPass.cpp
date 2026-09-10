@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/IR/Argument.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
@@ -37,6 +38,10 @@ using ImageMdMap = std::map<std::pair<unsigned, unsigned>, std::set<Value *>>;
 using MetadataVector = SmallVector<Metadata *, 3>;
 
 unsigned getOrdinal(Value *Val) {
+  Val = Val->stripPointerCasts();
+  if (auto *Arg = dyn_cast<Argument>(Val)) {
+    return Arg->getArgNo();
+  }
   auto *call = dyn_cast<CallInst>(Val);
   assert(call != nullptr);
   assert(clspv::Builtins::Lookup(call->getCalledFunction()).getType() ==
