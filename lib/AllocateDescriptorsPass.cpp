@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -52,6 +53,44 @@ const uint32_t kMemorySemanticsUniformMemory = 0x40;
 // Constant that represents bitfield for ImageMemory Memory Semantics from
 // SPIR-V. Used to test barrier semantics.
 const uint32_t kMemorySemanticsImageMemory = 0x800;
+
+bool IsImageMetadataQuery(const CallInst *Call) {
+  if (auto *Callee = Call->getCalledFunction()) {
+    auto builtin_type = clspv::Builtins::Lookup(Callee).getType();
+    return builtin_type == clspv::Builtins::kGetImageChannelOrder ||
+           builtin_type == clspv::Builtins::kGetImageChannelDataType;
+  }
+  return false;
+}
+
+bool HasOnlyImageMetadataQueries(const Argument &Arg) {
+  if (Arg.use_empty()) {
+    return false;
+  }
+  SmallVector<const Value *, 4> WorkList;
+  SmallPtrSet<const Value *, 4> Visited;
+  WorkList.push_back(&Arg);
+  Visited.insert(&Arg);
+
+  while (!WorkList.empty()) {
+    const Value *V = WorkList.pop_back_val();
+    for (const auto *User : V->users()) {
+      if (const auto *Call = dyn_cast<CallInst>(User)) {
+        if (IsImageMetadataQuery(Call)) {
+          continue;
+        }
+      }
+      if (isa<BitCastInst>(User) || isa<AddrSpaceCastInst>(User)) {
+        if (Visited.insert(User).second) {
+          WorkList.push_back(User);
+        }
+        continue;
+      }
+      return false;
+    }
+  }
+  return true;
+}
 
 } // namespace
 
@@ -296,10 +335,13 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       // First assume no descriptor is required.
       discriminants_list.push_back(DiscriminantInfo{-1, key});
 
-      // Pointer-to-local arguments don't become resource variables.
-      if (arg_kind == clspv::ArgKind::Local) {
+      // Pointer-to-local arguments and image arguments only used for metadata
+      // queries don't become resource variables.
+      if (arg_kind == clspv::ArgKind::Local ||
+          (clspv::IsImageType(inferred_ty) &&
+           HasOnlyImageMetadataQueries(Arg))) {
         if (ShowDescriptors) {
-          errs() << "DBA: skip pointer-to-local\n\n";
+          errs() << "DBA: skip pointer-to-local or metadata-only image\n\n";
         }
       } else {
         int index;
