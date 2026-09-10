@@ -3892,6 +3892,11 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
   // %was_set        = OpIEqual %previous_value 1
   return replaceCallsWithValue(F, [](CallInst *Call) {
     auto flag_pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(flag_pointer)) {
+      flag_pointer = cast->getPointerOperand();
+    }
     const auto num_args = Call->arg_size();
     auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
     auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
@@ -3918,6 +3923,11 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
   //   OpAtomicStore %flag %scope %semantics 0
   return replaceCallsWithValue(F, [](CallInst *Call) {
     auto flag_pointer = Call->getArgOperand(0);
+    // Clang emits an address space cast to the generic address space. Skip the
+    // cast and use the input directly.
+    if (auto cast = dyn_cast<AddrSpaceCastOperator>(flag_pointer)) {
+      flag_pointer = cast->getPointerOperand();
+    }
     const auto num_args = Call->arg_size();
     auto order_arg = num_args > 1 ? Call->getArgOperand(1) : nullptr;
     auto scope_arg = num_args > 2 ? Call->getArgOperand(2) : nullptr;
