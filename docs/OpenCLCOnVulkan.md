@@ -858,7 +858,7 @@ constants as follows:
   Requires `CapabilityGroupNonUniformShuffle` capability.
 - `sub_group_shuffle_xor()` is mapped to `OpGroupNonUniformShuffleXor` operation.
   Requires `CapabilityGroupNonUniformShuffle` capability.
-- `sub_group_rotate()` is mapped to `OpGroupNonUniformRotateKHR` operation.
+- `sub_group_rotate()` and `sub_group_clustered_rotate()` are mapped to `OpGroupNonUniformRotateKHR` operation.
   Requires `CapabilityGroupNonUniformRotateKHR` capability and the
   `SPV_KHR_subgroup_rotate` extension.
 - `sub_group_<group_op>_add()` is mapped to `OpGroupNonUniformIAdd` operation
