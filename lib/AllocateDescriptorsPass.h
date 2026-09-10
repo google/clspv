@@ -63,7 +63,7 @@ private:
   // The compiler targets OpenCL 1.2, which only provides support for relaxed
   // atomics which means they cannot be used as synchronization primitives.
   // That is why the pass does not consider them for the addition of coherence.
-  bool CallTreeContainsGlobalBarrier(llvm::Function *F);
+  bool CallTreeContainsGlobalSynchronization(llvm::Function *F);
 
   // Returns a pair indicating if |V| is read and/or written to.
   // Traces the use chain looking for loads and stores and proceeding through

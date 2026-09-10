@@ -54,6 +54,8 @@ const uint32_t kMemorySemanticsUniformMemory = 0x40;
 // SPIR-V. Used to test barrier semantics.
 const uint32_t kMemorySemanticsImageMemory = 0x800;
 
+const uint32_t kMemorySemanticsNonRelaxed = 0x2 | 0x4 | 0x8 | 0x10;
+
 bool IsImageMetadataQuery(const CallInst *Call) {
   if (auto *Callee = Call->getCalledFunction()) {
     auto builtin_type = clspv::Builtins::Lookup(Callee).getType();
@@ -288,7 +290,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     }
     kernels_with_bodies.push_back(&F);
     auto &discriminants_list = discriminants_used_by_function[&F];
-    bool uses_barriers = CallTreeContainsGlobalBarrier(&F);
+    bool uses_barriers = CallTreeContainsGlobalSynchronization(&F);
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
@@ -899,7 +901,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   return Changed;
 }
 
-bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
+bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
     Function *F) {
   auto iter = barrier_map_.find(F);
   if (iter != barrier_map_.end()) {
@@ -933,15 +935,38 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
                   (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
                   (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
+          } else if (opcode == spv::OpAtomicIIncrement ||
+                     opcode == spv::OpAtomicIDecrement ||
+                     opcode == spv::OpAtomicCompareExchange ||
+                     opcode == spv::OpAtomicExchange ||
+                     opcode == spv::OpAtomicStore ||
+                     opcode == spv::OpAtomicIAdd ||
+                     opcode == spv::OpAtomicISub || opcode == spv::OpAtomicOr ||
+                     opcode == spv::OpAtomicXor || opcode == spv::OpAtomicAnd ||
+                     opcode == spv::OpAtomicSMin ||
+                     opcode == spv::OpAtomicSMax ||
+                     opcode == spv::OpAtomicUMin ||
+                     opcode == spv::OpAtomicUMax) {
+            if (auto* semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
+              uses_barrier =
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
+              uses_barrier &=
+                  (semantics->getZExtValue() & kMemorySemanticsNonRelaxed) != 0;
+            }
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
           // Continue searching in the subfunction.
           uses_barrier =
-              CallTreeContainsGlobalBarrier(call->getCalledFunction());
+              CallTreeContainsGlobalSynchronization(call->getCalledFunction());
         }
 
         if (uses_barrier)
           break;
+      }
+
+      if (auto* atomicrmw = dyn_cast<AtomicRMWInst>(&I)) {
+        uses_barrier = isStrongerThan(atomicrmw->getOrdering(), AtomicOrdering::Monotonic);
       }
 
       if (uses_barrier)
