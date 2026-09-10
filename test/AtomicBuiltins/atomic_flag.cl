@@ -1,6 +1,9 @@
 // RUN: clspv %s --cl-std=CL3.0 --enable-feature-macros=__opencl_c_atomic_order_seq_cst,__opencl_c_atomic_scope_device -o %t.spv
 // RUN: spirv-val --target-env vulkan1.1 %t.spv
 // RUN: spirv-dis %t.spv | FileCheck %s
+// RUN: clspv %s --cl-std=CL2.0 -inline-entry-points -o %t.spv
+// RUN: spirv-val --target-env vulkan1.1 %t.spv
+// RUN: spirv-dis %t.spv | FileCheck %s
 
 // CHECK-DAG: OpEntryPoint GLCompute %[[flag_global:[a-zA-Z0-9_]+]] "flag_global"
 // CHECK-DAG: OpEntryPoint GLCompute %[[flag_local:[a-zA-Z0-9_]+]] "flag_local"
