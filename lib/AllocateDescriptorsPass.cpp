@@ -911,7 +911,10 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
   bool uses_barrier = false;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto *call = dyn_cast<CallInst>(&I)) {
+      if (auto *atomicrmw = dyn_cast<AtomicRMWInst>(&I)) {
+        uses_barrier =
+            isStrongerThan(atomicrmw->getOrdering(), AtomicOrdering::Monotonic);
+      } else if (auto *call = dyn_cast<CallInst>(&I)) {
         // For barrier and mem_fence semantics, only Uniform (covering Uniform
         // and StorageBuffer storage classes) and Image semantics are checked
         // because Workgroup variables are inherently coherent (and do not
@@ -935,7 +938,8 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
                   (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
                   (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
-          } else if (opcode == spv::OpAtomicIIncrement ||
+          } else if (opcode == spv::OpAtomicLoad ||
+                     opcode == spv::OpAtomicIIncrement ||
                      opcode == spv::OpAtomicIDecrement ||
                      opcode == spv::OpAtomicCompareExchange ||
                      opcode == spv::OpAtomicExchange ||
@@ -965,10 +969,6 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
           break;
       }
 
-      if (auto* atomicrmw = dyn_cast<AtomicRMWInst>(&I)) {
-        uses_barrier = isStrongerThan(atomicrmw->getOrdering(), AtomicOrdering::Monotonic);
-      }
-
       if (uses_barrier)
         break;
     }
@@ -990,7 +990,7 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
   // or write memory.
   auto IsInterestingUser = [](const User *user) {
     if (isa<StoreInst>(user) || isa<LoadInst>(user) || isa<CallInst>(user) ||
-        user->getType()->isPointerTy())
+        isa<AtomicRMWInst>(user) || user->getType()->isPointerTy())
       return true;
     return false;
   };
@@ -1014,6 +1014,9 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
     if (isa<LoadInst>(value)) {
       read = true;
     } else if (isa<StoreInst>(value)) {
+      write = true;
+    } else if (isa<AtomicRMWInst>(value)) {
+      read = true;
       write = true;
     } else {
       auto *call = dyn_cast<CallInst>(value);
