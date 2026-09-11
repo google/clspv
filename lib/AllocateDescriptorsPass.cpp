@@ -48,11 +48,18 @@ namespace {
 
 // Constant that represents bitfield for UniformMemory Memory Semantics from
 // SPIR-V. Used to test barrier semantics.
-const uint32_t kMemorySemanticsUniformMemory = 0x40;
+const uint32_t kMemorySemanticsUniformMemory =
+    spv::MemorySemanticsUniformMemoryMask;
 
 // Constant that represents bitfield for ImageMemory Memory Semantics from
 // SPIR-V. Used to test barrier semantics.
-const uint32_t kMemorySemanticsImageMemory = 0x800;
+const uint32_t kMemorySemanticsImageMemory =
+    spv::MemorySemanticsImageMemoryMask;
+
+const uint32_t kMemorySemanticsNonRelaxed =
+    spv::MemorySemanticsAcquireMask | spv::MemorySemanticsReleaseMask |
+    spv::MemorySemanticsAcquireReleaseMask |
+    spv::MemorySemanticsSequentiallyConsistentMask;
 
 bool IsImageMetadataQuery(const CallInst *Call) {
   if (auto *Callee = Call->getCalledFunction()) {
@@ -288,7 +295,7 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     }
     kernels_with_bodies.push_back(&F);
     auto &discriminants_list = discriminants_used_by_function[&F];
-    bool uses_barriers = CallTreeContainsGlobalBarrier(&F);
+    bool uses_barriers = CallTreeContainsGlobalSynchronization(&F);
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
@@ -899,7 +906,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
   return Changed;
 }
 
-bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
+bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
     Function *F) {
   auto iter = barrier_map_.find(F);
   if (iter != barrier_map_.end()) {
@@ -909,7 +916,12 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
   bool uses_barrier = false;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto *call = dyn_cast<CallInst>(&I)) {
+      if (auto *atomicrmw = dyn_cast<AtomicRMWInst>(&I)) {
+        uses_barrier =
+            atomicrmw->getPointerAddressSpace() ==
+                clspv::AddressSpace::Global &&
+            isStrongerThan(atomicrmw->getOrdering(), AtomicOrdering::Monotonic);
+      } else if (auto *call = dyn_cast<CallInst>(&I)) {
         // For barrier and mem_fence semantics, only Uniform (covering Uniform
         // and StorageBuffer storage classes) and Image semantics are checked
         // because Workgroup variables are inherently coherent (and do not
@@ -933,11 +945,31 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalBarrier(
                   (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
                   (semantics->getZExtValue() & kMemorySemanticsImageMemory);
             }
+          } else if (opcode == spv::OpAtomicLoad ||
+                     opcode == spv::OpAtomicIIncrement ||
+                     opcode == spv::OpAtomicIDecrement ||
+                     opcode == spv::OpAtomicCompareExchange ||
+                     opcode == spv::OpAtomicExchange ||
+                     opcode == spv::OpAtomicStore ||
+                     opcode == spv::OpAtomicIAdd ||
+                     opcode == spv::OpAtomicISub || opcode == spv::OpAtomicOr ||
+                     opcode == spv::OpAtomicXor || opcode == spv::OpAtomicAnd ||
+                     opcode == spv::OpAtomicSMin ||
+                     opcode == spv::OpAtomicSMax ||
+                     opcode == spv::OpAtomicUMin ||
+                     opcode == spv::OpAtomicUMax) {
+            if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
+              uses_barrier =
+                  (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
+                  (semantics->getZExtValue() & kMemorySemanticsImageMemory);
+              uses_barrier &=
+                  (semantics->getZExtValue() & kMemorySemanticsNonRelaxed) != 0;
+            }
           }
         } else if (!call->getCalledFunction()->isDeclaration()) {
           // Continue searching in the subfunction.
           uses_barrier =
-              CallTreeContainsGlobalBarrier(call->getCalledFunction());
+              CallTreeContainsGlobalSynchronization(call->getCalledFunction());
         }
 
         if (uses_barrier)
@@ -965,7 +997,7 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
   // or write memory.
   auto IsInterestingUser = [](const User *user) {
     if (isa<StoreInst>(user) || isa<LoadInst>(user) || isa<CallInst>(user) ||
-        user->getType()->isPointerTy())
+        isa<AtomicRMWInst>(user) || user->getType()->isPointerTy())
       return true;
     return false;
   };
@@ -989,6 +1021,9 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
     if (isa<LoadInst>(value)) {
       read = true;
     } else if (isa<StoreInst>(value)) {
+      write = true;
+    } else if (isa<AtomicRMWInst>(value)) {
+      read = true;
       write = true;
     } else {
       auto *call = dyn_cast<CallInst>(value);

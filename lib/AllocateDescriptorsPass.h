@@ -56,14 +56,13 @@ private:
     return set;
   }
 
-  // Returns true if |F| or call function |F| calls contains a global barrier.
-  // Specifically, it checks that the memory semantics operand contains
-  // UniformMemory memory semantics.
+  // Returns true if |F| or call function |F| calls contains a global
+  // synchronization primitive. Specifically, it checks that the memory
+  // semantics operand contains UniformMemory memory semantics.
   //
-  // The compiler targets OpenCL 1.2, which only provides support for relaxed
-  // atomics which means they cannot be used as synchronization primitives.
-  // That is why the pass does not consider them for the addition of coherence.
-  bool CallTreeContainsGlobalBarrier(llvm::Function *F);
+  // The compiler targets OpenCL 1.2+, which provides support for ordered
+  // atomics, barriers and fences.
+  bool CallTreeContainsGlobalSynchronization(llvm::Function *F);
 
   // Returns a pair indicating if |V| is read and/or written to.
   // Traces the use chain looking for loads and stores and proceeding through
