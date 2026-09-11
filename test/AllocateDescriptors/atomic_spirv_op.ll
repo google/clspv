@@ -1,15 +1,15 @@
 ; RUN: clspv-opt %s -o %t.ll --passes=allocate-descriptors
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.3(i32 0, i32 3, i32 0, i32 3, i32 3, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.4(i32 0, i32 4, i32 0, i32 4, i32 4, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.5(i32 0, i32 5, i32 0, i32 5, i32 5, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.6(i32 0, i32 6, i32 0, i32 6, i32 6, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.7(i32 0, i32 7, i32 0, i32 7, i32 7, i32 0, { [0 x i32] } zeroinitializer)
-; CHECK: call ptr addrspace(1) @_Z14clspv.resource.8(i32 0, i32 8, i32 0, i32 8, i32 8, i32 0, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.0(i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.1(i32 0, i32 1, i32 0, i32 1, i32 1, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.2(i32 0, i32 2, i32 0, i32 2, i32 2, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.3(i32 0, i32 3, i32 0, i32 3, i32 3, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.4(i32 0, i32 4, i32 0, i32 4, i32 4, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.5(i32 0, i32 5, i32 0, i32 5, i32 5, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.6(i32 0, i32 6, i32 0, i32 6, i32 6, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.7(i32 0, i32 7, i32 0, i32 7, i32 7, i32 1, { [0 x i32] } zeroinitializer)
+; CHECK: call ptr addrspace(1) @_Z14clspv.resource.8(i32 0, i32 8, i32 0, i32 8, i32 8, i32 1, { [0 x i32] } zeroinitializer)
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-vulkan"
