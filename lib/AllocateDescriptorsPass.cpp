@@ -48,13 +48,18 @@ namespace {
 
 // Constant that represents bitfield for UniformMemory Memory Semantics from
 // SPIR-V. Used to test barrier semantics.
-const uint32_t kMemorySemanticsUniformMemory = 0x40;
+const uint32_t kMemorySemanticsUniformMemory =
+    spv::MemorySemanticsUniformMemoryMask;
 
 // Constant that represents bitfield for ImageMemory Memory Semantics from
 // SPIR-V. Used to test barrier semantics.
-const uint32_t kMemorySemanticsImageMemory = 0x800;
+const uint32_t kMemorySemanticsImageMemory =
+    spv::MemorySemanticsImageMemoryMask;
 
-const uint32_t kMemorySemanticsNonRelaxed = 0x2 | 0x4 | 0x8 | 0x10;
+const uint32_t kMemorySemanticsNonRelaxed =
+    spv::MemorySemanticsAcquireMask | spv::MemorySemanticsReleaseMask |
+    spv::MemorySemanticsAcquireReleaseMask |
+    spv::MemorySemanticsSequentiallyConsistentMask;
 
 bool IsImageMetadataQuery(const CallInst *Call) {
   if (auto *Callee = Call->getCalledFunction()) {
