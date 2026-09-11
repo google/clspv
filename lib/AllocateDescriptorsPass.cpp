@@ -918,6 +918,8 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
     for (auto &I : BB) {
       if (auto *atomicrmw = dyn_cast<AtomicRMWInst>(&I)) {
         uses_barrier =
+            atomicrmw->getPointerAddressSpace() ==
+                clspv::AddressSpace::Global &&
             isStrongerThan(atomicrmw->getOrdering(), AtomicOrdering::Monotonic);
       } else if (auto *call = dyn_cast<CallInst>(&I)) {
         // For barrier and mem_fence semantics, only Uniform (covering Uniform
