@@ -171,6 +171,11 @@ llvm::cl::opt<bool> hack_convert_to_float(
     llvm::cl::desc("Insert a dummy instruction after conversions to float to "
                    "avoid driver optimization getting rid of the conversion"));
 
+llvm::cl::opt<bool> hack_atomic_flag_barrier(
+    "hack-atomic-flag-barrier", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Emit OpMemoryBarrier for non-relaxed atomic_flag builtins"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -550,6 +555,7 @@ bool HackMulExtended() { return hack_mul_extended; }
 bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
 bool HackConvertToFloat() { return hack_convert_to_float; }
 bool HackImage1dBufferBGRA() { return hack_image1d_buffer_bgra; }
+bool HackAtomicFlagBarrier() { return hack_atomic_flag_barrier; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }
