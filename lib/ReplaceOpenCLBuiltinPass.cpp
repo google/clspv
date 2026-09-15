@@ -3884,6 +3884,42 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
   });
 }
 
+namespace {
+bool OrderHasAcquire(Value *order_arg) {
+  if (order_arg == nullptr) {
+    return true;
+  }
+  if (auto const_order = dyn_cast<ConstantInt>(order_arg)) {
+    auto order_val =
+        static_cast<AtomicMemoryOrder>(const_order->getZExtValue());
+    return order_val == AtomicMemoryOrder::kMemoryOrderAcquire ||
+           order_val == AtomicMemoryOrder::kMemoryOrderAcqRel ||
+           order_val == AtomicMemoryOrder::kMemoryOrderSeqCst;
+  }
+  return true;
+}
+
+bool OrderHasRelease(Value *order_arg) {
+  if (order_arg == nullptr) {
+    return true;
+  }
+  if (auto const_order = dyn_cast<ConstantInt>(order_arg)) {
+    auto order_val =
+        static_cast<AtomicMemoryOrder>(const_order->getZExtValue());
+    return order_val == AtomicMemoryOrder::kMemoryOrderRelease ||
+           order_val == AtomicMemoryOrder::kMemoryOrderAcqRel ||
+           order_val == AtomicMemoryOrder::kMemoryOrderSeqCst;
+  }
+  return true;
+}
+
+void InsertMemoryBarrier(CallInst *Call, Value *scope, Value *semantics) {
+  Type *void_ty = Type::getVoidTy(Call->getContext());
+  InsertSPIRVOp(Call, spv::OpMemoryBarrier, {Attribute::Convergent}, void_ty,
+                {scope, semantics});
+}
+} // namespace
+
 bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
   // convert
   // %was_set        = OpAtomicFlagTestAndSet %bool %flag %scope %semantics
@@ -3908,10 +3944,26 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
 
     auto scope = MemoryScope(scope_arg, is_global, Call);
     IRBuilder<> builder(Call);
+    uint32_t storage = is_global ? spv::MemorySemanticsUniformMemoryMask
+                                 : spv::MemorySemanticsWorkgroupMemoryMask;
+
+    if (clspv::Option::HackAtomicFlagBarrier() && OrderHasRelease(order_arg)) {
+      auto release_semantics =
+          builder.getInt32(spv::MemorySemanticsReleaseMask | storage);
+      InsertMemoryBarrier(Call, scope, release_semantics);
+    }
+
     auto set_value = builder.getInt32(1);
     auto previous_value =
         InsertSPIRVOp(Call, spv::OpAtomicExchange, {}, set_value->getType(),
                       {flag_pointer, scope, semantics, set_value});
+
+    if (clspv::Option::HackAtomicFlagBarrier() && OrderHasAcquire(order_arg)) {
+      auto acquire_semantics =
+          builder.getInt32(spv::MemorySemanticsAcquireMask | storage);
+      InsertMemoryBarrier(Call, scope, acquire_semantics);
+    }
+
     return builder.CreateICmpEQ(previous_value, set_value);
   });
 }
@@ -3941,6 +3993,14 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
     auto scope = MemoryScope(scope_arg, is_global, Call);
 
     IRBuilder<> builder(Call);
+    if (clspv::Option::HackAtomicFlagBarrier() && OrderHasRelease(order_arg)) {
+      uint32_t storage = is_global ? spv::MemorySemanticsUniformMemoryMask
+                                   : spv::MemorySemanticsWorkgroupMemoryMask;
+      auto release_semantics =
+          builder.getInt32(spv::MemorySemanticsReleaseMask | storage);
+      InsertMemoryBarrier(Call, scope, release_semantics);
+    }
+
     auto clear_value = builder.getInt32(0);
     return InsertSPIRVOp(Call, spv::OpAtomicStore, {}, builder.getVoidTy(),
                          {flag_pointer, scope, semantics, clear_value});

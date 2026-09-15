@@ -94,6 +94,10 @@ bool HackConvertToFloat();
 // requires components to be shuffled to match OpenCL specification.
 bool HackImage1dBufferBGRA();
 
+// Returns true if OpMemoryBarrier should be emitted for non-relaxed atomic_flag
+// builtins. Works around driver bugs.
+bool HackAtomicFlagBarrier();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
