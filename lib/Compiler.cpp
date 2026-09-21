@@ -650,7 +650,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
     pm.addPass(clspv::UndoSRetPass());
 
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(
-        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic, false)));
 
     // We need to run mem2reg and inst combine early because some of our passes
     // (e.g. ThreeElementVectorLowering and InlineFuncWithBitCastArgsPass)
@@ -740,7 +740,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
     pm.addPass(clspv::DestructurizeGEPPass());
 
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(
-        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic)));
+        llvm::InferAddressSpacesPass(clspv::AddressSpace::Generic, false)));
     pm.addPass(clspv::StructurizeGEPPass());
   });
 

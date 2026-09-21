@@ -22,6 +22,7 @@
 #include "Builtins.h"
 #include "OpenCLInlinerPass.h"
 
+#include <list>
 #include <unordered_set>
 
 using namespace llvm;
