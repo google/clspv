@@ -1,4 +1,4 @@
-// RUN: clspv %target %s -o %t.spv -vec3-to-vec4
+// RUN: clspv %target %s -o %t.spv -vec3-to-vec4 --use-native-builtins=mix
 // RUN: spirv-dis %t.spv -o %t.spvasm
 // RUN: FileCheck %s < %t.spvasm
 // RUN: spirv-val --target-env vulkan1.0 %t.spv

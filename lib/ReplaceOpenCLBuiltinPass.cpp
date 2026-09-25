@@ -146,6 +146,7 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kAtomicXor,
      Builtins::kCross,
      Builtins::kFract,
+     Builtins::kMix,
      Builtins::kMadHi,
      Builtins::kMulHi,
      Builtins::kMadSat,
@@ -724,6 +725,13 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     }
     break;
   }
+
+  case Builtins::kMix:
+    if (clspv::Option::UseNativeBuiltins().count(Builtins::kMix) == 0 &&
+        !clspv::Option::NativeMath()) {
+      return replaceMix(F);
+    }
+    break;
 
   case Builtins::kSignbit:
     return replaceSignbit(F, FI.getParameter(0).vector_size != 0);
@@ -4279,6 +4287,24 @@ bool ReplaceOpenCLBuiltinPass::replaceFDim(Function &F) {
     auto cmp = builder.CreateFCmpUGT(x, y);
     return builder.CreateSelect(cmp, sub,
                                 Constant::getNullValue(Call->getType()));
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceMix(Function &F) {
+  return replaceCallsWithValue(F, [](CallInst *Call) {
+    const auto x = Call->getArgOperand(0);
+    const auto y = Call->getArgOperand(1);
+    auto a = Call->getArgOperand(2);
+    IRBuilder<> builder(Call);
+    if (auto vec_ty = dyn_cast<VectorType>(x->getType())) {
+      if (a->getType()->isFloatingPointTy()) {
+        a = builder.CreateVectorSplat(
+            vec_ty->getElementCount().getKnownMinValue(), a, "arg_splat");
+      }
+    }
+    auto diff = builder.CreateFSub(y, x);
+    auto prod = builder.CreateFMul(diff, a);
+    return builder.CreateFAdd(x, prod);
   });
 }
 
