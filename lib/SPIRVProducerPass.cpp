@@ -5843,7 +5843,13 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         if (I.getOpcode() == Instruction::IntToPtr ||
             I.getOpcode() == Instruction::AddrSpaceCast) {
           Ty = clspv::InferType(&I, module->getContext(), &InferredTypeCache);
-          assert(Ty);
+          // If the type cannot be inferred (e.g. when the pointer is only
+          // passed to an undefined function declaration), fall back to a
+          // default type. Any call to an undefined function will be caught and
+          // reported later in HandleDeferredInstruction().
+          if (!Ty) {
+            Ty = Type::getInt32Ty(module->getContext());
+          }
           Ops << getSPIRVPointerType(I.getType(), Ty);
         } else {
           Ty = I.getType();
