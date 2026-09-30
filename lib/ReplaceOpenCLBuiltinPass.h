@@ -62,6 +62,7 @@ private:
   bool replaceSignbit(llvm::Function &F, bool is_vec);
   bool replaceMul(llvm::Function &F, bool is_float, bool is_mad);
   bool replaceMix(llvm::Function &F);
+  bool replaceSign(llvm::Function &F);
   llvm::Value *createVloadHalf(llvm::Module &M, llvm::CallInst *CI,
                                llvm::Value *index, llvm::Value *ptr);
   bool replaceVloadHalf(llvm::Function &F, const std::string &name,
