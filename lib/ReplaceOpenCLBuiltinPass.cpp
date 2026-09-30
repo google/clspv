@@ -163,6 +163,7 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kVstoreHalf,
      Builtins::kSmoothstep,
      Builtins::kStep,
+     Builtins::kSign,
      Builtins::kSignbit,
      Builtins::kSubSat,
      Builtins::kReadImageh,
@@ -730,6 +731,13 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     if (clspv::Option::UseNativeBuiltins().count(Builtins::kMix) == 0 &&
         !clspv::Option::NativeMath()) {
       return replaceMix(F);
+    }
+    break;
+
+  case Builtins::kSign:
+    if (clspv::Option::UseNativeBuiltins().count(Builtins::kSign) == 0 &&
+        !clspv::Option::NativeMath()) {
+      return replaceSign(F);
     }
     break;
 
@@ -4305,6 +4313,31 @@ bool ReplaceOpenCLBuiltinPass::replaceMix(Function &F) {
     auto diff = builder.CreateFSub(y, x);
     auto prod = builder.CreateFMul(diff, a);
     return builder.CreateFAdd(x, prod);
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceSign(Function &F) {
+  return replaceCallsWithValue(F, [&](CallInst *Call) {
+    const auto x = Call->getArgOperand(0);
+    auto ty = Call->getType();
+    auto int_ty = getIntOrIntVectorTyForCast(F.getContext(), ty);
+    auto zero = Constant::getNullValue(ty);
+    auto one = ConstantFP::get(ty, 1.0);
+    auto minus_one = ConstantFP::get(ty, -1.0);
+    auto sign_mask_val = APInt::getSignMask(ty->getScalarSizeInBits());
+    auto sign_mask = ConstantInt::get(int_ty, sign_mask_val);
+
+    IRBuilder<> builder(Call);
+    auto x_int = builder.CreateBitCast(x, int_ty);
+    auto x_sign = builder.CreateAnd(x_int, sign_mask);
+    auto copysign_zero = builder.CreateBitCast(x_sign, ty);
+    auto is_gt = builder.CreateFCmpOGT(x, zero);
+    auto is_lt = builder.CreateFCmpOLT(x, zero);
+    auto is_eq = builder.CreateFCmpOEQ(x, zero);
+    auto res = builder.CreateSelect(is_eq, copysign_zero, zero);
+    res = builder.CreateSelect(is_lt, minus_one, res);
+    res = builder.CreateSelect(is_gt, one, res);
+    return res;
   });
 }
 
