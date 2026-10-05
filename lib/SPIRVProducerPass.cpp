@@ -6809,14 +6809,22 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     // Align MemoryOperand helps load vectorization and is required for
     // PhysicalStorageBuffer
-    uint32_t memory_access = spv::MemoryAccessAlignedMask;
-    if (LD->isVolatile()) {
-      memory_access |= spv::MemoryAccessVolatileMask;
+    if (clspv::Option::HackPSBVolatileAsAtomic() && LD->isVolatile() &&
+        LD->getType()->isIntegerTy(32) &&
+        GetStorageClass(LD->getPointerAddressSpace()) ==
+            spv::StorageClassPhysicalStorageBuffer) {
+      Ops << getSPIRVInt32Constant(spv::ScopeDevice)
+          << getSPIRVInt32Constant(spv::MemorySemanticsMaskNone);
+      RID = addSPIRVInst(spv::OpAtomicLoad, Ops);
+    } else {
+      uint32_t memory_access = spv::MemoryAccessAlignedMask;
+      if (LD->isVolatile()) {
+        memory_access |= spv::MemoryAccessVolatileMask;
+      }
+      Ops << memory_access;
+      Ops << static_cast<uint32_t>(LD->getAlign().value());
+      RID = addSPIRVInst(spv::OpLoad, Ops);
     }
-    Ops << memory_access;
-    Ops << static_cast<uint32_t>(LD->getAlign().value());
-
-    RID = addSPIRVInst(spv::OpLoad, Ops);
 
     auto no_layout_id = getSPIRVType(LD->getType());
     if (no_layout_id.get() != result_type_id.get()) {
@@ -6852,22 +6860,32 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     //
     // TODO: Do we need to implement Optional Memory Access???
     Ops << getSPIRVPointerOperand(ptr, value_ty);
-    if (RID.isValid()) {
-      Ops << RID;
+    if (clspv::Option::HackPSBVolatileAsAtomic() && ST->isVolatile() &&
+        value_ty->isIntegerTy(32) &&
+        GetStorageClass(ST->getPointerAddressSpace()) ==
+            spv::StorageClassPhysicalStorageBuffer) {
+      Ops << getSPIRVInt32Constant(spv::ScopeDevice)
+          << getSPIRVInt32Constant(spv::MemorySemanticsMaskNone)
+          << ST->getValueOperand();
+      RID = addSPIRVInst(spv::OpAtomicStore, Ops);
     } else {
-      Ops << ST->getValueOperand();
-    }
+      if (RID.isValid()) {
+        Ops << RID;
+      } else {
+        Ops << ST->getValueOperand();
+      }
 
-    // Align MemoryOperand helps store vectorization and is required for
-    // PhysicalStorageBuffer
-    uint32_t memory_access = spv::MemoryAccessAlignedMask;
-    if (ST->isVolatile()) {
-      memory_access |= spv::MemoryAccessVolatileMask;
-    }
-    Ops << memory_access;
-    Ops << static_cast<uint32_t>(ST->getAlign().value());
+      // Align MemoryOperand helps store vectorization and is required for
+      // PhysicalStorageBuffer
+      uint32_t memory_access = spv::MemoryAccessAlignedMask;
+      if (ST->isVolatile()) {
+        memory_access |= spv::MemoryAccessVolatileMask;
+      }
+      Ops << memory_access;
+      Ops << static_cast<uint32_t>(ST->getAlign().value());
 
-    RID = addSPIRVInst(spv::OpStore, Ops);
+      RID = addSPIRVInst(spv::OpStore, Ops);
+    }
     break;
   }
   case Instruction::AtomicCmpXchg: {

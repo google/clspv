@@ -296,12 +296,13 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     kernels_with_bodies.push_back(&F);
     auto &discriminants_list = discriminants_used_by_function[&F];
     bool uses_barriers = CallTreeContainsGlobalSynchronization(&F);
-    if (uses_barriers && clspv::Option::PhysicalStorageBuffers()) {
+    if (uses_barriers && clspv::Option::PhysicalStorageBuffers() &&
+        clspv::Option::HackPSBVolatileAsAtomic()) {
       for (BasicBlock &BB : F) {
         for (Instruction &I : BB) {
-          if (isa<IntToPtrInst>(&I) && I.getType()->isPointerTy() &&
-              I.getType()->getPointerAddressSpace() ==
-                  clspv::AddressSpace::Global) {
+          if (auto *int_to_ptr = dyn_cast<IntToPtrInst>(&I);
+              int_to_ptr &&
+              int_to_ptr->getAddressSpace() == clspv::AddressSpace::Global) {
             HasReadsAndWrites(&I, true);
           }
         }
@@ -1096,7 +1097,7 @@ std::pair<bool, bool> clspv::AllocateDescriptorsPass::HasReadsAndWrites(
     }
   }
 
-  if (set_volatile_if_coherent && !loads.empty() && !stores.empty()) {
+  if (set_volatile_if_coherent && read && write) {
     for (auto *ld : loads) {
       ld->setVolatile(true);
     }

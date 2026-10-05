@@ -176,6 +176,11 @@ llvm::cl::opt<bool> hack_atomic_flag_barrier(
     llvm::cl::desc(
         "Emit OpMemoryBarrier for non-relaxed atomic_flag builtins"));
 
+llvm::cl::opt<bool> hack_psb_volatile_as_atomic(
+    "hack-psb-volatile-as-atomic", llvm::cl::init(false),
+    llvm::cl::desc("Emit OpAtomicLoad and OpAtomicStore for coherent "
+                   "PhysicalStorageBuffer 32-bit integer accesses"));
+
 llvm::cl::opt<bool>
     pod_ubo("pod-ubo", llvm::cl::init(false),
             llvm::cl::desc("POD kernel arguments are in uniform buffers"));
@@ -556,6 +561,7 @@ bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
 bool HackConvertToFloat() { return hack_convert_to_float; }
 bool HackImage1dBufferBGRA() { return hack_image1d_buffer_bgra; }
 bool HackAtomicFlagBarrier() { return hack_atomic_flag_barrier; }
+bool HackPSBVolatileAsAtomic() { return hack_psb_volatile_as_atomic; }
 bool ModuleConstantsInStorageBuffer() {
   return module_constants_in_storage_buffer;
 }

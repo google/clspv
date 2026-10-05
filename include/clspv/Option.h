@@ -98,6 +98,10 @@ bool HackImage1dBufferBGRA();
 // builtins. Works around driver bugs.
 bool HackAtomicFlagBarrier();
 
+// Returns true if coherent PhysicalStorageBuffer loads and stores should be
+// emitted as relaxed atomic operations. Works around driver bugs.
+bool HackPSBVolatileAsAtomic();
+
 // Returns true if module-scope constants are to be collected into a single
 // storage buffer.  The binding for that buffer, and its intialization data
 // are given in the descriptor map file.
