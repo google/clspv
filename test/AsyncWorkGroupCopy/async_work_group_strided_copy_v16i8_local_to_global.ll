@@ -19,7 +19,8 @@ entry:
 
 declare spir_func ptr @_Z29async_work_group_strided_copyPU3AS1Dv16_cPU3AS3KS_jj9ocl_event(ptr addrspace(1), ptr addrspace(3), i32, i32, ptr)
 
-; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) @__spirv_LocalInvocationId, align
+; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 0
+; CHECK: [[localid0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
 ; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 1
 ; CHECK: [[localid1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(5) [[gep]], align
 ; CHECK: [[gep:%[^ ]+]] = getelementptr <3 x i32>, ptr addrspace(5) @__spirv_LocalInvocationId, i32 0, i32 2

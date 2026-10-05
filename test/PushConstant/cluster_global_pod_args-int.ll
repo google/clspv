@@ -6,7 +6,8 @@
 ; CHECK: @__push_constants = addrspace(9) global [[outer]] zeroinitializer, !push_constants [[pc_md:![0-9]+]]
 
 ; CHECK: define spir_kernel void @foo(ptr addrspace(1) %out) !clspv.pod_args_impl [[pod_args_md:![0-9]+]] !kernel_arg_map [[arg_map_md:![0-9]+]]
-; CHECK: load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0), align 4
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 2, i32 0
+; CHECK: load i32, ptr addrspace(9) [[gep]], align 4
 
 ; CHECK-DAG: [[pc_md]] = !{i32 1, i32 4, i32 7}
 ; CHECK-DAG: [[pod_args_md]] = !{i32 3}

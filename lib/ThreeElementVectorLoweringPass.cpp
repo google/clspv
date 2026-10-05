@@ -20,6 +20,7 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
@@ -657,7 +658,7 @@ Value *clspv::ThreeElementVectorLoweringPass::visitGetElementPtrInst(
   if (EquivalentType == nullptr)
     return nullptr;
 
-  IRBuilder<> B(&I);
+  IRBuilder<NoFolder> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
   auto *V = B.CreateInBoundsGEP(EquivalentType, EquivalentPointer, Indices);
   registerReplacement(I, *V);

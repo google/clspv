@@ -13,6 +13,7 @@ entry:
   ret void
 }
 
-; CHECK:  %load = load <4 x i32>, ptr getelementptr inbounds (<4 x i32>, ptr @gv, i32 1), align 32
+; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr inbounds <4 x i32>, ptr @gv, i32 1
+; CHECK:  %load = load <4 x i32>, ptr [[gep0]], align 32
 ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr <3 x i32>, ptr @gv, i32 1, i32 0
 ; CHECK:  %load2 = load i32, ptr [[gep]], align 32

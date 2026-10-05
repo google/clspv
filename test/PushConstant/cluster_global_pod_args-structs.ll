@@ -22,7 +22,8 @@ define spir_kernel void @chars(%1 %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @chars() !clspv.pod_args_impl [[pod_arg_md:![0-9]+]] !kernel_arg_map [[chars_map:![0-9]+]]
 
-  ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
+  ; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 0
+  ; CHECK: [[ld:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep]], align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld]] to i8
   ; CHECK: [[in:%[a-zA-Z0-9_.]+]] = insertvalue [[s0]] poison, i8 [[cast]], 0
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s1]] poison, %3 [[in]], 0
@@ -45,12 +46,18 @@ define spir_kernel void @aligns(%3 %arg) !clspv.pod_args_impl !0 {
 entry:
   ; CHECK: define spir_kernel void @aligns() !clspv.pod_args_impl [[pod_arg_md]] !kernel_arg_map [[aligns_map:![0-9]+]]
 
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
-  ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 4), align 4
-  ; CHECK: [[ld5:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 5), align 4
+  ; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 0
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep0]], align 4
+  ; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep1]], align 4
+  ; CHECK: [[gep2:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep2]], align 4
+  ; CHECK: [[gep3:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep3]], align 4
+  ; CHECK: [[gep4:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 4
+  ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep4]], align 4
+  ; CHECK: [[gep5:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 5
+  ; CHECK: [[ld5:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep5]], align 4
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
   ; CHECK: [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [[s3]] poison, i8 [[cast]], 0
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld2]] to i8

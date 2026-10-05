@@ -21,6 +21,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
@@ -454,6 +455,7 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
       auto *ArgTy = EquivalentArgs[j]->getType();
       if (ArgTy->isPointerTy()) {
         assert(pointer_scalar_ty && "Missing pointer scalar type");
+        IRBuilder<NoFolder> B(&I);
         Args[j] = B.CreateInBoundsGEP(ArrayType::get(pointer_scalar_ty, Arity),
                                       EquivalentArgs[j],
                                       {Zero, ConstantInt::get(IntTy, i)});
@@ -1124,7 +1126,7 @@ clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
     }
   }
 
-  IRBuilder<> B(&I);
+  IRBuilder<NoFolder> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
   reworkIndices(Indices, I.getSourceElementType());
 

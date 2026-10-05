@@ -19,6 +19,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -124,7 +125,8 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
   assert(found && "Push constant wasn't declared.");
 
   // Construct pointer
-  IRBuilder<> Builder(BB);
+  IRBuilder<NoFolder> Builder(BB, BB->hasTerminator() ? BB->getFirstNonPHIIt()
+                                                      : BB->end());
   SmallVector<Value *, 4> Indices(2);
   Indices[0] = Builder.getInt32(0);
   Indices[1] = Builder.getInt32(idx);

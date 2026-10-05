@@ -67,10 +67,12 @@ define dso_local spir_kernel void @test6(ptr addrspace(1) %out) {
 ; CHECK: load [[SHORT8:\[8 x i16\]]], ptr addrspace(1) [[PTR]], align 32
 
 ; CHECK-LABEL: @test4(
-; CHECK: load [[FLOAT8]], ptr addrspace(3) [[global]]
+; CHECK: [[PTR:%[^ ]+]] = getelementptr [1 x [[FLOAT8]]], ptr addrspace(3) [[global]], i32 0, i32 undef
+; CHECK: load [[FLOAT8]], ptr addrspace(3) [[PTR]], align 32
 
 ; CHECK-LABEL: @test5(
-; CHECK: load [[FLOAT8]], ptr addrspace(3) [[global]]
+; CHECK: [[PTR:%[^ ]+]] = getelementptr inbounds [1 x [[FLOAT8]]], ptr addrspace(3) [[global]], i32 0, i32 0
+; CHECK: load [[FLOAT8]], ptr addrspace(3) [[PTR]], align 32
 
 ; CHECK-LABEL: @test6(
 ; CHECK: load [[FLOAT8]], ptr addrspace(3) [[global]]
