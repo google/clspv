@@ -296,6 +296,17 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
     kernels_with_bodies.push_back(&F);
     auto &discriminants_list = discriminants_used_by_function[&F];
     bool uses_barriers = CallTreeContainsGlobalSynchronization(&F);
+    if (uses_barriers && clspv::Option::PhysicalStorageBuffers()) {
+      for (BasicBlock &BB : F) {
+        for (Instruction &I : BB) {
+          if (isa<IntToPtrInst>(&I) && I.getType()->isPointerTy() &&
+              I.getType()->getPointerAddressSpace() ==
+                  clspv::AddressSpace::Global) {
+            HasReadsAndWrites(&I, true);
+          }
+        }
+      }
+    }
 
     int arg_index = 0;
     for (Argument &Arg : F.args()) {
@@ -988,8 +999,8 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
   return uses_barrier;
 }
 
-std::pair<bool, bool>
-clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
+std::pair<bool, bool> clspv::AllocateDescriptorsPass::HasReadsAndWrites(
+    Value *V, bool set_volatile_if_coherent) {
   // Atomics and OpenCL builtins modf and frexp are all represented as function
   // calls.
   //
@@ -1004,6 +1015,8 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
 
   bool read = false;
   bool write = false;
+  SmallVector<LoadInst *, 8> loads;
+  SmallVector<StoreInst *, 8> stores;
   DenseSet<Value *> visited;
   std::vector<std::pair<Value *, unsigned>> stack;
   for (auto &Use : V->uses()) {
@@ -1011,17 +1024,19 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
       stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
   }
 
-  while (!stack.empty() && !(read && write)) {
+  while (!stack.empty() && (set_volatile_if_coherent || !(read && write))) {
     Value *value = stack.back().first;
     unsigned operand_no = stack.back().second;
     stack.pop_back();
     if (!visited.insert(value).second)
       continue;
 
-    if (isa<LoadInst>(value)) {
+    if (auto *ld = dyn_cast<LoadInst>(value)) {
       read = true;
-    } else if (isa<StoreInst>(value)) {
+      loads.push_back(ld);
+    } else if (auto *st = dyn_cast<StoreInst>(value)) {
       write = true;
+      stores.push_back(st);
     } else if (isa<AtomicRMWInst>(value)) {
       read = true;
       write = true;
@@ -1078,6 +1093,15 @@ clspv::AllocateDescriptorsPass::HasReadsAndWrites(Value *V) {
             stack.push_back(std::make_pair(U.getUser(), U.getOperandNo()));
         }
       }
+    }
+  }
+
+  if (set_volatile_if_coherent && !loads.empty() && !stores.empty()) {
+    for (auto *ld : loads) {
+      ld->setVolatile(true);
+    }
+    for (auto *st : stores) {
+      st->setVolatile(true);
     }
   }
 

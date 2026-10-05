@@ -6809,7 +6809,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     // Align MemoryOperand helps load vectorization and is required for
     // PhysicalStorageBuffer
-    Ops << spv::MemoryAccessAlignedMask;
+    uint32_t memory_access = spv::MemoryAccessAlignedMask;
+    if (LD->isVolatile()) {
+      memory_access |= spv::MemoryAccessVolatileMask;
+    }
+    Ops << memory_access;
     Ops << static_cast<uint32_t>(LD->getAlign().value());
 
     RID = addSPIRVInst(spv::OpLoad, Ops);
@@ -6856,7 +6860,11 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
 
     // Align MemoryOperand helps store vectorization and is required for
     // PhysicalStorageBuffer
-    Ops << spv::MemoryAccessAlignedMask;
+    uint32_t memory_access = spv::MemoryAccessAlignedMask;
+    if (ST->isVolatile()) {
+      memory_access |= spv::MemoryAccessVolatileMask;
+    }
+    Ops << memory_access;
     Ops << static_cast<uint32_t>(ST->getAlign().value());
 
     RID = addSPIRVInst(spv::OpStore, Ops);
