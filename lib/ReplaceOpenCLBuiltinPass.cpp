@@ -22,6 +22,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
@@ -1051,7 +1052,7 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
    *    after
    */
 
-  IRBuilder<> Builder(CI);
+  IRBuilder<NoFolder> Builder(CI);
 
   auto Cst0 = Builder.getInt32(0);
   auto Cst1 = Builder.getInt32(1);

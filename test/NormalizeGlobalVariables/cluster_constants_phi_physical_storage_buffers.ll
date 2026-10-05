@@ -2,12 +2,16 @@
 ; RUN: FileCheck %s < %t.ll
 
 ; CHECK: entry:
-; CHECK:   [[load:%[^ ]+]] = load i64, ptr addrspace(9) @__push_constants, align 8
+; CHECK:   [[gep0:%[^ ]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0
+; CHECK:   [[gep1:%[^ ]+]] = getelementptr inbounds i64, ptr addrspace(9) [[gep0]], i32 0
+; CHECK:   [[load:%[^ ]+]] = load i64, ptr addrspace(9) [[gep1]], align 8
 ; CHECK:   [[ptr:%[^ ]+]] = inttoptr i64 [[load]] to ptr addrspace(2)
 ; CHECK:   [[gep_entry:%[^ ]+]] = getelementptr inbounds { <{ [4 x i32] }> }, ptr addrspace(2) [[ptr]], i32 0, i32 0
 ; CHECK:   br i1 %test, label %true, label %false
 ; CHECK: true:
-; CHECK:   [[load:%[^ ]+]] = load i64, ptr addrspace(9) @__push_constants, align 8
+; CHECK:   [[gep0:%[^ ]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0
+; CHECK:   [[gep1:%[^ ]+]] = getelementptr inbounds i64, ptr addrspace(9) [[gep0]], i32 0
+; CHECK:   [[load:%[^ ]+]] = load i64, ptr addrspace(9) [[gep1]], align 8
 ; CHECK:   [[ptr:%[^ ]+]] = inttoptr i64 [[load]] to ptr addrspace(2)
 ; CHECK:   [[gep_true:%[^ ]+]] = getelementptr inbounds { <{ [4 x i32] }> }, ptr addrspace(2) [[ptr]], i32 0, i32 0
 ; CHECK:   br i1 %test2, label %exit, label %false

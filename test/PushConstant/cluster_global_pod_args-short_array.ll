@@ -13,11 +13,16 @@ target triple = "spirv32-unknown-vulkan"
 
 define spir_kernel void @i8x16(%original %arg) !clspv.pod_args_impl !0 {
 entry:
-  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) @__push_constants, align 4
-  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1), align 4
-  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2), align 4
-  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3), align 4
-  ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) getelementptr inbounds (%0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 4), align 4
+  ; CHECK: [[gep0:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 0
+  ; CHECK: [[ld0:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep0]], align 4
+  ; CHECK: [[gep1:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 1
+  ; CHECK: [[ld1:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep1]], align 4
+  ; CHECK: [[gep2:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 2
+  ; CHECK: [[ld2:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep2]], align 4
+  ; CHECK: [[gep3:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 3
+  ; CHECK: [[ld3:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep3]], align 4
+  ; CHECK: [[gep4:%[a-zA-Z0-9_.]+]] = getelementptr inbounds %0, ptr addrspace(9) @__push_constants, i32 0, i32 0, i32 4
+  ; CHECK: [[ld4:%[a-zA-Z0-9_.]+]] = load i32, ptr addrspace(9) [[gep4]], align 4
 
   ; CHECK: [[cast:%[a-zA-Z0-9_.]+]] = trunc i32 [[ld0]] to i8
   ; CHECK: [[s_in0:%[a-zA-Z0-9_.]+]] = insertvalue %original poison, i8 [[cast]], 0

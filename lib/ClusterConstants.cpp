@@ -26,6 +26,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/NoFolder.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -141,7 +142,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
 
     // Replace uses of the other globals with references to the members of the
     // clustered constant.
-    IRBuilder<> Builder(Context);
+    IRBuilder<NoFolder> Builder(Context);
     Value *zero = Builder.getInt32(0);
     for (GlobalVariable *GV : global_constants) {
       SmallVector<User *, 8> users(GV->users());
@@ -156,6 +157,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
                                        llvm::Instruction::InstListType::iterator
                                            InsertBefore) {
             if (clspv::Option::PhysicalStorageBuffers()) {
+              Builder.SetInsertPoint(InsertBefore);
               auto *bb = InsertBefore->getParent();
               auto *clustered_ptr_ty = clspv::GetPushConstantType(
                   M, clspv::PushConstant::ModuleConstantsPointer);
