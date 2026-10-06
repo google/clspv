@@ -281,6 +281,12 @@ private:
       return true;
     }
 
+    // Cooperative matrix types from Clang are handled via
+    // spirv.CooperativeMatrixKHR TargetExtType.
+    if (QT->isCooperativeMatrixType()) {
+      return true;
+    }
+
 #ifndef NDEBUG
     llvm::dbgs() << "IsSupportedType lacks support for QualType: "
                  << QT.getAsString() << '\n';
