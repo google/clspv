@@ -232,7 +232,14 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     }
   }
 
-  const bool Changed = !WorkList.empty();
+  bool Changed = false;
+
+  // A merged offset that is not a whole number of smaller elements cannot be
+  // expressed as GEP indices without truncating it (e.g. a struct field whose
+  // size is not a multiple of the GEP element size); skip those chains.
+  auto offsetIsRepresentable = [](int64_t cstVal, size_t smallerBitWidths) {
+    return cstVal % static_cast<int64_t>(smallerBitWidths) == 0;
+  };
 
   for (GetElementPtrInst *GEP : WorkList) {
     IRBuilder<> Builder(GEP);
@@ -299,11 +306,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                               smallerBitWidths2);
       cstVal += smallerBitWidths2 * cstVal2;
       smallerBitWidths = std::min(smallerBitWidths, smallerBitWidths2);
-      if (cstVal % static_cast<int64_t>(smallerBitWidths) != 0) {
-        // The combined offset is not a whole number of smaller elements
-        // (e.g. a struct field whose size is not a multiple of the GEP
-        // element size); simplifying would truncate the offset, so leave
-        // this GEP chain alone.
+      if (!offsetIsRepresentable(cstVal, smallerBitWidths)) {
         LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (offset not "
                              "representable): ";
                    OtherGEP->dump(); GEP->dump());
@@ -335,11 +338,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       assert(dynVal == nullptr);
       cstVal = cstVal * smallerBitWidths + cstVal2 * smallerBitWidths2;
       smallerBitWidths = std::min(smallerBitWidths, smallerBitWidths2);
-      if (cstVal % static_cast<int64_t>(smallerBitWidths) != 0) {
-        // The combined offset is not a whole number of smaller elements
-        // (e.g. a struct field whose size is not a multiple of the GEP
-        // element size); simplifying would truncate the offset, so leave
-        // this GEP chain alone.
+      if (!offsetIsRepresentable(cstVal, smallerBitWidths)) {
         LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (offset not "
                              "representable): ";
                    OtherGEP->dump(); GEP->dump());
@@ -494,6 +493,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       // ... and remove it if we were its only user.
       OtherGEP->eraseFromParent();
     }
+    Changed = true;
   }
 
   return Changed;
