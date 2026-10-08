@@ -4,10 +4,18 @@
 // which is not divisible by 128). The pass used to truncate 800/128 to 6
 // and rebuild a GEP pointing into the middle of opad.h, which the type walk
 // rejected with "Err: SrcTy ... CstVal = 96" and an abort. The pass must
-// leave the chain alone instead.
+// leave the chain alone instead: the merged indices below must preserve the
+// correct member path through the struct (opad, then the w1/h arrays).
 
 // RUN: clspv %target %s -O2 -o %t.spv
 // RUN: spirv-val %t.spv
+// RUN: spirv-dis %t.spv -o %t.spvasm
+// RUN: FileCheck %s < %t.spvasm
+
+// The merged GEP keeps the correct member path: opad.w1[idx] and ipad.h[idx]
+// with a dynamic last index through each array.
+// CHECK: OpAccessChain %_ptr_Function_uint {{%[0-9]+}} %uint_1 %uint_1 %{{[0-9]+}}
+// CHECK: OpAccessChain %_ptr_Function_uint {{%[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}}
 
 typedef struct inner_t {
   int h[4];
