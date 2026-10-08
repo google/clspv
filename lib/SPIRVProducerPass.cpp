@@ -422,6 +422,9 @@ struct SPIRVProducerPassImpl {
   }
 
   SPIRVID getSPIRVPointerType(Type *PtrTy, Type *DataTy);
+  // Storage class of a SPIR-V pointer type id, or StorageClassMax if the id
+  // is not a registered pointer type.
+  spv::StorageClass PointerTypeClassOf(unsigned type_id) const;
 
   // Lookup or create function type.
   //
@@ -695,6 +698,7 @@ private:
   DenseMap<Value *, Type *> InferredTypeCache;
   DenseMap<unsigned, SPIRVID> IDTypeMap;
   std::unordered_map<unsigned, LayoutTypeMapType> PointerTypeMap;
+  std::unordered_map<unsigned, spv::StorageClass> PointerTypeClass;
   TypeMapType FunctionTypeMap;
 
   // Maps an LLVM Value pointer to the corresponding SPIR-V Id.
@@ -2000,8 +2004,18 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVPointerType(Type *PtrTy, Type *DataTy) {
   if (entry.empty())
     entry.resize(2);
   entry[layout_index] = ptr_id;
+  PointerTypeClass[ptr_id.get()] = GetStorageClass(canonical_aspace);
 
   return ptr_id;
+}
+
+spv::StorageClass SPIRVProducerPassImpl::PointerTypeClassOf(
+    unsigned type_id) const {
+  auto where = PointerTypeClass.find(type_id);
+  if (where == PointerTypeClass.end()) {
+    return spv::StorageClass::StorageClassMax;
+  }
+  return where->second;
 }
 
 SPIRVID SPIRVProducerPassImpl::getSPIRVFunctionType(FunctionType *FTy,
@@ -2754,6 +2768,20 @@ SPIRVProducerPassImpl::getSPIRVPointerOperand(Value *PtrVal,
     auto storage_class =
         GetStorageClass(PtrVal->getType()->getPointerAddressSpace());
     if (storage_class == spv::StorageClassPhysicalStorageBuffer) {
+      // OpBitcast with a logical pointer operand is invalid SPIR-V. When the
+      // value was emitted with a logical storage class (for example a
+      // Private variable produced by rehoming optimizer-generated tables),
+      // keep the value's own pointer: loads and stores through it stay in
+      // its storage class. When both sides are PhysicalStorageBuffer
+      // pointers, the reconciling bitcast is valid and expected (#1637).
+      auto it2 = IDTypeMap.find(PtrID.get());
+      if (it2 != IDTypeMap.end() && it2->second.isValid()) {
+        auto emitted_class = PointerTypeClassOf(it2->second.get());
+        if (emitted_class != spv::StorageClass::StorageClassMax &&
+            emitted_class != spv::StorageClassPhysicalStorageBuffer) {
+          return PtrID;
+        }
+      }
       SPIRVOperandVec Ops;
       Ops << ExpectedPtrTypeID << PtrID;
       return addSPIRVInst(spv::OpBitcast, Ops);
