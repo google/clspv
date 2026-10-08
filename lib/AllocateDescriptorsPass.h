@@ -70,7 +70,8 @@ private:
   //
   // This function assumes loads, stores and function calls are the only
   // instructions that can read or write to memory.
-  std::pair<bool, bool> HasReadsAndWrites(llvm::Value *V);
+  std::pair<bool, bool>
+  HasReadsAndWrites(llvm::Value *V, bool set_volatile_if_coherent = false);
 
   // Cache for which functions' call trees contain a global barrier.
   llvm::DenseMap<llvm::Function *, bool> barrier_map_;
