@@ -234,9 +234,6 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
 
   bool Changed = false;
 
-  // A merged offset that is not a whole number of smaller elements cannot be
-  // expressed as GEP indices without truncating it (e.g. a struct field whose
-  // size is not a multiple of the GEP element size); skip those chains.
   auto offsetIsRepresentable = [](int64_t cstVal, size_t smallerBitWidths) {
     return cstVal % static_cast<int64_t>(smallerBitWidths) == 0;
   };

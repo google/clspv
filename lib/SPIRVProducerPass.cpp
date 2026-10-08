@@ -2080,38 +2080,6 @@ SPIRVID SPIRVProducerPassImpl::getSPIRVType(Type *Ty, bool needs_layout) {
     }
   }
 
-  // SPIR-V array types over layout-invariant elements (scalars and vectors)
-  // are identical in both layout variants: layout only drives the
-  // ArrayStride decoration for the shared id. Sharing one id between the
-  // variants keeps type identity for variables and their initializers;
-  // distinct ids for the same array type make the module fail validation
-  // when the variable and its initializer pick different ids. Arrays over
-  // aggregates (structs, nested arrays) are excluded because their element
-  // ids genuinely differ between the layout variants.
-  if (auto *ArrTy = dyn_cast<ArrayType>(Ty)) {
-    Type *ElemTy = ArrTy->getElementType();
-    if (ElemTy->isIntOrIntVectorTy() || ElemTy->isFPOrFPVectorTy()) {
-      auto entry = TypeMap.find(Ty);
-      if (entry != TypeMap.end()) {
-        assert(entry->second.size() == 2);
-        for (unsigned variant = 0; variant < 2; variant++) {
-          if (entry->second[variant].isValid()) {
-            auto id = entry->second[variant];
-            // Fill the requested variant so later lookups hit the fast path.
-            entry->second[layout] = id;
-            if (needs_layout) {
-              getTypesNeedingArrayStride().insert(StrideType(
-                  static_cast<uint32_t>(GetTypeAllocSize(
-                      ArrTy->getElementType(), module->getDataLayout())),
-                  id));
-            }
-            return id;
-          }
-        }
-      }
-    }
-  }
-
   auto Canonical = CanonicalType(Ty);
 
   if (Canonical != Ty) {
