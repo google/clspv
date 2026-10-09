@@ -18,5 +18,5 @@ attributes #1 = { inaccessiblememonly nofree nosync nounwind willreturn }
 
 !0 = !{!1}
 !1 = distinct !{!1, !2, !"test.inner: %input"}
-!2 = distinct !{!2, !"test.inner"}
+!2 = distinct !{!2, i1 false, !"test.inner"}
 
