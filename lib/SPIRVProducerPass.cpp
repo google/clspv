@@ -399,6 +399,7 @@ struct SPIRVProducerPassImpl {
   // *not* be converted to a storage buffer, replace each such global variable
   // with one in the storage class expecgted by SPIR-V.
   void FindGlobalConstVars();
+  void RehomeGlobalVarToModuleScopePrivate(llvm::GlobalVariable *GV);
   // Populate ResourceVarInfoList, FunctionToResourceVarsMap, and
   // ModuleOrderedResourceVars.
   void FindResourceVars();
@@ -1069,6 +1070,35 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
   clspv::NormalizeGlobalVariables(*module);
   const DataLayout &DL = module->getDataLayout();
 
+  // The optimizer's default pipeline (e.g. SimplifyCFG's switch-to-lookup-
+  // table conversion) creates private-linkage read-only globals in the
+  // Global address space with constant initializers. User program-scope
+  // globals never have private linkage, so this population is exactly the
+  // compiler-generated tables. Emitting them as StorageBuffer resources is
+  // invalid: Vulkan requires such variables to be structs, an initializer
+  // is not allowed in that storage class, and SPIR-V 1.4+ requires them to
+  // be listed as entry point interfaces. Rehome them to ModuleScopePrivate
+  // (SPIR-V Private), which allows initializers and is handled by the
+  // conservative interface listing.
+  SmallVector<GlobalVariable *, 8> CompilerGeneratedTables;
+  SmallVector<GlobalVariable *, 8> DeadTables;
+  for (GlobalVariable &GV : module->globals()) {
+    if (GV.getType()->getAddressSpace() == AddressSpace::Global &&
+        GV.hasPrivateLinkage() && GV.isConstant() && GV.hasInitializer()) {
+      if (GV.use_empty()) {
+        DeadTables.push_back(&GV);
+      } else {
+        CompilerGeneratedTables.push_back(&GV);
+      }
+    }
+  }
+  for (GlobalVariable *GV : DeadTables) {
+    GV->eraseFromParent();
+  }
+  for (GlobalVariable *GV : CompilerGeneratedTables) {
+    RehomeGlobalVarToModuleScopePrivate(GV);
+  }
+
   SmallVector<GlobalVariable *, 8> GVList;
   SmallVector<GlobalVariable *, 8> DeadGVList;
   for (GlobalVariable &GV : module->globals()) {
@@ -1104,62 +1134,63 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
     }
   } else {
     // Change global constant variable's address space to ModuleScopePrivate.
-    auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
     for (auto GV : GVList) {
-      // Create new gv with ModuleScopePrivate address space.
-      Type *NewGVTy = GV->getValueType();
-      GlobalVariable *NewGV = new GlobalVariable(
-          *module, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
-          nullptr, GV->getThreadLocalMode(), AddressSpace::ModuleScopePrivate);
-      NewGV->takeName(GV);
+      RehomeGlobalVarToModuleScopePrivate(GV);
+    }
+  }
+}
 
-      const SmallVector<User *, 8> GVUsers(GV->user_begin(), GV->user_end());
-      SmallVector<User *, 8> CandidateUsers;
+void SPIRVProducerPassImpl::RehomeGlobalVarToModuleScopePrivate(
+    llvm::GlobalVariable *GV) {
+  auto &GlobalConstFuncTyMap = getGlobalConstFuncTypeMap();
+  // Create new gv with ModuleScopePrivate address space.
+  Type *NewGVTy = GV->getValueType();
+  GlobalVariable *NewGV = new GlobalVariable(
+      *module, NewGVTy, false, GV->getLinkage(), GV->getInitializer(), "",
+      nullptr, GV->getThreadLocalMode(), AddressSpace::ModuleScopePrivate);
+  NewGV->takeName(GV);
 
-      auto record_called_function_type_as_user =
-          [&GlobalConstFuncTyMap](Value *gv, CallInst *call) {
-            // Find argument index.
-            unsigned index = 0;
-            for (unsigned i = 0; i < call->arg_size(); i++) {
-              if (gv == call->getOperand(i)) {
-                // TODO(dneto): Should we break here?
-                index = i;
-              }
-            }
+  const SmallVector<User *, 8> GVUsers(GV->user_begin(), GV->user_end());
+  SmallVector<User *, 8> CandidateUsers;
 
-            // Record function type with global constant.
-            GlobalConstFuncTyMap[call->getFunctionType()] =
-                std::make_pair(call->getFunctionType(), index);
-          };
-
-      for (User *GVU : GVUsers) {
-        if (CallInst *Call = dyn_cast<CallInst>(GVU)) {
-          record_called_function_type_as_user(GV, Call);
-        } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(GVU)) {
-          // Check GEP users.
-          for (User *GEPU : GEP->users()) {
-            if (CallInst *GEPCall = dyn_cast<CallInst>(GEPU)) {
-              record_called_function_type_as_user(GEP, GEPCall);
-            }
+  auto record_called_function_type_as_user =
+      [&GlobalConstFuncTyMap](Value *gv, CallInst *call) {
+        // Find argument index.
+        unsigned index = 0;
+        for (unsigned i = 0; i < call->arg_size(); i++) {
+          if (gv == call->getOperand(i)) {
+            // TODO(dneto): Should we break here?
+            index = i;
           }
         }
 
-        CandidateUsers.push_back(GVU);
-      }
+        // Record function type with global constant.
+        GlobalConstFuncTyMap[call->getFunctionType()] =
+            std::make_pair(call->getFunctionType(), index);
+      };
 
-      for (User *U : CandidateUsers) {
-        // Update users of gv with new gv.
-        if (!isa<Constant>(U)) {
-          // #254: Can't change operands of a constant, but this shouldn't be
-          // something that sticks around in the module.
-          U->replaceUsesOfWith(GV, NewGV);
+  for (User *GVU : GVUsers) {
+    if (CallInst *Call = dyn_cast<CallInst>(GVU)) {
+      record_called_function_type_as_user(GV, Call);
+    } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(GVU)) {
+      // Check GEP users.
+      for (User *GEPU : GEP->users()) {
+        if (CallInst *GEPCall = dyn_cast<CallInst>(GEPU)) {
+          record_called_function_type_as_user(GEP, GEPCall);
         }
       }
-
-      // Delete original gv.
-      GV->eraseFromParent();
     }
+
+    CandidateUsers.push_back(GVU);
   }
+
+  // Update users of gv with new gv. replaceAllUsesWith also handles
+  // constant users (#254), so nothing with live uses survives pointing at
+  // the old gv.
+  GV->replaceAllUsesWith(NewGV);
+
+  // Delete original gv.
+  GV->eraseFromParent();
 }
 
 void SPIRVProducerPassImpl::FindResourceVars() {
