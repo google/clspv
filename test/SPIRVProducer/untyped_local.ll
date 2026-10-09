@@ -122,9 +122,9 @@ declare ptr addrspace(3) @_Z11clspv.local.3(i32, { [0 x i32] })
 !24 = !{!"y", i32 3, i32 3, i32 4, i32 4, !"pod_pushconstant"}
 !25 = !{!26}
 !26 = distinct !{!26, !27, !"test.inner: %wg1"}
-!27 = distinct !{!27, !"test.inner"}
+!27 = distinct !{!27, i1 false, !"test.inner"}
 !28 = !{!29, !26}
 !29 = distinct !{!29, !30, !"__clang_ocl_kern_imp_test: %wg1"}
-!30 = distinct !{!30, !"__clang_ocl_kern_imp_test"}
+!30 = distinct !{!30, i1 false, !"__clang_ocl_kern_imp_test"}
 !31 = !{!""}
 

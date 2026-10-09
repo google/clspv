@@ -92,6 +92,6 @@ attributes #2 = { alwaysinline convergent nounwind willreturn memory(none) }
 !12 = !{!"Simple C++ TBAA"}
 !13 = !{!14}
 !14 = distinct !{!14, !15, !"_ZNU3AS46beyond9Samples2DINS_11SampleRGB48EE4ReadENS_8Vector2DIiEE: argument 0"}
-!15 = distinct !{!15, !"_ZNU3AS46beyond9Samples2DINS_11SampleRGB48EE4ReadENS_8Vector2DIiEE"}
+!15 = distinct !{!15, i1 false, !"_ZNU3AS46beyond9Samples2DINS_11SampleRGB48EE4ReadENS_8Vector2DIiEE"}
 !16 = distinct !{!16, !17}
 !17 = !{!"llvm.loop.mustprogress"}
