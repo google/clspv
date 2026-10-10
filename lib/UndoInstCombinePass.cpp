@@ -287,7 +287,8 @@ bool clspv::UndoInstCombinePass::UndoNarrowedIntDiv(Instruction *inst) {
   if (!dst_elem_ty->isIntegerTy() || !src_elem_ty->isIntegerTy())
     return false;
 
-  if (dst_elem_ty->getIntegerBitWidth() <= src_elem_ty->getIntegerBitWidth())
+  if (dst_elem_ty->getIntegerBitWidth() <= src_elem_ty->getIntegerBitWidth() ||
+      dst_elem_ty->getIntegerBitWidth() > 32)
     return false;
 
   IRBuilder<> builder(cast);
