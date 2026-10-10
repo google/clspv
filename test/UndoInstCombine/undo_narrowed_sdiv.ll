@@ -29,3 +29,16 @@ entry:
   store i32 %zext, ptr addrspace(1) %out, align 4
   ret void
 }
+
+define void @test_udiv_i64(i32 %in, ptr addrspace(1) %out) {
+entry:
+  ; CHECK-LABEL: @test_udiv_i64
+  ; CHECK: [[div:%[a-zA-Z0-9_.]+]] = udiv i32 %in, 3
+  ; CHECK: [[zext:%[a-zA-Z0-9_.]+]] = zext i32 [[div]] to i64
+  ; CHECK: store i64 [[zext]]
+  ; CHECK-NOT: udiv i64
+  %udiv = udiv i32 %in, 3
+  %zext = zext i32 %udiv to i64
+  store i64 %zext, ptr addrspace(1) %out, align 8
+  ret void
+}
