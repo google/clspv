@@ -1066,43 +1066,28 @@ void SPIRVProducerPassImpl::GenerateLLVMIRInfo() {
   FindTypesForResourceVars();
 }
 
+// Optimizer-created lookup tables (e.g. from switch-to-lookup-table) are
+// private-linkage constants; user program-scope variables never are.
+static bool IsCompilerGeneratedConstVar(const GlobalVariable &GV) {
+  return GV.getType()->getAddressSpace() == AddressSpace::Global &&
+         GV.hasPrivateLinkage() && GV.isConstant() && GV.hasInitializer();
+}
+
 void SPIRVProducerPassImpl::FindGlobalConstVars() {
   clspv::NormalizeGlobalVariables(*module);
   const DataLayout &DL = module->getDataLayout();
 
-  // The optimizer's default pipeline (e.g. SimplifyCFG's switch-to-lookup-
-  // table conversion) creates private-linkage read-only globals in the
-  // Global address space with constant initializers. User program-scope
-  // globals never have private linkage, so this population is exactly the
-  // compiler-generated tables. Emitting them as StorageBuffer resources is
-  // invalid: Vulkan requires such variables to be structs, an initializer
-  // is not allowed in that storage class, and SPIR-V 1.4+ requires them to
-  // be listed as entry point interfaces. Rehome them to ModuleScopePrivate
-  // (SPIR-V Private), which allows initializers and is handled by the
-  // conservative interface listing.
-  SmallVector<GlobalVariable *, 8> CompilerGeneratedTables;
-  SmallVector<GlobalVariable *, 8> DeadTables;
-  for (GlobalVariable &GV : module->globals()) {
-    if (GV.getType()->getAddressSpace() == AddressSpace::Global &&
-        GV.hasPrivateLinkage() && GV.isConstant() && GV.hasInitializer()) {
-      if (GV.use_empty()) {
-        DeadTables.push_back(&GV);
-      } else {
-        CompilerGeneratedTables.push_back(&GV);
-      }
-    }
-  }
-  for (GlobalVariable *GV : DeadTables) {
-    GV->eraseFromParent();
-  }
-  for (GlobalVariable *GV : CompilerGeneratedTables) {
-    RehomeGlobalVarToModuleScopePrivate(GV);
-  }
-
   SmallVector<GlobalVariable *, 8> GVList;
   SmallVector<GlobalVariable *, 8> DeadGVList;
+  SmallVector<GlobalVariable *, 8> RehomeGVList;
   for (GlobalVariable &GV : module->globals()) {
-    if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
+    if (IsCompilerGeneratedConstVar(GV)) {
+      if (GV.use_empty()) {
+        DeadGVList.push_back(&GV);
+      } else {
+        RehomeGVList.push_back(&GV);
+      }
+    } else if (GV.getType()->getAddressSpace() == AddressSpace::Constant) {
       if (GV.use_empty() &&
           GV.getName() != clspv::ClusteredConstantsVariableName()) {
         DeadGVList.push_back(&GV);
@@ -1117,6 +1102,10 @@ void SPIRVProducerPassImpl::FindGlobalConstVars() {
     GV->eraseFromParent();
   }
   DeadGVList.clear();
+
+  for (auto GV : RehomeGVList) {
+    RehomeGlobalVarToModuleScopePrivate(GV);
+  }
 
   if (clspv::Option::ModuleConstantsInStorageBuffer()) {
     // For now, we only support a single storage buffer.
@@ -1184,10 +1173,14 @@ void SPIRVProducerPassImpl::RehomeGlobalVarToModuleScopePrivate(
     CandidateUsers.push_back(GVU);
   }
 
-  // Update users of gv with new gv. replaceAllUsesWith also handles
-  // constant users (#254), so nothing with live uses survives pointing at
-  // the old gv.
-  GV->replaceAllUsesWith(NewGV);
+  for (User *U : CandidateUsers) {
+    // Update users of gv with new gv.
+    if (!isa<Constant>(U)) {
+      // #254: Can't change operands of a constant, but this shouldn't be
+      // something that sticks around in the module.
+      U->replaceUsesOfWith(GV, NewGV);
+    }
+  }
 
   // Delete original gv.
   GV->eraseFromParent();
