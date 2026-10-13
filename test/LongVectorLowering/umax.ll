@@ -15,6 +15,6 @@ entry:
 ; CHECK-NOT: declare <8 x i32> @llvm.umax.v8i32
 
 ; CHECK-LABEL: @test
-; CHECK-COUNT-8: @llvm.umax.i32
+; CHECK-COUNT-2: @llvm.umax.v4i32
 
 ; CHECK-NOT: declare <8 x i32> @llvm.fmuladd.v8i32

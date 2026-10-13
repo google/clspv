@@ -17,13 +17,7 @@ attributes #1 = { nounwind readnone speculatable willreturn }
 ; CHECK-NOT: declare <8 x half> @llvm.fmuladd.v8f16
 
 ; CHECK-LABEL: @test
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
-; CHECK: @llvm.fmuladd.f16
+; CHECK: @llvm.fmuladd.v4f16
+; CHECK: @llvm.fmuladd.v4f16
 
 ; CHECK-NOT: declare <8 x half> @llvm.fmuladd.v8f16

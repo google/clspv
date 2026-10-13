@@ -16,5 +16,5 @@ entry:
 declare <8 x float> @llvm.maxnum.v8f(<8 x float>, <8 x float>)
 
 ; CHECK-LABEL: @foo
-; CHECK-COUNT-8: %{{[0-9]+}} = call spir_func float @llvm.maxnum.f32(float %{{[0-9]+}}, float %{{[0-9]+}})
+; CHECK-COUNT-2: %{{[0-9]+}} = call spir_func <4 x float> @llvm.maxnum.v4f32(<4 x float> %{{[0-9]+}}, <4 x float> %{{[0-9]+}})
 ; CHECK-NOT %{{[0-9]+}} = call spir_func <8 x float> @llvm.maxnum.v8f(<8 x float> %{{[0-9]+}}, <8 x float> %{{[0-9]+}})

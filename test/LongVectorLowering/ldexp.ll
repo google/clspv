@@ -17,7 +17,7 @@ declare spir_func <8 x float> @_Z5ldexpDv8_fDv8_i(<8 x float>, <8 x i32>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x float> @_Z5ldexpDv8_fDv8_i
-; CHECK-COUNT-8: {{.*}} = call spir_func float @_Z5ldexpfi(float {{.*}}, i32 {{.*}})
+; CHECK-COUNT-2: {{.*}} = call spir_func <4 x float> @_Z5ldexpDv4_fDv4_i(<4 x float> {{.*}}, <4 x i32> {{.*}})
 ; CHECK-NOT: call spir_func <8 x float> @_Z5ldexpDv8_fDv8_i
 
 define spir_kernel void @test2(ptr addrspace(1) %x, ptr addrspace(1) %k) {
@@ -33,5 +33,5 @@ declare spir_func <16 x float> @_Z5ldexpDv16_fi(<16 x float>, i32)
 
 ; CHECK-LABEL: @test2
 ; CHECK-NOT: call spir_func <16 x float> @_Z5ldexpDv8_fi
-; CHECK-COUNT-16: {{.*}} = call spir_func float @_Z5ldexpfi(float {{.*}}, i32 {{.*}})
+; CHECK-COUNT-4: {{.*}} = call spir_func <4 x float> @_Z5ldexpDv4_fi(<4 x float> {{.*}}, i32 {{.*}})
 ; CHECK-NOT: call spir_func <16 x float> @_Z5ldexpDv8_fi

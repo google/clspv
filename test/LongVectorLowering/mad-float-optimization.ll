@@ -1,7 +1,7 @@
 ; RUN: clspv-opt --passes=long-vector-lowering %s -o %t.ll
 ; RUN: FileCheck %s < %t.ll
 
-; CHECK-COUNT-8: call spir_func float @_Z3madfff(
+; CHECK-COUNT-2: call spir_func <4 x float> @_Z3madDv4_fDv4_fDv4_f(
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-G1"
 target triple = "spirv32-unknown-vulkan"

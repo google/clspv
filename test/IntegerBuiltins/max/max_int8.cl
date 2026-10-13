@@ -7,15 +7,10 @@
 // CHECK: [[GLSL:%[0-9a-zA-Z_]+]] = OpExtInstImport "GLSL.std.450"
 //
 // CHECK: [[INT:%[0-9a-zA-Z_]+]] = OpTypeInt 32
+// CHECK: [[INT4:%[0-9a-zA-Z_]+]] = OpTypeVector [[INT]] 4
 //
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
-// CHECK: OpExtInst [[INT]] [[GLSL]] SMax
+// CHECK: OpExtInst [[INT4]] [[GLSL]] SMax
+// CHECK: OpExtInst [[INT4]] [[GLSL]] SMax
 
 void kernel test(global int8 *in, global int8 *out) {
   *out = max(in[0], in[1]);

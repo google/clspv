@@ -18,12 +18,6 @@ declare spir_func <8 x float> @_Z10smoothstepDv8_fS_S_(<8 x float>, <8 x float>,
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x float> @_Z10smoothstepDv8_fS_S_
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z10smoothstepfff(float {{.*}}, float {{.*}}, float {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z10smoothstepDv4_fDv4_fDv4_f(<4 x float> {{.*}}, <4 x float> {{.*}}, <4 x float> {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z10smoothstepDv4_fDv4_fDv4_f(<4 x float> {{.*}}, <4 x float> {{.*}}, <4 x float> {{.*}})
 ; CHECK-NOT: call spir_func <8 x float> @_Z10smoothstepDv8_fS_S_

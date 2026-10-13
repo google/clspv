@@ -19,14 +19,8 @@ kernel void test(global int *in, global int *out) {
   {
     int8 a = vload8(0, in);
     int8 b = vload8(1, in);
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
+    // CHECK: OpExtInst [[UINT4]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
+    // CHECK: OpExtInst [[UINT4]] [[EXT]] SMax {{%[0-9]+}} {{%[0-9]+}}
     int8 c = max(a, b);
     vstore8(c, 0, out);
   }
@@ -34,14 +28,10 @@ kernel void test(global int *in, global int *out) {
   {
     int8 a = vload8(0, in);
     int8 b = vload8(1, in);
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B:%[^ ]+]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
-    // CHECK: OpExtInst [[UINT]] [[EXT]] SMax {{%[0-9]+}} [[B]]
+    // CHECK: [[SPLAT0:%[0-9]+]] = OpVectorShuffle [[UINT4]] {{%[0-9]+}} {{%[0-9]+}} 0 0 0 0
+    // CHECK: OpExtInst [[UINT4]] [[EXT]] SMax {{%[0-9]+}} [[SPLAT0]]
+    // CHECK: [[SPLAT1:%[0-9]+]] = OpVectorShuffle [[UINT4]] {{%[0-9]+}} {{%[0-9]+}} 0 0 0 0
+    // CHECK: OpExtInst [[UINT4]] [[EXT]] SMax {{%[0-9]+}} [[SPLAT1]]
     int8 c = max(a, b.s0);
     vstore8(c, 0, out);
   }

@@ -16,13 +16,7 @@ declare spir_func <8 x float> @_Z7radiansDv8_f(<8 x float>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x float> @_Z7radiansDv8_f
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z7radiansf(float {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z7radiansDv4_f(<4 x float> {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z7radiansDv4_f(<4 x float> {{.*}})
 ; CHECK-NOT: call spir_func <8 x float> @_Z7radiansDv8_f
 

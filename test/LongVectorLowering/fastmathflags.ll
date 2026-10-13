@@ -74,14 +74,8 @@ entry:
 ; CHECK: frem reassoc
 ; CHECK: frem reassoc
 
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
-; CHECK: call fast float @llvm.fmuladd.f32
+; CHECK: call fast <4 x float> @llvm.fmuladd.v4f32
+; CHECK: call fast <4 x float> @llvm.fmuladd.v4f32
 
 ; CHECK: fcmp fast
 ; CHECK: fcmp fast

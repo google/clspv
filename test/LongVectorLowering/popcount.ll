@@ -14,11 +14,5 @@ entry:
 
 declare spir_func <8 x i32> @_Z8popcountDv8_i(<8 x i32>)
 
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
-; CHECK: call spir_func i32 @_Z8popcounti(i32
+; CHECK: call spir_func <4 x i32> @_Z8popcountDv4_i(<4 x i32>
+; CHECK: call spir_func <4 x i32> @_Z8popcountDv4_i(<4 x i32>
