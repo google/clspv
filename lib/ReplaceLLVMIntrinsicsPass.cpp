@@ -97,6 +97,10 @@ bool clspv::ReplaceLLVMIntrinsicsPass::runOnFunction(Function &F) {
     return replaceAddSubSat(F, true, false);
   case Intrinsic::sadd_sat:
     return replaceAddSubSat(F, true, true);
+  case Intrinsic::smulh:
+    return replaceMulHi(F, true);
+  case Intrinsic::umulh:
+    return replaceMulHi(F, false);
   case Intrinsic::is_fpclass:
     return replaceIsFpClass(F);
   // SPIR-V OpAssumeTrueKHR requires ExpectAssumeKHR capability in
@@ -1101,6 +1105,15 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceAddSubSat(Function &F,
       auto cmp = builder.CreateICmpEQ(carry_borrow, Constant::getNullValue(ty));
       return builder.CreateSelect(cmp, add_sub, clamp_value);
     }
+  });
+}
+
+bool clspv::ReplaceLLVMIntrinsicsPass::replaceMulHi(Function &F,
+                                                    bool is_signed) {
+  return replaceCallsWithValue(F, [is_signed](CallInst *Call) -> Value * {
+    auto a = Call->getArgOperand(0);
+    auto b = Call->getArgOperand(1);
+    return clspv::InsertOpMulExtended(Call, b, a, is_signed, false).second;
   });
 }
 

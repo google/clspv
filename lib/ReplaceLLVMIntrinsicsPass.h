@@ -36,6 +36,7 @@ struct ReplaceLLVMIntrinsicsPass
   bool replaceCountZeroes(llvm::Function &F, bool leading);
   bool replaceCopysign(llvm::Function &F);
   bool replaceAddSubSat(llvm::Function &F, bool is_signed, bool is_add);
+  bool replaceMulHi(llvm::Function &F, bool is_signed);
   bool replaceIsFpClass(llvm::Function &F);
   bool replaceVectorReduce(llvm::Function &F, llvm::Instruction::BinaryOps,
                            bool with_start_value);

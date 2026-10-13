@@ -47,4 +47,8 @@ InsertSPIRVOp(Instruction *Insert, spv::Op Opcode,
               ArrayRef<Value *> Args,
               const MemoryEffects &MemEffects = MemoryEffects::unknown());
 
+std::pair<Value *, Value *>
+InsertOpMulExtended(Instruction *InsertPoint, Value *a, Value *b, bool IsSigned,
+                    bool ExtractLo = true, bool Int64 = false);
+
 } // namespace clspv

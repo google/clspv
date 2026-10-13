@@ -133,17 +133,6 @@ private:
   bool replaceAsyncWorkGroupCopy(llvm::Function &F, llvm::Type *ty);
   bool replaceAsyncWorkGroupStridedCopy(llvm::Function &F, llvm::Type *ty);
 
-  // Caches struct types for { |type|, |type| }. This prevents
-  // getOrInsertllvm::Function from introducing a bitcasts between structs
-  // with identical contents.
-  llvm::Type *GetPairStruct(llvm::Type *type);
-
-  llvm::Value *InsertOpMulExtended(llvm::Instruction *InsertPoint,
-                                   llvm::Value *a, llvm::Value *b,
-                                   bool IsSigned, bool Int64 = false);
-
-  llvm::DenseMap<llvm::Type *, llvm::Type *> PairStructMap;
-
   llvm::DenseMap<llvm::Value *, llvm::Type *> InferredTypeCache;
 
 public:
