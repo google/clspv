@@ -50,7 +50,7 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts,
                      bool reworkUnsizedTy = true);
 
-unsigned PointerOperandNum(Instruction *inst);
+unsigned PointerOperandNum(Instruction *inst, Value *source = nullptr);
 
 SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
                                             Type *BaseTy = nullptr);
