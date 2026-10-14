@@ -18,6 +18,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <numeric>
 #include <tuple>
 
 #include "BitcastUtils.h"
@@ -298,7 +299,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                               dyn_cast<StructType>(OtherGEPPrevTy), cstVal2,
                               smallerBitWidths2);
       cstVal += smallerBitWidths2 * cstVal2;
-      smallerBitWidths = std::min(smallerBitWidths, smallerBitWidths2);
+      smallerBitWidths = std::gcd(smallerBitWidths, smallerBitWidths2);
       cstVal /= smallerBitWidths;
       auto newGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEPPrevTy,
@@ -324,7 +325,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
                            smallerBitWidths2);
       assert(dynVal == nullptr);
       cstVal = cstVal * smallerBitWidths + cstVal2 * smallerBitWidths2;
-      smallerBitWidths = std::min(smallerBitWidths, smallerBitWidths2);
+      smallerBitWidths = std::gcd(smallerBitWidths, smallerBitWidths2);
       cstVal /= smallerBitWidths;
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
