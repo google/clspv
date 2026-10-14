@@ -16,6 +16,7 @@
 // CHECK-DAG: OpEntryPoint GLCompute [[image_dim:%[a-zA-Z0-9_]+]] "image_dim"
 
 // CHECK-DAG: [[float:%[a-zA-Z0-9_]+]] = OpTypeFloat 32
+// CHECK-DAG: [[float3:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 3
 // CHECK-DAG: [[float4:%[a-zA-Z0-9_]+]] = OpTypeVector [[float]] 4
 // CHECK-DAG: [[uint:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[uint3:%[a-zA-Z0-9_]+]] = OpTypeVector [[uint]] 3
@@ -41,10 +42,13 @@
 // CHECK: [[read_float]] = OpFunction
 // CHECK: [[image:%[a-zA-Z0-9_]+]] = OpLoad [[f_ro_image]]
 // CHECK: [[sample:%[a-zA-Z0-9_]+]] = OpSampledImage [[f_sampled]] [[image]]
-// CHECK: OpImageSampleExplicitLod [[float4]] [[sample]] {{.*}} Lod [[float_0]]
+// CHECK: [[coord:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[float3]] {{.*}} 0 1 2
+// CHECK: OpImageSampleExplicitLod [[float4]] [[sample]] [[coord]] Lod [[float_0]]
 // CHECK: [[sample:%[a-zA-Z0-9_]+]] = OpSampledImage [[f_sampled]] [[image]]
-// CHECK: OpImageSampleExplicitLod [[float4]] [[sample]] {{.*}} Lod [[float_0]]
-// CHECK: OpImageFetch [[float4]] [[image]] {{.*}} Lod [[uint_0]]
+// CHECK: [[coord:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[float3]] {{.*}} 0 1 2
+// CHECK: OpImageSampleExplicitLod [[float4]] [[sample]] [[coord]] Lod [[float_0]]
+// CHECK: [[coord:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[uint3]] {{.*}} 0 1 2
+// CHECK: OpImageFetch [[float4]] [[image]] [[coord]] Lod [[uint_0]]
 kernel void read_float(read_only image2d_array_t image, sampler_t s, global float4* out) {
   out[0] = read_imagef(image, s, (float4)(0));
   out[1] = read_imagef(image, s, (int4)(0));
@@ -53,7 +57,8 @@ kernel void read_float(read_only image2d_array_t image, sampler_t s, global floa
 
 // CHECK: [[write_float]] = OpFunction
 // CHECK: [[image:%[a-zA-Z0-9_]+]] = OpLoad [[f_wo_image]]
-// CHECK: OpImageWrite [[image]]
+// CHECK: [[coord:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[uint3]] {{.*}} 0 1 2
+// CHECK: OpImageWrite [[image]] [[coord]]
 kernel void write_float(write_only image2d_array_t image) {
   write_imagef(image, (int4)(0), (float4)(0));
 }

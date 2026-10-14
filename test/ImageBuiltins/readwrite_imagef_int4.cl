@@ -16,7 +16,10 @@ kernel void foo(read_write image3d_t im) {
 // CHECK-DAG: [[int:%[a-zA-Z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: [[int4:%[a-zA-Z0-9_]+]] = OpTypeVector [[int]] 4
 // CHECK-DAG: [[coord:%[a-zA-Z0-9_]+]] = OpConstantNull [[int4]]
+// CHECK-DAG: [[int3:%[a-zA-Z0-9_]+]] = OpTypeVector [[int]] 3
 // CHECK: [[ld:%[a-zA-Z0-9_]+]] = OpLoad [[image]]
-// CHECK: [[x:%[a-zA-Z0-9_]+]] = OpImageRead [[float4]] [[ld]] [[coord]]
-// CHECK: OpImageWrite [[ld]] [[coord]] [[x]]
+// CHECK: [[coord_read:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[int3]] [[coord]] [[coord]] 0 1 2
+// CHECK: [[x:%[a-zA-Z0-9_]+]] = OpImageRead [[float4]] [[ld]] [[coord_read]]
+// CHECK: [[coord_write:%[a-zA-Z0-9_]+]] = OpVectorShuffle [[int3]] [[coord]] [[coord]] 0 1 2
+// CHECK: OpImageWrite [[ld]] [[coord_write]] [[x]]
 
