@@ -122,7 +122,9 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
   case Intrinsic::sadd_sat:
   case Intrinsic::uadd_sat:
   case Intrinsic::ssub_sat:
-  case Intrinsic::usub_sat: {
+  case Intrinsic::usub_sat:
+  case Intrinsic::smulh:
+  case Intrinsic::umulh: {
     SmallVector<Type *, 16> ParamTys;
     bool Success = Intrinsic::isSignatureValid(&Intrinsic, ParamTys);
     assert(Success);

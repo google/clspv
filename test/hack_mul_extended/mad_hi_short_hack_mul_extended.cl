@@ -14,7 +14,7 @@
 // CHECK:     [[mul:%[^ ]+]] = OpIMul [[uint]] [[b_ext]] [[a_ext]]
 // CHECK:     [[shift:%[^ ]+]] = OpShiftRightLogical [[uint]] [[mul]] [[uint_16]]
 // CHECK:     [[trunc:%[^ ]+]] = OpUConvert [[ushort]] [[shift]]
-// CHECK:     [[add:%[^ ]+]] = OpIAdd [[ushort]] [[c]] [[trunc]]
+// CHECK:     [[add:%[^ ]+]] = OpIAdd [[ushort]] [[trunc]] [[c]]
 // CHECK:     OpStore {{.*}} [[add]]
 
 kernel void __attribute__((reqd_work_group_size(1, 1, 1))) foo(global short *a, global short *b, global short *c, global short *d)
