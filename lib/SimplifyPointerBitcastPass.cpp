@@ -487,6 +487,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
 
   struct ImplicitGEPAliasing {
     Instruction *inst;
+    Value *source;
     int steps;
     GetElementPtrInst *gep;
   };
@@ -528,7 +529,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
           bool userCall = call && !call->getCalledFunction()->isDeclaration();
           if (!userCall && (gep || PerfectMatch)) {
             GEPAliasingList.push_back(
-                {&I, Steps, PerfectMatch ? nullptr : gep});
+                {&I, source, Steps, PerfectMatch ? nullptr : gep});
           }
         } else if (isa<StoreInst>(&I) && !isa<GetElementPtrInst>(source)) {
           GEPBeforeStoreList.push_back({&I, dest_ty});
@@ -555,7 +556,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     auto *gep = GEPInfo.gep;
     IRBuilder<> Builder{I};
     SmallVector<Value *, 8> GEPIndices{};
-    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+    unsigned PointerOperandNum =
+        BitcastUtils::PointerOperandNum(I, GEPInfo.source);
 
     for (int i = 0; i < Steps + 1; i++) {
       GEPIndices.push_back(Builder.getInt32(0));

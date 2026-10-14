@@ -903,7 +903,7 @@ bool RemoveCstExprFromFunction(Function *F) {
   return Changed;
 }
 
-unsigned PointerOperandNum(Instruction *inst) {
+unsigned PointerOperandNum(Instruction *inst, Value *source) {
   if (isa<StoreInst>(inst)) {
     return 1;
   } else if (auto *call = dyn_cast<CallInst>(inst)) {
@@ -917,6 +917,13 @@ unsigned PointerOperandNum(Instruction *inst) {
           static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
           opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor);
       if (atomic) {
+        return 1;
+      }
+    } else if (call->getCalledFunction()->getName().starts_with(
+                   "llvm.memcpy")) {
+      if (call->getArgOperand(0) == source) {
+        return 0;
+      } else if (call->getArgOperand(1) == source) {
         return 1;
       }
     }
@@ -1037,8 +1044,14 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
       auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
       if (DstTy && SrcTy && DstTy != SrcTy) {
-        if (SizeInBits(M.getDataLayout(), DstTy) >=
-            SizeInBits(M.getDataLayout(), SrcTy)) {
+        int Steps;
+        bool PerfectMatch;
+        auto DstSize = SizeInBits(M.getDataLayout(), DstTy);
+        auto SrcSize = SizeInBits(M.getDataLayout(), SrcTy);
+        if (DstSize > SrcSize ||
+            (DstSize == SrcSize &&
+             !FindAliasingContainedType(DstTy, SrcTy, Steps, PerfectMatch,
+                                        M.getDataLayout()))) {
           source = Src;
           source_ty = SrcTy;
           dest_ty = DstTy;
