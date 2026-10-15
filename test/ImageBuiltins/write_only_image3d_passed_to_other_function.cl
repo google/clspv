@@ -19,6 +19,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image3
 // CHECK-DAG:  [[_2:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 3D 0 0 0 2 Unknown
 // CHECK-DAG:  [[_uint:%[0-9a-zA-Z_]+]] = OpTypeInt 32 0
 // CHECK-DAG:  [[_v4uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 4
+// CHECK-DAG:  [[_v3uint:%[0-9a-zA-Z_]+]] = OpTypeVector [[_uint]] 3
 // CHECK-DAG:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
 // CHECK:  = OpFunction
 // CHECK:  [[_33:%[0-9a-zA-Z_]+]] = OpLoad [[_v4float]]
@@ -27,4 +28,5 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(write_only image3
 // CHECK:  [[_23:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v4uint]]
 // CHECK:  [[_24:%[0-9a-zA-Z_]+]] = OpFunctionParameter [[_v4float]]
 // CHECK:  [[_26:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
-// CHECK:  OpImageWrite [[_26]] [[_23]] [[_24]]
+// CHECK:  [[_coord:%[0-9a-zA-Z_]+]] = OpVectorShuffle [[_v3uint]] [[_23]] [[_23]] 0 1 2
+// CHECK:  OpImageWrite [[_26]] [[_coord]] [[_24]]

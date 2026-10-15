@@ -4191,6 +4191,25 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
   auto *image_ty = InferType(Call->getArgOperand(0), module->getContext(),
                              &InferredTypeCache);
   LLVMContext &Context = module->getContext();
+
+  auto GetCoordinate = [this, image_ty](Value *Coord) -> SPIRVID {
+    SPIRVID CoordID = getSPIRVValue(Coord);
+    const uint32_t dim = ImageNumDimensions(image_ty);
+    const uint32_t components = dim + (IsArrayImageType(image_ty) ? 1 : 0);
+    if (auto *vec_ty = dyn_cast<FixedVectorType>(Coord->getType())) {
+      if (vec_ty->getNumElements() > components) {
+        SPIRVOperandVec Ops;
+        Ops << FixedVectorType::get(vec_ty->getElementType(), components)
+            << CoordID << CoordID;
+        for (uint32_t i = 0; i < components; ++i) {
+          Ops << i;
+        }
+        CoordID = addSPIRVInst(spv::OpVectorShuffle, Ops);
+      }
+    }
+    return CoordID;
+  };
+
   switch (FuncInfo.getType()) {
   case Builtins::kReadImagef:
   case Builtins::kReadImageh:
@@ -4219,6 +4238,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       Ops << ImageTyID << Image << Sampler;
 
       SPIRVID SampledImageID = addSPIRVInst(spv::OpSampledImage, Ops);
+      SPIRVID CoordinateID = GetCoordinate(Coordinate);
 
       //
       // Generate OpImageSampleExplicitLod.
@@ -4242,7 +4262,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       uint32_t mask = spv::ImageOperandsLodMask |
                       GetExtendMask(Call->getType(), is_int_image);
       Constant *CstFP0 = ConstantFP::get(Context, APFloat(0.0f));
-      Ops << result_type << SampledImageID << Coordinate << mask << CstFP0;
+      Ops << result_type << SampledImageID << CoordinateID << mask << CstFP0;
 
       RID = addSPIRVInst(spv::OpImageSampleExplicitLod, Ops);
 
@@ -4256,6 +4276,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       // read_image on a storage image is mapped to OpImageRead.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
+      SPIRVID CoordinateID = GetCoordinate(Coordinate);
 
       //
       // Generate OpImageRead
@@ -4275,7 +4296,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
         result_type = getSPIRVType(Call->getType());
       }
 
-      Ops << result_type << Image << Coordinate;
+      Ops << result_type << Image << CoordinateID;
       uint32_t mask = GetExtendMask(Call->getType(), is_int_image);
       if (mask != 0)
         Ops << mask;
@@ -4295,6 +4316,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       // OpImageFetch.
       Value *Image = Call->getArgOperand(0);
       Value *Coordinate = Call->getArgOperand(1);
+      SPIRVID CoordinateID = GetCoordinate(Coordinate);
 
       //
       // Generate OpImageFetch
@@ -4314,7 +4336,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       } else {
         result_type = getSPIRVType(Call->getType());
       }
-      Ops << result_type << Image << Coordinate;
+      Ops << result_type << Image << CoordinateID;
       if (ImageDimensionality(image_ty) != spv::DimBuffer) {
         uint32_t mask = spv::ImageOperandsLodMask |
                         GetExtendMask(Call->getType(), is_int_image);
@@ -4353,6 +4375,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     Value *Coordinate = Call->getArgOperand(1);
     Value *Texel = Call->getArgOperand(2);
 
+    SPIRVID CoordinateID = GetCoordinate(Coordinate);
     SPIRVID TexelID = getSPIRVValue(Texel);
 
     const bool is_int_image = IsIntImageType(image_ty);
@@ -4362,7 +4385,7 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
       TexelID = addSPIRVInst(spv::OpBitcast, Ops);
       Ops.clear();
     }
-    Ops << Image << Coordinate << TexelID;
+    Ops << Image << CoordinateID << TexelID;
     uint32_t mask = GetExtendMask(Texel->getType(), is_int_image);
     if (mask != 0)
       Ops << mask;

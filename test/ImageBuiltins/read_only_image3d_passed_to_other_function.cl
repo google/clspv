@@ -19,6 +19,7 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d
 // CHECK-DAG:  [[_2:%[0-9a-zA-Z_]+]] = OpTypeSampler
 // CHECK-DAG:  [[_4:%[0-9a-zA-Z_]+]] = OpTypeImage [[_float]] 3D 0 0 0 1 Unknown
 // CHECK-DAG:  [[_v4float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 4
+// CHECK-DAG:  [[_v3float:%[0-9a-zA-Z_]+]] = OpTypeVector [[_float]] 3
 // CHECK-DAG:  [[_17:%[0-9a-zA-Z_]+]] = OpTypeSampledImage [[_4]]
 // CHECK-DAG:  [[_float_0:%[0-9a-zA-Z_]+]] = OpConstant [[_float]] 0
 // CHECK:  = OpFunction
@@ -30,6 +31,6 @@ void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(read_only image3d
 // CHECK:  [[_29:%[0-9a-zA-Z_]+]] = OpLoad [[_4]]
 // CHECK:  [[_30:%[0-9a-zA-Z_]+]] = OpLoad [[_2]]
 // CHECK:  [[_31:%[0-9a-zA-Z_]+]] = OpSampledImage [[_17]] [[_29]] [[_30]]
-
-// CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_31]] [[_27]] Lod [[_float_0]]
+// CHECK:  [[_coord:%[0-9a-zA-Z_]+]] = OpVectorShuffle [[_v3float]] [[_27]] [[_27]] 0 1 2
+// CHECK:  [[_32:%[0-9a-zA-Z_]+]] = OpImageSampleExplicitLod [[_v4float]] [[_31]] [[_coord]] Lod [[_float_0]]
 // CHECK:  OpReturnValue [[_32]]
