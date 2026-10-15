@@ -25,8 +25,12 @@ int referenced(int a) {
 
 // CHECK-NOT: OpFunction %[[UINT_TYPE_ID]] Const %[[REFERENCED_TYPE_ID]]
 
+int unreferenced_leaf(int a) {
+  return a + 7;
+}
+
 int unreferenced(int a) {
-  return a + 13;
+  return unreferenced_leaf(a) + 13;
 }
 
 // CHECK: %[[FOO_ID]] = OpFunction
