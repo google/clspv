@@ -168,6 +168,7 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
       if (!call->getCalledFunction()->isDeclaration()) {
         // See if the type can be inferred from the use in the called
         // function.
+        CacheType(nullptr);
         auto *ty = InferType(call->getCalledFunction()->getArg(operand),
                              context, cache);
         if (ty)
@@ -375,6 +376,9 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
 
   auto iter = cache->find(v);
   if (iter != cache->end()) {
+    if (iter->second == nullptr && TyHint != nullptr) {
+      return (*cache)[v] = TyHint;
+    }
     return iter->second;
   }
 
@@ -546,7 +550,7 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   if (TyHint) {
     return CacheType(TyHint);
   }
-  return nullptr;
+  return CacheType(nullptr);
 }
 
 bool clspv::PointersAre64Bit(llvm::Module &m) {

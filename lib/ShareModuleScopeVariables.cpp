@@ -61,7 +61,10 @@ void clspv::ShareModuleScopeVariablesPass::MapEntryPoints(Module &M) {
 
 void clspv::ShareModuleScopeVariablesPass::TraceFunction(
     Function *function, Function *entry_point) {
-  function_to_entry_points_[function].insert(entry_point);
+  auto &entry_points = function_to_entry_points_[function];
+  if (entry_points.idFor(entry_point) != 0)
+    return;
+  entry_points.insert(entry_point);
 
   for (auto &BB : *function) {
     for (auto &I : BB) {
