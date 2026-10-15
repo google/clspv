@@ -77,6 +77,8 @@ UniqueVector<Function *> CallGraphOrderedFunctions(Module &M) {
               [&functions](Function *lhs, Function *rhs) {
                 return functions.idFor(lhs) < functions.idFor(rhs);
               });
+    auto uniqued = std::unique(callees.begin(), callees.end());
+    callees.erase(uniqued, callees.end());
   }
 
   // Use Kahn's algorithm for topoological sort.
