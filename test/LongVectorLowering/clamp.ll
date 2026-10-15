@@ -18,12 +18,6 @@ declare spir_func <8 x i32> @_Z5clampDv8_iS_S_(<8 x i32>, <8 x i32>, <8 x i32>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x i32> @_Z5clampDv8_iS_S_
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z5clampiii(i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x i32> @_Z5clampDv4_iDv4_iDv4_i(<4 x i32> {{.*}}, <4 x i32> {{.*}}, <4 x i32> {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x i32> @_Z5clampDv4_iDv4_iDv4_i(<4 x i32> {{.*}}, <4 x i32> {{.*}}, <4 x i32> {{.*}})
 ; CHECK-NOT: call spir_func <8 x i32> @_Z5clampDv8_iS_S_

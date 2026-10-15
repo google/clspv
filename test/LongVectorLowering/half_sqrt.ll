@@ -16,5 +16,5 @@ declare spir_func <8 x float> @_Z9half_sqrtDv8_f(<8 x float>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x float> @_Z9half_sqrtDv8_f
-; CHECK-COUNT-8: {{.*}} = call spir_func float @_Z9half_sqrtf(float {{.*}})
+; CHECK-COUNT-2: {{.*}} = call spir_func <4 x float> @_Z9half_sqrtDv4_f(<4 x float> {{.*}})
 ; CHECK-NOT: call spir_func <8 x float> @_Z9half_sqrtDv8_f

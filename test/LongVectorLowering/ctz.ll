@@ -14,11 +14,5 @@ entry:
 
 declare <8 x i32> @llvm.cttz.v8i32(<8 x i32>, i1 immarg) #1
 
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
-; CHECK: call spir_func i32 @llvm.cttz.i32(i32
+; CHECK: call spir_func <4 x i32> @llvm.cttz.v4i32(<4 x i32>
+; CHECK: call spir_func <4 x i32> @llvm.cttz.v4i32(<4 x i32>

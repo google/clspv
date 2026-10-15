@@ -58,31 +58,34 @@ declare <8 x i8> @_Z7add_satDv8_cS_(<8 x i8>, <8 x i8>)
 ; CHECK: [[add6:%[a-zA-Z0-9_.]+]] = add nuw nsw i16 [[sext_a6]], [[sext_b6]]
 ; CHECK: [[add7:%[a-zA-Z0-9_.]+]] = add nuw nsw i16 [[sext_a7]], [[sext_b7]]
 
-; CHECK: [[clamp0:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add0]], i16 -128, i16 127)
-; CHECK: [[clamp1:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add1]], i16 -128, i16 127)
-; CHECK: [[clamp2:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add2]], i16 -128, i16 127)
-; CHECK: [[clamp3:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add3]], i16 -128, i16 127)
-; CHECK: [[clamp4:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add4]], i16 -128, i16 127)
-; CHECK: [[clamp5:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add5]], i16 -128, i16 127)
-; CHECK: [[clamp6:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add6]], i16 -128, i16 127)
-; CHECK: [[clamp7:%[a-zA-Z0-9_.]+]] = call i16 @_Z5clampsss(i16 [[add7]], i16 -128, i16 127)
+; CHECK: [[clamp_lo:%[a-zA-Z0-9_.]+]] = call <4 x i16> @_Z5clampDv4_sDv4_sDv4_s(<4 x i16> {{.*}}, <4 x i16> splat (i16 -128), <4 x i16> splat (i16 127))
+; CHECK: [[clamp_hi:%[a-zA-Z0-9_.]+]] = call <4 x i16> @_Z5clampDv4_sDv4_sDv4_s(<4 x i16> {{.*}}, <4 x i16> splat (i16 -128), <4 x i16> splat (i16 127))
 
-; CHECK: [[trunc0:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp0]] to i8
-; CHECK: [[trunc1:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp1]] to i8
-; CHECK: [[trunc2:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp2]] to i8
-; CHECK: [[trunc3:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp3]] to i8
-; CHECK: [[trunc4:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp4]] to i8
-; CHECK: [[trunc5:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp5]] to i8
-; CHECK: [[trunc6:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp6]] to i8
-; CHECK: [[trunc7:%[a-zA-Z0-9_.]+]] = trunc i16 [[clamp7]] to i8
+; CHECK-DAG: [[bitcast0:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_lo]] to <8 x i8>
+; CHECK-DAG: [[bitcast1:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_lo]] to <8 x i8>
+; CHECK-DAG: [[bitcast2:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_lo]] to <8 x i8>
+; CHECK-DAG: [[bitcast3:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_lo]] to <8 x i8>
+; CHECK-DAG: [[bitcast4:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_hi]] to <8 x i8>
+; CHECK-DAG: [[bitcast5:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_hi]] to <8 x i8>
+; CHECK-DAG: [[bitcast6:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_hi]] to <8 x i8>
+; CHECK-DAG: [[bitcast7:%[a-zA-Z0-9_.]+]] = bitcast <4 x i16> [[clamp_hi]] to <8 x i8>
 
-; CHECK:  [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] poison, i8 [[trunc0]], 0
-; CHECK:  [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in0]], i8 [[trunc1]], 1
-; CHECK:  [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in1]], i8 [[trunc2]], 2
-; CHECK:  [[in3:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in2]], i8 [[trunc3]], 3
-; CHECK:  [[in4:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in3]], i8 [[trunc4]], 4
-; CHECK:  [[in5:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in4]], i8 [[trunc5]], 5
-; CHECK:  [[in6:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in5]], i8 [[trunc6]], 6
-; CHECK:  [[in7:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in6]], i8 [[trunc7]], 7
+; CHECK-DAG: [[clamp0:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast0]], i64 0
+; CHECK-DAG: [[clamp1:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast1]], i64 2
+; CHECK-DAG: [[clamp2:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast2]], i64 4
+; CHECK-DAG: [[clamp3:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast3]], i64 6
+; CHECK-DAG: [[clamp4:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast4]], i64 0
+; CHECK-DAG: [[clamp5:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast5]], i64 2
+; CHECK-DAG: [[clamp6:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast6]], i64 4
+; CHECK-DAG: [[clamp7:%[a-zA-Z0-9_.]+]] = extractelement <8 x i8> [[bitcast7]], i64 6
+
+; CHECK:  [[in0:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] poison, i8 [[clamp0]], 0
+; CHECK:  [[in1:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in0]], i8 [[clamp1]], 1
+; CHECK:  [[in2:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in1]], i8 [[clamp2]], 2
+; CHECK:  [[in3:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in2]], i8 [[clamp3]], 3
+; CHECK:  [[in4:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in3]], i8 [[clamp4]], 4
+; CHECK:  [[in5:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in4]], i8 [[clamp5]], 5
+; CHECK:  [[in6:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in5]], i8 [[clamp6]], 6
+; CHECK:  [[in7:%[a-zA-Z0-9_.]+]] = insertvalue [8 x i8] [[in6]], i8 [[clamp7]], 7
 
 ; CHECK: ret [8 x i8] [[in7]]

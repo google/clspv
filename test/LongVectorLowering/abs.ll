@@ -14,11 +14,5 @@ entry:
 
 declare spir_func <8 x i32> @_Z3absDv8_i(<8 x i32>)
 
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
-; CHECK: call spir_func i32 @_Z3absi(i32
+; CHECK: call spir_func <4 x i32> @_Z3absDv4_i(<4 x i32>
+; CHECK: call spir_func <4 x i32> @_Z3absDv4_i(<4 x i32>

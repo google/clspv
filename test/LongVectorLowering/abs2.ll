@@ -14,11 +14,5 @@ entry:
 
 declare <8 x i32> @llvm.abs.v8i32(<8 x i32>, i1)
 
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
-; CHECK: call spir_func i32 @llvm.abs.i32(i32
+; CHECK: call spir_func <4 x i32> @llvm.abs.v4i32(<4 x i32>
+; CHECK: call spir_func <4 x i32> @llvm.abs.v4i32(<4 x i32>

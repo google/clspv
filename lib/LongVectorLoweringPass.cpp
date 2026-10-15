@@ -78,8 +78,15 @@ void partitionInstructions(ArrayRef<WeakTrackingVH> Instructions,
   }
 }
 
-/// Get the scalar overload for the given LLVM @p Intrinsic.
-Function *getIntrinsicScalarVersion(Function &Intrinsic) {
+FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
+  while (VectorTy->getNumElements() > clspv::SPIRVMaxVectorSize()) {
+    VectorTy = FixedVectorType::getHalfElementsVectorType(VectorTy);
+  }
+  return VectorTy;
+}
+
+/// Get the SPIR-V compliant vector overload for the given LLVM @p Intrinsic.
+Function *getIntrinsicSpirvCompliantVersion(Function &Intrinsic) {
   auto id = Intrinsic.getIntrinsicID();
   assert(id != Intrinsic::not_intrinsic);
 
@@ -130,11 +137,11 @@ Function *getIntrinsicScalarVersion(Function &Intrinsic) {
     assert(Success);
     (void)Success;
 
-    // Map vectors to scalars.
+    // Map long vectors to SPIR-V compliant vectors.
     for (auto *&Param : ParamTys) {
       // TODO Need support for other types, like pointers. Need test case.
       assert(Param->isVectorTy());
-      Param = Param->getScalarType();
+      Param = getSpirvCompliantVectorType(cast<FixedVectorType>(Param));
     }
 
     return Intrinsic::getOrInsertDeclaration(Intrinsic.getParent(), id,
@@ -195,8 +202,9 @@ Type *getScalarPointerType(Function &Builtin) {
   }
 }
 
-/// Get the scalar overload for the given OpenCL builtin function @p Builtin.
-Function *getBIFScalarVersion(Function &Builtin) {
+/// Get the scalar or SPIR-V compliant vector overload for the given OpenCL
+/// builtin function @p Builtin.
+Function *getBIFVersion(Function &Builtin, bool Scalar) {
   assert(!Builtin.isIntrinsic());
   const auto &Info = clspv::Builtins::Lookup(&Builtin);
   assert(Info.getType() != clspv::Builtins::kBuiltinNone);
@@ -273,28 +281,33 @@ Function *getBIFScalarVersion(Function &Builtin) {
   case clspv::Builtins::kSpirvOp:
   case clspv::Builtins::kStep:
   case clspv::Builtins::kSqrt:
+  case clspv::Builtins::kSubGroupBroadcast:
   case clspv::Builtins::kSubGroupNonUniformBroadcast:
   case clspv::Builtins::kTan:
   case clspv::Builtins::kTanh:
   case clspv::Builtins::kTrunc: {
-    // Scalarise all the input/output types. Here we intentionally do not rely
-    // on getEquivalentType because we want the scalar overload.
-    SmallVector<Type *, 16> ScalarParamTys;
+    SmallVector<Type *, 16> ParamTys;
     for (auto &Param : Builtin.args()) {
       auto *ParamTy = Param.getType();
 
-      Type *ScalarParamTy = nullptr;
+      Type *NewParamTy = nullptr;
       if (ParamTy->isPointerTy()) {
-        ScalarParamTy = ParamTy;
-      } else {
+        NewParamTy = ParamTy;
+      } else if (Scalar) {
         assert((ParamTy->isVectorTy() || ParamTy->isFloatingPointTy() ||
                 ParamTy->isIntegerTy()) &&
                "Unsupported kind of parameter type.");
-        ScalarParamTy = ParamTy->getScalarType();
+        NewParamTy = ParamTy->getScalarType();
+      } else if (auto *VecParamTy = dyn_cast<FixedVectorType>(ParamTy)) {
+        NewParamTy = getSpirvCompliantVectorType(VecParamTy);
+      } else {
+        assert((ParamTy->isFloatingPointTy() || ParamTy->isIntegerTy()) &&
+               "Unsupported kind of parameter type.");
+        NewParamTy = ParamTy;
       }
 
-      assert(ScalarParamTy);
-      ScalarParamTys.push_back(ScalarParamTy);
+      assert(NewParamTy);
+      ParamTys.push_back(NewParamTy);
     }
 
     Type *ReturnTy;
@@ -309,34 +322,37 @@ Function *getBIFScalarVersion(Function &Builtin) {
             RetTy->getStructElementType(eachRetTy)->getScalarType());
       }
       ReturnTy = StructType::create(RetTys);
-    } else {
+    } else if (Scalar) {
       ReturnTy = Builtin.getReturnType()->getScalarType();
+    } else {
+      ReturnTy = getSpirvCompliantVectorType(
+          cast<FixedVectorType>(Builtin.getReturnType()));
     }
 
-    FunctionTy =
-        FunctionType::get(ReturnTy, ScalarParamTys, Builtin.isVarArg());
+    FunctionTy = FunctionType::get(ReturnTy, ParamTys, Builtin.isVarArg());
     break;
   }
   }
 
   // Handle signedness of parameters by using clspv::Builtins API.
-  std::string ScalarName = getMangledScalarName(Info);
+  std::string NewName =
+      Scalar ? getMangledScalarName(Info) : getSpirvCompliantName(Info);
 
-  // Get the scalar version, which might not already exist in the module.
+  // Get the target overload, which might not already exist in the module.
   auto *M = Builtin.getParent();
-  auto *ScalarFn = M->getFunction(ScalarName);
+  auto *NewFn = M->getFunction(NewName);
 
-  if (ScalarFn == nullptr) {
-    ScalarFn = Function::Create(FunctionTy, Builtin.getLinkage(), ScalarName);
-    ScalarFn->setCallingConv(Builtin.getCallingConv());
-    ScalarFn->copyAttributesFrom(&Builtin);
+  if (NewFn == nullptr) {
+    NewFn = Function::Create(FunctionTy, Builtin.getLinkage(), NewName);
+    NewFn->setCallingConv(Builtin.getCallingConv());
+    NewFn->copyAttributesFrom(&Builtin);
 
-    M->getFunctionList().push_front(ScalarFn);
+    M->getFunctionList().push_front(NewFn);
   }
 
-  assert(Builtin.getCallingConv() == ScalarFn->getCallingConv());
+  assert(Builtin.getCallingConv() == NewFn->getCallingConv());
 
-  return ScalarFn;
+  return NewFn;
 }
 
 /// Convert the given value @p V to a value of the given @p EquivalentTy.
@@ -491,6 +507,71 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
   return ReturnValue;
 }
 
+/// Lower the vector instruction @p I into calls on SPIR-V compliant sub-vectors
+/// by invoking @p SubVecOperation.
+Value *
+convertSpirvCompliantVectorOperation(Instruction &I, Type *EquivalentReturnTy,
+                                     ArrayRef<Value *> EquivalentArgs,
+                                     ScalarOperationFactory SubVecOperation) {
+  assert(EquivalentReturnTy != nullptr);
+  assert(EquivalentReturnTy->isArrayTy());
+
+  auto *VectorReturnTy = cast<FixedVectorType>(I.getType());
+  FixedVectorType *DstReturnTy = getSpirvCompliantVectorType(VectorReturnTy);
+  unsigned InitNumElements = VectorReturnTy->getNumElements();
+  unsigned DstNumElements = DstReturnTy->getNumElements();
+  assert(EquivalentReturnTy->getArrayNumElements() == InitNumElements);
+  assert(InitNumElements % DstNumElements == 0);
+
+  Value *ReturnValue = PoisonValue::get(EquivalentReturnTy);
+
+  IRBuilder<> B(&I);
+  for (unsigned eachCall = 0; eachCall < InitNumElements / DstNumElements;
+       ++eachCall) {
+    SmallVector<Value *, 16> Args;
+    Args.resize(EquivalentArgs.size());
+
+    for (unsigned j = 0; j < Args.size(); ++j) {
+      auto *ArgTy = EquivalentArgs[j]->getType();
+      if (ArgTy->isArrayTy()) {
+        assert(ArgTy->getArrayNumElements() == InitNumElements);
+        auto *SubVecArgTy =
+            FixedVectorType::get(ArgTy->getArrayElementType(), DstNumElements);
+        Value *SubVector = PoisonValue::get(SubVecArgTy);
+        for (unsigned eachVecElement = 0; eachVecElement < DstNumElements;
+             ++eachVecElement) {
+          auto *Val = B.CreateExtractValue(
+              EquivalentArgs[j], eachVecElement + eachCall * DstNumElements);
+          SubVector =
+              B.CreateInsertElement(SubVector, Val, B.getInt64(eachVecElement));
+        }
+        Args[j] = SubVector;
+      } else {
+        assert((ArgTy->isFloatingPointTy() || ArgTy->isIntegerTy() ||
+                ArgTy->isVectorTy()) &&
+               "Unsupported kind of parameter type.");
+        Args[j] = EquivalentArgs[j];
+      }
+    }
+
+    Value *SubVecCall = SubVecOperation(B, Args);
+
+    if (isa<Instruction>(SubVecCall)) {
+      cast<Instruction>(SubVecCall)->copyIRFlags(&I);
+    }
+
+    for (unsigned eachVecElement = 0; eachVecElement < DstNumElements;
+         ++eachVecElement) {
+      auto *Val =
+          B.CreateExtractElement(SubVecCall, B.getInt64(eachVecElement));
+      ReturnValue = B.CreateInsertValue(
+          ReturnValue, Val, eachVecElement + eachCall * DstNumElements);
+    }
+  }
+
+  return ReturnValue;
+}
+
 /// Map the arguments of the wrapper function (which are either not long-vectors
 /// or aggregates of scalars) to the original arguments of the user-defined
 /// function (which can be long-vectors). Handle pointers as well.
@@ -563,13 +644,6 @@ Function *createFunctionWithMappedTypes(Function &F,
   BitcastUtils::RemoveCstExprFromFunction(Wrapper);
 
   return Wrapper;
-}
-
-FixedVectorType *getSpirvCompliantVectorType(FixedVectorType *VectorTy) {
-  while (VectorTy->getNumElements() > clspv::SPIRVMaxVectorSize()) {
-    VectorTy = FixedVectorType::getHalfElementsVectorType(VectorTy);
-  }
-  return VectorTy;
 }
 
 using ReduceOperationFactory =
@@ -1654,29 +1728,39 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinCall(
   Function *VectorFunction = VectorCall.getCalledFunction();
   assert(VectorFunction);
 
+  auto *ScalarPointerDataTy = getScalarPointerType(*VectorFunction);
+  bool LowerToScalar = ScalarPointerDataTy != nullptr ||
+                       !VectorFunction->getReturnType()->isVectorTy();
+
   // Use and update the FunctionMap cache.
-  Function *ScalarFunction = FunctionMap[VectorFunction];
-  if (ScalarFunction == nullptr) {
+  Function *ReplacementFunction = FunctionMap[VectorFunction];
+  if (ReplacementFunction == nullptr) {
     // Handle both OpenCL builtin functions, available as simple declarations,
     // and LLVM intrinsics.
-    auto getter = VectorFunction->isIntrinsic() ? getIntrinsicScalarVersion
-                                                : getBIFScalarVersion;
-    ScalarFunction = getter(*VectorFunction);
-    FunctionMap[VectorFunction] = ScalarFunction;
+    if (VectorFunction->isIntrinsic()) {
+      ReplacementFunction = getIntrinsicSpirvCompliantVersion(*VectorFunction);
+    } else {
+      ReplacementFunction = getBIFVersion(*VectorFunction, LowerToScalar);
+    }
+    FunctionMap[VectorFunction] = ReplacementFunction;
   }
-  assert(ScalarFunction);
+  assert(ReplacementFunction);
 
-  auto ScalarFactory = [ScalarFunction, &VectorCall](auto &B, auto Args) {
-    CallInst *ScalarCall = B.CreateCall(ScalarFunction, Args);
-    ScalarCall->copyIRFlags(&VectorCall);
-    ScalarCall->copyMetadata(VectorCall);
-    ScalarCall->setCallingConv(VectorCall.getCallingConv());
-    return ScalarCall;
+  auto CallFactory = [ReplacementFunction, &VectorCall](auto &B, auto Args) {
+    CallInst *NewCall = B.CreateCall(ReplacementFunction, Args);
+    NewCall->copyIRFlags(&VectorCall);
+    NewCall->copyMetadata(VectorCall);
+    NewCall->setCallingConv(VectorCall.getCallingConv());
+    return NewCall;
   };
 
-  auto *ScalarPointerDataTy = getScalarPointerType(*VectorFunction);
-  return convertVectorOperation(VectorCall, EquivalentReturnTy, EquivalentArgs,
-                                ScalarFactory, ScalarPointerDataTy);
+  if (LowerToScalar) {
+    return convertVectorOperation(VectorCall, EquivalentReturnTy,
+                                  EquivalentArgs, CallFactory,
+                                  ScalarPointerDataTy);
+  }
+  return convertSpirvCompliantVectorOperation(VectorCall, EquivalentReturnTy,
+                                              EquivalentArgs, CallFactory);
 }
 
 Value *clspv::LongVectorLoweringPass::convertAllBuiltinCall(

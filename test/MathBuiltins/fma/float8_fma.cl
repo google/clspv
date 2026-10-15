@@ -7,15 +7,10 @@
 // CHECK: [[GLSL:%[0-9a-zA-Z_]+]] = OpExtInstImport "GLSL.std.450"
 //
 // CHECK: [[FLOAT:%[0-9a-zA-Z_]+]] = OpTypeFloat 32
+// CHECK: [[FLOAT4:%[0-9a-zA-Z_]+]] = OpTypeVector [[FLOAT]] 4
 //
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
-// CHECK: OpExtInst [[FLOAT]] [[GLSL]] Fma
+// CHECK: OpExtInst [[FLOAT4]] [[GLSL]] Fma
+// CHECK: OpExtInst [[FLOAT4]] [[GLSL]] Fma
 
 void kernel test(global float8 *in, global float8 *out) {
   *out = fma(in[0], in[1], in[2]);

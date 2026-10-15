@@ -17,13 +17,7 @@ declare spir_func <8 x i32> @_Z4stepDv8_iS_(<8 x i32>, <8 x i32>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x i32> @_Z4stepDv8_iS_
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
-; CHECK: {{.*}} = call spir_func i32 @_Z4stepii(i32 {{.*}}, i32 {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x i32> @_Z4stepDv4_iDv4_i(<4 x i32> {{.*}}, <4 x i32> {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x i32> @_Z4stepDv4_iDv4_i(<4 x i32> {{.*}}, <4 x i32> {{.*}})
 ; CHECK-NOT: call spir_func <8 x i32> @_Z4stepDv8_iS_
 

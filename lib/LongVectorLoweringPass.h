@@ -116,7 +116,7 @@ private:
   bool runOnFunction(llvm::Function &F);
 
   /// Map the call @p CI to an OpenCL builtin function or an LLVM intrinsic to
-  /// calls to its scalar version.
+  /// calls to its scalar or SPIR-V compliant vector version.
   llvm::Value *convertBuiltinCall(llvm::CallInst &CI,
                                   llvm::Type *EquivalentReturnTy,
                                   llvm::ArrayRef<llvm::Value *> EquivalentArgs);

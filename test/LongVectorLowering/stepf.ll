@@ -17,13 +17,7 @@ declare spir_func <8 x float> @_Z4stepDv8_fS_(<8 x float>, <8 x float>)
 
 ; CHECK-LABEL: @test
 ; CHECK-NOT: call spir_func <8 x float> @_Z4stepDv8_fS_
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
-; CHECK: {{.*}} = call spir_func float @_Z4stepff(float {{.*}}, float {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z4stepDv4_fDv4_f(<4 x float> {{.*}}, <4 x float> {{.*}})
+; CHECK: {{.*}} = call spir_func <4 x float> @_Z4stepDv4_fDv4_f(<4 x float> {{.*}}, <4 x float> {{.*}})
 ; CHECK-NOT: call spir_func <8 x float> @_Z4stepDv8_fS_
 

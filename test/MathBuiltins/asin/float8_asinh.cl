@@ -5,14 +5,9 @@
 
 // CHECK: %[[EXT_INST:[a-zA-Z0-9_]*]] = OpExtInstImport "GLSL.std.450"
 // CHECK-DAG: %[[FLOAT_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeFloat 32
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
-// CHECK: OpExtInst %[[FLOAT_TYPE_ID]] %[[EXT_INST]] Asinh
+// CHECK-DAG: %[[FLOAT_VECTOR_TYPE_ID:[a-zA-Z0-9_]*]] = OpTypeVector %[[FLOAT_TYPE_ID]] 4
+// CHECK: OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] Asinh
+// CHECK: OpExtInst %[[FLOAT_VECTOR_TYPE_ID]] %[[EXT_INST]] Asinh
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global float8* a, global float8* b)
 {

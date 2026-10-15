@@ -15,11 +15,5 @@ entry:
 
 declare <8 x i32> @llvm.fshl.v8i32(<8 x i32>, <8 x i32>, <8 x i32>)
 
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
-; CHECK: call spir_func i32 @llvm.fshl.i32(i32
+; CHECK: call spir_func <4 x i32> @llvm.fshl.v4i32(<4 x i32>
+; CHECK: call spir_func <4 x i32> @llvm.fshl.v4i32(<4 x i32>
