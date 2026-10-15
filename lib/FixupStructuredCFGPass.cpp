@@ -146,7 +146,7 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
       auto new_latch =
           BasicBlock::Create(F.getContext(), "", &F, latch->getNextNode());
       UncondBrInst::Create(BB, new_latch);
-      loop->addBlockEntry(new_latch);
+      loop->addBasicBlockToLoop(new_latch, LI);
 
       const auto idx = cond_latch_terminator->getSuccessor(0) == BB ? 0 : 1;
       cond_latch_terminator->setSuccessor(idx, new_latch);
@@ -160,7 +160,7 @@ void clspv::FixupStructuredCFGPass::isolateConvergentLatch(
                    dyn_cast_or_null<UncondBrInst>(latch_terminator)) {
       // Simple case: just split the block.
       auto new_block = latch->splitBasicBlockBefore(uncond_latch_terminator);
-      loop->addBlockEntry(new_block);
+      loop->addBasicBlockToLoop(new_block, LI);
     }
   }
 }
@@ -197,7 +197,7 @@ void clspv::FixupStructuredCFGPass::breakConditionalHeader(
 
     if (succ1_in_body && succ2_in_body) {
       auto new_block = BB->splitBasicBlockBefore(terminator);
-      loop->addBlockEntry(new_block);
+      loop->addBasicBlockToLoop(new_block, LI);
     }
   }
 }
@@ -233,7 +233,7 @@ void clspv::FixupStructuredCFGPass::isolateContinue(
           auto new_exit =
               BasicBlock::Create(F.getContext(), "", &F, exit_block);
           UncondBrInst::Create(exit_block, new_exit);
-          parent->addBlockEntry(new_exit);
+          parent->addBasicBlockToLoop(new_exit, LI);
 
           // Collect the exit's predecessors from within the loop.
           SmallVector<BasicBlock *, 4> loop_preds;
