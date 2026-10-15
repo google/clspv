@@ -893,10 +893,16 @@ bool RemoveCstExprFromFunction(Function *F) {
       I->setOperand(OperandId, VecNew);
     } else if (auto CstExpr =
                    dyn_cast<ConstantExpr>(I->getOperand(OperandId))) {
-      auto Operand = CstExpr->getAsInstruction();
-      Operand->insertBefore(InsertBefore);
-      CheckInstruction(Operand);
-      I->setOperand(OperandId, Operand);
+      if (CstExpr->getOpcode() == Instruction::AddrSpaceCast &&
+          isa<ConstantPointerNull>(CstExpr->getOperand(0))) {
+        I->setOperand(OperandId, ConstantPointerNull::get(
+                                     cast<PointerType>(CstExpr->getType())));
+      } else {
+        auto Operand = CstExpr->getAsInstruction();
+        Operand->insertBefore(InsertBefore);
+        CheckInstruction(Operand);
+        I->setOperand(OperandId, Operand);
+      }
     }
   }
 
