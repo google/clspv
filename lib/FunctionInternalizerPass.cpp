@@ -23,16 +23,21 @@ using namespace llvm;
 
 PreservedAnalyses
 clspv::FunctionInternalizerPass::run(Module &M, ModuleAnalysisManager &) {
-  SmallVector<Function *, 8> ToRemoves;
+  bool Changed = true;
+  while (Changed) {
+    Changed = false;
+    SmallVector<Function *, 8> ToRemoves;
 
-  for (auto &F : M) {
-    if ((CallingConv::SPIR_KERNEL != F.getCallingConv()) && F.user_empty()) {
-      ToRemoves.push_back(&F);
+    for (auto &F : M) {
+      if ((CallingConv::SPIR_KERNEL != F.getCallingConv()) && F.user_empty()) {
+        ToRemoves.push_back(&F);
+      }
     }
-  }
 
-  for (auto *F : ToRemoves) {
-    F->eraseFromParent();
+    for (auto *F : ToRemoves) {
+      F->eraseFromParent();
+      Changed = true;
+    }
   }
 
   PreservedAnalyses PA;
