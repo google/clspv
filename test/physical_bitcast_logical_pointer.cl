@@ -7,7 +7,7 @@
 // RUN: spirv-val --target-env vulkan1.2 %t.spv
 
 // CHECK: OpVariable %_ptr_Private__arr_uint_uint_4 Private %{{[0-9]+}}
-// CHECK-NOT: OpBitcast %_ptr_PhysicalStorageBuffer %{{[0-9]+}}
+// CHECK-NOT: OpBitcast
 
 kernel void repro(global int* out, int seed) {
   uint t = 0;
