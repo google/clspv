@@ -2735,17 +2735,19 @@ SPIRVProducerPassImpl::getSPIRVPointerOperand(Value *PtrVal,
   if (!PtrVal->getType()->isPointerTy()) {
     return PtrID;
   }
-  if (Option::UntypedPointerAddressSpace(
-          PtrVal->getType()->getPointerAddressSpace())) {
+  // Resolve rehoming so the expected pointer type carries the emitted
+  // storage class; a stale Global address space would register a spurious
+  // PhysicalStorageBuffer type and force an invalid OpBitcast.
+  auto AddrSpace = GetPointerAddressSpace(PtrVal);
+  if (Option::UntypedPointerAddressSpace(AddrSpace)) {
     return PtrID;
   }
-  SPIRVID ExpectedPtrTypeID =
-      getSPIRVPointerType(PtrVal->getType(), ExpectedPointeeTy);
+  auto *PtrTy = PointerType::get(module->getContext(), AddrSpace);
+  SPIRVID ExpectedPtrTypeID = getSPIRVPointerType(PtrTy, ExpectedPointeeTy);
   auto it = IDTypeMap.find(PtrID.get());
   if (it != IDTypeMap.end() && it->second.isValid() &&
       it->second != ExpectedPtrTypeID) {
-    auto storage_class =
-        GetStorageClass(PtrVal->getType()->getPointerAddressSpace());
+    auto storage_class = GetStorageClass(AddrSpace);
     if (storage_class == spv::StorageClassPhysicalStorageBuffer) {
       SPIRVOperandVec Ops;
       Ops << ExpectedPtrTypeID << PtrID;
