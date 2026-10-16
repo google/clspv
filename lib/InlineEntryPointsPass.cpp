@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
@@ -91,7 +92,7 @@ bool clspv::InlineEntryPointsPass::RequiresInlining(Module &M) {
         if (HasGeneric(I.getType()))
           return true;
         for (auto *op : I.operand_values()) {
-          if (HasGeneric(op->getType()))
+          if (!isa<ConstantPointerNull>(op) && HasGeneric(op->getType()))
             return true;
         }
       }
