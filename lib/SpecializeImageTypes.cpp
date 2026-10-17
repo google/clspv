@@ -130,15 +130,18 @@ SpecializeImageTypesPass::RemapUse(Value *value, unsigned operand_no) {
       ResultType final_res = ResultType::kNotImage;
       Type *new_ty = nullptr;
       if (!called->isDeclaration()) {
-        for (auto &U : called->getArg(operand_no)->uses()) {
-          ResultType res = ResultType::kNotImage;
-          Type *ty = nullptr;
-          std::tie(res, ty) = RemapUse(U.getUser(), U.getOperandNo());
-          if (res == ResultType::kSpecialized) {
-            return std::make_pair(res, ty);
-          } else if (res == kNotSpecialized && final_res == kNotImage) {
-            final_res = res;
-            new_ty = ty;
+        auto *arg = called->getArg(operand_no);
+        if (visited_.insert(arg).second) {
+          for (auto &U : arg->uses()) {
+            ResultType res = ResultType::kNotImage;
+            Type *ty = nullptr;
+            std::tie(res, ty) = RemapUse(U.getUser(), U.getOperandNo());
+            if (res == ResultType::kSpecialized) {
+              return std::make_pair(res, ty);
+            } else if (res == kNotSpecialized && final_res == kNotImage) {
+              final_res = res;
+              new_ty = ty;
+            }
           }
         }
       }
