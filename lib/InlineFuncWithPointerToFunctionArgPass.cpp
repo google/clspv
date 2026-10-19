@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/UniqueVector.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -37,15 +39,64 @@ bool IsPointerToFunctionStorage(Type *type) {
   return false;
 }
 
-// Returns true if |type| is a function whose return type or any of its
-// arguments are pointer-to-Function storage class.
-bool IsProblematicFunctionType(Type *type) {
-  if (auto *funcTy = dyn_cast<FunctionType>(type)) {
-    if (IsPointerToFunctionStorage(funcTy->getReturnType())) {
-      return true;
+bool ParamRequiresInlining(Argument *arg) {
+  SmallVector<Value *, 8> worklist{arg};
+  SmallPtrSet<Value *, 8> visited{arg};
+  while (!worklist.empty()) {
+    Value *v = worklist.pop_back_val();
+    for (Use &use : v->uses()) {
+      User *user = use.getUser();
+      if (auto *gep = dyn_cast<GetElementPtrInst>(user)) {
+        if (gep->getSourceElementType()->isPointerTy()) {
+          continue;
+        }
+        auto *cst = dyn_cast<ConstantInt>(gep->getOperand(1));
+        if (!cst || !cst->isZero()) {
+          // Non-zero first index generates OpPtrAccessChain, which is not
+          // supported for Function storage class.
+          return true;
+        }
+        if (visited.insert(gep).second) {
+          worklist.push_back(gep);
+        }
+      } else if (auto *st = dyn_cast<StoreInst>(user)) {
+        if (st->getValueOperand() == v) {
+          return true;
+        }
+      } else if (isa<LoadInst>(user)) {
+        continue;
+      } else if (isa<CallInst>(user)) {
+        if (v != arg) {
+          // Passing a GEP of a Private pointer to a function call is not a
+          // memory object declaration in SPIR-V.
+          return true;
+        }
+        continue;
+      } else {
+        // PHINode, SelectInst, BitCastInst, etc.
+        return true;
+      }
     }
-    for (auto *paramTy : funcTy->params()) {
-      if (IsPointerToFunctionStorage(paramTy)) {
+  }
+  return false;
+}
+
+bool CallRequiresInlining(CallInst *call) {
+  auto *func = call->getCalledFunction();
+  if (!func || func->isDeclaration()) {
+    return false;
+  }
+  auto *funcTy = call->getFunctionType();
+  if (IsPointerToFunctionStorage(funcTy->getReturnType())) {
+    return true;
+  }
+  for (unsigned i = 0; i < funcTy->getNumParams(); ++i) {
+    if (IsPointerToFunctionStorage(funcTy->getParamType(i))) {
+      Value *argOp = call->getArgOperand(i);
+      if (!isa<AllocaInst>(argOp) && !isa<Argument>(argOp)) {
+        return true;
+      }
+      if (ParamRequiresInlining(func->getArg(i))) {
         return true;
       }
     }
@@ -76,7 +127,7 @@ bool clspv::InlineFuncWithPointerToFunctionArgPass::InlineFunctions(Module &M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (auto call = dyn_cast<CallInst>(&I)) {
-          if (IsProblematicFunctionType(call->getFunctionType())) {
+          if (CallRequiresInlining(call)) {
             WorkList.insert(call);
           }
         }
@@ -95,12 +146,11 @@ bool clspv::InlineFuncWithPointerToFunctionArgPass::InlineFunctions(Module &M) {
   do {
     removed = false;
     for (auto &F : M) {
-      if (F.getCallingConv() == CallingConv::SPIR_KERNEL)
+      if (F.isDeclaration() || F.getCallingConv() == CallingConv::SPIR_KERNEL)
         continue;
       if (F.use_begin() == F.use_end()) {
         F.eraseFromParent();
         removed = true;
-        Changed = true;
         break;
       }
     }
