@@ -713,7 +713,6 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
     pm.addPass(clspv::DestructurizeGEPPass());
 
     pm.addPass(clspv::InlineFuncWithImageMetadataGetterPass());
-    pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
     pm.addPass(clspv::InlineFuncWithPointerToFunctionArgPass());
     pm.addPass(clspv::InlineFuncWithSingleCallSitePass());
     pm.addPass(clspv::InlineFuncWithReadImage3DNonLiteralSamplerPass());
@@ -722,6 +721,7 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
       pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::PromotePass()));
       pm.addPass(clspv::LogicalPointerToIntPass());
     }
+    pm.addPass(clspv::InlineFuncWithPointerBitCastArgPass());
 
     // Mem2Reg pass should be run early because O0 level optimization leaves
     // redundant alloca, load and store instructions from function arguments.
