@@ -50,12 +50,47 @@ static bool IsTargetAddrSpace(unsigned AS) {
          !clspv::Option::PhysicalStorageBuffers();
 }
 
+static bool ReachesFunctionArgument(Value *V) {
+  SmallVector<Value *, 8> WorkList = {V};
+  SmallPtrSet<Value *, 8> Visited;
+  while (!WorkList.empty()) {
+    Value *Cur = WorkList.pop_back_val();
+    if (!Visited.insert(Cur).second)
+      continue;
+    if (isa<Argument>(Cur))
+      return true;
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(Cur)) {
+      WorkList.push_back(GEP->getPointerOperand());
+    } else if (auto *BC = dyn_cast<BitCastInst>(Cur)) {
+      WorkList.push_back(BC->getOperand(0));
+    } else if (auto *Sel = dyn_cast<SelectInst>(Cur)) {
+      WorkList.push_back(Sel->getTrueValue());
+      WorkList.push_back(Sel->getFalseValue());
+    } else if (auto *Phi = dyn_cast<PHINode>(Cur)) {
+      for (Value *Inc : Phi->incoming_values()) {
+        WorkList.push_back(Inc);
+      }
+    }
+  }
+  return false;
+}
+
 static bool FunctionShouldBeInlined(Function &F) {
   for (BasicBlock &BB : F) {
     for (Instruction &I : BB) {
       if (isa<IntToPtrInst>(I) || isa<PtrToIntInst>(I) ||
           isa<PtrToAddrInst>(I)) {
         return true;
+      }
+      if (auto *ICmp = dyn_cast<ICmpInst>(&I)) {
+        if (auto *PtrTy =
+                dyn_cast<PointerType>(ICmp->getOperand(0)->getType())) {
+          if (IsTargetAddrSpace(PtrTy->getAddressSpace()) &&
+              (ReachesFunctionArgument(ICmp->getOperand(0)) ||
+               ReachesFunctionArgument(ICmp->getOperand(1)))) {
+            return true;
+          }
+        }
       }
     }
   }
