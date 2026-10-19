@@ -912,6 +912,12 @@ bool RemoveCstExprFromFunction(Function *F) {
 unsigned PointerOperandNum(Instruction *inst, Value *source) {
   if (isa<StoreInst>(inst)) {
     return 1;
+  } else if (auto *sel = dyn_cast<SelectInst>(inst)) {
+    if (sel->getTrueValue() == source) {
+      return 1;
+    } else if (sel->getFalseValue() == source) {
+      return 2;
+    }
   } else if (auto *call = dyn_cast<CallInst>(inst)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
     if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
@@ -983,6 +989,25 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     if (RefTy) {
       for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
         auto Op = phi->getIncomingValue(i);
+        auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
+        if (OpTy != RefTy) {
+          source = Op;
+          source_ty = OpTy;
+          dest_ty = RefTy;
+          break;
+        }
+      }
+    }
+  } else if (auto *sel = dyn_cast<SelectInst>(&I)) {
+    if (!sel->getType()->isPointerTy() ||
+        clspv::Option::UntypedPointerAddressSpace(
+            sel->getType()->getPointerAddressSpace())) {
+      return false;
+    }
+    auto RefTy = clspv::InferType(sel, M.getContext(), &type_cache);
+    if (RefTy) {
+      for (unsigned i = 1; i <= 2; i++) {
+        auto Op = sel->getOperand(i);
         auto OpTy = clspv::InferType(Op, M.getContext(), &type_cache);
         if (OpTy != RefTy) {
           source = Op;
