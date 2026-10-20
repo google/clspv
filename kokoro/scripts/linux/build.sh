@@ -39,8 +39,16 @@ if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
   using clang-18
 fi
 
+CMAKE_OPTIONS=""
+if [ "$BUILD_TOOLCHAIN" == "gcc" ] && [ "$BUILD_TYPE" == "Debug" ]; then
+  # Enable split DWARF for GCC Debug builds to reduce linker memory usage and
+  # avoid running out of memory when linking large LLVM/Clang binaries in
+  # parallel.
+  CMAKE_OPTIONS="-DLLVM_USE_SPLIT_DWARF=ON"
+fi
+
 echo $(date): Starting build...
-cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE $CMAKE_OPTIONS ..
 
 echo $(date): Build everything...
 ninja

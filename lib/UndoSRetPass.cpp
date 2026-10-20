@@ -45,7 +45,7 @@ PreservedAnalyses clspv::UndoSRetPass::run(Module &M, ModuleAnalysisManager &) {
   }
 
   for (Function *F : WorkList) {
-    auto InsertPoint = F->getEntryBlock().getFirstNonPHIOrDbg();
+    auto InsertPoint = F->getEntryBlock().getFirstNonPHIOrPseudoProbe();
 
     for (Argument &Arg : F->args()) {
       // Check sret attribute.

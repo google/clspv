@@ -4,7 +4,9 @@
 ; CHECK: [[type:%[^ ]+]] = type { <3 x i32>, [[pc:%[^ ]+]] }
 ; CHECK: [[pc]] = type { i32, i32 }
 
-; CHECK-COUNT-2: load i32, ptr addrspace(9) getelementptr inbounds ([[type]], ptr addrspace(9) @__push_constants, i32 0, i32 0, i64 2), align 4
+; CHECK: [[gep:%[^ ]+]] = getelementptr inbounds [[type]], ptr addrspace(9) @__push_constants, i32 0, i32 0, i64 2
+; CHECK: load i32, ptr addrspace(9) [[gep]], align 4
+; CHECK: load i32, ptr addrspace(9) getelementptr inbounds nuw (i8, ptr addrspace(9) @__push_constants, i64 8), align 4
 
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv64-unknown-vulkan"

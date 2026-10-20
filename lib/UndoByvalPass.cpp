@@ -81,7 +81,7 @@ PreservedAnalyses clspv::UndoByvalPass::run(Module &M,
       }
 
       // Create alloca instruction for byval argument on function's entry block.
-      auto InsertPoint = F->getEntryBlock().getFirstNonPHIOrDbg();
+      auto InsertPoint = F->getEntryBlock().getFirstNonPHIOrPseudoProbe();
       ValueToValueMapTy ArgVMap;
       for (Argument *Arg : ByValList) {
         Type *ArgTy = Arg->getParamByValType();
