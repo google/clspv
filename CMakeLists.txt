@@ -131,6 +131,8 @@ else()
 
   # Kokoro bots have older toolchains so make that LLVM check a warning.
   option(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN "" ON)
+  # Do not include LLVM test targets so they are not built as part of 'all'.
+  option(LLVM_INCLUDE_TESTS "" OFF)
   set(CLSPV_LLVM_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm)
 
   # First tell LLVM where to find clang.

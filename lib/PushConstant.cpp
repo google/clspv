@@ -125,8 +125,8 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
   assert(found && "Push constant wasn't declared.");
 
   // Construct pointer
-  IRBuilder<NoFolder> Builder(BB, BB->hasTerminator() ? BB->getFirstNonPHIIt()
-                                                      : BB->end());
+  IRBuilder<NoFolder> Builder(BB->hasTerminator() ? BB->getFirstNonPHIIt()
+                                                  : BB->end());
   SmallVector<Value *, 4> Indices(2);
   Indices[0] = Builder.getInt32(0);
   Indices[1] = Builder.getInt32(idx);
@@ -308,7 +308,7 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
             push_constant_ty, gep_operator->getSourceElementType(), steps,
             perfect_match, M.getDataLayout());
 
-        SmallVector<Constant *, 4> indices;
+        SmallVector<Value *, 4> indices;
         if (alias_found) {
           for (int i = 0; i < steps; i++) {
             indices.push_back(
@@ -327,9 +327,14 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
           }
           indices.push_back(cst);
         }
-        auto new_gep = ConstantExpr::getGetElementPtr(
-            push_constant_ty, new_GV, indices, gep_operator->isInBounds());
-        user->replaceAllUsesWith(new_gep);
+        SmallVector<User *, 8> gep_users(gep_operator->users());
+        for (auto *gep_user : gep_users) {
+          auto *inst = cast<Instruction>(gep_user);
+          auto *new_gep = GetElementPtrInst::Create(
+              push_constant_ty, new_GV, indices, "", inst->getIterator());
+          new_gep->setNoWrapFlags(gep_operator->getNoWrapFlags());
+          inst->replaceUsesOfWith(gep_operator, new_gep);
+        }
       } else if (auto load = dyn_cast<LoadInst>(user)) {
         auto new_load =
             new LoadInst(load->getType(), new_GV, "", load->getIterator());

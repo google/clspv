@@ -35,6 +35,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/LibraryOptionsContext.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
@@ -155,6 +156,8 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool>
     WarningsAsErrors("Werror", llvm::cl::init(false),
                      llvm::cl::desc("Turn warnings into errors"));
+
+static llvm::cl::LibraryOptionsContext LibraryOptions;
 
 enum OutputFormat {
   OutputFormatLLVMIR,
@@ -569,6 +572,7 @@ int SetCompilerInstanceOptions(
 
 int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
                     std::string *output_log) {
+  M.getContext().getLibraryOptions().assign(LibraryOptions);
   llvm::LoopAnalysisManager lam;
   llvm::FunctionAnalysisManager fam;
   llvm::CGSCCAnalysisManager cgam;
@@ -577,8 +581,9 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
   llvm::StandardInstrumentations si(M.getContext(), false /*DebugLogging*/);
   clspv::RegisterClspvPasses(&PIC);
   si.registerCallbacks(PIC, &mam);
-  llvm::PassBuilder pb(nullptr, llvm::PipelineTuningOptions(), std::nullopt,
-                       &PIC);
+  llvm::PassBuilder pb(
+      nullptr, llvm::PipelineTuningOptions(&M.getContext().getLibraryOptions()),
+      std::nullopt, &PIC);
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);
   pb.registerFunctionAnalyses(fam);
@@ -914,9 +919,11 @@ int ParseOptions(const int argc, const char *const argv[]) {
     llvmArgv[llvmArgc++] = "-enable-load-pre=0";
   }
 
+  LibraryOptions.assign(llvm::cl::LibraryOptionsContext());
   llvm::cl::ResetAllOptionOccurrences();
-  llvm::cl::ParseCommandLineOptions(llvmArgc, llvmArgv);
-  llvm::cl::ParseCommandLineOptions(argc, argv);
+  llvm::cl::parseCommandLineOptions(LibraryOptions,
+                                    llvm::ArrayRef(llvmArgv, llvmArgc));
+  llvm::cl::parseCommandLineOptions(LibraryOptions, llvm::ArrayRef(argv, argc));
 
   if (!clspv::Option::OpaquePointers()) {
     llvm::errs() << "transparent pointer is not supported anymore\n";

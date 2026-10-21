@@ -56,11 +56,12 @@ static llvm::cl::opt<std::string> Passes("passes", llvm::cl::desc("Passes"));
 int main(int argc, char **argv) {
   llvm::InitLLVM c(argc, argv);
 
-  llvm::cl::ParseCommandLineOptions(argc, argv,
+  llvm::LLVMContext context;
+  llvm::cl::parseCommandLineOptions(context.getLibraryOptions(),
+                                    llvm::ArrayRef(argv, argc),
                                     "clspv IR to IR modular optimizer\n");
 
   llvm::SMDiagnostic err;
-  llvm::LLVMContext context;
   context.setDiscardValueNames(false);
   std::unique_ptr<llvm::Module> module =
       llvm::parseIRFile(InputFile, err, context);
@@ -100,8 +101,9 @@ int main(int argc, char **argv) {
 
   llvm::PassInstrumentationCallbacks PIC;
   clspv::RegisterClspvPasses(&PIC);
-  llvm::PassBuilder PB(nullptr, llvm::PipelineTuningOptions(), std::nullopt,
-                       &PIC);
+  llvm::PassBuilder PB(
+      nullptr, llvm::PipelineTuningOptions(&context.getLibraryOptions()),
+      std::nullopt, &PIC);
   clspv::RegisterClspvPassBuilderCallback(&PB);
 
   PB.registerModuleAnalyses(MAM);

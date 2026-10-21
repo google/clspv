@@ -848,31 +848,6 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
   }
 
-  // TODO(#874): this pass needs updated to handle constantexpr more robustly.
-  if (auto *CE = dyn_cast<ConstantExpr>(&Cst)) {
-    switch (CE->getOpcode()) {
-    case Instruction::GetElementPtr: {
-      auto *GEP = cast<GEPOperator>(CE);
-      auto *EquivalentSourceTy = getEquivalentType(GEP->getSourceElementType());
-      Constant *EquivalentPointer = cast<Constant>(GEP->getPointerOperand());
-      SmallVector<Value *, 4> Indices(GEP->idx_begin(), GEP->idx_end());
-
-      auto *EquivalentGEP = ConstantExpr::getGetElementPtr(
-          EquivalentSourceTy, EquivalentPointer, Indices, GEP->isInBounds(),
-          GEP->getInRange());
-
-      return EquivalentGEP;
-    }
-
-    default:
-#ifndef NDEBUG
-      dbgs() << "Constant Expression not handled: " << *CE << '\n';
-      dbgs() << "Constant Expression Opcode: " << CE->getOpcodeName() << '\n';
-#endif
-      llvm_unreachable("Unsupported kind of ConstantExpr");
-    }
-  }
-
 #ifndef NDEBUG
   dbgs() << "Constant not handled: " << Cst << '\n';
 #endif
