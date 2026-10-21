@@ -83,47 +83,43 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
 
     // Make the global variable.
     SmallVector<Constant *, 8> initializers_as_vec;
+    std::map<Constant *, unsigned> initializer_index;
 
     uint64_t max_alignment = 0;
 
     // Make sure that every element is at the proper offset regarding its
     // alignment (which might not be the one of its type due to the lowering of
     // long vectors).
-    {
-      UniqueVector<Constant *> new_initializers;
-      for (Constant *init : initializers) {
-        Type *ty = init->getType();
-        types.push_back(ty);
-        auto align = initializers_alignment[init];
-        max_alignment = std::max(max_alignment, align);
-        auto offset = DL.getStructLayout(StructType::get(Context, types))
-                          ->getElementOffset(types.size() - 1);
-        auto padding = align != 0 ? (align - (offset % align)) % align : 0;
-        if (padding) {
-          types.pop_back();
-          Type *pad_elem_ty;
-          if (padding % sizeof(uint32_t) == 0) {
-            pad_elem_ty = ty->getInt32Ty(Context);
-          } else if (padding % sizeof(uint16_t) == 0) {
-            pad_elem_ty = ty->getInt16Ty(Context);
-          } else {
-            pad_elem_ty = ty->getInt8Ty(Context);
-          }
-          padding /= (pad_elem_ty->getScalarSizeInBits() / 8);
-          ArrayType *pad_ty = ArrayType::get(pad_elem_ty, padding);
-          SmallVector<Constant *, 4> data;
-          for (unsigned i = 0; i < padding; i++) {
-            data.push_back(ConstantInt::get(pad_elem_ty, 0));
-          }
-          types.push_back(pad_ty);
-          types.push_back(ty);
-          initializers_as_vec.push_back(ConstantArray::get(pad_ty, data));
-          new_initializers.insert(nullptr);
+    for (Constant *init : initializers) {
+      Type *ty = init->getType();
+      types.push_back(ty);
+      auto align = initializers_alignment[init];
+      max_alignment = std::max(max_alignment, align);
+      auto offset = DL.getStructLayout(StructType::get(Context, types))
+                        ->getElementOffset(types.size() - 1);
+      auto padding = align != 0 ? (align - (offset % align)) % align : 0;
+      if (padding) {
+        types.pop_back();
+        Type *pad_elem_ty;
+        if (padding % sizeof(uint32_t) == 0) {
+          pad_elem_ty = ty->getInt32Ty(Context);
+        } else if (padding % sizeof(uint16_t) == 0) {
+          pad_elem_ty = ty->getInt16Ty(Context);
+        } else {
+          pad_elem_ty = ty->getInt8Ty(Context);
         }
-        initializers_as_vec.push_back(init);
-        new_initializers.insert(init);
+        padding /= (pad_elem_ty->getScalarSizeInBits() / 8);
+        ArrayType *pad_ty = ArrayType::get(pad_elem_ty, padding);
+        SmallVector<Constant *, 4> data;
+        for (unsigned i = 0; i < padding; i++) {
+          data.push_back(ConstantInt::get(pad_elem_ty, 0));
+        }
+        types.push_back(pad_ty);
+        types.push_back(ty);
+        initializers_as_vec.push_back(ConstantArray::get(pad_ty, data));
       }
-      initializers = std::move(new_initializers);
+      initializer_index[init] = types.size() - 1;
+      initializers_as_vec.push_back(init);
     }
 
     StructType *type = StructType::get(Context, types);
@@ -150,7 +146,7 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
         if (GV == user) {
           // This is the original global variable declaration.  Skip it.
         } else if (auto *inst = dyn_cast<Instruction>(user)) {
-          unsigned index = initializers.idFor(GV->getInitializer()) - 1;
+          unsigned index = initializer_index[GV->getInitializer()];
 
           auto getTypeAndPtr = [&clustered_gv, &M, &Builder, &type, &ptr_type,
                                 &zero](Type *&PointeeType, Value *&Ptr,
