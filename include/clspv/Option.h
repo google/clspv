@@ -354,6 +354,9 @@ bool SupportsFmaKHR(uint32_t scalarSizeInBits);
 // that it can be implemented with an alloca
 uint32_t MemmoveAllocaLimit();
 
+// Clean option caches.
+void CleanCache();
+
 } // namespace Option
 } // namespace clspv
 

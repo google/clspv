@@ -931,6 +931,7 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
 
   LibraryOptions.assign(llvm::cl::LibraryOptionsContext());
+  clspv::Option::CleanCache();
   llvm::cl::ResetAllOptionOccurrences();
   llvm::cl::parseCommandLineOptions(LibraryOptions,
                                     llvm::ArrayRef(llvmArgv, llvmArgc));
