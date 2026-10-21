@@ -64,6 +64,7 @@ bool clspv::UndoInstCombinePass::runOnFunction(Function &F) {
       changed |= UndoWideVectorExtractCast(&I);
       changed |= UndoWideVectorShuffleCast(&I);
       changed |= UndoNarrowedIntDiv(&I);
+      changed |= UndoBoolVectorReduce(&I);
     }
   }
 
@@ -316,6 +317,40 @@ bool clspv::UndoInstCombinePass::UndoNarrowedIntDiv(Instruction *inst) {
   cast->replaceAllUsesWith(new_binop);
   dead_.push_back(cast);
   potentially_dead_.insert(binop);
+
+  return true;
+}
+
+bool clspv::UndoInstCombinePass::UndoBoolVectorReduce(Instruction *inst) {
+  auto icmp = dyn_cast<ICmpInst>(inst);
+  if (!icmp || !icmp->isEquality())
+    return false;
+
+  auto cast = dyn_cast<BitCastInst>(icmp->getOperand(0));
+  auto cst = dyn_cast<ConstantInt>(icmp->getOperand(1));
+  if (!cast || !cst)
+    return false;
+
+  auto src = cast->getOperand(0);
+  auto vec_ty = dyn_cast<FixedVectorType>(src->getType());
+  if (!vec_ty || !vec_ty->getElementType()->isIntegerTy(1))
+    return false;
+
+  if (!cst->isZero() && !cst->isAllOnesValue())
+    return false;
+
+  IRBuilder<> builder(icmp);
+  Intrinsic::ID id = cst->isAllOnesValue() ? Intrinsic::vector_reduce_and
+                                           : Intrinsic::vector_reduce_or;
+  Value *res = builder.CreateIntrinsic(id, {vec_ty}, {src});
+  if ((cst->isAllOnesValue() && icmp->getPredicate() == ICmpInst::ICMP_NE) ||
+      (cst->isZero() && icmp->getPredicate() == ICmpInst::ICMP_EQ)) {
+    res = builder.CreateNot(res);
+  }
+
+  icmp->replaceAllUsesWith(res);
+  dead_.push_back(icmp);
+  potentially_dead_.insert(cast);
 
   return true;
 }
