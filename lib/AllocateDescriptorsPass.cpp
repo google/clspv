@@ -964,6 +964,7 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
                      opcode == spv::OpAtomicExchange ||
                      opcode == spv::OpAtomicStore ||
                      opcode == spv::OpAtomicIAdd ||
+                     opcode == spv::OpAtomicFAddEXT ||
                      opcode == spv::OpAtomicISub || opcode == spv::OpAtomicOr ||
                      opcode == spv::OpAtomicXor || opcode == spv::OpAtomicAnd ||
                      opcode == spv::OpAtomicSMin ||

@@ -139,6 +139,7 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
           static_cast<spv::Op>(cast<ConstantInt>(op_param)->getZExtValue());
       switch (op) {
       case spv::Op::OpAtomicIAdd:
+      case spv::Op::OpAtomicFAddEXT:
       case spv::Op::OpAtomicISub:
       case spv::Op::OpAtomicSMin:
       case spv::Op::OpAtomicUMin:
