@@ -23,6 +23,7 @@
 
 #include "clspv/Option.h"
 
+#include "BitcastUtils.h"
 #include "InlineFuncWithPointerBitCastArgPass.h"
 #include "Types.h"
 
@@ -121,7 +122,33 @@ bool clspv::InlineFuncWithPointerBitCastArgPass::InlineFunctions(Module &M) {
                                               M.getContext(), &type_cache);
               auto *param_ty = clspv::InferType(func->getArg(i), M.getContext(),
                                                 &type_cache);
-              if (arg_ty != param_ty) {
+              if (arg_ty && param_ty && arg_ty != param_ty) {
+                int steps = 0;
+                bool perfect_match = false;
+                if (BitcastUtils::FindAliasingContainedType(
+                        arg_ty, param_ty, steps, perfect_match,
+                        M.getDataLayout()) &&
+                    perfect_match) {
+                  if (call->getArgOperand(i)
+                          ->getType()
+                          ->getPointerAddressSpace() ==
+                      clspv::AddressSpace::Private) {
+                    if (param_ty->isPointerTy()) {
+                      continue;
+                    }
+                  } else if (isa<GetElementPtrInst>(call->getArgOperand(i)) ||
+                             func->hasFnAttribute(Attribute::NoInline)) {
+                    IRBuilder<> Builder(call);
+                    SmallVector<Value *, 8> GEPIndices(steps + 1,
+                                                       Builder.getInt32(0));
+                    auto *NewGEP = GetElementPtrInst::Create(
+                        arg_ty, call->getArgOperand(i), GEPIndices, "",
+                        call->getIterator());
+                    call->setArgOperand(i, NewGEP);
+                    Changed = true;
+                    continue;
+                  }
+                }
                 WorkList.insert(call);
               }
             }
