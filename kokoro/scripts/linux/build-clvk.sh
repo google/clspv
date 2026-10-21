@@ -38,7 +38,7 @@ fi
 cd $SRC
 python3 utils/fetch_sources.py --ci
 
-VULKAN_VERSION=v1.3.243
+VULKAN_VERSION=v1.4.350
 
 # Get and build Vulkan-Headers
 echo $(date): Starting Vulkan-Headers build...
