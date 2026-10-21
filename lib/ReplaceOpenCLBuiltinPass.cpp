@@ -166,6 +166,8 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kStep,
      Builtins::kSign,
      Builtins::kSignbit,
+     Builtins::kSqrt,
+     Builtins::kRsqrt,
      Builtins::kSubSat,
      Builtins::kReadImageh,
      Builtins::kReadImagef,
@@ -739,6 +741,20 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
     if (clspv::Option::UseNativeBuiltins().count(Builtins::kSign) == 0 &&
         !clspv::Option::NativeMath()) {
       return replaceSign(F);
+    }
+    break;
+
+  case Builtins::kSqrt:
+    if (clspv::Option::UseNativeBuiltins().count(Builtins::kSqrt) == 0 &&
+        !clspv::Option::NativeMath()) {
+      return replaceSqrt(F);
+    }
+    break;
+
+  case Builtins::kRsqrt:
+    if (clspv::Option::UseNativeBuiltins().count(Builtins::kRsqrt) == 0 &&
+        !clspv::Option::NativeMath()) {
+      return replaceRsqrt(F);
     }
     break;
 
@@ -4276,5 +4292,68 @@ bool ReplaceOpenCLBuiltinPass::replacePown(Function &F) {
     auto conv = builder.CreateSIToFP(Call->getArgOperand(1), Call->getType());
     return builder.CreateCall(pow_func->getFunctionType(), pow_func,
                               {Call->getArgOperand(0), conv});
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceSqrt(Function &F) {
+  if (!F.getReturnType()->getScalarType()->isHalfTy()) {
+    return false;
+  }
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    auto Arg = CI->getOperand(0);
+    Type *FloatTy = Type::getFloatTy(M.getContext());
+    if (auto VecTy = dyn_cast<VectorType>(CI->getType())) {
+      FloatTy = FixedVectorType::get(
+          FloatTy, VecTy->getElementCount().getKnownMinValue());
+    }
+    auto NewFType = FunctionType::get(FloatTy, {FloatTy}, false);
+    auto NewFName = Builtins::GetMangledFunctionName("sqrt", NewFType);
+    Function *NewF = M.getFunction(NewFName);
+    if (!NewF) {
+      NewF = Function::Create(NewFType, F.getLinkage(), NewFName, &M);
+      NewF->setCallingConv(F.getCallingConv());
+      NewF->copyAttributesFrom(&F);
+    }
+    IRBuilder<> builder(CI);
+    auto Ext = builder.CreateFPExt(Arg, FloatTy);
+    auto Call = builder.CreateCall(NewF, {Ext});
+    Call->setCallingConv(NewF->getCallingConv());
+    return builder.CreateFPTrunc(Call, CI->getType());
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceRsqrt(Function &F) {
+  Module &M = *F.getParent();
+  return replaceCallsWithValue(F, [&](CallInst *CI) {
+    auto Arg = CI->getOperand(0);
+    Type *CalcTy = CI->getType();
+    bool IsHalf = CalcTy->getScalarType()->isHalfTy();
+    if (IsHalf) {
+      CalcTy = Type::getFloatTy(M.getContext());
+      if (auto VecTy = dyn_cast<VectorType>(CI->getType())) {
+        CalcTy = FixedVectorType::get(
+            CalcTy, VecTy->getElementCount().getKnownMinValue());
+      }
+    }
+    auto NewFType = FunctionType::get(CalcTy, {CalcTy}, false);
+    auto NewFName = Builtins::GetMangledFunctionName("sqrt", NewFType);
+    Function *NewF = M.getFunction(NewFName);
+    if (!NewF) {
+      NewF = Function::Create(NewFType, F.getLinkage(), NewFName, &M);
+      NewF->setCallingConv(F.getCallingConv());
+      NewF->copyAttributesFrom(&F);
+    }
+    IRBuilder<> builder(CI);
+    if (IsHalf) {
+      Arg = builder.CreateFPExt(Arg, CalcTy);
+    }
+    auto Call = builder.CreateCall(NewF, {Arg});
+    Call->setCallingConv(NewF->getCallingConv());
+    Value *Res = builder.CreateFDiv(ConstantFP::get(CalcTy, 1.0), Call);
+    if (IsHalf) {
+      Res = builder.CreateFPTrunc(Res, CI->getType());
+    }
+    return Res;
   });
 }
