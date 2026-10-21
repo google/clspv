@@ -58,11 +58,11 @@ namespace {
 bool FunctionContainsImageChannelGetter(Function *F) {
   std::set<Function *> visited_fct;
   SmallVector<Function *, 1> fcts_to_visit;
+  visited_fct.insert(F);
   fcts_to_visit.push_back(F);
   while (!fcts_to_visit.empty()) {
     SmallVector<Function *, 1> next_fcts_to_visit;
     for (auto *fct : fcts_to_visit) {
-      visited_fct.insert(fct);
       for (auto &BB : *fct) {
         for (auto &I : BB) {
           if (auto call = dyn_cast<CallInst>(&I)) {
@@ -72,7 +72,7 @@ bool FunctionContainsImageChannelGetter(Function *F) {
               return true;
             } else {
               Function *f = call->getCalledFunction();
-              if (visited_fct.count(f) == 0) {
+              if (visited_fct.insert(f).second) {
                 next_fcts_to_visit.push_back(f);
               }
             }
@@ -87,11 +87,11 @@ bool FunctionContainsImageChannelGetter(Function *F) {
 bool FunctionContainsReadImage3DNonLiteralSampler(Function *F) {
   std::set<Function *> visited_fct;
   SmallVector<Function *, 1> fcts_to_visit;
+  visited_fct.insert(F);
   fcts_to_visit.push_back(F);
   while (!fcts_to_visit.empty()) {
     SmallVector<Function *, 1> next_fcts_to_visit;
     for (auto *fct : fcts_to_visit) {
-      visited_fct.insert(fct);
       for (auto &BB : *fct) {
         for (auto &I : BB) {
           if (auto call = dyn_cast<CallInst>(&I)) {
@@ -102,7 +102,7 @@ bool FunctionContainsReadImage3DNonLiteralSampler(Function *F) {
               }
             } else {
               Function *f = call->getCalledFunction();
-              if (visited_fct.count(f) == 0) {
+              if (visited_fct.insert(f).second) {
                 next_fcts_to_visit.push_back(f);
               }
             }

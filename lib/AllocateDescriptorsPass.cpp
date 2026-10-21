@@ -1050,10 +1050,13 @@ std::pair<bool, bool> clspv::AllocateDescriptorsPass::HasReadsAndWrites(
         for (size_t i = 0; i != operand_no; ++i, ++arg_iter) {
         }
 
-        for (auto &Use : arg_iter->uses()) {
-          auto *User = Use.getUser();
-          if (IsInterestingUser(User))
-            stack.push_back(std::make_pair(Use.getUser(), Use.getOperandNo()));
+        if (visited.insert(&*arg_iter).second) {
+          for (auto &Use : arg_iter->uses()) {
+            auto *User = Use.getUser();
+            if (IsInterestingUser(User))
+              stack.push_back(
+                  std::make_pair(Use.getUser(), Use.getOperandNo()));
+          }
         }
       } else if (call) {
         auto func_info = clspv::Builtins::Lookup(call->getCalledFunction());
