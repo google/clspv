@@ -1083,7 +1083,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
   bool changed = false;
   DenseMap<Value *, Type *> type_cache;
 
-  SmallVector<std::pair<GetElementPtrInst *, Instruction *>> Worklist;
+  SmallVector<std::tuple<GetElementPtrInst *, Instruction *, Type *>> Worklist;
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -1103,7 +1103,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
             if (auto cst = dyn_cast<ConstantInt>(
                     gep->getOperand(gep->getNumOperands() - 1))) {
               if (cst->getZExtValue() == 0) {
-                Worklist.push_back(std::make_pair(gep, &I));
+                Worklist.push_back(std::make_tuple(gep, &I, dest_ty));
               }
             }
           }
@@ -1112,15 +1112,21 @@ bool clspv::SimplifyPointerBitcastPass::runOnUnneededIndices(Module &M) const {
     }
   }
 
-  for (auto pair : Worklist) {
-    GetElementPtrInst *gep = pair.first;
-    Instruction *I = pair.second;
+  for (auto tuple : Worklist) {
+    GetElementPtrInst *gep = std::get<0>(tuple);
+    Instruction *I = std::get<1>(tuple);
+    Type *dest_ty = std::get<2>(tuple);
     SmallVector<Value *> Indices(gep->indices());
     while (Indices.size() > 1) {
       auto lastIndice = Indices.back();
       if (auto cst = dyn_cast<ConstantInt>(lastIndice)) {
         if (cst->getZExtValue() == 0) {
           Indices.pop_back();
+          Type *IndexedTy = GetElementPtrInst::getIndexedType(
+              gep->getSourceElementType(), Indices);
+          if (SizeInBits(DL, IndexedTy) >= SizeInBits(DL, dest_ty)) {
+            break;
+          }
         } else {
           break;
         }
