@@ -279,6 +279,7 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
   new_GV->setInitializer(Constant::getNullValue(push_constant_ty));
   std::vector<Metadata *> md_args;
   if (old_GV) {
+    old_GV->removeDeadConstantUsers();
     // Replace the old push constant variable metadata and uses.
     new_GV->takeName(old_GV);
     auto md = old_GV->getMetadata(clspv::PushConstantsMetadataName());
@@ -327,6 +328,7 @@ void RedeclareGlobalPushConstants(Module &M, StructType *mangled_struct_ty,
           }
           indices.push_back(cst);
         }
+        cast<Constant>(gep_operator)->removeDeadConstantUsers();
         SmallVector<User *, 8> gep_users(gep_operator->users());
         for (auto *gep_user : gep_users) {
           auto *inst = cast<Instruction>(gep_user);
