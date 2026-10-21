@@ -28,6 +28,7 @@ enum Type {
   UniformConstant,    // Vulkan uniform constant memory.
   ModuleScopePrivate, // Vulkan private memory.
   PushConstant,       // Vulkan push constant.
+  StorageBuffer,      // Vulkan storage buffer (explicit descriptor).
 };
 }
 } // namespace clspv

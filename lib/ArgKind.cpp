@@ -113,12 +113,15 @@ ArgKind GetArgKindForPointerPodArgs(Function &F) {
   auto impl = GetPodArgsImpl(F);
   switch (impl) {
   case kUBO:
+  case kSSBO:
+    // NonSemantic.ClspvReflection only defines ArgumentPointerUniform and
+    // ArgumentPointerPushConstant for physical pointer arguments.
+    // There is no PointerSSBO ArgKind; physical pointer arguments that are not
+    // in push constants always use PointerUBO.
     return ArgKind::PointerUBO;
   case kPushConstant:
   case kGlobalPushConstant:
     return ArgKind::PointerPushConstant;
-  case kSSBO:
-    llvm_unreachable("SSBO PODs not supported with physical pointer arguments!");
   }
   llvm_unreachable("Unhandled case in clspv::GetArgKindForPodArgs");
 }

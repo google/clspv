@@ -639,6 +639,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
           else if (arg_kind == clspv::ArgKind::PodPushConstant ||
                    arg_kind == clspv::ArgKind::PointerPushConstant)
             addr_space = clspv::AddressSpace::PushConstant;
+          else if (clspv::Option::PhysicalStorageBuffers())
+            addr_space = clspv::AddressSpace::StorageBuffer;
           else
             addr_space = clspv::AddressSpace::Global;
           break;
