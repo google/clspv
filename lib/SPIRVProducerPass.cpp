@@ -3614,6 +3614,12 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
     addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_fma");
   }
 
+  if (CapabilitySet.count(spv::CapabilityAtomicFloat32AddEXT) ||
+      CapabilitySet.count(spv::CapabilityAtomicFloat64AddEXT)) {
+    addSPIRVInst<kExtensions>(spv::OpExtension,
+                              "SPV_EXT_shader_atomic_float_add");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -4154,6 +4160,18 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     // Handle SPIR-V intrinsics
     auto *arg0 = dyn_cast<ConstantInt>(Call->getArgOperand(0));
     spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
+    if (opcode == spv::OpAtomicFAddEXT) {
+      switch (Call->getType()->getScalarSizeInBits()) {
+      case 32:
+        addCapability(spv::CapabilityAtomicFloat32AddEXT);
+        break;
+      case 64:
+        addCapability(spv::CapabilityAtomicFloat64AddEXT);
+        break;
+      default:
+        llvm_unreachable("Unsupported OpAtomicFAddEXT bitwidth");
+      }
+    }
     if (opcode != spv::OpNop) {
       SPIRVOperandVec Ops;
 
@@ -7559,6 +7577,7 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpLoad:
     case spv::OpAtomicLoad:
     case spv::OpAtomicIAdd:
+    case spv::OpAtomicFAddEXT:
     case spv::OpAtomicISub:
     case spv::OpAtomicExchange:
     case spv::OpAtomicIIncrement:

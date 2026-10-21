@@ -100,7 +100,8 @@ private:
                                      clspv::AddressSpace::Type addrspace);
   bool replaceExplicitAtomics(llvm::Function &F, spv::Op Op,
                               spv::MemorySemanticsMask semantics =
-                                  spv::MemorySemanticsAcquireReleaseMask);
+                                  spv::MemorySemanticsAcquireReleaseMask,
+                              bool negate_value = false);
   bool replaceAtomicCompareExchange(llvm::Function &);
   bool replaceAtomicFlagTestAndSet(llvm::Function &F);
   bool replaceAtomicFlagClear(llvm::Function &F);

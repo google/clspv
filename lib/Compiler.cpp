@@ -224,10 +224,21 @@ clang::TargetInfo *PrepareTargetInfo(CompilerInstance &instance) {
   if (!clspv::Option::FP64()) {
     Opts["cl_khr_fp64"] = false;
   }
+
   // Enable/Disable CL3.0 feature macros for unsupported features
   if (instance.getLangOpts().LangStd == clang::LangStandard::lang_opencl30) {
 
     auto EnabledFeatureMacros = clspv::Option::EnabledFeatureMacros();
+    bool has_float_atomics = false;
+    for (auto [feat, str] : clspv::FeatureMacroList) {
+      if (clspv::IsFloatAtomicsFeatureMacro(feat)) {
+        const bool enabled = EnabledFeatureMacros.count(feat) != 0;
+        Opts[str] = enabled;
+        has_float_atomics |= enabled;
+      }
+    }
+    Opts["cl_ext_float_atomics"] = has_float_atomics;
+
     // overwrite feature macro list for certain options
     if (clspv::Option::FP64()) {
       EnabledFeatureMacros.insert(clspv::FeatureMacro::__opencl_c_fp64);
@@ -991,11 +1002,20 @@ int ParseOptions(const int argc, const char *const argv[]) {
   }
 
   const auto enabled_feature_macros = clspv::Option::EnabledFeatureMacros();
-  if (!clspv::Option::FP64() &&
-      enabled_feature_macros.count(clspv::FeatureMacro::__opencl_c_fp64)) {
-    llvm::errs() << "error: Cannot enabled feature macro __opencl_c_fp64 while "
-                    "-fp64 is disabled!\n";
-    return -1;
+  if (!clspv::Option::FP64()) {
+    for (auto feat :
+         {clspv::FeatureMacro::__opencl_c_fp64,
+          clspv::FeatureMacro::__opencl_c_ext_fp64_global_atomic_add,
+          clspv::FeatureMacro::__opencl_c_ext_fp64_local_atomic_add}) {
+      if (enabled_feature_macros.count(feat)) {
+        auto itr = std::find_if(
+            clspv::FeatureMacroList.begin(), clspv::FeatureMacroList.end(),
+            [feat](const auto &macro) { return std::get<0>(macro) == feat; });
+        llvm::errs() << "error: Cannot enabled feature macro "
+                     << std::get<1>(*itr) << " while -fp64 is disabled!\n";
+        return -1;
+      }
+    }
   }
 
   if (clspv::Option::PhysicalStorageBuffers() &&

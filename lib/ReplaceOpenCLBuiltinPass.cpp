@@ -596,11 +596,18 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kAtomicExchangeExplicit:
     return replaceExplicitAtomics(F, spv::OpAtomicExchange);
   case Builtins::kAtomicFetchAdd:
-  case Builtins::kAtomicFetchAddExplicit:
-    return replaceExplicitAtomics(F, spv::OpAtomicIAdd);
+  case Builtins::kAtomicFetchAddExplicit: {
+    auto op = F.getReturnType()->isFloatingPointTy() ? spv::OpAtomicFAddEXT
+                                                     : spv::OpAtomicIAdd;
+    return replaceExplicitAtomics(F, op);
+  }
   case Builtins::kAtomicFetchSub:
-  case Builtins::kAtomicFetchSubExplicit:
-    return replaceExplicitAtomics(F, spv::OpAtomicISub);
+  case Builtins::kAtomicFetchSubExplicit: {
+    bool is_fp = F.getReturnType()->isFloatingPointTy();
+    auto op = is_fp ? spv::OpAtomicFAddEXT : spv::OpAtomicISub;
+    return replaceExplicitAtomics(F, op, spv::MemorySemanticsAcquireReleaseMask,
+                                  is_fp);
+  }
   case Builtins::kAtomicFetchOr:
   case Builtins::kAtomicFetchOrExplicit:
     return replaceExplicitAtomics(F, spv::OpAtomicOr);
@@ -3674,8 +3681,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAddressSpaceQualifiers(
 }
 
 bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
-    Function &F, spv::Op Op, spv::MemorySemanticsMask semantics) {
-  return replaceCallsWithValue(F, [Op, semantics](CallInst *Call) {
+    Function &F, spv::Op Op, spv::MemorySemanticsMask semantics,
+    bool negate_value) {
+  return replaceCallsWithValue(F, [Op, semantics,
+                                   negate_value](CallInst *Call) {
     auto pointer = Call->getArgOperand(0);
     // Clang emits an address space cast to the generic address space. Skip the
     // cast and use the input directly.
@@ -3683,6 +3692,10 @@ bool ReplaceOpenCLBuiltinPass::replaceExplicitAtomics(
       pointer = cast->getPointerOperand();
     }
     Value *value = Call->getArgOperand(1);
+    if (negate_value) {
+      IRBuilder<> builder(Call);
+      value = builder.CreateFNeg(value);
+    }
     Value *order_arg = Call->arg_size() > 2 ? Call->getArgOperand(2) : nullptr;
     Value *scope_arg = Call->arg_size() > 3 ? Call->getArgOperand(3) : nullptr;
     bool is_global = pointer->getType()->getPointerAddressSpace() ==

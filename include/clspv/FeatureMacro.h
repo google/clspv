@@ -48,10 +48,25 @@ enum class FeatureMacro {
   // dot product
   __opencl_c_integer_dot_product_input_4x8bit,
   __opencl_c_integer_dot_product_input_4x8bit_packed,
+  // cl_ext_float_atomics
+  __opencl_c_ext_fp16_global_atomic_add,
+  __opencl_c_ext_fp16_local_atomic_add,
+  __opencl_c_ext_fp16_global_atomic_load_store,
+  __opencl_c_ext_fp16_local_atomic_load_store,
+  __opencl_c_ext_fp16_global_atomic_min_max,
+  __opencl_c_ext_fp16_local_atomic_min_max,
+  __opencl_c_ext_fp32_global_atomic_add,
+  __opencl_c_ext_fp32_local_atomic_add,
+  __opencl_c_ext_fp32_global_atomic_min_max,
+  __opencl_c_ext_fp32_local_atomic_min_max,
+  __opencl_c_ext_fp64_global_atomic_add,
+  __opencl_c_ext_fp64_local_atomic_add,
+  __opencl_c_ext_fp64_global_atomic_min_max,
+  __opencl_c_ext_fp64_local_atomic_min_max,
 };
 
 #define FeatureStr(f) std::make_pair(FeatureMacro::f, #f)
-constexpr std::array<std::pair<FeatureMacro, const char *>, 17>
+constexpr std::array<std::pair<FeatureMacro, const char *>, 31>
     FeatureMacroList{
         FeatureStr(__opencl_c_3d_image_writes),
         FeatureStr(__opencl_c_atomic_order_acq_rel),
@@ -59,6 +74,10 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 17>
         FeatureStr(__opencl_c_images),
         FeatureStr(__opencl_c_generic_address_space),
         FeatureStr(__opencl_c_subgroups),
+        FeatureStr(__opencl_c_ext_fp32_global_atomic_add),
+        FeatureStr(__opencl_c_ext_fp32_local_atomic_add),
+        FeatureStr(__opencl_c_ext_fp64_global_atomic_add),
+        FeatureStr(__opencl_c_ext_fp64_local_atomic_add),
         // following items are always enabled by clang
         FeatureStr(__opencl_c_int64),
         FeatureStr(__opencl_c_atomic_order_seq_cst),
@@ -72,8 +91,40 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 17>
         FeatureStr(__opencl_c_program_scope_global_variables),
         FeatureStr(__opencl_c_integer_dot_product_input_4x8bit),
         FeatureStr(__opencl_c_integer_dot_product_input_4x8bit_packed),
+        FeatureStr(__opencl_c_ext_fp16_global_atomic_add),
+        FeatureStr(__opencl_c_ext_fp16_local_atomic_add),
+        FeatureStr(__opencl_c_ext_fp16_global_atomic_load_store),
+        FeatureStr(__opencl_c_ext_fp16_local_atomic_load_store),
+        FeatureStr(__opencl_c_ext_fp16_global_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp16_local_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp32_global_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp32_local_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp64_global_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp64_local_atomic_min_max),
     };
 #undef FeatureStr
+
+inline bool IsFloatAtomicsFeatureMacro(FeatureMacro feat) {
+  switch (feat) {
+  case FeatureMacro::__opencl_c_ext_fp16_global_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp16_local_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp16_global_atomic_load_store:
+  case FeatureMacro::__opencl_c_ext_fp16_local_atomic_load_store:
+  case FeatureMacro::__opencl_c_ext_fp16_global_atomic_min_max:
+  case FeatureMacro::__opencl_c_ext_fp16_local_atomic_min_max:
+  case FeatureMacro::__opencl_c_ext_fp32_global_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp32_local_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp32_global_atomic_min_max:
+  case FeatureMacro::__opencl_c_ext_fp32_local_atomic_min_max:
+  case FeatureMacro::__opencl_c_ext_fp64_global_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp64_local_atomic_add:
+  case FeatureMacro::__opencl_c_ext_fp64_global_atomic_min_max:
+  case FeatureMacro::__opencl_c_ext_fp64_local_atomic_min_max:
+    return true;
+  default:
+    return false;
+  }
+}
 
 FeatureMacro FeatureMacroLookup(const std::string &name);
 } // namespace clspv
