@@ -5,19 +5,24 @@ target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:2
 target triple = "spirv32-unknown-vulkan"
 
 @mem0 = addrspace(2) constant [3 x i8] zeroinitializer, align 1
+@mem2 = addrspace(2) constant [3 x [2 x i8]] zeroinitializer, align 2
 @mem8 = addrspace(2) constant [3 x [8 x i8]] zeroinitializer, align 8
 
 define spir_kernel void @foo() {
 entry:
   %0 = getelementptr [3 x i8], ptr addrspace(2) @mem0, i32 0
-  %1 = getelementptr [3 x [8 x i8]], ptr addrspace(2) @mem8, i32 0
+  %1 = getelementptr [3 x [2 x i8]], ptr addrspace(2) @mem2, i32 0
+  %2 = getelementptr [3 x [8 x i8]], ptr addrspace(2) @mem8, i32 0
   ret void
 }
 
-; CHECK: [[clustered_constants:@[^ ]+]] = internal addrspace(2) constant { [3 x i8], [5 x i8], [3 x [8 x i8]] } zeroinitializer, align 8
+; CHECK: [[clustered_constants:@[^ ]+]] = internal addrspace(2) constant { [3 x i8], [1 x i8], [3 x [2 x i8]], [3 x i16], [3 x [8 x i8]] } zeroinitializer, align 8
 
-; CHECK: [[mem0:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 0
+; CHECK: [[mem0:%[^ ]+]] = getelementptr inbounds { [3 x i8], [1 x i8], [3 x [2 x i8]], [3 x i16], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 0
 ; CHECK: getelementptr [3 x i8], ptr addrspace(2) [[mem0]], i32 0
 
-; CHECK: [[mem8:%[^ ]+]] = getelementptr inbounds { [3 x i8], [5 x i8], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 2
+; CHECK: [[mem2:%[^ ]+]] = getelementptr inbounds { [3 x i8], [1 x i8], [3 x [2 x i8]], [3 x i16], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 2
+; CHECK: getelementptr [3 x [2 x i8]], ptr addrspace(2) [[mem2]], i32 0
+
+; CHECK: [[mem8:%[^ ]+]] = getelementptr inbounds { [3 x i8], [1 x i8], [3 x [2 x i8]], [3 x i16], [3 x [8 x i8]] }, ptr addrspace(2) [[clustered_constants]], i32 0, i32 4
 ; CHECK: getelementptr [3 x [8 x i8]], ptr addrspace(2) [[mem8]], i32 0
