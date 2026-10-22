@@ -52,8 +52,11 @@ bool clspv::InlineEntryPointsPass::InlineFunctions(Module &M) {
       continue;
 
     for (auto user : F.users()) {
-      if (auto call = dyn_cast<CallInst>(user))
-        to_inline.push_back(call);
+      if (auto call = dyn_cast<CallInst>(user)) {
+        if (call->getCaller()->getCallingConv() == CallingConv::SPIR_KERNEL) {
+          to_inline.push_back(call);
+        }
+      }
     }
   }
 
