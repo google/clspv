@@ -537,6 +537,10 @@ static llvm::cl::opt<uint32_t> memmove_alloca_limit(
         "Max size of the alloca used to implement memmove intrinsic"),
     llvm::cl::init(16));
 
+static std::unordered_map<clspv::Option::FloatingPointType,
+                          clspv::Option::DenormMode>
+    denorm_modes;
+
 } // namespace
 
 namespace clspv {
@@ -613,29 +617,28 @@ bool ExecutionModeSignedZeroInfNanPreserve(FloatingPointType fp) {
 }
 
 DenormMode ExecutionModeDenorm(FloatingPointType fpty) {
-  static std::unordered_map<FloatingPointType, DenormMode> modes;
-  auto mode = modes.find(fpty);
-  if (mode != modes.end()) {
-    return modes[fpty];
+  auto mode = denorm_modes.find(fpty);
+  if (mode != denorm_modes.end()) {
+    return denorm_modes[fpty];
   }
 
   for (auto type : denorm_preserve) {
-    modes[type] = DenormMode::preserve;
+    denorm_modes[type] = DenormMode::preserve;
   }
   for (auto type : denorm_flush_to_zero) {
-    if (modes.find(type) != modes.end()) {
-      modes[type] = DenormMode::error;
+    if (denorm_modes.find(type) != denorm_modes.end()) {
+      denorm_modes[type] = DenormMode::error;
     } else {
-      modes[type] = DenormMode::flush_to_zero;
+      denorm_modes[type] = DenormMode::flush_to_zero;
     }
   }
   for (auto type : {FloatingPointType::fp16, FloatingPointType::fp32,
                     FloatingPointType::fp64}) {
-    if (modes.find(type) == modes.end()) {
-      modes[type] = DenormMode::unspecified;
+    if (denorm_modes.find(type) == denorm_modes.end()) {
+      denorm_modes[type] = DenormMode::unspecified;
     }
   }
-  return modes[fpty];
+  return denorm_modes[fpty];
 }
 
 bool HackFMulFlushToZero(FloatingPointType fpty) {
@@ -765,6 +768,8 @@ bool SupportsFmaKHR(uint32_t scalarSizeInBits) {
 }
 
 uint32_t MemmoveAllocaLimit() { return memmove_alloca_limit; }
+
+void CleanCache() { denorm_modes.clear(); }
 
 } // namespace Option
 } // namespace clspv
