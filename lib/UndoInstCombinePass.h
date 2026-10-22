@@ -84,6 +84,15 @@ private:
   //  %3 = sdiv i32 %a, 3
   bool UndoNarrowedIntDiv(llvm::Instruction *inst);
 
+  // Undoes boolean vector reductions canonicalized to bitcast + icmp,
+  // for example:
+  //  %1 = bitcast <2 x i1> %a to i2
+  //  %2 = icmp eq i2 %1, -1
+  //
+  // With:
+  //  %2 = call i1 @llvm.vector.reduce.and.v2i1(<2 x i1> %a)
+  bool UndoBoolVectorReduce(llvm::Instruction *inst);
+
   llvm::UniqueVector<llvm::Value *> potentially_dead_;
   std::vector<llvm::Instruction *> dead_;
 };
