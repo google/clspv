@@ -58,6 +58,7 @@ clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed |= runOnAllocaNotAliasing(M);
     changed |= runOnPHIFromGEP(M);
     changed |= runOnGEPFromGEP(M);
+    changed |= runOnGEPToVector(M);
   }
 
   return PA;
@@ -1313,4 +1314,106 @@ bool clspv::SimplifyPointerBitcastPass::runOnAllocaNotAliasing(
   }
 
   return Allocas.size() != 0;
+}
+
+bool clspv::SimplifyPointerBitcastPass::runOnGEPToVector(Module &M) const {
+  // Rewrite scalar loads/stores through a GEP into a Private vector (e.g.,
+  // produced by ((type *)&vec)[idx] after DestructurizeGEPPass and
+  // runOnImplicitGEP) into vector load + extractelement / insertelement +
+  // vector store, enabling SROA to promote the vector alloca to registers.
+  SmallVector<GetElementPtrInst *, 16> WorkList;
+  for (Function &F : M) {
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        auto *GEP = dyn_cast<GetElementPtrInst>(&I);
+        if (!GEP ||
+            GEP->getPointerAddressSpace() != clspv::AddressSpace::Private ||
+            GEP->getNumIndices() < 2 || GEP->use_empty()) {
+          continue;
+        }
+
+        SmallVector<Value *, 4> VecIndices(GEP->indices().begin(),
+                                           GEP->indices().end() - 1);
+        Value *ElemIdx = *(GEP->indices().end() - 1);
+        Type *IndexedTy = GetElementPtrInst::getIndexedType(
+            GEP->getSourceElementType(), VecIndices);
+        auto *VecTy = dyn_cast_or_null<FixedVectorType>(IndexedTy);
+        if (!VecTy || VecTy->getNumElements() > 4 ||
+            GEP->getResultElementType() != VecTy->getElementType()) {
+          continue;
+        }
+        if (auto *C = dyn_cast<ConstantInt>(ElemIdx)) {
+          if (C->getZExtValue() >= VecTy->getNumElements()) {
+            continue;
+          }
+        }
+
+        bool AllUsersValid = true;
+        for (User *U : GEP->users()) {
+          if (auto *LI = dyn_cast<LoadInst>(U)) {
+            if (LI->isVolatile() || LI->getType() != VecTy->getElementType()) {
+              AllUsersValid = false;
+              break;
+            }
+          } else if (auto *SI = dyn_cast<StoreInst>(U)) {
+            if (SI->isVolatile() || SI->getPointerOperand() != GEP ||
+                SI->getValueOperand()->getType() != VecTy->getElementType()) {
+              AllUsersValid = false;
+              break;
+            }
+          } else {
+            AllUsersValid = false;
+            break;
+          }
+        }
+        if (AllUsersValid) {
+          WorkList.push_back(GEP);
+        }
+      }
+    }
+  }
+
+  for (GetElementPtrInst *GEP : WorkList) {
+    SmallVector<Value *, 4> VecIndices(GEP->indices().begin(),
+                                       GEP->indices().end() - 1);
+    Value *ElemIdx = *(GEP->indices().end() - 1);
+    auto *VecTy = cast<FixedVectorType>(GetElementPtrInst::getIndexedType(
+        GEP->getSourceElementType(), VecIndices));
+
+    Value *VecPtr = nullptr;
+    if (VecIndices.size() == 1 && isa<ConstantInt>(VecIndices[0]) &&
+        cast<ConstantInt>(VecIndices[0])->isZero() &&
+        GEP->getSourceElementType() == VecTy) {
+      VecPtr = GEP->getPointerOperand();
+    } else {
+      auto *NewGEP = GetElementPtrInst::Create(
+          GEP->getSourceElementType(), GEP->getPointerOperand(), VecIndices, "",
+          GEP->getIterator());
+      NewGEP->setIsInBounds(GEP->isInBounds());
+      VecPtr = NewGEP;
+    }
+
+    SmallVector<Instruction *, 8> Users;
+    for (User *U : GEP->users()) {
+      Users.push_back(cast<Instruction>(U));
+    }
+    for (Instruction *UserInst : Users) {
+      IRBuilder<> B(UserInst);
+      if (auto *LI = dyn_cast<LoadInst>(UserInst)) {
+        Value *Vec = B.CreateLoad(VecTy, VecPtr);
+        Value *Elem = B.CreateExtractElement(Vec, ElemIdx);
+        LI->replaceAllUsesWith(Elem);
+        LI->eraseFromParent();
+      } else if (auto *SI = dyn_cast<StoreInst>(UserInst)) {
+        Value *Vec = B.CreateLoad(VecTy, VecPtr);
+        Value *NewVec =
+            B.CreateInsertElement(Vec, SI->getValueOperand(), ElemIdx);
+        B.CreateStore(NewVec, VecPtr);
+        SI->eraseFromParent();
+      }
+    }
+    GEP->eraseFromParent();
+  }
+
+  return !WorkList.empty();
 }

@@ -781,6 +781,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
     // Run SimplifyPointerBitcastPass before ReplaceLLVMInstrinsicsPass to help
     // lower memcpy.
     pm.addPass(clspv::SimplifyPointerBitcastPass());
+    // Promote allocas whose pointer bitcasts / scalar element GEPs were
+    // simplified into vector extractelement / insertelement operations.
+    pm.addPass(llvm::createModuleToFunctionPassAdaptor(
+        llvm::SROAPass(llvm::SROAOptions::PreserveCFG)));
     pm.addPass(clspv::ReplaceLLVMIntrinsicsPass());
     // Replace LLVM intrinsics can leave dead code around.
     pm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DCEPass()));

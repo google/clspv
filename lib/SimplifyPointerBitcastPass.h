@@ -34,6 +34,7 @@ struct SimplifyPointerBitcastPass
   bool runOnImplicitGEP(llvm::Module &M) const;
   bool runOnUnneededIndices(llvm::Module &M) const;
   bool runOnPHIFromGEP(llvm::Module &M) const;
+  bool runOnGEPToVector(llvm::Module &M) const;
 };
 } // namespace clspv
 
