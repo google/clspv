@@ -138,6 +138,8 @@ else()
   # First tell LLVM where to find clang.
   set(LLVM_EXTERNAL_CLANG_SOURCE_DIR ${CLSPV_CLANG_SOURCE_DIR})
   set(LLVM_ENABLE_PROJECTS clang CACHE STRING "LLVM enabled projects for clspv")
+  # Do not build ClangIR support to avoid pulling in MLIR.
+  set(CLANG_ENABLE_CIR OFF)
 
   # Also tell LLVM where to find libclc if required.
   if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
