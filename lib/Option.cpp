@@ -613,29 +613,30 @@ bool ExecutionModeSignedZeroInfNanPreserve(FloatingPointType fp) {
 }
 
 DenormMode ExecutionModeDenorm(FloatingPointType fpty) {
-  static std::unordered_map<FloatingPointType, DenormMode> modes;
-  auto mode = modes.find(fpty);
-  if (mode != modes.end()) {
-    return modes[fpty];
-  }
-
+  bool preserve = false;
   for (auto type : denorm_preserve) {
-    modes[type] = DenormMode::preserve;
+    if (type == fpty) {
+      preserve = true;
+      break;
+    }
   }
+  bool flush_to_zero = false;
   for (auto type : denorm_flush_to_zero) {
-    if (modes.find(type) != modes.end()) {
-      modes[type] = DenormMode::error;
-    } else {
-      modes[type] = DenormMode::flush_to_zero;
+    if (type == fpty) {
+      flush_to_zero = true;
+      break;
     }
   }
-  for (auto type : {FloatingPointType::fp16, FloatingPointType::fp32,
-                    FloatingPointType::fp64}) {
-    if (modes.find(type) == modes.end()) {
-      modes[type] = DenormMode::unspecified;
-    }
+  if (preserve && flush_to_zero) {
+    return DenormMode::error;
   }
-  return modes[fpty];
+  if (preserve) {
+    return DenormMode::preserve;
+  }
+  if (flush_to_zero) {
+    return DenormMode::flush_to_zero;
+  }
+  return DenormMode::unspecified;
 }
 
 bool HackFMulFlushToZero(FloatingPointType fpty) {
