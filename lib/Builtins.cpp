@@ -292,7 +292,8 @@ Builtins::FunctionInfo::FunctionInfo(const std::string &mangled_name) {
   type_ = LookupBuiltinType(name_);
   if (type_ == kConvert) {
     // deduce return type from name, only for convert
-    char tok = name_[8];
+    size_t offset = name_.find("__clc_") == 0 ? 14 : 8;
+    char tok = name_[offset];
     return_type_.is_signed = tok != 'u'; // unsigned
     return_type_.type_id = tok == 'f' ? Type::FloatTyID : Type::IntegerTyID;
   }
