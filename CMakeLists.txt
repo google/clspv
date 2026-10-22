@@ -162,6 +162,19 @@ else()
   # Ensure clspv and LLVM use the same build options (e.g. -D_FILE_OFFSET_BITS=64).
   list(APPEND CMAKE_MODULE_PATH ${CLSPV_LLVM_SOURCE_DIR}/cmake/modules/)
   include(HandleLLVMOptions)
+
+  # LLVM_INCLUDE_TESTS=OFF skips adding LLVM's googletest targets (llvm_gtest
+  # and llvm_gtest_main), which downstream projects like clvk rely on for their
+  # test suites. Add them with EXCLUDE_FROM_ALL so they remain available without
+  # being built by default.
+  if (NOT TARGET llvm_gtest AND EXISTS ${CLSPV_LLVM_SOURCE_DIR}/../third-party/unittest)
+    set(LLVM_SOURCE_DIR ${CLSPV_LLVM_SOURCE_DIR})
+    set(LLVM_BINARY_DIR ${CLSPV_LLVM_BINARY_DIR})
+    include(AddLLVM)
+    add_subdirectory(${CLSPV_LLVM_SOURCE_DIR}/../third-party/unittest
+                     ${CLSPV_LLVM_BINARY_DIR}/third-party/unittest
+                     EXCLUDE_FROM_ALL)
+  endif()
 endif()
 
 set(CLSPV_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
