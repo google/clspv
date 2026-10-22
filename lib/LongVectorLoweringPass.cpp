@@ -416,12 +416,24 @@ Value *convertEquivalentValue(IRBuilder<> &B, Value *V, Type *EquivalentTy,
     }
   } else {
     assert(EquivalentTy->isArrayTy());
-    assert(V->getType()->isVectorTy());
+    if (V->getType()->isArrayTy()) {
+      assert(EquivalentTy->getArrayNumElements() ==
+             V->getType()->getArrayNumElements());
+      unsigned Arity = EquivalentTy->getArrayNumElements();
+      Type *ElementType = EquivalentTy->getArrayElementType();
+      for (unsigned i = 0; i < Arity; ++i) {
+        Value *Element = B.CreateExtractValue(V, {i});
+        Value *NewElement = convertEquivalentValue(B, Element, ElementType, DL);
+        NewValue = B.CreateInsertValue(NewValue, NewElement, {i});
+      }
+    } else {
+      assert(V->getType()->isVectorTy());
 
-    unsigned Arity = EquivalentTy->getArrayNumElements();
-    for (unsigned i = 0; i < Arity; ++i) {
-      Value *Scalar = B.CreateExtractElement(V, i);
-      NewValue = B.CreateInsertValue(NewValue, Scalar, i);
+      unsigned Arity = EquivalentTy->getArrayNumElements();
+      for (unsigned i = 0; i < Arity; ++i) {
+        Value *Scalar = B.CreateExtractElement(V, i);
+        NewValue = B.CreateInsertValue(NewValue, Scalar, i);
+      }
     }
   }
 
@@ -830,6 +842,28 @@ Value *clspv::LongVectorLoweringPass::visitConstant(Constant &Cst) {
     }
 
     return ConstantArray::get(cast<ArrayType>(EquivalentTy), Scalars);
+  }
+
+  if (auto *Array = dyn_cast<ConstantArray>(&Cst)) {
+    assert(isa<ArrayType>(EquivalentTy));
+
+    SmallVector<Constant *, 16> Elements;
+    for (unsigned i = 0; i < Array->getNumOperands(); ++i) {
+      Elements.push_back(cast<Constant>(visitOrSelf(Array->getOperand(i))));
+    }
+
+    return ConstantArray::get(cast<ArrayType>(EquivalentTy), Elements);
+  }
+
+  if (auto *Struct = dyn_cast<ConstantStruct>(&Cst)) {
+    assert(isa<StructType>(EquivalentTy));
+
+    SmallVector<Constant *, 16> Elements;
+    for (unsigned i = 0; i < Struct->getNumOperands(); ++i) {
+      Elements.push_back(cast<Constant>(visitOrSelf(Struct->getOperand(i))));
+    }
+
+    return ConstantStruct::get(cast<StructType>(EquivalentTy), Elements);
   }
 
   if (auto *CFP = dyn_cast<ConstantFP>(&Cst)) {
