@@ -1213,7 +1213,8 @@ clspv::LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
 
   // Extract array pointer
   Value *PtrOperand = nullptr;
-  if (auto *Load = dyn_cast<LoadInst>(EquivalentValue)) {
+  if (auto *Load = dyn_cast<LoadInst>(EquivalentValue);
+      Load && Load->getPointerAddressSpace() == clspv::AddressSpace::Private) {
     PtrOperand = Load->getPointerOperand();
   } else {
     IRBuilder<> BFront(&I.getFunction()->front().front());
@@ -1225,8 +1226,9 @@ clspv::LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
   auto *GEP = B.CreateInBoundsGEP(EquivalentValue->getType(), PtrOperand,
                                   {B.getInt32(0), I.getOperand(2)});
   B.CreateStore(ScalarElement, GEP);
-  registerReplacement(I, *EquivalentValue);
-  return EquivalentValue;
+  auto *Load = B.CreateLoad(EquivalentValue->getType(), PtrOperand);
+  registerReplacement(I, *Load);
+  return Load;
 }
 
 Value *clspv::LongVectorLoweringPass::visitInsertValueInst(InsertValueInst &I) {
