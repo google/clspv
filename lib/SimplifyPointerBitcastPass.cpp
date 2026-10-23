@@ -281,9 +281,26 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
           GEP->hasAllConstantIndices() && OtherGEPPrevTy &&
           OtherGEPPrevTy->isStructTy() && OtherGEPLastIdx &&
           !GEP->getSourceElementType()->isAggregateType();
+      // Make sure the combined offset stays in the struct.
+      if (OtherGEPPrevIsCstToStruct) {
+        auto &DL = M.getDataLayout();
+        auto STy = cast<StructType>(OtherGEPPrevTy);
+        APInt GEPOffset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+        GEP->accumulateConstantOffset(DL, GEPOffset);
+        auto SLayout = DL.getStructLayout(STy);
+        int64_t Offset =
+            SLayout->getElementOffset(OtherGEPLastIdx->getZExtValue()) +
+            GEPOffset.getSExtValue();
+        int64_t AccessSize =
+            DL.getTypeStoreSize(GEP->getResultElementType()).getFixedValue();
+        int64_t StructSize = SLayout->getSizeInBytes();
+        OtherGEPPrevIsCstToStruct =
+            Offset >= 0 && Offset + AccessSize <= StructSize;
+      }
     }
 
     SmallVector<Value *, 8> Idxs;
+    Type *NewGEPSrcTy = OtherGEP->getSourceElementType();
     if (OtherGEPPrevIsCstToStruct) {
       int64_t cstVal;
       Value *dynVal;
@@ -327,10 +344,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       cstVal = cstVal * smallerBitWidths + cstVal2 * smallerBitWidths2;
       smallerBitWidths = std::gcd(smallerBitWidths, smallerBitWidths2);
       cstVal /= smallerBitWidths;
+      auto Src = OtherGEP->getPointerOperand();
+      if (auto Alloca = dyn_cast<AllocaInst>(Src)) {
+        NewGEPSrcTy = Alloca->getAllocatedType();
+      } else if (auto GV = dyn_cast<GlobalVariable>(Src)) {
+        NewGEPSrcTy = GV->getValueType();
+      }
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
-          M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
-          GEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          OtherGEP->getPointerOperand());
+          M.getDataLayout(), Builder, NewGEPSrcTy, GEP->getResultElementType(),
+          cstVal, dynVal, smallerBitWidths, Src);
       Idxs.append(NewGEPIdxs);
     } else {
       if (CstSrcLastIdxOp && CstGEPIdxOp &&
@@ -455,10 +477,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     // and create the GEP instruction directly.
     if (GEP->isInBounds() && OtherGEP->isInBounds()) {
       NewGEP = GetElementPtrInst::CreateInBounds(
-          OtherGEP->getSourceElementType(), OtherGEP->getPointerOperand(), Idxs,
-          "", GEP->getIterator());
+          NewGEPSrcTy, OtherGEP->getPointerOperand(), Idxs, "",
+          GEP->getIterator());
     } else {
-      NewGEP = GetElementPtrInst::Create(OtherGEP->getSourceElementType(),
+      NewGEP = GetElementPtrInst::Create(NewGEPSrcTy,
                                          OtherGEP->getPointerOperand(), Idxs,
                                          "", GEP->getIterator());
     }
