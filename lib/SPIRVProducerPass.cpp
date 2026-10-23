@@ -1680,6 +1680,8 @@ SPIRVProducerPassImpl::GetStorageClass(unsigned AddrSpace) const {
     return spv::StorageClassPrivate;
   case AddressSpace::PushConstant:
     return spv::StorageClassPushConstant;
+  case AddressSpace::StorageBuffer:
+    return spv::StorageClassStorageBuffer;
   default:
     llvm_unreachable("Unsupported OpenCL address space");
   }
@@ -1891,6 +1893,7 @@ bool SPIRVProducerPassImpl::PointerRequiresLayout(unsigned aspace) {
   switch (aspace) {
   case AddressSpace::PushConstant:
   case AddressSpace::Uniform:
+  case AddressSpace::StorageBuffer:
   case AddressSpace::Global:
   case AddressSpace::Constant:
     return true;

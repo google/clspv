@@ -734,6 +734,7 @@ bool UntypedPointerAddressSpace(unsigned aspace) {
 
   switch (aspace) {
   case AddressSpace::Global:
+  case AddressSpace::StorageBuffer:
   case AddressSpace::PushConstant:
   case AddressSpace::Uniform:
   case AddressSpace::Constant:
