@@ -235,6 +235,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
 
   const bool Changed = !WorkList.empty();
 
+  DenseMap<Value *, Type *> type_cache;
   for (GetElementPtrInst *GEP : WorkList) {
     IRBuilder<> Builder(GEP);
 
@@ -270,6 +271,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     ConstantInt *OtherGEPLastIdx = nullptr;
     Type *OtherGEPPrevTy = nullptr;
     SmallVector<Value *, 4> OtherGEPIdxs;
+    // Total GEP offset from the start of OtherGEPPrevTy, in units of
+    // StructSmallerBitWidths.
+    int64_t StructCstVal = 0;
+    size_t StructSmallerBitWidths = 0;
     if (OtherGEP->getNumIndices() > 1) {
       OtherGEPIdxs.append(SmallVector<Value *, 4>(OtherGEP->indices()));
       OtherGEPLastIdx =
@@ -281,30 +286,33 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
           GEP->hasAllConstantIndices() && OtherGEPPrevTy &&
           OtherGEPPrevTy->isStructTy() && OtherGEPLastIdx &&
           !GEP->getSourceElementType()->isAggregateType();
+      if (OtherGEPPrevIsCstToStruct) {
+        auto &DL = M.getDataLayout();
+        Value *dynVal;
+        ExtractOffsetFromGEP(DL, Builder, GEP, StructCstVal, dynVal,
+                             StructSmallerBitWidths);
+        assert(dynVal == nullptr);
+        ExtractOffsetFromStruct(DL, OtherGEPLastIdx,
+                                cast<StructType>(OtherGEPPrevTy), StructCstVal,
+                                StructSmallerBitWidths);
+        // Make sure the combined offset stays in the struct.
+        int64_t OffsetInBits = StructCstVal * (int64_t)StructSmallerBitWidths;
+        int64_t AccessSize =
+            DL.getTypeStoreSizeInBits(GEP->getResultElementType())
+                .getFixedValue();
+        int64_t StructSize = SizeInBits(DL, OtherGEPPrevTy);
+        OtherGEPPrevIsCstToStruct =
+            OffsetInBits >= 0 && OffsetInBits + AccessSize <= StructSize;
+      }
     }
 
     SmallVector<Value *, 8> Idxs;
+    Type *NewGEPSrcTy = OtherGEP->getSourceElementType();
     if (OtherGEPPrevIsCstToStruct) {
-      int64_t cstVal;
-      Value *dynVal;
-      size_t smallerBitWidths;
-      ExtractOffsetFromGEP(M.getDataLayout(), Builder, GEP, cstVal, dynVal,
-                           smallerBitWidths);
-      assert(dynVal == nullptr);
-      cstVal *= smallerBitWidths;
-      int64_t cstVal2 = 0;
-      size_t smallerBitWidths2 =
-          SizeInBits(M.getDataLayout(), OtherGEP->getResultElementType());
-      ExtractOffsetFromStruct(M.getDataLayout(), OtherGEPLastIdx,
-                              dyn_cast<StructType>(OtherGEPPrevTy), cstVal2,
-                              smallerBitWidths2);
-      cstVal += smallerBitWidths2 * cstVal2;
-      smallerBitWidths = std::gcd(smallerBitWidths, smallerBitWidths2);
-      cstVal /= smallerBitWidths;
       auto newGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, OtherGEPPrevTy,
-          GEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          OtherGEP->getPointerOperand());
+          GEP->getResultElementType(), StructCstVal, nullptr,
+          StructSmallerBitWidths, OtherGEP->getPointerOperand());
 
       Idxs.append(OtherGEPIdxs);
       Idxs.append(
@@ -327,10 +335,13 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       cstVal = cstVal * smallerBitWidths + cstVal2 * smallerBitWidths2;
       smallerBitWidths = std::gcd(smallerBitWidths, smallerBitWidths2);
       cstVal /= smallerBitWidths;
+      auto Src = OtherGEP->getPointerOperand();
+      if (auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache)) {
+        NewGEPSrcTy = SrcTy;
+      }
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
-          M.getDataLayout(), Builder, OtherGEP->getSourceElementType(),
-          GEP->getResultElementType(), cstVal, dynVal, smallerBitWidths,
-          OtherGEP->getPointerOperand());
+          M.getDataLayout(), Builder, NewGEPSrcTy, GEP->getResultElementType(),
+          cstVal, dynVal, smallerBitWidths, Src);
       Idxs.append(NewGEPIdxs);
     } else {
       if (CstSrcLastIdxOp && CstGEPIdxOp &&
@@ -455,10 +466,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     // and create the GEP instruction directly.
     if (GEP->isInBounds() && OtherGEP->isInBounds()) {
       NewGEP = GetElementPtrInst::CreateInBounds(
-          OtherGEP->getSourceElementType(), OtherGEP->getPointerOperand(), Idxs,
-          "", GEP->getIterator());
+          NewGEPSrcTy, OtherGEP->getPointerOperand(), Idxs, "",
+          GEP->getIterator());
     } else {
-      NewGEP = GetElementPtrInst::Create(OtherGEP->getSourceElementType(),
+      NewGEP = GetElementPtrInst::Create(NewGEPSrcTy,
                                          OtherGEP->getPointerOperand(), Idxs,
                                          "", GEP->getIterator());
     }
@@ -468,11 +479,13 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     GEP->replaceAllUsesWith(NewGEP);
 
     // Remove the GEP as it has no users now.
+    type_cache.erase(GEP);
     GEP->eraseFromParent();
 
     // Check if the other GEP had no other users...
     if (0 == OtherGEP->getNumUses()) {
       // ... and remove it if we were its only user.
+      type_cache.erase(OtherGEP);
       OtherGEP->eraseFromParent();
     }
   }
