@@ -27,6 +27,28 @@ entry:
   ret void
 }
 
+; Non-zero first index: VecIndices is [1], so a new GEP is created instead of reusing %v.
+; CHECK-LABEL: define spir_kernel void @direct_vec_nonzero_idx(
+; CHECK-NEXT: entry:
+; CHECK-NEXT:   %v = alloca <4 x float>, i32 2, align 16
+; CHECK-NEXT:   [[VEC_GEP:%[^ ]+]] = getelementptr inbounds <4 x float>, ptr %v, i32 1
+; CHECK-NEXT:   [[LD0:%[^ ]+]] = load <4 x float>, ptr [[VEC_GEP]], align 16
+; CHECK-NEXT:   [[EXT:%[^ ]+]] = extractelement <4 x float> [[LD0]], i32 %idx
+; CHECK-NEXT:   [[ADD:%[^ ]+]] = fadd float [[EXT]], 1.000000e+00
+; CHECK-NEXT:   [[LD1:%[^ ]+]] = load <4 x float>, ptr [[VEC_GEP]], align 16
+; CHECK-NEXT:   [[INS:%[^ ]+]] = insertelement <4 x float> [[LD1]], float [[ADD]], i32 %idx
+; CHECK-NEXT:   store <4 x float> [[INS]], ptr [[VEC_GEP]], align 16
+; CHECK-NEXT:   ret void
+define spir_kernel void @direct_vec_nonzero_idx(i32 %idx) {
+entry:
+  %v = alloca <4 x float>, i32 2, align 16
+  %gep = getelementptr inbounds <4 x float>, ptr %v, i32 1, i32 %idx
+  %val = load float, ptr %gep, align 4
+  %inc = fadd float %val, 1.000000e+00
+  store float %inc, ptr %gep, align 4
+  ret void
+}
+
 ; Array of vectors: creates an inbounds GEP to the vector element.
 ; CHECK-LABEL: define spir_kernel void @array_of_vec_load_store(
 ; CHECK-NEXT: entry:
