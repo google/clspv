@@ -31,8 +31,9 @@ using namespace llvm;
 
 namespace {
 
-// Returns the sole non-array, non-struct type contained in |type|. Returns
-// nullptr if there is no such type.
+// Returns the sole non-array, non-struct type contained in |type|. If |stop_ty|
+// is provided, stops recursion at |stop_ty| and treats it as a leaf type.
+// Returns nullptr if there is no unique contained type.
 Type *SoleContainedType(Type *type, Type *stop_ty = nullptr) {
   if (type == stop_ty) {
     return type;
@@ -68,7 +69,8 @@ uint64_t GetNumElements(Type *type) {
 }
 
 // Flattens |constant| into |flattened|. |flattened| is populated with all
-// arrays and structs broken down into constituent constants.
+// arrays and structs broken down into constituent constants, stopping at
+// constants of type |stop_ty| if provided.
 void FlattenConstant(Constant *constant, std::vector<Constant *> *flattened,
                      Type *stop_ty = nullptr) {
   if (constant->getType() == stop_ty) {
