@@ -206,7 +206,7 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
       uint64_t global_push_constant_kernel_args_offset = 0;
       if (pod_arg_impl == clspv::PodArgImpl::kGlobalPushConstant) {
         SmallVector<Type*, 8> new_global_pc_elems {global_push_constant_ty->elements()};
-        new_global_pc_elems.push_back(PodArgsStructTy);
+        new_global_pc_elems.push_back(mangled_struct_ty);
         auto *new_global_push_constant_ty =
             StructType::get(M.getContext(), new_global_pc_elems, false);
         global_push_constant_kernel_args_offset =
