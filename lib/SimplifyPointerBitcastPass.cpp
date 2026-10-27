@@ -338,7 +338,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       cstVal /= smallerBitWidths;
       auto Src = OtherGEP->getPointerOperand();
       if (auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache)) {
-        NewGEPSrcTy = SrcTy;
+        uint64_t OffsetInBits = cstVal * smallerBitWidths;
+        if (GoThroughTypeAtOffset(M.getDataLayout(), Builder, SrcTy, SrcTy,
+                                  GEP->getResultElementType(), OffsetInBits,
+                                  nullptr) == 0) {
+          NewGEPSrcTy = SrcTy;
+        }
       }
       auto NewGEPIdxs = GetIdxsForTyFromOffset(
           M.getDataLayout(), Builder, NewGEPSrcTy, GEP->getResultElementType(),
@@ -1060,7 +1065,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     auto new_gep = GetElementPtrInst::Create(dest_ty, ptr, NewGEPIdxs, "",
                                              GEPInfo.gep->getIterator());
 
-    unsigned PointerOperandNum = BitcastUtils::PointerOperandNum(I);
+    unsigned PointerOperandNum =
+        BitcastUtils::PointerOperandNum(I, GEPInfo.gep);
     if (auto phi = dyn_cast<PHINode>(I)) {
       for (uint32_t iOp = 0; iOp < phi->getNumOperands(); iOp++) {
         if (I->getOperand(iOp) == GEPInfo.gep) {
