@@ -244,6 +244,26 @@ unsigned CalculateNumIter(unsigned SrcTyBitWidth, unsigned DstTyBitWidth) {
   return NumIter;
 }
 
+// Convert 'Idx', an index in units of 'FromBitWidth' bits, into an index in
+// units of 'ToBitWidth' bits. Return nullptr if 'Idx' is nullptr or if the
+// conversion is not exact.
+Value *ConvertIdxUnit(IRBuilder<> &Builder, Value *Idx, size_t FromBitWidth,
+                      size_t ToBitWidth) {
+  if (Idx == nullptr || FromBitWidth == ToBitWidth) {
+    return Idx;
+  }
+  if (FromBitWidth > ToBitWidth) {
+    if (FromBitWidth % ToBitWidth != 0) {
+      return nullptr;
+    }
+    return CreateMul(Builder, FromBitWidth / ToBitWidth, Idx);
+  }
+  if (ToBitWidth % FromBitWidth != 0) {
+    return nullptr;
+  }
+  return CreateDiv(Builder, ToBitWidth / FromBitWidth, Idx);
+}
+
 Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
                    Value *Src, Type *SrcTy, Type *DstTy,
                    SmallVector<Value *, 4> &NewAddrIdxs,
@@ -745,6 +765,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     SmallVector<std::pair<User *, bool>, 32> AllUsers;
 
     Value *OrgGEPIdx = nullptr;
+    // Size in bits of the unit in which OrgGEPIdx is expressed.
+    size_t OrgGEPIdxBitWidth = 0;
     if (auto GEP = dyn_cast<GetElementPtrInst>(Inst)) {
       IRBuilder<> Builder(GEP);
 
@@ -754,6 +776,7 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
 
       OrgGEPIdx = DynVal;
+      OrgGEPIdxBitWidth = SmallerBitWidths;
       if (DynVal == nullptr) {
         OrgGEPIdx = Builder.getInt32(CstVal);
       } else if (CstVal != 0) {
@@ -800,8 +823,18 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
                      IsGEPUser, Src, SrcTy, ST->getValueOperand()->getType(),
                      NewAddrIdxs, ToBeDeleted);
       } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
-        Value *DstVal = ComputeLoad(Builder, OrgGEPIdx, IsGEPUser, Src, SrcTy,
+        // ComputeLoad expects the index in units of the loaded type, which
+        // can differ from the element type of the GEP. e.g.
+        //   %gep = getelementptr i64, ptr %src, i32 %i
+        //   %ld = load i32, ptr %gep
+        Value *LDIdx = ConvertIdxUnit(Builder, OrgGEPIdx, OrgGEPIdxBitWidth,
+                                      SizeInBits(DL, LD->getType()));
+        Value *DstVal = ComputeLoad(Builder, LDIdx, IsGEPUser, Src, SrcTy,
                                     LD->getType(), NewAddrIdxs, ToBeDeleted);
+        if (LDIdx != OrgGEPIdx && LDIdx != nullptr && isa<Instruction>(LDIdx)) {
+          // Only removed if ComputeLoad did not use it.
+          ToBeDeleted.push_back(LDIdx);
+        }
         // Update LD's users with DstVal.
         LD->replaceAllUsesWith(DstVal);
       } else {
