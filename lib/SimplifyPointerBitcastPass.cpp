@@ -19,6 +19,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include <numeric>
 #include <tuple>
@@ -797,6 +798,17 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitCasts(Module &M) const {
       size_t SmallerBitWidths;
       ExtractOffsetFromGEP(DL, Builder, inst_gep, CstVal, DynVal,
                            SmallerBitWidths);
+
+      // A dynamic offset that is not known to be a multiple of the size of the
+      // elements of src_ty (e.g. an offset that can point to the second i32 of
+      // an i64) cannot be expressed with indices into src_ty. Leave the cast to
+      // ReplacePointerBitcastPass, which handles such sub-element accesses.
+      if (DynVal != nullptr &&
+          !IsDynOffsetExactForTy(DL, src_ty, inst_gep->getResultElementType(),
+                                 CstVal, DynVal, SmallerBitWidths)) {
+        RecursivelyDeleteTriviallyDeadInstructions(DynVal);
+        continue;
+      }
 
       if (DynVal == nullptr &&
           GoThroughTypeAtOffset(DL, Builder, src_ty, src_ty, nullptr,

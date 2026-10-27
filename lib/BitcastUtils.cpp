@@ -18,8 +18,10 @@
 #include "clspv/AddressSpace.h"
 #include "clspv/Option.h"
 #include <cmath>
+#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Debug.h>
+#include <llvm/Support/KnownBits.h>
 
 #define DEBUG_TYPE "bitcastutils"
 
@@ -1378,6 +1380,50 @@ bool IsClspvResourceOrLocal(Value *val) {
   return false;
 }
 
+// Returns the type of the element of 'SrcTy' that GetIdxsForTyFromOffset
+// computes the indices of, to access 'DstTy'.
+static Type *GetIdxsTargetTy(const DataLayout &DataLayout, Type *SrcTy,
+                             Type *DstTy) {
+  if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
+      DstTy != SrcTy && DstTy != GetEleType(SrcTy)) {
+    DstTy = SrcTy;
+    auto ElDstTy = GetEleType(DstTy);
+    while (DstTy != ElDstTy) {
+      DstTy = ElDstTy;
+      ElDstTy = GetEleType(DstTy);
+    }
+  }
+  return DstTy;
+}
+
+bool IsDynOffsetExactForTy(const DataLayout &DataLayout, Type *SrcTy,
+                           Type *DstTy, int64_t CstVal, Value *DynVal,
+                           size_t SmallerBitWidths) {
+  if (DstTy == nullptr || DstTy->isVoidTy()) {
+    DstTy = Type::getInt8Ty(SrcTy->getContext());
+  }
+  SrcTy = reworkUnsizedType(DataLayout, SrcTy);
+  DstTy =
+      GetIdxsTargetTy(DataLayout, SrcTy, reworkUnsizedType(DataLayout, DstTy));
+
+  // GetIdxsForTyFromOffset converts the offset into units of
+  // 'NewSmallerBitWidths' bits.
+  size_t NewSmallerBitWidths =
+      getEleTypesBitWidths(SrcTy, DataLayout, DstTy).back();
+  if (NewSmallerBitWidths <= SmallerBitWidths) {
+    return SmallerBitWidths % NewSmallerBitWidths == 0;
+  }
+  if (NewSmallerBitWidths % SmallerBitWidths != 0) {
+    return false;
+  }
+  unsigned Ratio = NewSmallerBitWidths / SmallerBitWidths;
+  if (!IsPowerOfTwo(Ratio) || CstVal % (int64_t)Ratio != 0) {
+    return false;
+  }
+  KnownBits Known = computeKnownBits(DynVal, DataLayout);
+  return Known.countMinTrailingZeros() >= Log2_32(Ratio);
+}
+
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, int64_t CstVal, Value *DynVal,
@@ -1412,15 +1458,7 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
     Idxs.push_back(ConstantInt::get(Builder.getInt32Ty(), 0));
   }
 
-  if (SizeInBits(DataLayout, DstTy) >= SizeInBits(DataLayout, SrcTy) &&
-      DstTy != SrcTy && DstTy != GetEleType(SrcTy)) {
-    DstTy = SrcTy;
-    auto ElDstTy = GetEleType(DstTy);
-    while (DstTy != ElDstTy) {
-      DstTy = ElDstTy;
-      ElDstTy = GetEleType(DstTy);
-    }
-  }
+  DstTy = GetIdxsTargetTy(DataLayout, SrcTy, DstTy);
 
   if (DynVal == nullptr) {
     Type *Ty = SrcTy;
