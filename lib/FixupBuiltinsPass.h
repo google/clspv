@@ -35,6 +35,10 @@ private:
   // Shuffle the component of a read_image of a image1d_buffer if the image
   // order is CL_BGRA.
   bool fixupReadImage(llvm::Function &F);
+
+  // Fold constant calls to llvm.canonicalize according to the target denormal
+  // mode.
+  bool fixupCanonicalize(llvm::Function &F);
 };
 } // namespace clspv
 

@@ -5119,21 +5119,7 @@ SPIRVID SPIRVProducerPassImpl::GenerateFabs(Value *Input) {
 }
 
 bool SPIRVProducerPassImpl::ShouldFlushDenorms(Type *Ty) const {
-  Type *ScalarTy = Ty->getScalarType();
-  if (ScalarTy->isHalfTy()) {
-    return clspv::Option::ExecutionModeDenorm(
-               clspv::Option::FloatingPointType::fp16) ==
-           clspv::Option::DenormMode::flush_to_zero;
-  } else if (ScalarTy->isFloatTy()) {
-    return clspv::Option::ExecutionModeDenorm(
-               clspv::Option::FloatingPointType::fp32) !=
-           clspv::Option::DenormMode::preserve;
-  } else if (ScalarTy->isDoubleTy()) {
-    return clspv::Option::ExecutionModeDenorm(
-               clspv::Option::FloatingPointType::fp64) !=
-           clspv::Option::DenormMode::preserve;
-  }
-  return false;
+  return clspv::ShouldFlushDenorms(Ty);
 }
 
 SPIRVID SPIRVProducerPassImpl::GenerateCopySignZero(SPIRVID val,

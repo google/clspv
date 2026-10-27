@@ -717,3 +717,21 @@ Constant *clspv::GetPlaceholderValue(Type *type) {
   }
   return Constant::getNullValue(type);
 }
+
+bool clspv::ShouldFlushDenorms(Type *type) {
+  Type *ScalarTy = type->getScalarType();
+  if (ScalarTy->isHalfTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp16) ==
+           clspv::Option::DenormMode::flush_to_zero;
+  } else if (ScalarTy->isFloatTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp32) !=
+           clspv::Option::DenormMode::preserve;
+  } else if (ScalarTy->isDoubleTy()) {
+    return clspv::Option::ExecutionModeDenorm(
+               clspv::Option::FloatingPointType::fp64) !=
+           clspv::Option::DenormMode::preserve;
+  }
+  return false;
+}
