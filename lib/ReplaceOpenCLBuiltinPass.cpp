@@ -1994,8 +1994,12 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
     if (is_vec) {
       return Shift;
     } else {
-      return CastInst::CreateZExtOrBitCast(
-          Shift, Type::getInt32Ty(CI->getContext()), "", CI->getIterator());
+      // The scalar overloads return int, so the shifted sign bit has to be
+      // zero-extended for half and truncated for double.
+      return CastInst::CreateIntegerCast(
+          Shift, Type::getInt32Ty(CI->getContext()),
+          /*isSigned=*/false, "", CI->getIterator());
+
     }
   });
 }
