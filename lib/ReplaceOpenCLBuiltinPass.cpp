@@ -1999,7 +1999,6 @@ bool ReplaceOpenCLBuiltinPass::replaceSignbit(Function &F, bool is_vec) {
       return CastInst::CreateIntegerCast(
           Shift, Type::getInt32Ty(CI->getContext()),
           /*isSigned=*/false, "", CI->getIterator());
-
     }
   });
 }
