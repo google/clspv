@@ -110,6 +110,10 @@ bool clspv::ShareModuleScopeVariablesPass::ShareModuleScopeVariables(
     auto next = global;
     ++next;
     for (; next != M.global_end(); ++next) {
+      // Only __local variables can be shared
+      if (!clspv::IsLocalPtr(next->getType()))
+        continue;
+
       if (clspv::InferType(cast<Value>(global), M.getContext(), &cache) !=
           clspv::InferType(cast<Value>(next), M.getContext(), &cache))
         continue;
