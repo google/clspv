@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/KnownBits.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <numeric>
@@ -827,10 +829,16 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     size_t smallerBitWidth;
     Type *dest_ty;
     GetElementPtrInst *gep;
+    // Whether 'val' is only known to be a multiple of the size of 'dest_ty'
+    // from its known bits. It can then be negative, and has to be divided with
+    // an exact arithmetic shift.
+    bool knownMultiple;
   };
   auto gepIndicesCanBeUpgradedTo = [&DL, &M](Type *ty, GetElementPtrInst *gep,
                                              int64_t &cstVal, Value *&dynVal,
-                                             size_t &smallerBitWidths) {
+                                             size_t &smallerBitWidths,
+                                             bool &knownMultiple) {
+    knownMultiple = false;
     if (gep->hasAllConstantIndices()) {
       // should not be used as all indices are constant
       IRBuilder<> Builder{gep};
@@ -882,7 +890,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         }
       }
       if ((coef % coef_target) != 0) {
-        return false;
+        // The index can also be known to be a multiple of the size of 'ty'
+        // without being such a product, e.g. a sign-extended scaled index:
+        //   ashr exact (shl i64 %n, 32), 30
+        if (!isPowerOf2_32(coef_target) ||
+            computeKnownBits(dynVal, DL).countMinTrailingZeros() <
+                Log2_32(coef_target / CHAR_BIT)) {
+          return false;
+        }
+        knownMultiple = true;
       }
     }
     return true;
@@ -923,13 +939,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           int64_t cstVal;
           Value *dynVal;
           size_t smallerBitWidths;
+          bool knownMultiple;
 
           auto &context = M.getContext();
           auto findBiggerTyToUpdate = [DL, &context, gepIndicesCanBeUpgradedTo,
                                        source_ty, gep, &cstVal, &dynVal,
-                                       &smallerBitWidths](Type *dest_ty) {
+                                       &smallerBitWidths,
+                                       &knownMultiple](Type *dest_ty) {
             if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
-                                          smallerBitWidths)) {
+                                          smallerBitWidths, knownMultiple)) {
               return dest_ty;
             }
             if (!dest_ty->isIntegerTy()) {
@@ -941,7 +959,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
             while (dest_ty_size > SizeInBits(DL, source_ty)) {
               dest_ty = Type::getIntNTy(context, dest_ty_size);
               if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
-                                            smallerBitWidths)) {
+                                            smallerBitWidths, knownMultiple)) {
                 return dest_ty;
               }
               dest_ty_size /= 2;
@@ -952,8 +970,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
           dest_ty = findBiggerTyToUpdate(dest_ty);
           if (dest_ty != source_ty) {
 
-            Worklist.push_back(
-                {&I, cstVal, dynVal, smallerBitWidths, dest_ty, gep});
+            Worklist.push_back({&I, cstVal, dynVal, smallerBitWidths, dest_ty,
+                                gep, knownMultiple});
           }
         } else if (auto *phi = dyn_cast<PHINode>(source)) {
           auto &context = M.getContext();
@@ -1000,16 +1018,17 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               int64_t cstVal;
               Value *dynVal;
               size_t smallerBitWidths;
+              bool knownMultiple;
               if (gep == nullptr ||
                   !gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
-                                             smallerBitWidths)) {
+                                             smallerBitWidths, knownMultiple)) {
                 geps.clear();
                 return geps;
               }
               if (GEPsDefiningPHISeen.count(gep) == 0) {
                 GEPsDefiningPHISeen.insert(gep);
-                geps.push_back(
-                    {gep, cstVal, dynVal, smallerBitWidths, dest_ty, gep});
+                geps.push_back({gep, cstVal, dynVal, smallerBitWidths, dest_ty,
+                                gep, knownMultiple});
               }
             }
             return geps;
@@ -1020,6 +1039,21 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     }
   }
 
+  // When GEPInfo.val is only known to be a multiple of the size of
+  // GEPInfo.dest_ty from its known bits, convert it into units of
+  // GEPInfo.dest_ty with an exact arithmetic shift, as it can be negative.
+  auto divideKnownMultiple = [&DL](IRBuilder<> &Builder,
+                                   const UpgradeInfo &GEPInfo, Value *&val,
+                                   size_t &smallerBitWidths) {
+    if (!GEPInfo.knownMultiple) {
+      return;
+    }
+    size_t destBitWidths = SizeInBits(DL, GEPInfo.dest_ty);
+    val = Builder.CreateAShr(val, Log2_64(destBitWidths / smallerBitWidths), "",
+                             /*isExact=*/true);
+    smallerBitWidths = destBitWidths;
+  };
+
   for (auto GEPInfo : GEPsDefiningPHIsWorklist) {
     auto gep = dyn_cast<GetElementPtrInst>(GEPInfo.inst);
     int64_t cst = GEPInfo.cst;
@@ -1028,6 +1062,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Type *dest_ty = GEPInfo.dest_ty;
     Value *ptr = GEPInfo.gep->getPointerOperand();
     IRBuilder Builder{gep};
+    divideKnownMultiple(Builder, GEPInfo, val, smallerBitWidths);
 
     auto NewGEPIdxs =
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
@@ -1057,6 +1092,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
     Type *dest_ty = GEPInfo.dest_ty;
     Value *ptr = GEPInfo.gep->getPointerOperand();
     IRBuilder Builder{GEPInfo.gep};
+    divideKnownMultiple(Builder, GEPInfo, val, smallerBitWidths);
 
     auto NewGEPIdxs =
         GetIdxsForTyFromOffset(M.getDataLayout(), Builder, dest_ty, dest_ty,
@@ -1236,8 +1272,14 @@ bool clspv::SimplifyPointerBitcastPass::runOnPHIFromGEP(Module &M) const {
                                              "", gep->getIterator());
     LLVM_DEBUG(dbgs() << "\n##runOnPHIFromGEP:\nreplace: "; gep->dump();
                dbgs() << "by: "; new_gep->dump());
-    gep->replaceAllUsesWith(new_gep);
-    gep->eraseFromParent();
+    // Only replace the GEP in PHIs. Its other users can need its current type,
+    // e.g. a load of a wider type, for which runOnUpgradeableConstantCasts
+    // would upgrade the GEP again.
+    gep->replaceUsesWithIf(new_gep,
+                           [](Use &U) { return isa<PHINode>(U.getUser()); });
+    if (gep->use_empty()) {
+      gep->eraseFromParent();
+    }
     changed = true;
   }
 
