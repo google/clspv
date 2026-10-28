@@ -14,6 +14,7 @@
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 
 #include "Builtins.h"
@@ -29,6 +30,16 @@ using namespace llvm;
 
 namespace clspv_local {
 static double rsqrt(double input) { return 1.0 / sqrt(input); }
+static Constant *foldConstantFPCanonicalize(ConstantFP *CFP,
+                                            bool flush_denorms) {
+  if (CFP->getValueAPF().isDenormal() && flush_denorms) {
+    return ConstantFP::getZero(CFP->getType(), CFP->isNegative());
+  }
+  if (CFP->getValueAPF().isSignaling()) {
+    return ConstantFP::get(CFP->getType(), CFP->getValueAPF().makeQuiet());
+  }
+  return CFP;
+}
 } // namespace clspv_local
 
 PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
@@ -40,6 +51,12 @@ PreservedAnalyses FixupBuiltinsPass::run(Module &M, ModuleAnalysisManager &) {
 }
 
 bool FixupBuiltinsPass::runOnFunction(Function &F) {
+  switch (F.getIntrinsicID()) {
+  case Intrinsic::canonicalize:
+    return fixupCanonicalize(F);
+  default:
+    break;
+  }
   auto &FI = Builtins::Lookup(&F);
   switch (FI.getType()) {
   case Builtins::kSqrt:
@@ -142,4 +159,46 @@ bool FixupBuiltinsPass::fixupReadImage(Function &F) {
     }
   }
   return changed;
+}
+
+bool FixupBuiltinsPass::fixupCanonicalize(Function &F) {
+  bool modified = false;
+  SmallVector<CallInst *> worklist;
+  for (auto &U : F.uses()) {
+    if (auto CI = dyn_cast<CallInst>(U.getUser())) {
+      worklist.push_back(CI);
+    }
+  }
+  bool flush_denorms = ShouldFlushDenorms(F.getReturnType());
+  for (auto CI : worklist) {
+    Value *Arg = CI->getArgOperand(0);
+    Constant *Folded = nullptr;
+    if (auto *CFP = dyn_cast<ConstantFP>(Arg)) {
+      Folded = clspv_local::foldConstantFPCanonicalize(CFP, flush_denorms);
+    } else if (auto *VTy = dyn_cast<FixedVectorType>(Arg->getType())) {
+      if (auto *CV = dyn_cast<Constant>(Arg)) {
+        SmallVector<Constant *, 16> Elts;
+        bool AllConstantFP = true;
+        for (unsigned i = 0, e = VTy->getNumElements(); i < e; ++i) {
+          if (auto *CFP =
+                  dyn_cast_or_null<ConstantFP>(CV->getAggregateElement(i))) {
+            Elts.push_back(
+                clspv_local::foldConstantFPCanonicalize(CFP, flush_denorms));
+          } else {
+            AllConstantFP = false;
+            break;
+          }
+        }
+        if (AllConstantFP) {
+          Folded = ConstantVector::get(Elts);
+        }
+      }
+    }
+    if (Folded) {
+      CI->replaceAllUsesWith(Folded);
+      CI->eraseFromParent();
+      modified = true;
+    }
+  }
+  return modified;
 }

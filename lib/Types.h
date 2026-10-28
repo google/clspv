@@ -89,6 +89,9 @@ bool PointersAre64Bit(llvm::Module &m);
 // otherwise returns the undef value.
 llvm::Constant *GetPlaceholderValue(llvm::Type *type);
 
+// Returns true if subnormal values of the given type should be flushed to zero.
+bool ShouldFlushDenorms(llvm::Type *type);
+
 } // namespace clspv
 
 #endif
