@@ -17,6 +17,10 @@
 #include "Types.h"
 #include "clspv/AddressSpace.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 
 #define DEBUG_TYPE "LowerPrivatePointerPHI"
@@ -101,6 +105,88 @@ Type *getSmallestTypeInStruct(const DataLayout &DL, StructType *Ty) {
   }
   return SmallestTy;
 }
+
+bool isPrivatePointerPHIOrSelect(Instruction &I) {
+  if (!isa<PHINode>(I) && !isa<SelectInst>(I)) {
+    return false;
+  }
+  Type *Ty = I.getType();
+  return Ty->isPointerTy() &&
+         Ty->getPointerAddressSpace() == clspv::AddressSpace::Private;
+}
+
+// The lowering of a PHI or select of private pointers requires all of its
+// incoming pointers to point into the same alloca. SROA can split an alloca
+// into several ones that end up selected by a PHI or select (e.g. the elements
+// of an array indexed by the induction variable of an unrolled loop). Merge
+// such allocas into a single array alloca, as long as they have the same type.
+void mergeAllocasOfPrivatePointerPHIs(Function &F) {
+  const DataLayout &DL = F.getParent()->getDataLayout();
+
+  EquivalenceClasses<AllocaInst *> AllocaClasses;
+  for (auto &I : instructions(F)) {
+    if (!isPrivatePointerPHIOrSelect(I)) {
+      continue;
+    }
+    SmallVector<const Value *, 4> Objects;
+    getUnderlyingObjects(&I, Objects, nullptr, 0);
+    AllocaInst *First = nullptr;
+    for (auto Object : Objects) {
+      if (auto Alloca = dyn_cast<AllocaInst>(Object)) {
+        auto *AI = const_cast<AllocaInst *>(Alloca);
+        if (First == nullptr) {
+          First = AI;
+        } else {
+          AllocaClasses.unionSets(First, AI);
+        }
+      }
+    }
+  }
+  if (AllocaClasses.empty()) {
+    return;
+  }
+
+  // Collect the allocas of each class in the order of the function.
+  MapVector<AllocaInst *, SmallVector<AllocaInst *, 4>> Groups;
+  for (auto &I : instructions(F)) {
+    if (auto AI = dyn_cast<AllocaInst>(&I)) {
+      if (AllocaClasses.contains(AI)) {
+        Groups[AllocaClasses.getLeaderValue(AI)].push_back(AI);
+      }
+    }
+  }
+
+  for (auto &Group : Groups) {
+    auto &Allocas = Group.second;
+    Type *Ty = Allocas[0]->getAllocatedType();
+    Align Alignment = Allocas[0]->getAlign();
+    bool CanMerge = !BitcastUtils::IsComplexStruct(DL, Ty);
+    for (auto AI : Allocas) {
+      CanMerge &= AI->isStaticAlloca() && !AI->isArrayAllocation() &&
+                  AI->getAllocatedType() == Ty;
+      Alignment = std::max(Alignment, AI->getAlign());
+    }
+    if (!CanMerge) {
+      continue;
+    }
+
+    // Allocas[0] is the first alloca of the group in the entry block, so the
+    // new instructions dominate all the uses of the group.
+    IRBuilder<> B(Allocas[0]);
+    auto ArrayTy = ArrayType::get(Ty, Allocas.size());
+    auto Merged = B.CreateAlloca(ArrayTy, Allocas[0]->getAddressSpace());
+    Merged->setAlignment(Alignment);
+    SmallVector<Value *, 4> Elements;
+    for (unsigned i = 0; i < Allocas.size(); i++) {
+      Elements.push_back(
+          B.CreateInBoundsGEP(ArrayTy, Merged, {B.getInt32(0), B.getInt32(i)}));
+    }
+    for (unsigned i = 0; i < Allocas.size(); i++) {
+      Allocas[i]->replaceAllUsesWith(Elements[i]);
+      Allocas[i]->eraseFromParent();
+    }
+  }
+}
 } // namespace
 
 llvm::PreservedAnalyses
@@ -116,24 +202,16 @@ clspv::LowerPrivatePointerPHIPass::run(Module &M,
 void clspv::LowerPrivatePointerPHIPass::runOnFunction(Function &F) {
   auto DL = F.getParent()->getDataLayout();
 
+  mergeAllocasOfPrivatePointerPHIs(F);
+
   bool PrivatePointerPHIOrSelect = false;
   SmallVector<AllocaInst *> worklist;
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (auto alloca = dyn_cast<AllocaInst>(&I)) {
         worklist.push_back(alloca);
-      } else if (auto phi = dyn_cast<PHINode>(&I)) {
-        Type *Ty = phi->getType();
-        if (Ty->isPointerTy() &&
-            Ty->getPointerAddressSpace() == clspv::AddressSpace::Private) {
-          PrivatePointerPHIOrSelect = true;
-        }
-      } else if (auto select = dyn_cast<SelectInst>(&I)) {
-        Type *Ty = select->getType();
-        if (Ty->isPointerTy() &&
-            Ty->getPointerAddressSpace() == clspv::AddressSpace::Private) {
-          PrivatePointerPHIOrSelect = true;
-        }
+      } else if (isPrivatePointerPHIOrSelect(I)) {
+        PrivatePointerPHIOrSelect = true;
       }
     }
   }
