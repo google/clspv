@@ -1447,6 +1447,8 @@ GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
         BitcastUtils::getEleTypesBitWidths(SrcTy, DataLayout, DstTy);
     size_t NewSmallerBitWidths = TyBitWidths[TyBitWidths.size() - 1];
     if (NewSmallerBitWidths <= SmallerBitWidths) {
+      assert(SmallerBitWidths % NewSmallerBitWidths == 0 &&
+             "Offset granularity is not a multiple of the new element size");
       CstVal *= (int64_t)SmallerBitWidths / (int64_t)NewSmallerBitWidths;
       DynVal =
           CreateMul(Builder, SmallerBitWidths / NewSmallerBitWidths, DynVal);

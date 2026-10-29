@@ -591,13 +591,16 @@ bool DowngradeModule(Module &M) {
   const DataLayout &DL = M.getDataLayout();
 
   // Downgrade object type when detecting implicit cast with inner source type
-  // bigger than destination type in 2 cases:
+  // bigger than destination type in 3 cases:
   // - storing => avoid trying to store an element smaller that the object type
   // (not supported later on).
   // - complex structures (whatever is done with the ptr casted afterwards) =>
   // avoid complex load/store with structures casted into other types where it
   // can be hard to reassemble everything to get the proper type/value from the
   // structure.
+  // - source size not a multiple of the destination size (e.g. an i64 loaded
+  // from a 12-byte struct) => the destination cannot be extracted from the
+  // loaded source (not supported later on).
   for (auto &F : M) {
     for (auto &BB : F) {
       for (auto &I : BB) {
@@ -616,9 +619,7 @@ bool DowngradeModule(Module &M) {
             }
           }
         }
-        if (!isStore && !IsComplexStruct(DL, source_ty)) {
-          continue;
-        }
+        bool isComplexStruct = IsComplexStruct(DL, source_ty);
 
         if (auto gep = dyn_cast<GetElementPtrInst>(&I)) {
           dest_ty = gep->getResultElementType();
@@ -631,11 +632,27 @@ bool DowngradeModule(Module &M) {
         }
         size_t source_size = SizeInBits(DL, source_ty);
         size_t dest_size = SizeInBits(DL, dest_ty);
+        bool isNonMultiple = (dest_size != 0) && (source_size % dest_size != 0);
+        if (!isStore && !isComplexStruct && !isNonMultiple) {
+          continue;
+        }
+
         if (source_size > dest_size) {
+          // The downgraded type becomes the element type of the rewritten
+          // GEPs, so its size must evenly divide the size of the source type.
+          // Otherwise the stride between source objects cannot be expressed
+          // in units of the new type (e.g. a 12-byte struct indexed as i64),
+          // and the GEP indices would be silently truncated. In that case
+          // downgrade to the largest power-of-two integer type dividing both.
+          Type *Ty = dest_ty;
+          if (isNonMultiple) {
+            Ty = IntegerType::get(M.getContext(),
+                                  MinAlign(source_size, dest_size));
+          }
           if (isa<IntToPtrInst>(source)) {
-            return DowngradeSourceToTy(DL, &I, dest_ty);
+            return DowngradeSourceToTy(DL, &I, Ty);
           } else {
-            return DowngradeSourceToTy(DL, source, dest_ty);
+            return DowngradeSourceToTy(DL, source, Ty);
           }
         }
       }
