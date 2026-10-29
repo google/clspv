@@ -31,7 +31,6 @@
 #include "clspv/Option.h"
 
 #include <cmath>
-#include <numeric>
 
 using namespace llvm;
 using namespace BitcastUtils;
@@ -647,10 +646,8 @@ bool DowngradeModule(Module &M) {
           // downgrade to the largest power-of-two integer type dividing both.
           Type *Ty = dest_ty;
           if (isNonMultiple) {
-            size_t gcd = std::gcd(source_size, dest_size);
-            // Bit twiddling to calculate largest power of two that divides gcd
-            gcd = gcd & (~gcd + 1);
-            Ty = IntegerType::get(M.getContext(), gcd);
+            Ty = IntegerType::get(M.getContext(),
+                                  MinAlign(source_size, dest_size));
           }
           if (isa<IntToPtrInst>(source)) {
             return DowngradeSourceToTy(DL, &I, Ty);
