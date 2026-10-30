@@ -559,7 +559,10 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
       UserWorkList.pop_back();
 
       auto gep = dyn_cast<GetElementPtrInst>(user);
-      if (gep && TySize < SizeInBits(DL, gep->getSourceElementType())) {
+      if (gep && (TySize < SizeInBits(DL, gep->getSourceElementType()) ||
+                  (TySize == SizeInBits(DL, gep->getSourceElementType()) &&
+                   gep->getSourceElementType()->isFloatingPointTy() &&
+                   Ty->isIntegerTy()))) {
         for (auto *U : user->users()) {
           UserWorkList.push_back(U);
         }
@@ -611,6 +614,13 @@ bool DowngradeModule(Module &M) {
                              ReplacePhysicalPointerBitcasts)) {
           continue;
         }
+        bool isAtomic = isa<AtomicRMWInst>(I);
+        if (auto *call = dyn_cast<CallInst>(&I)) {
+          if (auto *callee = call->getCalledFunction();
+              callee && !callee->getName().starts_with("llvm.memcpy")) {
+            isAtomic = true;
+          }
+        }
         bool isStore = isa<StoreInst>(I);
         if (!isStore) {
           for (User *U : I.users()) {
@@ -633,11 +643,13 @@ bool DowngradeModule(Module &M) {
         size_t source_size = SizeInBits(DL, source_ty);
         size_t dest_size = SizeInBits(DL, dest_ty);
         bool isNonMultiple = (dest_size != 0) && (source_size % dest_size != 0);
-        if (!isStore && !isComplexStruct && !isNonMultiple) {
+        if (!isStore && !isComplexStruct && !isNonMultiple && !isAtomic) {
           continue;
         }
 
-        if (source_size > dest_size) {
+        if (source_size > dest_size ||
+            (isAtomic && source_ty->isFloatingPointTy() &&
+             dest_ty->isIntegerTy() && source_size == dest_size)) {
           // The downgraded type becomes the element type of the rewritten
           // GEPs, so its size must evenly divide the size of the source type.
           // Otherwise the stride between source objects cannot be expressed
