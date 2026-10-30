@@ -396,6 +396,26 @@ Type *InferUsersType(Value *v, LLVMContext &context,
   return nullptr;
 }
 
+bool IsNullOrUndef(const Value *v) {
+  return isa<ConstantPointerNull>(v) || isa<UndefValue>(v);
+}
+
+Type *InferNonNullType(Value *v, LLVMContext &context,
+                       DenseMap<Value *, Type *> *cache) {
+  return IsNullOrUndef(v) ? nullptr : InferType(v, context, cache);
+}
+
+bool ShouldPreferIncomingPhiType(const DataLayout &DL, Type *phi_ty,
+                                 Type *inc_ty, Type *users_ty) {
+  if (!inc_ty)
+    return false;
+  if (!phi_ty)
+    return true;
+  auto phi_bits = BitcastUtils::SizeInBits(DL, phi_ty);
+  auto inc_bits = BitcastUtils::SizeInBits(DL, inc_ty);
+  return phi_bits > inc_bits || (phi_bits == inc_bits && inc_ty != users_ty);
+}
+
 } // namespace
 
 Type *clspv::InferType(Value *v, LLVMContext &context,
@@ -403,6 +423,10 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   // Non-pointer types are reflexive.
   if (!isa<PointerType>(v->getType()))
     return v->getType();
+
+  if (IsNullOrUndef(v) && TyHint) {
+    return TyHint;
+  }
 
   auto iter = cache->find(v);
   if (iter != cache->end()) {
@@ -428,9 +452,11 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     return CacheType(func->getFunctionType());
   } else if (auto *select = dyn_cast<SelectInst>(v)) {
     const DataLayout &DL = select->getModule()->getDataLayout();
-    auto false_ty = InferType(select->getFalseValue(), context, cache);
-    auto true_ty = InferType(select->getTrueValue(), context, cache);
-    return CacheType(SmallerTypeNotAliasing(DL, false_ty, true_ty));
+    auto *false_ty = InferNonNullType(select->getFalseValue(), context, cache);
+    auto *true_ty = InferNonNullType(select->getTrueValue(), context, cache);
+    if (auto *sel_ty = SmallerTypeNotAliasing(DL, false_ty, true_ty)) {
+      return CacheType(sel_ty);
+    }
   } else if (auto *asc = dyn_cast<AddrSpaceCastOperator>(v)) {
     CacheType(nullptr);
     return CacheType(InferType(asc->getPointerOperand(), context, cache));
@@ -467,11 +493,12 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
     const DataLayout &DL = phi->getModule()->getDataLayout();
     for (unsigned twice = 0; twice < 2; twice++) {
       for (unsigned i = 0; i < phi->getNumIncomingValues(); i++) {
+        Value *inc_val = phi->getIncomingValue(i);
+        if (IsNullOrUndef(inc_val))
+          continue;
         (*cache)[phi] = phi_ty;
-        auto IncValTy = InferType(phi->getIncomingValue(i), context, cache);
-        if (phi_ty && IncValTy &&
-            BitcastUtils::SizeInBits(DL, phi_ty) >
-                BitcastUtils::SizeInBits(DL, IncValTy)) {
+        auto *IncValTy = InferType(inc_val, context, cache);
+        if (ShouldPreferIncomingPhiType(DL, phi_ty, IncValTy, users_ty)) {
           phi_ty = IncValTy;
         }
       }
