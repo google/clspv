@@ -270,6 +270,11 @@ bool clspv::LogicalPointerToIntPass::isMemBase(Value *Val) {
     if (IsTargetAddrSpace(GV->getAddressSpace())) {
       return true;
     }
+  } else if (auto *LD = dyn_cast<LoadInst>(Val)) {
+    if (LD->getType()->isPointerTy() &&
+        IsTargetAddrSpace(LD->getType()->getPointerAddressSpace())) {
+      return true;
+    }
   }
 
   return false;
