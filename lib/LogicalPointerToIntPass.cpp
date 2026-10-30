@@ -193,22 +193,97 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
     ICmp->replaceAllUsesWith(B.CreateICmp(ICmp->getPredicate(), LHS, RHS));
   }
 
-  for (auto *Instr : InstrsToProcess) {
-    auto *IntTy = cast<IntegerType>(Instr->getType());
-
-    auto *PtrOp = Instr->getOperand(0);
+  DenseMap<PHINode *, PHINode *> PhiMap;
+  std::function<Value *(Value *, IntegerType *, Instruction *)> ConvertPtr =
+      [&](Value *PtrOp, IntegerType *IntTy,
+          Instruction *InsertBefore) -> Value * {
+    if (isa<ConstantPointerNull>(PtrOp)) {
+      return ConstantInt::get(IntTy, 0);
+    }
+    if (auto *ASC = dyn_cast<AddrSpaceCastInst>(PtrOp)) {
+      if (isa<ConstantPointerNull>(ASC->getPointerOperand())) {
+        return ConstantInt::get(IntTy, 0);
+      }
+    }
+    if (isa<UndefValue>(PtrOp)) {
+      return UndefValue::get(IntTy);
+    }
     Value *MemBase = nullptr;
     int64_t CstOffset = 0;
     Value *DynOffset = nullptr;
-
     if (processValue(M.getDataLayout(), PtrOp, CstOffset, DynOffset, MemBase)) {
       auto BaseAddr = getMemBaseAddr(MemBase);
-      Value *Replacement;
-      Replacement = ConstantInt::get(IntTy, BaseAddr + CstOffset, false, true);
+      Value *Replacement =
+          ConstantInt::get(IntTy, BaseAddr + CstOffset, false, true);
       if (DynOffset != nullptr) {
-        IRBuilder<> B(Instr);
+        IRBuilder<> B(InsertBefore);
         Replacement = B.CreateAdd(Replacement, DynOffset);
       }
+      return Replacement;
+    }
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(PtrOp)) {
+      Value *BaseInt = ConvertPtr(GEP->getPointerOperand(), IntTy, GEP);
+      if (!BaseInt) {
+        return nullptr;
+      }
+      IRBuilder<> B(GEP);
+      size_t SmallerBitWidths;
+      int64_t CstVal = 0;
+      Value *DynVal = nullptr;
+      BitcastUtils::ExtractOffsetFromGEP(M.getDataLayout(), B, GEP, CstVal,
+                                         DynVal, SmallerBitWidths);
+      int64_t CstOffset = CstVal * SmallerBitWidths / CHAR_BIT;
+      Value *Result = BaseInt;
+      if (CstOffset != 0) {
+        Result = B.CreateAdd(Result,
+                             ConstantInt::get(IntTy, CstOffset, false, true));
+      }
+      if (DynVal) {
+        DynVal =
+            BitcastUtils::CreateMul(B, SmallerBitWidths / CHAR_BIT, DynVal);
+        if (DynVal->getType() != IntTy) {
+          DynVal = B.CreateSExtOrTrunc(DynVal, IntTy);
+        }
+        Result = B.CreateAdd(Result, DynVal);
+      }
+      return Result;
+    }
+    if (auto *Sel = dyn_cast<SelectInst>(PtrOp)) {
+      Value *TrueVal = ConvertPtr(Sel->getTrueValue(), IntTy, Sel);
+      Value *FalseVal = ConvertPtr(Sel->getFalseValue(), IntTy, Sel);
+      if (TrueVal && FalseVal) {
+        IRBuilder<> B(Sel);
+        return B.CreateSelect(Sel->getCondition(), TrueVal, FalseVal);
+      }
+      return nullptr;
+    }
+    if (auto *Phi = dyn_cast<PHINode>(PtrOp)) {
+      auto It = PhiMap.find(Phi);
+      if (It != PhiMap.end()) {
+        return It->second;
+      }
+      auto *NewPhi = PHINode::Create(IntTy, Phi->getNumIncomingValues(), "",
+                                     Phi->getIterator());
+      PhiMap[Phi] = NewPhi;
+      for (unsigned i = 0; i < Phi->getNumIncomingValues(); ++i) {
+        BasicBlock *BB = Phi->getIncomingBlock(i);
+        Value *Inc =
+            ConvertPtr(Phi->getIncomingValue(i), IntTy, BB->getTerminator());
+        if (!Inc) {
+          PhiMap.erase(Phi);
+          NewPhi->eraseFromParent();
+          return nullptr;
+        }
+        NewPhi->addIncoming(Inc, BB);
+      }
+      return NewPhi;
+    }
+    return nullptr;
+  };
+
+  for (auto *Instr : InstrsToProcess) {
+    auto *IntTy = cast<IntegerType>(Instr->getType());
+    if (Value *Replacement = ConvertPtr(Instr->getOperand(0), IntTy, Instr)) {
       Instr->replaceAllUsesWith(Replacement);
     }
   }
@@ -225,6 +300,10 @@ bool clspv::LogicalPointerToIntPass::processValue(const DataLayout &DL,
                                                   llvm::Value *&DynOffset,
                                                   Value *&MemBase) {
   if (auto *GEP = dyn_cast<GetElementPtrInst>(Val)) {
+    if (!processValue(DL, GEP->getPointerOperand(), CstOffset, DynOffset,
+                      MemBase)) {
+      return false;
+    }
     // Convert GEP indices to byte offset
     IRBuilder<> B(GEP);
     size_t SmallerBitWidths;
@@ -241,8 +320,7 @@ bool clspv::LogicalPointerToIntPass::processValue(const DataLayout &DL,
     } else if (DynVal) {
       DynOffset = DynVal;
     }
-    return processValue(DL, GEP->getPointerOperand(), CstOffset, DynOffset,
-                        MemBase);
+    return true;
   } else if (auto *Bitcast = dyn_cast<BitCastInst>(Val)) {
     return processValue(DL, Bitcast->getOperand(0), CstOffset, DynOffset,
                         MemBase);
