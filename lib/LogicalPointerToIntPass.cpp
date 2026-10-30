@@ -242,7 +242,7 @@ clspv::LogicalPointerToIntPass::run(Module &M, ModuleAnalysisManager &MAM) {
         DynVal =
             BitcastUtils::CreateMul(B, SmallerBitWidths / CHAR_BIT, DynVal);
         if (DynVal->getType() != IntTy) {
-          DynVal = B.CreateZExtOrTrunc(DynVal, IntTy);
+          DynVal = B.CreateSExtOrTrunc(DynVal, IntTy);
         }
         Result = B.CreateAdd(Result, DynVal);
       }
