@@ -30,8 +30,10 @@ PreservedAnalyses clspv::RemoveUnusedArguments::run(Module &M,
                                                     ModuleAnalysisManager &) {
   PreservedAnalyses PA;
   std::vector<Candidate> candidates;
-  findCandidates(M, &candidates);
-  removeUnusedParameters(M, candidates);
+  while (findCandidates(M, &candidates)) {
+    removeUnusedParameters(M, candidates);
+    candidates.clear();
+  }
 
   return PA;
 }
@@ -76,16 +78,17 @@ void clspv::RemoveUnusedArguments::removeUnusedParameters(
     // Rebuild the type.
     auto fn_attrs = f->getAttributes();
     SmallVector<Type *, 8> arg_types;
+    SmallVector<AttributeSet, 8> param_attrs;
     uint32_t idx = 0;
     for (auto *arg : candidate.args) {
       if (arg) {
         arg_types.push_back(arg->getType());
-      } else {
-        // Remove any parameter attributes for deleted args.
-        fn_attrs = fn_attrs.removeParamAttributes(M.getContext(), idx);
+        param_attrs.push_back(fn_attrs.getParamAttrs(idx));
       }
       idx++;
     }
+    fn_attrs = AttributeList::get(M.getContext(), fn_attrs.getFnAttrs(),
+                                  fn_attrs.getRetAttrs(), param_attrs);
     FunctionType *new_type =
         FunctionType::get(f->getReturnType(), arg_types, false);
 
