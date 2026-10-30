@@ -349,7 +349,36 @@ Type *InferUsersType(Value *v, LLVMContext &context,
       // Handle stores with only pointer operands.
       if (auto *store = dyn_cast<StoreInst>(user)) {
         if (store->getPointerOperand() != v) {
-          user = dyn_cast<User>(store->getPointerOperand());
+          Value *base_ptr = store->getPointerOperand();
+          while (auto *gep = dyn_cast<GEPOperator>(base_ptr)) {
+            base_ptr = gep->getPointerOperand();
+          }
+          SmallVector<Value *, 8> ptr_containers{base_ptr};
+          SmallPtrSet<Value *, 8> visited_containers{base_ptr};
+          while (!ptr_containers.empty()) {
+            Value *container = ptr_containers.pop_back_val();
+            for (Use &u : container->uses()) {
+              User *usr = u.getUser();
+              if (auto *c_gep = dyn_cast<GEPOperator>(usr)) {
+                if (visited_containers.insert(c_gep).second) {
+                  ptr_containers.push_back(c_gep);
+                }
+              } else if (auto *c_ld = dyn_cast<LoadInst>(usr)) {
+                if (c_ld->getType() == v->getType()) {
+                  worklist.push_back(std::make_pair(c_ld, 0));
+                }
+              } else if (auto *c_call = dyn_cast<CallInst>(usr)) {
+                if (auto *callee = c_call->getCalledFunction();
+                    callee && !callee->isDeclaration()) {
+                  Argument *arg = callee->getArg(u.getOperandNo());
+                  if (visited_containers.insert(arg).second) {
+                    ptr_containers.push_back(arg);
+                  }
+                }
+              }
+            }
+          }
+          continue;
         } else if (auto *value = dyn_cast<User>(store->getValueOperand())) {
           user = value;
         }
