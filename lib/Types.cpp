@@ -304,6 +304,83 @@ Type *SmallerTypeNotAliasing(const DataLayout &DL, Type *TyA, Type *TyB) {
   return TyA;
 }
 
+bool IsNonKernelPointerArg(Value *v) {
+  auto *arg = dyn_cast<Argument>(v);
+  return arg &&
+         arg->getParent()->getCallingConv() != CallingConv::SPIR_KERNEL &&
+         !clspv::IsPhysicalSSBOType(v->getType());
+}
+
+bool UpdateAliasingCompositeType(const DataLayout &DL, Type *ty,
+                                 Type *&composite_ty) {
+  if (!composite_ty) {
+    composite_ty = ty;
+    return true;
+  }
+  if (composite_ty == ty)
+    return true;
+  int steps = 0;
+  bool perfect_match = false;
+  if (BitcastUtils::FindAliasingContainedType(composite_ty, ty, steps,
+                                              perfect_match, DL, false) &&
+      perfect_match) {
+    return true;
+  }
+  if (BitcastUtils::FindAliasingContainedType(ty, composite_ty, steps,
+                                              perfect_match, DL, false) &&
+      perfect_match) {
+    composite_ty = ty;
+    return true;
+  }
+  return false;
+}
+
+bool CanGEPAliasComposite(Type *composite_ty, GEPOperator *gep) {
+  Type *target_ty = gep->getSourceElementType();
+  if (composite_ty == target_ty || gep->getNumOperands() <= 1)
+    return true;
+  auto *cst0 = dyn_cast<ConstantInt>(gep->getOperand(1));
+  if (!cst0)
+    return false;
+  if (cst0->isZero())
+    return true;
+  uint64_t idx = cst0->getZExtValue();
+  Type *curr = composite_ty;
+  while (curr != target_ty) {
+    if (auto *st = dyn_cast<StructType>(curr)) {
+      if (st->isOpaque() || st->getNumElements() == 0)
+        return false;
+      if (st->getElementType(0) == target_ty) {
+        return BitcastUtils::IsArrayLike(st) && idx < st->getNumElements();
+      }
+      curr = st->getElementType(0);
+    } else if (auto *arr = dyn_cast<ArrayType>(curr)) {
+      if (arr->getElementType() == target_ty) {
+        return idx < arr->getNumElements();
+      }
+      curr = arr->getElementType();
+    } else if (auto *vec = dyn_cast<FixedVectorType>(curr)) {
+      if (vec->getElementType() == target_ty) {
+        return idx < vec->getNumElements();
+      }
+      curr = vec->getElementType();
+    } else {
+      return false;
+    }
+  }
+  return false;
+}
+
+bool CanAllDirectGEPsAliasComposite(Value *v, Type *composite_ty) {
+  for (Use &use : v->uses()) {
+    if (auto *gep = dyn_cast<GEPOperator>(use.getUser())) {
+      if (use.getOperandNo() == 0 && !CanGEPAliasComposite(composite_ty, gep))
+        return false;
+    }
+  }
+  return true;
+}
+
 // Returns the type of |v| inferred by inspecting its users.
 // Updates |cache|.
 Type *InferUsersType(Value *v, LLVMContext &context,
@@ -319,6 +396,8 @@ Type *InferUsersType(Value *v, LLVMContext &context,
 
   Type *backup_ty = nullptr;
   Type *user_ty = nullptr;
+  Type *composite_ty = nullptr;
+  bool can_alias_composite = IsNonKernelPointerArg(v);
   DenseSet<Value *> seen;
   while (!worklist.empty()) {
     User *user = worklist.back().first;
@@ -339,6 +418,9 @@ Type *InferUsersType(Value *v, LLVMContext &context,
     Type *user_backup_ty = nullptr;
     Type *ty = InferUserType(user, isPointerTy, operand, user_backup_ty,
                              context, cache, v);
+    if (ty && can_alias_composite) {
+      can_alias_composite = UpdateAliasingCompositeType(DL, ty, composite_ty);
+    }
     user_ty = SmallerTypeNotAliasing(DL, user_ty, ty);
     if (user_ty == nullptr) {
       backup_ty = SmallerTypeNotAliasing(DL, backup_ty, user_backup_ty);
@@ -387,6 +469,10 @@ Type *InferUsersType(Value *v, LLVMContext &context,
         worklist.push_back(std::make_pair(use.getUser(), use.getOperandNo()));
       }
     }
+  }
+  if (can_alias_composite && composite_ty &&
+      CanAllDirectGEPsAliasComposite(v, composite_ty)) {
+    return composite_ty;
   }
   if (user_ty) {
     return user_ty;
