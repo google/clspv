@@ -43,6 +43,45 @@
 ; CHECK: [[gep:%[^ ]+]] = getelementptr i64, ptr %a, i64 [[idx]]
 ; CHECK: store i64 %v, ptr [[gep]], align 8
 
+; The i16 load through the GEP %gep folded into %base is replaced along with it.
+; It is not also replaced on its own, as a load of the i32 that %gep points to,
+; which could leave %base in place depending on the order of the replacements.
+
+; CHECK-LABEL: @narrow_load_of_folded_gep
+; CHECK-NOT: getelementptr i64
+; CHECK: [[off:%[^ ]+]] = shl i64 %i, 1
+; CHECK: [[idx:%[^ ]+]] = add i64 %j, [[off]]
+; CHECK: [[idx16:%[^ ]+]] = shl i64 [[idx]], 1
+; CHECK: [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %in, i64 [[idx]]
+; CHECK: [[ld:%[^ ]+]] = load i32, ptr addrspace(1) [[gep]], align 4
+; CHECK: [[elt:%[^ ]+]] = and i64 [[idx16]], 1
+; CHECK: [[vec:%[^ ]+]] = bitcast i32 [[ld]] to <2 x i16>
+; CHECK: [[v:%[^ ]+]] = extractelement <2 x i16> [[vec]], i64 [[elt]]
+; CHECK: zext i16 [[v]] to i32
+
+; Likewise, the i16 GEP %g2 using the GEP %g1 folded into %base is folded in
+; turn, and not also replaced on its own.
+
+; CHECK-LABEL: @gep_of_folded_gep
+; CHECK-NOT: getelementptr i64
+; CHECK: [[off:%[^ ]+]] = shl i64 %i, 1
+; CHECK: [[idx32:%[^ ]+]] = add i64 %j, [[off]]
+; CHECK: [[off16:%[^ ]+]] = shl i64 [[idx32]], 1
+; CHECK: [[idx:%[^ ]+]] = add i64 %k, [[off16]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr i16, ptr addrspace(1) %in, i64 [[idx]]
+; CHECK: [[v:%[^ ]+]] = load i16, ptr addrspace(1) [[gep]], align 2
+; CHECK: add i16 %lo, [[v]]
+
+; %gep is folded into %base even though its block comes first in the function.
+
+; CHECK-LABEL: @gep_laid_out_before_base
+; CHECK: [[off:%[^ ]+]] = shl i64 %i, 1
+; CHECK: [[idx:%[^ ]+]] = add i64 %j, [[off]]
+; CHECK: [[gep:%[^ ]+]] = getelementptr i32, ptr addrspace(1) %in, i64 [[idx]]
+; CHECK: load i32, ptr addrspace(1) [[gep]], align 4
+; CHECK: def:
+; CHECK-NEXT: br label %use
+
 target datalayout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n8:16:32:64-G1"
 target triple = "spirv64-unknown-vulkan"
 
@@ -91,4 +130,46 @@ entry:
   %ld = load i64, ptr %a, align 8
   store i64 %ld, ptr addrspace(1) %out, align 8
   ret void
+}
+
+define spir_kernel void @narrow_load_of_folded_gep(ptr addrspace(1) %in, ptr addrspace(1) %out, i64 %i, i64 %j) {
+entry:
+  %lo = load i32, ptr addrspace(1) %in, align 4
+  %base = getelementptr i64, ptr addrspace(1) %in, i64 %i
+  %gep = getelementptr i32, ptr addrspace(1) %base, i64 %j
+  %v = load i16, ptr addrspace(1) %gep, align 2
+  %ext = zext i16 %v to i32
+  %sum = add i32 %lo, %ext
+  store i32 %sum, ptr addrspace(1) %out, align 4
+  ret void
+}
+
+define spir_kernel void @gep_of_folded_gep(ptr addrspace(1) %in, ptr addrspace(1) %out, i64 %i, i64 %j, i64 %k) {
+entry:
+  %lo = load i16, ptr addrspace(1) %in, align 2
+  %base = getelementptr i64, ptr addrspace(1) %in, i64 %i
+  %g1 = getelementptr i32, ptr addrspace(1) %base, i64 %j
+  %g2 = getelementptr i16, ptr addrspace(1) %g1, i64 %k
+  %v = load i16, ptr addrspace(1) %g2, align 2
+  %sum = add i16 %lo, %v
+  store i16 %sum, ptr addrspace(1) %out, align 2
+  ret void
+}
+
+define spir_kernel void @gep_laid_out_before_base(ptr addrspace(1) %in, ptr addrspace(1) %out, i64 %i, i64 %j) {
+entry:
+  %lo = load i32, ptr addrspace(1) %in, align 4
+  br label %def
+
+use:
+  %gep = getelementptr i32, ptr addrspace(1) %base, i64 %j
+  %v = load i16, ptr addrspace(1) %gep, align 2
+  %ext = zext i16 %v to i32
+  %sum = add i32 %lo, %ext
+  store i32 %sum, ptr addrspace(1) %out, align 4
+  ret void
+
+def:
+  %base = getelementptr i64, ptr addrspace(1) %in, i64 %i
+  br label %use
 }

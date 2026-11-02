@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
@@ -471,17 +474,6 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
   }
 }
 
-// Return the offset 'CstVal' + 'DynVal' as a single value.
-Value *GetOffsetValue(IRBuilder<> &Builder, int64_t CstVal, Value *DynVal) {
-  if (DynVal == nullptr) {
-    return Builder.getInt32(CstVal);
-  } else if (CstVal != 0) {
-    return Builder.CreateAdd(ConstantInt::get(DynVal->getType(), CstVal),
-                             DynVal);
-  }
-  return DynVal;
-}
-
 // Add 'BaseCstVal' + 'BaseDynVal', the offset of a GEP in units of
 // 'BaseBitWidths' bits, to the offset of 'GEP', a GEP using it. Return the
 // offset of 'GEP' from the pointer operand of the former in 'CstVal' +
@@ -511,62 +503,6 @@ void FoldGEPOffset(const DataLayout &DL, IRBuilder<> &Builder,
     DynVal = CreateAdd(Builder, DynVal, BaseDynVal);
   } else if (BaseDynVal != nullptr) {
     DynVal = BaseDynVal;
-  }
-}
-
-// Replace the loads and stores in 'Users', accessing 'DstTy' from 'Src', by
-// accesses to 'SrcTy'. For users of a GEP, 'OrgGEPIdx' is the offset of the GEP
-// in units of 'OrgGEPIdxBitWidth' bits, and 'NewAddrIdxs' its indices in
-// 'SrcTy'.
-void ReplaceUsers(const DataLayout &DL, ArrayRef<std::pair<User *, bool>> Users,
-                  Value *Src, Type *SrcTy, Type *DstTy, Value *OrgGEPIdx,
-                  size_t OrgGEPIdxBitWidth,
-                  SmallVector<Value *, 4> &NewAddrIdxs,
-                  WeakInstructions &ToBeDeleted) {
-  for (auto UserIter : Users) {
-    User *U = UserIter.first;
-    bool IsGEPUser = UserIter.second;
-    LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";
-               U->dump());
-
-    IRBuilder<> Builder(cast<Instruction>(U));
-
-    if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
-      Type *STTy = ST->getValueOperand()->getType();
-      // ComputeStore expects the index in units of the stored type, which can
-      // differ from the unit of the offset of a folded GEP.
-      Value *STIdx = nullptr;
-      if (DstTy == STTy) {
-        STIdx = ConvertIdxUnit(Builder, OrgGEPIdx, OrgGEPIdxBitWidth,
-                               SizeInBits(DL, STTy));
-      }
-      ComputeStore(Builder, ST, STIdx, IsGEPUser, Src, SrcTy, STTy, NewAddrIdxs,
-                   ToBeDeleted);
-      if (STIdx != OrgGEPIdx && STIdx != nullptr && isa<Instruction>(STIdx)) {
-        // Only removed if ComputeStore did not use it.
-        ToBeDeleted.push_back(STIdx);
-      }
-    } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
-      // ComputeLoad expects the index in units of the loaded type, which
-      // can differ from the element type of the GEP. e.g.
-      //   %gep = getelementptr i64, ptr %src, i32 %i
-      //   %ld = load i32, ptr %gep
-      Value *LDIdx = ConvertIdxUnit(Builder, OrgGEPIdx, OrgGEPIdxBitWidth,
-                                    SizeInBits(DL, LD->getType()));
-      Value *DstVal = ComputeLoad(Builder, LDIdx, IsGEPUser, Src, SrcTy,
-                                  LD->getType(), NewAddrIdxs, ToBeDeleted);
-      if (LDIdx != OrgGEPIdx && LDIdx != nullptr && isa<Instruction>(LDIdx)) {
-        // Only removed if ComputeLoad did not use it.
-        ToBeDeleted.push_back(LDIdx);
-      }
-      // Update LD's users with DstVal.
-      LD->replaceAllUsesWith(DstVal);
-    } else {
-      U->print(errs());
-      llvm_unreachable("Handle above user of gep on ReplacePointerBitcastPass");
-    }
-
-    ToBeDeleted.push_back(cast<Instruction>(U));
   }
 }
 
@@ -807,10 +743,30 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     changed = DowngradeModule(M);
   } while (changed);
 
-  DenseSet<Instruction *> WorkList;
+  // The instructions to replace, each followed by the GEPs folded into it,
+  // directly or not. The source accessed by a GEP and its offset from it are
+  // set when it is replaced.
+  struct GEPInfo {
+    Value *Src = nullptr;
+    int64_t CstVal = 0;
+    Value *DynVal = nullptr;
+    size_t BitWidths = 0;
+  };
+  MapVector<Instruction *, GEPInfo> WorkList;
   for (auto &F : M) {
+    if (F.isDeclaration())
+      continue;
+    // Visit the blocks in reverse post-order, followed by the unreachable
+    // blocks, so that the instructions using a GEP are visited after it.
+    ReversePostOrderTraversal<Function *> RPOT(&F);
+    SmallVector<BasicBlock *, 16> Blocks(RPOT.begin(), RPOT.end());
+    SmallPtrSet<BasicBlock *, 16> Reachable(Blocks.begin(), Blocks.end());
     for (auto &BB : F) {
-      for (auto &I : BB) {
+      if (!Reachable.contains(&BB))
+        Blocks.push_back(&BB);
+    }
+    for (BasicBlock *BB : Blocks) {
+      for (auto &I : *BB) {
         Value *source = nullptr;
         Type *source_ty = nullptr;
         Type *dest_ty = nullptr;
@@ -828,9 +784,8 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         bool ok = true;
         SmallVector<User *, 16> UserWorkList;
         UserWorkList.push_back(&I);
-        while (!UserWorkList.empty()) {
-          auto *user = UserWorkList.back();
-          UserWorkList.pop_back();
+        for (size_t i = 0; i < UserWorkList.size(); ++i) {
+          auto *user = UserWorkList[i];
 
           if (isa<GetElementPtrInst>(user)) {
             for (auto *U : user->users())
@@ -843,19 +798,43 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
         if (!ok)
           continue;
 
-        WorkList.insert(&I);
+        // Add I, followed by the GEPs to fold in breadth-first order: those
+        // using I or a GEP folded into it, of another source element type than
+        // the result element type of the GEP they use. The instructions using
+        // them are then skipped above, as they are replaced along with them.
+        WorkList.insert({&I, GEPInfo()});
+        for (User *U : drop_begin(UserWorkList)) {
+          auto *GEP = dyn_cast<GetElementPtrInst>(U);
+          if (GEP == nullptr)
+            continue;
+          auto *Base = cast<GetElementPtrInst>(GEP->getPointerOperand());
+          if (WorkList.count(Base) > 0 &&
+              GEP->getSourceElementType() != Base->getResultElementType())
+            WorkList.insert({GEP, GEPInfo()});
+        }
       }
     }
   }
 
-  for (Instruction *Inst : WorkList) {
+  for (auto &Entry : WorkList) {
+    Instruction *Inst = Entry.first;
+    GEPInfo &Info = Entry.second;
     LLVM_DEBUG(dbgs() << "## Inst: "; Inst->dump());
     Value *Src = nullptr;
     Type *SrcTy = nullptr;
     Type *DstTy = nullptr;
+    // A GEP using another GEP of the work list is folded into it: it accesses
+    // the source of the latter, at the sum of both offsets.
+    const GEPInfo *BaseInfo = nullptr;
     if (auto *gep = dyn_cast<GetElementPtrInst>(Inst)) {
       Src = gep->getPointerOperand();
       DstTy = gep->getSourceElementType();
+      auto Base = WorkList.find(dyn_cast<Instruction>(Src));
+      if (Base != WorkList.end()) {
+        BaseInfo = &Base->second;
+        assert(BaseInfo->Src && "GEP replaced before the GEP it uses");
+        Src = BaseInfo->Src;
+      }
     } else if (auto *ld = dyn_cast<LoadInst>(Inst)) {
       Src = ld->getPointerOperand();
       DstTy = ld->getType();
@@ -875,16 +854,6 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
     // It consist of User* and bool whether user is gep or not.
     SmallVector<std::pair<User *, bool>, 32> AllUsers;
 
-    // GEPs of another source element type using the GEP, with the offset of
-    // their pointer operand from Src.
-    struct GEPToFold {
-      GetElementPtrInst *GEP;
-      int64_t CstVal;
-      Value *DynVal;
-      size_t BitWidths;
-    };
-    SmallVector<GEPToFold, 4> GEPsToFold;
-
     Value *OrgGEPIdx = nullptr;
     // Size in bits of the unit in which OrgGEPIdx is expressed.
     size_t OrgGEPIdxBitWidth = 0;
@@ -894,86 +863,91 @@ clspv::ReplacePointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
       int64_t CstVal;
       Value *DynVal;
       size_t SmallerBitWidths;
-      ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+      if (BaseInfo != nullptr) {
+        FoldGEPOffset(DL, Builder, GEP, BaseInfo->CstVal, BaseInfo->DynVal,
+                      BaseInfo->BitWidths, CstVal, DynVal, SmallerBitWidths);
+      } else {
+        ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal,
+                             SmallerBitWidths);
+      }
+      Info = GEPInfo{Src, CstVal, DynVal, SmallerBitWidths};
+      ToBeDeleted.push_back(GEP);
 
-      OrgGEPIdx = GetOffsetValue(Builder, CstVal, DynVal);
+      // The GEPs using it are either replaced as later entries of the work
+      // list, or left using it if their source element type is its result
+      // element type.
+      for (User *GEPUser : GEP->users()) {
+        if (!isa<GetElementPtrInst>(GEPUser))
+          AllUsers.push_back(std::make_pair(GEPUser, true));
+      }
+      if (AllUsers.empty())
+        continue;
+
+      OrgGEPIdx = DynVal;
       OrgGEPIdxBitWidth = SmallerBitWidths;
+      if (DynVal == nullptr) {
+        OrgGEPIdx = Builder.getInt32(CstVal);
+      } else if (CstVal != 0) {
+        OrgGEPIdx = Builder.CreateAdd(
+            ConstantInt::get(DynVal->getType(), CstVal), DynVal);
+      }
 
       DstTy = GEP->getResultElementType();
 
-      auto Idx =
-          GetIdxsForTyFromOffset(DL, Builder, SrcTy, DstTy, CstVal, DynVal,
-                                 SmallerBitWidths, GEP->getPointerOperand());
+      auto Idx = GetIdxsForTyFromOffset(DL, Builder, SrcTy, DstTy, CstVal,
+                                        DynVal, SmallerBitWidths, Src);
       NewAddrIdxs.append(Idx);
-
-      // If bitcast's user is gep, investigate gep's users too.
-      for (User *GEPUser : GEP->users()) {
-        if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
-          if (GEPUserGEP->getSourceElementType() == GEP->getResultElementType())
-            continue;
-          GEPsToFold.push_back({GEPUserGEP, CstVal, DynVal, SmallerBitWidths});
-          continue;
-        }
-        AllUsers.push_back(std::make_pair(GEPUser, true));
-      }
-      if (!GEP->users().empty()) {
-        ToBeDeleted.push_back(GEP);
-      }
     } else {
       AllUsers.push_back(std::make_pair(Inst, false));
     }
 
-    ReplaceUsers(DL, AllUsers, Src, SrcTy, DstTy, OrgGEPIdx, OrgGEPIdxBitWidth,
-                 NewAddrIdxs, ToBeDeleted);
+    // Handle users.
+    bool IsGEPUser = false;
+    for (auto UserIter : AllUsers) {
+      User *U = UserIter.first;
+      IsGEPUser = UserIter.second;
+      LLVM_DEBUG(dbgs() << "###### User (isGEP: " << IsGEPUser << ") : ";
+                 U->dump());
 
-    // Only removed if they are not used, e.g. by the users of the GEP.
-    auto ScheduleIdxsForRemoval = [&ToBeDeleted](ArrayRef<Value *> Idxs) {
-      for (Value *Idx : Idxs) {
-        if (auto *IdxInst = dyn_cast_or_null<Instruction>(Idx)) {
-          ToBeDeleted.push_back(IdxInst);
+      IRBuilder<> Builder(cast<Instruction>(U));
+
+      if (StoreInst *ST = dyn_cast<StoreInst>(U)) {
+        Type *STTy = ST->getValueOperand()->getType();
+        // ComputeStore expects the index in units of the stored type, which
+        // can differ from the unit of the offset of a folded GEP.
+        Value *STIdx = nullptr;
+        if (DstTy == STTy) {
+          STIdx = ConvertIdxUnit(Builder, OrgGEPIdx, OrgGEPIdxBitWidth,
+                                 SizeInBits(DL, STTy));
         }
-      }
-    };
-    if (!GEPsToFold.empty()) {
-      ScheduleIdxsForRemoval(NewAddrIdxs);
-      ScheduleIdxsForRemoval(OrgGEPIdx);
-    }
-
-    // A GEP of another source element type using the GEP, e.g. a GEP of a
-    // struct member using a GEP that DowngradeModule retyped, is folded into
-    // it: its users access Src at the sum of both offsets.
-    while (!GEPsToFold.empty()) {
-      GEPToFold ToFold = GEPsToFold.pop_back_val();
-      LLVM_DEBUG(dbgs() << "###### Folded GEP: "; ToFold.GEP->dump());
-      IRBuilder<> Builder(ToFold.GEP);
-
-      int64_t CstVal;
-      Value *DynVal;
-      size_t BitWidths;
-      FoldGEPOffset(DL, Builder, ToFold.GEP, ToFold.CstVal, ToFold.DynVal,
-                    ToFold.BitWidths, CstVal, DynVal, BitWidths);
-
-      Type *FoldedDstTy = ToFold.GEP->getResultElementType();
-      SmallVector<Value *, 4> FoldedAddrIdxs;
-      FoldedAddrIdxs.append(GetIdxsForTyFromOffset(
-          DL, Builder, SrcTy, FoldedDstTy, CstVal, DynVal, BitWidths, Src));
-
-      SmallVector<std::pair<User *, bool>, 32> FoldedUsers;
-      for (User *GEPUser : ToFold.GEP->users()) {
-        if (auto GEPUserGEP = dyn_cast<GetElementPtrInst>(GEPUser)) {
-          if (GEPUserGEP->getSourceElementType() == FoldedDstTy)
-            continue;
-          GEPsToFold.push_back({GEPUserGEP, CstVal, DynVal, BitWidths});
-          continue;
+        ComputeStore(Builder, ST, STIdx, IsGEPUser, Src, SrcTy, STTy,
+                     NewAddrIdxs, ToBeDeleted);
+        if (STIdx != OrgGEPIdx && STIdx != nullptr && isa<Instruction>(STIdx)) {
+          // Only removed if ComputeStore did not use it.
+          ToBeDeleted.push_back(STIdx);
         }
-        FoldedUsers.push_back(std::make_pair(GEPUser, true));
+      } else if (LoadInst *LD = dyn_cast<LoadInst>(U)) {
+        // ComputeLoad expects the index in units of the loaded type, which
+        // can differ from the element type of the GEP. e.g.
+        //   %gep = getelementptr i64, ptr %src, i32 %i
+        //   %ld = load i32, ptr %gep
+        Value *LDIdx = ConvertIdxUnit(Builder, OrgGEPIdx, OrgGEPIdxBitWidth,
+                                      SizeInBits(DL, LD->getType()));
+        Value *DstVal = ComputeLoad(Builder, LDIdx, IsGEPUser, Src, SrcTy,
+                                    LD->getType(), NewAddrIdxs, ToBeDeleted);
+        if (LDIdx != OrgGEPIdx && LDIdx != nullptr && isa<Instruction>(LDIdx)) {
+          // Only removed if ComputeLoad did not use it.
+          ToBeDeleted.push_back(LDIdx);
+        }
+        // Update LD's users with DstVal.
+        LD->replaceAllUsesWith(DstVal);
+      } else {
+        U->print(errs());
+        llvm_unreachable(
+            "Handle above user of gep on ReplacePointerBitcastPass");
       }
-      Value *FoldedGEPIdx = GetOffsetValue(Builder, CstVal, DynVal);
-      ReplaceUsers(DL, FoldedUsers, Src, SrcTy, FoldedDstTy, FoldedGEPIdx,
-                   BitWidths, FoldedAddrIdxs, ToBeDeleted);
-      ScheduleIdxsForRemoval(FoldedAddrIdxs);
-      ScheduleIdxsForRemoval(FoldedGEPIdx);
-      ToBeDeleted.push_back(ToFold.GEP);
+
+      ToBeDeleted.push_back(cast<Instruction>(U));
     }
 
     // Schedule for removal only if Inst has no users. If all its users are
