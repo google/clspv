@@ -35,6 +35,25 @@ using namespace BitcastUtils;
 
 #define DEBUG_TYPE "SimplifyPointerBitcast"
 
+namespace {
+// Returns whether the offset of 'GEP', a GEP with constant indices of a global
+// variable of type 'Ty', points inside a scalar element of 'Ty', e.g. to the
+// high half of an i64. Such an offset cannot be expressed with indices into
+// 'Ty'.
+bool IsOffsetInsideScalar(const DataLayout &DL, GetElementPtrInst *GEP,
+                          Type *Ty) {
+  IRBuilder<> Builder{GEP};
+  int64_t CstVal;
+  Value *DynVal;
+  size_t SmallerBitWidths;
+  ExtractOffsetFromGEP(DL, Builder, GEP, CstVal, DynVal, SmallerBitWidths);
+  assert(DynVal == nullptr && "Expected a GEP with constant indices");
+  return GoThroughTypeAtOffset(DL, Builder, Ty, Ty, nullptr,
+                               CstVal * (int64_t)SmallerBitWidths,
+                               nullptr) != 0;
+}
+} // namespace
+
 PreservedAnalyses
 clspv::SimplifyPointerBitcastPass::run(Module &M, ModuleAnalysisManager &) {
   PreservedAnalyses PA;
@@ -697,6 +716,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnImplicitGEP(Module &M) const {
     Value *dynVal;
     size_t smallerBitWidths;
     ExtractOffsetFromGEP(DL, Builder, gep, cstVal, dynVal, smallerBitWidths);
+    // An offset inside a scalar element of the global variable, e.g. to the
+    // high half of an i64, cannot be expressed with indices into its type.
+    // Leave the GEP to ReplacePointerBitcastPass.
+    if (IsOffsetInsideScalar(DL, gep, ty)) {
+      LLVM_DEBUG(dbgs() << "\n##runOnImplicitGEP (from GV):\nskip (offset "
+                           "inside a scalar element): ";
+                 gep->dump());
+      continue;
+    }
     auto new_gep_idxs = GetIdxsForTyFromOffset(DL, Builder, ty, nullptr, cstVal,
                                                dynVal, smallerBitWidths, ptr);
     auto new_gep = GetElementPtrInst::Create(ty, ptr, new_gep_idxs, "",
@@ -933,7 +961,15 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
-          if (IsGVConstantGEP(gep))
+          // runOnImplicitGEP turns a GEP with constant indices of a global
+          // variable into a GEP of the type of the global variable, so do not
+          // upgrade it, unless it points inside a scalar element, which
+          // runOnImplicitGEP leaves as is.
+          if (IsGVConstantGEP(gep) &&
+              !IsOffsetInsideScalar(DL, gep,
+                                    clspv::InferType(gep->getPointerOperand(),
+                                                     M.getContext(),
+                                                     &type_cache)))
             continue;
 
           int64_t cstVal;
