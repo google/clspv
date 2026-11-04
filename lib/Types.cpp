@@ -456,11 +456,13 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
   }
 
   // If we have not figured out the type yet and the value is a kernel function
-  // argument, deduce it from the arg info metadata if enabled.
-  if (clspv::Option::KernelArgInfo() && isa<Argument>(v)) {
+  // argument, deduce it from the arg info metadata if available.
+  if (isa<Argument>(v)) {
     auto arg = cast<Argument>(v);
     auto kernelFn = arg->getParent();
-    if (kernelFn->getCallingConv() == CallingConv::SPIR_KERNEL) {
+    if (kernelFn->getCallingConv() == CallingConv::SPIR_KERNEL &&
+        kernelFn->getMetadata("kernel_arg_type") &&
+        kernelFn->getMetadata("kernel_arg_access_qual")) {
       unsigned ordinal = arg->getArgNo();
       // If ClusterPodKernelArgumentsPass has transformed the kernel signature
       // we need to refer to the argument map to know the index of arguments
@@ -486,8 +488,6 @@ Type *clspv::InferType(Value *v, LLVMContext &context,
         }
       }
 
-      assert(kernelFn->getMetadata("kernel_arg_type") &&
-             kernelFn->getMetadata("kernel_arg_access_qual"));
       auto const &type_op =
           kernelFn->getMetadata("kernel_arg_type")->getOperand(ordinal);
       auto const &type_name_str = dyn_cast<MDString>(type_op)->getString();
