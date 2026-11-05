@@ -84,6 +84,13 @@ int64_t GoThroughTypeAtOffset(const DataLayout &DataLayout,
 
 bool IsClspvResourceOrLocal(Value *val);
 
+// Returns whether GetIdxsForTyFromOffset can convert the dynamic offset
+// 'CstVal + DynVal', in units of 'SmallerBitWidths' bits, into the indices to
+// access 'DstTy' in 'SrcTy' without dropping a remainder.
+bool IsDynOffsetExactForTy(const DataLayout &DataLayout, Type *SrcTy,
+                           Type *DstTy, int64_t CstVal, Value *DynVal,
+                           size_t SmallerBitWidths);
+
 SmallVector<Value *, 2>
 GetIdxsForTyFromOffset(const DataLayout &DataLayout, IRBuilder<> &Builder,
                        Type *SrcTy, Type *DstTy, int64_t CstVal, Value *DynVal,
