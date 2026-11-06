@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <climits>
 #include <map>
 #include <set>
@@ -26,6 +27,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
@@ -49,6 +51,151 @@ namespace {
 cl::opt<bool> ShowDRA("show-dra", cl::init(false), cl::Hidden,
                       cl::desc("Show direct resource access details"));
 
+Value *SelectPointerArrayElement(LoadInst *ld, Value *idx,
+                                 ArrayRef<Value *> elems) {
+  if (!idx)
+    return elems[0];
+  if (auto *cst = dyn_cast<ConstantInt>(idx))
+    return elems[std::clamp<int64_t>(cst->getSExtValue(), 0, elems.size() - 1)];
+  IRBuilder<> B(ld);
+  Value *sel = elems[0];
+  for (size_t k = 1; k < elems.size(); ++k) {
+    Value *cmp = B.CreateICmpEQ(idx, ConstantInt::get(idx->getType(), k));
+    sel = B.CreateSelect(cmp, elems[k], sel);
+  }
+  return sel;
+}
+
+// Replaces loads from |container| with the corresponding element from |elems|
+// (using a SelectInst chain for dynamic indices) and erases dead loads/GEPs.
+void ReplaceLoadsFromPointerArray(Value *container, ArrayRef<Value *> elems) {
+  SmallVector<std::pair<Value *, Value *>, 8> worklist{{container, nullptr}};
+  SmallVector<LoadInst *, 8> loads_to_erase;
+  SmallVector<GetElementPtrInst *, 8> geps;
+
+  while (!worklist.empty()) {
+    auto [curr, curr_idx] = worklist.pop_back_val();
+    for (User *usr : curr->users()) {
+      if (auto *ld = dyn_cast<LoadInst>(usr)) {
+        ld->replaceAllUsesWith(SelectPointerArrayElement(ld, curr_idx, elems));
+        loads_to_erase.push_back(ld);
+      } else if (auto *gep = dyn_cast<GetElementPtrInst>(usr)) {
+        geps.push_back(gep);
+        Value *next_idx = gep->hasAllZeroIndices()
+                              ? curr_idx
+                              : gep->getOperand(gep->getNumOperands() - 1);
+        worklist.push_back({gep, next_idx});
+      }
+    }
+  }
+
+  for (LoadInst *ld : loads_to_erase)
+    ld->eraseFromParent();
+  for (auto *gep : llvm::reverse(geps)) {
+    if (gep->use_empty())
+      gep->eraseFromParent();
+  }
+}
+
+void RecordPointerArrayStore(StoreInst *st, int64_t idx,
+                             SmallVectorImpl<Value *> &elems) {
+  if (idx < 0 || static_cast<size_t>(idx) >= elems.size())
+    return;
+  Value *val = st->getValueOperand();
+  if (!isa<ConstantPointerNull>(val) && !isa<UndefValue>(val))
+    elems[idx] = val;
+}
+
+// Populates |elems| with the pointer values stored into each slot of |alloca|.
+void CollectPointerArrayElements(AllocaInst *alloca, ArrayType *arr_ty,
+                                 const DataLayout &DL,
+                                 SmallVectorImpl<Value *> &elems) {
+  auto *elem_ptr_ty = cast<PointerType>(arr_ty->getElementType());
+  int64_t ptr_size = DL.getTypeAllocSize(elem_ptr_ty);
+  elems.assign(arr_ty->getNumElements(), ConstantPointerNull::get(elem_ptr_ty));
+
+  for (User *usr : alloca->users()) {
+    if (auto *st = dyn_cast<StoreInst>(usr)) {
+      if (st->getPointerOperand() == alloca)
+        RecordPointerArrayStore(st, 0, elems);
+    } else if (auto *gep = dyn_cast<GetElementPtrInst>(usr)) {
+      APInt offset(DL.getIndexSizeInBits(gep->getPointerAddressSpace()), 0);
+      if (!gep->accumulateConstantOffset(DL, offset))
+        continue;
+      int64_t idx = offset.getSExtValue() / ptr_size;
+      for (User *gep_usr : gep->users()) {
+        if (auto *st = dyn_cast<StoreInst>(gep_usr)) {
+          if (st->getPointerOperand() == gep)
+            RecordPointerArrayStore(st, idx, elems);
+        }
+      }
+    }
+  }
+}
+
+// Erases |root| and its stores/GEPs/lifetime intrinsics if it does not escape.
+void EraseDeadPointerArrayUsers(Value *root) {
+  SmallVector<Value *, 8> worklist{root};
+  SmallVector<Instruction *, 16> leaf_insts;
+  SmallVector<Instruction *, 16> addr_insts;
+  while (!worklist.empty()) {
+    Value *v = worklist.pop_back_val();
+    for (User *usr : v->users()) {
+      if (auto *st = dyn_cast<StoreInst>(usr)) {
+        if (st->getValueOperand() == v)
+          return;
+        leaf_insts.push_back(st);
+      } else if (auto *ii = dyn_cast<IntrinsicInst>(usr)) {
+        if (!ii->isLifetimeStartOrEnd())
+          return;
+        leaf_insts.push_back(ii);
+      } else if (isa<GetElementPtrInst>(usr) || isa<BitCastInst>(usr)) {
+        auto *inst = cast<Instruction>(usr);
+        addr_insts.push_back(inst);
+        worklist.push_back(inst);
+      } else {
+        return;
+      }
+    }
+  }
+  for (Instruction *inst : leaf_insts)
+    inst->eraseFromParent();
+  for (Instruction *inst : llvm::reverse(addr_insts)) {
+    if (inst->use_empty())
+      inst->eraseFromParent();
+  }
+  if (auto *alloca = dyn_cast<AllocaInst>(root); alloca && alloca->use_empty())
+    alloca->eraseFromParent();
+}
+
+// Lowers local alloca arrays of resource pointers to direct resource accesses.
+void RewritePointerArrayAccesses(Module &M) {
+  const DataLayout &DL = M.getDataLayout();
+  SmallVector<AllocaInst *, 8> all_ptr_allocas;
+
+  for (Function &F : M) {
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        auto *alloca = dyn_cast<AllocaInst>(&I);
+        if (!alloca)
+          continue;
+        auto *arr_ty = dyn_cast<ArrayType>(alloca->getAllocatedType());
+        if (!arr_ty || !arr_ty->getElementType()->isPointerTy() ||
+            arr_ty->getNumElements() == 0)
+          continue;
+
+        SmallVector<Value *, 8> elems;
+        CollectPointerArrayElements(alloca, arr_ty, DL, elems);
+        ReplaceLoadsFromPointerArray(alloca, elems);
+        all_ptr_allocas.push_back(alloca);
+      }
+    }
+  }
+
+  for (AllocaInst *alloca : all_ptr_allocas)
+    EraseDeadPointerArrayUsers(alloca);
+}
+
 } // namespace
 
 PreservedAnalyses
@@ -67,6 +214,7 @@ clspv::DirectResourceAccessPass::run(Module &M, ModuleAnalysisManager &) {
     for (auto *fn : ordered_functions) {
       RewriteResourceAccesses(fn);
     }
+    RewritePointerArrayAccesses(M);
   }
 
   return PA;
