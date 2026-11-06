@@ -201,6 +201,58 @@ bool clspv::SimplifyPointerBitcastPass::runOnBitcastFromBitcast(
   return Changed;
 }
 
+namespace {
+
+bool FoldConstantGEPIntoEnclosingStruct(const DataLayout &DL,
+                                        IRBuilder<> &Builder,
+                                        GetElementPtrInst *OtherGEP,
+                                        GetElementPtrInst *GEP,
+                                        SmallVectorImpl<Value *> &Idxs) {
+  if (OtherGEP->getNumIndices() <= 1 || !GEP->hasAllConstantIndices() ||
+      GEP->getSourceElementType()->isAggregateType()) {
+    return false;
+  }
+
+  int64_t StructCstVal = 0;
+  size_t StructSmallerBitWidths = 0;
+  Value *dynVal = nullptr;
+  ExtractOffsetFromGEP(DL, Builder, GEP, StructCstVal, dynVal,
+                       StructSmallerBitWidths);
+  assert(dynVal == nullptr);
+  int64_t AccessSize =
+      DL.getTypeStoreSizeInBits(GEP->getResultElementType()).getFixedValue();
+
+  SmallVector<Value *, 4> OtherGEPIdxs(OtherGEP->indices());
+  while (OtherGEPIdxs.size() > 1) {
+    auto *OtherGEPLastIdx = dyn_cast<ConstantInt>(OtherGEPIdxs.back());
+    if (!OtherGEPLastIdx)
+      break;
+    OtherGEPIdxs.pop_back();
+    Type *OtherGEPPrevTy = GetElementPtrInst::getIndexedType(
+        OtherGEP->getSourceElementType(), OtherGEPIdxs);
+    if (!OtherGEPPrevTy || !OtherGEPPrevTy->isStructTy())
+      break;
+
+    ExtractOffsetFromStruct(DL, OtherGEPLastIdx,
+                            cast<StructType>(OtherGEPPrevTy), StructCstVal,
+                            StructSmallerBitWidths);
+    int64_t OffsetInBits = StructCstVal * (int64_t)StructSmallerBitWidths;
+    int64_t StructSize = SizeInBits(DL, OtherGEPPrevTy);
+    if (OffsetInBits >= 0 && OffsetInBits + AccessSize <= StructSize) {
+      auto newGEPIdxs = GetIdxsForTyFromOffset(
+          DL, Builder, OtherGEPPrevTy, GEP->getResultElementType(),
+          StructCstVal, nullptr, StructSmallerBitWidths,
+          OtherGEP->getPointerOperand());
+      Idxs.append(OtherGEPIdxs);
+      Idxs.append(newGEPIdxs.begin() + 1, newGEPIdxs.end());
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace
+
 bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
   SmallVector<GetElementPtrInst *, 16> WorkList;
   for (Function &F : M) {
@@ -290,56 +342,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
       VecOrArraySize =
           BitcastUtils::GetNumEle(OtherGEP->getSourceElementType());
     }
-    bool OtherGEPPrevIsCstToStruct = false;
-    ConstantInt *OtherGEPLastIdx = nullptr;
-    Type *OtherGEPPrevTy = nullptr;
-    SmallVector<Value *, 4> OtherGEPIdxs;
-    // Total GEP offset from the start of OtherGEPPrevTy, in units of
-    // StructSmallerBitWidths.
-    int64_t StructCstVal = 0;
-    size_t StructSmallerBitWidths = 0;
-    if (OtherGEP->getNumIndices() > 1) {
-      OtherGEPIdxs.append(SmallVector<Value *, 4>(OtherGEP->indices()));
-      OtherGEPLastIdx =
-          dyn_cast<ConstantInt>(OtherGEPIdxs[OtherGEP->getNumIndices() - 1]);
-      OtherGEPIdxs.pop_back();
-      OtherGEPPrevTy = GetElementPtrInst::getIndexedType(
-          OtherGEP->getSourceElementType(), OtherGEPIdxs);
-      OtherGEPPrevIsCstToStruct =
-          GEP->hasAllConstantIndices() && OtherGEPPrevTy &&
-          OtherGEPPrevTy->isStructTy() && OtherGEPLastIdx &&
-          !GEP->getSourceElementType()->isAggregateType();
-      if (OtherGEPPrevIsCstToStruct) {
-        auto &DL = M.getDataLayout();
-        Value *dynVal;
-        ExtractOffsetFromGEP(DL, Builder, GEP, StructCstVal, dynVal,
-                             StructSmallerBitWidths);
-        assert(dynVal == nullptr);
-        ExtractOffsetFromStruct(DL, OtherGEPLastIdx,
-                                cast<StructType>(OtherGEPPrevTy), StructCstVal,
-                                StructSmallerBitWidths);
-        // Make sure the combined offset stays in the struct.
-        int64_t OffsetInBits = StructCstVal * (int64_t)StructSmallerBitWidths;
-        int64_t AccessSize =
-            DL.getTypeStoreSizeInBits(GEP->getResultElementType())
-                .getFixedValue();
-        int64_t StructSize = SizeInBits(DL, OtherGEPPrevTy);
-        OtherGEPPrevIsCstToStruct =
-            OffsetInBits >= 0 && OffsetInBits + AccessSize <= StructSize;
-      }
-    }
-
     SmallVector<Value *, 8> Idxs;
     Type *NewGEPSrcTy = OtherGEP->getSourceElementType();
-    if (OtherGEPPrevIsCstToStruct) {
-      auto newGEPIdxs = GetIdxsForTyFromOffset(
-          M.getDataLayout(), Builder, OtherGEPPrevTy,
-          GEP->getResultElementType(), StructCstVal, nullptr,
-          StructSmallerBitWidths, OtherGEP->getPointerOperand());
-
-      Idxs.append(OtherGEPIdxs);
-      Idxs.append(
-          SmallVector<Value *, 4>(newGEPIdxs.begin() + 1, newGEPIdxs.end()));
+    if (FoldConstantGEPIntoEnclosingStruct(M.getDataLayout(), Builder, OtherGEP,
+                                           GEP, Idxs)) {
+      // Handled by FoldConstantGEPIntoEnclosingStruct.
     } else if (GEP->hasAllConstantIndices() &&
                OtherGEP->hasAllConstantIndices() &&
                (GEP->getPointerAddressSpace() == clspv::AddressSpace::Private ||
