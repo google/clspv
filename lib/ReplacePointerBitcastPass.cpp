@@ -644,6 +644,39 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
   return changed;
 }
 
+// Returns true if any atomic operation reached from Src, directly or through
+// GEPs, operates on integer data.
+bool HasIntegerAtomicUser(Value *Src) {
+  while (auto gep = dyn_cast<GetElementPtrInst>(Src)) {
+    Src = gep->getPointerOperand();
+  }
+  SmallVector<Value *, 16> WorkList{Src};
+  SmallPtrSet<Value *, 16> Visited;
+  while (!WorkList.empty()) {
+    auto *V = WorkList.pop_back_val();
+    if (!Visited.insert(V).second)
+      continue;
+    for (auto *U : V->users()) {
+      if (isa<GetElementPtrInst>(U)) {
+        WorkList.push_back(U);
+      } else if (auto *rmw = dyn_cast<AtomicRMWInst>(U)) {
+        if (rmw->getType()->isIntegerTy())
+          return true;
+      } else if (auto *call = dyn_cast<CallInst>(U)) {
+        auto *callee = call->getCalledFunction();
+        if (!callee || callee->getName().starts_with("llvm.memcpy"))
+          continue;
+        auto *data_ty = call->getType();
+        if (data_ty->isVoidTy() && call->arg_size() > 0)
+          data_ty = call->getArgOperand(call->arg_size() - 1)->getType();
+        if (data_ty->isIntegerTy())
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool DowngradeModule(Module &M) {
   DenseMap<Value *, Type *> type_cache;
   const DataLayout &DL = M.getDataLayout();
@@ -702,9 +735,17 @@ bool DowngradeModule(Module &M) {
           continue;
         }
 
-        if (source_size > dest_size ||
-            (isAtomic && source_ty->isFloatingPointTy() &&
-             dest_ty->isIntegerTy() && source_size == dest_size)) {
+        // Atomics must access the memory with the type of the data they
+        // operate on. For a same-sized FP/integer mismatch, retype the source
+        // to the atomic data type: integer atomics on FP storage, or FP
+        // atomics on integer storage. The latter is skipped if integer atomics
+        // also access the storage, so that both rules don't fight each other.
+        const bool atomicTypeMismatch =
+            isAtomic && source_size == dest_size &&
+            ((source_ty->isFloatingPointTy() && dest_ty->isIntegerTy()) ||
+             (source_ty->isIntegerTy() && dest_ty->isFloatingPointTy() &&
+              !HasIntegerAtomicUser(source)));
+        if (source_size > dest_size || atomicTypeMismatch) {
           // The downgraded type becomes the element type of the rewritten
           // GEPs, so its size must evenly divide the size of the source type.
           // Otherwise the stride between source objects cannot be expressed
