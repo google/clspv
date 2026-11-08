@@ -930,7 +930,9 @@ unsigned PointerOperandNum(Instruction *inst, Value *source) {
       const bool atomic =
           (static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
            opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor)) ||
-          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT);
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT) ||
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMinEXT) ||
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMaxEXT);
       if (atomic) {
         return 1;
       }
@@ -1049,7 +1051,9 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
       const bool atomic =
           (static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
            opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor)) ||
-          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT);
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT) ||
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMinEXT) ||
+          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMaxEXT);
       if (atomic) {
         source = call->getArgOperand(1);
         if (clspv::Option::UntypedPointerAddressSpace(

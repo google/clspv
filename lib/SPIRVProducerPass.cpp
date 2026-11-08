@@ -3634,6 +3634,12 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
                               "SPV_EXT_shader_atomic_float_add");
   }
 
+  if (CapabilitySet.count(spv::CapabilityAtomicFloat32MinMaxEXT) ||
+      CapabilitySet.count(spv::CapabilityAtomicFloat64MinMaxEXT)) {
+    addSPIRVInst<kExtensions>(spv::OpExtension,
+                              "SPV_EXT_shader_atomic_float_min_max");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -4184,6 +4190,18 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
         break;
       default:
         llvm_unreachable("Unsupported OpAtomicFAddEXT bitwidth");
+      }
+    } else if (opcode == spv::OpAtomicFMinEXT ||
+               opcode == spv::OpAtomicFMaxEXT) {
+      switch (Call->getType()->getScalarSizeInBits()) {
+      case 32:
+        addCapability(spv::CapabilityAtomicFloat32MinMaxEXT);
+        break;
+      case 64:
+        addCapability(spv::CapabilityAtomicFloat64MinMaxEXT);
+        break;
+      default:
+        llvm_unreachable("Unsupported OpAtomicFMinEXT/FMaxEXT bitwidth");
       }
     }
     if (opcode != spv::OpNop) {
@@ -7587,6 +7605,8 @@ void SPIRVProducerPassImpl::WriteSPIRVBinary(
     case spv::OpAtomicSMin:
     case spv::OpAtomicUMax:
     case spv::OpAtomicSMax:
+    case spv::OpAtomicFMinEXT:
+    case spv::OpAtomicFMaxEXT:
     case spv::OpAtomicAnd:
     case spv::OpAtomicOr:
     case spv::OpAtomicXor:

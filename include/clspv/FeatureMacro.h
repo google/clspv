@@ -78,6 +78,10 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 31>
         FeatureStr(__opencl_c_ext_fp32_local_atomic_add),
         FeatureStr(__opencl_c_ext_fp64_global_atomic_add),
         FeatureStr(__opencl_c_ext_fp64_local_atomic_add),
+        FeatureStr(__opencl_c_ext_fp32_global_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp32_local_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp64_global_atomic_min_max),
+        FeatureStr(__opencl_c_ext_fp64_local_atomic_min_max),
         // following items are always enabled by clang
         FeatureStr(__opencl_c_int64),
         FeatureStr(__opencl_c_atomic_order_seq_cst),
@@ -97,10 +101,6 @@ constexpr std::array<std::pair<FeatureMacro, const char *>, 31>
         FeatureStr(__opencl_c_ext_fp16_local_atomic_load_store),
         FeatureStr(__opencl_c_ext_fp16_global_atomic_min_max),
         FeatureStr(__opencl_c_ext_fp16_local_atomic_min_max),
-        FeatureStr(__opencl_c_ext_fp32_global_atomic_min_max),
-        FeatureStr(__opencl_c_ext_fp32_local_atomic_min_max),
-        FeatureStr(__opencl_c_ext_fp64_global_atomic_min_max),
-        FeatureStr(__opencl_c_ext_fp64_local_atomic_min_max),
     };
 #undef FeatureStr
 
