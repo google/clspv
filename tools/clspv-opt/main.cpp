@@ -101,10 +101,8 @@ int main(int argc, char **argv) {
 
   llvm::PassInstrumentationCallbacks PIC;
   clspv::RegisterClspvPasses(&PIC);
-  llvm::PassBuilder PB(
-      context, nullptr,
-      llvm::PipelineTuningOptions(&context.getLibraryOptions()), std::nullopt,
-      &PIC);
+  llvm::PassBuilder PB(context, nullptr, llvm::PipelineTuningOptions(),
+                       std::nullopt, &PIC);
   clspv::RegisterClspvPassBuilderCallback(&PB);
 
   PB.registerModuleAnalyses(MAM);
