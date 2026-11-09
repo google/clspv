@@ -21,7 +21,7 @@
 namespace clspv {
 
 FeatureMacro FeatureMacroLookup(const std::string &name) {
-  constexpr std::array<FeatureMacro, 13> NotSuppported{
+  constexpr std::array<FeatureMacro, 9> NotSuppported{
       FeatureMacro::__opencl_c_pipes,
       FeatureMacro::__opencl_c_device_enqueue,
       FeatureMacro::__opencl_c_program_scope_global_variables,
@@ -30,11 +30,7 @@ FeatureMacro FeatureMacroLookup(const std::string &name) {
       FeatureMacro::__opencl_c_ext_fp16_global_atomic_load_store,
       FeatureMacro::__opencl_c_ext_fp16_local_atomic_load_store,
       FeatureMacro::__opencl_c_ext_fp16_global_atomic_min_max,
-      FeatureMacro::__opencl_c_ext_fp16_local_atomic_min_max,
-      FeatureMacro::__opencl_c_ext_fp32_global_atomic_min_max,
-      FeatureMacro::__opencl_c_ext_fp32_local_atomic_min_max,
-      FeatureMacro::__opencl_c_ext_fp64_global_atomic_min_max,
-      FeatureMacro::__opencl_c_ext_fp64_local_atomic_min_max};
+      FeatureMacro::__opencl_c_ext_fp16_local_atomic_min_max};
 
   const auto macro_itr = std::find_if(
       FeatureMacroList.begin(), FeatureMacroList.end(),

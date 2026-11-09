@@ -1012,7 +1012,9 @@ int ParseOptions(const int argc, const char *const argv[]) {
     for (auto feat :
          {clspv::FeatureMacro::__opencl_c_fp64,
           clspv::FeatureMacro::__opencl_c_ext_fp64_global_atomic_add,
-          clspv::FeatureMacro::__opencl_c_ext_fp64_local_atomic_add}) {
+          clspv::FeatureMacro::__opencl_c_ext_fp64_local_atomic_add,
+          clspv::FeatureMacro::__opencl_c_ext_fp64_global_atomic_min_max,
+          clspv::FeatureMacro::__opencl_c_ext_fp64_local_atomic_min_max}) {
       if (enabled_feature_macros.count(feat)) {
         auto itr = std::find_if(
             clspv::FeatureMacroList.begin(), clspv::FeatureMacroList.end(),

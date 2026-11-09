@@ -145,6 +145,8 @@ Type *InferUserType(User *user, bool &isPointerTy, unsigned operand,
       case spv::Op::OpAtomicUMin:
       case spv::Op::OpAtomicSMax:
       case spv::Op::OpAtomicUMax:
+      case spv::Op::OpAtomicFMinEXT:
+      case spv::Op::OpAtomicFMaxEXT:
       case spv::Op::OpAtomicAnd:
       case spv::Op::OpAtomicOr:
       case spv::Op::OpAtomicXor:

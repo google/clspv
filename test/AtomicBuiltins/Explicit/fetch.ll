@@ -103,3 +103,56 @@ declare spir_func i32 @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicjj12memory_o
 ; CHECK: call i32 @_Z8spirv.op.239.{{.*}}(i32 239, ptr addrspace(1) %atomic, i32 1, i32 72, i32 100)
 ; CHECK: call i32 @_Z8spirv.op.239.{{.*}}(i32 239, ptr addrspace(1) %atomic, i32 1, i32 0, i32 101)
 ; CHECK: call i32 @_Z8spirv.op.239.{{.*}}(i32 239, ptr addrspace(1) %atomic, i32 3, i32 0, i32 102)
+
+define void @global_float(ptr addrspace(1) %atomic) {
+entry:
+  %cast = addrspacecast ptr addrspace(1) %atomic to ptr addrspace(4)
+
+  %fmin0 = call spir_func float @_Z16atomic_fetch_minPU3AS4VU7_Atomicff(ptr addrspace(4) %cast, float 1.0)
+  %fmin1 = call spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4) %cast, float 2.0, i32 0)
+  %fmin2 = call spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4) %cast, float 3.0, i32 0, i32 4)
+
+  %fmax0 = call spir_func float @_Z16atomic_fetch_maxPU3AS4VU7_Atomicff(ptr addrspace(4) %cast, float 1.0)
+  %fmax1 = call spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4) %cast, float 2.0, i32 0)
+  %fmax2 = call spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4) %cast, float 3.0, i32 0, i32 4)
+
+  ret void
+}
+
+define void @local_float(ptr addrspace(3) %atomic) {
+entry:
+  %cast = addrspacecast ptr addrspace(3) %atomic to ptr addrspace(4)
+
+  %fmin0 = call spir_func float @_Z16atomic_fetch_minPU3AS4VU7_Atomicff(ptr addrspace(4) %cast, float 1.0)
+  %fmin1 = call spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4) %cast, float 2.0, i32 0)
+  %fmin2 = call spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4) %cast, float 3.0, i32 0, i32 1)
+
+  %fmax0 = call spir_func float @_Z16atomic_fetch_maxPU3AS4VU7_Atomicff(ptr addrspace(4) %cast, float 1.0)
+  %fmax1 = call spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4) %cast, float 2.0, i32 0)
+  %fmax2 = call spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4) %cast, float 3.0, i32 0, i32 1)
+
+  ret void
+}
+
+declare spir_func float @_Z16atomic_fetch_minPU3AS4VU7_Atomicff(ptr addrspace(4), float)
+declare spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4), float, i32)
+declare spir_func float @_Z25atomic_fetch_min_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4), float, i32, i32)
+declare spir_func float @_Z16atomic_fetch_maxPU3AS4VU7_Atomicff(ptr addrspace(4), float)
+declare spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order(ptr addrspace(4), float, i32)
+declare spir_func float @_Z25atomic_fetch_max_explicitPU3AS4VU7_Atomicff12memory_order12memory_scope(ptr addrspace(4), float, i32, i32)
+
+; CHECK-LABEL: global_float
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(1) %atomic, i32 1, i32 72, float 1.000000e+00)
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(1) %atomic, i32 1, i32 0, float 2.000000e+00)
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(1) %atomic, i32 3, i32 0, float 3.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(1) %atomic, i32 1, i32 72, float 1.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(1) %atomic, i32 1, i32 0, float 2.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(1) %atomic, i32 3, i32 0, float 3.000000e+00)
+
+; CHECK-LABEL: local_float
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(3) %atomic, i32 2, i32 264, float 1.000000e+00)
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(3) %atomic, i32 2, i32 0, float 2.000000e+00)
+; CHECK: call float @_Z8spirv.op.5614.{{.*}}(i32 5614, ptr addrspace(3) %atomic, i32 2, i32 0, float 3.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(3) %atomic, i32 2, i32 264, float 1.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(3) %atomic, i32 2, i32 0, float 2.000000e+00)
+; CHECK: call float @_Z8spirv.op.5615.{{.*}}(i32 5615, ptr addrspace(3) %atomic, i32 2, i32 0, float 3.000000e+00)

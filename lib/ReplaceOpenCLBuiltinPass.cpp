@@ -618,15 +618,19 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kAtomicFetchAndExplicit:
     return replaceExplicitAtomics(F, spv::OpAtomicAnd);
   case Builtins::kAtomicFetchMin:
-  case Builtins::kAtomicFetchMinExplicit:
-    return replaceExplicitAtomics(F, FI.getParameter(1).is_signed
-                                         ? spv::OpAtomicSMin
-                                         : spv::OpAtomicUMin);
+  case Builtins::kAtomicFetchMinExplicit: {
+    auto op = F.getReturnType()->isFloatingPointTy() ? spv::OpAtomicFMinEXT
+              : FI.getParameter(1).is_signed         ? spv::OpAtomicSMin
+                                                     : spv::OpAtomicUMin;
+    return replaceExplicitAtomics(F, op);
+  }
   case Builtins::kAtomicFetchMax:
-  case Builtins::kAtomicFetchMaxExplicit:
-    return replaceExplicitAtomics(F, FI.getParameter(1).is_signed
-                                         ? spv::OpAtomicSMax
-                                         : spv::OpAtomicUMax);
+  case Builtins::kAtomicFetchMaxExplicit: {
+    auto op = F.getReturnType()->isFloatingPointTy() ? spv::OpAtomicFMaxEXT
+              : FI.getParameter(1).is_signed         ? spv::OpAtomicSMax
+                                                     : spv::OpAtomicUMax;
+    return replaceExplicitAtomics(F, op);
+  }
   // Weak compare exchange is generated as strong compare exchange.
   case Builtins::kAtomicCompareExchangeWeak:
   case Builtins::kAtomicCompareExchangeWeakExplicit:

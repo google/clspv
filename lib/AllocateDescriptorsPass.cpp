@@ -972,7 +972,9 @@ bool clspv::AllocateDescriptorsPass::CallTreeContainsGlobalSynchronization(
                      opcode == spv::OpAtomicSMin ||
                      opcode == spv::OpAtomicSMax ||
                      opcode == spv::OpAtomicUMin ||
-                     opcode == spv::OpAtomicUMax) {
+                     opcode == spv::OpAtomicUMax ||
+                     opcode == spv::OpAtomicFMinEXT ||
+                     opcode == spv::OpAtomicFMaxEXT) {
             if (auto *semantics = dyn_cast<ConstantInt>(call->getOperand(3))) {
               uses_barrier =
                   (semantics->getZExtValue() & kMemorySemanticsUniformMemory) ||
