@@ -51,6 +51,133 @@ namespace {
 cl::opt<bool> ShowDRA("show-dra", cl::init(false), cl::Hidden,
                       cl::desc("Show direct resource access details"));
 
+// We can convert a parameter to a direct resource access if it is
+// either a direct call to a clspv.resource.var.* or if it a GEP of
+// such a thing (where the GEP can only have zero indices).
+struct ParamInfo {
+  // The base value. It is either a global variable or a resource-access
+  // builtin function (clspv.resource.var.* or clspv.local.var.*).
+  Value *base = nullptr;
+  // The descriptor set.
+  uint32_t set = 0;
+  // The binding.
+  uint32_t binding = 0;
+  // If base is a resource, then this is the resource type.
+  // If base is a pointer-to-local, then this is the array type.
+  // If base is a global value, then this is the value type (the type stored
+  // in the global value).
+  Type *pointee_type = nullptr;
+  // If the call parameter is a GEP, then this is the number of zero-indices
+  // the GEP used.
+  unsigned num_gep_zeroes = 0;
+  // A sample call using this function argument as the resource described
+  // above.
+  CallInst *sample_call = nullptr;
+
+  bool operator==(const ParamInfo &other) const {
+    return base == other.base && set == other.set && binding == other.binding &&
+           num_gep_zeroes == other.num_gep_zeroes;
+  }
+  bool operator!=(const ParamInfo &other) const { return !(*this == other); }
+};
+
+// Unpack GEPs with zeros, if we can.  Rewrite |value| as we go along.
+Value *StripZeroGEPs(Value *value, unsigned *num_gep_zeroes = nullptr) {
+  bool first_gep = true;
+  while (auto *gep = dyn_cast<GetElementPtrInst>(value)) {
+    if (!gep->hasAllZeroIndices())
+      return num_gep_zeroes ? nullptr : value;
+    // If not the first GEP, then ignore the "element" index (which I call
+    // "slide") since that will be combined with the last index of the
+    // previous GEP.
+    if (num_gep_zeroes)
+      *num_gep_zeroes += gep->getNumIndices() + (first_gep ? 0 : -1);
+    value = gep->getPointerOperand();
+    first_gep = false;
+  }
+  return value;
+}
+
+bool ExtractParamInfo(Value *value, ParamInfo &pi, bool allow_null = false) {
+  if (allow_null &&
+      (isa<ConstantPointerNull>(value) || isa<UndefValue>(value))) {
+    pi = {value, 0, 0, nullptr, 0, nullptr};
+    return true;
+  }
+  // We care about two cases:
+  //     - a direct call to clspv.resource.var.*
+  //     - a GEP with only zero indices, where the base pointer is
+  //       direct call to @clspv.resource.var.* or clspv.local.var.*,
+  //       or is a global value for a workgroup variable.
+  unsigned num_gep_zeroes = 0;
+  value = StripZeroGEPs(value, &num_gep_zeroes);
+  if (!value)
+    return false;
+  if (auto *call = dyn_cast<CallInst>(value)) {
+    // If the call is a call to a @clspv.resource.var.* function, then try
+    // to merge it, assuming the given number of GEP zero-indices so far.
+    auto *callee = call->getCalledFunction();
+    auto &func_info = clspv::Builtins::Lookup(callee);
+    if (func_info.getType() == clspv::Builtins::kClspvResource) {
+      const auto set = uint32_t(
+          dyn_cast<ConstantInt>(
+              call->getOperand(clspv::ClspvOperand::kResourceDescriptorSet))
+              ->getZExtValue());
+      const auto binding =
+          uint32_t(dyn_cast<ConstantInt>(
+                       call->getOperand(clspv::ClspvOperand::kResourceBinding))
+                       ->getZExtValue());
+      auto *resource_type =
+          call->getOperand(clspv::ClspvOperand::kResourceDataType)->getType();
+      pi = {callee, set, binding, resource_type, num_gep_zeroes, call};
+      return true;
+    } else if (!allow_null &&
+               func_info.getType() == clspv::Builtins::kClspvLocal) {
+      const uint32_t spec_id =
+          uint32_t(dyn_cast<ConstantInt>(
+                       call->getOperand(clspv::ClspvOperand::kWorkgroupSpecId))
+                       ->getZExtValue());
+      auto *array_ty =
+          call->getOperand(clspv::ClspvOperand::kWorkgroupDataType)->getType();
+      pi = {callee, spec_id, 0, array_ty, num_gep_zeroes, call};
+      return true;
+    }
+  } else if (!allow_null) {
+    if (auto *gv = dyn_cast<GlobalValue>(value)) {
+      // This occurs when there a __local variable is declared inside a
+      // function. (Are there other times?)
+      pi = {value, 0, 0, gv->getValueType(), num_gep_zeroes, nullptr};
+      return true;
+    }
+  }
+  return false;
+}
+
+Value *MaterializeParamInfo(IRBuilder<> &Builder, const ParamInfo &pi) {
+  Value *replacement = pi.base;
+  if (auto *function = dyn_cast<Function>(replacement)) {
+    // Create the call.
+    SmallVector<Value *, 8> args(pi.sample_call->arg_begin(),
+                                 pi.sample_call->arg_end());
+    replacement = Builder.CreateCall(function, args);
+    if (ShowDRA) {
+      outs() << "DRA:    Replace: call " << *replacement << "\n";
+    }
+  }
+  if (pi.num_gep_zeroes) {
+    SmallVector<Value *, 3> zeroes(pi.num_gep_zeroes, Builder.getInt32(0));
+    // Builder.CreateGEP is not used to avoid creating a GEPConstantExpr in the
+    // case of global variables.
+    replacement =
+        GetElementPtrInst::Create(pi.pointee_type, replacement, zeroes);
+    Builder.Insert(cast<Instruction>(replacement));
+    if (ShowDRA) {
+      outs() << "DRA:    Replace: gep  " << *replacement << "\n";
+    }
+  }
+  return replacement;
+}
+
 Value *SelectPointerArrayElement(LoadInst *ld, Value *idx,
                                  ArrayRef<Value *> elems) {
   if (!idx)
@@ -168,9 +295,103 @@ void EraseDeadPointerArrayUsers(Value *root) {
     alloca->eraseFromParent();
 }
 
+bool ExtractPointerArrayParamInfos(ArrayRef<Value *> elems,
+                                   SmallVectorImpl<ParamInfo> &infos) {
+  infos.resize(elems.size());
+  for (size_t k = 0; k < elems.size(); ++k) {
+    if (!ExtractParamInfo(elems[k], infos[k], /*allow_null=*/true))
+      return false;
+  }
+  return true;
+}
+
+// Checks whether all callers of |fn| pass a pointer array with the same
+// resource descriptors for |arg_index|, storing the common descriptors in
+// |common|.
+bool FindCommonCallerPointerArray(
+    Function *fn, unsigned arg_index,
+    const DenseMap<Value *, SmallVector<ParamInfo, 8>> &ptr_array_map,
+    SmallVectorImpl<ParamInfo> &common) {
+  bool seen_one = false;
+  for (User *usr : fn->users()) {
+    auto *caller = dyn_cast<CallInst>(usr);
+    if (!caller)
+      return false;
+    Value *val = StripZeroGEPs(caller->getArgOperand(arg_index));
+    auto it = ptr_array_map.find(val);
+    if (it == ptr_array_map.end())
+      return false;
+    if (!seen_one) {
+      common = it->second;
+      seen_one = true;
+    } else if (common != it->second) {
+      return false;
+    }
+  }
+  return seen_one;
+}
+
+bool HasLoadFromPointerArray(Value *v) {
+  for (User *u : v->users()) {
+    if (isa<LoadInst>(u) ||
+        (isa<GetElementPtrInst>(u) && HasLoadFromPointerArray(u)))
+      return true;
+  }
+  return false;
+}
+
+void MaterializePointerArrayForArg(Argument &arg, ArrayRef<ParamInfo> common) {
+  if (!HasLoadFromPointerArray(&arg))
+    return;
+  Function *fn = arg.getParent();
+  IRBuilder<> Builder(fn->getEntryBlock().getFirstNonPHIIt());
+  SmallVector<Value *, 8> fn_elems;
+  for (const ParamInfo &pi : common)
+    fn_elems.push_back(MaterializeParamInfo(Builder, pi));
+  ReplaceLoadsFromPointerArray(&arg, fn_elems);
+}
+
+// Propagates resource pointer arrays across private pointer parameters in
+// topological call-graph order, then disconnects rewritten call arguments.
+void PropagatePointerArrayArguments(
+    const UniqueVector<Function *> &ordered_functions,
+    DenseMap<Value *, SmallVector<ParamInfo, 8>> &ptr_array_map) {
+  SmallVector<Argument *, 16> rewritten_args;
+  for (Function *fn : ordered_functions) {
+    if (fn->isDeclaration() ||
+        fn->getCallingConv() == CallingConv::SPIR_KERNEL || fn->use_empty())
+      continue;
+    for (Argument &arg : fn->args()) {
+      if (!arg.getType()->isPointerTy() ||
+          arg.getType()->getPointerAddressSpace() !=
+              clspv::AddressSpace::Private)
+        continue;
+      SmallVector<ParamInfo, 8> common;
+      if (!FindCommonCallerPointerArray(fn, arg.getArgNo(), ptr_array_map,
+                                        common))
+        continue;
+      ptr_array_map[&arg] = common;
+      rewritten_args.push_back(&arg);
+      MaterializePointerArrayForArg(arg, common);
+    }
+  }
+
+  for (Argument *arg : llvm::reverse(rewritten_args)) {
+    auto *null_ptr =
+        ConstantPointerNull::get(cast<PointerType>(arg->getType()));
+    for (User *usr : arg->getParent()->users()) {
+      if (auto *caller = dyn_cast<CallInst>(usr))
+        caller->setArgOperand(arg->getArgNo(), null_ptr);
+    }
+    EraseDeadPointerArrayUsers(arg);
+  }
+}
+
 // Lowers local alloca arrays of resource pointers to direct resource accesses.
-void RewritePointerArrayAccesses(Module &M) {
+void RewritePointerArrayAccesses(
+    Module &M, const UniqueVector<Function *> &ordered_functions) {
   const DataLayout &DL = M.getDataLayout();
+  DenseMap<Value *, SmallVector<ParamInfo, 8>> ptr_array_map;
   SmallVector<AllocaInst *, 8> all_ptr_allocas;
 
   for (Function &F : M) {
@@ -188,9 +409,15 @@ void RewritePointerArrayAccesses(Module &M) {
         CollectPointerArrayElements(alloca, arr_ty, DL, elems);
         ReplaceLoadsFromPointerArray(alloca, elems);
         all_ptr_allocas.push_back(alloca);
+
+        SmallVector<ParamInfo, 8> info_vec;
+        if (ExtractPointerArrayParamInfos(elems, info_vec))
+          ptr_array_map[alloca] = std::move(info_vec);
       }
     }
   }
+
+  PropagatePointerArrayArguments(ordered_functions, ptr_array_map);
 
   for (AllocaInst *alloca : all_ptr_allocas)
     EraseDeadPointerArrayUsers(alloca);
@@ -214,7 +441,7 @@ clspv::DirectResourceAccessPass::run(Module &M, ModuleAnalysisManager &) {
     for (auto *fn : ordered_functions) {
       RewriteResourceAccesses(fn);
     }
-    RewritePointerArrayAccesses(M);
+    RewritePointerArrayAccesses(M, ordered_functions);
   }
 
   return PA;
@@ -256,122 +483,24 @@ bool clspv::DirectResourceAccessPass::RewriteResourceAccesses(Function *fn) {
 bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
                                                             int arg_index,
                                                             Argument &arg) {
-  bool Changed = false;
   if (fn->use_empty()) {
     return false;
   }
 
-  // We can convert a parameter to a direct resource access if it is
-  // either a direct call to a clspv.resource.var.* or if it a GEP of
-  // such a thing (where the GEP can only have zero indices).
-  struct ParamInfo {
-    // The base value. It is either a global variable or a resource-access
-    // builtin function (clspv.resource.var.* or clspv.local.var.*).
-    Value *base;
-    // The descriptor set.
-    uint32_t set;
-    // The binding.
-    uint32_t binding;
-    // If base is a resource, then this is the resource type.
-    // If base is a pointer-to-local, then this is the array type.
-    // If base is a global value, then this is the value type (the type stored
-    // in the global value).
-    Type *pointee_type;
-    // If the call parameter is a GEP, then this is the number of zero-indices
-    // the GEP used.
-    unsigned num_gep_zeroes;
-    // A sample call using this function argument as the resource described
-    // above.
-    CallInst *sample_call;
-  };
-
   // The common valid parameter info across all the callers seen so far.
   ParamInfo common = {};
   bool seen_one = false;
-
-  // Tries to merge the given parameter info into |common|.  If it is the first
-  // time we've tried, then save it.  Returns true if there is no conflict.
-  auto merge_param_info = [&seen_one, &common](const ParamInfo &pi) {
+  for (auto &use : fn->uses()) {
+    auto *caller = dyn_cast<CallInst>(use.getUser());
+    if (!caller)
+      return false;
+    ParamInfo pi;
+    if (!ExtractParamInfo(caller->getArgOperand(arg_index), pi))
+      return false;
     if (!seen_one) {
       common = pi;
       seen_one = true;
-      return true;
-    }
-    return pi.base == common.base && pi.set == common.set &&
-           pi.binding == common.binding &&
-           pi.num_gep_zeroes == common.num_gep_zeroes;
-  };
-
-  for (auto &use : fn->uses()) {
-    if (auto *caller = dyn_cast<CallInst>(use.getUser())) {
-      Value *value = caller->getArgOperand(arg_index);
-      // We care about two cases:
-      //     - a direct call to clspv.resource.var.*
-      //     - a GEP with only zero indices, where the base pointer is
-      //       direct call to @clspv.resource.var.* or clspv.local.var.*,
-      //       or is a global value for a workgroup variable.
-
-      // Unpack GEPs with zeros, if we can.  Rewrite |value| as we go along.
-      unsigned num_gep_zeroes = 0;
-      bool first_gep = true;
-      for (auto *gep = dyn_cast<GetElementPtrInst>(value); gep;
-           gep = dyn_cast<GetElementPtrInst>(value)) {
-        if (!gep->hasAllZeroIndices()) {
-          return false;
-        }
-        // If not the first GEP, then ignore the "element" index (which I call
-        // "slide") since that will be combined with the last index of the
-        // previous GEP.
-        num_gep_zeroes += gep->getNumIndices() + (first_gep ? 0 : -1);
-        value = gep->getPointerOperand();
-        first_gep = false;
-      }
-      if (auto *call = dyn_cast<CallInst>(value)) {
-        // If the call is a call to a @clspv.resource.var.* function, then try
-        // to merge it, assuming the given number of GEP zero-indices so far.
-        auto *callee = call->getCalledFunction();
-        auto &func_info = clspv::Builtins::Lookup(callee);
-        if (func_info.getType() == clspv::Builtins::kClspvResource) {
-          const auto set = uint32_t(
-              dyn_cast<ConstantInt>(
-                  call->getOperand(clspv::ClspvOperand::kResourceDescriptorSet))
-                  ->getZExtValue());
-          const auto binding = uint32_t(
-              dyn_cast<ConstantInt>(
-                  call->getOperand(clspv::ClspvOperand::kResourceBinding))
-                  ->getZExtValue());
-          auto *resource_type =
-              call->getOperand(clspv::ClspvOperand::kResourceDataType)
-                  ->getType();
-          if (!merge_param_info(
-                  {callee, set, binding, resource_type, num_gep_zeroes, call}))
-            return false;
-        } else if (func_info.getType() == clspv::Builtins::kClspvLocal) {
-          const uint32_t spec_id = uint32_t(
-              dyn_cast<ConstantInt>(
-                  call->getOperand(clspv::ClspvOperand::kWorkgroupSpecId))
-                  ->getZExtValue());
-          auto *array_ty =
-              call->getOperand(clspv::ClspvOperand::kWorkgroupDataType)
-                  ->getType();
-          if (!merge_param_info(
-                  {callee, spec_id, 0, array_ty, num_gep_zeroes, call}))
-            return false;
-        } else {
-          // A call but not to a resource access builtin function.
-          return false;
-        }
-      } else if (auto *gv = dyn_cast<GlobalValue>(value)) {
-        // This occurs when there a __local variable is declared inside a
-        // function. (Are there other times?)
-        if (!merge_param_info(
-                {value, 0, 0, gv->getValueType(), num_gep_zeroes, nullptr}))
-          return false;
-      } else {
-        // Not a call.
-        return false;
-      }
-    } else {
+    } else if (pi != common) {
       // There isn't enough commonality.  Bail out without changing anything.
       return false;
     }
@@ -390,37 +519,10 @@ bool clspv::DirectResourceAccessPass::RewriteAccessesForArg(Function *fn,
   }
 
   // Now rewrite the argument, using the info in |common|.
-
-  Changed = true;
   IRBuilder<> Builder(fn->getParent()->getContext());
-  auto *zero = Builder.getInt32(0);
   Builder.SetInsertPoint(fn->getEntryBlock().getFirstNonPHIIt());
-
-  Value *replacement = common.base;
-  if (Function *function = dyn_cast<Function>(replacement)) {
-    // Create the call.
-    SmallVector<Value *, 8> args(common.sample_call->arg_begin(),
-                                 common.sample_call->arg_end());
-    replacement = Builder.CreateCall(function, args);
-    if (ShowDRA) {
-      outs() << "DRA:    Replace: call " << *replacement << "\n";
-    }
-  }
-  if (common.num_gep_zeroes) {
-    SmallVector<Value *, 3> zeroes;
-    for (unsigned i = 0; i < common.num_gep_zeroes; i++) {
-      zeroes.push_back(zero);
-    }
-    // Builder.CreateGEP is not used to avoid creating a GEPConstantExpr in the
-    // case of global variables.
-    replacement =
-        GetElementPtrInst::Create(common.pointee_type, replacement, zeroes);
-    Builder.Insert(cast<Instruction>(replacement));
-    if (ShowDRA) {
-      outs() << "DRA:    Replace: gep  " << *replacement << "\n";
-    }
-  }
+  Value *replacement = MaterializeParamInfo(Builder, common);
   arg.replaceAllUsesWith(replacement);
 
-  return Changed;
+  return true;
 }
