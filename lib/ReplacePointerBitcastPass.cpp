@@ -616,8 +616,10 @@ bool DowngradeSourceToTy(const DataLayout &DL, Value *Src, Type *Ty) {
       auto gep = dyn_cast<GetElementPtrInst>(user);
       if (gep && (TySize < SizeInBits(DL, gep->getSourceElementType()) ||
                   (TySize == SizeInBits(DL, gep->getSourceElementType()) &&
-                   gep->getSourceElementType()->isFloatingPointTy() &&
-                   Ty->isIntegerTy()))) {
+                   ((gep->getSourceElementType()->isFloatingPointTy() &&
+                     Ty->isIntegerTy()) ||
+                    (gep->getSourceElementType()->isIntegerTy() &&
+                     Ty->isFloatingPointTy()))))) {
         for (auto *U : user->users()) {
           UserWorkList.push_back(U);
         }
@@ -663,13 +665,8 @@ bool HasIntegerAtomicUser(Value *Src) {
         if (rmw->getType()->isIntegerTy())
           return true;
       } else if (auto *call = dyn_cast<CallInst>(U)) {
-        auto *callee = call->getCalledFunction();
-        if (!callee || callee->getName().starts_with("llvm.memcpy"))
-          continue;
-        auto *data_ty = call->getType();
-        if (data_ty->isVoidTy() && call->arg_size() > 0)
-          data_ty = call->getArgOperand(call->arg_size() - 1)->getType();
-        if (data_ty->isIntegerTy())
+        auto *data_ty = BitcastUtils::GetAtomicCallDataTy(call);
+        if (data_ty && data_ty->isIntegerTy())
           return true;
       }
     }

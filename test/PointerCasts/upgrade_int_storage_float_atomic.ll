@@ -44,5 +44,22 @@ entry:
   ret void
 }
 
+; A kernel argument has no declared pointee type: its storage type is only
+; inferred from its uses, so every GEP reaching it, not just the ones feeding
+; the float atomic, must be retyped when the argument's storage is downgraded.
+; CHECK-LABEL: define spir_kernel void @fadd_argument(
+; CHECK: [[gep:%[a-zA-Z0-9_.]+]] = getelementptr float, ptr addrspace(1) %buf, i32 %idx
+; CHECK: call void @use(ptr addrspace(1) [[gep]])
+; CHECK: call float @_Z8spirv.op.6035.PU3AS1fjjf(i32 6035, ptr addrspace(1) %buf, i32 2, i32 0, float %v)
+define spir_kernel void @fadd_argument(ptr addrspace(1) %buf, float %v, i32 %idx) {
+entry:
+  %gep = getelementptr i32, ptr addrspace(1) %buf, i32 %idx
+  call void @use(ptr addrspace(1) %gep)
+  %old = call float @_Z8spirv.op.6035.PU3AS1fjjf(i32 6035, ptr addrspace(1) %buf, i32 2, i32 0, float %v)
+  ret void
+}
+
+declare void @use(ptr addrspace(1))
 declare float @_Z8spirv.op.6035.PU3AS3fjjf(i32, ptr addrspace(3), i32, i32, float)
 declare i32 @_Z8spirv.op.234.PU3AS3jjjj(i32, ptr addrspace(3), i32, i32, i32)
+declare float @_Z8spirv.op.6035.PU3AS1fjjf(i32, ptr addrspace(1), i32, i32, float)

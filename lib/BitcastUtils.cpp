@@ -951,6 +951,38 @@ unsigned PointerOperandNum(Instruction *inst, Value *source) {
   return 0;
 }
 
+Type *GetAtomicCallDataTy(CallInst *call) {
+  auto *callee = call->getCalledFunction();
+  if (!callee) {
+    return nullptr;
+  }
+  auto &info = clspv::Builtins::Lookup(callee);
+  if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
+    if (info.getType() == clspv::Builtins::kAtomicStore ||
+        info.getType() == clspv::Builtins::kAtomicStoreExplicit) {
+      return call->getArgOperand(1)->getType();
+    }
+    return call->getType();
+  } else if (info.getType() == clspv::Builtins::kSpirvOp) {
+    auto opcode_op = call->getArgOperand(0);
+    auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
+    const bool atomic =
+        (static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
+         opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor)) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMinEXT) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMaxEXT);
+    if (!atomic) {
+      return nullptr;
+    }
+    if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
+      return call->getArgOperand(4)->getType();
+    }
+    return call->getType();
+  }
+  return nullptr;
+}
+
 bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
                      Instruction &I, Value *&source, Type *&source_ty,
                      Type *&dest_ty, bool ReplacePhysicalPointerBitcasts,
@@ -1039,12 +1071,7 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
         return false;
       }
       source_ty = clspv::InferType(source, M.getContext(), &type_cache);
-      if (info.getType() == clspv::Builtins::kAtomicStore ||
-          info.getType() == clspv::Builtins::kAtomicStoreExplicit) {
-        dest_ty = call->getArgOperand(1)->getType();
-      } else {
-        dest_ty = call->getType();
-      }
+      dest_ty = GetAtomicCallDataTy(call);
     } else if (info.getType() == clspv::Builtins::kSpirvOp) {
       auto opcode_op = call->getArgOperand(0);
       auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
@@ -1061,11 +1088,9 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
           return false;
         }
         source_ty = clspv::InferType(source, M.getContext(), &type_cache);
-        if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
-          dest_ty = call->getArgOperand(4)->getType();
-        } else {
-          dest_ty = call->getType();
-        }
+        dest_ty = GetAtomicCallDataTy(call);
+      } else {
+        dest_ty = call->getType();
       }
     } else if (call->getCalledFunction()->getName().starts_with(
                    "llvm.memcpy")) {
