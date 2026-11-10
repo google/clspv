@@ -52,6 +52,11 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
 
 unsigned PointerOperandNum(Instruction *inst, Value *source = nullptr);
 
+// Returns the type of the data operated on by `call` if it is an atomic
+// builtin call or an `OpAtomicXXX` SPIR-V op intrinsic call, or nullptr if
+// `call` is not recognized as an atomic operation.
+Type *GetAtomicCallDataTy(CallInst *call);
+
 SmallVector<size_t, 4> getEleTypesBitWidths(Type *Ty, const DataLayout &DL,
                                             Type *BaseTy = nullptr);
 

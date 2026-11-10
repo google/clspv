@@ -922,7 +922,8 @@ unsigned PointerOperandNum(Instruction *inst, Value *source) {
     }
   } else if (auto *call = dyn_cast<CallInst>(inst)) {
     auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
-    if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
+    if (BUILTIN_IN_GROUP(info.getType(), Atomic) ||
+        info.getType() == clspv::Builtins::kSpirvAtomicXor) {
       return 0;
     } else if (info.getType() == clspv::Builtins::kSpirvOp) {
       auto opcode_op = call->getArgOperand(0);
@@ -949,6 +950,64 @@ unsigned PointerOperandNum(Instruction *inst, Value *source) {
   }
 
   return 0;
+}
+
+Type *GetAtomicCallDataTy(CallInst *call) {
+  auto *callee = call->getCalledFunction();
+  if (!callee) {
+    return nullptr;
+  }
+  auto &info = clspv::Builtins::Lookup(callee);
+  if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
+    switch (info.getType()) {
+    case clspv::Builtins::kAtomicWorkItemFence:
+      // No pointer operand: not an atomic memory access.
+      return nullptr;
+    case clspv::Builtins::kAtomicInit:
+    case clspv::Builtins::kAtomicStore:
+    case clspv::Builtins::kAtomicStoreExplicit:
+      // Data type is the "value"/"desired" operand, not the void return
+      // type.
+      return call->getArgOperand(1)->getType();
+    case clspv::Builtins::kAtomicCompareExchangeStrong:
+    case clspv::Builtins::kAtomicCompareExchangeStrongExplicit:
+    case clspv::Builtins::kAtomicCompareExchangeWeak:
+    case clspv::Builtins::kAtomicCompareExchangeWeakExplicit:
+      // Data type is the "desired" operand, not the bool return type.
+      return call->getArgOperand(2)->getType();
+    case clspv::Builtins::kAtomicFlagClear:
+    case clspv::Builtins::kAtomicFlagClearExplicit:
+    case clspv::Builtins::kAtomicFlagTestAndSet:
+    case clspv::Builtins::kAtomicFlagTestAndSetExplicit:
+      // atomic_flag storage is an i32, regardless of the call's own
+      // void/bool return type.
+      return IntegerType::get(call->getContext(), 32);
+    default:
+      return call->getType();
+    }
+  } else if (info.getType() == clspv::Builtins::kSpirvAtomicXor) {
+    // Emitted by ReplaceOpenCLBuiltinPass for vstore_half and lowered to
+    // OpAtomicXor. Not in the Atomic group, but its return type matches the
+    // i32 storage it operates on.
+    return call->getType();
+  } else if (info.getType() == clspv::Builtins::kSpirvOp) {
+    auto opcode_op = call->getArgOperand(0);
+    auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
+    const bool atomic =
+        (static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
+         opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor)) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMinEXT) ||
+        opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMaxEXT);
+    if (!atomic) {
+      return nullptr;
+    }
+    if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
+      return call->getArgOperand(4)->getType();
+    }
+    return call->getType();
+  }
+  return nullptr;
 }
 
 bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
@@ -1030,43 +1089,15 @@ bool IsImplicitCasts(Module &M, DenseMap<Value *, Type *> &type_cache,
     source_ty = clspv::InferType(source, M.getContext(), &type_cache);
     dest_ty = atomic->getType();
   } else if (auto *call = dyn_cast<CallInst>(&I)) {
-    auto &info = clspv::Builtins::Lookup(call->getCalledFunction());
-    if (BUILTIN_IN_GROUP(info.getType(), Atomic)) {
-      source = call->getArgOperand(0);
+    if (auto *atomic_ty = GetAtomicCallDataTy(call)) {
+      source = call->getArgOperand(PointerOperandNum(call));
       if (source->getType()->isPointerTy() &&
           clspv::Option::UntypedPointerAddressSpace(
               source->getType()->getPointerAddressSpace())) {
         return false;
       }
       source_ty = clspv::InferType(source, M.getContext(), &type_cache);
-      if (info.getType() == clspv::Builtins::kAtomicStore ||
-          info.getType() == clspv::Builtins::kAtomicStoreExplicit) {
-        dest_ty = call->getArgOperand(1)->getType();
-      } else {
-        dest_ty = call->getType();
-      }
-    } else if (info.getType() == clspv::Builtins::kSpirvOp) {
-      auto opcode_op = call->getArgOperand(0);
-      auto opcode = cast<ConstantInt>(opcode_op)->getZExtValue();
-      const bool atomic =
-          (static_cast<uint64_t>(spv::Op::OpAtomicLoad) <= opcode &&
-           opcode <= static_cast<uint64_t>(spv::Op::OpAtomicXor)) ||
-          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFAddEXT) ||
-          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMinEXT) ||
-          opcode == static_cast<uint64_t>(spv::Op::OpAtomicFMaxEXT);
-      if (atomic) {
-        source = call->getArgOperand(1);
-        if (clspv::Option::UntypedPointerAddressSpace(
-                source->getType()->getPointerAddressSpace())) {
-          return false;
-        }
-        source_ty = clspv::InferType(source, M.getContext(), &type_cache);
-        if (opcode == static_cast<uint64_t>(spv::Op::OpAtomicStore)) {
-          dest_ty = call->getArgOperand(4)->getType();
-        } else {
-          dest_ty = call->getType();
-        }
-      }
+      dest_ty = atomic_ty;
     } else if (call->getCalledFunction()->getName().starts_with(
                    "llvm.memcpy")) {
       // To help lower memcpy, try to rework memcpy inputs to have the same type
