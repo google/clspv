@@ -5882,6 +5882,26 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         Ops.clear();
         Ops << Ty << RID << getSPIRVConstant(ConstantInt::get(Ty, 24));
         RID = addSPIRVInst(spv::OpShiftRightArithmetic, Ops);
+      } else if (!clspv::Option::Int8Support() && OpTy->isIntegerTy(8) &&
+                 I.getOpcode() == Instruction::ZExt) {
+        // The SPIR-V operand type is a 32-bit int.  Zero extend, i.e. keep
+        // only the bottom 8 bits.  Convert the masked value when the result
+        // type is not i32.
+        // Before:
+        //   %result = zext i8 %a to i32
+        //   %result = zext i8 %a to i64
+        // After
+        //   %mask = OpBitwiseAnd %uint %a %uint_255
+        //   %result = %mask
+        //   %result = OpUConvert %ulong %mask
+        SPIRVOperandVec Ops;
+        Ops << OpTy << I.getOperand(0) << getSPIRVInt32Constant(255);
+        RID = addSPIRVInst(spv::OpBitwiseAnd, Ops);
+        if (!Ty->isIntegerTy(32)) {
+          Ops.clear();
+          Ops << Ty << RID;
+          RID = addSPIRVInst(spv::OpUConvert, Ops);
+        }
       } else if (!clspv::Option::Int8Support() &&
                  I.getOpcode() == Instruction::Trunc && fromI32 && toI8) {
         // The SPIR-V target type is a 32-bit int.  Keep only the bottom
