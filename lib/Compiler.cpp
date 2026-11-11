@@ -21,6 +21,7 @@
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -41,6 +42,8 @@
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
+#include "llvm/Transforms/IPO/Internalize.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/DCE.h"
 #include "llvm/Transforms/Scalar/InferAddressSpaces.h"
@@ -629,6 +632,15 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::AnnotationToMetadataPass());
     pm.addPass(clspv::FunctionInternalizerPass());
+    // Linking is complete before RunPassPipeline runs, so internalize
+    // program-scope constants to let LLVM fold and eliminate them. Run after
+    // FunctionInternalizerPass so globals only used by dead functions are
+    // dropped too.
+    pm.addPass(llvm::InternalizePass([](const llvm::GlobalValue &GV) {
+      const auto *GVar = llvm::dyn_cast<llvm::GlobalVariable>(&GV);
+      return !GVar || GVar->isDeclaration() || !GVar->isConstant();
+    }));
+    pm.addPass(llvm::GlobalDCEPass());
     pm.addPass(clspv::NativeMathPass());
     pm.addPass(clspv::ZeroInitializeAllocasPass());
     pm.addPass(clspv::KernelArgNamesToMetadataPass());

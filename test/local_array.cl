@@ -1,5 +1,5 @@
-// We have -O0 here because the compiler will optimize away the unused
-// local uint b[5] otherwise.
+// We have -O0 here because the compiler will optimize away the local uint
+// b[5] otherwise.
 // RUN: clspv %target -O0 %s -o %t.spv
 // RUN: spirv-dis -o %t2.spvasm %t.spv
 // RUN: FileCheck %s < %t2.spvasm
@@ -14,5 +14,6 @@
 
 void kernel __attribute__((reqd_work_group_size(1, 1, 1))) foo(global uint * a) {
   local uint b[5];
-  *a = 5;
+  b[0] = 5;
+  *a = b[0];
 }
