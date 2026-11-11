@@ -632,11 +632,10 @@ int RunPassPipeline(llvm::Module &M, llvm::raw_svector_ostream *binaryStream,
                                         llvm::OptimizationLevel level) {
     pm.addPass(clspv::AnnotationToMetadataPass());
     pm.addPass(clspv::FunctionInternalizerPass());
-    // Internalize non-static program-scope constants so GlobalDCEPass can
-    // remove unused ones.  This pipeline only runs for final compilation, so
-    // external linkage is unnecessary.  Run after FunctionInternalizerPass so
-    // constants referenced only by removed functions are dropped too.
-    // https://github.com/google/clspv/issues/1471
+    // Linking is complete before RunPassPipeline runs, so internalize
+    // program-scope constants to let LLVM fold and eliminate them. Run after
+    // FunctionInternalizerPass so globals only used by dead functions are
+    // dropped too.
     pm.addPass(llvm::InternalizePass([](const llvm::GlobalValue &GV) {
       const auto *GVar = llvm::dyn_cast<llvm::GlobalVariable>(&GV);
       return !GVar || GVar->isDeclaration() || !GVar->isConstant();
