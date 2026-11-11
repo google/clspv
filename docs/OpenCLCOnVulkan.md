@@ -681,9 +681,17 @@ spaces.
 The `char`, `char2`, `char3`, `uchar`, `uchar2`, and `uchar3` types
 can be used. To disable general support for these types, use `-int8=0`.
 
-#### 64-Bit Types
+#### 64-Bit Floating-Point Types
 
-The `double`, `double2`, `double3` and `double4` types **must not** be used.
+The `double`, `double2`, `double3`, `double4`, `double8`, and `double16`
+types can be used. The `double8` and `double16` types require the experimental
+`-long-vector` option. To disable support for these types, use `-fp64=0`.
+
+**Note**: FP64 support is still incomplete (see
+[issue 321](https://github.com/google/clspv/issues/321)). For example,
+`degrees()` and `radians()` on `double` produce invalid SPIR-V, as do
+transcendental built-ins such as `sin()` and `exp()` when `-cl-native-math` or
+`-use-native-builtins` is used.
 
 #### Pointers
 
