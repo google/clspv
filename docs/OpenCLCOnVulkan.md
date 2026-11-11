@@ -689,10 +689,6 @@ types can be used. The `double8` and `double16` types require the experimental
 
 **Note**: FP64 support is still incomplete, particularly for some built-in
 functions (see [issue 321](https://github.com/google/clspv/issues/321)).
-[issue 321](https://github.com/google/clspv/issues/321)). For example,
-`degrees()` and `radians()` on `double` produce invalid SPIR-V, as do
-transcendental built-ins such as `sin()` and `exp()` when `-cl-native-math` or
-`-use-native-builtins` is used.
 
 #### Pointers
 
