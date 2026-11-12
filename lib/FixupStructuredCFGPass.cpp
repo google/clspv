@@ -37,7 +37,6 @@ clspv::FixupStructuredCFGPass::run(Function &F, FunctionAnalysisManager &FAM) {
 
 void clspv::FixupStructuredCFGPass::removeUndefPHI(Function &F) {
   SmallVector<PHINode *> ToBeDeleted;
-  DenseMap<PHINode *, SmallVector<PHINode *>> dict;
   for (auto &BB : F) {
     for (auto &I : BB) {
       if (auto phi = dyn_cast<PHINode>(&I)) {

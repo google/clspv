@@ -56,7 +56,8 @@ bool IsOffsetInsideScalar(const DataLayout &DL, GetElementPtrInst *GEP,
 
 bool IsByteArrayTy(Type *Ty) {
   if (auto *ArrTy = dyn_cast<ArrayType>(Ty)) {
-    return ArrTy->getElementType()->isIntegerTy(8);
+    return ArrTy->getNumElements() > 0 &&
+           ArrTy->getElementType()->isIntegerTy(8);
   }
   return false;
 }
@@ -893,6 +894,11 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
                                              size_t &smallerBitWidths,
                                              bool &knownMultiple) {
     knownMultiple = false;
+    if (auto *STy = dyn_cast<StructType>(ty)) {
+      if (STy->isPacked() || IsByteArrayTy(gep->getSourceElementType())) {
+        return false;
+      }
+    }
     if (gep->hasAllConstantIndices()) {
       // should not be used as all indices are constant
       IRBuilder<> Builder{gep};
@@ -918,6 +924,12 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
       vector.push_back(dynVal);
       uint32_t coef = smallerBitWidths;
       uint32_t coef_target = SizeInBits(DL, ty);
+      if (smallerBitWidths == 0 || coef_target == 0 ||
+          (coef_target <= smallerBitWidths
+               ? (smallerBitWidths % coef_target) != 0
+               : (coef_target % smallerBitWidths) != 0)) {
+        return false;
+      }
       while (!vector.empty()) {
         auto val = vector.back();
         vector.pop_back();
@@ -949,6 +961,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         // without being such a product, e.g. a sign-extended scaled index:
         //   ashr exact (shl i64 %n, 32), 30
         if (coef_target <= smallerBitWidths ||
+            (coef_target % smallerBitWidths) != 0 ||
             !isPowerOf2_32(coef_target / smallerBitWidths) ||
             computeKnownBits(dynVal, DL).countMinTrailingZeros() <
                 Log2_32(coef_target / smallerBitWidths)) {
@@ -986,7 +999,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
 
         if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
           if ((SizeInBits(DL, source_ty) >= SizeInBits(DL, dest_ty) &&
-               !IsByteArrayTy(source_ty)) ||
+               (!IsByteArrayTy(source_ty) || dest_ty->isStructTy())) ||
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
