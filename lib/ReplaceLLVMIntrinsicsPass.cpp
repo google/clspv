@@ -539,7 +539,7 @@ static void replaceMemsetDynamic(CallInst *CI, Module &M, Value *Dst,
   Builder.CreateCondBr(Builder.CreateICmpULT(Idx, Len), LoopBB, PostBB);
 
   Builder.SetInsertPoint(LoopBB);
-  Value *GEP = Builder.CreateGEP(I8Ty, Dst, Idx);
+  Value *GEP = clspv::CreateGEP(Builder, I8Ty, Dst, Idx);
   Builder.CreateStore(ValCast, GEP)->setVolatile(IsVolatile);
   Value *NextIdx = Builder.CreateAdd(Idx, ConstantInt::get(SizeTy, 1));
   Idx->addIncoming(NextIdx, LoopBB);
@@ -858,7 +858,7 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
             auto SrcElemPtr = GetElementPtrInst::CreateInBounds(
                 ElemTy, Src, Indices, "", CI->getIterator());
             auto Srci = Builder.CreateLoad(ElemTy, SrcElemPtr, Volatile);
-            auto DstElemPtr = Builder.CreateGEP(ElemTy, Dst, Indices);
+            auto DstElemPtr = clspv::CreateGEP(Builder, ElemTy, Dst, Indices);
             Builder.CreateStore(Srci, DstElemPtr, Volatile);
           }
 

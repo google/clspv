@@ -27,6 +27,7 @@
 
 #include "BitcastUtils.h"
 #include "Constants.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -132,7 +133,7 @@ Value *GetPushConstantPointer(BasicBlock *BB, PushConstant pc,
   Indices[1] = Builder.getInt32(idx);
   for (auto idx : extra_indices)
     Indices.push_back(idx);
-  return Builder.CreateInBoundsGEP(GV->getValueType(), GV, Indices);
+  return clspv::CreateInBoundsGEP(Builder, GV->getValueType(), GV, Indices);
 }
 
 bool UsesGlobalPushConstants(Module &M) {

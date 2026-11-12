@@ -302,7 +302,7 @@ Value *ComputeLoad(IRBuilder<> &Builder, Value *OrgGEPIdx, bool IsGEPUser,
       LastAddrIdx = Builder.CreateAdd(LastAddrIdx, GetIndexTyConst(Builder, 1));
       AddrIdxs.push_back(LastAddrIdx);
     }
-    auto *SrcAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
+    auto *SrcAddr = clspv::CreateGEP(Builder, OrigSrcTy, Src, AddrIdxs);
     Type *LoadTy = GetElementPtrInst::getIndexedType(OrigSrcTy, AddrIdxs);
     LoadInst *SrcVal = Builder.CreateLoad(LoadTy, SrcAddr);
     LDValues.push_back(SrcVal);
@@ -468,7 +468,7 @@ void ComputeStore(IRBuilder<> &Builder, StoreInst *ST, Value *OrgGEPIdx,
       AddrIdxs.push_back(LastAddrIdx);
     }
 
-    Value *DstAddr = Builder.CreateGEP(OrigSrcTy, Src, AddrIdxs);
+    Value *DstAddr = clspv::CreateGEP(Builder, OrigSrcTy, Src, AddrIdxs);
 
     Builder.CreateStore(STValues[i], DstAddr);
   }

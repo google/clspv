@@ -200,7 +200,8 @@ void clspv::MultiVersionUBOFunctionsPass::SpecializeCall(
           ++new_arg_iter;
         }
       }
-      ptr = builder.CreateGEP((*iter)->getSourceElementType(), ptr, indices);
+      ptr = clspv::CreateGEP(builder, (*iter)->getSourceElementType(), ptr,
+                             indices);
     }
 
     // Now replace the use of the argument with the result GEP.

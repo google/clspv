@@ -161,7 +161,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineMappedBuiltin(
     Result = Builder.CreateExtractElement(LoadVec, InBoundsDim);
   } else {
     Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-    Value *GEP = Builder.CreateGEP(VT, GV, Indices);
+    Value *GEP = clspv::CreateGEP(Builder, VT, GV, Indices);
     Result = Builder.CreateLoad(IT, GEP);
   }
 
@@ -201,7 +201,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
 
   Value *Result = nullptr;
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-  Value *GEP = Builder.CreateGEP(GV->getValueType(), GV, Indices);
+  Value *GEP = clspv::CreateGEP(Builder, GV->getValueType(), GV, Indices);
   Result = Builder.CreateLoad(IT, GEP);
 
   auto GidBase = inBoundsDimensionOrDefaultValue(Builder, Dim, Result, 0);
@@ -215,7 +215,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalIDBuiltin(Module &M) {
   Value *Ret = GidBase;
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::RegionOffset);
-    auto DimPtr = Builder.CreateInBoundsGEP(VT, Ptr, Indices);
+    auto DimPtr = clspv::CreateInBoundsGEP(Builder, VT, Ptr, Indices);
     auto Size = Builder.CreateLoad(IT, DimPtr);
     auto RegOff = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 0);
     if (clspv::PointersAre64Bit(M)) {
@@ -262,7 +262,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
   if (clspv::Option::NonUniformNDRangeSupported()) {
     auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::GlobalSize);
     auto Ty = GetPushConstantType(M, clspv::PushConstant::GlobalSize);
-    auto DimPtr = Builder.CreateInBoundsGEP(Ty, Ptr, Indices);
+    auto DimPtr = clspv::CreateInBoundsGEP(Builder, Ty, Ptr, Indices);
     GlobalSize = Builder.CreateLoad(Ty->getScalarType(), DimPtr);
   } else {
     IntegerType *IT = IntegerType::get(M.getContext(), 32);
@@ -289,11 +289,11 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalSizeBuiltin(Module &M) {
     }
 
     // Load the workgroup size.
-    Value *GEP = Builder.CreateGEP(VT, WGS, Indices);
+    Value *GEP = clspv::CreateGEP(Builder, VT, WGS, Indices);
     Value *LoadWGS = Builder.CreateLoad(IT, GEP);
 
     // And the number of workgroups.
-    GEP = Builder.CreateGEP(VT, NWG, Indices);
+    GEP = clspv::CreateGEP(Builder, VT, NWG, Indices);
     Value *LoadNWG = Builder.CreateLoad(IT, GEP);
 
     // We multiply the workgroup size by the number of workgroups to calculate
@@ -340,7 +340,8 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineNumGroupsBuiltin(Module &M) {
                                            AddressSpace::Input);
   }
 
-  auto NumGroupsPtr = Builder.CreateInBoundsGEP(VT, NumGroupsVarPtr, Indices);
+  auto NumGroupsPtr =
+      clspv::CreateInBoundsGEP(Builder, VT, NumGroupsVarPtr, Indices);
   auto NumGroups = Builder.CreateLoad(IT, NumGroupsPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, NumGroups, 1);
 
@@ -375,7 +376,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
       createGlobalVariable(M, "__spirv_WorkgroupId", VT, AddressSpace::Input);
 
   auto RegionGroupIDPtr =
-      Builder.CreateInBoundsGEP(VT, RegionGroupIDVarPtr, Indices);
+      clspv::CreateInBoundsGEP(Builder, VT, RegionGroupIDVarPtr, Indices);
   auto RegionGroupID = Builder.CreateLoad(IT, RegionGroupIDPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupID, 0);
 
@@ -383,7 +384,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGroupIDBuiltin(Module &M) {
     auto RegionGroupOffsetVarPtr =
         GetPushConstantPointer(BB, clspv::PushConstant::RegionGroupOffset);
     auto RegionGroupOffsetPtr =
-        Builder.CreateInBoundsGEP(VT, RegionGroupOffsetVarPtr, Indices);
+        clspv::CreateInBoundsGEP(Builder, VT, RegionGroupOffsetVarPtr, Indices);
     auto RegionGroupOffsetVal = Builder.CreateLoad(IT, RegionGroupOffsetPtr);
     auto RegionGroupOffset =
         inBoundsDimensionOrDefaultValue(Builder, Dim, RegionGroupOffsetVal, 0);
@@ -439,7 +440,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineGlobalOffsetBuiltin(Module &M) {
       auto offset_var = createGlobalVariable(M, name, VecTy,
                                              AddressSpace::ModuleScopePrivate);
       Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
-      gep = Builder.CreateInBoundsGEP(VecTy, offset_var, Indices);
+      gep = clspv::CreateInBoundsGEP(Builder, VecTy, offset_var, Indices);
     }
     auto load = Builder.CreateLoad(Int32Ty, gep);
     Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, load, 0);
@@ -612,7 +613,7 @@ bool DefineOpenCLWorkItemBuiltinsPass::defineEnqueuedLocalSizeBuiltin(
   Value *Indices[] = {Builder.getInt32(0), InBoundsDim};
   auto Ptr = GetPushConstantPointer(BB, clspv::PushConstant::EnqueuedLocalSize);
   auto *Ty = GetPushConstantType(M, clspv::PushConstant::EnqueuedLocalSize);
-  auto DimPtr = Builder.CreateInBoundsGEP(Ty, Ptr, Indices);
+  auto DimPtr = clspv::CreateInBoundsGEP(Builder, Ty, Ptr, Indices);
   auto Size = Builder.CreateLoad(Ty->getScalarType(), DimPtr);
   auto Ret = inBoundsDimensionOrDefaultValue(Builder, Dim, Size, 1);
 

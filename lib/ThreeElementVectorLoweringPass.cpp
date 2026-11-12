@@ -632,7 +632,8 @@ Value *clspv::ThreeElementVectorLoweringPass::visitGetElementPtrInst(
 
   IRBuilder<NoFolder> B(&I);
   SmallVector<Value *, 4> Indices(I.indices());
-  auto *V = B.CreateInBoundsGEP(EquivalentType, EquivalentPointer, Indices);
+  auto *V =
+      clspv::CreateInBoundsGEP(B, EquivalentType, EquivalentPointer, Indices);
   registerReplacement(I, *V);
   return V;
 }

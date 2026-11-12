@@ -713,9 +713,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::BufferUBO:
           // Return a GEP to the first element
           // in the runtime array we'll make.
-          replacement = Builder.CreateGEP(
-              resource_type, call,
-              {zero, zero, zero});
+          replacement = clspv::CreateGEP(Builder, resource_type, call,
+                                         {zero, zero, zero});
           break;
         case clspv::ArgKind::Pod:
         case clspv::ArgKind::PodUBO:
@@ -723,9 +722,8 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
         case clspv::ArgKind::PointerUBO:
         case clspv::ArgKind::PointerPushConstant: {
           // Replace with a load of the start of the (virtual) variable.
-          auto *gep = Builder.CreateGEP(
-              resource_type, call,
-              {zero, zero});
+          auto *gep =
+              clspv::CreateGEP(Builder, resource_type, call, {zero, zero});
           replacement =
               Builder.CreateLoad(inferred_ty, gep);
         } break;
@@ -884,7 +882,7 @@ bool clspv::AllocateDescriptorsPass::AllocateLocalKernelArgSpecIds(Module &M) {
                 argTy->getPointerAddressSpace())) {
           zeroes.push_back(zero);
         }
-        Value *replacement = Builder.CreateGEP(data_ty, call, zeroes);
+        Value *replacement = clspv::CreateGEP(Builder, data_ty, call, zeroes);
         if (replacement->getType() != Arg.getType()) {
           replacement = Builder.CreatePointerBitCastOrAddrSpaceCast(
               replacement, Arg.getType());

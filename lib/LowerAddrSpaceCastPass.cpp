@@ -158,9 +158,9 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitStoreInst(llvm::StoreInst &I) {
 llvm::Value *clspv::LowerAddrSpaceCastPass::visitGetElementPtrInst(
     llvm::GetElementPtrInst &I) {
   IRBuilder<> B(&I);
-  auto gep = B.CreateGEP(I.getSourceElementType(), visit(I.getPointerOperand()),
-                         SmallVector<Value *>{I.indices()}, I.getName(),
-                         I.isInBounds());
+  auto gep = clspv::CreateGEP(
+      B, I.getSourceElementType(), visit(I.getPointerOperand()),
+      SmallVector<Value *>{I.indices()}, I.getName(), I.isInBounds());
   registerReplacement(&I, gep);
   return gep;
 }
