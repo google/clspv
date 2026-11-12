@@ -97,7 +97,6 @@ clspv::ClusterPodKernelArgumentsPass::run(Module &M, ModuleAnalysisManager &) {
         M, mangled_struct_ty, (int)clspv::PushConstant::KernelArgument);
   }
 
-  DenseMap<Value *, Type *> type_cache;
   for (Function *F : WorkList) {
     auto pod_arg_impl = clspv::GetPodArgsImpl(*F);
     // An ArgMapping describes how a kernel argument is remapped.
