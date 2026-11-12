@@ -53,6 +53,13 @@ bool IsOffsetInsideScalar(const DataLayout &DL, GetElementPtrInst *GEP,
                                CstVal * (int64_t)SmallerBitWidths,
                                nullptr) != 0;
 }
+
+bool IsByteArrayTy(Type *Ty) {
+  if (auto *ArrTy = dyn_cast<ArrayType>(Ty)) {
+    return ArrTy->getElementType()->isIntegerTy(8);
+  }
+  return false;
+}
 } // namespace
 
 PreservedAnalyses
@@ -896,19 +903,20 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         return false;
       }
     } else {
-      // if gep contains dynamic indices, only consider i8 gep width and look
-      // for mul and shl composing the single indice.
-      if (gep->getSourceElementType() != Type::getInt8Ty(M.getContext()) ||
+      // if gep contains dynamic indices, only consider i8 or [N x i8] gep width
+      // and look for mul and shl composing the single indice.
+      Type *src_elem_ty = gep->getSourceElementType();
+      if ((!src_elem_ty->isIntegerTy(8) && !IsByteArrayTy(src_elem_ty)) ||
           gep->getNumIndices() != 1) {
         return false;
       }
       cstVal = 0;
-      smallerBitWidths = CHAR_BIT;
+      smallerBitWidths = SizeInBits(DL, src_elem_ty);
       dynVal = gep->getOperand(gep->getNumOperands() - 1);
 
       SmallVector<Value *> vector;
       vector.push_back(dynVal);
-      uint32_t coef = CHAR_BIT;
+      uint32_t coef = smallerBitWidths;
       uint32_t coef_target = SizeInBits(DL, ty);
       while (!vector.empty()) {
         auto val = vector.back();
@@ -940,9 +948,10 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         // The index can also be known to be a multiple of the size of 'ty'
         // without being such a product, e.g. a sign-extended scaled index:
         //   ashr exact (shl i64 %n, 32), 30
-        if (!isPowerOf2_32(coef_target) ||
+        if (coef_target <= smallerBitWidths ||
+            !isPowerOf2_32(coef_target / smallerBitWidths) ||
             computeKnownBits(dynVal, DL).countMinTrailingZeros() <
-                Log2_32(coef_target / CHAR_BIT)) {
+                Log2_32(coef_target / smallerBitWidths)) {
           return false;
         }
         knownMultiple = true;
@@ -976,7 +985,8 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
         }
 
         if (auto *gep = dyn_cast<GetElementPtrInst>(source)) {
-          if (SizeInBits(DL, source_ty) >= SizeInBits(DL, dest_ty) ||
+          if ((SizeInBits(DL, source_ty) >= SizeInBits(DL, dest_ty) &&
+               !IsByteArrayTy(source_ty)) ||
               IsClspvResourceOrLocal(gep->getPointerOperand())) {
             continue;
           }
@@ -1011,7 +1021,9 @@ bool clspv::SimplifyPointerBitcastPass::runOnUpgradeableConstantCasts(
             size_t dest_ty_size = SizeInBits(DL, dest_ty);
             dest_ty_size /= 2;
 
-            while (dest_ty_size > SizeInBits(DL, source_ty)) {
+            size_t min_ty_size =
+                IsByteArrayTy(source_ty) ? CHAR_BIT : SizeInBits(DL, source_ty);
+            while (dest_ty_size > min_ty_size) {
               dest_ty = Type::getIntNTy(context, dest_ty_size);
               if (gepIndicesCanBeUpgradedTo(dest_ty, gep, cstVal, dynVal,
                                             smallerBitWidths, knownMultiple)) {

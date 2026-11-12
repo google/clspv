@@ -83,7 +83,7 @@ Value *makeNewGEP(const DataLayout &DL, IRBuilder<> &B, Instruction *Src,
   }
   auto Idxs = BitcastUtils::GetIdxsForTyFromOffset(
       DL, B, SrcTy, DstTy, CstVal, DynVal, SmallerBitWidths, Src);
-  return B.CreateGEP(SrcTy, Src, Idxs, "", true);
+  return clspv::CreateInBoundsGEP(B, SrcTy, Src, Idxs);
 }
 
 Type *getSmallestTypeInStruct(const DataLayout &DL, StructType *Ty) {
@@ -178,8 +178,8 @@ void mergeAllocasOfPrivatePointerPHIs(Function &F) {
     Merged->setAlignment(Alignment);
     SmallVector<Value *, 4> Elements;
     for (unsigned i = 0; i < Allocas.size(); i++) {
-      Elements.push_back(
-          B.CreateInBoundsGEP(ArrayTy, Merged, {B.getInt32(0), B.getInt32(i)}));
+      Elements.push_back(clspv::CreateInBoundsGEP(
+          B, ArrayTy, Merged, {B.getInt32(0), B.getInt32(i)}));
     }
     for (unsigned i = 0; i < Allocas.size(); i++) {
       Allocas[i]->replaceAllUsesWith(Elements[i]);

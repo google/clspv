@@ -35,6 +35,7 @@
 #include "BitcastUtils.h"
 #include "Builtins.h"
 #include "LongVectorLoweringPass.h"
+#include "Types.h"
 
 #include <array>
 #include <functional>
@@ -486,9 +487,9 @@ Value *convertVectorOperation(Instruction &I, Type *EquivalentReturnTy,
       if (ArgTy->isPointerTy()) {
         assert(pointer_scalar_ty && "Missing pointer scalar type");
         IRBuilder<NoFolder> B(&I);
-        Args[j] = B.CreateInBoundsGEP(ArrayType::get(pointer_scalar_ty, Arity),
-                                      EquivalentArgs[j],
-                                      {Zero, ConstantInt::get(IntTy, i)});
+        Args[j] = clspv::CreateInBoundsGEP(
+            B, ArrayType::get(pointer_scalar_ty, Arity), EquivalentArgs[j],
+            {Zero, ConstantInt::get(IntTy, i)});
       } else if (ArgTy->isArrayTy()) {
         Args[j] = B.CreateExtractValue(EquivalentArgs[j], i);
       } else {
@@ -1107,8 +1108,9 @@ clspv::LongVectorLoweringPass::visitExtractElementInst(ExtractElementInst &I) {
     B.CreateStore(EquivalentValue, PtrOperand);
   }
 
-  auto *GEP = B.CreateInBoundsGEP(EquivalentValue->getType(), PtrOperand,
-                                  {B.getInt32(0), I.getOperand(1)});
+  auto *GEP =
+      clspv::CreateInBoundsGEP(B, EquivalentValue->getType(), PtrOperand,
+                               {B.getInt32(0), I.getOperand(1)});
   auto *Load =
       B.CreateLoad(EquivalentValue->getType()->getArrayElementType(), GEP);
   registerReplacement(I, *Load);
@@ -1217,9 +1219,9 @@ clspv::LongVectorLoweringPass::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   Value *V;
   if (I.isInBounds()) {
-    V = B.CreateInBoundsGEP(Type, EquivalentPointer, Indices);
+    V = clspv::CreateInBoundsGEP(B, Type, EquivalentPointer, Indices);
   } else {
-    V = B.CreateGEP(Type, EquivalentPointer, Indices);
+    V = clspv::CreateGEP(B, Type, EquivalentPointer, Indices);
   }
   registerReplacement(I, *V);
   return V;
@@ -1257,8 +1259,9 @@ clspv::LongVectorLoweringPass::visitInsertElementInst(InsertElementInst &I) {
     B.CreateStore(EquivalentValue, PtrOperand);
   }
 
-  auto *GEP = B.CreateInBoundsGEP(EquivalentValue->getType(), PtrOperand,
-                                  {B.getInt32(0), I.getOperand(2)});
+  auto *GEP =
+      clspv::CreateInBoundsGEP(B, EquivalentValue->getType(), PtrOperand,
+                               {B.getInt32(0), I.getOperand(2)});
   B.CreateStore(ScalarElement, GEP);
   auto *Load = B.CreateLoad(EquivalentValue->getType(), PtrOperand);
   registerReplacement(I, *Load);
@@ -1835,8 +1838,8 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
     auto SrcArity = cast<ArrayType>(SrcTy)->getArrayNumElements();
     for (uint64_t i = 0; i < SrcArity; i++) {
       auto Val = B.CreateExtractValue(SrcA, i);
-      auto Gep = B.CreateGEP(alloca->getAllocatedType(), alloca,
-                             {B.getInt32(0), B.getInt32(i)});
+      auto Gep = clspv::CreateGEP(B, alloca->getAllocatedType(), alloca,
+                                  {B.getInt32(0), B.getInt32(i)});
       B.CreateStore(Val, Gep);
     }
     SrcA = alloca;
@@ -1848,8 +1851,8 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
       alloca = BFront.CreateAlloca(SrcTy);
       for (uint64_t i = 0; i < SrcArity; i++) {
         auto Val = B.CreateExtractValue(SrcB, i);
-        auto Gep = B.CreateGEP(alloca->getAllocatedType(), alloca,
-                               {B.getInt32(0), B.getInt32(i)});
+        auto Gep = clspv::CreateGEP(B, alloca->getAllocatedType(), alloca,
+                                    {B.getInt32(0), B.getInt32(i)});
         B.CreateStore(Val, Gep);
       }
       SrcB = alloca;
@@ -1875,8 +1878,9 @@ Value *clspv::LongVectorLoweringPass::convertBuiltinShuffle2(
       return B.CreateExtractElement(Vector, Index);
     } else {
       assert(isa<AllocaInst>(Vector));
-      auto gep = B.CreateGEP(cast<AllocaInst>(Vector)->getAllocatedType(),
-                             Vector, {B.getInt32(0), Index});
+      auto gep =
+          clspv::CreateGEP(B, cast<AllocaInst>(Vector)->getAllocatedType(),
+                           Vector, {B.getInt32(0), Index});
       return (Value *)B.CreateLoad(ScalarTy, gep);
     }
   };

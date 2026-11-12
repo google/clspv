@@ -39,6 +39,7 @@
 #include "Constants.h"
 #include "NormalizeGlobalVariable.h"
 #include "PushConstant.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -160,8 +161,8 @@ clspv::ClusterModuleScopeConstantVars::run(Module &M, ModuleAnalysisManager &) {
               auto *ptr_to_ptr = clspv::GetPushConstantPointer(
                   bb, clspv::PushConstant::ModuleConstantsPointer);
               Value *indices[] = {zero};
-              auto *ptr_gep = Builder.CreateInBoundsGEP(clustered_ptr_ty,
-                                                        ptr_to_ptr, indices);
+              auto *ptr_gep = clspv::CreateInBoundsGEP(
+                  Builder, clustered_ptr_ty, ptr_to_ptr, indices);
               auto *clustered_ptr_val = new LoadInst(
                   clustered_ptr_ty, ptr_gep, "", InsertBefore->getIterator());
               auto *clustered_ptr = CastInst::Create(

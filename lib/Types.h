@@ -18,12 +18,37 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 
 #include "spirv/unified1/spirv.hpp"
 
 namespace clspv {
+
+template <typename FolderTy, typename InserterTy>
+inline llvm::Value *
+CreateGEP(llvm::IRBuilder<FolderTy, InserterTy> &Builder, llvm::Type *Ty,
+          llvm::Value *Ptr, llvm::ArrayRef<llvm::Value *> IdxList,
+          const llvm::Twine &Name = "",
+          llvm::GEPNoWrapFlags NW = llvm::GEPNoWrapFlags::none()) {
+  if (auto *V =
+          FolderTy().FoldGEP(Builder.getDataLayout(), Ty, Ptr, IdxList, NW))
+    return V;
+  return Builder.Insert(llvm::GetElementPtrInst::Create(Ty, Ptr, IdxList, NW),
+                        Name);
+}
+
+template <typename FolderTy, typename InserterTy>
+inline llvm::Value *
+CreateInBoundsGEP(llvm::IRBuilder<FolderTy, InserterTy> &Builder,
+                  llvm::Type *Ty, llvm::Value *Ptr,
+                  llvm::ArrayRef<llvm::Value *> IdxList,
+                  const llvm::Twine &Name = "") {
+  return CreateGEP(Builder, Ty, Ptr, IdxList, Name,
+                   llvm::GEPNoWrapFlags::inBounds());
+}
 
 // Returns the inferred type of |v|.
 //

@@ -18,6 +18,7 @@
 #include "llvm/IR/Module.h"
 
 #include "DestructurizeGEPPass.h"
+#include "Types.h"
 
 using namespace llvm;
 
@@ -48,7 +49,8 @@ PreservedAnalyses clspv::DestructurizeGEPPass::run(Module &M,
       Indices.push_back(Call->getArgOperand(i));
     }
 
-    Value *GEP = Builder.CreateGEP(SourceTy, Ptr, Indices, Call->getName());
+    Value *GEP =
+        clspv::CreateGEP(Builder, SourceTy, Ptr, Indices, Call->getName());
 
     Call->replaceAllUsesWith(GEP);
     Call->eraseFromParent();

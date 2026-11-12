@@ -919,11 +919,11 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
   GlobalVariable *GVId =
       getOrCreateGlobalVariable(M, clspv::LocalInvocationIdVariableName(),
                                 clspv::LocalInvocationIdAddressSpace());
-  Value *GEP0 = Builder.CreateGEP(VT, GVId, {Cst0, Cst0});
+  Value *GEP0 = clspv::CreateGEP(Builder, VT, GVId, {Cst0, Cst0});
   Value *LocalId0 = Builder.CreateLoad(IT, GEP0);
-  Value *GEP1 = Builder.CreateGEP(VT, GVId, {Cst0, Cst1});
+  Value *GEP1 = clspv::CreateGEP(Builder, VT, GVId, {Cst0, Cst1});
   Value *LocalId1 = Builder.CreateLoad(IT, GEP1);
-  Value *GEP2 = Builder.CreateGEP(VT, GVId, {Cst0, Cst2});
+  Value *GEP2 = clspv::CreateGEP(Builder, VT, GVId, {Cst0, Cst2});
   Value *LocalId2 = Builder.CreateLoad(IT, GEP2);
 
   // get_local_size({0, 1, 2});
@@ -994,8 +994,8 @@ Value *ReplaceOpenCLBuiltinPass::replaceAsyncWorkGroupCopies(
     // async_work_group_strided_copy global to local case
     SrcIterator = Builder.CreateMul(PHIIterator, Stride);
   }
-  auto DstI = Builder.CreateGEP(GenType, Dst, DstIterator);
-  auto SrcI = Builder.CreateGEP(GenType, Src, SrcIterator);
+  auto DstI = clspv::CreateGEP(Builder, GenType, Dst, DstIterator);
+  auto SrcI = clspv::CreateGEP(Builder, GenType, Src, SrcIterator);
   auto NewIterator = Builder.CreateAdd(PHIIterator, Incr);
   auto Ld = Builder.CreateLoad(GenType, SrcI);
   Builder.CreateStore(Ld, DstI);
@@ -2073,7 +2073,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVstore(Function &F) {
       auto idx = clspv::PointersAre64Bit(*F.getParent()) ? builder.getInt64(i)
                                                          : builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(vec_data_type->getScalarType(), ptr, add);
+      auto gep =
+          clspv::CreateGEP(builder, vec_data_type->getScalarType(), ptr, add);
       auto extract = builder.CreateExtractElement(data, i);
       V = builder.CreateStore(extract, gep);
     }
@@ -2109,7 +2110,8 @@ bool ReplaceOpenCLBuiltinPass::replaceVload(Function &F) {
       auto idx = clspv::PointersAre64Bit(*F.getParent()) ? builder.getInt64(i)
                                                          : builder.getInt32(i);
       auto add = builder.CreateAdd(adjust, idx);
-      auto gep = builder.CreateGEP(vec_ret_type->getScalarType(), ptr, add);
+      auto gep =
+          clspv::CreateGEP(builder, vec_ret_type->getScalarType(), ptr, add);
       auto load = builder.CreateLoad(vec_ret_type->getScalarType(), gep);
       V = builder.CreateInsertElement(V, load, i);
     }
