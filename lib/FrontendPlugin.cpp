@@ -63,6 +63,7 @@ private:
     CustomDiagnosticOverloadedKernel,
     CustomDiagnosticStructContainsPointer,
     CustomDiagnosticRecursiveStruct,
+    CustomDiagnosticIncompleteStruct,
     CustomDiagnosticPushConstantSizeExceeded,
     CustomDiagnosticPushConstantContainsArray,
     CustomDiagnosticUnsupported16BitStorage,
@@ -218,6 +219,14 @@ private:
     }
 
     if (auto *RT = llvm::dyn_cast<RecordType>(canonicalType)) {
+      // Kernel arguments require complete structure types.
+      if (IsKernelParameter && !RT->getDecl()->getDefinition()) {
+        Instance.getDiagnostics().Report(
+            SR.getBegin(),
+            CustomDiagnosticsIDMap[CustomDiagnosticIncompleteStruct]);
+        return false;
+      }
+
       // Do not allow recursive struct definitions.
       llvm::DenseSet<const Type *> seen;
       if (IsRecursiveType(canonicalType, &seen)) {
@@ -697,6 +706,9 @@ public:
     CustomDiagnosticsIDMap[CustomDiagnosticRecursiveStruct] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "recursive structures are not supported");
+    CustomDiagnosticsIDMap[CustomDiagnosticIncompleteStruct] =
+        DE.getCustomDiagID(DiagnosticsEngine::Error,
+                           "structure types must be complete");
     CustomDiagnosticsIDMap[CustomDiagnosticPushConstantSizeExceeded] =
         DE.getCustomDiagID(DiagnosticsEngine::Error,
                            "max push constant size exceeded");
