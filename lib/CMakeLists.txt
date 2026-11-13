@@ -119,7 +119,14 @@ foreach(clspv_lib clspv_core clspv_passes)
 
   target_include_directories(${clspv_lib} PRIVATE ${CLANG_INCLUDE_DIRS})
 
-  target_include_directories(${clspv_lib} PUBLIC ${CLSPV_INCLUDE_DIRS})
+  target_include_directories(
+    ${clspv_lib}
+    INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+      ${CLSPV_INCLUDE_DIRS}
+  )
 
 endforeach(clspv_lib)
 
