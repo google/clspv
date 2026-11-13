@@ -16,6 +16,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -215,7 +216,7 @@ bool FoldConstantGEPIntoEnclosingStruct(const DataLayout &DL,
                                         IRBuilder<> &Builder,
                                         GetElementPtrInst *OtherGEP,
                                         GetElementPtrInst *GEP,
-                                        SmallVectorImpl<Value *> &Idxs) {
+                                        SmallVectorImpl<Value *> *Idxs) {
   if (OtherGEP->getNumIndices() <= 1 || !GEP->hasAllConstantIndices() ||
       GEP->getSourceElementType()->isAggregateType()) {
     return false;
@@ -247,12 +248,14 @@ bool FoldConstantGEPIntoEnclosingStruct(const DataLayout &DL,
     int64_t OffsetInBits = StructCstVal * (int64_t)StructSmallerBitWidths;
     int64_t StructSize = SizeInBits(DL, OtherGEPPrevTy);
     if (OffsetInBits >= 0 && OffsetInBits + AccessSize <= StructSize) {
-      auto newGEPIdxs = GetIdxsForTyFromOffset(
-          DL, Builder, OtherGEPPrevTy, GEP->getResultElementType(),
-          StructCstVal, nullptr, StructSmallerBitWidths,
-          OtherGEP->getPointerOperand());
-      Idxs.append(OtherGEPIdxs);
-      Idxs.append(newGEPIdxs.begin() + 1, newGEPIdxs.end());
+      if (Idxs) {
+        auto newGEPIdxs = GetIdxsForTyFromOffset(
+            DL, Builder, OtherGEPPrevTy, GEP->getResultElementType(),
+            StructCstVal, nullptr, StructSmallerBitWidths,
+            OtherGEP->getPointerOperand());
+        Idxs->append(OtherGEPIdxs);
+        Idxs->append(newGEPIdxs.begin() + 1, newGEPIdxs.end());
+      }
       return true;
     }
   }
@@ -262,7 +265,45 @@ bool FoldConstantGEPIntoEnclosingStruct(const DataLayout &DL,
 } // namespace
 
 bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
-  SmallVector<GetElementPtrInst *, 16> WorkList;
+  const DataLayout &DL = M.getDataLayout();
+  auto CanCombine = [&DL](GetElementPtrInst *OtherGEP, GetElementPtrInst *GEP) {
+    if (OtherGEP->getResultElementType() != GEP->getSourceElementType())
+      return false;
+
+    auto LastTypeStruct = [](Type *Ty, SmallVector<Value *> Idxs) {
+      Idxs.pop_back();
+      return dyn_cast<StructType>(GetElementPtrInst::getIndexedType(Ty, Idxs));
+    };
+    auto ConstantValue = [](Value *V) {
+      if (auto CstVal = dyn_cast<ConstantInt>(V)) {
+        return CstVal->getZExtValue();
+      }
+      return UINT64_MAX;
+    };
+    auto LastTypeStructTy =
+        LastTypeStruct(OtherGEP->getSourceElementType(),
+                       SmallVector<Value *>(OtherGEP->indices()));
+    if (GEP->getNumOperands() > 1 && LastTypeStructTy != nullptr &&
+        ((ConstantValue(GEP->getOperand(1)) >=
+              LastTypeStructTy->getStructNumElements() &&
+          IsArrayLike(LastTypeStructTy)) ||
+         (ConstantValue(GEP->getOperand(1)) != 0 &&
+          !IsArrayLike(LastTypeStructTy))) &&
+        !(GEP->hasAllConstantIndices() && OtherGEP->hasAllConstantIndices())) {
+      IRBuilder<> Builder(GEP);
+      if (FoldConstantGEPIntoEnclosingStruct(DL, Builder, OtherGEP, GEP,
+                                             nullptr)) {
+        return true;
+      }
+      LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (out-of-bound "
+                           "struct access): ";
+                 OtherGEP->dump(); GEP->dump());
+      return false;
+    }
+    return true;
+  };
+
+  SmallVector<WeakVH, 16> WorkList;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
@@ -277,36 +318,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
           if (auto OtherGEP =
                   dyn_cast<GetElementPtrInst>(GEP->getPointerOperand())) {
             // ... with no implicit cast between them...
-            if (OtherGEP->getResultElementType() ==
-                GEP->getSourceElementType()) {
-
-              auto LastTypeStruct = [](Type *Ty, SmallVector<Value *> Idxs) {
-                Idxs.pop_back();
-                return dyn_cast<StructType>(
-                    GetElementPtrInst::getIndexedType(Ty, Idxs));
-              };
-              auto ConstantValue = [](Value *V) {
-                if (auto CstVal = dyn_cast<ConstantInt>(V)) {
-                  return CstVal->getZExtValue();
-                }
-                return UINT64_MAX;
-              };
-              auto LastTypeStructTy =
-                  LastTypeStruct(OtherGEP->getSourceElementType(),
-                                 SmallVector<Value *>(OtherGEP->indices()));
-              if (GEP->getNumOperands() > 1 && LastTypeStructTy != nullptr &&
-                  ((ConstantValue(GEP->getOperand(1)) >=
-                        LastTypeStructTy->getStructNumElements() &&
-                    IsArrayLike(LastTypeStructTy)) ||
-                   (ConstantValue(GEP->getOperand(1)) != 0 &&
-                    !IsArrayLike(LastTypeStructTy))) &&
-                  !(GEP->hasAllConstantIndices() &&
-                    OtherGEP->hasAllConstantIndices())) {
-                LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nskip (out-of-bound "
-                                     "struct access): ";
-                           OtherGEP->dump(); GEP->dump());
-                continue;
-              }
+            if (CanCombine(OtherGEP, GEP)) {
               // ... record the GEP as something we need to process.
               WorkList.push_back(GEP);
             }
@@ -316,13 +328,21 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     }
   }
 
-  const bool Changed = !WorkList.empty();
+  bool Changed = false;
 
   DenseMap<Value *, Type *> type_cache;
-  for (GetElementPtrInst *GEP : WorkList) {
-    IRBuilder<> Builder(GEP);
+  for (WeakVH &VH : WorkList) {
+    // An earlier iteration may have erased this GEP as a dead OtherGEP.
+    auto *GEP = cast_or_null<GetElementPtrInst>(VH);
+    if (!GEP)
+      continue;
 
-    auto OtherGEP = cast<GetElementPtrInst>(GEP->getPointerOperand());
+    // An earlier fold may have replaced the pointer operand.
+    auto *OtherGEP = dyn_cast<GetElementPtrInst>(GEP->getPointerOperand());
+    if (!OtherGEP || !CanCombine(OtherGEP, GEP))
+      continue;
+
+    IRBuilder<> Builder(GEP);
     LLVM_DEBUG(dbgs() << "\n##runOnGEPFromGEP:\nreplace: "; OtherGEP->dump();
                GEP->dump());
 
@@ -353,7 +373,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
     SmallVector<Value *, 8> Idxs;
     Type *NewGEPSrcTy = OtherGEP->getSourceElementType();
     if (FoldConstantGEPIntoEnclosingStruct(M.getDataLayout(), Builder, OtherGEP,
-                                           GEP, Idxs)) {
+                                           GEP, &Idxs)) {
       // Handled by FoldConstantGEPIntoEnclosingStruct.
     } else if (GEP->hasAllConstantIndices() &&
                OtherGEP->hasAllConstantIndices() &&
@@ -520,6 +540,7 @@ bool clspv::SimplifyPointerBitcastPass::runOnGEPFromGEP(Module &M) const {
 
     // And replace the original GEP with our replacement GEP.
     GEP->replaceAllUsesWith(NewGEP);
+    Changed = true;
 
     // Remove the GEP as it has no users now.
     type_cache.erase(GEP);
