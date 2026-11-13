@@ -70,6 +70,7 @@ PreservedAnalyses clspv::LowerAddrSpaceCastPass::run(Module &M,
     runOnFunction(F);
   }
   cleanModule(M);
+  FunctionMap.clear();
 
   return PA;
 }
@@ -256,22 +257,29 @@ llvm::Value *clspv::LowerAddrSpaceCastPass::visitCallInst(llvm::CallInst &I) {
   Module *M = I.getModule();
   auto getEquivalentFunction = [&Name, &M, &FunctionTy, this, &F]() {
     Function *eqF = M->getFunction(Name);
-    if (eqF != nullptr)
+    if (eqF != nullptr && eqF->getFunctionType() == FunctionTy)
       return eqF;
 
-    eqF = FunctionMap[F];
+    auto key = std::make_pair(F, FunctionTy);
+    eqF = FunctionMap.lookup(key);
     if (eqF != nullptr)
       return eqF;
 
     eqF = Function::Create(FunctionTy, F->getLinkage(), Name);
-    FunctionMap[F] = eqF;
+    eqF->copyAttributesFrom(F);
+    // immarg only applies to intrinsics; drop it from the non-intrinsic
+    // replacement.
+    if (F->isIntrinsic()) {
+      for (auto i = 0u; i < eqF->arg_size(); ++i) {
+        eqF->removeParamAttr(i, Attribute::ImmArg);
+      }
+    }
+    FunctionMap[key] = eqF;
     M->getFunctionList().push_front(eqF);
 
     return eqF;
   };
   Function *EquivalentFunction = getEquivalentFunction();
-  EquivalentFunction->copyAttributesFrom(F);
-  EquivalentFunction->setCallingConv(F->getCallingConv());
 
   IRBuilder<> B(&I);
   auto call = B.CreateCall(EquivalentFunction, EquivalentArgs);

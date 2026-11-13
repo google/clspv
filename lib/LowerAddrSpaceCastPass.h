@@ -70,7 +70,9 @@ private:
 
   llvm::DenseMap<llvm::Value *, llvm::Type *> TypeCache;
 
-  llvm::DenseMap<llvm::Function *, llvm::Function *> FunctionMap;
+  llvm::DenseMap<std::pair<llvm::Function *, llvm::FunctionType *>,
+                 llvm::Function *>
+      FunctionMap;
 };
 } // namespace clspv
 
