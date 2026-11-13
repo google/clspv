@@ -114,8 +114,25 @@ To do so, replace the last two commands with:
 
 Other useful configuration options (the first `cmake` command):
 
+* `-DCMAKE_BUILD_TYPE=Release` : Build an optimized compiler. Release builds
+  also link much faster than debug builds.
 * `-DCMAKE_BUILD_TYPE=RelWithDebInfo` : Build in release mode, with debugging
-  information. Default is a debug build.
+  information. Default is `Debug`.
+* `-DCLSPV_SHARED_LIB=ON` : Build `clspv_core` as a shared library, which
+  `clspv` and `clspv-reflection` link against. Default is `OFF`.
+* `-DSKIP_CLSPV_INSTALL=ON` : Do not install the compiler libraries or headers.
+  Default is `OFF`.
+* `-DSKIP_CLSPV_TOOLS_INSTALL=ON` : Do not install the command line tools.
+  Default is `OFF`.
+* `-DCLSPV_BUILD_SPIRV_DIS=OFF` : Do not add SPIRV-Tools as a subdirectory when
+  `spirv-dis` is not already defined. Use this when a parent project provides
+  SPIRV-Tools. Default is `ON`.
+* `-DENABLE_CLSPV_OPT=OFF` : Do not build the `clspv-opt` tool. Default is `ON`.
+* `-DEXTERNAL_LLVM=1` : Use an externally built LLVM instead of the LLVM
+  monorepo. Requires `CLSPV_LLVM_SOURCE_DIR`, `CLSPV_CLANG_SOURCE_DIR`,
+  `CLSPV_LLVM_BINARY_DIR` and `CLSPV_EXTERNAL_LIBCLC_DIR`. Default is `OFF`.
+* `-DCLSPV_BUILD_TESTS=OFF` : Do not configure the test targets (on
+  non-Android platforms). Default is `ON`.
 
 See the [CMake][CMake] [documentation][CMake-doc] for more generic options.
 
