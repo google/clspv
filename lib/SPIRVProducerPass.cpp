@@ -899,6 +899,17 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
     out = new raw_svector_ostream(*binary);
   }
 
+  auto fail_on_error = [&]() {
+    if (HasErrorOut) {
+      *HasErrorOut = true;
+    }
+    if (TestOutput) {
+      delete out;
+      delete binary;
+    }
+    return false;
+  };
+
   binaryOut = outputCInitList ? &binaryTempOut : out;
 
   NonUniformPointers.clear();
@@ -906,6 +917,9 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
   ReadFunctionAttributes();
   PopulateUBOTypeMaps();
   PopulateStructuredCFGMaps();
+  if (HasError) {
+    return fail_on_error();
+  }
 
   // SPIR-V always begins with its header information
   outputHeader();
@@ -953,8 +967,7 @@ bool SPIRVProducerPassImpl::runOnModule(Module &M) {
 
   HandleDeferredInstruction();
   if (HasError) {
-    *HasErrorOut = true;
-    return false;
+    return fail_on_error();
   }
   HandleDeferredDecorations();
 
@@ -8005,6 +8018,26 @@ void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
                     .getManager();
     auto &DT = FAM.getResult<DominatorTreeAnalysis>(F);
     auto &LI = FAM.getResult<LoopAnalysis>(F);
+
+    // Structured control flow requires at most one exit and a single latch
+    // block for each loop. Detect unsupported loops before computing the order,
+    // as that computation assumes these conditions hold.
+    for (auto *L : LI.getLoopsInPreorder()) {
+      SmallVector<BasicBlock *, 4> ExitBlocks;
+      L->getExitBlocks(ExitBlocks);
+      if (ExitBlocks.size() > 1 || !L->getLoopLatch()) {
+        std::string err_msg =
+            "error: loops must have a single exit and latch block\n";
+        if (OutputLog) {
+          OutputLog->append(err_msg);
+        } else {
+          errs() << err_msg;
+        }
+        HasError = true;
+        return;
+      }
+    }
+
     std::deque<BasicBlock *> order;
     DenseSet<BasicBlock *> visited;
     clspv::ComputeStructuredOrder(&*F.begin(), &DT, LI, &order, &visited);
@@ -8018,10 +8051,16 @@ void SPIRVProducerPassImpl::PopulateStructuredCFGMaps() {
 
         MergeBB = L->getExitBlock();
         if (!MergeBB) {
-          // StructurizeCFG pass converts CFG into triangle shape and the cfg
-          // has regions with single entry/exit. As a result, loop should not
-          // have multiple exits.
-          llvm_unreachable("Loop has multiple exits???");
+          // Loops with multiple exits are rejected above. This loop has no
+          // exit, so create an unreachable merge block for it.
+          std::string warn_msg = "warning: loop has no exit block\n";
+          if (OutputLog) {
+            OutputLog->append(warn_msg);
+          } else {
+            errs() << warn_msg;
+          }
+          MergeBB = BasicBlock::Create(module->getContext(), "", &F);
+          new UnreachableInst(module->getContext(), MergeBB);
         }
 
         if (L->isLoopLatch(BB)) {

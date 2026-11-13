@@ -54,8 +54,8 @@ void clspv::ComputeStructuredOrder(BasicBlock *block, DominatorTree *DT,
       }
     }
     // At least the latch dominates itself so we will always find a continue
-    // block.
-    assert(continue_block && merge_block && "Bad loop");
+    // block. Loops without an exit have no merge block.
+    assert(continue_block && "Bad loop");
   } else if (terminator->getNumSuccessors() > 1) {
     // This is potentially a selection case, but it could also be a conditional
     // branch with one arm back to the loop header, which would make this block
@@ -76,11 +76,10 @@ void clspv::ComputeStructuredOrder(BasicBlock *block, DominatorTree *DT,
   }
 
   // Traverse merge and continue first.
-  if (merge_block) {
+  if (merge_block)
     ComputeStructuredOrder(merge_block, DT, LI, order, visited);
-    if (continue_block)
-      ComputeStructuredOrder(continue_block, DT, LI, order, visited);
-  }
+  if (continue_block)
+    ComputeStructuredOrder(continue_block, DT, LI, order, visited);
   for (unsigned i = 0; i < terminator->getNumSuccessors(); ++i) {
     auto *successor = terminator->getSuccessor(i);
     if (successor != merge_block && successor != continue_block)
