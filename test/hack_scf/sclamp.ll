@@ -1,20 +1,18 @@
 ; RUN: clspv-opt -hack-scf --passes=signed-compare-fixup %s -o %t.ll
-; RUN: FileCheck %s < %t.ll
+; RUN: FileCheck %s --implicit-check-not="icmp s" < %t.ll
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-vulkan"
 
 ; CHECK-LABEL: sclamp
-; CHECK: [[b_m_a:%[0-9]+]] = sub i32 %b, %a
-; CHECK: [[m_1:%[0-9]+]] = sub i32 [[b_m_a]], 1
-; CHECK: [[and:%[0-9]+]] = and i32 [[m_1]], -2147483648
-; CHECK: [[cmp:%[0-9]+]] = icmp eq i32 [[and]], 0
+; CHECK: [[a_flipped:%[0-9]+]] = xor i32 %a, -2147483648
+; CHECK: [[b_flipped:%[0-9]+]] = xor i32 %b, -2147483648
+; CHECK: [[cmp:%[0-9]+]] = icmp ult i32 [[a_flipped]], [[b_flipped]]
 ; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 %b, i32 %a
-; CHECK: [[a_m_c:%[0-9]+]] = sub i32 %a, %c
-; CHECK: [[m_1:%[0-9]+]] = sub i32 [[a_m_c]], 1
-; CHECK: [[and:%[0-9]+]] = and i32 [[m_1]], -2147483648
-; CHECK: [[cmp:%[0-9]+]] = icmp eq i32 [[and]], 0
-; CHECK: [[sel2:%[0-9]+]] = select i1 [[cmp]], i32 %c, i32 [[sel]]
+; CHECK: [[c_flipped:%[0-9]+]] = xor i32 %c, -2147483648
+; CHECK: [[a_flipped2:%[0-9]+]] = xor i32 %a, -2147483648
+; CHECK: [[cmp2:%[0-9]+]] = icmp ult i32 [[c_flipped]], [[a_flipped2]]
+; CHECK: [[sel2:%[0-9]+]] = select i1 [[cmp2]], i32 %c, i32 [[sel]]
 ; CHECK: ret i32 [[sel2]]
 
 define i32 @sclamp(i32 %a, i32 %b, i32 %c) {
@@ -26,16 +24,14 @@ entry:
 declare spir_func i32 @_Z5clampiii(i32, i32, i32)
 
 ; CHECK-LABEL: sclamp4
-; CHECK: [[b_m_a:%[0-9]+]] = sub <4 x i32> %b, %a
-; CHECK: [[m_1:%[0-9]+]] = sub <4 x i32> [[b_m_a]], splat (i32 1)
-; CHECK: [[and:%[0-9]+]] = and <4 x i32> [[m_1]], splat (i32 -2147483648)
-; CHECK: [[cmp:%[0-9]+]] = icmp eq <4 x i32> [[and]], zeroinitializer
+; CHECK: [[a_flipped:%[0-9]+]] = xor <4 x i32> %a, splat (i32 -2147483648)
+; CHECK: [[b_flipped:%[0-9]+]] = xor <4 x i32> %b, splat (i32 -2147483648)
+; CHECK: [[cmp:%[0-9]+]] = icmp ult <4 x i32> [[a_flipped]], [[b_flipped]]
 ; CHECK: [[sel:%[0-9]+]] = select <4 x i1> [[cmp]], <4 x i32> %b, <4 x i32> %a
-; CHECK: [[a_m_c:%[0-9]+]] = sub <4 x i32> %a, %c
-; CHECK: [[m_1:%[0-9]+]] = sub <4 x i32> [[a_m_c]], splat (i32 1)
-; CHECK: [[and:%[0-9]+]] = and <4 x i32> [[m_1]], splat (i32 -2147483648)
-; CHECK: [[cmp:%[0-9]+]] = icmp eq <4 x i32> [[and]], zeroinitializer
-; CHECK: [[sel2:%[0-9]+]] = select <4 x i1> [[cmp]], <4 x i32> %c, <4 x i32> [[sel]]
+; CHECK: [[c_flipped:%[0-9]+]] = xor <4 x i32> %c, splat (i32 -2147483648)
+; CHECK: [[a_flipped2:%[0-9]+]] = xor <4 x i32> %a, splat (i32 -2147483648)
+; CHECK: [[cmp2:%[0-9]+]] = icmp ult <4 x i32> [[c_flipped]], [[a_flipped2]]
+; CHECK: [[sel2:%[0-9]+]] = select <4 x i1> [[cmp2]], <4 x i32> %c, <4 x i32> [[sel]]
 ; CHECK: ret <4 x i32> [[sel2]]
 
 define <4 x i32> @sclamp4(<4 x i32> %a, <4 x i32> %b, <4 x i32> %c) {

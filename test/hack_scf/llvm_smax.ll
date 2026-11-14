@@ -1,11 +1,10 @@
 ; RUN: clspv-opt -hack-scf --passes=signed-compare-fixup %s -o %t.ll
-; RUN: FileCheck %s < %t.ll
+; RUN: FileCheck %s --implicit-check-not="icmp s" < %t.ll
 
 ; CHECK-LABEL: smax
-; CHECK: [[b_m_a:%[0-9]+]] = sub i32 %b, %a
-; CHECK: [[m_1:%[0-9]+]] = sub i32 [[b_m_a]], 1
-; CHECK: [[and:%[0-9]+]] = and i32 [[m_1]], -2147483648
-; CHECK: [[cmp:%[0-9]+]] = icmp eq i32 [[and]], 0
+; CHECK: [[a_flipped:%[0-9]+]] = xor i32 %a, -2147483648
+; CHECK: [[b_flipped:%[0-9]+]] = xor i32 %b, -2147483648
+; CHECK: [[cmp:%[0-9]+]] = icmp ult i32 [[a_flipped]], [[b_flipped]]
 ; CHECK: [[sel:%[0-9]+]] = select i1 [[cmp]], i32 %b, i32 %a
 ; CHECK: ret i32 [[sel]]
 
@@ -21,10 +20,9 @@ entry:
 declare i32 @llvm.smax.i32(i32, i32)
 
 ; CHECK-LABEL: smax3
-; CHECK: [[b_m_a:%[0-9]+]] = sub <3 x i32> %b, %a
-; CHECK: [[m_1:%[0-9]+]] = sub <3 x i32> [[b_m_a]], splat (i32 1)
-; CHECK: [[and:%[0-9]+]] = and <3 x i32> [[m_1]], splat (i32 -2147483648)
-; CHECK: [[cmp:%[0-9]+]] = icmp eq <3 x i32> [[and]], zeroinitializer
+; CHECK: [[a_flipped:%[0-9]+]] = xor <3 x i32> %a, splat (i32 -2147483648)
+; CHECK: [[b_flipped:%[0-9]+]] = xor <3 x i32> %b, splat (i32 -2147483648)
+; CHECK: [[cmp:%[0-9]+]] = icmp ult <3 x i32> [[a_flipped]], [[b_flipped]]
 ; CHECK: [[sel:%[0-9]+]] = select <3 x i1> [[cmp]], <3 x i32> %b, <3 x i32> %a
 ; CHECK: ret <3 x i32> [[sel]]
 
