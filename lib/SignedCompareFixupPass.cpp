@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
+#include <utility>
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
@@ -21,7 +21,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -110,89 +109,37 @@ PreservedAnalyses SignedCompareFixupPass::run(Module &M,
   }
 
   IRBuilder<> Builder(M.getContext());
-  // First break up any vector cases in to scalar cases.
-  SmallVector<ICmpInst *, 16> scalar_work_list;
   for (auto *icmp : work_list) {
     auto *x = icmp->getOperand(0);
     auto *y = icmp->getOperand(1);
     auto *x_type = x->getType();
 
-    // Make some useful constants
-    auto *zero = ConstantInt::get(x_type, 0);
-    auto *one = ConstantInt::get(x_type, 1);
-    unsigned bit_width;
-    if (auto *scalar = dyn_cast<ConstantInt>(one)) {
-      bit_width = scalar->getBitWidth();
-    } else if (auto *cdv = dyn_cast<ConstantDataVector>(one)) {
-      bit_width = cdv->getElementAsAPInt(0).getBitWidth();
-    } else {
-      errs() << "Signed Comparison Fixup: Unhandled constant vector type "
-             << *(one->getType()) << "\n";
-      bit_width = 1;
-      llvm_unreachable("Unhandled constant vector type");
-    }
-    auto *sign_bit = ConstantInt::get(x_type, uint64_t(1) << (bit_width - 1));
+    // Flipping the sign bit of both operands maps the signed order onto the
+    // unsigned order. Unlike a subtraction-based replacement, this cannot
+    // overflow.
+    const unsigned bit_width = x_type->getScalarSizeInBits();
+    auto *sign_bit = ConstantInt::get(x_type, APInt::getSignMask(bit_width));
 
     Builder.SetInsertPoint(icmp);
+    auto *x_unsigned = Builder.CreateXor(x, sign_bit);
+    auto *y_unsigned = Builder.CreateXor(y, sign_bit);
+
     Value *replacement;
     switch (icmp->getPredicate()) {
-    case CmpInst::ICMP_SGT: {
-      // Derivation of the replacement:
-      //
-      //    x > y
-      //
-      //    x - y > 0
-      //
-      //    x - y - 1 >= 0
-      //
-      //    sign(x - y - 1) == 0
-      auto *diff = Builder.CreateSub(x, y);
-      auto *diff_minus_one = Builder.CreateSub(diff, one);
-      auto *diff_sign = Builder.CreateAnd(diff_minus_one, sign_bit);
-      replacement = Builder.CreateICmpEQ(diff_sign, zero);
-    } break;
-    case CmpInst::ICMP_SGE: {
-      // Derivation of the replacement:
-      //
-      //    x >= y
-      //
-      //    x - y >= 0
-      //
-      //    sign(x - y) == 0
-      auto *diff = Builder.CreateSub(x, y);
-      auto *diff_sign = Builder.CreateAnd(diff, sign_bit);
-      replacement = Builder.CreateICmpEQ(diff_sign, zero);
-    } break;
-    case CmpInst::ICMP_SLT: {
-      // Derivation of the replacement:
-      //
-      //    x < y
-      //
-      //    0 < y - x
-      //
-      //    0 <= y - x - 1
-      //
-      //    sign(y - x - 1) == 0
-      auto *diff = Builder.CreateSub(y, x);
-      auto *diff_minus_one = Builder.CreateSub(diff, one);
-      auto *diff_sign = Builder.CreateAnd(diff_minus_one, sign_bit);
-      replacement = Builder.CreateICmpEQ(diff_sign, zero);
-    } break;
-    case CmpInst::ICMP_SLE: {
-      // Derivation of the replacement:
-      //
-      //    x <= y
-      //
-      //    0 <= y - x
-      //
-      //    sign(y - x) == 0
-      auto *diff = Builder.CreateSub(y, x);
-      auto *diff_sign = Builder.CreateAnd(diff, sign_bit);
-      replacement = Builder.CreateICmpEQ(diff_sign, zero);
-    } break;
+    case CmpInst::ICMP_SGT:
+      replacement = Builder.CreateICmpUGT(x_unsigned, y_unsigned);
+      break;
+    case CmpInst::ICMP_SGE:
+      replacement = Builder.CreateICmpUGE(x_unsigned, y_unsigned);
+      break;
+    case CmpInst::ICMP_SLT:
+      replacement = Builder.CreateICmpULT(x_unsigned, y_unsigned);
+      break;
+    case CmpInst::ICMP_SLE:
+      replacement = Builder.CreateICmpULE(x_unsigned, y_unsigned);
+      break;
     default:
       llvm_unreachable("Unhandled integer comparison");
-      break;
     }
     icmp->replaceAllUsesWith(replacement);
   }
