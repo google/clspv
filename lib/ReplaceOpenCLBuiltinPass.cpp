@@ -27,6 +27,7 @@
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -148,6 +149,8 @@ std::set<Builtins::BuiltinType> ReplaceOpenCLBuiltinPass::ReplaceableBuiltins =
      Builtins::kCross,
      Builtins::kFract,
      Builtins::kMix,
+     Builtins::kDegrees,
+     Builtins::kRadians,
      Builtins::kMadHi,
      Builtins::kMulHi,
      Builtins::kMadSat,
@@ -498,6 +501,11 @@ bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   case Builtins::kSinpi:
   case Builtins::kTanpi:
     return replaceTrigPi(F, FI.getType());
+
+  case Builtins::kDegrees:
+    return replaceDegreesOrRadians(F, true);
+  case Builtins::kRadians:
+    return replaceDegreesOrRadians(F, false);
 
   case Builtins::kSincos:
     return replaceSincos(F);
@@ -4377,5 +4385,21 @@ bool ReplaceOpenCLBuiltinPass::replaceRsqrt(Function &F) {
       Res = builder.CreateFPTrunc(Res, CI->getType());
     }
     return Res;
+  });
+}
+
+bool ReplaceOpenCLBuiltinPass::replaceDegreesOrRadians(Function &F,
+                                                       bool is_degrees) {
+  if (!F.getReturnType()->getScalarType()->isDoubleTy()) {
+    return false;
+  }
+  return replaceCallsWithValue(F, [is_degrees](CallInst *Call) {
+    // GLSL.std.450 does not define Degrees or Radians for 64-bit
+    // floating-point types.
+    const auto x = Call->getArgOperand(0);
+    const double factor =
+        is_degrees ? 180.0 / llvm::numbers::pi : llvm::numbers::pi / 180.0;
+    IRBuilder<> builder(Call);
+    return builder.CreateFMul(x, ConstantFP::get(x->getType(), factor));
   });
 }

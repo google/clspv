@@ -63,6 +63,7 @@ private:
   bool replaceMul(llvm::Function &F, bool is_float, bool is_mad);
   bool replaceMix(llvm::Function &F);
   bool replaceSign(llvm::Function &F);
+  bool replaceDegreesOrRadians(llvm::Function &F, bool is_degrees);
   bool replaceSqrt(llvm::Function &F);
   bool replaceRsqrt(llvm::Function &F);
   llvm::Value *createVloadHalf(llvm::Module &M, llvm::CallInst *CI,
