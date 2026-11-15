@@ -3448,7 +3448,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
   Module &M = *F.getParent();
   return replaceCallsWithValue(F, [&](CallInst *CI) {
     auto IntTy = Type::getInt32Ty(M.getContext());
-    auto FloatTy = Type::getFloatTy(M.getContext());
+    auto ElemTy = CI->getType()->getScalarType();
 
     Constant *DownShuffleMask[3] = {ConstantInt::get(IntTy, 0),
                                     ConstantInt::get(IntTy, 1),
@@ -3458,9 +3458,8 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
         ConstantInt::get(IntTy, 0), ConstantInt::get(IntTy, 1),
         ConstantInt::get(IntTy, 2), ConstantInt::get(IntTy, 3)};
 
-    Constant *FloatVec[3] = {ConstantFP::get(FloatTy, 0.0f),
-                             PoisonValue::get(FloatTy),
-                             PoisonValue::get(FloatTy)};
+    Constant *ZeroVec[3] = {ConstantFP::get(ElemTy, 0.0),
+                            PoisonValue::get(ElemTy), PoisonValue::get(ElemTy)};
 
     auto Vec4Ty = CI->getArgOperand(0)->getType();
     auto Arg0 = new ShuffleVectorInst(
@@ -3479,7 +3478,7 @@ bool ReplaceOpenCLBuiltinPass::replaceCross(Function &F) {
     auto DownResult =
         CallInst::Create(Cross3Func, {Arg0, Arg1}, "", CI->getIterator());
 
-    return new ShuffleVectorInst(DownResult, ConstantVector::get(FloatVec),
+    return new ShuffleVectorInst(DownResult, ConstantVector::get(ZeroVec),
                                  ConstantVector::get(UpShuffleMask), "",
                                  CI->getIterator());
   });
