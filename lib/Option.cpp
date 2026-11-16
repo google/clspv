@@ -542,6 +542,10 @@ static llvm::cl::opt<uint32_t> memmove_alloca_limit(
         "Max size of the alloca used to implement memmove intrinsic"),
     llvm::cl::init(16));
 
+static llvm::cl::opt<bool>
+    vulkan_memory_model("vulkan-memory-model", llvm::cl::init(false),
+                        llvm::cl::desc("Enable SPV_KHR_vulkan_memory_model"));
+
 static std::unordered_map<clspv::Option::FloatingPointType,
                           clspv::Option::DenormMode>
     denorm_modes;
@@ -776,6 +780,8 @@ bool SupportsFmaKHR(uint32_t scalarSizeInBits) {
 }
 
 uint32_t MemmoveAllocaLimit() { return memmove_alloca_limit; }
+
+bool VulkanMemoryModel() { return vulkan_memory_model; }
 
 void CleanCache() { denorm_modes.clear(); }
 

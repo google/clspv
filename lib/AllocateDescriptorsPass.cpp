@@ -338,9 +338,10 @@ bool clspv::AllocateDescriptorsPass::AllocateKernelArgDescriptors(Module &M) {
       }
 
       int coherent = 0;
-      if (uses_barriers && (arg_kind == clspv::ArgKind::Buffer ||
-                            arg_kind == clspv::ArgKind::StorageImage ||
-                            arg_kind == clspv::ArgKind::StorageTexelBuffer)) {
+      if (uses_barriers && !clspv::Option::VulkanMemoryModel() &&
+          (arg_kind == clspv::ArgKind::Buffer ||
+           arg_kind == clspv::ArgKind::StorageImage ||
+           arg_kind == clspv::ArgKind::StorageTexelBuffer)) {
         // Coherency is only required if the argument is an SSBO or storage
         // image or texel buffer that is both read and written to.
         bool reads = false;

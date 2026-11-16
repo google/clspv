@@ -245,4 +245,18 @@ std::pair<Value *, Value *> InsertOpMulExtended(Instruction *InsertPoint,
   }
 }
 
+uint32_t ApplyMemoryModelSemantics(uint32_t semantics) {
+  if (clspv::Option::VulkanMemoryModel()) {
+    if (semantics & (spv::MemorySemanticsAcquireMask |
+                     spv::MemorySemanticsAcquireReleaseMask)) {
+      semantics |= spv::MemorySemanticsMakeVisibleKHRMask;
+    }
+    if (semantics & (spv::MemorySemanticsReleaseMask |
+                     spv::MemorySemanticsAcquireReleaseMask)) {
+      semantics |= spv::MemorySemanticsMakeAvailableKHRMask;
+    }
+  }
+  return semantics;
+}
+
 } // namespace clspv

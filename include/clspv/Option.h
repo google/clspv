@@ -357,6 +357,9 @@ bool SupportsFmaKHR(uint32_t scalarSizeInBits);
 // that it can be implemented with an alloca
 uint32_t MemmoveAllocaLimit();
 
+// Returns true if SPV_KHR_vulkan_memory_model is enabled.
+bool VulkanMemoryModel();
+
 // Clean option caches.
 void CleanCache();
 

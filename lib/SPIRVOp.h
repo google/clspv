@@ -51,4 +51,6 @@ std::pair<Value *, Value *>
 InsertOpMulExtended(Instruction *InsertPoint, Value *a, Value *b, bool IsSigned,
                     bool ExtractLo = true, bool Int64 = false);
 
+uint32_t ApplyMemoryModelSemantics(uint32_t semantics);
+
 } // namespace clspv
