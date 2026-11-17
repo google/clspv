@@ -3653,6 +3653,11 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
                               "SPV_EXT_shader_atomic_float_min_max");
   }
 
+  if (clspv::Option::SubgroupUniformControlFlow() && !EntryPoints.empty()) {
+    addSPIRVInst<kExtensions>(spv::OpExtension,
+                              "SPV_KHR_subgroup_uniform_control_flow");
+  }
+
   //
   // Generate OpMemoryModel
   //
@@ -3772,6 +3777,15 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
 
         addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
       }
+    }
+  }
+
+  if (clspv::Option::SubgroupUniformControlFlow()) {
+    for (auto EntryPoint : EntryPoints) {
+      Ops.clear();
+      Ops << EntryPoint.second
+          << spv::ExecutionModeSubgroupUniformControlFlowKHR;
+      addSPIRVInst<kExecutionModes>(spv::OpExecutionMode, Ops);
     }
   }
 

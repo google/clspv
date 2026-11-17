@@ -341,6 +341,9 @@ bool ClMadEnable();
 // Returns true if cl_arm_integer_dot_product is enabled
 bool ArmIntegerDotProduct();
 
+// Returns true if SPV_KHR_subgroup_uniform_control_flow is enabled
+bool SubgroupUniformControlFlow();
+
 // Returns true if untyped pointers are enabled
 bool UntypedPointers();
 
