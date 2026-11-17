@@ -47,6 +47,9 @@ additional extensions:
   class.
 - _SPV\_KHR\_non\_semantic\_info_ - to enable embedding reflection information
   directly into the binary.
+- _SPV\_KHR\_subgroup\_uniform\_control\_flow_ - to emit the
+  `SubgroupUniformControlFlowKHR` execution mode on kernels when
+  `-subgroup-uniform-control-flow` is used.
 
 The SPIR-V as produced from the OpenCL C language can make use of the following
 capabilities:

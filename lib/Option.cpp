@@ -516,6 +516,11 @@ static llvm::cl::opt<bool> no_subgroup_ifp(
     llvm::cl::desc("Indicate that kernels in this program do not require "
                    "sub-groups to make independent forward progress"));
 
+static llvm::cl::opt<bool> subgroup_uniform_control_flow(
+    "subgroup-uniform-control-flow", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Enable SPV_KHR_subgroup_uniform_control_flow for kernels."));
+
 static llvm::cl::opt<bool>
     untyped_pointers("untyped-pointers", llvm::cl::init(false),
                      llvm::cl::desc("Enable SPV_KHR_untyped_pointers"));
@@ -724,6 +729,8 @@ uint32_t PrintfBufferSize() { return printf_buffer_size; }
 bool ClMadEnable() { return cl_mad_enable; }
 
 bool ArmIntegerDotProduct() { return cl_arm_integer_dot_product; }
+
+bool SubgroupUniformControlFlow() { return subgroup_uniform_control_flow; }
 
 bool UntypedPointers() { return untyped_pointers; }
 
