@@ -878,10 +878,13 @@ bool Builtins::BuiltinWithGenericPointer(StringRef name) {
     }
   }
 
-  // Check for vstore_half family of functions.
-  if (demangled.size() >= strlen("vstore_half")) {
-    static Regex regex("^vstore_half(2|3|4|8|16)?(_rte|_rtz|_rtp|_rtn)?$");
-    if (regex.match(demangled)) {
+  // Check for vstore_half / vstorea_half family of functions.
+  StringRef demangled_ref(demangled);
+  if (demangled_ref.starts_with("vstore_half") ||
+      demangled_ref.starts_with("vstorea_half")) {
+    static Regex regex("^(vstore_half(2|3|4|8|16)?|vstorea_half(2|3|4|8|16))"
+                       "(_rte|_rtz|_rtp|_rtn)?$");
+    if (regex.match(demangled_ref)) {
       return true;
     }
   }
