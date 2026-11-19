@@ -22,6 +22,7 @@
 #include "NativeMathPass.h"
 #include "ReplaceOpenCLBuiltinPass.h"
 #include "clspv/Option.h"
+#include "clspv/spirv_glsl.hpp"
 
 #include <set>
 
@@ -30,6 +31,58 @@ using namespace llvm;
 namespace {
 bool is_libclc_builtin(llvm::Function *F) {
   return F->getMetadata("clspv_libclc_builtin");
+}
+
+bool is_unsupported_fp64_glsl_op(clspv::glsl::ExtInst Op) {
+  switch (Op) {
+  case clspv::glsl::ExtInst::ExtInstRadians:
+  case clspv::glsl::ExtInst::ExtInstDegrees:
+  case clspv::glsl::ExtInst::ExtInstAcos:
+  case clspv::glsl::ExtInst::ExtInstAcosh:
+  case clspv::glsl::ExtInst::ExtInstAsin:
+  case clspv::glsl::ExtInst::ExtInstAsinh:
+  case clspv::glsl::ExtInst::ExtInstAtan:
+  case clspv::glsl::ExtInst::ExtInstAtanh:
+  case clspv::glsl::ExtInst::ExtInstAtan2:
+  case clspv::glsl::ExtInst::ExtInstSin:
+  case clspv::glsl::ExtInst::ExtInstSinh:
+  case clspv::glsl::ExtInst::ExtInstCos:
+  case clspv::glsl::ExtInst::ExtInstCosh:
+  case clspv::glsl::ExtInst::ExtInstTan:
+  case clspv::glsl::ExtInst::ExtInstTanh:
+  case clspv::glsl::ExtInst::ExtInstExp:
+  case clspv::glsl::ExtInst::ExtInstExp2:
+  case clspv::glsl::ExtInst::ExtInstLog:
+  case clspv::glsl::ExtInst::ExtInstLog2:
+  case clspv::glsl::ExtInst::ExtInstPow:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool keep_fp64_libclc_body(const clspv::Builtins::FunctionInfo &Info,
+                           const llvm::Function &F) {
+  if (F.isDeclaration() || !F.getReturnType()->getScalarType()->isDoubleTy()) {
+    return false;
+  }
+  if (is_unsupported_fp64_glsl_op(clspv::Builtins::getExtInstEnum(Info))) {
+    return true;
+  }
+  switch (Info.getType()) {
+  case clspv::Builtins::kExp10:
+  case clspv::Builtins::kExpm1:
+  case clspv::Builtins::kLog10:
+  case clspv::Builtins::kLog1p:
+  case clspv::Builtins::kPown:
+  case clspv::Builtins::kCospi:
+  case clspv::Builtins::kSinpi:
+  case clspv::Builtins::kTanpi:
+  case clspv::Builtins::kSincos:
+    return true;
+  default:
+    return false;
+  }
 }
 } // namespace
 
@@ -45,20 +98,23 @@ PreservedAnalyses clspv::NativeMathPass::run(Module &M,
     // Default conversions are declarations replaced by ReplaceOpenCLBuiltinPass
     // with standard cast instructions, whereas saturated and explicit rounding
     // mode conversions have a libclc implementation body that must be kept.
+    // FP64 math builtins lacking 64-bit Vulkan SPIR-V GLSL.std.450 support
+    // also keep their libclc implementation bodies.
     bool is_convert_with_body =
         info.getType() == Builtins::kConvert && !F.isDeclaration();
+    bool keep_libclc_body =
+        is_convert_with_body || keep_fp64_libclc_body(info, F);
 
     bool has_glsl_ext_inst =
         Builtins::getExtInstEnum(info) != Builtins::kGlslExtInstBad;
     bool is_replaceable_builtin =
-        ReplaceOpenCLBuiltinPass::ReplaceableBuiltins.count(info.getType()) >
-            0 &&
-        !is_convert_with_body;
-    bool have_native_impl = has_glsl_ext_inst || is_replaceable_builtin;
+        ReplaceOpenCLBuiltinPass::ReplaceableBuiltins.count(info.getType()) > 0;
+    bool have_native_impl =
+        (has_glsl_ext_inst || is_replaceable_builtin) && !keep_libclc_body;
     if (have_native_impl &&
         (nativeBuiltins.count(info.getType()) || clspv::Option::NativeMath())) {
       F.deleteBody();
-    } else if (!have_native_impl && !is_convert_with_body &&
+    } else if (!have_native_impl && !keep_libclc_body &&
                nativeBuiltins.count(info.getType())) {
       llvm::report_fatal_error(
           llvm::StringRef("--use-native-builtins: couldn't replace builtin '" +
