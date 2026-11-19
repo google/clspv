@@ -23,7 +23,7 @@ set -x
 
 # Common tools.
 using cmake-3.31.2
-using gcc-13
+using gcc-15
 using ninja-1.10.0
 using python-3.12
 
@@ -31,14 +31,14 @@ BUILD_ROOT=$PWD
 SRC=$PWD/github/clspv
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-13.0.1
+  using clang-18
 fi
 
 # Get Clspv dependencies.
 cd $SRC
 python3 utils/fetch_sources.py --ci
 
-VULKAN_VERSION=v1.3.243
+VULKAN_VERSION=v1.4.350
 
 # Get and build Vulkan-Headers
 echo $(date): Starting Vulkan-Headers build...
