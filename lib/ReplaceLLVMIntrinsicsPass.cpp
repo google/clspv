@@ -968,13 +968,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceCopysign(Function &F) {
     // Return X with the sign of Y
 
     // Sign bit masks
-    auto SignBit = IntTy->getScalarSizeInBits() - 1;
-    auto SignBitMask = 1 << SignBit;
-    auto SignBitMaskValue = ConstantInt::get(
-        IntTy, SignBitMask, /* isSigned = */ false, /* implicitTrunc = */ true);
-    auto NotMask = ~SignBitMask;
-    auto NotSignBitMaskValue = ConstantInt::get(
-        IntTy, NotMask, /* isSigned = */ false, /* implicitTrunc = */ true);
+    auto SignBitMask = APInt::getSignMask(IntTy->getScalarSizeInBits());
+    auto SignBitMaskValue = ConstantInt::get(IntTy, SignBitMask);
+    auto NotSignBitMaskValue = ConstantInt::get(IntTy, ~SignBitMask);
 
     IRBuilder<> Builder(CI);
 
