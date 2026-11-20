@@ -249,12 +249,12 @@ Value *MemoryOrderSemantics(Value *order, bool is_global,
 
   // Constants for SPIR-V ordering memory semantics.
   const auto RelaxedSemantics = builder.getInt32(spv::MemorySemanticsMaskNone);
-  const auto AcquireSemantics =
-      builder.getInt32(spv::MemorySemanticsAcquireMask);
-  const auto ReleaseSemantics =
-      builder.getInt32(spv::MemorySemanticsReleaseMask);
-  const auto AcqRelSemantics =
-      builder.getInt32(spv::MemorySemanticsAcquireReleaseMask);
+  const auto AcquireSemantics = builder.getInt32(
+      ApplyMemoryModelSemantics(spv::MemorySemanticsAcquireMask));
+  const auto ReleaseSemantics = builder.getInt32(
+      ApplyMemoryModelSemantics(spv::MemorySemanticsReleaseMask));
+  const auto AcqRelSemantics = builder.getInt32(
+      ApplyMemoryModelSemantics(spv::MemorySemanticsAcquireReleaseMask));
 
   // Constants for SPIR-V storage class semantics.
   const auto UniformSemantics =
@@ -838,8 +838,9 @@ bool ReplaceOpenCLBuiltinPass::replaceWaitGroupEvents(Function &F) {
         "", CI->getIterator());
     auto MemorySemantics = BinaryOperator::Create(
         Instruction::Or, MemorySemanticsWorkgroup,
-        ConstantInt::get(Builder.getInt32Ty(),
-                         spv::MemorySemanticsAcquireReleaseMask),
+        ConstantInt::get(
+            Builder.getInt32Ty(),
+            ApplyMemoryModelSemantics(spv::MemorySemanticsAcquireReleaseMask)),
         "", CI->getIterator());
 
     return clspv::InsertSPIRVOp(
@@ -1217,7 +1218,8 @@ bool ReplaceOpenCLBuiltinPass::replaceBarrier(Function &F, bool subgroup) {
     const auto ImageMemFence =
         ConstantInt::get(Arg->getType(), MemFence::CLK_IMAGE_MEM_FENCE);
     const auto ConstantAcquireRelease = ConstantInt::get(
-        Arg->getType(), spv::MemorySemanticsAcquireReleaseMask);
+        Arg->getType(),
+        ApplyMemoryModelSemantics(spv::MemorySemanticsAcquireReleaseMask));
     const auto ConstantScopeDevice =
         ConstantInt::get(Arg->getType(), spv::ScopeDevice);
     const auto ConstantScopeWorkgroup =
@@ -1332,7 +1334,7 @@ bool ReplaceOpenCLBuiltinPass::replaceMemFence(
     const auto ImageMemFence =
         ConstantInt::get(Arg->getType(), MemFence::CLK_IMAGE_MEM_FENCE);
     const auto ConstantMemorySemantics =
-        ConstantInt::get(Arg->getType(), semantics);
+        ConstantInt::get(Arg->getType(), ApplyMemoryModelSemantics(semantics));
     const auto ConstantScopeWorkgroup =
         ConstantInt::get(Arg->getType(), spv::ScopeWorkgroup);
 
@@ -3396,9 +3398,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
     // We need to map the OpenCL constants to the SPIR-V equivalents.
     const auto ConstantScopeDevice = ConstantInt::get(IntTy, spv::ScopeDevice);
-    const auto ConstantMemorySemantics =
-        ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
-                                    spv::MemorySemanticsAcquireReleaseMask);
+    const auto ConstantMemorySemantics = ConstantInt::get(
+        IntTy,
+        ApplyMemoryModelSemantics(spv::MemorySemanticsUniformMemoryMask |
+                                  spv::MemorySemanticsAcquireReleaseMask));
 
     SmallVector<Value *, 5> Params;
 
@@ -3413,9 +3416,10 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomics(Function &F, spv::Op Op) {
 
     if (2 < CI->arg_size()) {
       // The unequal memory semantics.
-      const auto ConstantUnequalSemantics =
-          ConstantInt::get(IntTy, spv::MemorySemanticsUniformMemoryMask |
-                                      spv::MemorySemanticsAcquireMask);
+      const auto ConstantUnequalSemantics = ConstantInt::get(
+          IntTy,
+          ApplyMemoryModelSemantics(spv::MemorySemanticsUniformMemoryMask |
+                                    spv::MemorySemanticsAcquireMask));
       Params.push_back(ConstantUnequalSemantics);
 
       // The value.
@@ -3756,6 +3760,28 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicCompareExchange(Function &F) {
     // performed in the |then| block. The condition is the inversion of the
     // comparison result.
     IRBuilder<> builder(Call);
+    if (clspv::Option::VulkanMemoryModel()) {
+      // Vulkan (VUID-StandaloneSpirv-OpAtomicCompareExchange-10878) forbids
+      // Unequal (failure) memory semantics from setting MakeVisibleKHR unless
+      // Equal (success) also sets MakeVisibleKHR (which in turn requires
+      // AcquireRelease when Release is set).
+      auto fail_has_visible = builder.CreateICmpNE(
+          builder.CreateAnd(
+              failure,
+              builder.getInt32(spv::MemorySemanticsMakeVisibleKHRMask)),
+          builder.getInt32(0));
+      auto succ_is_release = builder.CreateICmpNE(
+          builder.CreateAnd(success,
+                            builder.getInt32(spv::MemorySemanticsReleaseMask)),
+          builder.getInt32(0));
+      auto need_promote = builder.CreateAnd(fail_has_visible, succ_is_release);
+      auto promoted_success = builder.CreateOr(
+          builder.CreateAnd(success,
+                            builder.getInt32(~spv::MemorySemanticsReleaseMask)),
+          builder.getInt32(spv::MemorySemanticsAcquireReleaseMask |
+                           spv::MemorySemanticsMakeVisibleKHRMask));
+      success = builder.CreateSelect(need_promote, promoted_success, success);
+    }
     auto load = builder.CreateLoad(value->getType(), expected);
     auto cmp_xchg = InsertSPIRVOp(
         Call, spv::OpAtomicCompareExchange, {Attribute::Convergent},
@@ -3833,8 +3859,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
                                  : spv::MemorySemanticsWorkgroupMemoryMask;
 
     if (clspv::Option::HackAtomicFlagBarrier() && OrderHasRelease(order_arg)) {
-      auto release_semantics =
-          builder.getInt32(spv::MemorySemanticsReleaseMask | storage);
+      auto release_semantics = builder.getInt32(
+          ApplyMemoryModelSemantics(spv::MemorySemanticsReleaseMask | storage));
       InsertMemoryBarrier(Call, scope, release_semantics);
     }
 
@@ -3844,8 +3870,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagTestAndSet(Function &F) {
                       {flag_pointer, scope, semantics, set_value});
 
     if (clspv::Option::HackAtomicFlagBarrier() && OrderHasAcquire(order_arg)) {
-      auto acquire_semantics =
-          builder.getInt32(spv::MemorySemanticsAcquireMask | storage);
+      auto acquire_semantics = builder.getInt32(
+          ApplyMemoryModelSemantics(spv::MemorySemanticsAcquireMask | storage));
       InsertMemoryBarrier(Call, scope, acquire_semantics);
     }
 
@@ -3881,8 +3907,8 @@ bool ReplaceOpenCLBuiltinPass::replaceAtomicFlagClear(Function &F) {
     if (clspv::Option::HackAtomicFlagBarrier() && OrderHasRelease(order_arg)) {
       uint32_t storage = is_global ? spv::MemorySemanticsUniformMemoryMask
                                    : spv::MemorySemanticsWorkgroupMemoryMask;
-      auto release_semantics =
-          builder.getInt32(spv::MemorySemanticsReleaseMask | storage);
+      auto release_semantics = builder.getInt32(
+          ApplyMemoryModelSemantics(spv::MemorySemanticsReleaseMask | storage));
       InsertMemoryBarrier(Call, scope, release_semantics);
     }
 

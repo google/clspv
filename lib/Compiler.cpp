@@ -1050,6 +1050,13 @@ int ParseOptions(const int argc, const char *const argv[]) {
     return -1;
   }
 
+  if (clspv::Option::VulkanMemoryModel() &&
+      clspv::Option::SpvVersion() < clspv::Option::SPIRVVersion::SPIRV_1_3) {
+    llvm::errs()
+        << "error: -vulkan-memory-model requires SPIR-V 1.3 or higher\n";
+    return -1;
+  }
+
   if (!clspv::Option::ImageSupport() &&
       enabled_feature_macros.count(clspv::FeatureMacro::__opencl_c_images)) {
     llvm::errs()
