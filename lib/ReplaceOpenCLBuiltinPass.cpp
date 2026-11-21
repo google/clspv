@@ -374,7 +374,12 @@ bool skipBuiltinsWithGenericPointer(Function &F,
   auto name = F.getName();
   if (!Builtins::BuiltinWithGenericPointer(name))
     return false;
-  if (clspv::Option::UseNativeBuiltins().count(builtin) > 0)
+  // NativeMathPass keeps the libclc implementation of FP64 sincos because
+  // GLSL.std.450 Sin and Cos only support 16-bit and 32-bit floats. Keep
+  // skipping it so that LowerAddrSpaceCastPass can redirect the call to it.
+  bool is_fp64_sincos = builtin == Builtins::kSincos &&
+                        F.getReturnType()->getScalarType()->isDoubleTy();
+  if (clspv::Option::UseNativeBuiltins().count(builtin) > 0 && !is_fp64_sincos)
     return false;
   for (auto &Arg : F.args()) {
     Type *Ty = Arg.getType();
@@ -3574,7 +3579,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
     //   OpConstant %float 1
     // which is not quite right.
     const double kJustUnderOneScalar =
-        ldexp(double((1 << num_significand_bits) - 1), -num_significand_bits);
+        ldexp(double((1ULL << num_significand_bits) - 1),
+              -static_cast<int>(num_significand_bits));
 
     Constant *just_under_one =
         ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
