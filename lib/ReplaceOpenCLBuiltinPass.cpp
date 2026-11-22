@@ -369,12 +369,9 @@ bool replaceCallsWithValue(Function &F,
   return Changed;
 }
 
-bool skipBuiltinsWithGenericPointer(Function &F,
-                                    Builtins::BuiltinType builtin) {
+bool skipBuiltinsWithGenericPointer(Function &F) {
   auto name = F.getName();
   if (!Builtins::BuiltinWithGenericPointer(name))
-    return false;
-  if (clspv::Option::UseNativeBuiltins().count(builtin) > 0)
     return false;
   for (auto &Arg : F.args()) {
     Type *Ty = Arg.getType();
@@ -433,11 +430,10 @@ void ReplaceOpenCLBuiltinPass::removeUnusedSamplers(Module &M) {
 
 bool ReplaceOpenCLBuiltinPass::runOnFunction(Function &F) {
   auto &FI = Builtins::Lookup(&F);
-  auto builtin = FI.getType();
-  if (skipBuiltinsWithGenericPointer(F, builtin)) {
+  if (skipBuiltinsWithGenericPointer(F)) {
     return false;
   }
-  switch (builtin) {
+  switch (FI.getType()) {
   case Builtins::kAbs:
     if (!FI.getParameter(0).is_signed) {
       return replaceAbs(F);
@@ -3574,7 +3570,8 @@ bool ReplaceOpenCLBuiltinPass::replaceFract(Function &F, int vec_size) {
     //   OpConstant %float 1
     // which is not quite right.
     const double kJustUnderOneScalar =
-        ldexp(double((1 << num_significand_bits) - 1), -num_significand_bits);
+        ldexp(double((1ULL << num_significand_bits) - 1),
+              -static_cast<int>(num_significand_bits));
 
     Constant *just_under_one =
         ConstantFP::get(result_ty->getScalarType(), kJustUnderOneScalar);
