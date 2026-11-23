@@ -3,6 +3,21 @@
 ; RUN: spirv-val --target-env spv1.0 %t.spv
 ; RUN: FileCheck %s < %t.spvasm
 
+; RUN: clspv-opt %s -hack-convert-to-float -cl-unsafe-math-optimizations --passes=spirv-producer -o %t.unsafe.ll -producer-out-file %t.unsafe.spv
+; RUN: spirv-dis %t.unsafe.spv -o %t.unsafe.spvasm
+; RUN: spirv-val --target-env spv1.0 %t.unsafe.spv
+; RUN: FileCheck %s --check-prefix=NOHACK < %t.unsafe.spvasm
+
+; RUN: clspv-opt %s -hack-convert-to-float -cl-fast-relaxed-math --passes=spirv-producer -o %t.fast.ll -producer-out-file %t.fast.spv
+; RUN: spirv-dis %t.fast.spv -o %t.fast.spvasm
+; RUN: spirv-val --target-env spv1.0 %t.fast.spv
+; RUN: FileCheck %s --check-prefix=NOHACK < %t.fast.spvasm
+
+; RUN: clspv-opt %s -hack-convert-to-float -cl-native-math --passes=spirv-producer -o %t.native.ll -producer-out-file %t.native.spv
+; RUN: spirv-dis %t.native.spv -o %t.native.spvasm
+; RUN: spirv-val --target-env spv1.0 %t.native.spv
+; RUN: FileCheck %s --check-prefix=NOHACK < %t.native.spvasm
+
 ; CHECK: OpCapability Float16
 ; CHECK: OpFConvert
 ; CHECK-NEXT: OpBitcast
@@ -10,6 +25,10 @@
 ; CHECK-NEXT: OpBitcast
 ; CHECK-NEXT: OpFAdd
 ; CHECK-NEXT: OpStore
+
+; NOHACK: OpCapability Float16
+; NOHACK: OpFConvert
+; NOHACK-NEXT: OpStore
 
 target datalayout = "e-p:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024"
 target triple = "spirv32-unknown-vulkan"

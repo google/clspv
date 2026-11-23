@@ -88,6 +88,8 @@ bool HackLogicalPtrtoint();
 
 // Returns true if a dummy instruction should be inserted after conversion to
 // float to prevent driver optimisation getting rid of the conversion.
+// Disabled when UnsafeMath() is enabled (i.e. -cl-unsafe-math-optimizations,
+// -cl-fast-relaxed-math, or -cl-native-math).
 bool HackConvertToFloat();
 
 // Returns true if reading a image1d_buffer with CL_BGRA format without sampler

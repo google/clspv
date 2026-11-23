@@ -169,7 +169,9 @@ llvm::cl::opt<bool> hack_mul_extended(
 llvm::cl::opt<bool> hack_convert_to_float(
     "hack-convert-to-float", llvm::cl::init(false),
     llvm::cl::desc("Insert a dummy instruction after conversions to float to "
-                   "avoid driver optimization getting rid of the conversion"));
+                   "avoid driver optimization getting rid of the conversion. "
+                   "Disabled when -cl-unsafe-math-optimizations, "
+                   "-cl-fast-relaxed-math, or -cl-native-math is enabled."));
 
 llvm::cl::opt<bool> hack_atomic_flag_barrier(
     "hack-atomic-flag-barrier", llvm::cl::init(false),
@@ -567,7 +569,7 @@ bool HackBlockOrder() { return hack_block_order; }
 bool HackClampWidth() { return hack_clamp_width; }
 bool HackMulExtended() { return hack_mul_extended; }
 bool HackLogicalPtrtoint() { return hack_logical_ptrtoint; }
-bool HackConvertToFloat() { return hack_convert_to_float; }
+bool HackConvertToFloat() { return hack_convert_to_float && !UnsafeMath(); }
 bool HackImage1dBufferBGRA() { return hack_image1d_buffer_bgra; }
 bool HackAtomicFlagBarrier() { return hack_atomic_flag_barrier; }
 bool HackPSBVolatileAsAtomic() { return hack_psb_volatile_as_atomic; }
