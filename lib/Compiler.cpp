@@ -408,8 +408,6 @@ int SetCompilerInstanceOptions(
   instance.getLangOpts().SinglePrecisionConstants =
       cl_single_precision_constants;
   // cl_fp32_correctly_rounded_divide_sqrt ignored for now!
-  instance.getCodeGenOpts().LessPreciseFPMAD =
-      clspv::Option::ClMadEnable() || clspv::Option::UnsafeMath();
   // cl_no_signed_zeros ignored for now!
   instance.getLangOpts().UnsafeFPMath = clspv::Option::UnsafeMath();
   instance.getLangOpts().FastRelaxedMath = clspv::Option::FastRelaxedMath();

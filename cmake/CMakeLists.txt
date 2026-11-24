@@ -118,13 +118,18 @@ add_custom_target(clspv64_builtin_library
 if (NOT DEFINED CLSPV_EXTERNAL_LIBCLC_DIR)
   set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spirv32-unknown-vulkan/libclc.bc)
   set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV_LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/lib/spirv64-unknown-vulkan/libclc.bc)
-  set(CLSPV_LIBRARY_DEP libclc)
-  set(CLSPV64_LIBRARY_DEP libclc)
+  # libclc is built via LLVM runtimes (ExternalProject), so the outer build
+  # system does not track its libclc.bc outputs directly. Declare them as
+  # BYPRODUCTS of a wrapper target depending on libclc so that the baked
+  # headers are regenerated whenever libclc.bc is updated.
+  add_custom_target(clspv_libclc_byproducts
+    COMMAND ${CMAKE_COMMAND} -E true
+    BYPRODUCTS ${CLSPV_LIBRARY_INPUT_FILE} ${CLSPV64_LIBRARY_INPUT_FILE}
+    DEPENDS libclc
+  )
 else()
   set(CLSPV_LIBRARY_INPUT_FILE ${CLSPV_EXTERNAL_LIBCLC_DIR}/spirv32-unknown-vulkan/libclc.bc)
   set(CLSPV64_LIBRARY_INPUT_FILE ${CLSPV_EXTERNAL_LIBCLC_DIR}/spirv64-unknown-vulkan/libclc.bc)
-  set(CLSPV_LIBRARY_DEP ${CLSPV_LIBRARY_INPUT_FILE})
-  set(CLSPV64_LIBRARY_DEP ${CLSPV64_LIBRARY_INPUT_FILE})
 endif()
 
 add_custom_command(
@@ -135,7 +140,7 @@ add_custom_command(
     --header-var=${CLSPV_LIBRARY_DATA_VAR_NAME}
     --header-size=${CLSPV_LIBRARY_SIZE_VAR_NAME}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV_LIBRARY_DEP}
+    DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV_LIBRARY_INPUT_FILE}
 )
 
 add_custom_command(
@@ -146,5 +151,5 @@ add_custom_command(
     --header-var=${CLSPV64_LIBRARY_DATA_VAR_NAME}
     --header-size=${CLSPV64_LIBRARY_SIZE_VAR_NAME}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV64_LIBRARY_DEP}
+    DEPENDS ${BAKE_FILE_PYTHON_FILE} ${CLSPV64_LIBRARY_INPUT_FILE}
 )
