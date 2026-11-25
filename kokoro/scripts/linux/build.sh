@@ -23,7 +23,7 @@ set -x
 
 # Common tools.
 using cmake-3.31.2
-using gcc-13
+using gcc-15
 using ninja-1.10.0
 using python-3.12
 
@@ -36,11 +36,19 @@ python3 utils/fetch_sources.py --ci
 mkdir build && cd $SRC/build
 
 if [ "$BUILD_TOOLCHAIN" == "clang" ]; then
-  using clang-13.0.1
+  using clang-18
+fi
+
+CMAKE_OPTIONS=""
+if [ "$BUILD_TOOLCHAIN" == "gcc" ] && [ "$BUILD_TYPE" == "Debug" ]; then
+  # Enable split DWARF for GCC Debug builds to reduce linker memory usage and
+  # avoid running out of memory when linking large LLVM/Clang binaries in
+  # parallel.
+  CMAKE_OPTIONS="-DLLVM_USE_SPLIT_DWARF=ON"
 fi
 
 echo $(date): Starting build...
-cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+cmake -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE $CMAKE_OPTIONS ..
 
 echo $(date): Build everything...
 ninja
