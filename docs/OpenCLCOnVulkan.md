@@ -50,11 +50,18 @@ additional extensions:
 - _SPV\_KHR\_subgroup\_uniform\_control\_flow_ - to emit the
   `SubgroupUniformControlFlowKHR` execution mode on kernels when
   `-subgroup-uniform-control-flow` is used.
+- _SPV\_KHR\_vulkan\_memory\_model_ - to enable the Vulkan memory model prior to
+  SPIR-V 1.5 when `-vulkan-memory-model` is used.
 
 The SPIR-V as produced from the OpenCL C language can make use of the following
 capabilities:
 
 - `Shader` as we are targeting the OpenCL C language at a Vulkan implementation.
+- `VulkanMemoryModel` and `VulkanMemoryModelDeviceScope`, from the
+  _SPV\_KHR\_vulkan\_memory\_model_ extension (or core SPIR-V 1.5), when
+  `-vulkan-memory-model` is used.
+  - *Note*: `VulkanMemoryModelDeviceScope` is only emitted when an atomic,
+    barrier, or fence operation uses `Device` memory scope.
 - `VariablePointersStorageBuffer`, from the _SPV\_KHR\_variable\_pointers_ extension.
 - `VariablePointers`, from the _SPV\_KHR\_variable\_pointers_ extension.
   - *Note*: the compiler attempts to add the minimal variable pointers capability required.
@@ -209,9 +216,27 @@ shader is as follows:
   ID is reported in the descriptor map file, generated via the `-descriptormap`
   option.
 
-The shaders produced use the GLSL450 memory model. As such, there is an assumption of
+#### Memory Model
+
+The default shaders produced use the GLSL450 memory model. As such, there is an assumption of
 no aliasing by default. The compiler does not generate *Aliased* decorations
 currently. Users should be aware of this and ensure they are not relying on aliasing.
+
+The `-vulkan-memory-model` option can be used to produce shaders using the
+Vulkan memory model (`SPV_KHR_vulkan_memory_model`). In this mode:
+- SPIR-V 1.3 or higher is required, and
+  `OpExtension "SPV_KHR_vulkan_memory_model"` is emitted prior to SPIR-V 1.5.
+- `OpCapability VulkanMemoryModel` is emitted, and
+  `OpCapability VulkanMemoryModelDeviceScope` is emitted only when `Device`
+  memory scope is used.
+- `Coherent` decorations on storage buffers, storage images, and function
+  parameters are suppressed, and resource descriptors are not split by
+  coherency.
+- Non-private memory accesses (`OpLoad`, `OpStore`, `OpCopyMemorySized`) and
+  storage-image accesses (`OpImageRead`, `OpImageWrite`) are tagged with
+  `NonPrivatePointer` and `NonPrivateTexel`.
+- Non-relaxed atomic, barrier, and fence operations include `MakeAvailable` and
+  `MakeVisible` memory semantics.
 
 #### Embedded Reflection Instructions
 

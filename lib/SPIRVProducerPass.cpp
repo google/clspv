@@ -68,6 +68,7 @@
 #include "Layout.h"
 #include "NormalizeGlobalVariable.h"
 #include "Passes.h"
+#include "SPIRVOp.h"
 #include "SpecConstant.h"
 #include "Types.h"
 
@@ -542,6 +543,52 @@ struct SPIRVProducerPassImpl {
 
   // Returns true if |Arg| is called with a coherent resource.
   bool CalledWithCoherentResource(Argument &Arg);
+
+  bool isNonPrivatePointer(Value *ptr) {
+    if (!ptr->getType()->isPointerTy()) {
+      return false;
+    }
+    switch (GetStorageClass(GetPointerAddressSpace(ptr))) {
+    case spv::StorageClassUniform:
+    case spv::StorageClassWorkgroup:
+    case spv::StorageClassStorageBuffer:
+    case spv::StorageClassPhysicalStorageBuffer:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  void addDeviceScopeCapabilityIfUsed(Value *scope_val) {
+    if (!clspv::Option::VulkanMemoryModel()) {
+      return;
+    }
+    SmallPtrSet<Value *, 8> visited;
+    SmallVector<Value *, 8> worklist;
+    worklist.push_back(scope_val);
+    while (!worklist.empty()) {
+      Value *v = worklist.pop_back_val();
+      if (!visited.insert(v).second) {
+        continue;
+      }
+      if (auto *ci = dyn_cast<ConstantInt>(v)) {
+        if (ci->getZExtValue() == spv::ScopeDevice) {
+          addCapability(spv::CapabilityVulkanMemoryModelDeviceScope);
+          return;
+        }
+      } else if (auto *sel = dyn_cast<SelectInst>(v)) {
+        worklist.push_back(sel->getTrueValue());
+        worklist.push_back(sel->getFalseValue());
+      } else if (auto *phi = dyn_cast<PHINode>(v)) {
+        for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
+          worklist.push_back(phi->getIncomingValue(i));
+        }
+      } else {
+        addCapability(spv::CapabilityVulkanMemoryModelDeviceScope);
+        return;
+      }
+    }
+  }
 
   bool NeedDecorationNoContraction(spv::Op op) {
     static const SmallVector<spv::Op> list_full = {
@@ -2974,7 +3021,7 @@ void SPIRVProducerPassImpl::GenerateResourceVars() {
     Ops << info->var_id << spv::DecorationBinding << info->binding;
     addSPIRVInst<kAnnotations>(spv::OpDecorate, Ops);
 
-    if (info->coherent) {
+    if (info->coherent && !clspv::Option::VulkanMemoryModel()) {
       // Decorate with Coherent if required for the variable.
       Ops.clear();
       Ops << info->var_id << spv::DecorationCoherent;
@@ -3512,7 +3559,8 @@ void SPIRVProducerPassImpl::GenerateFuncPrologue(Function &F) {
       SPIRVID param_id = addSPIRVInst(spv::OpFunctionParameter, Ops);
       VMap[&Arg] = param_id;
 
-      if (CalledWithCoherentResource(Arg)) {
+      if (CalledWithCoherentResource(Arg) &&
+          !clspv::Option::VulkanMemoryModel()) {
         // If the arg is passed a coherent resource ever, then decorate this
         // parameter with Coherent too.
         Ops.clear();
@@ -3561,6 +3609,9 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
       ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp32) ||
       ExecutionModeSignedZeroInfNanPreserve(FloatingPointType::fp64)) {
     addCapability(spv::CapabilitySignedZeroInfNanPreserve);
+  }
+  if (clspv::Option::VulkanMemoryModel()) {
+    addCapability(spv::CapabilityVulkanMemoryModel);
   }
 
   SPIRVOperandVec Ops;
@@ -3658,18 +3709,22 @@ void SPIRVProducerPassImpl::GenerateModuleInfo() {
                               "SPV_KHR_subgroup_uniform_control_flow");
   }
 
+  if (clspv::Option::VulkanMemoryModel() &&
+      SpvVersion() < SPIRVVersion::SPIRV_1_5) {
+    addSPIRVInst<kExtensions>(spv::OpExtension, "SPV_KHR_vulkan_memory_model");
+  }
+
   //
   // Generate OpMemoryModel
   //
-  // Memory model for Vulkan will always be GLSL450.
-
   // Ops[0] = Addressing Model
   // Ops[1] = Memory Model
   Ops.clear();
   Ops << (clspv::Option::PhysicalStorageBuffers()
               ? spv::AddressingModelPhysicalStorageBuffer64
               : spv::AddressingModelLogical)
-      << spv::MemoryModelGLSL450;
+      << (clspv::Option::VulkanMemoryModel() ? spv::MemoryModelVulkanKHR
+                                             : spv::MemoryModelGLSL450);
 
   addSPIRVInst<kMemoryModel>(spv::OpMemoryModel, Ops);
 
@@ -4190,6 +4245,7 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
   }
   case Builtins::kSpirvAtomicXor: {
     // Handle SPIR-V intrinsics
+    addDeviceScopeCapabilityIfUsed(Call->getArgOperand(1));
     SPIRVOperandVec Ops;
 
     if (!Call->getType()->isVoidTy()) {
@@ -4207,6 +4263,37 @@ SPIRVProducerPassImpl::GenerateClspvInstruction(CallInst *Call,
     // Handle SPIR-V intrinsics
     auto *arg0 = dyn_cast<ConstantInt>(Call->getArgOperand(0));
     spv::Op opcode = static_cast<spv::Op>(arg0->getZExtValue());
+    switch (opcode) {
+    case spv::OpMemoryBarrier:
+      addDeviceScopeCapabilityIfUsed(Call->getArgOperand(1));
+      break;
+    case spv::OpControlBarrier:
+    case spv::OpAtomicLoad:
+    case spv::OpAtomicStore:
+    case spv::OpAtomicExchange:
+    case spv::OpAtomicCompareExchange:
+    case spv::OpAtomicCompareExchangeWeak:
+    case spv::OpAtomicIIncrement:
+    case spv::OpAtomicIDecrement:
+    case spv::OpAtomicIAdd:
+    case spv::OpAtomicISub:
+    case spv::OpAtomicSMin:
+    case spv::OpAtomicUMin:
+    case spv::OpAtomicSMax:
+    case spv::OpAtomicUMax:
+    case spv::OpAtomicAnd:
+    case spv::OpAtomicOr:
+    case spv::OpAtomicXor:
+    case spv::OpAtomicFlagTestAndSet:
+    case spv::OpAtomicFlagClear:
+    case spv::OpAtomicFAddEXT:
+    case spv::OpAtomicFMinEXT:
+    case spv::OpAtomicFMaxEXT:
+      addDeviceScopeCapabilityIfUsed(Call->getArgOperand(2));
+      break;
+    default:
+      break;
+    }
     if (opcode == spv::OpAtomicFAddEXT) {
       switch (Call->getType()->getScalarSizeInBits()) {
       case 32:
@@ -4401,6 +4488,9 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
 
       Ops << result_type << Image << CoordinateID;
       uint32_t mask = GetExtendMask(Call->getType(), is_int_image);
+      if (clspv::Option::VulkanMemoryModel()) {
+        mask |= spv::ImageOperandsNonPrivateTexelKHRMask;
+      }
       if (mask != 0)
         Ops << mask;
       RID = addSPIRVInst(spv::OpImageRead, Ops);
@@ -4490,6 +4580,9 @@ SPIRVProducerPassImpl::GenerateImageInstruction(CallInst *Call,
     }
     Ops << Image << CoordinateID << TexelID;
     uint32_t mask = GetExtendMask(Texel->getType(), is_int_image);
+    if (clspv::Option::VulkanMemoryModel()) {
+      mask |= spv::ImageOperandsNonPrivateTexelKHRMask;
+    }
     if (mask != 0)
       Ops << mask;
     RID = addSPIRVInst(spv::OpImageWrite, Ops);
@@ -5517,6 +5610,12 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
 
     SPIRVOperandVec Ops;
     Ops << Dst << Src << Call->getArgOperand(2);
+    assert((!clspv::Option::VulkanMemoryModel() ||
+            isNonPrivatePointer(Dst) == isNonPrivatePointer(Src)) &&
+           "Mixed private/non-private OpCopyMemorySized should have been "
+           "lowered");
+    const bool non_private =
+        clspv::Option::VulkanMemoryModel() && isNonPrivatePointer(Dst);
     if (Option::SpvVersion() < Option::SPIRVVersion::SPIRV_1_4) {
       // Before 1.4, memory operands affected both Dst and Src so use the
       // smaller alignment.
@@ -5526,21 +5625,37 @@ SPIRVID SPIRVProducerPassImpl::GenerateInstructionFromCall(CallInst *Call) {
         memOp |= 0x1;
       if (align != 0)
         memOp |= 0x2;
-      Ops << memOp << align;
+      if (non_private) {
+        memOp |= spv::MemoryAccessNonPrivatePointerKHRMask;
+      }
+      Ops << memOp;
+      if (align != 0)
+        Ops << align;
     } else {
       uint32_t DstMemOp = 0;
       if (Volatile)
         DstMemOp |= 0x1;
       if (DstAlign != 0)
         DstMemOp |= 0x2;
+      if (non_private) {
+        DstMemOp |= spv::MemoryAccessNonPrivatePointerKHRMask;
+      }
 
       uint32_t SrcMemOp = 0;
       if (Volatile)
         SrcMemOp |= 0x1;
       if (SrcAlign != 0)
         SrcMemOp |= 0x2;
+      if (non_private) {
+        SrcMemOp |= spv::MemoryAccessNonPrivatePointerKHRMask;
+      }
 
-      Ops << DstMemOp << DstAlign << SrcMemOp << SrcAlign;
+      Ops << DstMemOp;
+      if (DstAlign != 0)
+        Ops << DstAlign;
+      Ops << SrcMemOp;
+      if (SrcAlign != 0)
+        Ops << SrcAlign;
     }
     return addSPIRVInst(spv::OpCopyMemorySized, Ops);
   }
@@ -6870,6 +6985,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
     break;
   }
   case Instruction::PHI: {
+    PHINode *PHI = cast<PHINode>(&I);
+    if (PHI->getType()->isPointerTy()) {
+      auto &GlobalConstArgSet = getGlobalConstArgSet();
+      for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
+        if (GlobalConstArgSet.count(PHI->getIncomingValue(j))) {
+          GlobalConstArgSet.insert(PHI);
+          break;
+        }
+      }
+    }
     // PHI instruction is deferred because it needs label's ID.
     RID = addSPIRVPlaceholder(&I);
     break;
@@ -6945,6 +7070,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         LD->getType()->isIntegerTy(32) &&
         GetStorageClass(LD->getPointerAddressSpace()) ==
             spv::StorageClassPhysicalStorageBuffer) {
+      if (clspv::Option::VulkanMemoryModel()) {
+        addCapability(spv::CapabilityVulkanMemoryModelDeviceScope);
+      }
       Ops << getSPIRVInt32Constant(spv::ScopeDevice)
           << getSPIRVInt32Constant(spv::MemorySemanticsMaskNone);
       RID = addSPIRVInst(spv::OpAtomicLoad, Ops);
@@ -6952,6 +7080,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       uint32_t memory_access = spv::MemoryAccessAlignedMask;
       if (LD->isVolatile()) {
         memory_access |= spv::MemoryAccessVolatileMask;
+      }
+      if (clspv::Option::VulkanMemoryModel() && isNonPrivatePointer(ptr)) {
+        memory_access |= spv::MemoryAccessNonPrivatePointerKHRMask;
       }
       Ops << memory_access;
       Ops << static_cast<uint32_t>(LD->getAlign().value());
@@ -6996,6 +7127,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         value_ty->isIntegerTy(32) &&
         GetStorageClass(ST->getPointerAddressSpace()) ==
             spv::StorageClassPhysicalStorageBuffer) {
+      if (clspv::Option::VulkanMemoryModel()) {
+        addCapability(spv::CapabilityVulkanMemoryModelDeviceScope);
+      }
       Ops << getSPIRVInt32Constant(spv::ScopeDevice)
           << getSPIRVInt32Constant(spv::MemorySemanticsMaskNone)
           << ST->getValueOperand();
@@ -7012,6 +7146,9 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
       uint32_t memory_access = spv::MemoryAccessAlignedMask;
       if (ST->isVolatile()) {
         memory_access |= spv::MemoryAccessVolatileMask;
+      }
+      if (clspv::Option::VulkanMemoryModel() && isNonPrivatePointer(ptr)) {
+        memory_access |= spv::MemoryAccessNonPrivatePointerKHRMask;
       }
       Ops << memory_access;
       Ops << static_cast<uint32_t>(ST->getAlign().value());
@@ -7075,13 +7212,16 @@ void SPIRVProducerPassImpl::GenerateInstruction(Instruction &I) {
         << getSPIRVPointerOperand(AtomicRMW->getPointerOperand(),
                                   AtomicRMW->getValOperand()->getType());
 
+    if (clspv::Option::VulkanMemoryModel()) {
+      addCapability(spv::CapabilityVulkanMemoryModelDeviceScope);
+    }
     const auto ConstantScopeDevice = getSPIRVInt32Constant(spv::ScopeDevice);
     Ops << ConstantScopeDevice;
 
     // Vulkan disallows sequentially consistent.
-    const auto ConstantMemorySemantics =
-        getSPIRVInt32Constant(spv::MemorySemanticsUniformMemoryMask |
-                              spv::MemorySemanticsAcquireReleaseMask);
+    const auto ConstantMemorySemantics = getSPIRVInt32Constant(
+        ApplyMemoryModelSemantics(spv::MemorySemanticsUniformMemoryMask |
+                                  spv::MemorySemanticsAcquireReleaseMask));
     Ops << ConstantMemorySemantics << AtomicRMW->getValOperand();
 
     RID = addSPIRVInst(opcode, Ops);
@@ -7232,13 +7372,9 @@ void SPIRVProducerPassImpl::HandleDeferredInstruction() {
       auto PHITy = PHI->getType();
       auto &GlobalConstArgSet = getGlobalConstArgSet();
       if (PHITy->isPointerTy()) {
-        for (unsigned j = 0; j < PHI->getNumIncomingValues(); j++) {
-          if (GlobalConstArgSet.count(PHI->getIncomingValue(j))) {
-            PHITy = PointerType::get(module->getContext(),
-                                     AddressSpace::ModuleScopePrivate);
-            GlobalConstArgSet.insert(PHI);
-            break;
-          }
+        if (GlobalConstArgSet.count(PHI)) {
+          PHITy = PointerType::get(module->getContext(),
+                                   AddressSpace::ModuleScopePrivate);
         }
         // OpPhi on pointers requires variable pointers.
         setVariablePointersCapabilities(PHITy->getPointerAddressSpace());

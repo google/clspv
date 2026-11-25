@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
@@ -50,6 +51,36 @@ Type *UpdateTy(LLVMContext &Ctx, uint64_t Size) {
     return Type::getInt16Ty(Ctx);
   } else {
     return Type::getInt8Ty(Ctx);
+  }
+}
+
+bool IsNonPrivatePointer(Value *Ptr) {
+  unsigned AS = Ptr->getType()->getPointerAddressSpace();
+  switch (AS) {
+  case clspv::AddressSpace::StorageBuffer:
+  case clspv::AddressSpace::Uniform:
+  case clspv::AddressSpace::Local:
+    return true;
+  case clspv::AddressSpace::Global:
+  case clspv::AddressSpace::Constant: {
+    SmallVector<const Value *, 4> Objects;
+    getUnderlyingObjects(Ptr, Objects, /*LI=*/nullptr, /*MaxLookup=*/0);
+    for (const Value *Obj : Objects) {
+      if (const auto *GV = dyn_cast<GlobalVariable>(Obj)) {
+        if (AS == clspv::AddressSpace::Constant &&
+            !clspv::Option::ModuleConstantsInStorageBuffer()) {
+          return false;
+        }
+        if (AS == clspv::AddressSpace::Global && GV->hasPrivateLinkage() &&
+            GV->isConstant() && GV->hasInitializer()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  default:
+    return false;
   }
 }
 } // namespace
@@ -831,7 +862,9 @@ bool clspv::ReplaceLLVMIntrinsicsPass::replaceMemcpy(Module &M) {
         if (!Option::UntypedPointerAddressSpace(
                 Dst->getType()->getPointerAddressSpace()) ||
             !Option::UntypedPointerAddressSpace(
-                Src->getType()->getPointerAddressSpace())) {
+                Src->getType()->getPointerAddressSpace()) ||
+            (Option::VulkanMemoryModel() &&
+             IsNonPrivatePointer(Dst) != IsNonPrivatePointer(Src))) {
           auto DstTy = clspv::InferType(Dst, M.getContext(), &type_cache);
           auto SrcTy = clspv::InferType(Src, M.getContext(), &type_cache);
 
